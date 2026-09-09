@@ -475,13 +475,23 @@
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
 		bump('structure', id);
 	}
+	/** Retype a card in place: take it out and put it back at the same index under the
+	 *  new kind. A read hands back a valid `CardInput`, so the fields, the body, `$ext`
+	 *  and `$seed` cross on the spread and only `kind` moves.
+	 *
+	 *  The removal is undone when the insert refuses. `insertCard` is the kind gate —
+	 *  an unknown kind throws there, after the card is already out — so without the
+	 *  restore a rejected retype would delete the card it was asked to retype. */
 	function retypeCardById(id: string, kind: string): void {
 		const i = cardIndexOf(id);
 		if (i < 0) return;
+		const previous = doc.removeCard(i);
+		if (!previous) return;
 		try {
-			doc.setCardKind(i, kind);
+			doc.insertCard({ ...previous, kind }, i);
 			bump('structure', id, i);
 		} catch (e) {
+			doc.insertCard(previous, i);
 			reportError(onError, {
 				code: 'card-op-failed',
 				severity: 'error',
@@ -630,12 +640,12 @@
 		// chrome, so a resolve failure degrades to no ghosts, never a blank form.
 		let resolved: Resolved | undefined;
 		try {
-			resolved = quill.resolve(doc);
+			resolved = quill.reader(doc).resolve();
 		} catch (e) {
 			reportError(onError, {
 				code: 'resolve-failed',
 				severity: 'error',
-				message: `quill.resolve threw; ghosted defaults fall back to none: ${errorMessage(e)}`,
+				message: `reader.resolve threw; ghosted defaults fall back to none: ${errorMessage(e)}`,
 				cause: e
 			});
 		}

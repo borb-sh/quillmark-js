@@ -110,11 +110,18 @@ for (const abs of files) {
 
 const installed = wasmVersion();
 
+// The release core, prerelease tag dropped. A tree developed against an unreleased
+// artifact holds a `0.113.0-dev.<sha>` build of the version the ledger names, and the
+// ledger names releases: the surface it describes is 0.113.0's whether or not that
+// number has shipped. Comparing cores admits that one case and refuses every other —
+// a bump that left the sentence untouched still moves the core.
+const release = (v) => v.split('-')[0];
+
 const pins = [
 	...readFileSync(join(ROOT, LEDGER), 'utf8').matchAll(/`@quillmark\/wasm`\s+(\d+\.\d+\.\d+)/g)
 ].map((m) => m[1]);
 for (const pin of pins)
-	if (pin !== installed)
+	if (pin !== release(installed))
 		errors.push(`${LEDGER}: states @quillmark/wasm ${pin}; ${installed} is installed`);
 if (pins.length === 0)
 	errors.push(`${LEDGER}: names no @quillmark/wasm version — the pin is recorded here or nowhere`);

@@ -1,20 +1,19 @@
 // The PM schema: the codec owns it; decode/encode target it. Nodes mirror the
 // content block kinds (para/heading/code/rule/island) and its container nesting
 // (list_item/quote → lists/blockquote); marks mirror the content formatting set.
-// Each of the three open sets gets an inert carrier so an unrecognized value
-// survives a round-trip: the `unknown` mark, the paragraph's `unknown` attribute,
-// and the `unknown_container` node. `blockSchema` is the full field; `inlineSchema`
-// is the constrained single-textblock form for `richtext(inline)` (one paragraph,
-// no block split, no containers, no islands) and `plaintextSchema` is that one
-// without marks: same decode/lower/position machinery, narrower shape. Anchors are
-// not marks here (decorations).
+// Every content vocabulary is closed, so the schema names each member and nothing
+// else: a value outside one never reaches a read and throws on a write.
+// `blockSchema` is the full field; `inlineSchema` is the constrained
+// single-textblock form for `richtext(inline)` (one paragraph, no block split, no
+// containers, no islands) and `plaintextSchema` is that one without marks: same
+// decode/lower/position machinery, narrower shape. Anchors are not marks here
+// (decorations).
 //
 // `toDOM` and `parseDOM` are one tier, not two halves of a rendering: a copy and a
 // paste inside one body run the whole document through them (CODEC §"Markdown at the
-// edges"), so every attribute written here is read back here. A carrier's payload
-// crosses as JSON under a `data-qm-*` name, which is the form the content's open sets
-// already have. Foreign HTML spells none of those names, so what a paste takes off the
-// web is unchanged; the one rule that widens that door on purpose is the fence's.
+// edges"), so every attribute written here is read back here. Foreign HTML spells
+// none of those names, so what a paste takes off the web is unchanged; the one rule
+// that widens that door on purpose is the fence's.
 import { Schema } from 'prosemirror-model';
 import type { MarkSpec, NodeSpec } from 'prosemirror-model';
 import { islandBlockSpec, islandInlineSpec } from './islands.js';
@@ -50,54 +49,10 @@ export function rendersHref(href: string): boolean {
 	return scheme === null || RENDERED_SCHEMES.has(scheme[1]!.toLowerCase());
 }
 
-// ── The open sets' DOM payload ──────────────────────────────────────────────
-// A carrier's tag is a `data-qm-unknown-*` name and its `attrs` are JSON beside it,
-// under one name across all three: an element carries at most one carrier, a
-// paragraph's tag and the mark's sitting on different elements.
-
-/** The `attrs` half of a carrier, absent where there is none. */
-function packAttrs(attrs: unknown): Record<string, string> {
-	return attrs == null ? {} : { 'data-qm-unknown-attrs': JSON.stringify(attrs) };
-}
-
-/** The `attrs` half back off an element. `null` for anything that is not the JSON
- *  this schema wrote: a hand-built document reaches the same parse a paste does, and a
- *  carrier's payload is the keyed object upstream spells, never a bare scalar. */
-function unpackAttrs(el: HTMLElement): unknown {
-	const raw = el.getAttribute('data-qm-unknown-attrs');
-	if (raw == null) return null;
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed : null;
-	} catch {
-		return null;
-	}
-}
-
-// ── The names a carrier may not wear ────────────────────────────────────────
-// A carrier holds a value this build does not know, so a name the model does know is
-// the one it cannot carry: the projection re-emits it with `attrs` beside it
-// (`encode.ts` §`textblockKind`) and the store refuses `attrs` beside a built-in
-// discriminant, failing every write for the rest of the session. `decode` applies the
-// same guard from the other side, where a `para` line mints no carrier.
-
-/** The line kinds `ContentLineKind` names, which decode maps to a node of their own. */
-const BUILTIN_LINE_KINDS = new Set(['para', 'heading', 'code', 'rule', 'island']);
-
-/** The containers `ContentContainer` names. */
-const BUILTIN_CONTAINERS = new Set(['list_item', 'quote']);
-
-/** A carrier's name, or `null` where it is empty or one the model owns. */
-function carrierName(el: HTMLElement, attr: string, builtin: Set<string>): string | null {
-	const name = el.getAttribute(attr);
-	return name && !builtin.has(name) ? name : null;
-}
-
 // ── Marks (the block and inline schemas share them; plaintext declares none) ─
 const marks: Record<string, MarkSpec> = {
 	// Order matters: it fixes mark-set sort order and parse precedence. `link`
-	// last so it wraps outermost; `unknown` after it, non-exclusive so several
-	// distinct unknown marks coexist on one range.
+	// last so it wraps outermost.
 	strong: { parseDOM: [{ tag: 'strong' }, { tag: 'b' }], toDOM: () => ['strong', 0] },
 	em: { parseDOM: [{ tag: 'em' }, { tag: 'i' }], toDOM: () => ['em', 0] },
 	underline: { parseDOM: [{ tag: 'u' }], toDOM: () => ['u', 0] },
@@ -119,36 +74,8 @@ const marks: Record<string, MarkSpec> = {
 			const href = mark.attrs.href as string;
 			return rendersHref(href) ? ['a', { href }, 0] : ['span', { 'data-qm-href': href }, 0];
 		}
-	},
-	// The open-set escape hatch: an inert mark that renders as a bare span and
-	// re-emits its stored `type`/`attrs` on encode. `excludes: ''` lets marks of
-	// this type with different attrs share a range (they are distinct families).
-	unknown: {
-		attrs: { type: { default: '' }, attrs: { default: null } },
-		excludes: '',
-		parseDOM: [
-			{
-				tag: 'span[data-qm-unknown-mark]',
-				// `false` declines the rule, so the text arrives unmarked rather than
-				// carrying a second spelling of a mark this schema already has.
-				getAttrs: (el) => {
-					const type = carrierName(el, 'data-qm-unknown-mark', BUILTIN_MARKS);
-					return type ? { type, attrs: unpackAttrs(el) } : false;
-				}
-			}
-		],
-		toDOM: (mark) => [
-			'span',
-			{ 'data-qm-unknown-mark': mark.attrs.type as string, ...packAttrs(mark.attrs.attrs) },
-			0
-		]
 	}
 };
-
-/** The mark types the content model names: this schema's own, and `anchor`, which is a
- *  decoration here rather than a mark (§Marks). Read off the record above, so a mark
- *  added there closes the carrier's door on its name in the same edit. */
-const BUILTIN_MARKS = new Set([...Object.keys(marks), 'anchor']);
 
 // ── The fence's language ────────────────────────────────────────────────────
 // The one attribute no keystroke in the visual editor mints: the shorthand fires on
@@ -176,31 +103,19 @@ function fenceLang(pre: HTMLElement): string | null {
 // ── Block nodes ─────────────────────────────────────────────────────────────
 const blockNodes: Record<string, NodeSpec> = {
 	doc: { content: 'block+' },
-	// `unknown` carries a line `kind` this build does not know (`{ kind, attrs }`,
-	// else null). A paragraph is how such a line renders, so the carrier is an
-	// attribute rather than a node type: every paragraph command already reaches it,
-	// and retyping it to a heading or a list drops the attribute: an explicit
-	// conversion, which is the one place the unknown kind should be lost.
 	paragraph: {
 		content: 'inline*',
 		group: 'block',
-		attrs: { unknown: { default: null } },
-		parseDOM: [
-			{
-				tag: 'p',
-				getAttrs: (el) => {
-					const kind = carrierName(el, 'data-qm-unknown-line', BUILTIN_LINE_KINDS);
-					return { unknown: kind ? { kind, attrs: unpackAttrs(el) } : null };
-				}
-			}
-		],
-		toDOM: (node) => {
-			const u = node.attrs.unknown as { kind: string; attrs: unknown } | null;
-			return u ? ['p', { 'data-qm-unknown-line': u.kind, ...packAttrs(u.attrs) }, 0] : ['p', 0];
-		}
+		parseDOM: [{ tag: 'p' }],
+		toDOM: () => ['p', 0]
 	},
 	heading: {
-		content: 'inline*',
+		// No `hard_break`: a heading is a block of one line, so the mint clears a
+		// `continues` on the line after one and answers a heading holding a break with
+		// two headings. Forbidding it here is what keeps the PM document a projection
+		// of some content — a break the schema admitted would draw a shape the store
+		// does not hold, and the leaf would go on drawing it.
+		content: '(text | island_inline)*',
 		group: 'block',
 		defining: true,
 		attrs: { level: { default: 1 } },
@@ -270,35 +185,6 @@ const blockNodes: Record<string, NodeSpec> = {
 		defining: true,
 		parseDOM: [{ tag: 'li' }],
 		toDOM: () => ['li', 0]
-	},
-	// A container this build does not know: a transparent wrapper that renders as a
-	// bare block (its children flow at the enclosing level, which is how upstream
-	// renders it) and re-emits its `container`/`attrs` on encode. `defining` so a
-	// lift out of it is deliberate rather than a backspace away.
-	unknown_container: {
-		content: 'block+',
-		group: 'block',
-		defining: true,
-		attrs: { container: { default: '' }, attrs: { default: null } },
-		parseDOM: [
-			{
-				tag: 'div[data-qm-unknown-container]',
-				// `false` declines the rule, so the div's children flow at the enclosing
-				// level — which is how a transparent container renders anyway.
-				getAttrs: (el) => {
-					const container = carrierName(el, 'data-qm-unknown-container', BUILTIN_CONTAINERS);
-					return container ? { container, attrs: unpackAttrs(el) } : false;
-				}
-			}
-		],
-		toDOM: (node) => [
-			'div',
-			{
-				'data-qm-unknown-container': node.attrs.container as string,
-				...packAttrs(node.attrs.attrs)
-			},
-			0
-		]
 	},
 	island_block: islandBlockSpec
 };

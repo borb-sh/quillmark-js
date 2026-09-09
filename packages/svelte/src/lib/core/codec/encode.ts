@@ -11,7 +11,6 @@
 // auto-rebases the marks already in the field; `mapMarks` answers where that leaves
 // them, so `markOps` are the difference from that answer and stay coverage-precise.
 import type { Mark, Node as PMNode } from 'prosemirror-model';
-import { isAnchorMark } from '@quillmark/wasm';
 import type {
 	ChangeBundle,
 	Delta,
@@ -122,7 +121,7 @@ function scanBlocks(
 
 /** A block's container run shape, `ordinal` and `instance` aside; null where it opens
  * no container. A list's `start` is not in it — the store welds two runs differing only
- * there — and an unknown's `attrs` is, as `containerKey` reads it on the way back. */
+ * there. */
 function runShape(node: PMNode): string | null {
 	switch (node.type.name) {
 		case 'blockquote':
@@ -131,8 +130,6 @@ function runShape(node: PMNode): string | null {
 			return 'list\u0000bullet';
 		case 'ordered_list':
 			return 'list\u0000ordered';
-		case 'unknown_container':
-			return `unknown\u0000${node.attrs.container}\u0000${JSON.stringify(node.attrs.attrs)}`;
 		default:
 			return null;
 	}
@@ -186,12 +183,6 @@ function scanBlock(
 		case 'blockquote':
 			scanBlocks(acc, node, contentStart, [...containers, { container: 'quote', instance }]);
 			break;
-		case 'unknown_container':
-			scanBlocks(acc, node, contentStart, [
-				...containers,
-				{ container: node.attrs.container as string, attrs: node.attrs.attrs, instance }
-			]);
-			break;
 		case 'bullet_list':
 		case 'ordered_list': {
 			const ordered = name === 'ordered_list';
@@ -215,13 +206,11 @@ function scanBlock(
 	}
 }
 
-/** A textblock's line kind: a heading's `level`, or (for a paragraph) `para`, or
- * the unknown kind it carries (schema.ts) re-emitted verbatim. */
+/** A textblock's line kind: a heading's `level`, or `para`. */
 function textblockKind(node: PMNode): ContentLineKind {
 	if (node.type.name === 'heading')
 		return { kind: 'heading', attrs: { level: node.attrs.level as number } };
-	const u = node.attrs.unknown as { kind: string; attrs: unknown } | null;
-	return u ? { kind: u.kind, attrs: u.attrs } : { kind: 'para' };
+	return { kind: 'para' };
 }
 
 /** Open a new content line: emit the boundary `\n` (except the first line) + record. */
@@ -262,12 +251,12 @@ function scanInline(
 			// `clearIncompatible` nor `replaceNewlines` — leaves one. It rides the text
 			// run, where PM and USV advance together.
 			const breaks = text.split('\n').length - 1;
-			for (let i = 0; i < breaks; i++) acc.lines.push({ containers, continues: true, ...kind });
+			for (let i = 0; i < breaks; i++) acc.lines.push(continuation(containers, kind));
 		} else if (child.type.name === 'hard_break') {
-			// A within-block hard break: the content `\n` (a `continues` line).
+			// A within-block hard break: the content `\n`.
 			acc.runs.push({ kind: 'nl', pmStart: pm, pmEnd: pm + 1, usvStart: acc.usvEnd });
 			appendText(acc, '\n');
-			acc.lines.push({ containers, continues: true, ...kind });
+			acc.lines.push(continuation(containers, kind));
 		} else if (child.type.name === 'island_inline') {
 			acc.runs.push({ kind: 'atom', pmStart: pm, usvStart: acc.usvEnd });
 			appendText(acc, ISLAND_SLOT);
@@ -277,7 +266,17 @@ function scanInline(
 	});
 }
 
-/** Append a text node's chars: one position run + a content mark per formatting/unknown mark. */
+/** The line a within-block break opens. `continues` says the break is inside one block,
+ * and only a kind that spans lines can carry it: a heading, island or rule is a block of
+ * one line, so the mint clears the flag on the line after one — at `applyChange` and at
+ * `overwrite` alike. Projecting it anyway would put a shape in the PM doc that the store
+ * answers with two blocks, and the leaf would draw one until something re-hydrated it. */
+function continuation(containers: ContentContainer[], kind: ContentLineKind): ContentLine {
+	const spans = kind.kind === 'para' || kind.kind === 'code';
+	return spans ? { containers, continues: true, ...kind } : { containers, ...kind };
+}
+
+/** Append a text node's chars: one position run + a content mark per formatting mark. */
 function emitText(acc: Acc, s: string, pmStart: number, marks: readonly Mark[]): void {
 	if (!s.length) return;
 	const usvStart = acc.usvEnd;
@@ -409,8 +408,8 @@ function diffLines(oldRt: Content, newRt: Content, delta: Delta | undefined): Li
 	// Force every new line's metadata. Redundant ops are safe no-ops (verified),
 	// so this is correct regardless of how the delta's split/join inheritance left
 	// the intermediate metadata. `continues` is a boundary property of the `\n`
-	// preceding a line: line 0 has no predecessor, never carries it, and the op
-	// rejects it there, so it's set only for lines ≥ 1.
+	// preceding a line: line 0 has no predecessor and never carries it, so it's set
+	// only for lines ≥ 1 rather than sent and cleared by the mint.
 	for (let i = 0; i < newRt.lines.length; i++) {
 		const l = newRt.lines[i];
 		ops.push({ op: 'setContainers', line: i, containers: l.containers });
@@ -422,9 +421,8 @@ function diffLines(oldRt: Content, newRt: Content, delta: Delta | undefined): Li
 
 /** A line minus its `containers` / `continues` envelope: exactly `setKind`'s
  * payload, which the boundary names `ContentLineKind`. Lifting it whole is what
- * keeps this arm-agnostic: `kind` is an open set, so an arm-by-arm switch would
- * have to guess at the unknown arm's payload and would drift on every arm
- * upstream adds. */
+ * keeps this arm-agnostic: an arm-by-arm switch would restate each payload and
+ * drift on every arm upstream adds. */
 function kindPart(l: ContentLine): ContentLineKind {
 	const { containers: _containers, continues: _continues, ...kind } = l;
 	return kind;
@@ -445,8 +443,8 @@ function lineMetaEqual(a: ContentLine[], b: ContentLine[]): boolean {
 }
 
 /** A line kind's comparison key: key-order-insensitive at every depth, because the two
- * sides come from different producers (a WASM read and this scan) and an unknown kind
- * carries a nested `attrs` bag. */
+ * sides come from different producers (a WASM read and this scan) and a heading or a
+ * fence carries a nested `attrs` bag. */
 function kindKey(l: ContentLine): string {
 	return canonicalJson(kindPart(l));
 }
@@ -585,7 +583,7 @@ function diffMarks(oldRt: Content, newRt: Content, moved: ChangeBundle, opts: Lo
 		for (const [id, pos] of newA) {
 			if (!oldA.has(id) || oldA.get(id) !== pos) {
 				if (oldA.has(id)) ops.push({ op: 'removeAnchor', id });
-				ops.push({ op: 'add', start: pos, end: pos, type: 'anchor', attrs: { id } } as MarkOp);
+				ops.push({ op: 'add', start: pos, end: pos, type: 'anchor', attrs: { id } });
 			}
 		}
 		for (const id of oldA.keys()) if (!newA.has(id)) ops.push({ op: 'removeAnchor', id });
@@ -602,7 +600,7 @@ interface FormattingGroup {
 function groupFormatting(marks: ContentMark[]): Map<string, FormattingGroup> {
 	const groups = new Map<string, FormattingGroup>();
 	for (const m of marks) {
-		if (isAnchorMark(m)) continue;
+		if (m.type === 'anchor') continue;
 		const descriptor = descriptorOf(m);
 		const key = markKey(descriptor);
 		let g = groups.get(key);

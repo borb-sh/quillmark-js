@@ -87,7 +87,7 @@ export interface CardModel {
 	 * Field name → its resolved provenance row (`{ value, source }`), parallel to
 	 * `values` (FIELD_PROVENANCE). The channel that feeds chrome (the ghosted
 	 * `default:` and any authored/default/zero affordance), never the control
-	 * value. Empty when `quill.resolve` is unavailable.
+	 * value. Empty when `reader.resolve` is unavailable.
 	 */
 	provenance: Record<string, ResolvedField>;
 	sections: GroupSection[];

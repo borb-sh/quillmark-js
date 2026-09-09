@@ -19,12 +19,16 @@ beforeAll(() => {
 	(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = NoopIO;
 });
 
-/** A report-only session stub: only the geometry verbs the loop calls at build. */
-function mockSession(pageCount: number, supportsCanvas = true): LiveSession {
+/** A report-only session stub: only the geometry verbs the loop calls at build.
+ *  `paints` is expressed the way a session expresses it — `pageSize` refuses the
+ *  page — there being no capability left to report. */
+function mockSession(pageCount: number, paints = true): LiveSession {
 	return {
 		pageCount,
-		supportsCanvas,
-		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
+		pageSize: () => {
+			if (!paints) throw new Error('paint: page index 0 out of range (pageCount=0)');
+			return { widthPt: 612, heightPt: 792 };
+		},
 		paint: () => ({
 			layoutWidth: 612,
 			layoutHeight: 792,
@@ -181,10 +185,10 @@ describe('a recompile re-locates the followed caret', () => {
 	});
 });
 
-// `supportsCanvas` must gate the view (runtime.d.ts says re-check the
-// getter after `open`), and the gate is re-read per compile so a non-paintable
-// compile that later becomes paintable recovers; the zero-page escape, generalized.
-describe('preview controller supportsCanvas gating', () => {
+// A compile that cannot paint must gate the view, and the gate is re-read per
+// compile so a non-paintable compile that later becomes paintable recovers; the
+// zero-page escape, generalized.
+describe('preview controller paintability gating', () => {
 	let container: HTMLDivElement;
 	beforeEach(() => {
 		container = document.createElement('div');
@@ -200,14 +204,15 @@ describe('preview controller supportsCanvas gating', () => {
 		preview.destroy();
 	});
 
-	it('a non-canvas compile that becomes paintable on a later apply escapes the message', () => {
+	it('a non-paintable compile that becomes paintable on a later apply escapes the message', () => {
 		let paintable = false;
-		// A live getter so `render` re-reads the capability per compile (a real
-		// session's getter reflects the last-good compile after `apply`).
+		// Asked per compile, so a real session's answer after `apply` is the one read
+		// (this stub refuses until the flag flips).
 		const session = {
 			...mockSession(2),
-			get supportsCanvas() {
-				return paintable;
+			pageSize: () => {
+				if (!paintable) throw new Error('paint: page index 0 out of range (pageCount=0)');
+				return { widthPt: 612, heightPt: 792 };
 			}
 		} as unknown as LiveSession;
 

@@ -25,7 +25,6 @@ import {
 	pmMarkFromContent
 } from '$lib/core/codec/marks.js';
 import type { Content, ContentMark, TableProps } from '@quillmark/wasm';
-import { isAnchorMark, isLinkMark } from '@quillmark/wasm';
 import { freshDoc, normalize, contentEqual, md, textblocks } from './_util.js';
 
 /** The transaction one key press produces, through the leaf's chain falling through
@@ -54,7 +53,7 @@ interface AnchorOpts {
 
 /** The stored position of the identity anchor `id`. */
 function anchorAt(stored: Content, id: string): number | undefined {
-	return stored.marks.find((mark) => isAnchorMark(mark) && mark.attrs.id === id)?.start;
+	return stored.marks.find((mark) => mark.type === 'anchor' && mark.attrs.id === id)?.start;
 }
 
 /** Install `rt`, build a PM tr, lower+apply, and assert the store matches PM. */
@@ -182,110 +181,39 @@ describe('formatting marks round-trip', () => {
 		const { stored } = lowerApply(md('go to site'), (s) =>
 			s.tr.addMark(6, 10, blockSchema.marks.link.create({ href: 'http://x' }))
 		);
-		const link = stored.marks.find(isLinkMark);
+		const link = stored.marks.find((m) => m.type === 'link');
 		expect(link?.attrs.url).toBe('http://x');
 	});
 });
 
-describe('unknown mark round-trip (verbatim)', () => {
-	const unknownRt: Content = {
-		text: 'abcdef ghi',
-		lines: [{ containers: [], kind: 'para' }],
-		marks: [{ start: 0, end: 6, type: 'sub', attrs: { x: 1 } } as never],
-		islands: []
+// The mark diff groups a WASM read against a PM projection with one key. The two
+// descriptors are produced by different functions, so a mark that keys differently
+// on the two sides lands in neither group: `lower` then emits a full-range `remove`
+// and a full-range `add` for a mark nothing touched, on every keystroke.
+describe('both descriptor producers key one mark alike', () => {
+	const mark = (m: Record<string, unknown>) => ({ start: 0, end: 3, ...m }) as ContentMark;
+	const cases: Record<string, ContentMark> = {
+		strong: mark({ type: 'strong' }),
+		emph: mark({ type: 'emph' }),
+		code: mark({ type: 'code' }),
+		underline: mark({ type: 'underline' }),
+		strike: mark({ type: 'strike' }),
+		link: mark({ type: 'link', attrs: { url: 'http://x' } })
 	};
-	it('survives decode → pmToContent verbatim', () => {
-		const back = pmToContent(decode(unknownRt, blockSchema));
-		const u = back.marks.find((m) => m.type === 'sub') as { attrs: unknown } | undefined;
-		expect(u).toBeTruthy();
-		expect(u!.attrs).toEqual({ x: 1 });
-	});
-	it('survives decode → lower(edit) → apply → decode', () => {
-		const { stored } = lowerApply(unknownRt, (s) => s.tr.insertText('Z', 8));
-		const u = stored.marks.find((m) => m.type === 'sub') as { attrs: unknown } | undefined;
-		expect(u).toBeTruthy();
-		expect(u!.attrs).toEqual({ x: 1 });
-	});
 
-	// The mark diff groups a WASM read against a PM projection with one key. The two
-	// descriptors are produced by different functions, so a mark that keys differently
-	// on the two sides lands in neither group: `lower` then emits a full-range `remove`
-	// and a full-range `add` for a mark nothing touched, on every keystroke.
-	describe('both descriptor producers key one mark alike', () => {
-		const mark = (m: Record<string, unknown>) => ({ start: 0, end: 3, ...m }) as never;
-		const cases: Record<string, ContentMark> = {
-			strong: mark({ type: 'strong' }),
-			emph: mark({ type: 'emph' }),
-			code: mark({ type: 'code' }),
-			link: mark({ type: 'link', attrs: { url: 'http://x' } }),
-			'unknown with attrs': mark({ type: 'sub', attrs: { x: 1 } }),
-			'unknown with null attrs': mark({ type: 'sub', attrs: null }),
-			'unknown with no attrs key': mark({ type: 'sub' })
-		};
-
-		for (const [name, m] of Object.entries(cases)) {
-			it(name, () => {
-				const pm = pmMarkFromContent(blockSchema, m);
-				expect(pm, 'every case here projects to a PM mark').not.toBeNull();
-				expect(markKey(contentDescriptorFromPM(pm!))).toBe(markKey(descriptorOf(m)));
-			});
-		}
-
-		it('an attrs bag keys by value, not by key order', () => {
-			expect(markKey(descriptorOf(mark({ type: 'sub', attrs: { a: 1, b: { c: 2, d: 3 } } })))).toBe(
-				markKey(descriptorOf(mark({ type: 'sub', attrs: { b: { d: 3, c: 2 }, a: 1 } })))
-			);
+	for (const [name, m] of Object.entries(cases)) {
+		it(name, () => {
+			const pm = pmMarkFromContent(blockSchema, m);
+			expect(pm, 'every case here projects to a PM mark').not.toBeNull();
+			expect(markKey(contentDescriptorFromPM(pm!))).toBe(markKey(descriptorOf(m)));
 		});
+	}
 
-		it('different attrs stay different families', () => {
-			expect(markKey(descriptorOf(mark({ type: 'sub', attrs: { x: 1 } })))).not.toBe(
-				markKey(descriptorOf(mark({ type: 'sub', attrs: { x: 2 } })))
-			);
-		});
-	});
-});
-
-describe('unknown line kind and container round-trip (verbatim)', () => {
-	// The open block vocabulary, from the codec's side: a `kind` and a
-	// `container` this build does not know. Both render as their nearest safe
-	// neighbor (a paragraph; nothing) and both must come back out unchanged; an
-	// edit anywhere in the field restates every line's metadata, so a carrier that
-	// only survives decode would still lose them on the first keystroke.
-	const openRt: Content = {
-		text: 'a callout line\ninside an aside',
-		lines: [
-			{ containers: [], kind: 'callout', attrs: { tone: 'warn' } } as never,
-			{ containers: [{ container: 'aside', attrs: { side: 'left' } } as never], kind: 'para' }
-		],
-		marks: [],
-		islands: []
-	};
-	/** The line at `i`, minus the envelope: what a `setKind` restates. */
-	const kindOf = (rt: Content, i: number) => {
-		const { containers: _c, continues: _k, ...kind } = rt.lines[i];
-		return kind;
-	};
-
-	it('decodes to a paragraph carrying the kind, wrapped in an unknown container', () => {
-		const doc = decode(openRt, blockSchema);
-		expect(doc.child(0).type.name).toBe('paragraph');
-		expect(doc.child(0).attrs.unknown).toEqual({ kind: 'callout', attrs: { tone: 'warn' } });
-		expect(doc.child(1).type.name).toBe('unknown_container');
-		expect(doc.child(1).attrs).toEqual({ container: 'aside', attrs: { side: 'left' } });
-	});
-	it('survives decode → pmToContent verbatim', () => {
-		const back = pmToContent(decode(openRt, blockSchema));
-		expect(kindOf(back, 0)).toEqual({ kind: 'callout', attrs: { tone: 'warn' } });
-		expect(back.lines[1].containers).toEqual([
-			{ container: 'aside', attrs: { side: 'left' }, instance: 0 }
-		]);
-	});
-	it('survives decode → lower(edit) → apply → decode', () => {
-		const { stored } = lowerApply(openRt, (s) => s.tr.insertText('Z', 2));
-		expect(kindOf(stored, 0)).toEqual({ kind: 'callout', attrs: { tone: 'warn' } });
-		expect(stored.lines[1].containers).toEqual([
-			{ container: 'aside', attrs: { side: 'left' }, instance: 0 }
-		]);
+	// `link` is the one arm carrying a payload, so it is where a key can be forged.
+	it('different attrs stay different families', () => {
+		expect(markKey(descriptorOf(mark({ type: 'link', attrs: { url: 'http://x' } })))).not.toBe(
+			markKey(descriptorOf(mark({ type: 'link', attrs: { url: 'http://y' } })))
+		);
 	});
 });
 
@@ -307,7 +235,7 @@ describe('identity anchor round-trip (op-based, survives edits)', () => {
 			newAnchors: [{ id: 'a1', pos: 8 }] // rebased +2
 		});
 		doc.applyChange({}, bundle);
-		const anchor = doc.main.body.marks.find(isAnchorMark);
+		const anchor = doc.main.body.marks.find((m) => m.type === 'anchor');
 		expect(anchor?.attrs.id).toBe('a1');
 		expect(anchor?.start).toBe(8);
 	});
@@ -335,7 +263,7 @@ describe('identity anchor round-trip (op-based, survives edits)', () => {
 		const body = doc.main.body;
 		expect(body.lines).toHaveLength(2);
 		expect(!!body.lines[1].continues).toBe(true);
-		const anchor = body.marks.find(isAnchorMark);
+		const anchor = body.marks.find((m) => m.type === 'anchor');
 		expect(anchor?.attrs.id).toBe('c1');
 	});
 

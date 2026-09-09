@@ -18,7 +18,7 @@ const quill = core.Quill.fromTree(loadFixtureTree());
 
 /** The `editor` namespace as the Document holds it. */
 function editorExt(doc: Document, addr = MAIN_CARD_ADDR): Record<string, unknown> {
-	return (doc.getExtNamespace(addr, 'editor') ?? {}) as Record<string, unknown>;
+	return ((doc.getExt(addr)?.editor ?? {}) as Record<string, unknown>) ?? {};
 }
 /** Render one tip and read back its HTML. */
 function html(markdown: string): string {
@@ -103,7 +103,7 @@ describe('patchEditorExt', () => {
 
 	it('drops a key patched to undefined, keeping the rest — on main and on a card', () => {
 		// The dismissal write (`VisualEditor.dismissTips`), and the hazard
-		// `removeExtNamespace` would cause: `tips` and `title` are sibling keys of one
+		// a namespace-replacing write would cause: `tips` and `title` are sibling keys of one
 		// namespace, so clearing the channel by removing the namespace destroys the
 		// rename. Both addresses, since rename writes cards and tips write main.
 		const doc = quill.seedDocument();
@@ -123,7 +123,7 @@ describe('patchEditorExt', () => {
 	it('preserves sibling namespaces', () => {
 		// Another consumer's `$ext` slot is not collateral.
 		const doc = quill.seedDocument();
-		doc.storeExtNamespace(MAIN_CARD_ADDR, 'other', { keep: 1 });
+		doc.storeExt(MAIN_CARD_ADDR, { ...doc.getExt(MAIN_CARD_ADDR), other: { keep: 1 } });
 		patchEditorExt(doc, MAIN_CARD_ADDR, { tips: ['x'] });
 		patchEditorExt(doc, MAIN_CARD_ADDR, { tips: undefined });
 		expect(doc.main.ext).toEqual({ other: { keep: 1 } });

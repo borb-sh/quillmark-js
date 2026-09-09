@@ -15,7 +15,6 @@
 // the codec already runs (one paragraph, no containers, no islands) is exactly its
 // shape, so a cell decodes and projects through the same machinery a
 // `richtext(inline)` field does.
-import { isAnchorMark } from '@quillmark/wasm';
 import type { Content, TableCell, TableProps } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { core } from '../lifecycle.js';
@@ -269,13 +268,13 @@ export function cellContent(cell: TableCell): Content {
 export function cellFromDoc(doc: PMNode, prior: TableCell): TableCell {
 	const projected = pmToContent(doc);
 	const text = projected.text;
-	const anchors = prior.marks.filter(isAnchorMark);
+	const anchors = prior.marks.filter((m) => m.type === 'anchor');
 	if (!anchors.length) return { text, marks: projected.marks };
 	const before = cellContent(prior);
 	const delta = contentEdit(before, cellContent({ text, marks: [] })).delta;
 	const rebased = core()
 		.mapMarks(before, delta ? { delta } : {})
-		.filter(isAnchorMark);
+		.filter((m) => m.type === 'anchor');
 	return {
 		text,
 		marks: [...projected.marks, ...rebased].sort((a, b) => a.start - b.start || a.end - b.end)

@@ -27,7 +27,8 @@ import {
 	type Command
 } from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
-import type { Document, DocumentReader, Content, Addr, Quill } from '@quillmark/wasm';
+import type { Document, DocumentReader, Content, Addr, PathStep, Quill } from '@quillmark/wasm';
+import { core } from '../lifecycle.js';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
 import { decode } from './decode.js';
@@ -226,6 +227,74 @@ function readLeaf(reader: DocumentReader, addr: Addr): Content {
  * leaf (or an array's prose element) seeds from. */
 export function emptyContent(): Content {
 	return { text: '', lines: [{ containers: [], kind: 'para' }], marks: [], islands: [] };
+}
+
+/** Whether a stored value is a `Content` object: the four keys a decode indexes. */
+function isContent(v: unknown): v is Content {
+	if (typeof v !== 'object' || v === null) return false;
+	const c = v as Partial<Content>;
+	return (
+		typeof c.text === 'string' &&
+		Array.isArray(c.lines) &&
+		Array.isArray(c.marks) &&
+		Array.isArray(c.islands)
+	);
+}
+
+/** A `Content` holding `text` literally: the `plaintext` codec, which is the identity
+ *  on the text and mints one `para` line per `\n`. No boundary verb applies it — the
+ *  values form answers in it but answers in text — so it is spelled here. */
+function literalContent(text: string): Content {
+	return {
+		text,
+		lines: text.split('\n').map(() => ({ containers: [], kind: 'para' as const })),
+		marks: [],
+		islands: []
+	};
+}
+
+/**
+ * The `Content` at `path` inside the field `addr` names, or `undefined` where the
+ * path addresses nothing or reaches a leaf that is not content: an array's prose
+ * element, an object's content property, a variant's cell.
+ *
+ * The walk is the client's, and so is the codec. An `Addr` names a field and never a
+ * value inside one, so no boundary verb reads a nested leaf: `getStored` answers for
+ * the whole field, and `reader.get` answers in the values form, which is each leaf's
+ * codec text — an island's id and an anchor have no markdown projection to be read
+ * back out of, so the stored read is the one that can drive an editor and the text is
+ * the fallback.
+ *
+ * `plaintext` says which codec a leaf resting as a *string* decodes at: the declared
+ * type is the only thing that says whether one is markdown or literal text, and the
+ * caller holds it. A leaf already at content rest decodes at neither.
+ *
+ * `getStored` echoes the stored bytes, which omit a container's zero `instance`
+ * where the seam form spells it, so the walk restores it: `instance` is what tells
+ * two adjacent same-shape containers apart (`decode.ts` §`containerKey`), and a
+ * run boundary read off an absence would move on the first edit.
+ */
+export function storedContentAt(
+	doc: Document,
+	addr: Addr,
+	path: PathStep[],
+	plaintext = false
+): Content | undefined {
+	let node: unknown = doc.getStored(addr);
+	for (const step of path) {
+		if (typeof node !== 'object' || node === null) return undefined;
+		node = (node as Record<string | number, unknown>)[step];
+	}
+	if (typeof node === 'string')
+		return plaintext ? literalContent(node) : core().importMarkdown(node);
+	if (!isContent(node)) return undefined;
+	return {
+		...node,
+		lines: node.lines.map((line) => ({
+			...line,
+			containers: line.containers.map((c) => ({ ...c, instance: c.instance ?? 0 }))
+		}))
+	};
 }
 
 /** Whether ops may commit here: the stored value is a `Content` object, so

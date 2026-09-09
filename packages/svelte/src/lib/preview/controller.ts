@@ -98,8 +98,7 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 	// slots and never calls the `paint`/`pageSize` verbs the boundary refuses
 	// there. A paint that unexpectedly throws is caught per-slot and surfaced
 	// through the shared message rather than aborting the observer callback
-	// mid-sweep (runtime.d.ts: even a `supportsCanvas` compile can hit a paint
-	// the boundary refuses; brittle to leave uncaught).
+	// mid-sweep.
 	const paintLoop: PaintLoop = createPaintLoop(session, container, margin, (page, err) => {
 		reportError(opts.onError, {
 			code: 'paint-failed',
@@ -128,12 +127,25 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		bridge = undefined;
 	}
 
-	// Called at construction and after every `apply`, so `supportsCanvas` is re-read
-	// per compile (runtime.d.ts: re-check after `open`) and a 0-page or non-canvas
-	// compile that later gains paintable pages recovers; the check spans the paint
-	// capability generally, not just the page count.
+	/** Whether page 0 paints. There is no capability left to probe — a session paints
+	 *  by construction, and `pageSize` refuses only a page the compile does not have —
+	 *  so this asks the compile in hand rather than the backend, and the throw is what
+	 *  it answers with. Kept over a bare `pageCount > 0` because the refusal is the
+	 *  whole contract now: a compile that counts pages it cannot size states so here
+	 *  rather than at the first slot's paint. */
+	function paints(): boolean {
+		try {
+			session.pageSize(0);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	// Called at construction and after every `apply`, so the answer is re-read per
+	// compile and a 0-page compile that later gains paintable pages recovers.
 	function render(pageCount: number, dirtyPages: readonly number[]): void {
-		if (!session.supportsCanvas || pageCount === 0) {
+		if (pageCount === 0 || !paints()) {
 			// A 0-page compile is a recoverable empty; pages the boundary cannot
 			// raster are a genuine unsupported.
 			paintLoop.refresh([], 0);

@@ -772,14 +772,22 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('a non-table island keeps the literal placeholder', () => {
+	it('an island whose props do not read keeps the literal placeholder', () => {
 		const doc = quill().seedDocument();
 		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'chart', props: { any: 1 }, loss: 'unrepresentable' };
+		// The island vocabulary is closed and `table` is the only block member, so an
+		// island with nothing to draw is one whose `props` do not read as a rectangle —
+		// which a paste can carry, `props` crossing the DOM as opaque JSON.
+		rt.islands[0] = {
+			id: 'isl-0',
+			type: 'table',
+			props: { any: 1 } as unknown as TableProps,
+			loss: 'unrepresentable'
+		};
 		doc.overwrite({}, rt);
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		expect(field.el.querySelector('table')).toBeNull();
-		expect(field.el.textContent).toContain('[chart]');
+		expect(field.el.textContent).toContain('[table]');
 		field.destroy();
 	});
 });
@@ -1183,7 +1191,15 @@ describe('a pointer press on the island resolves to a caret', () => {
 	it('an island with no interior keeps the click: the rule, not an exception', () => {
 		const doc = quill().seedDocument();
 		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'chart', props: { any: 1 }, loss: 'unrepresentable' };
+		// The island vocabulary is closed and `table` is the only block member, so an
+		// island with nothing to draw is one whose `props` do not read as a rectangle —
+		// which a paste can carry, `props` crossing the DOM as opaque JSON.
+		rt.islands[0] = {
+			id: 'isl-0',
+			type: 'table',
+			props: { any: 1 } as unknown as TableProps,
+			loss: 'unrepresentable'
+		};
 		doc.overwrite({}, rt);
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		// Dispatched at the island rather than through it: PM's own mousedown wants a

@@ -80,7 +80,7 @@
 		 * only for a content-typed leaf: on any other the read is not content and
 		 * throws. `undefined` for a leaf the stored value does not reach — a slot this
 		 * control has spliced in and whose commit has yet to land, or was refused. */
-		contentAt: (path: PathStep[]) => Content | undefined;
+		contentAt: (path: PathStep[], plaintext?: boolean) => Content | undefined;
 		onCommit: (arr: unknown[]) => void;
 	}
 	let {
@@ -411,7 +411,7 @@
 							properties={items?.properties}
 							label={label != null ? `${label} ${k + 1}` : undefined}
 							idBase={idBase != null ? `${idBase}-e-${id}` : undefined}
-							contentAt={(path) => contentAt([k, ...path])}
+							contentAt={(path, plaintext) => contentAt([k, ...path], plaintext)}
 							onCommit={(obj) => commitElement(k, obj)}
 						/>
 					{/if}
@@ -421,7 +421,7 @@
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
-							content={() => contentAt([k]) ?? emptyContent()}
+							content={() => contentAt([k], items?.type === 'plaintext') ?? emptyContent()}
 							plaintext={items?.type === 'plaintext'}
 							label={label != null ? `${label} ${k + 1}` : undefined}
 							onChange={(rt) => commitElement(k, rt)}

@@ -70,22 +70,6 @@ describe('a copy and a paste carry the whole node', () => {
 				])
 			)
 		],
-		[
-			'a line kind this build does not know',
-			doc(S.nodes.paragraph.create({ unknown: { kind: 'footnote', attrs: { n: 1 } } }, S.text('a')))
-		],
-		[
-			'a container this build does not know',
-			doc(
-				S.nodes.unknown_container.create({ container: 'aside', attrs: { role: 'note' } }, [
-					para(S.text('a'))
-				])
-			)
-		],
-		[
-			'a mark this build does not know',
-			doc(para(S.text('a', [S.marks.unknown.create({ type: 'kbd', attrs: { k: 1 } })])))
-		],
 		['a table island', doc(table(TABLE))],
 		[
 			'an image island mid-paragraph',
@@ -170,53 +154,24 @@ describe('what a paste from outside the editor states', () => {
 	});
 });
 
-// What a carrier may not carry, and what a leaf a rule swallows takes with it. A paste
+// What a paste may not carry, and what a leaf a rule swallows takes with it. A paste
 // is the one door into the schema that no decode stands behind, so a value that reaches
 // a node here reaches the store without ever having been a `Content`.
 describe('what the parse rules refuse', () => {
-	// `textblockKind` re-emits a carrier's name with `attrs` beside it (`encode.ts`) and
-	// the store refuses `attrs` beside a built-in discriminant — a throw on every commit
-	// for the rest of the session, from a paragraph that looks ordinary on screen.
-	it.each(['para', 'heading', 'code', 'rule', 'island', ''])(
-		'a line carrier naming the built-in kind %s carries nothing',
-		(kind) => {
-			const back = parse(`<p data-qm-unknown-line="${kind}">x</p>`);
-			expect(back.child(0).attrs.unknown).toBe(null);
-			expect(pmToContent(back).lines[0]).toEqual({ containers: [], kind: 'para' });
-		}
-	);
-
-	it('a kind this build does not know still rides in', () => {
-		const back = parse(
-			'<p data-qm-unknown-line="footnote" data-qm-unknown-attrs=\'{"n":1}\'>x</p>'
-		);
-		expect(back.child(0).attrs.unknown).toEqual({ kind: 'footnote', attrs: { n: 1 } });
-	});
-
-	it.each(['quote', 'list_item'])(
-		'a container carrier naming the built-in %s declines, and its blocks stand',
-		(container) => {
-			expect(parse(`<div data-qm-unknown-container="${container}"><p>a</p></div>`).toString()).toBe(
-				'doc(paragraph("a"))'
-			);
-		}
-	);
-
-	it.each(['strong', 'link', 'code', 'anchor'])(
-		'a mark carrier naming the built-in %s declines, and the text stands unmarked',
-		(type) => {
-			const back = parse(`<p><span data-qm-unknown-mark="${type}">a</span></p>`);
-			expect(back.toString()).toBe('doc(paragraph("a"))');
-			expect(pmToContent(back).marks).toEqual([]);
-		}
-	);
-
-	// A carrier's payload is the keyed object upstream spells; a bare scalar is not one.
-	it('a carrier payload that is not an object reads as none', () => {
-		const back = parse(
-			'<div data-qm-unknown-container="aside" data-qm-unknown-attrs="42"><p>a</p></div>'
-		);
-		expect(back.child(0).attrs.attrs).toBe(null);
+	// The content vocabularies are closed, so the three carriers that round-tripped an
+	// unrecognized line kind, container and mark are gone with the open sets they
+	// served. A body copied out of a build that wrote them pastes as the text it shows:
+	// the names are inert, and no rule mints a node the store would refuse.
+	it.each([
+		['a line kind', '<p data-qm-unknown-line="footnote" data-qm-unknown-attrs=\'{"n":1}\'>x</p>'],
+		['a container', '<div data-qm-unknown-container="aside"><p>x</p></div>'],
+		['a mark', '<p><span data-qm-unknown-mark="kbd">x</span></p>']
+	])('%s carrier from an older build carries nothing', (_name, html) => {
+		const back = parse(html);
+		expect(back.toString()).toBe('doc(paragraph("x"))');
+		const content = pmToContent(back);
+		expect(content.lines[0]).toEqual({ containers: [], kind: 'para' });
+		expect(content.marks).toEqual([]);
 	});
 
 	// An island node is a leaf, so a rule claiming an element takes its whole subtree.
@@ -225,6 +180,10 @@ describe('what the parse rules refuse', () => {
 		[
 			"this schema's name without the id it writes",
 			'<div data-qm-island="widget"><p>keep me</p></div>'
+		],
+		[
+			'a type outside the closed island vocabulary, id and all',
+			'<div data-qm-island="widget" data-qm-island-id="isl-0"><p>keep me</p></div>'
 		]
 	])('%s mints no island, and the blocks under it stand', (_name, html) => {
 		expect(parse(html).toString()).toBe('doc(paragraph("keep me"))');

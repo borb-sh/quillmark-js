@@ -23,6 +23,7 @@
 		PathStep,
 		ResolvedField
 	} from '@quillmark/wasm';
+	import { storedContentAt } from '../core/codec/index.js';
 	import type { EditorErrorHandler } from '../core/errors.js';
 	import type { LeafRegistry } from './leaves.js';
 	import type { FieldModel, FieldSpan } from './structure.js';
@@ -126,15 +127,15 @@
 
 	/** The boundary's nested content read with this field's address already bound: an
 	 * array's elements, an object's properties, a variant's cells, and a subform's cells
-	 * under an open element. One door rather than one per depth, since `getContentAt`
-	 * takes the whole path and the walk down is each container prefixing its own step.
+	 * under an open element. One door rather than one per depth, the walk down being
+	 * each container prefixing its own step.
 	 *
-	 * The reader is held, as the codec's is (`field.ts`): a `{quill, doc}` pair reads
-	 * live, so every call through it sees the commit before it, and an array of prose
-	 * elements is one handle across the boundary rather than one per element. */
-	const reader = $derived(quill.reader(doc));
-	function contentAt(path: PathStep[]): Content | undefined {
-		return reader.getContentAt(addr, path);
+	 * The read is `storedContentAt` (`core/codec/field.ts`), which walks the field's
+	 * whole stored value: an `Addr` names a field and never a value inside one, so no
+	 * boundary verb takes this path. It reads `doc` live, so every call sees the commit
+	 * before it. */
+	function contentAt(path: PathStep[], plaintext = false): Content | undefined {
+		return storedContentAt(doc, addr, path, plaintext);
 	}
 
 	// ── Focus: one answer, two callers (`leaves.ts`) ─────────────────────────────

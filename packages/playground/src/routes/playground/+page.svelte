@@ -285,7 +285,7 @@
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
 			// does not replace the namespace.
 			if (params.has('foreign')) {
-				doc.insertCard(Document.makeCard('legacy_kind', {}, 'Trapped legacy body.'));
+				doc.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
 			}
 			if (params.has('tips')) {
 				visual.patchEditorExt(doc, MAIN_CARD_ADDR, {

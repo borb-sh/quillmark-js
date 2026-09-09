@@ -38,7 +38,7 @@ export type EditorErrorCode =
 	| 'card-op-failed'
 	/** `quill.validate` threw: this derive contributes no validation diagnostics. */
 	| 'validate-failed'
-	/** `quill.resolve` threw: ghosted `default:`s fall back to none for this derive. */
+	/** `reader.resolve` threw: ghosted `default:`s fall back to none for this derive. */
 	| 'resolve-failed'
 	/** A page paint the backend refused. The preview shows its error message state. */
 	| 'paint-failed'

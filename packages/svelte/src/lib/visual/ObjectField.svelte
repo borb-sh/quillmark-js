@@ -60,7 +60,7 @@
 		 * stands between this subform and the field (`reader.getContentAt`). Asked only
 		 * for a content-typed property: on any other the read is not content and throws.
 		 * `undefined` for a property the stored value does not reach. */
-		contentAt: (path: PathStep[]) => Content | undefined;
+		contentAt: (path: PathStep[], plaintext?: boolean) => Content | undefined;
 		onCommit: (obj: Record<string, unknown>) => void;
 	}
 	let { value, properties, labelledBy, describedBy, idBase, label, contentAt, onCommit }: Props =
@@ -226,7 +226,7 @@
 				     leaves the leaf mounted and the caret in it. -->
 				<ProseValue
 					bind:this={proseEls[key]}
-					content={() => contentAt([key]) ?? emptyContent()}
+					content={() => contentAt([key], sub.type === 'plaintext') ?? emptyContent()}
 					plaintext={sub.type === 'plaintext'}
 					label={named}
 					labelledBy={ids?.label}

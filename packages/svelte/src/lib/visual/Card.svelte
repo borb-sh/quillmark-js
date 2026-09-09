@@ -359,9 +359,9 @@
 {/snippet}
 
 <!-- A card whose `kind` has no schema stays visible and removable, its fields, body and
- `$ext` intact in the Document, so it is never a data trap. `setCardKind` swaps the kind
- and leaves payload and body untouched, so retyping drops no field; with no kinds to
- offer, delete is the only exit. -->
+ `$ext` intact in the Document, so it is never a data trap. A retype swaps the kind and
+ leaves payload and body untouched, so retyping drops no field; with no kinds to offer,
+ delete is the only exit. -->
 {#snippet recoveryShell()}
 	<header class="qm-card-header">
 		<span class="qm-card-title-static">{humanize(card.kind)}</span>

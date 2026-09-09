@@ -17,7 +17,13 @@ export { rangeAnchor } from './anchor.js';
 export type { RangeAnchor } from './anchor.js';
 
 // The prose leaf.
-export { createField, emptyContent, proseAttributes, proseLeafPlugins } from './field.js';
+export {
+	createField,
+	emptyContent,
+	proseAttributes,
+	proseLeafPlugins,
+	storedContentAt
+} from './field.js';
 export type { CreateFieldOpts, FieldController, LeafViews } from './field.js';
 
 // The table island's chrome vocabulary: the visual tier's `strings` set extends it,

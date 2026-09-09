@@ -27,7 +27,7 @@ Every edit lowers. `overwrite(addr, rt)` is left with two cases, neither a shape
 
 ## Decode: content → PM
 
-Fold the flat lines into the tree: group consecutive lines by common `containers` prefix (a shared `[ListItem]` path is one item's paragraphs; `[ListItem, Quote]` a quote nested in it), and join `continues` runs into one block (a code fence's lines → one `code_block`; a paragraph's hard breaks → one paragraph with `hard_break` nodes). The line `kind` selects the block node: `para` → paragraph, `heading{level}`, `code{lang}`, `rule` → horizontal_rule, `island` → a block island node, and anything else → a paragraph carrying the unknown kind (§Open sets).
+Fold the flat lines into the tree: group consecutive lines by common `containers` prefix (a shared `[ListItem]` path is one item's paragraphs; `[ListItem, Quote]` a quote nested in it), and join `continues` runs into one block (a code fence's lines → one `code_block`; a paragraph's hard breaks → one paragraph with `hard_break` nodes). The line `kind` selects the block node, and the set is closed (§Vocabularies): `para` → paragraph, `heading{level}`, `code{lang}`, `rule` → horizontal_rule, `island` → a block island node.
 
 **A continuation's metadata is its head's.** The fold takes `kind`, `containers` and `lang` off the line that opens a block and reads nothing off a continuation, which is the reading quillmark's own Markdown export and Typst lowering take of the same lines (`traverse::segment`). A continuation disagreeing with its head is therefore not a second reading of the block but a value nothing renders, and settling it is the store's rather than the fold's: the container half it refuses outright (`ContinuesAcrossContainers`), and the projection restates the head's kind on the next commit.
 
@@ -67,7 +67,6 @@ The content mark set is two algebra classes, and they route to two different PM 
 
 - **formatting** (`strong` / `emph` / `underline` / `strike` / `code` / `link`) is a property of a range. ↔ PM marks. A round-trip through PM yields the union ranges, which is what content normalization produces anyway, so formatting is stable.
 - **identity** (`anchor{id}`: comment threads, stable references; zero-width capable, no glyph) is a handle, not a property. It has no home as a PM mark (a PM mark needs a text node and carries no zero-width span). ↔ **PM decorations** (or plugin-held positions) keyed by id, carried across edits by `tr.mapping` and lowered to `anchor` mark ops. This split is what dissolves the "Peritext overlap vs nested marks" tension: overlap only bites where identity and formatting coexist, and they never share a mechanism.
-- **unknown** (`{type, attrs}`) is neither: it is one of the four open sets, and routes to its inert carrier (§Open sets).
 
 **A code line's text carries no marks.** `code_block` declares `marks: ''` (`schema.ts`), so decode builds its text node bare and the projection hands `emitText` an empty set. A formatting mark over code text has no reader anywhere — the fence and the Typst `#raw` emit the segment verbatim — so one that reaches a field survives the read and is gone on the first `markOps` diff; `importMarkdown` mints none and no gesture does. What reaches a code line is identity: an anchor is a decoration, and a comment thread on a fence holds.
 
@@ -77,7 +76,7 @@ The content mark set is two algebra classes, and they route to two different PM 
 
 A table or figure is one `U+FFFC` slot plus one `Island {id, type, props, loss}`. Decode maps it to a PM leaf node (block or inline by the slot's line); encode writes the slot char and the entry with its `id` preserved (stable identity, like an anchor). The **whole entry rides the node**, `loss` included: `applyChange` stores the class an island op hands it and re-derives nothing, so an edit that did not carry the class back would promote a degraded table to lossless on its first cell edit.
 
-Known types carry a typed props shape pinned upstream: `ContentIsland.props` is `TableProps` for `table` and `ImageProps` for `image`; an island of any other type passes opaque (§Open sets).
+The island vocabulary is closed and its props are typed with it: `ContentIsland.props` is `TableProps` for `table` and `ImageProps` for `image` (§Vocabularies). A node's attrs reach a reader off the DOM as well as out of a decode, so the discriminant is not on its own proof the payload is well-formed.
 
 An island edit lowers through `islandOps` (§Encode), and the entry's **value semantics** draw one boundary. A minted island id is this tier's to produce: the positional `isl-{n}` sequence continued past the highest the field holds, never a UUID or a clock reading, because the id is part of the document's canonical bytes (quillmark `DOCUMENT_STORAGE.md` §Island-id determinism). It is minted against the PM projection in hand, since an id minted against a stale content could collide with one the same transaction places.
 
@@ -133,24 +132,17 @@ The codec reports nothing to the shell: the leaf passes no island channel, becau
 
 **A landing in a cell is flagged for scroll, and on the leaf's own clearance.** Every route into a cell lands through one call — Tab and Shift-Tab, Enter into the next row or the one it appends, the arrow walk, and the reseat after a rebuild — and PM focuses with `preventScroll`, so an unflagged one leaves the caret typing where the pane has not moved to: past the right edge of the horizontal scroller a wide table lives in, or in an appended row below the fold. The rung is the leaf's line box rather than PM's 5px default, for the reason the leaf takes it (VISUAL_EDITOR §"Focus and the preview bridge"): a cell is one of the leaf's lines, and a caret revealed flush against the edge is the caret visible and unusable.
 
-Every other island type keeps the literal placeholder the node's `toDOM` draws: the NodeView narrows through the boundary's own `isTableIsland` guard, and an unknown island renders as its tag rather than as a table it is not.
+An island the NodeView cannot draw keeps the literal placeholder the node's `toDOM` writes — an `image`, and a `table` whose `props` do not read as a rectangle, which a paste can carry — rather than a table it is not.
 
-## Open sets: an unknown must survive an edit
+## Vocabularies: closed, and named once
 
-Four of the content's discriminants are **open**: a mark `type`, an island `type`, a line `kind`, and a container name. Every member spells its payload in one `attrs` bag, known or not, so an unrecognized value is a construct some newer quillmark writes rather than a corruption: it loads carrying its own tag and the same bag a known one would, opaque here. Promoting a name to a built-in therefore moves no bytes, and a foreign bag beside a built-in is legal and drops unread.
+All five of the content's discriminants — a line `kind`, a container name, a mark `type`, an island `type` and its `loss` — are **closed**. A name outside one never comes back from a read and throws on a write, at `fromStored` as much as at `applyChange`, so there is no unrecognized construct for this tier to carry.
 
-Reading one is the easy half. A bare `line.kind === 'heading'` does not narrow (the residual `{ kind: string; attrs }` arm keeps a `string` live), so the checked path is the boundary's guards (`isHeadingLine` / `isCodeLine` / `isListItemContainer` / `isLinkMark` / `isAnchorMark` / `isTableIsland` / `isImageIsland`) read off `@quillmark/wasm`, never re-derived here. What a guard buys is the bag's shape — `attrs.level`, `attrs.lang`, `attrs.url`, `attrs.id`, a `list_item`'s three — never a sibling of the tag.
+Reading one takes no guard. A bare `line.kind === 'heading'` narrows to `attrs.level`, `m.type === 'link'` to `attrs.url`, `island.type === 'table'` to `TableProps`; the boundary's `is*` guards are deleted, and the codec switches on the discriminant. Every member spells its payload in one `attrs` bag, so what a discriminant buys is the bag's shape — `attrs.level`, `attrs.lang`, `attrs.url`, `attrs.id`, a `list_item`'s three — never a sibling of the tag.
 
-Writing is the half that bites. Lowering restates **every** line's metadata as soon as any of it changed (§Encode), so an unknown the PM tree cannot hold is destroyed by the first keystroke anywhere in the field: a document that opens intact and saves mangled. So each open set has an inert carrier that renders as its nearest safe neighbor and re-emits verbatim:
+Writing is where the closure is load-bearing. Lowering restates **every** line's metadata as soon as any of it changed (§Encode), so a value the PM tree could hold but the store refuses would fail every commit for the rest of the session. The schema is therefore the vocabulary, member for member: `schema.ts` declares the five marks and `link`, the block nodes for `para`/`heading`/`code`/`rule`/`island`, `blockquote` and the two lists, and nothing beside them; `islandAttrsFromDOM` admits `table` and `image` and declines any other name, so a paste carrying one arrives as the text around it. The three inert carriers that round-tripped an unknown mark, line kind and container are gone with the open sets they served, and a paste of one from an older build carries nothing (§Markdown at the edges).
 
-| Open set | Renders as | Carrier |
-| --- | --- | --- |
-| mark `type` | nothing | the `unknown` mark (`{type, attrs}`), non-exclusive so distinct families share a range |
-| line `kind` | a paragraph | the paragraph's `unknown` attribute (`{kind, attrs}`) |
-| container | its children, at the enclosing level | the `unknown_container` node |
-| island `type` | the island leaf | `islandType` + opaque `props` on the node |
-
-A carrier is dropped only by an **explicit** conversion (retyping the paragraph to a heading, lifting out of the container), which is the one place losing it is what the user asked for. A copy is not one of them: each carrier's tag and payload cross the DOM the clipboard runs through (§Markdown at the edges).
+**A shape PM admits and the content does not is the schema's to refuse.** A heading is a block of one line: the mint clears a `continues` on the line after one and answers a heading holding a break with two headings, at `overwrite` as much as through `setContinues`. So `heading` declares no `hard_break` — a break the schema admitted would put a shape in the PM document that is the projection of no content, and the leaf would go on drawing it after the store had settled on something else.
 
 ## Inline mode
 
@@ -169,7 +161,7 @@ Markdown never represents an edit, and the clipboard is not how it reaches a fie
 - **whole-document serialize**: `Document.toMarkdown()`, read-only, canonical.
 - **paste**: shut to markdown, and to every construct this package's own `data-*` names do not spell. What a paste gets is ProseMirror's own DOM parse against the schema above: lists, headings and marks survive it, markdown text arrives literally, and a `<table>` flattens to its cells' text, nothing on the web naming an island. A field takes markdown by import — Quillmark's conversion to a DTO, or the source editor — which is a whole document with its anchors rather than a fragment that has to be rebased onto one. One rule reaches past the shut door on purpose: a `<pre>` stating a language, by `data-lang` or the `language-*` class every highlighter emits, arrives carrying it, and that is the whole of how a `code_block.lang` is minted in the visual editor (VISUAL_EDITOR §"Settled and open").
 - **copy**: the clipboard takes PM's own serialization. Nothing writes markdown, so there is no lossy export to warn about.
-- **the pair is a tier, not a rendering.** A copy and a paste inside one body run the whole document out through `toDOM` and back through `parseDOM`, so an attribute written there and not read back is a value an ordinary copy destroys — §"Open sets"' three carriers included, whose whole job is surviving everything but an explicit conversion. Every attribute the schema writes is read back: a fence's language, a list's `start`, each carrier's tag and its JSON `attrs`, an island's `props` and `loss` beside its type. The one value a paste does not carry verbatim is an island id, which is an identity rather than a payload: an id the field already holds is re-minted on the way in (`codec/islands.ts`), so a copy lands beside its original instead of as a second island wearing one id, and a cut pasted back keeps what it had.
+- **the pair is a tier, not a rendering.** A copy and a paste inside one body run the whole document out through `toDOM` and back through `parseDOM`, so an attribute written there and not read back is a value an ordinary copy destroys. Every attribute the schema writes is read back: a fence's language, a list's `start`, an island's `props` and `loss` beside its type. The one value a paste does not carry verbatim is an island id, which is an identity rather than a payload: an id the field already holds is re-minted on the way in (`codec/islands.ts`), so a copy lands beside its original instead of as a second island wearing one id, and a cut pasted back keeps what it had.
 
 ## Reconciliation
 

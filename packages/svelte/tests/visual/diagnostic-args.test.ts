@@ -75,6 +75,9 @@ describe('what a Diagnostic carries', () => {
 		const parse = diagnostics![0];
 		expect(parse.message).toContain('unclosed bracket');
 		expect(parse.path).toBeUndefined();
-		expect(Object.keys(parse.args ?? {}).sort()).toEqual(['blockIndex', 'line']);
+		expect(Object.keys(parse.args ?? {}).sort()).toEqual(['blockIndex']);
+		// The position is `location`'s, and it is the document's own: the fence content
+		// is line-for-line with its source, so the failure points at the line holding it.
+		expect(parse.location).toMatchObject({ line: 3, column: 8 });
 	});
 });
