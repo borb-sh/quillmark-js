@@ -29,7 +29,9 @@
 
   Studio stores nothing, so a boot is a seed and a reload is the reseed: the carry is
   what keeps an edited `example:` out of a running session, and F5 is what puts it back
-  (STUDIO §"The document is the blueprint's").
+  (STUDIO §"The document is the blueprint's"). What outlives a boot is which quill, and
+  it stands in the URL rather than in a store: a link names a quill, and a reload keeps
+  it while still reseeding the document (`link.ts`).
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -43,6 +45,7 @@
 	import type { EditorChange } from '@quillmark/svelte/visual';
 	import Picker from './Picker.svelte';
 	import Markdown from './Markdown.svelte';
+	import { askedRef, sayRef } from './link';
 	import { catalogOf, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
 	import { collect, diagnosticsOf, messageOf, placeOf } from './notes';
@@ -226,6 +229,37 @@
 	}
 
 	/**
+	 * The quill a boot opens: what the URL asks for where the quiver holds it, else the
+	 * catalog's first. A selector is honoured (`?quill=showcase`, `?quill=showcase@1`),
+	 * being the grammar `getQuill` already takes.
+	 *
+	 * A ref this quiver does not hold has nothing to honour, so the first quill opens and
+	 * the write below corrects the address bar to it.
+	 */
+	function firstOpen(from: Quiver, next: Catalog): { name: string; version: string } | undefined {
+		const asked = askedRef();
+		if (asked !== undefined) {
+			try {
+				const [name, version] = from.resolve(asked).split('@');
+				return { name: name!, version: version! };
+			} catch {
+				// Not in this quiver's catalog.
+			}
+		}
+		const first = next.quills[0];
+		if (!first) return undefined;
+		return { name: first.name, version: first.versions[0] };
+	}
+
+	// The address bar names the quill on screen, whichever way it got there: a pick, a
+	// document that named its own, or a repack that took the ref away. It is what makes
+	// a deployed studio linkable to a quill rather than to a quiver
+	// (STUDIO §"Opened, not stood on").
+	$effect(() => {
+		if (picked) sayRef(`${picked.name}@${picked.version}`);
+	});
+
+	/**
 	 * A repack landed: mint a fresh `Quiver`, re-read the catalog (a version directory
 	 * may have appeared or gone), and carry the document into the quill that came out.
 	 * The ref is unchanged, so the document is landed under a schema that may have
@@ -352,11 +386,11 @@
 				quiver = await openQuiver();
 				const next = catalogOf(quiver);
 				catalog = next;
-				const first = next.quills[0];
-				if (!first) throw new Error(`quiver "${next.name}" holds no quills`);
+				const at = firstOpen(quiver, next);
+				if (!at) throw new Error(`quiver "${next.name}" holds no quills`);
 				if (cancelled) return;
 				engine = new Engine();
-				await pick(first.name, first.versions[0]);
+				await pick(at.name, at.version);
 			} catch (err) {
 				if (!cancelled) {
 					thrown = diagnosticsOf(err);

@@ -56,6 +56,8 @@ npx quillkit studio
 
 Pick a quill, edit, watch it paint, read the errors. `quillkit test` answers _does it work_; studio answers _what is it like to use_. The document it holds is the blueprint's own, so what the gate renders is what you judge. Reload the page to pick up a repack.
 
+The address bar names what is on screen — `?quill=showcase@1.0.0` — so a link goes to a quill rather than to the quiver's first. `?quill=showcase` and `?quill=showcase@1` are links too, resolved the way `getQuill` resolves them; a ref the quiver does not hold opens the first quill and the address bar says so. The document is not in the URL: a reload keeps the quill and reseeds the example.
+
 It shows a quill rather than editing one: no plate editing, no schema editing, no auth, and nothing it holds outlives the tab.
 
 The client renders through the `@quillmark/wasm` it was built against, and the head names it; your `quillkit test` runs whatever your own tree holds, and nothing at runtime reconciles the two. The gate is authoritative, studio is advisory.
@@ -68,7 +70,7 @@ The client renders through the `@quillmark/wasm` it was built against, and the h
 npx quillkit site --out ./site
 ```
 
-The client resolves its quiver against `document.baseURI` and its assets relatively, so any static host works and no rebuild is needed per URL. The arrangement itself is two rules: the client's files at some base with a built quiver at `quiver/` under that same base, and no quiver inside the client, since one packed there would occupy the URL the built one is served from.
+The client resolves its quiver against `document.baseURI` and its assets relatively, so any static host works and no rebuild is needed per URL. A `?quill=` link needs no rewrite rule either: a query participates in no file resolution, and relative resolution drops it. The arrangement itself is two rules: the client's files at some base with a built quiver at `quiver/` under that same base, and no quiver inside the client, since one packed there would occupy the URL the built one is served from.
 
 For GitHub Pages, the build is `quillkit site` and an artifact upload:
 
