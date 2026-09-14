@@ -111,11 +111,35 @@ const DEMAND = `(async () => {
 	return { bare, held };
 })()`;
 
+/**
+ * The link half: what opened, and what the address bar says once it has. Read after the
+ * surface mounts, the write standing ahead of the open that follows it.
+ */
+const LINKED = `(async () => {
+	const deadline = Date.now() + 30000;
+	const until = async (find) => {
+		for (;;) {
+			const found = find();
+			if (found) return found;
+			if (Date.now() > deadline) return null;
+			await new Promise((wake) => setTimeout(wake, 50));
+		}
+	};
+	const mounted = await until(() => document.querySelector('.qm-pane'));
+	return { editorMounted: mounted !== null, search: location.search };
+})()`;
+
 interface Demand {
 	/** The surface's own width demand. */
 	bare: number;
 	/** The same, holding a 4000px element. */
 	held: number;
+}
+
+interface Linked {
+	editorMounted: boolean;
+	/** The address bar's query once the surface is up. */
+	search: string;
 }
 
 interface Probe {
@@ -203,6 +227,24 @@ describe('the built client, served under a subpath', () => {
 		async () => {
 			expect((await load<Probe>(url, PROBE, WIDE)).panesLaid).toBe(2);
 			expect((await load<Probe>(url, PROBE, NARROW)).panesLaid).toBe(1);
+		},
+		LOAD_MS
+	);
+
+	// The deployed fixture quiver holds `showcase@1.0.0` alone — `usaf_memo` sits under
+	// the draft floor `build` packs above — so what is asserted is the link itself: a
+	// selector opens and is said canonically, and a ref the quiver does not hold still
+	// reaches a surface with the address bar corrected to what is on it.
+	it(
+		'opens the quill a link names, and says which one is on screen',
+		async () => {
+			const named = await load<Linked>(`${url}?quill=showcase`, LINKED, WIDE);
+			expect(named.editorMounted, 'a link to a quill mounts a surface').toBe(true);
+			expect(named.search).toBe('?quill=showcase@1.0.0');
+
+			const stray = await load<Linked>(`${url}?quill=nope@9.9.9`, LINKED, WIDE);
+			expect(stray.editorMounted, 'a ref the quiver does not hold still opens').toBe(true);
+			expect(stray.search).toBe('?quill=showcase@1.0.0');
 		},
 		LOAD_MS
 	);
