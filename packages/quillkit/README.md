@@ -67,12 +67,46 @@ The client renders through the `@quillmark/wasm` it was built against, and the h
 `site` writes the arrangement a deploy serves (the client at the root, a built quiver at `quiver/` beneath it, which is where the client looks) and asserts both halves of it.
 
 ```sh
-npx quillkit site --out ./site
+npx quillkit test && npx quillkit site --out ./site
 ```
 
-The client resolves its quiver against `document.baseURI` and its assets relatively, so any static host works and no rebuild is needed per URL. A `?quill=` link needs no rewrite rule either: a query participates in no file resolution, and relative resolution drops it. The arrangement itself is two rules: the client's files at some base with a built quiver at `quiver/` under that same base, and no quiver inside the client, since one packed there would occupy the URL the built one is served from.
+**The gate runs first, here and in every recipe below.** `site` packs files and opens none of them — it stats each `Quill.yaml` as a sentinel and never parses it — so a quill that does not compile packs cleanly and reports itself in the client. That is what the local loop wants and what a deploy does not, and nothing in `site` supplies it.
 
-For GitHub Pages, the build is `quillkit site` and an artifact upload:
+The client resolves its quiver against `document.baseURI` and its assets relatively, so one build serves a root, a subpath and a preview URL with no rebuild. A `?quill=` link needs no rewrite rule either: a query participates in no file resolution, and relative resolution drops it. The arrangement itself is two rules: the client's files at some base with a built quiver at `quiver/` under that same base, and no quiver inside the client, since one packed there would occupy the URL the built one is served from.
+
+### What a host owes it
+
+Four rules, the same on every host:
+
+| Rule                                          | Why                                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| serve `assets/*` immutable                    | hash-named by the build, and the engine is tens of megabytes                                |
+| do not cache `quiver/latest.json` at the edge | the one name in the artifact carrying no digest, and a stale one pins readers to old quills |
+| a missing path is a 404                       | an SPA fallback answers 200 with the client's HTML, which then fails a digest check         |
+| serve over https                              | `crypto.subtle` is secure-context-only, and without it arriving bytes go unchecked          |
+
+The browser half of the second rule is the loader's own — `latest.json` is fetched `no-cache` and every digest-carrying name `force-cache` — so a host that sets no cache header at all is already correct there. What the rule covers is the layer above the browser, where a CDN serving one generation's pointer after the next has shipped is the one staleness the addressing cannot catch.
+
+The last two are the ones a default gets wrong. An SPA fallback is the commonest static-host default there is, and under it a 404 arrives as the client's own HTML with a 200, which reaches the loader as a digest mismatch rather than as a missing file.
+
+On Vercel, a `vercel.json` at the repository root is the whole of it — a missing path is already a 404 and everything but `assets/*` already revalidates:
+
+```json
+{
+	"buildCommand": "quillkit test && quillkit site --out site",
+	"outputDirectory": "site",
+	"headers": [
+		{
+			"source": "/assets/(.*)",
+			"headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+		}
+	]
+}
+```
+
+Netlify takes the same shape in a root `netlify.toml`: `[build]` for the command and the publish directory, one `[[headers]]` block for `assets/*`. On a host reading `_headers` or `_redirects` out of the served directory itself, write them after the build rather than committing them — `site` clears what it writes, so a file placed there beforehand is gone before the deploy uploads.
+
+For GitHub Pages, the build is the gate, `quillkit site` and an artifact upload:
 
 ```yaml
 # .github/workflows/studio.yml
@@ -92,6 +126,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npx quillkit test
       - run: npx quillkit site --out site
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -115,11 +150,12 @@ Keep the deploy in your own repository, as above: nothing outside it then holds 
 **If your quiver is not an npm project** (a `Quiver.yaml` and `quills/` with no `package.json`), there is no tree for the packer to be resolved from, so install it for the run and drop the `npm ci`:
 
 ```yaml
-- run: npm install --no-save @quillmark/quiver quillkit
+- run: npm install --no-save @quillmark/quiver @quillmark/wasm quillkit
+- run: npx quillkit test
 - run: npx quillkit site --out site
 ```
 
-That takes whatever `@quillmark/quiver` is current, where a `package.json` would pin the format your quiver is packed in. `site` packs files and instantiates nothing, so either way the deploy installs no wasm.
+That takes whatever `@quillmark/quiver` is current, where a `package.json` would pin the format your quiver is packed in. The gate renders, so `@quillmark/wasm` joins the install here. Dropping it and the `quillkit test` line with it is the trade: a deploy that installs no wasm, and nothing that fails on a quill which does not compile.
 
 A deployed quiver is frozen at a commit, so the repack loop is the local one, over a working tree.
 
