@@ -44,7 +44,8 @@ export interface BuiltTransport {
 /**
  * `revalidate` marks the one request that must not be answered from a cache:
  * `latest.json`, the only name in the artifact that is not content-addressed.
- * Everything else is safe to cache forever by construction.
+ * Everything else is safe to cache forever by construction, and a transport over a
+ * cache says so itself rather than leaving the fact to a host's headers.
  *
  * `maxBytes` is what the response may weigh, required because only the caller knows what
  * it asked for: a pointer, a bundle and a font carry their own ceilings. A transport

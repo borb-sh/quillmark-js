@@ -59,11 +59,15 @@ export class HttpTransport implements BuiltTransport {
 
 		let response: Response;
 		try {
-			// `no-cache` revalidates with the origin rather than skipping the cache:
-			// a 304 still serves from disk. Only the pointer asks for it, and only
-			// the browser-cache layer of the stale-pointer failure is a client's to
-			// fix; a stale edge is answered by that host's cache headers.
-			response = await globalThis.fetch(url, opts.revalidate ? { cache: 'no-cache' } : undefined);
+			// One mode per name-shape, so the browser layer is settled here rather than
+			// by a header the host may never send. `no-cache` revalidates with the origin
+			// rather than skipping the cache: a 304 still serves from disk, and only the
+			// pointer asks for it. `force-cache` takes a cached response whatever its age,
+			// which a content-addressed name is entitled to; a stale entry under one fails
+			// its digest as `transport_error`, which an evicting cache clears on retry.
+			response = await globalThis.fetch(url, {
+				cache: opts.revalidate ? 'no-cache' : 'force-cache'
+			});
 		} catch (err) {
 			throw new QuiverError(
 				'transport_error',
