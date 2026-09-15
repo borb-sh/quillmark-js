@@ -8,6 +8,8 @@
 
 **The floor's previous step refuses two PDF shapes.** A consumer's copy of the artifact now declines a pdfform base carrying an `/AcroForm` of its own (`pdf::existing_acroform`) or a non-finite widget rect (`pdf::bad_rect`). A quill that rendered PDF and stops did so on a double-form background whose behavior was the reader's choice.
 
+**Every request but the pointer is `force-cache`.** A name carrying its own digest is entitled to whatever a cache already holds, so a second load re-fetches `latest.json` and nothing else — on a host that sends no cache header, and on one that sends `max-age=0, must-revalidate`. A stale entry handed back under it fails its digest as `transport_error`, which is the check that makes those names safe to cache at all. The pointer stays `no-cache`, and the layer above the browser's stays the host's.
+
 ## v0.27.0 - 2026-08-26
 
 **The `@quillmark/wasm` peer floor is `>=0.110.0-0`.** Nothing here reads a container path or emits one, and nothing here validates, so the release's breaks land outside this package; the floor moves because a quiver hands out `Quill` handles the consumer's copy of the artifact has to be able to parse and render.

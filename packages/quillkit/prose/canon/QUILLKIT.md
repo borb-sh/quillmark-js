@@ -59,6 +59,10 @@ The tarball holds two, and they never meet: the client bundles the copy it was b
 
 Both halves are asserted rather than assumed: a client carrying a `quiver/` of its own would occupy the URL the built one is served from, and the winner would be whichever copy landed last.
 
+**What the layout cannot assert is the host's, and it is four rules**: `assets/*` immutable, no edge cache on `quiver/latest.json`, a missing path answered as a 404, and https. The first is the client's own bundle, which the loader reads nothing of; the second is the edge alone, the browser layer being closed by the fetch modes the transport picks per name-shape (QUIVER §"The pointer"). The last two are what a static host's defaults get wrong, and both surface as something other than themselves — a digest mismatch, and bytes nothing checked. The README carries them with the recipes, where a consumer deploying studio reads, rather than in quiver's.
+
+**And the gate is the recipe's, not this verb's.** `site` stats each `Quill.yaml` as a sentinel and parses none, so a quill that does not compile packs cleanly; the verb that renders is `test`, and every documented recipe runs it first. Putting it inside `site` would buy the consumer who does not read, at the price of a wasm in the packer's process and a second gate for every pipeline already running one.
+
 **It clears what it writes**, so an `--out` holding the collection or the working directory is refused the way `build` refuses one holding its source. The tree is this verb's, one level above the one quiver is handed, so the refusal does not travel with the packer.
 
 ## Not

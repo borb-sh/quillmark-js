@@ -124,7 +124,8 @@ describe('HttpTransport.fetchBytes', () => {
 describe('HttpTransport — revalidation', () => {
 	// `latest.json` is the one name in the artifact that is not
 	// content-addressed, so it is the one request a browser cache may not answer
-	// on its own. Everything else is immutable by construction.
+	// on its own. Everything else is immutable by construction, and says so here:
+	// a deploy that never sets a cache header still reuses what it already holds.
 	let originalFetch: typeof globalThis.fetch | undefined;
 
 	beforeEach(() => {
@@ -151,9 +152,9 @@ describe('HttpTransport — revalidation', () => {
 		expect(await initFor({ revalidate: true })).toEqual({ cache: 'no-cache' });
 	});
 
-	it('leaves caching to the browser otherwise', async () => {
-		expect(await initFor()).toBeUndefined();
-		expect(await initFor({ revalidate: false })).toBeUndefined();
+	it('takes a cached response whatever its age otherwise', async () => {
+		expect(await initFor()).toEqual({ cache: 'force-cache' });
+		expect(await initFor({ revalidate: false })).toEqual({ cache: 'force-cache' });
 	});
 });
 

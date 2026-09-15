@@ -124,7 +124,7 @@ The seed answers first and the URL serves what it does not carry. Seeding `lates
 
 ## The `latest.json` pointer
 
-`Quiver.fromBuiltUrl(url)` first fetches `<url>/latest.json`, a stable-named pointer to the current manifest. Everything behind that pointer is content-addressed and checked against the digest in its name; the pointer itself is not, so a cache layer can serve a stale one and silently pin the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), which closes the browser-cache layer. A stale CDN edge is answered by that host's cache headers.
+`Quiver.fromBuiltUrl(url)` first fetches `<url>/latest.json`, a stable-named pointer to the current manifest. Everything behind that pointer is content-addressed and checked against the digest in its name; the pointer itself is not, so a cache layer can serve a stale one and silently pin the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), and every other request is `force-cache`, a digest-carrying name being entitled to whatever the cache already holds. Both are the browser layer only: a stale CDN edge is answered by that host's cache headers, and `quillkit`'s README states the whole contract for a deploy serving a client over one.
 
 The check itself needs `crypto.subtle`, which a browser exposes only in a secure context. An `https` page, `http://localhost` and Node have one; a page served over plain `http` to anything else — a dev host on a LAN address, a staging box without a certificate — has none, and there every fetch passes through unchecked.
 
