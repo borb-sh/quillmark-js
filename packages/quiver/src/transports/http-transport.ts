@@ -59,12 +59,10 @@ export class HttpTransport implements BuiltTransport {
 
 		let response: Response;
 		try {
-			// One mode per name-shape, so the browser layer is settled here rather than
-			// by a header the host may never send. `no-cache` revalidates with the origin
-			// rather than skipping the cache: a 304 still serves from disk, and only the
-			// pointer asks for it. `force-cache` takes a cached response whatever its age,
-			// which a content-addressed name is entitled to; a stale entry under one fails
-			// its digest as `transport_error`, which an evicting cache clears on retry.
+			// `no-cache` revalidates with the origin rather than skipping the cache: a 304
+			// still serves from disk. `force-cache` takes a cached response whatever its
+			// age, which a digest-carrying name is entitled to; a stale one fails
+			// verification upstream as `transport_error`, which an evicting cache clears.
 			response = await globalThis.fetch(url, {
 				cache: opts.revalidate ? 'no-cache' : 'force-cache'
 			});

@@ -78,16 +78,14 @@ The client resolves its quiver against `document.baseURI` and its assets relativ
 
 Four rules, the same on every host:
 
-| Rule                                          | Why                                                                                         |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| serve `assets/*` immutable                    | hash-named by the build, and the engine is tens of megabytes                                |
-| do not cache `quiver/latest.json` at the edge | the one name in the artifact carrying no digest, and a stale one pins readers to old quills |
-| a missing path is a 404                       | an SPA fallback answers 200 with the client's HTML, which then fails a digest check         |
-| serve over https                              | `crypto.subtle` is secure-context-only, and without it arriving bytes go unchecked          |
+| Rule                                          | Why                                                                                                                    |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| serve `assets/*` immutable                    | hash-named by the build, and the engine is tens of megabytes                                                           |
+| do not cache `quiver/latest.json` at the edge | the one name in the artifact carrying no digest, and a stale one pins readers to old quills                            |
+| a missing path is a 404                       | an SPA fallback — the commonest default there is — answers 200 with the client's HTML, which then fails a digest check |
+| serve over https                              | `crypto.subtle` is secure-context-only, and without it arriving bytes go unchecked                                     |
 
-The browser half of the second rule is the loader's own — `latest.json` is fetched `no-cache` and every digest-carrying name `force-cache` — so a host that sets no cache header at all is already correct there. What the rule covers is the layer above the browser, where a CDN serving one generation's pointer after the next has shipped is the one staleness the addressing cannot catch.
-
-The last two are the ones a default gets wrong. An SPA fallback is the commonest static-host default there is, and under it a 404 arrives as the client's own HTML with a 200, which reaches the loader as a digest mismatch rather than as a missing file.
+The second rule covers the edge alone. The browser layer is the loader's own — `latest.json` fetched `no-cache`, every digest-carrying name `force-cache` — so a host that sets no cache header at all is already correct there. An edge serving one generation's pointer after the next has shipped is the one staleness the addressing cannot catch.
 
 On Vercel, a `vercel.json` at the repository root is the whole of it — a missing path is already a 404 and everything but `assets/*` already revalidates:
 
@@ -155,7 +153,7 @@ Keep the deploy in your own repository, as above: nothing outside it then holds 
 - run: npx quillkit site --out site
 ```
 
-That takes whatever `@quillmark/quiver` is current, where a `package.json` would pin the format your quiver is packed in. The gate renders, so `@quillmark/wasm` joins the install here. Dropping it and the `quillkit test` line with it is the trade: a deploy that installs no wasm, and nothing that fails on a quill which does not compile.
+That takes whatever `@quillmark/quiver` is current, where a `package.json` would pin the format your quiver is packed in. The gate renders, so `@quillmark/wasm` joins the install here. Dropping it and the `quillkit test` line with it is the trade: a deploy that installs no wasm, and nothing that fails on a quill that does not compile.
 
 A deployed quiver is frozen at a commit, so the repack loop is the local one, over a working tree.
 
