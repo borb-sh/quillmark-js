@@ -82,7 +82,7 @@ Four rules, the same on every host:
 
 | Rule                                          | Why                                                                                                                    |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| serve `assets/*` immutable                    | hash-named by the build, and the engine is tens of megabytes                                                           |
+| serve `assets/*` immutable                    | hash-named, so revalidating one can only return 304: a wasted round-trip per asset per visit                           |
 | do not cache `quiver/latest.json` at the edge | the one name in the artifact carrying no digest, and a stale one pins readers to old quills                            |
 | a missing path is a 404                       | an SPA fallback — the commonest default there is — answers 200 with the client's HTML, which then fails a digest check |
 | serve over https                              | `crypto.subtle` is secure-context-only, and without it arriving bytes go unchecked                                     |
@@ -93,6 +93,7 @@ On Vercel, a `vercel.json` at the repository root is the whole of it — a missi
 
 ```json
 {
+	"$schema": "https://openapi.vercel.sh/vercel.json",
 	"buildCommand": "quillkit test && quillkit site --out site",
 	"outputDirectory": "site",
 	"headers": [
