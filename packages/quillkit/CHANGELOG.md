@@ -20,6 +20,16 @@
 
 **A `quillkit.config.js` that throws fails the gate, and an artifact that will not load says what broke.** A config carrying a syntax error, a specifier that does not resolve or a throwing statement names the file and the error under it, where it read as a config that was not there and the gate rendered every quill through `@quillmark/wasm` and printed a pass table for it. Absence is the only fall-through and it is the filesystem's answer, not an error's. The artifact splits the same way: one that will not resolve names its install, and one that will not import or will not instantiate carries what threw.
 
+**`--quiver=<dir>` is read.** A verb took the flag as `--quiver <dir>` alone, so the `=` form matched nothing and every verb fell back to the working directory — `quillkit test`, the documented gate, graded the wrong tree and exited 0 on it. Both spellings are read now.
+
+**Studio's address bar names the quill on screen.** `?quill=showcase@1.0.0`, the grammar `getQuill` already takes, so a selector (`?quill=showcase`, `?quill=showcase@1`) resolves through the quiver. A boot opens what the URL asks for where the quiver holds it and the catalog's first quill otherwise, and a pick, a document that names its own quill, or a repack writes the ref back. A query rather than a path segment: a deploy is static files behind whatever host the author has, and a query participates in no file resolution and drops out of the relative base the client reads its quiver off. A reload keeps the quill and still reseeds the document.
+
+**A collection installed under `node_modules/` repacks on an edit.** The watcher read `node_modules` and `.git` segments of the absolute path rather than of the path below the watch root, so a quiver at `node_modules/@scope/quills` — the way canon points studio at an installed collection — had every file under it read as the pack's own write, and studio silently never repacked.
+
+**Studio's source panel keeps a draft through a drag that ends outside it.** A click's target is the nearest common ancestor of press and release, so dragging a text selection past the panel edge released at the dialog and discarded the edited draft with no confirmation. The close checks where the gesture began too.
+
+**The studio server closes what a cancelled request opened.** A read stream piped into a response had no teardown of its own, so a client cancelling mid-body left the fd open for the life of the process; one erroring on a file a repack removed under it took the server down mid-session. `quillkit <not-a-verb>` prints usage for every spelling, `toString` included.
+
 **The README states what a host owes a deploy, and every recipe gates before it packs.** Four rules: `assets/*` immutable, no edge cache on `quiver/latest.json`, a missing path answered as a 404, and https. The last two are the ones a default gets wrong — an SPA fallback turns a missing file into the client's own HTML under a 200, which reaches the loader as a digest mismatch, and a page off a secure context has no `crypto.subtle`, so arriving bytes go unchecked. `site` stats each `Quill.yaml` as a sentinel and parses none, so `quillkit test` stands ahead of it in the recipes rather than inside the verb.
 
 ## v0.5.4 - 2026-08-26

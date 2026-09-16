@@ -10,6 +10,8 @@
 
 **The floor's previous step refuses two PDF shapes.** A consumer's copy of the artifact now declines a pdfform base carrying an `/AcroForm` of its own (`pdf::existing_acroform`) or a non-finite widget rect (`pdf::bad_rect`). A quill that rendered PDF and stops did so on a double-form background whose behavior was the reader's choice.
 
+**A fetch names what it may weigh, and a response over it is refused where it arrives.** Each path carries its own ceiling: a bundle's is the unpack budget (64 MiB), a font's is 32 MiB, and `latest.json` and the manifest are 8 MiB apiece. `HttpTransport` refuses a `Content-Length` over the ceiling before reading a byte and cancels the body past it, so an artifact no loader would unpack costs a `quiver_invalid` naming the file rather than the tab. It is `quiver_invalid` and not `transport_error` because a retry fetches the same response, so there is nothing for an evicting cache to fix. `FsBuiltTransport` and `MemoryTransport` ignore the number: a file is read at the size it is, and a held buffer is already held.
+
 **Every request but the pointer is `force-cache`.** A name carrying its own digest is entitled to whatever a cache already holds, so a second load re-fetches `latest.json` and nothing else — on a host that sends no cache header, and on one that sends `max-age=0, must-revalidate`. A stale entry handed back under it fails its digest as `transport_error`, which is the check that makes those names safe to cache at all. The pointer stays `no-cache`, and the layer above the browser's stays the host's.
 
 ## v0.27.0 - 2026-08-26
