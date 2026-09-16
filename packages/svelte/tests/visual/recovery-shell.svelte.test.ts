@@ -3,16 +3,15 @@
 // the schema does not declare, so the shell is the only surface that card is reachable
 // from, and the retype it offers is what lets a session open over the document.
 //
-// `Document.makeCard` is the door in: schema-agnostic where the Quill-bound writer
-// refuses an undeclared kind, which is what the playground's `?foreign` seeds.
+// A `CardInput` literal is the door in: `insertCard` is schema-agnostic where the
+// Quill-bound writer refuses an undeclared kind, which is what the playground's
+// `?foreign` seeds.
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount, unmount, flushSync } from 'svelte';
-import { Engine, init, type Document, type Quill } from '@quillmark/wasm';
+import { Engine, type Document, type Quill } from '@quillmark/wasm';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import { humanize } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
-
-const core = await init();
 
 // jsdom implements neither; the first is the card operations' scroll hop and the flip a
 // removal runs the survivors through.
@@ -40,7 +39,11 @@ function mountEditor(q: Quill, doc: Document) {
 /** A seeded document with one card the schema cannot project, last in the stack. */
 function withForeignCard(q: Quill): Document {
 	const doc = q.seedDocument();
-	doc.insertCard(core.Document.makeCard('legacy_kind', { label: 'Held' }, 'Trapped legacy body.'));
+	doc.insertCard({
+		kind: 'legacy_kind',
+		payloadItems: [{ type: 'field', key: 'label', value: 'Held' }],
+		body: 'Trapped legacy body.'
+	});
 	return doc;
 }
 
@@ -82,7 +85,7 @@ describe('the recovery shell', () => {
 		select.dispatchEvent(new Event('change', { bubbles: true }));
 		flushSync();
 
-		// `setCardKind` swaps the kind alone: the fields and the body the card arrived with
+		// The retype swaps the kind alone: the fields and the body the card arrived with
 		// are still authored.
 		expect(shells(target)).toHaveLength(0);
 		const markdown = doc.toMarkdown();

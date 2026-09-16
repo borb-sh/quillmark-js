@@ -60,10 +60,11 @@ describe('what a Diagnostic carries', () => {
 		doc.free();
 	});
 
-	it('keeps the parse lane engine text out of `args`, which locates only', () => {
-		// The permanent fallback arm. `args` places the failure and stops there, so the
-		// parser's own sentence is reachable only as `message` and returning `undefined`
-		// from a formatter is the correct answer rather than a concession.
+	it('keeps the parse lane engine text out of `args`, which names the block only', () => {
+		// The permanent fallback arm. `args` names the block and stops there, the failure
+		// being placed on `location` in the document's own coordinates, so the parser's
+		// own sentence is reachable only as `message` and returning `undefined` from a
+		// formatter is the correct answer rather than a concession.
 		let thrown: unknown;
 		try {
 			core.Document.fromMarkdown('~~~\n$quill: showcase@1.0.0\ntitle: [unclosed\n~~~\n\nBody.\n');
@@ -75,6 +76,8 @@ describe('what a Diagnostic carries', () => {
 		const parse = diagnostics![0];
 		expect(parse.message).toContain('unclosed bracket');
 		expect(parse.path).toBeUndefined();
-		expect(Object.keys(parse.args ?? {}).sort()).toEqual(['blockIndex', 'line']);
+		expect(Object.keys(parse.args ?? {}).sort()).toEqual(['blockIndex']);
+		// The document's own line, not the block's: the `title:` line of the source.
+		expect(parse.location).toMatchObject({ file: 'input.md', line: 3 });
 	});
 });

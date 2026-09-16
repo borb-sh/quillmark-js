@@ -103,7 +103,7 @@ This package produces quills; `@quillmark/wasm` renders them. A quill from `getQ
 
 The canonical `Quill` / `Document` / `Engine` types are **not** re-exported here. They come from the `@quillmark/wasm` peer, which is their single source of truth: the one installed copy whose linear memory every handle indexes into (`check:deps`).
 
-`Engine.render`, `open`, `supportedFormats` and `supportsCanvas` are async.
+`Engine.render`, `open` and `supportedFormats` are async.
 
 ## Errors
 

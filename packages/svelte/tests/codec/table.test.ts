@@ -41,6 +41,11 @@ import { mount, press, quill, md } from './_util.js';
 
 const TABLE_MD = 'para\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ntail';
 
+/** A table payload no reader can index. The store's table decode fills what it can and
+ *  keeps the rest, so this is a stored state and not only a pasted one; the cast is the
+ *  authored shape, which the type is right to refuse. */
+const BAD_PROPS = { any: 1 } as unknown as TableProps;
+
 function cell(text: string): TableCell {
 	return { text, marks: [] };
 }
@@ -772,14 +777,14 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('a non-table island keeps the literal placeholder', () => {
+	it('an island whose props no reader can index keeps the literal placeholder', () => {
 		const doc = quill().seedDocument();
 		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'chart', props: { any: 1 }, loss: 'unrepresentable' };
+		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS, loss: 'unrepresentable' };
 		doc.overwrite({}, rt);
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		expect(field.el.querySelector('table')).toBeNull();
-		expect(field.el.textContent).toContain('[chart]');
+		expect(field.el.textContent).toContain('[table]');
 		field.destroy();
 	});
 });
@@ -1180,10 +1185,10 @@ describe('a pointer press on the island resolves to a caret', () => {
 		field.destroy();
 	});
 
-	it('an island with no interior keeps the click: the rule, not an exception', () => {
+	it('an island drawing no interior keeps the click: the rule, not an exception', () => {
 		const doc = quill().seedDocument();
 		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'chart', props: { any: 1 }, loss: 'unrepresentable' };
+		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS, loss: 'unrepresentable' };
 		doc.overwrite({}, rt);
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		// Dispatched at the island rather than through it: PM's own mousedown wants a

@@ -221,12 +221,14 @@
     #rev.at("note", default: "revised") (#str(rev.at("pages", default: 0)) pp)
     #linebreak()
   ]
-  // A checkbox widget, so a boolean field reaches the region table the same way
-  // the signature does — through a placement, not through a glyph span.
+  // A text widget over a boolean, so a boolean field reaches the region table the
+  // same way the signature does — through a placement, not through a glyph span.
+  // The mark is the plate's to draw: `form-field` keeps `text` and `signature`, and
+  // an interactive checkbox is an `acroform` quill's.
   #form-field(
     "DraftWatermark",
-    type: "checkbox",
-    value: data.at("draft_watermark", default: false),
+    type: "text",
+    value: if data.at("draft_watermark", default: false) { "X" } else { "" },
     field: "draft_watermark",
     width: 9pt,
     height: 9pt,

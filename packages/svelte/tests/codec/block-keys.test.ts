@@ -196,7 +196,18 @@ describe('Delete on an empty line takes the line', () => {
 	// an island"). So the table goes on the press after, never on this one.
 	it('an island below the line stands, armed for the press after', () => {
 		const next = expectPress(
-			atBlock(docOf(p(), n.island_block.create({ kind: 'table', payload: '' })), 0),
+			atBlock(
+				docOf(
+					p(),
+					n.island_block.create({
+						id: 'isl-0',
+						islandType: 'table',
+						props: { header: [], rows: [], aligns: [] },
+						loss: 'lossless'
+					})
+				),
+				0
+			),
 			'Delete',
 			'doc(island_block)'
 		);

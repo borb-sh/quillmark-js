@@ -40,7 +40,7 @@ const doc = quill.seedDocument();
 
 // An EXISTING document: parsed back from what you stored.
 const doc = Document.fromMarkdown(markdown); // canonical Quillmark markdown
-const doc = Document.fromJson(json); // the versioned storage DTO (`doc.toJson()`)
+const doc = Document.fromStored(json); // the versioned storage DTO (`doc.toStored()`)
 
 const session = await new Engine().open(quill, doc);
 // free() on teardown the handles you MINTED: this quill, this doc, this session.

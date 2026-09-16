@@ -69,7 +69,6 @@ const CONTAINER_CLASS = 'qm-preview';
 // class, the hooks a consumer and the tests target.
 const MESSAGE_CLASS = 'qm-preview-message';
 const EMPTY_CLASS = 'qm-preview-empty';
-const UNSUPPORTED_CLASS = 'qm-preview-unsupported';
 const ERROR_CLASS = 'qm-preview-error';
 
 export function createPreview(session: LiveSession, opts: PreviewOptions): PreviewController {
@@ -78,7 +77,7 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 	const t = mergePreviewStrings(opts.strings);
 	container.classList.add(CONTAINER_CLASS);
 
-	// One element, restamped: the non-paint states (empty, unsupported, a paint that
+	// One element, restamped: the non-paint states (empty, a paint that
 	// threw) are mutually exclusive.
 	let message: HTMLElement | undefined;
 	function showMessage(text: string, state: string): void {
@@ -98,8 +97,8 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 	// slots and never calls the `paint`/`pageSize` verbs the boundary refuses
 	// there. A paint that unexpectedly throws is caught per-slot and surfaced
 	// through the shared message rather than aborting the observer callback
-	// mid-sweep (runtime.d.ts: even a `supportsCanvas` compile can hit a paint
-	// the boundary refuses; brittle to leave uncaught).
+	// mid-sweep (a paint is the one surface that can still refuse a counted page;
+	// brittle to leave uncaught).
 	const paintLoop: PaintLoop = createPaintLoop(session, container, margin, (page, err) => {
 		reportError(opts.onError, {
 			code: 'paint-failed',
@@ -128,20 +127,14 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		bridge = undefined;
 	}
 
-	// Called at construction and after every `apply`, so `supportsCanvas` is re-read
-	// per compile (runtime.d.ts: re-check after `open`) and a 0-page or non-canvas
-	// compile that later gains paintable pages recovers; the check spans the paint
-	// capability generally, not just the page count.
+	// Called at construction and after every `apply`, so a 0-page compile that later
+	// gains pages recovers. A counted page is the whole condition: every backend
+	// paints, and `paint`/`pageSize` refuse only a page the count excludes.
 	function render(pageCount: number, dirtyPages: readonly number[]): void {
-		if (!session.supportsCanvas || pageCount === 0) {
-			// A 0-page compile is a recoverable empty; pages the boundary cannot
-			// raster are a genuine unsupported.
+		if (pageCount === 0) {
 			paintLoop.refresh([], 0);
 			detach();
-			showMessage(
-				pageCount === 0 ? t.noPages : t.unsupported,
-				pageCount === 0 ? EMPTY_CLASS : UNSUPPORTED_CLASS
-			);
+			showMessage(t.noPages, EMPTY_CLASS);
 			return;
 		}
 		// Read the count against the current slots before reconcile moves it, and

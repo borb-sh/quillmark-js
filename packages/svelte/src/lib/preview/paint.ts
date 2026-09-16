@@ -193,9 +193,7 @@ export function createPaintLoop(
 
 	// Slots are built on the first `refresh` (the controller calls it immediately),
 	// not here: reconcile → `session.pageSize` must run after the controller's
-	// `supportsCanvas`/`pageCount` gate, since a `supportsCanvas: false` compile with
-	// pages would throw on `pageSize` (runtime.d.ts: it succeeds iff `supportsCanvas`)
-	// before the controller can surface its "unsupported" message.
+	// `pageCount` gate, since `pageSize` throws for a page the count excludes.
 
 	// ── Keep mounted rasters in step with the display ───────────────────────────
 	// Every paint freezes `canvas.style.width/height` to the box width at that

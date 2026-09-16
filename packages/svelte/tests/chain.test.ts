@@ -28,13 +28,11 @@ describe('substrate chain', () => {
 		expect(doc.quillRef).toBe(`${quill.metadata.name}@${quill.metadata.version}`);
 
 		const engine = new Engine();
-		expect(await engine.supportsCanvas(quill)).toBe(true);
-
 		const session = await engine.open(quill, doc);
-		// The three quantities a session reports.
+		// The two quantities a session reports, and the paint the count promises.
 		expect(session.pageCount).toBeGreaterThan(0);
-		expect(session.supportsCanvas).toBe(true);
 		expect(Array.isArray(session.warnings)).toBe(true);
+		expect(session.pageSize(0).widthPt).toBeGreaterThan(0);
 
 		session.free();
 		doc.free();
