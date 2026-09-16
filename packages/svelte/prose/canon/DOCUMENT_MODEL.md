@@ -54,7 +54,7 @@ At the 0.113.0 target the whole table is stable API and one typing gap is open. 
 
 One obligation the closure carries here:
 
-- **Adding a construct is a storage-version event upstream, and a compile error here.** A vocabulary no longer has a residual arm to route a stranger through, so a name upstream promotes reaches this tier as a union member a `switch` has no case for. What the codec must not do is restate a set: `decode`'s kinds, `pmMarkFromContent`'s marks and the island type the DOM reader admits are the whole of what this package names, each read off the boundary's own union where one is exported.
+- **Adding a construct is a storage-version event upstream, and a compile error here.** A vocabulary has no residual arm to route a stranger through, so a name upstream promotes has to reach this tier as a refusal the checker makes rather than a fall-through some arm absorbs. Nothing here restates a set as a literal check: the five places that name one name it against the boundary's own union — an exhaustive `switch` closed by a `never` (`decode.ts` §`makeLeaf`, `marks.ts` §`pmMarkFromContent`), a `satisfies` on the container left after the list (`decode.ts` §`groupBlocks`), and a `Record` keyed by the union for the island `type` and `loss` the DOM reader admits (`islands.ts`). A member added upstream is a missing case, a missing key or a widened `satisfies`, in that order.
 
 Two shapes the editor reads straight off the boundary, with no local duplicate:
 

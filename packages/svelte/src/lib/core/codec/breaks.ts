@@ -12,7 +12,7 @@
 //
 // One spelling, held over the document rather than at each command that can open one,
 // so a paste and a drop are covered alongside the keys.
-import type { Schema } from 'prosemirror-model';
+import type { Node as PMNode, Schema } from 'prosemirror-model';
 import { Plugin } from 'prosemirror-state';
 import { takesLineBreak } from './schema.js';
 
@@ -29,23 +29,27 @@ export function linebreakPlugin(schema: Schema): Plugin {
 	return new Plugin({
 		appendTransaction(trs, _before, state) {
 			if (!br || !trs.some((tr) => tr.docChanged)) return null;
-			const at: { pos: number; break: boolean }[] = [];
+			const at: { pos: number; fill: PMNode }[] = [];
 			state.doc.descendants((node, pos, parent) => {
 				// A code block's newlines are its content (`whitespace: 'pre'`).
 				if (node.type.spec.code) return false;
-				if (!node.isText) return true;
-				const takes = !!parent && takesLineBreak(parent.type);
+				if (!node.isText || !parent) return true;
+				// A space carries the marks the `\n` it stands in for was under, the way
+				// PM's own `clearIncompatible` fills one: without them a bolded break
+				// leaves an unbolded space, and one mark becomes two in the store.
+				const fill = takesLineBreak(parent.type)
+					? br.create()
+					: schema.text(' ', parent.type.allowedMarks(node.marks));
 				const text = node.text ?? '';
 				for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1))
-					at.push({ pos: pos + i, break: takes });
+					at.push({ pos: pos + i, fill });
 				return true;
 			});
 			if (!at.length) return null;
 			// A break, a space and the `\n` either replaces are all one position wide, so
 			// an earlier replacement leaves every later one addressed.
 			const tr = state.tr;
-			for (const it of at)
-				tr.replaceWith(it.pos, it.pos + 1, it.break ? br.create() : schema.text(' '));
+			for (const it of at) tr.replaceWith(it.pos, it.pos + 1, it.fill);
 			return tr;
 		}
 	});

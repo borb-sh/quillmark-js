@@ -15,6 +15,7 @@ import { Selection } from 'prosemirror-state';
 import type { Command, EditorState, Transaction } from 'prosemirror-state';
 import { chainCommands, splitBlock } from 'prosemirror-commands';
 import { canJoin, findWrapping } from 'prosemirror-transform';
+import { takesLineBreak } from './schema.js';
 
 /** The head of a textblock: where a shorthand fires, and where a pick lands once its
  *  run is consumed. */
@@ -49,9 +50,32 @@ function retype(name: string, attrs?: Attrs): Command {
 		const type = state.schema.nodes[name];
 		const { $from } = state.selection;
 		if (!type || !atHead(state) || !fits($from, type)) return false;
-		dispatch?.(state.tr.setBlockType($from.pos, $from.pos, type, attrs));
+		const tr = state.tr;
+		spaceBreaks(tr, $from, type);
+		dispatch?.(tr.setBlockType($from.pos, $from.pos, type, attrs));
 		return true;
 	};
+}
+
+/** Replace every `hard_break` in the caret's block with a space, ahead of a retype into
+ *  a type that holds none. `setBlockType` clears what the new type cannot hold by
+ *  deleting it, which joins the text either side with nothing and glues the words; a
+ *  space is what the break becomes at every other door (`breaks.ts`, `decode.ts`). A
+ *  break and a space are both one position wide, so an earlier replacement leaves every
+ *  later one addressed. */
+function spaceBreaks(tr: Transaction, $from: ResolvedPos, type: NodeType): void {
+	const br = tr.doc.type.schema.nodes.hard_break;
+	if (!br || takesLineBreak(type)) return;
+	let at = $from.start();
+	$from.parent.forEach((child) => {
+		if (child.type === br)
+			tr.replaceWith(
+				at,
+				at + child.nodeSize,
+				type.schema.text(' ', type.allowedMarks(child.marks))
+			);
+		at += child.nodeSize;
+	});
 }
 
 /** `wrappingInputRule`'s body: wrap the block range at `pos`, then join a preceding

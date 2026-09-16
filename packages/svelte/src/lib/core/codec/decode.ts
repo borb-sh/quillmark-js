@@ -159,8 +159,11 @@ function groupBlocks(
 			i = j;
 			continue;
 		}
-		// A quote: a wrapper over the run of leaves carrying the identical container
-		// here, identity by `containerKey`.
+		// The quote, and the whole of what is left: `satisfies` is the exhaustiveness
+		// check, so a container added upstream is a compile error here rather than a
+		// blockquote it is not. A wrapper over the run of leaves carrying the identical
+		// container here, identity by `containerKey`.
+		here.container satisfies 'quote';
 		const key = containerKey(here);
 		let j = i + 1;
 		while (j < leaves.length) {
@@ -200,35 +203,46 @@ function containerKey(c: ContentContainer): string {
 	return `${c.container}\u0000${instanceOf(c)}`;
 }
 
-/** A single leaf block node (para/heading/code/rule/island) from its segments. */
+/** A single leaf block node from its segments. Exhaustive over the closed line
+ *  vocabulary, so a kind added upstream is a compile error rather than a silent
+ *  flattening to `para` that the next commit would store. */
 function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: IslandCursor): PMNode {
 	const line = leaf.line;
-	if (line.kind === 'rule') return schema.nodes.horizontal_rule.create();
-	if (line.kind === 'island') {
-		const attrs = islandAttrs(cursor);
-		return attrs ? schema.nodes.island_block.create(attrs) : schema.nodes.paragraph.create();
+	switch (line.kind) {
+		case 'rule':
+			return schema.nodes.horizontal_rule.create();
+		case 'island': {
+			const attrs = islandAttrs(cursor);
+			return attrs ? schema.nodes.island_block.create(attrs) : schema.nodes.paragraph.create();
+		}
+		case 'code': {
+			// One code_block: the segments' texts joined by literal `\n`, no marks.
+			const text = leaf.segments.map((s) => s.text).join('\n');
+			const content = text.length ? [schema.text(text)] : [];
+			return schema.nodes.code_block.create({ lang: line.attrs?.lang ?? null }, content);
+		}
+		case 'para':
+		case 'heading': {
+			// Inline content, the segment boundary a `hard_break` in a paragraph and a space
+			// in a heading, which takes none (`schema.ts` §`takesLineBreak`). A stored heading
+			// carries no continuation — the store clears one after a block of a single line —
+			// so the space is what keeps a hand-built content decodable.
+			const type = line.kind === 'heading' ? schema.nodes.heading : schema.nodes.paragraph;
+			const inline: PMNode[] = [];
+			leaf.segments.forEach((seg, idx) => {
+				if (idx > 0)
+					inline.push(takesLineBreak(type) ? schema.nodes.hard_break.create() : schema.text(' '));
+				inline.push(...buildInline(schema, seg.text, seg.startUSV, marks, cursor, false));
+			});
+			return line.kind === 'heading'
+				? type.create({ level: line.attrs.level }, inline)
+				: type.create(null, inline);
+		}
+		default: {
+			const unreached: never = line;
+			return unreached;
+		}
 	}
-	if (line.kind === 'code') {
-		// One code_block: the segments' texts joined by literal `\n`, no marks.
-		const text = leaf.segments.map((s) => s.text).join('\n');
-		const content = text.length ? [schema.text(text)] : [];
-		return schema.nodes.code_block.create({ lang: line.attrs?.lang ?? null }, content);
-	}
-	// para / heading: inline content, the segment boundary a `hard_break` in a paragraph
-	// and a space in a heading, which takes none (`schema.ts` §`takesLineBreak`). A
-	// stored heading carries no continuation — the store clears one after a block of a
-	// single line — so the space is what keeps a hand-built content decodable.
-	const type = line.kind === 'heading' ? schema.nodes.heading : schema.nodes.paragraph;
-	const boundary = () =>
-		takesLineBreak(type) ? schema.nodes.hard_break.create() : schema.text(' ');
-	const inline: PMNode[] = [];
-	leaf.segments.forEach((seg, idx) => {
-		if (idx > 0) inline.push(boundary());
-		inline.push(...buildInline(schema, seg.text, seg.startUSV, marks, cursor, false));
-	});
-	return line.kind === 'heading'
-		? type.create({ level: line.attrs.level }, inline)
-		: type.create(null, inline);
 }
 
 /** Consume the next island entry as PM node attrs (text-order matched to slots):

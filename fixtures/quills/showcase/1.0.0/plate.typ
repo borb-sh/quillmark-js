@@ -223,8 +223,8 @@
   ]
   // A text widget over a boolean, so a boolean field reaches the region table the
   // same way the signature does — through a placement, not through a glyph span.
-  // The mark is the plate's to draw: `form-field` keeps `text` and `signature`, and
-  // an interactive checkbox is an `acroform` quill's.
+  // `form-field` keeps `text` and `signature`, so the mark is a character this plate
+  // writes; an interactive checkbox is an `acroform` quill's.
   #form-field(
     "DraftWatermark",
     type: "text",

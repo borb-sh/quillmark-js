@@ -11,6 +11,7 @@
 import { Fragment, Slice, type Node as PMNode, type NodeSpec } from 'prosemirror-model';
 import { Plugin } from 'prosemirror-state';
 import type { ContentIsland, TableCell, TableProps } from '@quillmark/wasm';
+import { storableUrl } from './urls.js';
 
 /** The `U+FFFC` object-replacement char that occupies one island slot in `text`. */
 export const ISLAND_SLOT = '￼';
@@ -48,6 +49,20 @@ function islandDOM(node: PMNode): Record<string, string> {
 	};
 }
 
+// The two closed sets an element claims a value from. A `Record` over the boundary's own
+// union rather than a literal check, so a member added upstream is a missing key here
+// rather than a silent refusal at the one door with no decode behind it.
+
+/** The island types the content model names. */
+const ISLAND_TYPES: Record<ContentIsland['type'], true> = { table: true, image: true };
+
+/** The loss classes it names, weakest last: an unrecognized claim takes that one. */
+const LOSS_CLASSES: Record<ContentIsland['loss'], true> = {
+	lossless: true,
+	degraded: true,
+	unrepresentable: true
+};
+
 /** An island node's attributes off that DOM, or `false` where the id is absent or the
  *  type is one the content vocabulary does not name — a name no read produces and no
  *  write takes, so the element's text arrives as text. A `props` that is not the JSON
@@ -56,8 +71,9 @@ function islandDOM(node: PMNode): Record<string, string> {
  *  than taking the paste down with it. */
 function islandAttrsFromDOM(el: HTMLElement): IslandNodeAttrs | false {
 	const id = el.getAttribute('data-qm-island-id');
-	const type = el.getAttribute('data-qm-island');
-	if (id == null || (type !== 'table' && type !== 'image')) return false;
+	// Asserted off an untrusted attribute and checked against the set on the next line.
+	const type = el.getAttribute('data-qm-island') as ContentIsland['type'] | null;
+	if (id == null || type == null || !ISLAND_TYPES[type]) return false;
 	const raw = el.getAttribute('data-qm-island-props');
 	let props: unknown = null;
 	try {
@@ -65,14 +81,23 @@ function islandAttrsFromDOM(el: HTMLElement): IslandNodeAttrs | false {
 	} catch {
 		props = null;
 	}
-	return { id, islandType: type, props, loss: lossFromDOM(el) };
+	return { id, islandType: type, props: storableProps(type, props), loss: lossFromDOM(el) };
 }
 
 /** The `loss` an element claims, or the weakest class for a claim outside the set:
  *  an under-claim keeps a degraded island from re-crossing as a lossless one. */
 function lossFromDOM(el: HTMLElement): ContentIsland['loss'] {
-	const raw = el.getAttribute('data-qm-island-loss');
-	return raw === 'lossless' || raw === 'degraded' ? raw : 'unrepresentable';
+	const raw = el.getAttribute('data-qm-island-loss') as ContentIsland['loss'] | null;
+	return raw != null && LOSS_CLASSES[raw] ? raw : 'unrepresentable';
+}
+
+/** `props` with the one key the authored lane refuses made storable: an `image`'s `url`
+ *  carrying a line ending, which `IslandOp` and `overwrite` throw on. The rest crosses
+ *  opaque, as it did on the way out. */
+function storableProps(type: ContentIsland['type'], props: unknown): unknown {
+	if (type !== 'image' || typeof props !== 'object' || props === null) return props;
+	const url = (props as { url?: unknown }).url;
+	return typeof url === 'string' ? { ...props, url: storableUrl(url) } : props;
 }
 
 /** Block island node (a table): one `island`-kind content line. Atom, unselectable content. */
@@ -108,9 +133,10 @@ export interface IslandNodeAttrs {
 }
 
 /** Build a content island entry from a PM island node's attrs (block or inline). The
- *  cast pairs a closed `type` with a `props` that crossed the DOM as opaque JSON: a
- *  shape the type's arm does not hold is refused by the island op that carries it,
- *  which is where a malformed paste belongs. */
+ *  cast pairs a closed `type` with a `props` that crossed the DOM as opaque JSON. The
+ *  store is lenient about a table's shape — it fills what it can and keeps the rest —
+ *  so a payload the arm does not hold is stored rather than refused, and `undefined` at
+ *  its reader is what the surface draws the placeholder for (§`tablePropsOfNode`). */
 export function islandEntryFromNode(attrs: IslandNodeAttrs): ContentIsland {
 	return {
 		id: attrs.id,

@@ -16,7 +16,7 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { blockSchema as S, pmToContent, proseLeafPlugins } from '$lib/core/codec';
 import { tablePropsOfNode } from '$lib/core/codec/islands.js';
-import { mount } from './_util.js';
+import { freshDoc, mount } from './_util.js';
 
 // The clipboard's own two halves, as PM registers them by default.
 function serialize(doc: PMNode): string {
@@ -172,6 +172,26 @@ describe('what the parse rules refuse', () => {
 		]
 	])('%s mints no island, and the blocks under it stand', (_name, html) => {
 		expect(parse(html).toString()).toBe('doc(paragraph("keep me"))');
+	});
+
+	// CommonMark admits no line ending in a link destination, so the authored lane
+	// refuses one at `MarkOp.add` AND at `overwrite`: a field whose two commit lanes
+	// both throw stops persisting for the session, since the PM doc still holds the
+	// mark on the next keystroke. The encode is the one `toMarkdown` writes.
+	it('an href carrying a line ending arrives percent-encoded, and stores', () => {
+		const back = parse('<p><a href="http://a&#10;b/c">x</a></p>');
+		const projected = pmToContent(back);
+		expect(projected.marks[0]).toMatchObject({ type: 'link', attrs: { url: 'http://a%0Ab/c' } });
+		const doc = freshDoc();
+		expect(() => doc.overwrite({}, projected)).not.toThrow();
+	});
+
+	it("an image island's url carrying one arrives the same way", () => {
+		const props = JSON.stringify({ url: 'http://a\nb/c', alt: 'x' });
+		const back = parse(
+			`<p><span data-qm-island="image" data-qm-island-id="isl-0" data-qm-island-props='${props}'></span></p>`
+		);
+		expect(back.child(0).child(0).attrs.props).toEqual({ url: 'http://a%0Ab/c', alt: 'x' });
 	});
 
 	// `loss` is a closed set too, and an island under-claims rather than over-claims:

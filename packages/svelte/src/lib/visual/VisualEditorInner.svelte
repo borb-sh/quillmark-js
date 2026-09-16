@@ -480,9 +480,9 @@
 		if (i < 0) return;
 		try {
 			// Insert the retyped card ahead of the original and drop the original after.
-			// `insertCard` gates the kind positionally, so a kind the schema refuses at
-			// this position throws with the card still standing as it was; the reverse
-			// order would leave the document a card short.
+			// `insertCard` validates the whole card before it mutates and `removeCard`
+			// cannot throw, so a refusal leaves the document as it was; the reverse order
+			// would leave it a card short.
 			doc.insertCard({ ...doc.card(i), kind }, i);
 			doc.removeCard(i + 1);
 			bump('structure', id, i);
