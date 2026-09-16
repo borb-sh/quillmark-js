@@ -58,6 +58,8 @@ Pick a quill, edit, watch it paint, read the errors. `quillkit test` answers _do
 
 The address bar names what is on screen — `?quill=showcase@1.0.0` — so a link goes to a quill rather than to the quiver's first. `?quill=showcase` and `?quill=showcase@1` are links too, resolved the way `getQuill` resolves them; a ref the quiver does not hold opens the first quill and the address bar says so. The document is not in the URL: a reload keeps the quill and reseeds the example.
 
+The document has two doors, both in the head. **Edit source** is its canonical markdown, out and back in: what comes out opens in the CLI or a quiver repo unchanged, and what goes in is parsed and conformed against the quill in hand, so a file that names a quill this quiver holds lands in it and anything the schema will not take is named on the control it is about. **Download PDF** is the page itself — `name@x.y.z.pdf`, rendered from the compile the preview is painting, so the file and the screen agree. It is drawn where the quill's backend writes a PDF.
+
 It shows a quill rather than editing one: no plate editing, no schema editing, no auth, and nothing it holds outlives the tab.
 
 The client renders through the `@quillmark/wasm` it was built against, and the head names it; your `quillkit test` runs whatever your own tree holds, and nothing at runtime reconciles the two. The gate is authoritative, studio is advisory.

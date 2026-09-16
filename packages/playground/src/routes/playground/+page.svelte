@@ -43,6 +43,9 @@
   render-error feed: a real consumer derives external diagnostics from
   `session.warnings` (wired here, `[]` for the reference quill) plus render errors.
 
+  Beside them is the one lane the canvas paint does not run: `session.render` writes
+  the document out as a file, and the strip says what it cost or what refused it.
+
   Which quill is a control, since the answer changes what both surfaces are: picking
   tears the shell down and stands it back up. The seed variants are query flags with
   no chrome, read once per open, for the branches a quill on disk reaches none of
@@ -56,7 +59,8 @@
 		Document,
 		LiveSession,
 		ChangeSet,
-		Diagnostic
+		Diagnostic,
+		OutputFormat
 	} from '@quillmark/wasm';
 	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
@@ -102,6 +106,11 @@
 		externalDiagnostics = session ? [...session.warnings, ...injected] : injected;
 	}
 
+	// What this quill's backend emits, probed once per open off its descriptor: the
+	// download is drawn only where a document leaves as one file (`pdf`; the raster
+	// formats emit one artifact per page).
+	let formats = $state<OutputFormat[]>([]);
+
 	// Bridge observability: what the strip reads.
 	let lastHit = $state<Landing | undefined>();
 	let activeAddr = $state('none');
@@ -109,6 +118,7 @@
 	let lastChange = $state<ChangeSet | undefined>();
 	let lastChangeSource = $state('none');
 	let lastError = $state('none');
+	let lastEmit = $state('none');
 
 	// Every readout above names something in the document that is going, and the
 	// injected stand-in names a field the next quill need not have.
@@ -119,6 +129,7 @@
 		lastChange = undefined;
 		lastChangeSource = 'none';
 		lastError = 'none';
+		lastEmit = 'none';
 		injected = [];
 		syncDiagnostics();
 	}
@@ -212,6 +223,40 @@
 		lastError = `${err.code}: ${err.message}`;
 	}
 
+	// The render lane, which the preview's canvas paint does not run: a page that paints
+	// can still fail to emit, and the PDF spine is where that shows. Synchronous over the
+	// compiled snapshot — no second compile — so the file is the page beside it.
+	//
+	// The outcome is read back out on the strip like every other hop, since a harness that
+	// hands over a file and says nothing about it is one instrument short.
+	function download(): void {
+		if (!session) return;
+		try {
+			// Clocked here rather than read off the result: the emit is a synchronous call
+			// on a session this turn owns, so the wall time around it is the render's.
+			const started = performance.now();
+			const result = session.render({ format: 'pdf' });
+			const elapsedMs = performance.now() - started;
+			const artifact = result.artifacts[0];
+			if (!artifact) throw new Error(`${quillHandle?.backendId ?? 'the backend'} emitted no PDF`);
+			// The bytes cross as `Uint8Array<ArrayBufferLike>`, where `BlobPart` takes an
+			// `ArrayBuffer`-backed view alone; the engine's memory is one.
+			const url = URL.createObjectURL(
+				new Blob([artifact.bytes as BlobPart], { type: artifact.mimeType })
+			);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${fixture}.pdf`;
+			// Revoked on the same turn: `click` dispatches synchronously, and the browser
+			// has taken the URL by the time it returns.
+			a.click();
+			URL.revokeObjectURL(url);
+			lastEmit = `${artifact.bytes.length} B in ${Math.round(elapsedMs)} ms`;
+		} catch (e) {
+			lastEmit = `failed: ${e instanceof Error ? e.message : String(e)}`;
+		}
+	}
+
 	// A toggle, not a trip: the stand-in is re-appended on every recompile, so a one-way
 	// press would pin it to `main.title` for the life of the open.
 	function toggleDiagnostics(): void {
@@ -297,6 +342,9 @@
 				});
 			}
 			const engine = new Engine();
+			// Always free: it answers off the backend descriptor without loading the binary
+			// or cloning the quill.
+			const emits = await engine.supportedFormats(quill);
 			// A refusal is a state of the document, not the end of the open: the editor binds
 			// `doc` and `quill` alone, so the shell stands without a session.
 			let openedSession: LiveSession | undefined;
@@ -312,6 +360,7 @@
 				return;
 			}
 			VisualEditor = visual.VisualEditor;
+			formats = emits;
 			engineHandle = engine;
 			session = openedSession;
 			refused = refusal;
@@ -403,6 +452,12 @@
 				<span class="qm-readout" data-testid="last-change-source">{lastChangeSource}</span></span
 			>
 			<span class="stat"
+				><span class="qm-label">emit</span>
+				<span class="qm-readout" class:alert={lastEmit.startsWith('failed')} data-testid="last-emit"
+					>{lastEmit}</span
+				></span
+			>
+			<span class="stat"
 				><span class="qm-label">error</span>
 				<!-- The one reading on the strip that is a failure rather than a fact, so it
 				     is the one that takes colour when it holds one. -->
@@ -435,6 +490,18 @@
 						<span class="qm-label">quill</span>
 						<span class="qm-readout" data-testid="pick-quill">{fixture}</span>
 					</span>
+				{/if}
+				<!-- The document out as the file a reader keeps. Drawn where the backend writes
+				     one, so a quill whose backend emits no PDF stands no control that cannot
+				     be pressed. -->
+				{#if formats.includes('pdf')}
+					<button
+						class="qm-control"
+						type="button"
+						data-testid="download-doc"
+						disabled={opening || !session}
+						onclick={download}>Download PDF</button
+					>
 				{/if}
 				<button
 					class="qm-control"

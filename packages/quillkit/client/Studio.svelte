@@ -45,6 +45,7 @@
 	import type { EditorChange } from '@quillmark/svelte/visual';
 	import Picker from './Picker.svelte';
 	import Markdown from './Markdown.svelte';
+	import { save } from './save';
 	import { askedRef, sayRef } from './link';
 	import { catalogOf, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
@@ -86,6 +87,10 @@
 	/** What the last carry stranded. Held for the open and dropped at the first edit:
 	 *  from then on the schema producer speaks for the document's current state. */
 	let carried = $state.raw<Diagnostic[]>([]);
+	/** What the last emit refused. Its own slot rather than the compile's: a session that
+	 *  paints can still fail to write a file, the PDF spine being the one lane a canvas
+	 *  paint does not run, so the paint on screen is whole and what failed is the file. */
+	let unemitted = $state.raw<Diagnostic[]>([]);
 	/** Every producer's diagnostics, merged, for the editor to route by `path`. */
 	let notes = $state.raw<Diagnostic[]>([]);
 
@@ -93,12 +98,24 @@
 	 *  failure carries one and nothing the schema says does, so this is the line the
 	 *  author opens whichever shape the failure took. */
 	const placed = $derived(thrown.find((d) => d.location));
-	/** A failure with the surfaces up: the document in hand reaches no paint. With a session
-	 *  the last good paint stands under the strip and does not answer the document; with
-	 *  none there is nothing under it. */
-	const stalled = $derived(open !== undefined && thrown.length > 0);
-	/** What the strip names: the throw's place if it carried one, else its first note. */
-	const halt = $derived(stalled ? (placed ?? thrown[0]) : undefined);
+	/**
+	 * What the strip over the paint stands for, with the surfaces up, and what it is
+	 * called. Three failures reach it and one is shown: a compile that will not land or an
+	 * open the engine refused — both of which are why the paint does not answer the
+	 * document, and both of which outrank the third — or an emit that would not write the
+	 * file. It names the failure's place where it carried one, else its first note.
+	 */
+	const halt = $derived.by(() => {
+		if (!open) return undefined;
+		const set = thrown.length ? thrown : unemitted;
+		if (!set.length) return undefined;
+		const said = thrown.length
+			? open.session
+				? 'Compile failed'
+				: 'Open failed'
+			: 'Download failed';
+		return { said, note: set.find((d) => d.location) ?? set[0]! };
+	});
 
 	/** Whether a repack put the document where it is. An import lands through the same
 	 *  carry, and says nothing: a repack happens to the author, and an import is a thing
@@ -111,6 +128,7 @@
 			open ? open.quill.validate(open.doc) : [],
 			open?.session ? open.session.warnings : [],
 			carried,
+			unemitted,
 			recovered
 		]);
 	}
@@ -149,11 +167,13 @@
 		await tick();
 		if (previous) close(previous);
 		recovered = [];
+		unemitted = [];
 		try {
 			const next = await openRef(engine, quiver, ref, carry);
 			if (mine !== turn) return close(next);
 			open = next;
 			held = undefined;
+			writes = next.formats.includes('pdf');
 			thrown = next.refused;
 			carried = next.carry.stranded;
 			// Failed with the surfaces up: the head says the state, and the strip over the
@@ -195,7 +215,7 @@
 	 * The file names its own quill and is believed: a ref this quiver holds is the one it
 	 * lands in, the picker following. A ref the quiver does not hold has nothing to
 	 * honour, so the quill on screen takes it and the conform names what would not fit
-	 * (STUDIO §"The document has a door").
+	 * (STUDIO §"The document has doors").
 	 */
 	async function applyMarkdown(text: string): Promise<string | undefined> {
 		let at = picked;
@@ -218,6 +238,39 @@
 		held = undefined;
 		await mount(`${at.name}@${at.version}`, text);
 		return undefined;
+	}
+
+	// ── The file ────────────────────────────────────────────────────────────────
+	/** Whether the quill on screen writes a document as one file, which is what `pdf` is
+	 *  and the raster formats are not (one artifact per page). Latched from the open rather
+	 *  than derived off it, so the control holds its place while the next one loads; a
+	 *  backend that emits no PDF draws none, a control that cannot be used being chrome
+	 *  standing on the mounts. */
+	let writes = $state.raw(false);
+
+	/**
+	 * The document out as the file a reader keeps, named by the ref the address bar
+	 * carries.
+	 *
+	 * It renders the compiled snapshot the preview is painting rather than opening a
+	 * second compile, so the file is the paint: where a keystroke has not settled or a
+	 * compile failed, what is written is what is on screen, and the strip over the preview
+	 * is what says so. The emit is its own lane — a page that paints can still fail to
+	 * write — so a refusal lands in `unemitted`, which neither clobbers the compile's
+	 * failure nor is clobbered by it.
+	 */
+	function download(): void {
+		const at = open;
+		if (!at?.session) return;
+		try {
+			const [artifact] = at.session.render({ format: 'pdf' }).artifacts;
+			if (!artifact) throw new Error(`${at.quill.backendId} emitted no PDF`);
+			unemitted = [];
+			save(artifact.bytes, `${at.ref}.pdf`, artifact.mimeType);
+		} catch (err) {
+			unemitted = diagnosticsOf(err);
+		}
+		syncNotes();
 	}
 
 	/** A pick is a different document, so nothing crosses: the picked quill seeds its
@@ -336,8 +389,10 @@
 
 	function handleChange(change: EditorChange): void {
 		// The carry's diagnostics describe the document as it arrived; an edit makes
-		// them history, and the schema producer speaks for it from here.
+		// them history, and the schema producer speaks for it from here. The last emit's
+		// refusal goes with them, being about the document that was in hand when it ran.
 		if (carried.length) carried = [];
+		if (unemitted.length) unemitted = [];
 		// A structure op happens once per gesture and the stack has already moved, so
 		// it applies at once; prose and field edits arrive per keystroke and debounce.
 		if (change.source === 'structure') void recompileNow();
@@ -427,7 +482,9 @@
 		{#if catalog}
 			<Picker {catalog} {picked} disabled={busy} onPick={pick} />
 		{/if}
-		<!-- The document's one door (STUDIO §"Opened, not stood on"). -->
+		<!-- The document's two doors (STUDIO §"Opened, not stood on"). The source goes both
+		     ways through the panel; the file goes one way and needs none, so the press is
+		     the whole of it. -->
 		<button
 			class="qm-control"
 			type="button"
@@ -435,6 +492,15 @@
 			disabled={!carrying}
 			onclick={openSource}>Edit source</button
 		>
+		{#if writes}
+			<button
+				class="qm-control"
+				type="button"
+				data-testid="download-doc"
+				disabled={!open?.session}
+				onclick={download}>Download PDF</button
+			>
+		{/if}
 		<span class="state">
 			{#if phase.kind === 'booting'}
 				<span class="qm-status" data-testid="phase">Opening…</span>
@@ -504,16 +570,14 @@
 						<!-- A document that reaches no paint is a state of the paint, not a row under
 						     it: the failure at the surface it is about, carrying the place to open
 						     (STUDIO §"The errors"). The band below still lists it, one list being
-						     its job. The label says which of the two it stands over: a stale paint,
-						     or none. -->
+						     its job. The label says which it stands over: a stale paint, none, or a
+						     paint that is whole and would not be written out. -->
 						<div class="stalled" data-testid="stalled" role="status">
-							<span class="qm-status qm-status-error"
-								>{open.session ? 'Compile failed' : 'Open failed'}</span
-							>
-							{#if halt.location}
-								<span class="qm-readout at">{placeOf(halt.location)}</span>
+							<span class="qm-status qm-status-error">{halt.said}</span>
+							{#if halt.note.location}
+								<span class="qm-readout at">{placeOf(halt.note.location)}</span>
 							{/if}
-							<span class="what">{halt.message}</span>
+							<span class="what">{halt.note.message}</span>
 						</div>
 					{/if}
 					{#if open.session}

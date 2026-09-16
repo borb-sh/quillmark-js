@@ -1,6 +1,6 @@
 <!--
   The document's two doors, which are one panel: canonical Quillmark markdown out, the
-  same markdown in (STUDIO §"The document has a door").
+  same markdown in (STUDIO §"The document has doors").
 
   Nothing here parses, conforms or reports. `apply` hands the text to the caller, which
   lands it through the repack's own carry.
@@ -11,6 +11,8 @@
   tone and the plate's box, the preset carrying no dialog.
 -->
 <script lang="ts">
+	import { save } from './save';
+
 	interface Props {
 		/** The document as it stands: its canonical markdown, or the text a failed open
 		 *  left held. */
@@ -47,15 +49,10 @@
 
 	const dirty = $derived(draft !== text);
 
-	/** The document as bytes, named by its ref. Revoked on the same turn: the click has
-	 *  already been dispatched by the time the object URL is no longer reachable. */
+	/** The text in the panel, named by the document's ref: what is on screen rather than
+	 *  what the document holds, an edit here being what a reader is about to apply. */
 	function download(): void {
-		const url = URL.createObjectURL(new Blob([draft], { type: 'text/markdown' }));
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `${ref}.md`;
-		a.click();
-		URL.revokeObjectURL(url);
+		save(draft, `${ref}.md`, 'text/markdown');
 	}
 
 	async function readFile(input: HTMLInputElement): Promise<void> {
@@ -107,7 +104,7 @@
 
 		<div class="row">
 			<button class="qm-control" type="button" data-testid="markdown-download" onclick={download}
-				>Download</button
+				>Download .md</button
 			>
 			<!-- The input is the control; the label is what it looks like, since a file input
 			     draws a button this page does not draw. -->
