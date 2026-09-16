@@ -36,9 +36,9 @@ What the two panes are is not said. A form on the left and a page on the right, 
 
 **The address bar names the quill.** A reader who followed a link to the quiver is one link from being sent to a quill in it, so the picked ref stands in the URL: `?quill=showcase@1.0.0`, the grammar `getQuill` already takes, resolved through the quiver so `showcase` and `showcase@1` are links too. A query rather than a path segment, a deploy being static files behind whatever host the author has: a query participates in no file resolution and relative resolution drops it, so the base the quiver is read off is untouched and no host is asked for a rewrite rule. `replaceState` rather than a push, because there is one screen and back means leave rather than unpick. A ref the quiver does not hold has nothing to honour, so the catalog's first quill opens and the address bar is corrected to what is on screen; a selector is honoured and then said canonically, which pins the reader's own address bar and not the link they were sent. The document is not in it — the param names a quill, and a reload still reseeds.
 
-**One control, and the loop gains no step.** The document's door stands in the head, beside the picker, which is the one band studio draws that is already about what is being held rather than about what is on screen. Nothing opens on boot, nothing is dismissed, nothing is stored, and an author who never presses it is where they were.
+**Two controls, and the loop gains no step.** The document's doors stand in the head, beside the picker, which is the one band studio draws that is already about what is being held rather than about what is on screen. Nothing opens on boot, nothing is dismissed, nothing is stored, and an author who never presses either is where they were. They are two because what they move is: the source goes both ways and needs a panel to be edited in, and the file goes one way and needs nothing, so the press is the whole of it.
 
-The panel behind it is mounted only while open, for the same reason the document is not stored: it reads the document as it then stands, and one kept mounted would hold whatever the last opening did. Its drawing is studio's, not the preset's — the preset's shell is the pinned bands and the split, and a panel stands over that rather than among it, so nothing here restates a number the preset owns. Native `<dialog>` carries the top layer, the focus trap and the escape key; what studio writes is the scrim's tone and the plate's box. A second consumer wanting one is what would promote it.
+The panel behind the source control is mounted only while open, for the same reason the document is not stored: it reads the document as it then stands, and one kept mounted would hold whatever the last opening did. Its drawing is studio's, not the preset's — the preset's shell is the pinned bands and the split, and a panel stands over that rather than among it, so nothing here restates a number the preset owns. Native `<dialog>` carries the top layer, the focus trap and the escape key; what studio writes is the scrim's tone and the plate's box. A second consumer wanting one is what would promote it.
 
 ## A client, and what serves it
 
@@ -72,9 +72,9 @@ Studio holds one document and it starts as the schema's own: `seedDocument()` ov
 
 **What that costs.** The failures that only a long list, a wrapping value or an empty optional reveal are invisible here, and to `quillkit test` with it: neither renders a document the schema did not write. The corpus *is* the `example:` block, so an author buys that coverage by writing examples that are uncomfortable rather than tidy.
 
-## The document has a door
+## The document has doors
 
-Canonical markdown out, the same markdown in, through one panel. A visitor who fills a memo out has something to close the tab on, and a document on disk opens in the surface built to judge documents without a working tree behind it.
+Canonical markdown out and the same markdown in, through one panel; the rendered file out, through one press. A visitor who fills a memo out has something to close the tab on, and a document on disk opens in the surface built to judge documents without a working tree behind it.
 
 **Out is the string the loop already takes.** `toMarkdown()` is what the repack carries, and a failed open holds that same string, so the door covers the state where a quill will not compile — which is the state an author most wants a document out of.
 
@@ -86,7 +86,15 @@ The panel's text is editable, since replacing it is how a document comes in, and
 
 **Markdown, not the storage DTO.** `toJson()` / `fromJson` is the versioned DTO and would reconstitute exactly rather than re-conform. It is not in DOCUMENT_MODEL's table, which is the one place the version coupling to `@quillmark/wasm` is recorded, so a file a reader keeps would ride a coupling nothing records and move under a wasm bump with nothing to notice. Markdown is readable by whoever saved it, unchanged into the CLI or a quiver repo, and re-conformed on the way in — which is what is wanted when the schema moved under a stored document, and a loss only when it did not.
 
-**Neither half is the write door.** Both move a DOCUMENT, which studio mints, edits and frees on every keystroke. Nothing reaches a `Quill.yaml`, a plate or a quiver, so the rule below stands unamended.
+**And the document leaves as what it renders to.** A reader who filled a memo out wants the memo, not its source, so the second control writes the file: `session.render({ format: 'pdf' })` over the compiled snapshot the preview is already painting, named by the ref the address bar carries.
+
+The session rather than a second compile, because the alternative is a file that disagrees with the page it was taken from. **The file is the paint**: a keystroke that has not settled and a compile that failed are both states the preview is in, the last good one standing on screen either way, and the strip over it is what says so. A download that opened its own compile would answer a third document — the one in hand at the press — and studio would show two truths at once.
+
+**PDF, because a document is a file.** It is the one format the render contract answers with a single artifact; `svg` and `png` emit one per page, so a document leaving as them is a directory rather than a thing to keep. The format a backend emits is `supportedFormats`, an always-free probe off the backend descriptor, read once per open: a backend writing no PDF draws no control, a control that cannot be pressed being chrome standing on the mounts.
+
+**A page that paints can still fail to write**, the PDF spine being the lane a canvas paint does not run, so the refusal is its own slot among the errors and the strip over the preview takes it: the same register as a compile failure, saying `Download failed` instead, and outranked by one, since a compile that will not land is why the paint is stale and the emit's verdict is about the page that is there. The next edit drops it, as the carry's diagnostics are dropped: it described the document that was in hand when the control was pressed.
+
+**No door here is the write door.** Each moves a DOCUMENT, which studio mints, edits and frees on every keystroke, or bytes a render made of one. Nothing reaches a `Quill.yaml`, a plate or a quiver, so the rule below stands unamended.
 
 The one refusal that is not a stranding is markdown that will not parse at all: it never becomes a document, so it has no diagnostics to route and no session to land in. That is said at the door, beside the text that caused it, and the document on screen stands.
 
@@ -112,7 +120,7 @@ A *pick*, unlike a repack, carries nothing. A different quill is a different doc
 
 ## The errors
 
-Four producers say something about the document in hand — `quill.validate(doc)`, the compile (`session.warnings` and the diagnostics a throw carries), the `conform::*` set a repack stranded, and what a surface recovered from. They overlap by design, so the set is merged and deduplicated before anything reads it: one field's one problem is one thing on screen. The editor draws errors only; a warning in the set does not.
+Five producers say something about the document in hand — `quill.validate(doc)`, the compile (`session.warnings` and the diagnostics a throw carries), the `conform::*` set a repack stranded, what a surface recovered from, and what the last emit refused. They overlap by design, so the set is merged and deduplicated before anything reads it: one field's one problem is one thing on screen. The editor draws errors only; a warning in the set does not.
 
 A throw is unwrapped rather than reported as one line: a `QuillmarkError` carries every diagnostic, and a broken plate is the case that matters.
 

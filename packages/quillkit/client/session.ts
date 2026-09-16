@@ -1,7 +1,14 @@
 // One quill, one document, one `LiveSession`: what the surfaces are mounted over, and
 // what a repack replaces. The handle lifecycle lives here rather than in the
 // component, because it is the one thing in studio that is not chrome.
-import type { Diagnostic, Document, Engine, LiveSession, Quill } from '@quillmark/wasm';
+import type {
+	Diagnostic,
+	Document,
+	Engine,
+	LiveSession,
+	OutputFormat,
+	Quill
+} from '@quillmark/wasm';
 import type { Quiver } from '@quillmark/quiver';
 import { diagnosticsOf, messageOf } from './notes';
 
@@ -22,6 +29,9 @@ export interface Opened {
 	ref: string;
 	/** Borrowed from the quiver, never freed here (see `close`). */
 	quill: Quill;
+	/** What this quill's backend emits, read once per open. An always-free probe off the
+	 *  backend descriptor: no binary loaded, nothing cloned. */
+	formats: OutputFormat[];
 	doc: Document;
 	/** Absent while the engine refuses this document ({@link openSession}). */
 	session?: LiveSession;
@@ -56,6 +66,7 @@ export async function openRef(
 	// §getQuill). Studio rewrites no quill bytes, so it needs no quill of its own and
 	// pays for no second materialization.
 	const quill = await quiver.getQuill(ref);
+	const formats = await engine.supportedFormats(quill);
 
 	let doc: Document | undefined;
 	let landed: Carry = { how: 'seeded', stranded: [] };
@@ -74,7 +85,7 @@ export async function openRef(
 	}
 	doc ??= quill.seedDocument();
 
-	return { ref, quill, doc, ...(await openSession(engine, quill, doc)), carry: landed };
+	return { ref, quill, formats, doc, ...(await openSession(engine, quill, doc)), carry: landed };
 }
 
 /**
