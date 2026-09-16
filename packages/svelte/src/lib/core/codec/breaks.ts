@@ -12,8 +12,12 @@
 //
 // One spelling, held over the document rather than at each command that can open one,
 // so a paste and a drop are covered alongside the keys.
+//
+// Shift-Enter is the one gesture that is *about* opening a break, and it binds here
+// rather than beside the block shapes: a break is inline, and the key that mints one
+// belongs with the pass that normalizes every other route to one.
 import type { Node as PMNode, Schema } from 'prosemirror-model';
-import { Plugin } from 'prosemirror-state';
+import { Plugin, TextSelection, type Command } from 'prosemirror-state';
 import { takesLineBreak } from './schema.js';
 
 /**
@@ -53,4 +57,52 @@ export function linebreakPlugin(schema: Schema): Plugin {
 			return tr;
 		}
 	});
+}
+
+/**
+ * Shift-Enter: a line break inside the caret's own block — the `continues` line a hard
+ * break is, never a second block.
+ *
+ * A selection that is not a text range is swallowed outright: an island is the subject of
+ * the next command, never a thing armed for replacement (`atoms.ts`). Otherwise the
+ * caret's own block decides. It **declines** in a code block, where the newline Enter
+ * takes already *is* that line and the code link binds the key one surface in
+ * (`code.ts`); it **swallows** the key where the block holds no break (`takesLineBreak`),
+ * a heading being the one of those; everywhere else it inserts the break.
+ *
+ * **Swallowing is the guard, not a spelling of declining.** A key the leaf declines is
+ * the browser's, a contenteditable answers this one with a `<br>`, and a heading that
+ * merely declined would take the space a `<br>` parses to.
+ *
+ * The break takes no marks and the caret keeps them: `decode` mints an unmarked break,
+ * so an inherited mark would leave the leaf holding a shape a re-hydrate swaps out
+ * (CODEC §Encode, one spelling of each shape), while dropping the marks from the
+ * *caret* would end a bold run at a line break the author only meant to wrap at.
+ */
+function insertBreak(schema: Schema): Command {
+	const br = schema.nodes.hard_break;
+	return (state, dispatch) => {
+		if (!(state.selection instanceof TextSelection)) return true;
+		const { parent } = state.selection.$from;
+		if (parent.type.spec.code) return false;
+		if (!takesLineBreak(parent.type)) return true;
+		if (dispatch) {
+			const marks = state.storedMarks ?? state.selection.$from.marks();
+			dispatch(
+				state.tr.replaceSelectionWith(br.create(), false).setStoredMarks(marks).scrollIntoView()
+			);
+		}
+		return true;
+	};
+}
+
+/**
+ * The line-break link of the body's key chains: `{}` for the inline schemas, which
+ * declare no break node. A `richtext(inline)` field is one line by construction
+ * (`Content::is_inline`), so there the key is swallowed beside Enter (`field.ts`)
+ * rather than answered here.
+ */
+export function breakKeymap(schema: Schema): Record<string, Command> {
+	if (!schema.nodes.hard_break) return {};
+	return { 'Shift-Enter': insertBreak(schema) };
 }
