@@ -1,11 +1,11 @@
 [package]
 name = "tonguetoquill-usaf-memo"
-version = "4.0.0"
-compiler = "0.14.0"
+version = "5.0.0"
+compiler = "0.15.1"
 entrypoint = "src/lib.typ"
 repository = "https://github.com/nibsbin/tonguetoquill-usaf-memo"
 authors = ["Nibs"]
-license = "MIT"
+license = "Apache-2.0"
 description = "Typeset memos that are fully compliant with AFH 33-337 'The Tongue and Quill'."
 keywords = [
     "USAF",
@@ -20,8 +20,3 @@ keywords = [
 ]
 categories = ["office", "report"]
 disciplines = ["politics", "law", "business", "engineering", "education"]
-
-[template]
-path = "template"
-entrypoint = "usaf-template.typ"
-thumbnail = "template/assets/thumbnail.png"
