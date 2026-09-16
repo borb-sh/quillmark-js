@@ -175,10 +175,12 @@ function retypeAtProseEdge(side: -1 | 1): Command {
  *
  * `Enter` is upstream's `newlineInCode`, and it is load-bearing rather than
  * cosmetic: inside a `list_item > code_block` the list link's `splitListItem`
- * otherwise splits the item in two, each half holding a code block. Every command
- * here declines away from a code block — inside one for the three keys about its
- * text, against one for the two about its edge — so the list links keep the keys
- * elsewhere.
+ * otherwise splits the item in two, each half holding a code block. `Shift-Enter` is
+ * the same command because it is the same edit: the line break the key means
+ * everywhere else (`breaks.ts`) is, inside a fence, the newline Enter already takes.
+ * Every command here declines away from a code block — inside one for the four keys
+ * about its text, against one for the two about its edge — so the list links keep the
+ * keys elsewhere.
  */
 export function codeKeymap(schema: Schema): Record<string, Command> {
 	if (!schema.nodes.code_block) return {};
@@ -186,6 +188,7 @@ export function codeKeymap(schema: Schema): Record<string, Command> {
 		Tab: indentInCode,
 		'Shift-Tab': outdentInCode,
 		Enter: newlineInCode,
+		'Shift-Enter': newlineInCode,
 		Backspace: retypeAtProseEdge(-1),
 		Delete: retypeAtProseEdge(1)
 	};

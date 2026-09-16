@@ -1271,6 +1271,10 @@ class TableIslandView implements NodeView {
 			'Alt-ArrowRight': line('column', 1, true),
 			Tab: () => this.step(r, c, 1),
 			'Shift-Tab': () => this.step(r, c, -1),
+			// A cell is one line (`normalize` rewrites a cell newline to a space), so the
+			// key the body answers with a break is claimed here and does nothing: Enter
+			// already means the next row, and an unclaimed key is the browser's `<br>`.
+			'Shift-Enter': () => true,
 			Enter: () => {
 				// Over a rectangle it hands the caret back, which is the line verbs' own
 				// exit: the caret never left the cell, so there is nowhere else to put it.

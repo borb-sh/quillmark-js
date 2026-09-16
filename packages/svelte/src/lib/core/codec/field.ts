@@ -682,8 +682,12 @@ function editorKeymap(schema: Schema, inline: boolean, slash?: boolean): Record<
 	if (schema.marks.em) map['Mod-i'] = toggleMark(schema.marks.em);
 	if (schema.marks.underline) map['Mod-u'] = toggleMark(schema.marks.underline);
 	if (inline) {
-		// One textblock only: swallow Enter so no second block is attempted.
+		// One textblock only: swallow Enter so no second block is attempted. One *line*
+		// only too (`Content::is_inline`), so Shift-Enter goes with it: the schema
+		// declares no break node, and a declined key is the browser's, whose native
+		// `<br>` is the one thing that could put a second line in a field that holds one.
 		map['Enter'] = () => true;
+		map['Shift-Enter'] = () => true;
 	} else {
 		// Each binding falls through to `baseKeymap` when no link claims the key.
 		Object.assign(map, bodyKeymap(schema, slash));

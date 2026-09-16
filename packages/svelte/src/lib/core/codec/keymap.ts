@@ -13,6 +13,11 @@
 // about the body itself — the one position no surface owns, its very start — and a
 // link reading a caret's own surface would answer there first and never let it run.
 //
+// The break link is no surface either: Shift-Enter is the caret's own line wherever it
+// is pressed. It sits behind the code link, the one surface holding a nearer answer to
+// that key — inside a fence the line is the newline Enter already takes — and no link
+// below it binds the key at all.
+//
 // A table island's cell traversal is not a link here: it binds on the nested cell
 // view (`table-view.ts`), a keymap over a different document, so a key a cell
 // handled never reaches this map at all.
@@ -24,6 +29,7 @@ import { chainCommands } from 'prosemirror-commands';
 import type { Command } from 'prosemirror-state';
 import { atomKeymap } from './atoms.js';
 import { blockKeymap } from './blocks.js';
+import { breakKeymap } from './breaks.js';
 import { codeKeymap } from './code.js';
 import { listKeymap } from './lists.js';
 import { slashKeymap } from './slash.js';
@@ -56,6 +62,7 @@ export function bodyKeymap(schema: Schema, slash?: boolean): Record<string, Comm
 		...links,
 		blockKeymap(schema),
 		codeKeymap(schema),
+		breakKeymap(schema),
 		listKeymap(schema),
 		atomKeymap(schema)
 	);

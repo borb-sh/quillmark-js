@@ -42,6 +42,11 @@ function keyTr(state: EditorState, key: string): Transaction {
 	return out;
 }
 
+/** A state with the caret at PM position `pos`: where a key is pressed mid-block. */
+function caretAt(state: EditorState, pos: number): EditorState {
+	return state.apply(state.tr.setSelection(TextSelection.create(state.doc, pos)));
+}
+
 /** A state with the caret at the head of the `index`-th textblock. */
 function atHead(state: EditorState, index: number): EditorState {
 	const block = textblocks(state.doc)[index];
@@ -105,9 +110,9 @@ describe('lower ∘ apply matches PM', () => {
 	it('multi-op: insert then delete elsewhere', () => {
 		lowerApply(md('alpha beta gamma'), (s) => s.tr.insertText('ZZ', 6).delete(0, 2));
 	});
-	it('Shift+Enter — a hard break lowers via setContinues (op path, not install)', () => {
+	it('Shift+Enter — a hard break lowers via setContinues', () => {
 		const { stored, bundle } = lowerApply(md('one two'), (s) =>
-			s.tr.insert(4, blockSchema.nodes.hard_break.create())
+			keyTr(caretAt(s, 4), 'Shift-Enter')
 		);
 		expect(stored.lines).toHaveLength(2);
 		expect(!!stored.lines[1].continues).toBe(true);
