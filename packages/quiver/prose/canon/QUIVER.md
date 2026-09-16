@@ -71,7 +71,7 @@ Bundle and manifest names carry 32 hex chars; the width answers a chosen prefix 
 
 **The check is integrity, not provenance.** It says the bytes are the bytes the name claims and nothing about who packed them, so what a consumer owns is the choice of source, stated for them in the [README](../../README.md#what-a-quiver-is-trusted-to-be).
 
-**A bundle carries a budget**: a ceiling on what it unpacks to, on any one file inside it, and on how many there are, spent off the sizes the central directory declares and refused as `quiver_invalid` before a byte inflates. Deflate tops out near 1032:1, so what a megabyte of zip costs a reader is a gigabyte of resident bytes, and it finds out by allocating them.
+**A bundle carries a budget**: a ceiling on what it unpacks to, on any one file inside it, and on how many there are, spent off the sizes the central directory declares and refused as `quiver_invalid` at the entry that trips it. fflate filters and inflates in one pass, so the entries the budget already took are resident when it throws — bounded, being what fit inside it. Deflate tops out near 1032:1, so what a megabyte of zip costs a reader is a gigabyte of resident bytes, and it finds out by allocating them.
 
 The ceiling is a constant rather than an option a consumer raises, because the check above is integrity and not provenance: what a budget answers is a build that packed something enormous, not an artifact chosen to be hostile, which is a thing to refuse by choosing the source. `packFiles` spends the same budget, so a quill over it is refused by the build that packs it, named, rather than by whatever reads the artifact later. Fonts sit outside it, being store entries the manifest names rather than bundle entries.
 
