@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.6.0 - 2026-09-16
+
 **The carried `@quillmark/wasm` is 0.113.0, and a quill loads under a stricter reader.** Five shapes `quillkit test` passed now fail the load, each naming itself: a `main:` that is not a mapping or carries an unknown key (`quill::invalid_card_schema`), a `ui.group` on a card with no `ui.groups` registry (`quill::implicit_group`, promoted from a warning a binding host never saw), more than 1000 declared fields on one card (`quill::too_many_fields`), a retired `Quill.yaml` key — `must_fill`, `enum`, `ui.order`, `richtext(inline)`, `markdown` — under serde's unknown-key text in place of its own sentence, and a vendored `packages/<dir>/` with no `typst.toml`, which is skipped with a `typst::package_manifest` warning where it used to load under a synthesized `@local/<dir>:0.1.0`. Write the two-line manifest the fallback stood in for.
 
 **The studio hands the document back as a file.** **Download PDF** in the head writes `name@x.y.z.pdf` from the compile the preview is painting, so what is on screen is what is in the file — including a stale paint, which the strip over the preview already names. It is drawn where the quill's backend emits a PDF, that being the one format a document leaves as one file in; `svg` and `png` emit a page apiece. A quill whose PDF spine refuses what its canvas paints says so in that same strip, the emit being a lane the preview does not run. Beside it, **Edit source**'s own download says `.md`, the two doors now naming what they write.
