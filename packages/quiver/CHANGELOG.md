@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.28.0 - 2026-09-16
+
 **The `@quillmark/wasm` peer floor is `>=0.113.0-0`.** Nothing here reads a line, a mark or a container, so the release's closing of the content vocabularies lands outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. What a consumer of those handles meets is on the artifact's own terms: a payload under `attrs`, a name outside a vocabulary refused wherever content is decoded, and a `Quill` whose `metadata` carries its five identity keys and no mirrored backend key. Canvas paint stops being a capability, so `Engine.supportsCanvas` is gone and `BackendDescriptor` is `formats` alone — a registry entry keeps working with a `canvas` key left on it, which is now ignored.
 
 **A quill loads under a stricter reader.** The floor's step refuses shapes a quiver happily packed: a `Quill.yaml` whose `main:` is not a mapping or carries an unknown key (`quill::invalid_card_schema`), a `ui.group` with no `ui.groups` registry (`quill::implicit_group`, at error severity), more than 1000 declared fields on one card (`quill::too_many_fields`), and a vendored `packages/<dir>/` with no `typst.toml`, which is skipped with a `typst::package_manifest` warning instead of loading under a synthesized name. `.quillignore` is not read at all: a bundle carrying one ships it as an ordinary file and whatever it excluded ships too.
