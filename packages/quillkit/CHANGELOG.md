@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The studio hands the document back as a file.** **Download PDF** in the head writes `name@x.y.z.pdf` from the compile the preview is painting, so what is on screen is what is in the file — including a stale paint, which the strip over the preview already names. It is drawn where the quill's backend emits a PDF, that being the one format a document leaves as one file in; `svg` and `png` emit a page apiece. A quill whose PDF spine refuses what its canvas paints says so in that same strip, the emit being a lane the preview does not run. Beside it, **Edit source**'s own download says `.md`, the two doors now naming what they write.
+
 **The carried `@quillmark/wasm` is 0.112.0, and every member of the content vocabulary spells its payload in `attrs`.** A quill under test is unaffected: the respelling is a wire shape, `quillkit check` reads diagnostics rather than content, and a quill's own markdown and Typst are untouched. What moves is a golden held over rendered bytes — coincident marks reorder on the new tie-break and the generated Typst nests their wraps the other way for identical glyphs — so a content hash or a Typst golden recomputes once.
 
 **The previous carried step, 0.111.0, made the PDF spine check what it was trusting.** `quillkit check` refuses two shapes it passed: a pdfform base carrying its own `/AcroForm` (`pdf::existing_acroform`), which shipped a double-form PDF whose behavior was the reader's choice, and a non-finite widget rect (`pdf::bad_rect`), which wrote an unparseable PDF. Both are the quill's to fix — strip the background, correct the `form.json` geometry — and both are PDF output only, SVG and PNG drawing values regardless.
