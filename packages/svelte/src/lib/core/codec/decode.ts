@@ -11,8 +11,7 @@ import { DOMSerializer, type Mark, type Node as PMNode, type Schema } from 'pros
 import type { Content, ContentContainer, ContentLine, ContentMark } from '@quillmark/wasm';
 import { ISLAND_SLOT, type IslandNodeAttrs } from './islands.js';
 import { descriptorOf, markKey, pmMarkFromContent } from './marks.js';
-import { hasMarks, isInlineSchema } from './schema.js';
-import { isAnchorMark, isCodeLine, isHeadingLine, isListItemContainer } from '@quillmark/wasm';
+import { hasMarks, isInlineSchema, takesLineBreak } from './schema.js';
 
 /** Code points of `s` (USV units): the iteration granularity the content speaks. */
 export function codePoints(s: string): string[] {
@@ -63,7 +62,7 @@ export function decode(rt: Content, schema: Schema): PMNode {
 	// plaintext field that acquired one anyway — an older build's popover, a hand-
 	// written document — is exactly the content that must open and then heal on the
 	// next commit, not throw here.
-	const marks = hasMarks(schema) ? rt.marks.filter((m) => !isAnchorMark(m)) : [];
+	const marks = hasMarks(schema) ? rt.marks.filter((m) => m.type !== 'anchor') : [];
 	const cursor: IslandCursor = { i: 0, rt };
 
 	if (isInlineSchema(schema)) {
@@ -125,23 +124,19 @@ function groupBlocks(
 			continue;
 		}
 		const here = path[depth];
-		// `ContentContainer` is an open set: a bare `here.container === 'x'` does not
-		// narrow, so the two arms this schema builds are claimed by the boundary's
-		// guard and a literal check, and everything else is an unknown the inert
-		// wrapper carries (CODEC §Open sets); no branch degrades silently.
-		if (isListItemContainer(here)) {
+		if (here.container === 'list_item') {
 			// Gather the maximal run of sibling `list_item` leaves at this depth
 			// (same ordered/start), then split it into items by `ordinal`.
 			const { ordered, start } = here.attrs;
-			const { instance } = here;
+			const instance = instanceOf(here);
 			let j = i + 1;
 			while (j < leaves.length) {
 				const c = atDepth(leaves[j], depth);
-				if (!c || !isListItemContainer(c)) break;
+				if (!c || c.container !== 'list_item') break;
 				if (c.attrs.ordered !== ordered || c.attrs.start !== start) break;
 				// `instance` is the boundary between two adjacent lists; the normalizer
 				// numbers a run's `ordinal`s gaplessly from 0, so a reset carries none.
-				if (c.instance !== instance) break;
+				if (instanceOf(c) !== instance) break;
 				j++;
 			}
 			const run = leaves.slice(i, j);
@@ -164,9 +159,11 @@ function groupBlocks(
 			i = j;
 			continue;
 		}
-		// quote and every unknown container share one shape: a wrapper over the run
-		// of leaves carrying the identical container here (identity by `containerKey`,
-		// so two adjacent unknowns differing only in `attrs` stay two wrappers).
+		// The quote, and the whole of what is left: `satisfies` is the exhaustiveness
+		// check, so a container added upstream is a compile error here rather than a
+		// blockquote it is not. A wrapper over the run of leaves carrying the identical
+		// container here, identity by `containerKey`.
+		here.container satisfies 'quote';
 		const key = containerKey(here);
 		let j = i + 1;
 		while (j < leaves.length) {
@@ -175,14 +172,7 @@ function groupBlocks(
 			j++;
 		}
 		const inner = groupBlocks(schema, leaves.slice(i, j), depth + 1, marks, cursor);
-		out.push(
-			here.container === 'quote'
-				? schema.nodes.blockquote.create(null, inner)
-				: schema.nodes.unknown_container.create(
-						{ container: here.container, attrs: 'attrs' in here ? here.attrs : null },
-						inner
-					)
-		);
+		out.push(schema.nodes.blockquote.create(null, inner));
 		i = j;
 	}
 	return out;
@@ -193,62 +183,77 @@ function atDepth(leaf: Leaf, depth: number): ContentContainer | undefined {
 }
 
 /** The `ordinal` of a leaf's `list_item` at `depth`: only called inside a run the
- * guard has already established, so a miss is unreachable. */
+ * discriminant has already established, so a miss is unreachable. */
 function ordinalAt(leaf: Leaf, depth: number): number {
 	const c = atDepth(leaf, depth);
-	return c && isListItemContainer(c) ? c.attrs.ordinal : -1;
+	return c?.container === 'list_item' ? c.attrs.ordinal : -1;
 }
 
-/** Identity of a container for run gathering: its name, its `instance` and its payload,
- * NUL-joined as `markKey` joins a mark's, so no `attrs` content can forge a name
- * boundary. `instance` is what tells one container from an adjacent sibling of identical
- * shape, which contiguity alone reads as one. Every arm but `list_item` (which has its
- * own run rule) keys here. */
+/** A container's `instance`, absent meaning the zero a canonical read omits. It is what
+ * tells one container from an adjacent sibling of identical shape, which contiguity
+ * alone reads as one, so absent and `0` have to answer alike. */
+function instanceOf(c: ContentContainer): number {
+	return c.instance ?? 0;
+}
+
+/** Identity of a container for run gathering: its name and its `instance`, NUL-joined
+ * as `markKey` joins a mark's. `list_item` carries its own run rule, so the quote is
+ * what keys here. */
 function containerKey(c: ContentContainer): string {
-	const id = `${c.container}\u0000${c.instance}`;
-	return 'attrs' in c ? `${id}\u0000${JSON.stringify(c.attrs)}` : id;
+	return `${c.container}\u0000${instanceOf(c)}`;
 }
 
-/** A single leaf block node (para/heading/code/rule/island, or an unknown kind
- * carried on a paragraph) from its segments. `kind` is an open set, so the two
- * payload-carrying arms read through the boundary's guards; the payload-free arms
- * compare literally, and anything left is unknown. */
+/** A single leaf block node from its segments. Exhaustive over the closed line
+ *  vocabulary, so a kind added upstream is a compile error rather than a silent
+ *  flattening to `para` that the next commit would store. */
 function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: IslandCursor): PMNode {
 	const line = leaf.line;
-	if (line.kind === 'rule') return schema.nodes.horizontal_rule.create();
-	if (line.kind === 'island') {
-		return schema.nodes.island_block.create(islandAttrs(cursor));
+	switch (line.kind) {
+		case 'rule':
+			return schema.nodes.horizontal_rule.create();
+		case 'island': {
+			const attrs = islandAttrs(cursor);
+			return attrs ? schema.nodes.island_block.create(attrs) : schema.nodes.paragraph.create();
+		}
+		case 'code': {
+			// One code_block: the segments' texts joined by literal `\n`, no marks.
+			const text = leaf.segments.map((s) => s.text).join('\n');
+			const content = text.length ? [schema.text(text)] : [];
+			return schema.nodes.code_block.create({ lang: line.attrs?.lang ?? null }, content);
+		}
+		case 'para':
+		case 'heading': {
+			// Inline content, the segment boundary a `hard_break` in a paragraph and a space
+			// in a heading, which takes none (`schema.ts` §`takesLineBreak`). A stored heading
+			// carries no continuation — the store clears one after a block of a single line —
+			// so the space is what keeps a hand-built content decodable.
+			const type = line.kind === 'heading' ? schema.nodes.heading : schema.nodes.paragraph;
+			const inline: PMNode[] = [];
+			leaf.segments.forEach((seg, idx) => {
+				if (idx > 0)
+					inline.push(takesLineBreak(type) ? schema.nodes.hard_break.create() : schema.text(' '));
+				inline.push(...buildInline(schema, seg.text, seg.startUSV, marks, cursor, false));
+			});
+			return line.kind === 'heading'
+				? type.create({ level: line.attrs.level }, inline)
+				: type.create(null, inline);
+		}
+		default: {
+			const unreached: never = line;
+			return unreached;
+		}
 	}
-	if (isCodeLine(line)) {
-		// One code_block: the segments' texts joined by literal `\n`, no marks.
-		const text = leaf.segments.map((s) => s.text).join('\n');
-		const content = text.length ? [schema.text(text)] : [];
-		return schema.nodes.code_block.create({ lang: line.attrs?.lang ?? null }, content);
-	}
-	// para / heading / unknown: inline content, `hard_break` between continued segments.
-	const inline: PMNode[] = [];
-	leaf.segments.forEach((seg, idx) => {
-		if (idx > 0) inline.push(schema.nodes.hard_break.create());
-		inline.push(...buildInline(schema, seg.text, seg.startUSV, marks, cursor, false));
-	});
-	if (isHeadingLine(line)) {
-		return schema.nodes.heading.create({ level: line.attrs.level }, inline);
-	}
-	// An unknown kind renders as a paragraph and rides on it, so it re-encodes
-	// verbatim rather than flattening to `para` on the field's first edit.
-	const unknown =
-		line.kind === 'para' ? null : { kind: line.kind, attrs: 'attrs' in line ? line.attrs : null };
-	return schema.nodes.paragraph.create({ unknown }, inline);
 }
 
 /** Consume the next island entry as PM node attrs (text-order matched to slots):
  *  the whole entry, `loss` included, which an island edit has to write back
- *  (`islands.ts`). A slot with no entry behind it is a malformed content; the empty
- *  attrs keep the decode total rather than throwing on a read. */
-function islandAttrs(cursor: IslandCursor): IslandNodeAttrs {
+ *  (`islands.ts`). `null` where a slot has no entry behind it, which is a malformed
+ *  content: the slot draws an empty paragraph or nothing at all, so the decode stays
+ *  total without minting a node whose `type` the vocabulary would refuse on the way
+ *  back. */
+function islandAttrs(cursor: IslandCursor): IslandNodeAttrs | null {
 	const isl = cursor.rt.islands[cursor.i++];
-	if (!isl) return { id: '', islandType: '', props: null, loss: 'unrepresentable' };
-	return { id: isl.id, islandType: isl.type, props: isl.props, loss: isl.loss };
+	return isl ? { id: isl.id, islandType: isl.type, props: isl.props, loss: isl.loss } : null;
 }
 
 /**
@@ -293,7 +298,7 @@ function buildInline(
 		if (cp === ISLAND_SLOT) {
 			flush();
 			const attrs = islandAttrs(cursor);
-			if (!stripIslands && schema.nodes.island_inline) {
+			if (attrs && !stripIslands && schema.nodes.island_inline) {
 				out.push(schema.nodes.island_inline.create(attrs));
 			}
 			runKey = '\0slot'; // force a fresh run after a slot

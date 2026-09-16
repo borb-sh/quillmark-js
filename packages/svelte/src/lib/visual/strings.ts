@@ -140,9 +140,9 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
  * - **`edit::field_coercion_failed`**: re-words from the app's own control state, the
  *   refused value being in neither document (unchanged on throw) nor schema.
  * - **`parse::yaml_error_with_location`, `invalid_structure`**: does not re-word. No
- *   `path`, and `args` carries the location (`blockIndex`, `line`) and nothing else,
- *   engine prose riding under no key: the parser's own text, its column and its caret
- *   snippet exist only inside `message`.
+ *   `path`; `args` names the block (`blockIndex`) and `location` places the failure in
+ *   the document's own coordinates, engine prose riding under no key: the parser's own
+ *   text, its column and its caret snippet exist only inside `message`.
  * - **`LiveSession.warnings`**: does not re-word. Backend text, an external feed.
  *
  * The last two are the boundary's shape, not a gap in it, so the fallback arm is

@@ -20,10 +20,9 @@ beforeAll(() => {
 });
 
 /** A report-only session stub: only the geometry verbs the loop calls at build. */
-function mockSession(pageCount: number, supportsCanvas = true): LiveSession {
+function mockSession(pageCount: number): LiveSession {
 	return {
 		pageCount,
-		supportsCanvas,
 		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
 		paint: () => ({
 			layoutWidth: 612,
@@ -177,48 +176,6 @@ describe('a recompile re-locates the followed caret', () => {
 		expect(preview.scrollToField('main.date')).toBe(false);
 		preview.refresh(change(1));
 		expect(located).toEqual([['main.body', 12]]);
-		preview.destroy();
-	});
-});
-
-// `supportsCanvas` must gate the view (runtime.d.ts says re-check the
-// getter after `open`), and the gate is re-read per compile so a non-paintable
-// compile that later becomes paintable recovers; the zero-page escape, generalized.
-describe('preview controller supportsCanvas gating', () => {
-	let container: HTMLDivElement;
-	beforeEach(() => {
-		container = document.createElement('div');
-		document.body.appendChild(container);
-	});
-	const pages = () => container.querySelectorAll('.qm-page-slot').length;
-
-	it('a compile with pages the boundary cannot raster shows the unsupported message, not blank pages', () => {
-		const preview = createPreview(mockSession(2, false), { container });
-		expect(container.querySelector('.qm-preview-unsupported')).toBeTruthy();
-		expect(container.querySelector('.qm-preview-empty')).toBeFalsy();
-		expect(pages()).toBe(0);
-		preview.destroy();
-	});
-
-	it('a non-canvas compile that becomes paintable on a later apply escapes the message', () => {
-		let paintable = false;
-		// A live getter so `render` re-reads the capability per compile (a real
-		// session's getter reflects the last-good compile after `apply`).
-		const session = {
-			...mockSession(2),
-			get supportsCanvas() {
-				return paintable;
-			}
-		} as unknown as LiveSession;
-
-		const preview = createPreview(session, { container });
-		expect(container.querySelector('.qm-preview-unsupported')).toBeTruthy();
-		expect(pages()).toBe(0);
-
-		paintable = true;
-		preview.refresh(change(2));
-		expect(container.querySelector('.qm-preview-message')).toBeFalsy();
-		expect(pages()).toBe(2);
 		preview.destroy();
 	});
 });

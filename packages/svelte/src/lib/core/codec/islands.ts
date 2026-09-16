@@ -1,35 +1,34 @@
 // Islands: the `U+FFFC` slot + `ContentIsland` entry ↔ a PM leaf node. A slot
 // inside a `para` line is an inline island (an image); an `island`-kind line is a
-// block island (a table). The node carries `id`, `islandType`, and the opaque
-// `props` verbatim, so an unknown island type round-trips untouched.
+// block island (a table). The node carries `id`, `islandType` and `props` verbatim.
 //
 // A props-aware consumer reads the shape straight off the boundary:
 // `ContentIsland.props` is the typed union (`TableProps` for `table`,
 // `ImageProps` for `image`; DOCUMENT_MODEL §Stability seams), so the codec
-// reads it rather than hand-rolling a shape or guard. The open `type` arm means
-// a discriminant check does not auto-narrow `props`; key off `type` and read
-// `props` as the matching upstream type.
+// reads it rather than hand-rolling a shape. `type` is a closed set, so a
+// discriminant check narrows it; `props` still crosses the DOM as opaque JSON,
+// which is what §`tablePropsOfNode` guards.
 import { Fragment, Slice, type Node as PMNode, type NodeSpec } from 'prosemirror-model';
 import { Plugin } from 'prosemirror-state';
-import { isTableIsland } from '@quillmark/wasm';
 import type { ContentIsland, TableCell, TableProps } from '@quillmark/wasm';
+import { storableUrl } from './urls.js';
 
 /** The `U+FFFC` object-replacement char that occupies one island slot in `text`. */
 export const ISLAND_SLOT = '￼';
 
 // The four island node attributes carry the content entry verbatim: `id` is the
 // stable identity (rebases like an anchor), `islandType` the discriminator, `props`
-// the opaque payload the codec preserves byte-for-byte across a round-trip, and
-// `loss` how faithfully markdown can carry it. `loss` is authored, not derived:
-// `applyChange` stores the class an island op gives it and re-derives nothing, so
-// an entry that did not carry its own would promote a degraded table to lossless
-// on the first cell edit. The default is the class an unknown one reads as, so a
-// node no decode produced under-claims rather than over-claims; decode always
-// supplies the stored value.
+// the payload the codec preserves byte-for-byte across a round-trip, and `loss` how
+// faithfully markdown can carry it. `islandType` and `props` declare no default: a
+// node standing for an island holds one, so the pair is supplied at every `create`.
+// `loss` is authored, not derived: `applyChange` stores the class an island op gives
+// it and re-derives nothing, so an entry that did not carry its own would promote a
+// degraded table to lossless on the first cell edit. Its default is the weakest
+// claim; decode always supplies the stored value.
 const islandAttrs = {
 	id: { default: '' },
-	islandType: { default: '' },
-	props: { default: null },
+	islandType: {},
+	props: {},
 	loss: { default: 'unrepresentable' }
 };
 
@@ -50,13 +49,31 @@ function islandDOM(node: PMNode): Record<string, string> {
 	};
 }
 
-/** An island node's attributes off that DOM, or `false` where the id is absent. A
- *  `props` that is not the JSON written above reads as `null`, and one of the wrong
- *  shape is `undefined` at its reader (§`tablePropsOfNode`): the entry survives as an
- *  island of its type rather than taking the paste down with it. */
+// The two closed sets an element claims a value from. A `Record` over the boundary's own
+// union rather than a literal check, so a member added upstream is a missing key here
+// rather than a silent refusal at the one door with no decode behind it.
+
+/** The island types the content model names. */
+const ISLAND_TYPES: Record<ContentIsland['type'], true> = { table: true, image: true };
+
+/** The loss classes it names, weakest last: an unrecognized claim takes that one. */
+const LOSS_CLASSES: Record<ContentIsland['loss'], true> = {
+	lossless: true,
+	degraded: true,
+	unrepresentable: true
+};
+
+/** An island node's attributes off that DOM, or `false` where the id is absent or the
+ *  type is one the content vocabulary does not name — a name no read produces and no
+ *  write takes, so the element's text arrives as text. A `props` that is not the JSON
+ *  written above reads as `null`, and one of the wrong shape is `undefined` at its
+ *  reader (§`tablePropsOfNode`): the entry survives as an island of its type rather
+ *  than taking the paste down with it. */
 function islandAttrsFromDOM(el: HTMLElement): IslandNodeAttrs | false {
 	const id = el.getAttribute('data-qm-island-id');
-	if (id == null) return false;
+	// Asserted off an untrusted attribute and checked against the set on the next line.
+	const type = el.getAttribute('data-qm-island') as ContentIsland['type'] | null;
+	if (id == null || type == null || !ISLAND_TYPES[type]) return false;
 	const raw = el.getAttribute('data-qm-island-props');
 	let props: unknown = null;
 	try {
@@ -64,12 +81,23 @@ function islandAttrsFromDOM(el: HTMLElement): IslandNodeAttrs | false {
 	} catch {
 		props = null;
 	}
-	return {
-		id,
-		islandType: el.getAttribute('data-qm-island') ?? '',
-		props,
-		loss: (el.getAttribute('data-qm-island-loss') ?? 'unrepresentable') as ContentIsland['loss']
-	};
+	return { id, islandType: type, props: storableProps(type, props), loss: lossFromDOM(el) };
+}
+
+/** The `loss` an element claims, or the weakest class for a claim outside the set:
+ *  an under-claim keeps a degraded island from re-crossing as a lossless one. */
+function lossFromDOM(el: HTMLElement): ContentIsland['loss'] {
+	const raw = el.getAttribute('data-qm-island-loss') as ContentIsland['loss'] | null;
+	return raw != null && LOSS_CLASSES[raw] ? raw : 'unrepresentable';
+}
+
+/** `props` with the one key the authored lane refuses made storable: an `image`'s `url`
+ *  carrying a line ending, which `IslandOp` and `overwrite` throw on. The rest crosses
+ *  opaque, as it did on the way out. */
+function storableProps(type: ContentIsland['type'], props: unknown): unknown {
+	if (type !== 'image' || typeof props !== 'object' || props === null) return props;
+	const url = (props as { url?: unknown }).url;
+	return typeof url === 'string' ? { ...props, url: storableUrl(url) } : props;
 }
 
 /** Block island node (a table): one `island`-kind content line. Atom, unselectable content. */
@@ -94,24 +122,28 @@ export const islandInlineSpec: NodeSpec = {
 };
 
 /** A PM island node's attributes: the content entry, spelled the way a node spec
- *  spells it (`islandType`, because `type` on a PM node is the node type). `loss`
- *  reads its class off the entry rather than restating the union, which the public
- *  entry point does not name (DOCUMENT_MODEL §Stability seams). */
+ *  spells it (`islandType`, because `type` on a PM node is the node type). `islandType`
+ *  and `loss` read their sets off the entry rather than restating them, the public entry
+ *  point naming neither (DOCUMENT_MODEL §Stability seams). */
 export interface IslandNodeAttrs {
 	id: string;
-	islandType: string;
+	islandType: ContentIsland['type'];
 	props: unknown;
 	loss: ContentIsland['loss'];
 }
 
-/** Build a content island entry from a PM island node's attrs (block or inline). */
+/** Build a content island entry from a PM island node's attrs (block or inline). The
+ *  cast pairs a closed `type` with a `props` that crossed the DOM as opaque JSON. The
+ *  store is lenient about a table's shape — it fills what it can and keeps the rest —
+ *  so a payload the arm does not hold is stored rather than refused, and `undefined` at
+ *  its reader is what the surface draws the placeholder for (§`tablePropsOfNode`). */
 export function islandEntryFromNode(attrs: IslandNodeAttrs): ContentIsland {
 	return {
 		id: attrs.id,
 		type: attrs.islandType,
 		props: attrs.props,
 		loss: attrs.loss
-	};
+	} as ContentIsland;
 }
 
 /** The `TableProps` shape, over a value that reached the node off the DOM rather than
@@ -131,13 +163,13 @@ function isTableProps(props: unknown): props is TableProps {
 }
 
 /** A node's `TableProps`, or `undefined` for any other island and for a payload of the
- *  wrong shape: the boundary's own guard over the entry the node carries, so the open
- *  `type` arm narrows once here rather than at each reader. The type says which reader,
- *  the shape says whether it can read; every caller draws the placeholder for
- *  `undefined` (`table-view.ts` §`render`). */
+ *  wrong shape: the boundary's own guard over the entry the node carries, so a `props`
+ *  that crossed the DOM is read once here rather than at each reader. The type says
+ *  which reader, the shape says whether it can read; every caller draws the placeholder
+ *  for `undefined` (`table-view.ts` §`render`). */
 export function tablePropsOfNode(node: PMNode): TableProps | undefined {
-	const entry = islandEntryFromNode(node.attrs as IslandNodeAttrs);
-	return isTableIsland(entry) && isTableProps(entry.props) ? entry.props : undefined;
+	const attrs = node.attrs as IslandNodeAttrs;
+	return attrs.islandType === 'table' && isTableProps(attrs.props) ? attrs.props : undefined;
 }
 
 /**

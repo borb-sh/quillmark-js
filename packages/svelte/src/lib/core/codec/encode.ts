@@ -11,7 +11,6 @@
 // auto-rebases the marks already in the field; `mapMarks` answers where that leaves
 // them, so `markOps` are the difference from that answer and stay coverage-precise.
 import type { Mark, Node as PMNode } from 'prosemirror-model';
-import { isAnchorMark } from '@quillmark/wasm';
 import type {
 	ChangeBundle,
 	Delta,
@@ -23,7 +22,8 @@ import type {
 	ContentIsland,
 	ContentLine,
 	ContentLineKind,
-	ContentMark
+	ContentMark,
+	ContentMarkKind
 } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
 import { codePoints, usvLength } from './decode.js';
@@ -122,7 +122,7 @@ function scanBlocks(
 
 /** A block's container run shape, `ordinal` and `instance` aside; null where it opens
  * no container. A list's `start` is not in it — the store welds two runs differing only
- * there — and an unknown's `attrs` is, as `containerKey` reads it on the way back. */
+ * there. */
 function runShape(node: PMNode): string | null {
 	switch (node.type.name) {
 		case 'blockquote':
@@ -131,8 +131,6 @@ function runShape(node: PMNode): string | null {
 			return 'list\u0000bullet';
 		case 'ordered_list':
 			return 'list\u0000ordered';
-		case 'unknown_container':
-			return `unknown\u0000${node.attrs.container}\u0000${JSON.stringify(node.attrs.attrs)}`;
 		default:
 			return null;
 	}
@@ -184,12 +182,9 @@ function scanBlock(
 			acc.lastContentEndPm = nodePos + 1;
 			break;
 		case 'blockquote':
-			scanBlocks(acc, node, contentStart, [...containers, { container: 'quote', instance }]);
-			break;
-		case 'unknown_container':
 			scanBlocks(acc, node, contentStart, [
 				...containers,
-				{ container: node.attrs.container as string, attrs: node.attrs.attrs, instance }
+				withInstance({ container: 'quote' }, instance)
 			]);
 			break;
 		case 'bullet_list':
@@ -198,11 +193,10 @@ function scanBlock(
 			const start = ordered ? (node.attrs.start as number) : 1;
 			let itemPos = contentStart;
 			node.forEach((item, _off, index) => {
-				const container: ContentContainer = {
-					container: 'list_item',
-					attrs: { ordered, start, ordinal: index },
+				const container = withInstance(
+					{ container: 'list_item', attrs: { ordered, start, ordinal: index } },
 					instance
-				};
+				);
 				scanBlocks(acc, item, itemPos + 1, [...containers, container]);
 				itemPos += item.nodeSize;
 			});
@@ -215,13 +209,18 @@ function scanBlock(
 	}
 }
 
-/** A textblock's line kind: a heading's `level`, or (for a paragraph) `para`, or
- * the unknown kind it carries (schema.ts) re-emitted verbatim. */
+/** A textblock's line kind: a heading's `level`, or (for a paragraph) `para`. */
 function textblockKind(node: PMNode): ContentLineKind {
 	if (node.type.name === 'heading')
 		return { kind: 'heading', attrs: { level: node.attrs.level as number } };
-	const u = node.attrs.unknown as { kind: string; attrs: unknown } | null;
-	return u ? { kind: u.kind, attrs: u.attrs } : { kind: 'para' };
+	return { kind: 'para' };
+}
+
+/** A container with its run `instance`, spelled only where it is not the zero a
+ * canonical read omits: the projection is compared against such a read
+ * (`lineMetaEqual`), so the two have to spell one container one way. */
+function withInstance<T extends ContentContainer>(container: T, instance: number): T {
+	return instance === 0 ? container : { ...container, instance };
 }
 
 /** Open a new content line: emit the boundary `\n` (except the first line) + record. */
@@ -284,11 +283,7 @@ function emitText(acc: Acc, s: string, pmStart: number, marks: readonly Mark[]):
 	acc.runs.push({ kind: 'text', pmStart, usvStart, s });
 	appendText(acc, s);
 	for (const mark of marks) {
-		acc.rawMarks.push({
-			start: usvStart,
-			end: acc.usvEnd,
-			...contentDescriptorFromPM(mark)
-		} as ContentMark);
+		acc.rawMarks.push({ start: usvStart, end: acc.usvEnd, ...contentDescriptorFromPM(mark) });
 	}
 }
 
@@ -301,7 +296,7 @@ function emitText(acc: Acc, s: string, pmStart: number, marks: readonly Mark[]):
 function mergeMarks(raw: ContentMark[]): ContentMark[] {
 	const out: ContentMark[] = [];
 	for (const g of groupFormatting(raw).values()) {
-		for (const iv of union(g.intervals)) out.push({ ...iv, ...g.descriptor } as ContentMark);
+		for (const iv of union(g.intervals)) out.push({ ...iv, ...g.descriptor });
 	}
 	// Stable, content-like order: by start, then end.
 	return out.sort((a, b) => a.start - b.start || a.end - b.end);
@@ -421,10 +416,8 @@ function diffLines(oldRt: Content, newRt: Content, delta: Delta | undefined): Li
 }
 
 /** A line minus its `containers` / `continues` envelope: exactly `setKind`'s
- * payload, which the boundary names `ContentLineKind`. Lifting it whole is what
- * keeps this arm-agnostic: `kind` is an open set, so an arm-by-arm switch would
- * have to guess at the unknown arm's payload and would drift on every arm
- * upstream adds. */
+ * payload, which the boundary names `ContentLineKind`. Lifting it whole is what keeps
+ * this arm-agnostic, so an arm added upstream reaches the op by construction. */
 function kindPart(l: ContentLine): ContentLineKind {
 	const { containers: _containers, continues: _continues, ...kind } = l;
 	return kind;
@@ -445,8 +438,8 @@ function lineMetaEqual(a: ContentLine[], b: ContentLine[]): boolean {
 }
 
 /** A line kind's comparison key: key-order-insensitive at every depth, because the two
- * sides come from different producers (a WASM read and this scan) and an unknown kind
- * carries a nested `attrs` bag. */
+ * sides come from different producers (a WASM read and this scan) and a kind carries a
+ * nested `attrs` bag. */
 function kindKey(l: ContentLine): string {
 	return canonicalJson(kindPart(l));
 }
@@ -549,12 +542,9 @@ interface Interval {
 	end: number;
 }
 
-/** Formatting/unknown marks → add/remove ops; anchors → add/removeAnchor by id.
- *
- * Every op here spells its payload under `attrs`, which is what the wire takes: it
- * refuses the sibling spelling as a `legacy mark payload`. `MarkOp` still declares
- * the siblings, so the casts below are load-bearing rather than a spread's formality
- * — a checker reports neither shape. */
+/** Formatting marks → add/remove ops; anchors → add/removeAnchor by id. A `MarkOp`'s
+ * `add` / `remove` is a `ContentMark` under an op, so a descriptor spreads in whole and
+ * the wire's `attrs` spelling is the one a checker admits. */
 function diffMarks(oldRt: Content, newRt: Content, moved: ChangeBundle, opts: LowerOpts): MarkOp[] {
 	const ops: MarkOp[] = [];
 	// The store's answer for where `moved`'s text channels leave the field's marks;
@@ -573,9 +563,9 @@ function diffMarks(oldRt: Content, newRt: Content, moved: ChangeBundle, opts: Lo
 		const oldCov = union((oldG?.intervals ?? []).filter((iv) => iv.end > iv.start));
 		const newCov = union((newG?.intervals ?? []).filter((iv) => iv.end > iv.start));
 		for (const iv of subtract(oldCov, newCov))
-			ops.push({ op: 'remove', start: iv.start, end: iv.end, ...descriptor } as MarkOp);
+			ops.push({ op: 'remove', start: iv.start, end: iv.end, ...descriptor });
 		for (const iv of subtract(newCov, oldCov))
-			ops.push({ op: 'add', start: iv.start, end: iv.end, ...descriptor } as MarkOp);
+			ops.push({ op: 'add', start: iv.start, end: iv.end, ...descriptor });
 	}
 
 	// Anchors: diff the decoration sets by id (positions already in final coords).
@@ -585,7 +575,7 @@ function diffMarks(oldRt: Content, newRt: Content, moved: ChangeBundle, opts: Lo
 		for (const [id, pos] of newA) {
 			if (!oldA.has(id) || oldA.get(id) !== pos) {
 				if (oldA.has(id)) ops.push({ op: 'removeAnchor', id });
-				ops.push({ op: 'add', start: pos, end: pos, type: 'anchor', attrs: { id } } as MarkOp);
+				ops.push({ op: 'add', start: pos, end: pos, type: 'anchor', attrs: { id } });
 			}
 		}
 		for (const id of oldA.keys()) if (!newA.has(id)) ops.push({ op: 'removeAnchor', id });
@@ -594,7 +584,7 @@ function diffMarks(oldRt: Content, newRt: Content, moved: ChangeBundle, opts: Lo
 }
 
 interface FormattingGroup {
-	descriptor: Record<string, unknown>;
+	descriptor: ContentMarkKind;
 	intervals: Interval[];
 }
 
@@ -602,7 +592,7 @@ interface FormattingGroup {
 function groupFormatting(marks: ContentMark[]): Map<string, FormattingGroup> {
 	const groups = new Map<string, FormattingGroup>();
 	for (const m of marks) {
-		if (isAnchorMark(m)) continue;
+		if (m.type === 'anchor') continue;
 		const descriptor = descriptorOf(m);
 		const key = markKey(descriptor);
 		let g = groups.get(key);

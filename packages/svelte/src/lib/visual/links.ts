@@ -8,7 +8,7 @@
 // transaction so the mark diff lowers it as one link family exchanged for another
 // (`codec/marks.ts` keys a link on type+url).
 import type { Command, EditorState } from 'prosemirror-state';
-import { rendersHref } from '../core/codec/index.js';
+import { rendersHref, storableUrl } from '../core/codec/index.js';
 
 /** A scheme: a letter, then letters, digits, `+`, `-` or `.`, then `:` (RFC 3986). */
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
@@ -40,7 +40,7 @@ const HOST_PORT = /^[a-z0-9.-]+:\d+([/?#]|$)/i;
  * own exit rather than storing a link that draws as plain text.
  */
 export function normalizeHref(raw: string): string {
-	const value = raw.trim();
+	const value = storableUrl(raw.trim());
 	if (!value) return '';
 	if (!rendersHref(value) && !HOST_PORT.test(value)) return '';
 	if (SCHEME.test(value) && rendersHref(value)) return value;

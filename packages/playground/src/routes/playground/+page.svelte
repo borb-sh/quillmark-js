@@ -232,7 +232,11 @@
 	function download(): void {
 		if (!session) return;
 		try {
+			// Clocked here rather than read off the result: the emit is a synchronous call
+			// on a session this turn owns, so the wall time around it is the render's.
+			const started = performance.now();
 			const result = session.render({ format: 'pdf' });
+			const elapsedMs = performance.now() - started;
 			const artifact = result.artifacts[0];
 			if (!artifact) throw new Error(`${quillHandle?.backendId ?? 'the backend'} emitted no PDF`);
 			// The bytes cross as `Uint8Array<ArrayBufferLike>`, where `BlobPart` takes an
@@ -247,7 +251,7 @@
 			// has taken the URL by the time it returns.
 			a.click();
 			URL.revokeObjectURL(url);
-			lastEmit = `${artifact.bytes.length} B in ${Math.round(result.renderTimeMs)} ms`;
+			lastEmit = `${artifact.bytes.length} B in ${Math.round(elapsedMs)} ms`;
 		} catch (e) {
 			lastEmit = `failed: ${e instanceof Error ? e.message : String(e)}`;
 		}
@@ -303,15 +307,15 @@
 		try {
 			// Dynamic: the WASM binary and VisualEditor's ProseMirror stack are the
 			// route's heaviest payload and nothing before paint needs them, so they load
-			// after mount. `init` instantiates the core and resolves to `Quill` and
-			// `Document`, which the artifact exports nowhere statically. The fixture
-			// load awaits the same memoized gate to materialize its quill.
+			// after mount. `init` instantiates the core and resolves to `Quill`, which the
+			// artifact exports nowhere statically. The fixture load awaits the same
+			// memoized gate to materialize its quill.
 			const [{ Engine, MAIN_CARD_ADDR }, { init }, visual] = await Promise.all([
 				import('@quillmark/wasm'),
 				import('@quillmark/svelte/core'),
 				import('@quillmark/svelte/visual')
 			]);
-			const { Quill, Document } = await init();
+			const { Quill } = await init();
 			fixtures = await fixtureNames();
 			const params = new URLSearchParams(window.location.search);
 			const quill = Quill.fromTree(await loadFixtureTree(name));
@@ -324,9 +328,9 @@
 			// seed reaches both the recovery shell and the sessionless shell it draws in.
 			// `?tips` seeds the guidance channel a quill or consumer supplies
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
-			// does not replace the namespace.
+			// does not replace the map.
 			if (params.has('foreign')) {
-				doc.insertCard(Document.makeCard('legacy_kind', {}, 'Trapped legacy body.'));
+				doc.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
 			}
 			if (params.has('tips')) {
 				visual.patchEditorExt(doc, MAIN_CARD_ADDR, {

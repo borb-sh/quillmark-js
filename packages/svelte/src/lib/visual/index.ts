@@ -34,9 +34,8 @@ export type { VisualStrings, VisualStringsInput, FormatDiagnostic } from './stri
 export type { BodyPlaceholder, BodyPlaceholderContext } from './structure.js';
 
 // The `$ext.editor` write unit. A consumer seeding editor-side chrome
-// state (a card title, the tips channel) goes through this rather than
-// `storeExtNamespace`, which replaces the namespace and takes the sibling keys with
-// it.
+// state (a card title, the tips channel) goes through this rather than `storeExt`,
+// which replaces the whole map and takes every sibling with it.
 export { patchEditorExt } from './ext.js';
 
 // What the editor emits. Every hook naming a place speaks the canonical `DocPath`

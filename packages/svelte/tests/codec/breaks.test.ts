@@ -48,6 +48,29 @@ describe('a range across a fence edge', () => {
 	});
 });
 
+// A heading holds no break: it is a block of one line, so the store clears a
+// continuation after one. The space is what every door spells the boundary as, and
+// the three that can reach a heading are asserted here and in `block-keys`.
+describe('a block that holds no break takes a space', () => {
+	it('a fence merged into a heading arrives spaced, not run together', () => {
+		const next = press(sel('# head\n\n```\nalpha\nbeta\n```', 5, 7), 'Backspace');
+		expect(shape(next)).toBe('doc(heading("headalpha beta"))');
+		expect(representable(next)).toBe(true);
+	});
+
+	it('the space carries the marks the break stood under', () => {
+		const doc = blockSchema.nodes.doc.create(null, [
+			blockSchema.nodes.heading.create({ level: 1 }, [
+				blockSchema.text('a\nb', [blockSchema.marks.strong.create()])
+			])
+		]);
+		const state = EditorState.create({ doc, plugins: [linebreakPlugin(blockSchema)] });
+		// `appendTransaction` runs on a doc change, so a keystroke is what triggers it.
+		const next = state.apply(state.tr.insertText('X', 1));
+		expect(shape(next)).toBe('doc(heading(strong("Xa b")))');
+	});
+});
+
 describe('what it leaves alone', () => {
 	it('a code block keeps its own newlines', () => {
 		const doc = decode(md('```\nalpha\nbeta\n```'), blockSchema);

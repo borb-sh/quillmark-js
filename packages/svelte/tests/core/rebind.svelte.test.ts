@@ -26,7 +26,6 @@ beforeAll(() => {
 function mockSession(): LiveSession {
 	return {
 		pageCount: 1,
-		supportsCanvas: true,
 		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
 		paint: () => ({ layoutWidth: 612, layoutHeight: 792, pixelWidth: 612, pixelHeight: 792 }),
 		regions: () => [],

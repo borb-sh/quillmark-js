@@ -129,6 +129,23 @@ describe('mark input rules fire with exact positions', () => {
 	});
 });
 
+// A heading holds no `hard_break` (`schema.ts`), and `setBlockType` clears what a new
+// type cannot hold by deleting it — which joins the text either side with nothing. The
+// retype spaces the break first, which is what the break becomes at every other door.
+describe('`# ` over a paragraph carrying a break', () => {
+	it('spaces the break rather than running the words together', () => {
+		const view = mountView();
+		type(view, 'line one');
+		view.dispatch(view.state.tr.replaceSelectionWith(blockSchema.nodes.hard_break.create()));
+		type(view, 'line two');
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)));
+		type(view, '# ');
+		expect(view.state.doc.toString()).toBe('doc(heading("line one line two"))');
+		expect(representable(view.state)).toBe(true);
+		view.destroy();
+	});
+});
+
 // `list_item` is `block+`, so `list_item > heading` is a shape the content holds and
 // `importMarkdown` produces from `- # title`. A rule declining there would refuse to
 // author what a document can arrive carrying, so `# ` fires inside an item — and is

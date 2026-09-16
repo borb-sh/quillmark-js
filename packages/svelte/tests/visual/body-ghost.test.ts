@@ -52,7 +52,7 @@ describe('the reference quill body channel', () => {
 		expect(card).toBeTruthy();
 		doc.insertCard(card!, doc.cardCount);
 
-		const resolved = q.resolve(doc);
+		const resolved = q.reader(doc).resolve();
 		expect(resolved.cards.at(-1)?.kind).toBe('note');
 		for (const body of [resolved.main.body, resolved.cards.at(-1)?.body]) {
 			const ghost = stringifyGhost(ghostDefault(body ?? undefined));

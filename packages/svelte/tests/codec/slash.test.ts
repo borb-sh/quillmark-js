@@ -140,7 +140,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		pick(field, view, 0, 'quote');
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha');
-		expect(stored.lines[0].containers).toEqual([{ container: 'quote', instance: 0 }]);
+		expect(stored.lines[0].containers).toEqual([{ container: 'quote' }]);
 		field.destroy();
 	});
 
@@ -150,7 +150,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha');
 		expect(stored.lines[0].containers).toEqual([
-			{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 }, instance: 0 }
+			{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }
 		]);
 		field.destroy();
 	});
@@ -159,7 +159,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		const { field, view } = leaf('alpha');
 		pick(field, view, 0, 'numbered-list');
 		expect(field.getContent().lines[0].containers).toEqual([
-			{ container: 'list_item', attrs: { ordered: true, start: 1, ordinal: 0 }, instance: 0 }
+			{ container: 'list_item', attrs: { ordered: true, start: 1, ordinal: 0 } }
 		]);
 		field.destroy();
 	});
@@ -170,8 +170,8 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		const stored = field.getContent();
 		// One list of two items, so the second item is ordinal 1 of the first's list.
 		expect(stored.lines.map((l) => l.containers)).toEqual([
-			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 }, instance: 0 }],
-			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 1 }, instance: 0 }]
+			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }],
+			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 1 } }]
 		]);
 		field.destroy();
 	});
@@ -453,10 +453,10 @@ describe('a pick lands in the container the caret was writing in', () => {
 	}
 
 	/** The `list_item` container an item at `ordinal` carries. */
+	// No `instance`: a canonical read omits the zero, which every container here is.
 	const item = (ordinal: number, ordered = false) => ({
 		container: 'list_item',
-		attrs: { ordered, start: 1, ordinal },
-		instance: 0
+		attrs: { ordered, start: 1, ordinal }
 	});
 
 	it('nests a table in the bullet item the caret was in', () => {
@@ -490,7 +490,7 @@ describe('a pick lands in the container the caret was writing in', () => {
 		const { field, view } = leaf('> alpha');
 		pick(field, view, 0);
 		const stored = field.getContent();
-		expect(stored.lines[1].containers).toEqual([{ container: 'quote', instance: 0 }]);
+		expect(stored.lines[1].containers).toEqual([{ container: 'quote' }]);
 		field.destroy();
 	});
 

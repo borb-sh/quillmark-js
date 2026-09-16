@@ -1,5 +1,5 @@
-// Every word the preview says. Three, because the surface is a canvas and its
-// only prose is the message states that stand in when there is nothing to paint.
+// Every word the preview says: the surface is a canvas, and its only prose is the
+// message states that stand in when there is nothing to paint.
 //
 // Separate from the visual surface's set rather than pooled with it: `/preview`
 // reaches `/core` and nothing editor-side, which is what lets it promote to its own
@@ -8,23 +8,20 @@
 // twice rather than learning two idioms.
 //
 // A plain options field rather than a context channel, unlike the visual surface's:
-// these three are read in one module by one function, so there is no tree to make
-// them ambient for.
+// they are read in one module by one function, so there is no tree to make them
+// ambient for.
 
 export interface PreviewStrings {
 	/** A page the backend refused to raster. */
 	renderFailed: string;
 	/** A compile with zero pages: recoverable, and the commonest state of a fresh seed. */
 	noPages: string;
-	/** A compile whose pages this backend cannot raster at all. */
-	unsupported: string;
 }
 
 /** The package's English. Every key, so the merge below is total. */
 export const DEFAULT_PREVIEW_STRINGS: PreviewStrings = {
 	renderFailed: 'Preview failed to render.',
-	noPages: 'No pages to preview.',
-	unsupported: 'Preview is not available for this document.'
+	noPages: 'No pages to preview.'
 };
 
 /** A consumer's wording: any subset, the rest the package's. */

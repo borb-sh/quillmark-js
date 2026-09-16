@@ -479,7 +479,12 @@
 		const i = cardIndexOf(id);
 		if (i < 0) return;
 		try {
-			doc.setCardKind(i, kind);
+			// Insert the retyped card ahead of the original and drop the original after.
+			// `insertCard` validates the whole card before it mutates and `removeCard`
+			// cannot throw, so a refusal leaves the document as it was; the reverse order
+			// would leave it a card short.
+			doc.insertCard({ ...doc.card(i), kind }, i);
+			doc.removeCard(i + 1);
 			bump('structure', id, i);
 		} catch (e) {
 			reportError(onError, {
@@ -630,12 +635,12 @@
 		// chrome, so a resolve failure degrades to no ghosts, never a blank form.
 		let resolved: Resolved | undefined;
 		try {
-			resolved = quill.resolve(doc);
+			resolved = quill.reader(doc).resolve();
 		} catch (e) {
 			reportError(onError, {
 				code: 'resolve-failed',
 				severity: 'error',
-				message: `quill.resolve threw; ghosted defaults fall back to none: ${errorMessage(e)}`,
+				message: `reader.resolve threw; ghosted defaults fall back to none: ${errorMessage(e)}`,
 				cause: e
 			});
 		}
