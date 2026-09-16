@@ -116,10 +116,10 @@ describe('the shipped quill on the surface', () => {
 		// `inline` at every type — so the leaf is a one-line one and `packable` takes
 		// the `ui.compact` beside it.
 		const byName = Object.fromEntries(fieldModels(memo().schema.main).map((m) => [m.name, m]));
-		expect(byName.subject.control).toBe('prose');
-		expect(byName.subject.plaintext).toBe(true);
-		expect(byName.subject.inline).toBe(true);
-		expect(byName.tag_line.inline).toBe(true); // the one richtext scalar, declared alike
+		expect(byName.authority_line.control).toBe('prose');
+		expect(byName.authority_line.plaintext).toBe(true);
+		expect(byName.authority_line.inline).toBe(true);
+		expect(byName.tag_line.inline).toBe(true); // a richtext scalar, declared alike
 		expect(byName.dissemination.compact).toBe(true);
 
 		// And on the surface, where a packed field is a `cell` and a declined one — or one

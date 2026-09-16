@@ -1,19 +1,11 @@
-// primitives.typ: Reusable rendering primitives for USAF memorandum sections
-//
-// This module implements the visual rendering functions that produce AFH 33-337
-// compliant formatting for all sections of a USAF memorandum. Each function
-// corresponds to specific placement and formatting requirements from Chapter 14.
+// One rendering function per section of the memorandum, each placing its
+// section where AFH 33-337 Chapter 14 puts it.
 
 #import "config.typ": *
 #import "utils.typ": *
 
-// =============================================================================
-// LETTERHEAD RENDERING
-// =============================================================================
-// AFH 33-337 §1: "Use printed letterhead, computer-generated letterhead, or plain bond paper"
-// Letterhead placement is not explicitly specified in AFH 33-337, but follows
-// standard USAF memo formatting conventions
-
+// AFH 33-337 does not specify letterhead placement; the geometry below follows
+// standard USAF memo convention.
 #let render-letterhead(
   title,
   caption,
@@ -24,8 +16,8 @@
   letterhead-emblem-height: 1in, // emblem fit-box height; reduce for shorter emblems
 ) = {
   font = ensure-array(font)
-  // `upper` lowers content as readily as `str`, so the letterhead's uppercasing
-  // survives the title/caption arriving as `plaintext` markup blocks.
+  // `upper` takes content as readily as `str`, so the letterhead's uppercasing
+  // survives a title or caption handed over as markup.
   title = upper(join-lines(title))
   caption = upper(join-lines(caption))
 
@@ -78,8 +70,8 @@
         #fit-box(width: corner-width, height: band-height)[#letterhead-seal]
       ]
     } else {
-      // Isolate seal column from document `font_size`: stack `em` spacing and subtitle
-      // must not scale with body text (see frontmatter `set text(size: font_size)`).
+      // Isolate seal column from document `font-size`: stack `em` spacing and subtitle
+      // must not scale with body text (see frontmatter `set text(size: font-size)`).
       // Subtitle is wrapped in `box` so it stays on one line and may extend past
       // the seal's 2in column rather than wrapping.
       block[
@@ -114,15 +106,6 @@
     )
   }
 }
-
-// =============================================================================
-// HEADER SECTIONS
-// =============================================================================
-// AFH 33-337 "The Heading Section" specifies exact placement and format for:
-// - Date: 1 inch from right edge, 1.75 inches from top
-// - MEMORANDUM FOR: Second line below date
-// - FROM: Second line below MEMORANDUM FOR
-// - SUBJECT: Second line below FROM
 
 // AFH 33-337 "Date": "Place the date 1 inch from the right edge, 1.75 inches from the top"
 #let render-date-section(date, memo-style: "usaf") = {
@@ -160,12 +143,10 @@
 
 /// Whether a `references` entry carries no citation text.
 ///
-/// Blank entries reach the template routinely: a template author leaves a
-/// stub `- ` under `references:` for the user to fill in, and the quillmark
-/// helper hands back `""` for an unset or whitespace-only markdown field.
-/// Such an entry must not count as a reference — otherwise a lone blank one
-/// satisfies the "exactly one reference" test below and renders as an empty
-/// `()` after the subject.
+/// Blank entries reach the template routinely — a stub entry left under
+/// `references:` for the user to fill in. Such an entry must not count as a
+/// reference: a lone blank one would otherwise satisfy the "exactly one
+/// reference" test below and render as an empty `()` after the subject.
 ///
 /// - entry (any): A single `references` element
 /// -> bool
@@ -205,25 +186,48 @@
     blank-line()
     grid(
       columns: (auto, auto, 1fr),
-      // Each entry is markdown-converted content; spread them as enum items
-      // lettered "(a) (b) (c)" per AFH 33-337.
+      // Spread the entries as enum items lettered "(a) (b) (c)" per AFH 33-337.
       "References:", "  ", enum(..references, numbering: "(a) ", body-indent: 0pt),
     )
   }
 }
 
-// =============================================================================
-// SIGNATURE BLOCK
-// =============================================================================
 // AFH 33-337 "Signature Block": "Start the signature block on the fifth line below
 // the last line of text and 4.5 inches from the left edge of the page or three
 // spaces to the right of page center"
 // AFH 33-337 "Do not place the signature element on a continuation page by itself"
 // AFH 33-337 long-name example: "Signature block adjusted to the left" when a
 // long name would otherwise exceed the right margin.
+//
+// A closing line may open the section above the block, and AFH 33-337 gives it
+// one geometry across the two documents that have one: on the second line below
+// the text at the block's own anchor, with the signature then five lines below
+// the line rather than below the body. The memorandum's occupant is the
+// authority line, "FOR THE COMMANDER"; the personal letter's is the
+// complimentary close, "Sincerely", which the handbook bars the authority line
+// from. Hence the neutral parameter, and hence case belongs to the caller — the
+// authority line is uppercased, "Sincerely" is not.
 
-#let render-signature-block(signature-lines, signature-blank-lines: 4, signing-field: none) = {
+/// The memorandum's occupant of that slot, uppercased per AFH 33-337. Blank is
+/// no line: the handbook forbids one where the commander signs.
+///
+/// - value (str | content | none): The authority line as authored
+/// -> content | none
+#let format-authority-line(value) = if falsey(value) { none } else { upper(value) }
+
+#let render-signature-block(
+  signature-lines,
+  closing-line: none,
+  signature-blank-lines: 4,
+  signing-field: none,
+  // Lines of breaking height reserved below the block for the backmatter
+  // lead-in and its continuation note. Reclaimed immediately after, so it moves
+  // where the block may break and nothing else.
+  reserved-lines: 0,
+) = {
   signature-lines = ensure-array(signature-lines)
+  // Blank is no line, whichever occupant the caller passes.
+  if falsey(closing-line) { closing-line = none }
   // AFH 33-337 allows two equivalent anchors: 4.5in from the left edge, or three
   // spaces right of page center. On 8.5in stock these coincide (page center =
   // 4.25in; three TNR-12pt spaces ≈ 0.25in), so we use 4.5in as the canonical
@@ -231,19 +235,17 @@
   let default-pad = 4.5in - spacing.margin
   context {
     // Measure each line at its rendered settings to detect long-name overflow.
+    // The closing line shares the anchor, so it joins the measurement: the
+    // wider of the two decides the shift and they stay aligned.
     let body-width = page.width - 2 * spacing.margin
+    let anchored-lines = signature-lines
+    if closing-line != none { anchored-lines.push(closing-line) }
     let widest = 0pt
-    for line in signature-lines {
+    for line in anchored-lines {
       let w = measure(text(hyphenate: false, line)).width
       if w > widest { widest = w }
     }
-    let stride = {
-      let s = LINE_STRIDE.get()
-      if s == none {
-        let one-line = measure(par(spacing: 0pt)[x]).height
-        measure(par(spacing: 0pt)[x#linebreak()x]).height - one-line
-      } else { s }
-    }
+    let stride = line-stride()
     // If the widest line would overflow the right margin at the standard
     // anchor, shift the block left just enough to fit. Clamp at 0 so the
     // block never crosses the left margin.
@@ -262,25 +264,43 @@
       // and the block one indivisible unit. The total space above the block is
       // identical either way — `block.above` still contributes the same 0.5em —
       // but a gap left outside can be consumed at the foot of one page while
-      // the block starts at the top margin of the next, which is also what put
-      // the signing field off the page (see below).
-      #v(gap)
+      // the block starts at the top margin of the next.
+      //
+      // The closing line takes one of those lines above it and the gap then
+      // measures from the line, not from the text. Inside the block, so no page
+      // break can put it on a different page from the signature.
+      #if closing-line != none {
+        v(stride)
+        pad(left: left-pad, text(hyphenate: false, closing-line))
+      }
       #if signing-field != none {
         // The signing field covers those blank lines — where a signature is
-        // actually written — so it is placed over the gap. With the gap inside
-        // the block that is a downward offset from the block's own origin, and
-        // the field therefore travels with the block onto whatever page it
-        // lands on. The superseded form placed it at a NEGATIVE dy, reaching
-        // above the block into space that belongs to the previous page: when
-        // the block started at the top margin, the field was painted into the
-        // header band over the page number and the classification banner, or
-        // off the sheet entirely.
+        // actually written — so it is placed over the gap. It is placed BEFORE
+        // the gap is emitted: `place` anchors at the current flow position, so
+        // placing it after `v(gap)` anchors the box at the first name line and
+        // paints it down over the printed signature block. Anchored here it
+        // still travels with the block onto whatever page the block lands on,
+        // since the gap is inside the unbreakable block rather than ahead of
+        // it. The current position is below the closing line when there is
+        // one, which is where the signature is written.
+        //
+        // The widget keeps its own size (the helper's default is 50pt tall and
+        // it positions itself, so an `align` around it does nothing) and is
+        // offset to the BOTTOM of the gap: it always ends where the printed
+        // name begins, and whatever the gap has beyond the widget's height
+        // stays clear between the body text and the widget's frame.
+        let widget-height = {
+          let h = measure(signing-field).height
+          if h > 0pt { h } else { 50pt }
+        }
+        let drop = gap - widget-height - 3pt
         place(
           dx: left-pad,
-          dy: 0pt,
-          box(width: body-width - left-pad, height: gap, signing-field),
+          dy: if drop > 0pt { drop } else { 0pt },
+          box(width: body-width - left-pad, height: widget-height, signing-field),
         )
       }
+      #v(gap)
       #align(left)[
         #pad(left: left-pad)[
           #text(hyphenate: false)[
@@ -289,31 +309,26 @@
               // of the line above" — 2-character indent ≈ 1em in Times New Roman 12pt
               par(hanging-indent: .5em, line)
             }
+            // The page the backmatter compares its own against. Must stay
+            // inside the unbreakable block: a marker outside one travels with
+            // the section that moves.
+            #metadata(none)<usaf-memo-flow-anchor>
+            #v(stride * reserved-lines)
           ]
         ]
       ]
     ]
+    // The reservation counted toward breaking height only; the backmatter
+    // emits its own lead-in below.
+    v(stride * -reserved-lines)
   }
 }
 
-// =============================================================================
-// ACTION LINE RENDERING
-// =============================================================================
-// Renders the decision line for indorsement memos — an "either / or" pair
-// where the endorser's choice is circled and the rejected option struck out.
-//
-// Two option pairs are supported, reflecting the two roles an indorsement
-// plays in a coordination chain: coordinating officials Concur / Nonconcur,
-// while the final approval authority Approves / Disapproves.
-//
-// Which pair prints is not the endorser's to choose — it follows from the
-// role, so the caller supplies the role via `approval-authority` and the same
-// three `action` values (affirm, reject, or leave open) carry over both pairs.
-//
-// The "undecided" form renders both options plain, for printing a memo the
-// endorser marks by hand when signing.
-//
-// Empty/none suppression is handled by the caller before this is invoked.
+// The indorsement decision line is an "either / or" pair. Which pair prints
+// follows from the indorsement's role in the coordination chain rather than
+// from the endorser's choice, so the caller supplies the role and the same
+// three `action` values carry over both pairs. The caller also suppresses the
+// line entirely; reaching here means one is wanted.
 
 // The option pair for each role, ordered (affirmative, negative).
 #let APPROVAL_OPTIONS = ("Approve", "Disapprove")
@@ -368,24 +383,16 @@
   }
 }
 
-// =============================================================================
-// TABLE RENDERING
-// =============================================================================
-// AFH 33-337 does not specify table formatting, so we follow the general
-// aesthetic principles of the standard: plain black borders, no decorative
-// fills, and the body font inherited throughout.
-
-/// Renders a table with USAF memorandum–consistent formatting.
+/// Renders a table in the memorandum's style.
 ///
-/// Applies simple 0.5pt black cell borders and standard padding to any
-/// Typst `table` element, keeping the visual style clean and formal.
-/// Font and size are inherited from the surrounding body text.
+/// AFH 33-337 does not specify table formatting, so this follows the general
+/// aesthetic of the standard: plain black borders, a bold header row, no
+/// decorative fills, and the body font and size inherited from the surrounding
+/// text.
 ///
 /// - it (content): The table element to style and render
 /// -> content
 #let render-memo-table(it) = {
-  // AFH 33-337 does not specify table formatting, so we follow the general
-  // aesthetic principles of the standard: bold headers for clarity.
   show table.cell.where(y: 0): set text(weight: "bold")
   set table(
     stroke: 0.5pt + black,
@@ -394,23 +401,18 @@
   it
 }
 
-// =============================================================================
-// BACKMATTER SECTIONS
-// =============================================================================
-// AFH 33-337 "Attachment or Attachments": "Place 'Attachment:' (for a single attachment)
-// or '# Attachments:' (for two or more attachments) at the left margin, on the third
-// line below the signature element"
-// AFH 33-337 "Courtesy Copy Element": "place 'cc:' flush with the left margin, on the
-// second line below the attachment element"
-
 #let render-backmatter-section(
   content,
   section-label,
   numbering-style: none,
   continuation-label: none,
+  // Lines of breaking height reserved below this section for the lead-in and
+  // continuation note of the section that follows it. Reclaimed immediately
+  // after, so it moves where a break may fall and nothing else.
+  reserved-lines: 0,
 ) = {
   let formatted-content = {
-    // Use text() wrapper to prevent section label from being treated as a paragraph
+    // `text()` keeps the label from being laid out as a paragraph of its own.
     text()[#section-label]
     linebreak()
     if numbering-style != none {
@@ -421,29 +423,57 @@
     }
   }
 
+  // Attachments pass continuation-label ("… (listed on next page):" per AFH 33-337).
+  // cc: and DISTRIBUTION: use a neutral default — "listed" applies to attachment lists only.
+  let continuation-text = if continuation-label != none {
+    text()[#continuation-label]
+  } else {
+    text()[#(section-label + " (continued on next page)")]
+  }
+
   context {
-    let available-space = page.height - here().position().y - 1in
-    if measure(formatted-content).height > available-space {
-      // Attachments pass continuation-label ("… (listed on next page):" per AFH 33-337).
-      // cc: and DISTRIBUTION: use a neutral default — "listed" applies to attachment lists only.
-      let continuation-text = if continuation-label != none {
-        text()[#continuation-label]
-      } else {
-        text()[#(section-label + " (continued on next page)")]
+    // `breakable: false` lets Typst's own breaker move the section to the next
+    // page as a unit; an explicit pagebreak here would feed this context's
+    // layout query back into its own input and the two would chase each other
+    // until layout gave up.
+    //
+    // The note is decided by observing where that breaker put the block. The
+    // nearest anchor above is the signature block or the preceding section — an
+    // element with real height that stays on the page this section departs.
+    //
+    // Do not reduce this to a `here()` reading. `here()` sits in the section and
+    // travels with it, so once the section has moved it reports the top of the
+    // page it moved to and every section measures as fitting. The room the note
+    // needs is reserved inside the anchor's own unbreakable block, so the
+    // decision can never move its own input.
+    let above = query(selector(<usaf-memo-flow-anchor>).before(here()))
+    let below = query(selector(<usaf-memo-flow-anchor>).after(here()))
+    if above.len() > 0 and below.len() > 0 {
+      if below.first().location().page() > above.last().location().page() {
+        continuation-text
       }
-      continuation-text
-      pagebreak()
     }
-    formatted-content
+    block(breakable: false)[
+      #metadata(none)<usaf-memo-flow-anchor>
+      #formatted-content
+      #v(line-stride() * reserved-lines)
+    ]
+    v(line-stride() * -reserved-lines)
   }
 }
 
 #let calculate-backmatter-spacing(is-first-section) = {
   context {
-    let line_count = if is-first-section { 2 } else { 1 }
-    blank-lines(line_count)
+    let line-count = if is-first-section { 2 } else { 1 }
+    blank-lines(line-count)
   }
 }
+
+// AFH 33-337 "Attachment or Attachments": "Place 'Attachment:' (for a single attachment)
+// or '# Attachments:' (for two or more attachments) at the left margin, on the third
+// line below the signature element"
+// AFH 33-337 "Courtesy Copy Element": "place 'cc:' flush with the left margin, on the
+// second line below the attachment element"
 
 #let render-backmatter-sections(
   attachments: none,
@@ -461,27 +491,46 @@
     pagebreak(weak: true)
   }
 
+  // Collected first because a section's reservation depends on whether another
+  // follows it: with nothing below, no note can be owed.
+  let sections = ()
+
   if attachments != none and attachments.len() > 0 {
-    calculate-backmatter-spacing(true)
     let attachment-count = attachments.len()
     let section-label = if attachment-count == 1 { "Attachment:" } else { str(attachment-count) + " Attachments:" }
     let continuation-label = (
       (if attachment-count == 1 { "Attachment" } else { str(attachment-count) + " Attachments" })
         + " (listed on next page):"
     )
-    // AFH 33-337: a single attachment is not numbered; numbering applies to two or more.
-    let numbering-style = if attachment-count == 1 { none } else { "1." }
-    render-backmatter-section(attachments, section-label, numbering-style: numbering-style, continuation-label: continuation-label)
+    sections.push((
+      content: attachments,
+      label: section-label,
+      // AFH 33-337: a single attachment is not numbered; numbering applies to two or more.
+      numbering-style: if attachment-count == 1 { none } else { "1." },
+      continuation-label: continuation-label,
+    ))
   }
 
   if cc != none and cc.len() > 0 {
-    calculate-backmatter-spacing(attachments == none or attachments.len() == 0)
-    render-backmatter-section(cc, "cc:")
+    sections.push((content: cc, label: "cc:", numbering-style: none, continuation-label: none))
   }
 
   if distribution != none and distribution.len() > 0 {
-    calculate-backmatter-spacing((attachments == none or attachments.len() == 0) and (cc == none or cc.len() == 0))
-    render-backmatter-section(distribution, "DISTRIBUTION:")
+    sections.push((content: distribution, label: "DISTRIBUTION:", numbering-style: none, continuation-label: none))
+  }
+
+  for (index, section) in sections.enumerate() {
+    calculate-backmatter-spacing(index == 0)
+    // The next section's one blank line of lead-in, plus one for its note. The
+    // signature block reserves 3: the first section's lead-in is two lines.
+    let reserved-lines = if index + 1 < sections.len() { 2 } else { 0 }
+    render-backmatter-section(
+      section.content,
+      section.label,
+      numbering-style: section.numbering-style,
+      continuation-label: section.continuation-label,
+      reserved-lines: reserved-lines,
+    )
   }
 }
 
