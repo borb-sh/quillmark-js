@@ -84,7 +84,10 @@
 			document.getElementById(id ?? '')?.focus();
 			return undefined;
 		}
-		return cellsEl?.focusPath(path, pos);
+		const deeper = cellsEl?.focusPath(path, pos);
+		if (deeper) return deeper;
+		focus();
+		return undefined;
 	}
 </script>
 

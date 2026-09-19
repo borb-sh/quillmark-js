@@ -187,9 +187,12 @@
 		const [key, ...rest] = path;
 		if (typeof key !== 'string') return undefined;
 		const cell = propCells().find((c) => c.dataset.qmProp === key);
-		if (!cell) return undefined;
+		if (!cell) {
+			focus();
+			return undefined;
+		}
 		const nested = subEls[key];
-		if (rest.length) return (nested?.focusPath?.(rest, pos) ?? undefined) || cell;
+		if (rest.length && nested?.focusPath) return nested.focusPath(rest, pos) ?? cell;
 		const prose = proseEls[key];
 		if (pos != null && prose?.setCaret) prose.setCaret(pos);
 		else landOn(cell);
@@ -423,6 +426,13 @@
 	.qm-object.row,
 	.qm-object.row .qm-object-grid {
 		display: contents;
+	}
+	/* And it is not a query container here: a box is what a container query measures, and
+	   this figure has none. Left declared, the cells inside it would ask their questions of
+	   an element with no width and every `@container` rule over them would decline — which
+	   is the caller's rule for its own columns, one rung out. */
+	.qm-object.row {
+		container-type: normal;
 	}
 	/* A cell is a plain block: its label sits over its control where the caller stacks
 	   them, and goes off the page where the caller draws a header instead (`ArrayField`,

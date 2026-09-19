@@ -119,7 +119,10 @@
 		const [id, ...rest] = path;
 		if (typeof id !== 'string') return undefined;
 		const box = boxes[id];
-		if (!box) return undefined;
+		if (!box) {
+			focus();
+			return undefined;
+		}
 		const sub = subEls[id];
 		const column = rest.length && rest[0] !== MATRIX_HELD;
 		if (column && sub) return sub.focusPath?.(rest, pos) ?? memberEls[id];

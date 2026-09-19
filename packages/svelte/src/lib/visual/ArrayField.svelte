@@ -373,7 +373,10 @@
 			openId = id;
 			flushSync();
 		}
-		if (rest.length) return (rowSubEls[id]?.focusPath?.(rest, pos) ?? undefined) || rowEls[id];
+		if (rest.length) {
+			const sub = rowSubEls[id];
+			if (sub?.focusPath) return sub.focusPath(rest, pos) ?? rowEls[id];
+		}
 		focusObjectRow(id);
 		return rowEls[id];
 	}
@@ -390,11 +393,17 @@
 		els[id]?.focus();
 	}
 	/** Put the caret back where the move took it from: the same node where the reinsertion
-	 *  kept it focusable, the row's own landing otherwise. */
+	 *  kept it focusable, the row's own landing otherwise.
+	 *
+	 *  A row moved to an edge disables the control that moved it, and a disabled button
+	 *  holds no focus — so the press that lands a row first would otherwise cost the
+	 *  keyboard its place. The row is what the gesture was about, and its summary is where
+	 *  the next one starts from. */
 	async function restoreAfterFlush(id: string, held: HTMLElement): Promise<void> {
 		if (!(await span.resumes(tick()))) return;
 		if (document.activeElement === held) return;
-		if (held.isConnected) return held.focus();
+		const dead = 'disabled' in held && (held as HTMLButtonElement).disabled;
+		if (held.isConnected && !dead) return held.focus();
 		focusObjectRow(id);
 	}
 	/** Whether element `k` reads empty to the user. A text element's committed value
@@ -853,10 +862,12 @@
 		}
 	}
 	/* A table row's cells end on their own tracks, so the end inset belongs to the row
-	 rather than to each box the way a one-control row spends it. */
+	 rather than to each box the way a one-control row spends it: each box takes back the
+	 recipe's own inline inset, which is the rung `--_qm-inset-control` spends on that
+	 axis. The pair itself is a `padding` shorthand and would drop this longhand whole. */
 	.qm-table-row :global(.qm-input),
 	.qm-table-row :global(.qm-control-box) {
-		padding-inline-end: var(--_qm-inset-control);
+		padding-inline-end: var(--_qm-space-3);
 	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so
 	 the two read as one register. Inner radius: the chip family is the card's, and this

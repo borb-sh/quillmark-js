@@ -257,6 +257,25 @@ describe('a record row', () => {
 	});
 });
 
+describe('a card titled by a variant-bearing field', () => {
+	it('reads the member its discriminant selects, not the container it rests as', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		// `strand` declares `ui.title: "{topic}"` over an `enum` carrying `variants:`, so
+		// the field rests as a container and the template reads it. `titleText` of an
+		// object with no `.text` was `''`, which is a card with no name at all.
+		const at = [...Array(doc.cardCount).keys()].find((i) => q.reader(doc).card(i).kind === 'strand');
+		expect(at).toBeDefined();
+		q.writer(doc).card(at!).set('topic', { value: 'experience' });
+		const { target } = mountEditor(q, doc);
+
+		const titles = [...target.querySelectorAll<HTMLInputElement>('.qm-card-title')].map(
+			(i) => i.value || i.placeholder
+		);
+		expect(titles).toContain('experience');
+	});
+});
+
 describe('the grid arm', () => {
 	it('draws a short-celled row as a table with headers, and a record row as a list', () => {
 		const q = quill();

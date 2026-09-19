@@ -47,8 +47,9 @@ export interface FieldControl {
 	 *
 	 * Returns the box the innermost rung settled in, which is what the wash blooms: the
 	 * address named one row, and a wash over the repeater around it says the field where
-	 * the click said the row. `undefined` is a rung that fell back, and reads as
-	 * {@link el}.
+	 * the click said the row. **A rung that cannot reach its step takes the caret itself
+	 * and answers `undefined`**, which reads as {@link el}: so the caller never re-focuses
+	 * on a missing answer, and a landing that resolved nothing deeper still lands.
 	 */
 	focusPath?(path: PathStep[], pos?: number): HTMLElement | undefined;
 	readonly el: HTMLElement;
