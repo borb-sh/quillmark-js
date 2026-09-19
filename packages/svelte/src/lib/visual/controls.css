@@ -16,6 +16,38 @@
  fight. Unlayered with it, so a host's own layered reset never reaches these rules
  whatever order the sheets load in (`core/theme.css`). */
 
+/* The capacity ladder: how many tracks a field grid gets, off the width of the nearest
+ query container. Capacity is the container's, not JavaScript's — nothing measures, so
+ there is no observer to loop and no re-packing to restructure the DOM under a prose leaf
+ (VISUAL_EDITOR §"Structure mirrors the schema").
+
+ It steps 1 → 2 → 4, skipping 3: each rung is the width at which a track still clears the
+ comfortable field minimum, and an even capacity is what lets the half a subform of one
+ takes (`--cols-half`) land on a track boundary. A field ends on its track's own edge, so
+ a rung is `n * 220px + gaps`.
+
+ Here rather than in either caller because the ladder is walked at every depth: a card's
+ section mints the count for its fields, and a nested subform re-mints it over its own
+ narrower width, so a subform three rungs in draws the capacity its own box carries rather
+ than the section's. Two copies of the rungs is the drift no gate can see — the numbers are
+ a threshold rather than a declaration, so `check:style` reads neither. */
+:where(.qm-capacity) {
+	--cols: 1;
+	--cols-half: 1;
+}
+@container (min-width: 28rem) {
+	:where(.qm-capacity) {
+		--cols: 2;
+		--cols-half: 1;
+	}
+}
+@container (min-width: 57rem) {
+	:where(.qm-capacity) {
+		--cols: 4;
+		--cols-half: 2;
+	}
+}
+
 /* The themed focus ring in place of the raw UA outline, as a
  rule rather than a pair of rungs each control assembles. `--_qm-ring`
  fixes the value; which properties draw a ring, and on what state, is the other

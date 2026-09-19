@@ -24,7 +24,7 @@
 	import {
 		addrForFieldPath,
 		cardPath,
-		elementAddrForFieldPath,
+		nestedAddrForFieldPath,
 		fieldPathForAddr,
 		type DocPath,
 		type Landing
@@ -36,7 +36,9 @@
 		Addr,
 		CardAddr,
 		Diagnostic,
+		PathStep,
 		PayloadItem,
+		QuillFieldSchema,
 		Resolved,
 		ResolvedField
 	} from '@quillmark/wasm';
@@ -46,6 +48,8 @@
 	import type { FieldController } from '../core/codec/index.js';
 	import {
 		IdSeq,
+		MATRIX_HELD,
+		VARIANT_DISCRIMINANT,
 		controlKind,
 		fieldModels,
 		groupOrder,
@@ -730,20 +734,20 @@
 
 	/**
 	 * Put the caret in a revealed target, at the finest grain it can take: a USV offset
-	 * in a prose leaf or an array element, a bare focus everywhere else. A form control
+	 * in a prose leaf or a nested one, a bare focus everywhere else. A form control
 	 * has no coordinate to spend an offset in (an `<input type="number">` refuses a
 	 * selection outright), which is also the whole of what a click on plate-placed ink
-	 * can mean. An element is no `createField` leaf, so the offset goes down the element
-	 * lane instead, where what it means is the row control's (`leaves.ts`).
+	 * can mean. A leaf inside a field is no `createField` leaf, so the offset goes down
+	 * the nested lane instead, where what it means is the reached control's (`leaves.ts`).
 	 *
 	 * Hands back the box the arrival wash blooms in, which is the landing's own
-	 * granularity rather than the registry's: an element lands in one row and says so
-	 * over that row, and everything else — the field, and a row the document has since
-	 * dropped — over the field's box.
+	 * granularity rather than the registry's: a nested landing says "here" over the
+	 * innermost box the address named, and everything else — the field, and a rung the
+	 * document has since dropped — over the field's box.
 	 */
 	function land(found: Landed, pos: number | undefined): HTMLElement {
-		if (found.element != null && found.control.focusElement) {
-			return found.control.focusElement(found.element, pos) ?? found.control.el;
+		if (found.path && found.control.focusPath) {
+			return found.control.focusPath(found.path, pos) ?? found.control.el;
 		}
 		if (pos != null) {
 			const prose = leaves.prose(found.key);
@@ -802,11 +806,11 @@
 		reportError(onError, { code: 'target-unknown', severity: 'dev', message, path });
 	}
 
-	/** What a `DocPath` resolves to in the mounted tree: a leaf key, and the array
-	 *  element within it when the address names one. */
+	/** What a `DocPath` resolves to in the mounted tree: a leaf key, and the steps from
+	 *  that field down to the leaf when the address names one inside it. */
 	interface LeafTarget {
 		key: string;
-		element?: number;
+		path?: PathStep[];
 	}
 	/** A resolved target with the handle the registry holds for it. */
 	type Landed = LeafTarget & { control: FieldControl };
@@ -816,11 +820,11 @@
 	 * diagnostics take.
 	 *
 	 * Two rungs, because the boundary mints addresses at a finer granularity than
-	 * `Addr` can name: a `richtext[]` element surfaces as `main.keywords[0]`. The
-	 * second rung reads that trailing index segment under a field the schema declares
-	 * an array — which is why the ladder is the editor's (VISUAL_EDITOR.md §Surface):
+	 * `Addr` can name: a nested row cell surfaces as `main.vectors[0].tours[2].title`.
+	 * The second rung walks the steps past the field against the schema, one container
+	 * per step — which is why the ladder is the editor's (VISUAL_EDITOR.md §Surface):
 	 * the preview carries no schema, and truncating the address there is worse than
-	 * guessing, since `pos` is an offset into the element's own content.
+	 * guessing, since `pos` is an offset into the leaf's own content.
 	 */
 	function leafTargetFor(field: DocPath): LeafTarget | undefined {
 		const direct = addrForFieldPath(field);
@@ -828,22 +832,61 @@
 			const resolved = resolveCardKey(direct, cardIds);
 			return resolved ? { key: fieldKeyToString(resolved) } : undefined;
 		}
-		const element = elementAddrForFieldPath(field);
-		if (!element || !isArrayField(element.field)) return undefined;
-		const resolved = resolveCardKey(element.field, cardIds);
-		return resolved ? { key: fieldKeyToString(resolved), element: element.index } : undefined;
+		const nested = nestedAddrForFieldPath(field);
+		if (!nested || !declaresPath(nested.field, nested.path)) return undefined;
+		const resolved = resolveCardKey(nested.field, cardIds);
+		return resolved ? { key: fieldKeyToString(resolved), path: nested.path } : undefined;
 	}
 
-	/** The guard the element rung stands on. Asked of `controlKind`, so what the ladder
-	 *  tests is the control the tree mounted — the one holding a `focusElement` — and
-	 *  not a second reading of the schema beside it. */
-	function isArrayField(addr: Addr): boolean {
-		if (addr.field == null) return false;
+	/** The field schema an `Addr` names, or `undefined` for a card or a name the schema
+	 *  does not declare. */
+	function fieldSchema(addr: Addr): QuillFieldSchema | undefined {
+		if (addr.field == null) return undefined;
 		const kind = addr.card == null ? undefined : model.cards[addr.card]?.kind;
 		const schema = quill.schema;
 		const card = addr.card == null ? schema.main : kind ? schema.card_kinds?.[kind] : undefined;
-		const declared = card?.fields?.[addr.field];
-		return !!declared && controlKind(declared) === 'array';
+		return card?.fields?.[addr.field];
+	}
+
+	/**
+	 * The guard the nested rung stands on: every step declared, one container at a time —
+	 * an index under an `array`, a key under an `object`'s properties, under any world of
+	 * a variant, or under a `matrix` (a member id, then a column or the synthesized tick).
+	 *
+	 * Asked of the schema rather than of the document, and to the end of the path rather
+	 * than to the first rung: an address whose tail names nothing declared lands a caret
+	 * at a place the surface does not draw, which is the guess truncating at the preview
+	 * would have made.
+	 */
+	function declaresPath(addr: Addr, path: PathStep[]): boolean {
+		let at = fieldSchema(addr);
+		for (const step of path) {
+			if (!at) return false;
+			at = stepInto(at, step);
+		}
+		return !!at;
+	}
+
+	/** One rung of {@link declaresPath}: the schema a step reaches, or `undefined` where
+	 *  the container declares nothing under it. */
+	function stepInto(at: QuillFieldSchema, step: PathStep): QuillFieldSchema | undefined {
+		const kind = controlKind(at);
+		if (typeof step === 'number') return kind === 'array' ? at.items : undefined;
+		if (kind === 'object') return at.properties?.[step];
+		if (kind === 'variant') {
+			if (step === VARIANT_DISCRIMINANT) return at;
+			for (const cells of Object.values(at.variants ?? {})) if (cells[step]) return cells[step];
+			return undefined;
+		}
+		if (kind !== 'matrix') return undefined;
+		// A member is the object the loader expands it to — the columns plus the tick it
+		// synthesizes — which is never serialized, so the walk composes it here exactly as
+		// the control does (`structure.ts`).
+		if (!(at.members ?? []).some((g) => step in (g.values ?? {}))) return undefined;
+		return {
+			type: 'object',
+			properties: { ...(at.properties ?? {}), [MATRIX_HELD]: { type: 'boolean', default: false } }
+		};
 	}
 </script>
 

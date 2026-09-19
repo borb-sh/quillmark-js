@@ -16,6 +16,7 @@
 // its first segment, an array lands on its first element or its add affordance), so
 // the surface holds the answers it already gives a label click instead of re-deriving
 // them from markup.
+import type { PathStep } from '@quillmark/wasm';
 import type { FieldController } from '../core/codec/index.js';
 
 /**
@@ -29,22 +30,27 @@ import type { FieldController } from '../core/codec/index.js';
 export interface FieldControl {
 	focus(): void;
 	/**
-	 * Land in element `index` of a control that has elements, at USV `pos` where the
-	 * row's control can take one; resolving the index to the element's session id at
-	 * the call, with {@link focus}'s own answer for an index past the live list. Absent
-	 * on every control without elements.
+	 * Land at `path` inside a control that holds one — an element index, a property key,
+	 * a variant's cell, a matrix member, and the same again at every rung below — at USV
+	 * `pos` where the leaf it reaches can take one. Absent on every control with nothing
+	 * inside it.
+	 *
+	 * Each container consumes its own first step and hands the rest down, resolving an
+	 * index to its element's session id at the call; a step the live value no longer
+	 * reaches falls back to {@link focus} at that rung. The place rides the call because
+	 * the registry stays parent-keyed: a per-element key is positional, in a registry
+	 * whose doctrine is dodging positional churn.
 	 *
 	 * A landing, not a focus: an absent `pos` is the placement rung, exactly as on
-	 * `Landing`, and what a `pos` means is the row control's, the same way focusing is.
-	 * The place rides the call because the registry stays parent-keyed: a per-element
-	 * key is positional, in a registry whose doctrine is dodging positional churn.
+	 * `Landing`, and what a `pos` means is the reached control's, the same way focusing
+	 * is.
 	 *
-	 * Returns the element's own box, which is what the wash blooms in: the address
-	 * named one row, and a wash over the whole repeater says the field where the click
-	 * said the row. `undefined` is the fallback the index past the live list took, and
-	 * reads as {@link el}.
+	 * Returns the box the innermost rung settled in, which is what the wash blooms: the
+	 * address named one row, and a wash over the repeater around it says the field where
+	 * the click said the row. `undefined` is a rung that fell back, and reads as
+	 * {@link el}.
 	 */
-	focusElement?(index: number, pos?: number): HTMLElement | undefined;
+	focusPath?(path: PathStep[], pos?: number): HTMLElement | undefined;
 	readonly el: HTMLElement;
 }
 

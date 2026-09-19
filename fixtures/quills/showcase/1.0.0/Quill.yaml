@@ -239,6 +239,18 @@ main:
             inline: true
             default: ""
             description: The trailing caveat the marking carries. Blank to omit.
+          reviews:
+            type: array
+            items:
+              type: object
+              properties:
+                reviewer:
+                  type: string
+                finding:
+                  type: richtext
+                  description: What the review found. Block richtext inside a variant's cell, three containers deep.
+            default: []
+            description: Who has looked at the marking and what they said. A container inside a variant's cell, which recurses exactly as one inside a field's subform does.
       description: "How a copy is handled. The variant whose `default:` is the blank, which owns no world: an unset field draws the discriminant alone and ghosts the em dash, where `distribution` ghosts a member and draws its cells. Its cells are prose rather than data, a member is spelled as it is marked rather than as an id humanizes, and a value carries a space."
 
     issued:
@@ -278,6 +290,77 @@ main:
       ui:
         group: meta
       description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform, one at a time."
+
+    vectors:
+      type: array
+      max: 3
+      items:
+        type: object
+        ui:
+          title: "{name}"
+        properties:
+          name:
+            type: string
+            description: What the strand is called. The row summary reads it through `items.ui.title`.
+          brief:
+            type: richtext
+            description: What it covers, in paragraphs. A block leaf, so the row is a record and the strand declines a table however its cells are laid out.
+          tours:
+            type: array
+            max: 4
+            ui:
+              layout: table
+            items:
+              type: object
+              properties:
+                title:
+                  type: plaintext
+                  inline: true
+                  description: The tour's own name. No `string` cell in this row, so the summary falls to the inline leaf.
+                season:
+                  type: enum
+                  values:
+                    - spring
+                    - summer
+                    - autumn
+                  default: spring
+                nights:
+                  type: integer
+                  default: 1
+                lead:
+                  type: boolean
+                  default: false
+            description: "Four short cells, so the field asks for `ui.layout: table` and the editor grants it: one line a spreadsheet would hold, in a grid of the columns the row declares."
+      ui:
+        group: content
+      description: "The two-deep shape. A vector is a record holding a repeater of its own, so the editor recurses rather than standing a line: one figure at two rungs of nesting, one open row at a time per rung. `max: 3` caps it, and a keystroke in a nested prose cell re-encodes and commits the whole field, which is where that cost is legible."
+
+    qualifications:
+      type: matrix
+      properties:
+        detail:
+          type: plaintext
+          inline: true
+          default: ""
+          description: What the holder wants said about it. A column, drawn only under a held member.
+        year:
+          type: integer
+          default: 0
+          description: When it was earned. Zero renders as blank.
+      members:
+        - group: Operations
+          values:
+            flight_cc: Flight CC
+            dodin_ops: DODIN Ops
+        - group: Training
+          values:
+            cyber_200: Cyber 200
+            cyber_300: Cyber 300
+        - values:
+            instructor: Instructor
+      ui:
+        group: meta
+      description: "A closed vocabulary someone ticks, in groups, each held member unfolding the columns the field declares. A namespace: it obliges nothing of its own and takes no `default:`, and its columns are required when held and silent otherwise. Key presence is the tick, so `cyber_200: true` and `{held: true}` are one state; an untick keeps the columns in the document and off the page."
 
     colophon:
       type: richtext
@@ -357,6 +440,36 @@ card_kinds:
         ui:
           compact: true
         description: How loudly the aside is set.
+
+  strand:
+    description: A division titled by the world its own enum selects. Its `ui.title` names a variant-bearing field, so the header reads the discriminant rather than the container it rests as.
+    ui:
+      title: "{topic}"
+    fields:
+      topic:
+        type: enum
+        values:
+          - experience
+          - education
+          - service
+        default: experience
+        variants:
+          experience:
+            employer:
+              type: string
+              default: ""
+              description: Who the work was for.
+          education:
+            institution:
+              type: string
+              default: ""
+              description: Where the study was done.
+        description: What the strand is about. A container, so a `{field}` title over it reads the member it selects and not the empty text of an object.
+      lead:
+        type: plaintext
+        inline: true
+        default: ""
+        description: One line under the heading.
 
   signoff:
     description: Who signed, and when. The kind that renders no body leaf at all.

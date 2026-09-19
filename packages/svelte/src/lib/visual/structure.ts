@@ -23,7 +23,8 @@ export type ControlKind =
 	| 'boolean' // boolean → toggle
 	| 'date' // date / datetime → native date control
 	| 'array' // add/remove repeater
-	| 'object'; // nested subform
+	| 'object' // nested subform
+	| 'matrix'; // type:'matrix' → grouped ticks over the roster
 
 /** One field, projected: its schema, the control it renders as, and its layout hints. */
 export interface FieldModel {
@@ -220,14 +221,22 @@ export function controlKind(f: QuillFieldSchema): ControlKind {
 			return 'array';
 		case 'object':
 			return 'object';
+		case 'matrix':
+			return 'matrix';
 		default:
 			return 'text';
 	}
 }
 
-/** The discriminant cell of a variant container (`VARIANT_DISCRIMINANT_KEY` upstream,
- *  which the boundary does not export). Reserved: no variant may declare it. */
+/** The discriminant cell of a variant container (`VARIANT_DISCRIMINANT_KEY` upstream).
+ *  Reserved: no variant may declare it. Restated rather than imported, so this module
+ *  stays a pure projection with no edge into the runtime the init gate opens. */
 export const VARIANT_DISCRIMINANT = 'value';
+
+/** The tick cell of a matrix member, synthesized per member at load. Reserved beside
+ *  {@link VARIANT_DISCRIMINANT}: no column may declare it, and the boundary exports no
+ *  constant for it. */
+export const MATRIX_HELD = 'held';
 
 /**
  * Which world's cells to draw: the authored discriminant when the container carries
@@ -272,16 +281,114 @@ export function commitDiscriminant(
  * Whether the schema obliges a cell: `default:`'s absence, which is the whole of the
  * obligation (DOCUMENT_MODEL). A typed dictionary is exempt — a namespace declares no
  * `default:` at all, and `validate` anchors obligation on the leaves under it, so
- * reading one off the container would mark every subform required.
+ * reading one off the container would mark every subform required. A matrix is a
+ * namespace at the same rung: it takes no `default:` either, and its columns carry the
+ * obligation, gated on the tick (§"The matrix is a roster someone ticks").
  */
 export function obliged(schema: QuillFieldSchema): boolean {
-	return schema.type !== 'object' && schema.default === undefined;
+	return schema.type !== 'object' && schema.type !== 'matrix' && schema.default === undefined;
+}
+
+// ── The matrix (VISUAL_EDITOR §"The matrix is a roster someone ticks") ───────
+// The boundary hands over `members` — the roster — and `properties` — the columns.
+// The `{held, …columns}` object each member desugars to is derived at load and never
+// serialized, so the shapes below compose it here.
+
+/** One member of the roster, flattened out of its group: the key it stores under and
+ *  the title it draws as. */
+export interface MatrixMember {
+	id: string;
+	title: string;
+}
+
+/** A roster block as it draws: its heading, and the members under it. An ungrouped
+ *  block carries no label. */
+export interface MatrixGroup {
+	label: string | undefined;
+	members: MatrixMember[];
+}
+
+/** The roster in display order, group blocks kept: key order inside a block is the
+ *  schema's, which is the ordering contract `members` states. */
+export function matrixGroups(schema: QuillFieldSchema): MatrixGroup[] {
+	return (schema.members ?? []).map((g) => ({
+		label: g.group,
+		members: Object.entries(g.values ?? {}).map(([id, title]) => ({ id, title }))
+	}));
+}
+
+/**
+ * Whether a member is held. **Key presence is the tick** unless the mapping spells
+ * otherwise, which is the variant precedent one type over: `cyber_200: true` is to
+ * `{held: true}` what `classification: CUI` is to `{value: CUI}`. So the read takes
+ * both rest forms — a document through the transport door has been conformed through
+ * neither.
+ */
+export function matrixHeld(stored: unknown): boolean {
+	if (stored == null) return false;
+	if (typeof stored !== 'object') return stored !== false;
+	return (stored as Record<string, unknown>)[MATRIX_HELD] !== false;
+}
+
+/** A member's written columns, the tick cell dropped: the container a column control
+ *  commits into. Empty for the bare `true` spelling and for an absent member. */
+export function matrixColumns(stored: unknown): Record<string, unknown> {
+	if (stored == null || typeof stored !== 'object') return {};
+	const { [MATRIX_HELD]: _held, ...columns } = stored as Record<string, unknown>;
+	return columns;
+}
+
+/**
+ * The entry a member stores, or `undefined` to drop the key: **an unheld member holding
+ * no written column is absent from the map**. What "blank" is per column is not decided
+ * here — a cleared control commits `undefined` and the subform drops that key
+ * (VISUAL_EDITOR §"Structure mirrors the schema"), so an emptied column has already left
+ * the object by the time this reads it.
+ */
+export function matrixMember(
+	held: boolean,
+	columns: Record<string, unknown>
+): Record<string, unknown> | undefined {
+	const written = matrixColumns(columns);
+	if (!held && !Object.keys(written).length) return undefined;
+	return { [MATRIX_HELD]: held, ...written };
+}
+
+/** The map a matrix commits: the sparse form, or `undefined` for one holding nothing,
+ *  which is the unset rung every other control shares. */
+export function matrixCommit(
+	value: Record<string, unknown> | undefined,
+	id: string,
+	member: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+	const next = { ...(value ?? {}) };
+	if (member === undefined) delete next[id];
+	else next[id] = member;
+	return Object.keys(next).length ? next : undefined;
+}
+
+/** How many of the roster's members the document holds: the count the label row draws. */
+export function matrixHeldCount(
+	schema: QuillFieldSchema,
+	value: Record<string, unknown> | undefined
+): number {
+	let n = 0;
+	for (const g of matrixGroups(schema))
+		for (const m of g.members) if (matrixHeld(value?.[m.id])) n++;
+	return n;
 }
 
 /** `foo_bar` → `Foo bar`: the label fallback when a field declares no `ui.title`. */
 export function humanize(name: string): string {
 	const spaced = name.replace(/_/g, ' ').trim();
 	return spaced ? spaced[0].toUpperCase() + spaced.slice(1) : spaced;
+}
+
+/** A property's display label: its own `ui.title`, else the humanized key — the rule
+ *  {@link fieldModels} reads off a field, one rung in. A table's column header and the
+ *  label inside its cell are the same words, so they read one function. */
+export function propertyLabel(key: string, sub: QuillFieldSchema): string {
+	return sub.ui?.title ?? humanize(key);
 }
 
 /** Project a card schema's `fields` map (declaration = key order) into models. */
@@ -388,28 +495,46 @@ export interface PlacedField {
 }
 
 /**
- * Whether a field can share a row. `ui.compact` asks; a shape declines when the
- * document sets its height, because a row is as tall as its tallest cell and the cell
- * beside it does not grow in step: an object nests a whole field set, block richtext
- * (`inline` absent) holds paragraphs, and an array holds however many elements the
- * document carries. Any of them stands its neighbour in a column of whitespace. An
- * inline prose leaf is one line tall and packs like any scalar.
+ * Whether the document sets a shape's height, rather than its own line box: an object
+ * nests a whole field set, block richtext (`inline` absent) holds paragraphs, an array
+ * holds however many elements the document carries, and a matrix draws its whole
+ * roster. Any of them stands a neighbour in a column of whitespace, because a row is as
+ * tall as its tallest cell and the cell beside it does not grow in step. An inline prose
+ * leaf is one line tall and measures like any scalar.
  *
- * A variant declines for the same reason one step further in: its height is the live
- * world's cell count, so it is set by a pick rather than only by the document, and a
- * packed neighbour would reflow every time the discriminant moves. The hint reaches
- * nothing inside one either: a world's cells are the object subform's own grid, which
- * reads no `ui` of its own, so `ui.compact` is inert everywhere a variant carries it.
+ * A variant is the same fact a step further in: its height is the live world's cell
+ * count, so it is set by a pick rather than only by the document, and a packed neighbour
+ * would reflow every time the discriminant moves.
  *
- * An array declines whatever its items are: one-line elements make a one-line step,
- * but nothing holds two arrays to the same number of them, so the shorter of a packed
- * pair pays a cell of whitespace for every element the taller one has past it, and
- * pays more of it as the document is filled.
+ * An array grows whatever its items are: one-line elements make a one-line step, but
+ * nothing holds two arrays to the same number of them, so the shorter of a packed pair
+ * pays a cell of whitespace for every element the taller one has past it, and pays more
+ * of it as the document is filled.
+ *
+ * One rule at every rung: it decides what a field's `ui.compact` may ask for and what a
+ * subform property takes of its own grid, which is what lets the two grids measure alike
+ * however deep the nesting goes.
+ */
+export function grows(control: ControlKind, inline: boolean): boolean {
+	if (control === 'object' || control === 'array' || control === 'variant' || control === 'matrix')
+		return true;
+	return control === 'prose' && !inline;
+}
+
+/** Whether a subform property takes the whole grid rather than one track: {@link grows}
+ *  read off the property's own declaration. `ui` reaches nothing inside a subform — a
+ *  cell set is the object grid's own, and it reads no hint — so the shape decides alone. */
+export function propertyGrows(sub: QuillFieldSchema): boolean {
+	return grows(controlKind(sub), !!sub.inline);
+}
+
+/**
+ * Whether a field can share a row. `ui.compact` asks, and {@link grows} declines: the
+ * hint reaches nothing inside a variant or a subform either, those cells being the
+ * object grid's own, so `ui.compact` is inert everywhere a container carries it.
  */
 function packable(f: FieldModel): boolean {
-	if (!f.compact) return false;
-	if (f.control === 'object' || f.control === 'array' || f.control === 'variant') return false;
-	return f.control !== 'prose' || f.inline;
+	return f.compact && !grows(f.control, f.inline);
 }
 
 /**
@@ -461,12 +586,75 @@ export function interpolateTitle(template: string, values: Record<string, unknow
 
 /** A field value as title text. A parsed field rests as the authored string and a
  *  committed one as `Content`, whose `text` is the same words; a scalar reads as
- *  itself and any other container as nothing. */
+ *  itself, a variant container as the member it selects — the one word in it that is
+ *  the field's answer — and any other container as nothing. */
 export function titleText(v: unknown): string {
 	if (v == null) return '';
 	if (typeof v !== 'object') return String(v);
 	const text = (v as Partial<Content>).text;
-	return typeof text === 'string' ? text : '';
+	if (typeof text === 'string') return text;
+	const member = (v as Record<string, unknown>)[VARIANT_DISCRIMINANT];
+	return typeof member === 'string' ? member : '';
+}
+
+// ── An array's rows ─────────────────────────────────────────────────────────
+
+/**
+ * The cell a collapsed row falls back to when `items` declares no `ui.title`: the first
+ * whose words are the row's own — a `string`, or an inline content leaf, which is every
+ * airmark row's title and carries no `string` cell at all. Declaration order is the order
+ * a schema states its own priority in.
+ *
+ * A block leaf is not one: a paragraph read onto a summary line is a first sentence
+ * standing for a record it is only part of.
+ */
+export function summaryKey(items: QuillFieldSchema | undefined): string | undefined {
+	for (const [k, sub] of Object.entries(items?.properties ?? {})) {
+		const kind = controlKind(sub);
+		if (kind === 'text') return k;
+		if (kind === 'prose' && sub.inline) return k;
+	}
+	return undefined;
+}
+
+/**
+ * A collapsed row's own words: `items.ui.title` interpolated over the row's cells, else
+ * the fallback cell ({@link summaryKey}) read as text. `undefined` while the row has
+ * nothing written, which is what the indexed name stands in for.
+ */
+export function elementSummary(
+	items: QuillFieldSchema | undefined,
+	value: unknown
+): string | undefined {
+	const row = (value ?? {}) as Record<string, unknown>;
+	const template = items?.ui?.title;
+	if (!template?.trim()) return titleText(row[summaryKey(items) ?? '']).trim() || undefined;
+	// A template is written in only where one of the cells it names is. Its literal
+	// text — the arrow in `{from} → {for}` — is punctuation between two answers, so a
+	// row with neither reads its indexed name rather than the punctuation alone. A
+	// template naming no cell at all is a constant the author chose, and stands.
+	const named = titleFields(template);
+	if (named.length && !named.some((n) => titleText(row[n]).trim())) return undefined;
+	return interpolateTitle(template, row).trim() || undefined;
+}
+
+/**
+ * Whether an array draws as a grid: the field's own `ui.layout` asks and the row's shape
+ * answers. A request the editor may decline (canon quillmark `SCHEMAS.md`), and the
+ * ground it declines on is the schema alone — a container query cannot choose which
+ * components mount, and nothing here measures (VISUAL_EDITOR §"Structure mirrors the schema"), so a
+ * width is not a fact this decision can read.
+ *
+ * A row every one of whose cells is one line high is a line a spreadsheet would hold. One
+ * that {@link grows} — a block leaf, a nested container, a matrix — is a record, and a
+ * column of them is a column as tall as the tallest document: the record list is the
+ * fallback, and it is the same rows under a different figure.
+ */
+export function tabular(schema: QuillFieldSchema | undefined): boolean {
+	const items = schema?.items;
+	if (!items || schema?.ui?.layout !== 'table' || controlKind(items) !== 'object') return false;
+	const cells = Object.values(items.properties ?? {});
+	return cells.length > 0 && !cells.some(propertyGrows);
 }
 
 /** The field names a `{field}` title reads. */

@@ -7,6 +7,8 @@
 // `color-mix` resolves, instead of in keyframe values a script would have to
 // pre-resolve and re-resolve on a theme change.
 
+import { rungStyle } from './rungs.js';
+
 const BLOOM_CLASS = 'qm-bloom';
 const WASH = 'var(--_qm-accent-wash)';
 /** The dwell used when the derivation is out of reach (an unstyled root, or jsdom,
@@ -39,7 +41,7 @@ function bloom(el: HTMLElement): Animation | undefined {
 	if (typeof el.animate !== 'function') return undefined;
 	const reduced =
 		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-	const raw = getComputedStyle(el).getPropertyValue('--_qm-bloom-dwell').trim();
+	const raw = rungStyle(el).getPropertyValue('--_qm-bloom-dwell').trim();
 	const n = Number.parseFloat(raw);
 	const duration = !Number.isFinite(n) ? FALLBACK_MS : raw.endsWith('ms') ? n : n * 1000;
 	return el.animate(reduced ? FRAMES_REDUCED : FRAMES, { duration });

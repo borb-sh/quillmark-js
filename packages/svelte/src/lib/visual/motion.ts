@@ -6,6 +6,7 @@
 // script runs the animation.
 
 import type { AnimationConfig } from 'svelte/animate';
+import { rungMs, rungStyle } from '../core/rungs.js';
 
 /** Marks this module's runs, so a second reorder cancels the first rather than layering
  *  a second transform over it. */
@@ -17,17 +18,6 @@ const RUN_ID = 'qm-reorder';
 export function reorderTrips(node: HTMLElement): Animation[] {
 	if (typeof node.getAnimations !== 'function') return [];
 	return node.getAnimations().filter((run) => run.id === RUN_ID);
-}
-
-/** A duration rung off `style`, in ms; `undefined` where the derivation is out of reach
- *  (an unstyled root, or jsdom, where `getComputedStyle` reports custom properties as
- *  empty). No rung, no motion: a fallback here would be the scale restated in the one
- *  place `check:style` cannot read. */
-export function rungMs(style: CSSStyleDeclaration, rung: string): number | undefined {
-	const raw = style.getPropertyValue(rung).trim();
-	const n = Number.parseFloat(raw);
-	if (!Number.isFinite(n)) return undefined;
-	return raw.endsWith('ms') ? n : n * 1000;
 }
 
 /**
@@ -52,7 +42,7 @@ export function reorder(
 	// samples a config's keyframes through a JS easing function, and this curve is a
 	// rung the derivation mints.
 	if (!armed() || typeof node.animate !== 'function') return {};
-	const style = getComputedStyle(node);
+	const style = rungStyle(node);
 	const duration = rungMs(style, '--_qm-duration-slow');
 	const easing = style.getPropertyValue('--_qm-ease-reverse').trim();
 	if (duration === undefined || !easing) return {};

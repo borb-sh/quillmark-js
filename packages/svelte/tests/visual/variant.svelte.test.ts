@@ -276,17 +276,18 @@ describe('a variant whose default is the blank', () => {
 
 		pickWorld(target, 'CONTROLLED', 'Handling');
 		// Obligation is per world and per cell: `controlled_by` declares no `default:`
-		// and `caveat` declares the blank.
-		expect(cellLabels(target, 'Handling')).toEqual(['Controlled by *', 'Caveat']);
+		// and `caveat` declares the blank. `reviews` is the world's container cell, which
+		// the subform recurses into rather than standing a line.
+		expect(cellLabels(target, 'Handling')).toEqual(['Controlled by *', 'Caveat', 'Reviews']);
 
 		// A content cell is a leaf like any other, at the depth it sits: the cell mounts
 		// the prose leaf its scalar field mounts, named by the label beside it.
-		const cells = [...field(target, 'Handling').querySelectorAll<HTMLElement>('.qm-object-prop')];
+		const cells = [
+			...field(target, 'Handling').querySelectorAll<HTMLElement>('.qm-object-prop')
+		].filter((c) => c.querySelector('.ProseMirror'));
 		expect(cells).toHaveLength(2);
 		for (const cell of cells) {
 			const leaf = cell.querySelector<HTMLElement>('.ProseMirror');
-			expect(leaf).not.toBeNull();
-			expect(cell.querySelector('.qm-unsupported')).toBeNull();
 			const named = cell.querySelector<HTMLElement>('.qm-field-label span');
 			expect(leaf!.getAttribute('aria-labelledby')).toBe(named?.parentElement?.id);
 		}

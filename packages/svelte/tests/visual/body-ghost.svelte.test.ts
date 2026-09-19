@@ -81,14 +81,17 @@ describe('the hook is asked per card', () => {
 	});
 
 	it('reads as one invitation per kind when the hook is a function of kind', () => {
-		// Same kind, same words, because the function says so.
+		// Same kind, same words, because the function says so: many empty bodies, one
+		// invitation per kind that has one.
 		const target = mountEditor({
 			strings: { bodyPlaceholder: (ctx) => `Say something about the ${ctx.kind}…` }
 		});
 
 		const drawn = ghosts(target);
 		expect(drawn.length).toBeGreaterThan(1);
-		expect(new Set(drawn)).toEqual(new Set(['Say something about the note…']));
+		const kinds = [...new Set(drawn)].map((g) => /^Say something about the (.+)…$/.exec(g)?.[1]);
+		expect(kinds.length).toBeLessThan(drawn.length);
+		expect(kinds.every((k) => k && k !== 'main')).toBe(true);
 	});
 
 	it('ghosts the built-in when the hook declines', () => {

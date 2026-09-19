@@ -21,7 +21,19 @@ import {
 	bodyEnabled,
 	variantMember,
 	variantCells,
-	commitDiscriminant
+	commitDiscriminant,
+	elementSummary,
+	summaryKey,
+	tabular,
+	grows,
+	propertyGrows,
+	obliged,
+	matrixGroups,
+	matrixHeld,
+	matrixColumns,
+	matrixMember,
+	matrixCommit,
+	matrixHeldCount
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
 
@@ -459,5 +471,174 @@ describe('against the real showcase schema', () => {
 		expect(sections.flatMap((s) => s.fields.map((m) => m.name)).sort()).toEqual(
 			models.map((m) => m.name).sort()
 		);
+	});
+});
+
+// ── The row summary (VISUAL_EDITOR §"Structure mirrors the schema") ──────────
+
+describe('a row summary', () => {
+	const rowItems = (over: Partial<QuillFieldSchema>): QuillFieldSchema =>
+		f({ type: 'object', ...over });
+
+	it('reads `items.ui.title` over the row\u2019s own cells', () => {
+		const items = rowItems({
+			ui: { title: '{from} \u2192 {for}' },
+			properties: { from: f({}), for: f({}) }
+		});
+		expect(elementSummary(items, { from: 'Ops', for: 'Wing' })).toBe('Ops \u2192 Wing');
+		// A row with neither cell written reads its indexed name, not the arrow between
+		// them: the literal text of a template is punctuation between two answers.
+		expect(elementSummary(items, {})).toBeUndefined();
+		expect(elementSummary(items, undefined)).toBeUndefined();
+		// One of them written is written in.
+		expect(elementSummary(items, { from: 'Ops' })).toBe('Ops \u2192');
+		// A template naming no cell is a constant the author chose, and stands.
+		expect(elementSummary(rowItems({ ui: { title: 'Tour' } }), {})).toBe('Tour');
+	});
+
+	it('falls to the first cell whose words are the row\u2019s own', () => {
+		// A `string` cell is one, and so is an inline content leaf — which is the shape
+		// every airmark row carries and the one a `string`-only rule could not read.
+		expect(summaryKey(rowItems({ properties: { n: f({ type: 'integer' }), t: f({}) } }))).toBe('t');
+		expect(
+			summaryKey(
+				rowItems({
+					properties: {
+						flag: f({ type: 'boolean' }),
+						title: f({ type: 'plaintext', inline: true })
+					}
+				})
+			)
+		).toBe('title');
+		// A block leaf is not: a first sentence stands for a record it is only part of.
+		expect(summaryKey(rowItems({ properties: { body: f({ type: 'richtext' }) } }))).toBeUndefined();
+		// Read through `titleText`, so a committed cell and a parsed one read alike.
+		const items = rowItems({ properties: { title: f({ type: 'plaintext', inline: true }) } });
+		expect(elementSummary(items, { title: 'Spring run' })).toBe('Spring run');
+		expect(elementSummary(items, { title: { text: 'Spring run' } })).toBe('Spring run');
+	});
+
+	it('reads a variant container as the member it selects', () => {
+		// `{topic}` over a variant-bearing enum: the container carries no `.text`, so a
+		// title that read only content read nothing.
+		expect(titleText({ value: 'experience', employer: 'Wing' })).toBe('experience');
+		expect(interpolateTitle('{topic}', { topic: { value: 'experience' } })).toBe('experience');
+		// A container that selects nothing still reads as nothing.
+		expect(titleText({ employer: 'Wing' })).toBe('');
+	});
+});
+
+// ── The grid arm (#597) and the shape rule under it ─────────────────────────
+
+describe('the figure an array draws in', () => {
+	const table = (props: Record<string, QuillFieldSchema>): QuillFieldSchema =>
+		f({ type: 'array', ui: { layout: 'table' }, items: f({ type: 'object', properties: props }) });
+
+	it('grants a table to a row every cell of which is one line high', () => {
+		expect(
+			tabular(table({ title: f({ type: 'plaintext', inline: true }), n: f({ type: 'integer' }) }))
+		).toBe(true);
+		// A request, not a contract, and the schema alone answers it: a block leaf, a
+		// nested container and a matrix each make the row a record.
+		expect(tabular(table({ body: f({ type: 'richtext' }) }))).toBe(false);
+		expect(tabular(table({ rows: f({ type: 'array', items: f({}) }) }))).toBe(false);
+		expect(tabular(table({ m: f({ type: 'matrix', members: [] }) }))).toBe(false);
+		// A row with no cells is no table either.
+		expect(tabular(table({}))).toBe(false);
+	});
+
+	it('declines where the field asks for nothing, or asks it of the wrong shape', () => {
+		expect(
+			tabular(f({ type: 'array', items: f({ type: 'object', properties: { a: f({}) } }) }))
+		).toBe(false);
+		expect(tabular(f({ type: 'array', ui: { layout: 'table' }, items: f({}) }))).toBe(false);
+		expect(tabular(undefined)).toBe(false);
+	});
+
+	it('is the one height rule, read at a field and at a property alike', () => {
+		// `grows` decides what `ui.compact` may ask for and what a subform property takes
+		// of its own grid, so the two grids measure alike however deep the nesting goes.
+		expect(grows('prose', true)).toBe(false);
+		expect(grows('prose', false)).toBe(true);
+		for (const k of ['array', 'object', 'variant', 'matrix'] as const)
+			expect(grows(k, true)).toBe(true);
+		for (const k of ['text', 'enum', 'number', 'boolean', 'date'] as const)
+			expect(grows(k, false)).toBe(false);
+		expect(propertyGrows(f({ type: 'plaintext', inline: true }))).toBe(false);
+		expect(propertyGrows(f({ type: 'array', items: f({}) }))).toBe(true);
+	});
+});
+
+// ── The matrix (#599) ────────────────────────────────────────────────────────
+
+describe('the matrix projection', () => {
+	const roster = f({
+		type: 'matrix',
+		properties: { detail: f({ type: 'plaintext', inline: true, default: '' }) },
+		members: [
+			{ group: 'Ops', values: { flight_cc: 'Flight CC', dodin_ops: 'DODIN Ops' } },
+			{ values: { cyber_200: 'Cyber 200' } }
+		]
+	});
+
+	it('composes the roster the boundary serves, groups kept and order held', () => {
+		expect(matrixGroups(roster)).toEqual([
+			{
+				label: 'Ops',
+				members: [
+					{ id: 'flight_cc', title: 'Flight CC' },
+					{ id: 'dodin_ops', title: 'DODIN Ops' }
+				]
+			},
+			{ label: undefined, members: [{ id: 'cyber_200', title: 'Cyber 200' }] }
+		]);
+		expect(matrixGroups(f({ type: 'matrix' }))).toEqual([]);
+	});
+
+	it('reads both rest forms: key presence is the tick unless the mapping spells otherwise', () => {
+		expect(matrixHeld(undefined)).toBe(false);
+		expect(matrixHeld(true)).toBe(true);
+		expect(matrixHeld({})).toBe(true);
+		expect(matrixHeld({ detail: 'x' })).toBe(true);
+		expect(matrixHeld({ held: true, detail: 'x' })).toBe(true);
+		expect(matrixHeld({ held: false, detail: 'x' })).toBe(false);
+		expect(matrixHeld(false)).toBe(false);
+		// The columns are what is left when the tick comes off, at either spelling.
+		expect(matrixColumns(true)).toEqual({});
+		expect(matrixColumns({ held: false, detail: 'x' })).toEqual({ detail: 'x' });
+	});
+
+	it('writes the object form, and drops an unheld member holding nothing', () => {
+		expect(matrixMember(true, {})).toEqual({ held: true });
+		expect(matrixMember(true, { detail: 'x' })).toEqual({ held: true, detail: 'x' });
+		// An untick keeps the columns, so tick, type, untick, retick loses nothing.
+		expect(matrixMember(false, { detail: 'x' })).toEqual({ held: false, detail: 'x' });
+		expect(matrixMember(false, {})).toBeUndefined();
+		// The tick never rides in as a column.
+		expect(matrixMember(true, { held: false, detail: 'x' })).toEqual({ held: true, detail: 'x' });
+	});
+
+	it('commits a sparse map, and unsets the field once it holds nothing', () => {
+		expect(matrixCommit(undefined, 'flight_cc', { held: true })).toEqual({
+			flight_cc: { held: true }
+		});
+		expect(matrixCommit({ flight_cc: { held: true } }, 'flight_cc', undefined)).toBeUndefined();
+		expect(
+			matrixCommit({ flight_cc: { held: true }, cyber_200: true }, 'flight_cc', undefined)
+		).toEqual({ cyber_200: true });
+	});
+
+	it('counts what the document holds, across both spellings and every group', () => {
+		expect(matrixHeldCount(roster, undefined)).toBe(0);
+		expect(
+			matrixHeldCount(roster, { flight_cc: true, dodin_ops: { held: false }, cyber_200: { x: 1 } })
+		).toBe(2);
+	});
+
+	it('obliges nothing of its own, the namespace rule a typed dictionary already holds', () => {
+		expect(obliged(f({ type: 'matrix', members: [] }))).toBe(false);
+		expect(obliged(f({ type: 'object' }))).toBe(false);
+		expect(obliged(f({ type: 'string' }))).toBe(true);
+		expect(controlKind(f({ type: 'matrix' }))).toBe('matrix');
 	});
 });

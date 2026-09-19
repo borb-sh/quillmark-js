@@ -58,18 +58,25 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	 *  ghosts ({@link EnumField}). */
 	enumUnsetTag: string;
 
+	/** The row reorder pair's accessible names; the glyphs are chevrons. */
+	arrayMoveUp: string;
+	arrayMoveDown: string;
+	/**
+	 * An array's element count against its `max:`, drawn beside the add chip and read as
+	 * the group's description. Parametric, so a locale that separates the pair its own way
+	 * can.
+	 */
+	arrayCount: (count: number, max: number) => string;
+
+	// ── Matrix control ────────────────────────────────────────────────────────
+	/** How much of the roster the document holds, in the slot an array spends on its cap. */
+	matrixHeld: (held: number, total: number) => string;
+
 	// ── Subform ───────────────────────────────────────────────────────────────
 	/**
-	 * What stands where a subform declines to recurse — a nested `array` or `object`
-	 * property, whose own figure would nest a field past the depth this one draws —
-	 * and where to edit that property instead. The whole sentence, since a translator
-	 * orders the kind within it.
-	 */
-	nestedUnsupported: (kind: string) => string;
-	/**
-	 * A collapsed array element whose first text property is empty: the label and the
-	 * 1-based index, which is what its accessible name already says. Parametric, so
-	 * word order stays the translator's.
+	 * A collapsed array element with nothing written in the cell its summary reads: the
+	 * label and the 1-based index, which is what its accessible name already says.
+	 * Parametric, so word order stays the translator's.
 	 */
 	elementUntitled: (label: string, index: number) => string;
 
@@ -166,8 +173,11 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	addCard: '+ Add Card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
+	arrayMoveUp: 'Move up',
+	arrayMoveDown: 'Move down',
+	arrayCount: (count, max) => `${count} / ${max}`,
+	matrixHeld: (held, total) => `${held} of ${total} held`,
 	enumUnsetTag: 'default',
-	nestedUnsupported: (kind) => `A nested ${kind} — edit this field in the source view.`,
 	elementUntitled: (label, index) => `${label} ${index}`,
 	fieldRequired: 'required',
 	formatGroup: 'Formatting',

@@ -61,6 +61,31 @@
 	const member = $derived(variantMember(value, ghostMember));
 	const cells = $derived(variantCells(schema, member));
 	const discriminant = $derived(value?.[VARIANT_DISCRIMINANT] as string | undefined);
+
+	let cellsEl = $state<
+		| { focus: () => void; focusPath: (path: PathStep[], pos?: number) => HTMLElement | undefined }
+		| undefined
+	>();
+	/** Take the caret: the first cell of the live world, or the discriminant when that
+	 *  world declares none — which is then the whole of the control. */
+	export function focus(): void {
+		if (cellsEl) return cellsEl.focus();
+		document.getElementById(id ?? '')?.focus();
+	}
+	/**
+	 * Land at `path` (`leaves.ts`): the discriminant cell is the field's own control, and
+	 * every other step names a cell of the live world, which is the object subform's to
+	 * walk. A cell of a world that is not drawn resolves to nothing — it is in the
+	 * document and not on the page (VISUAL_EDITOR §"Enum variants") — and the landing
+	 * falls back to the field.
+	 */
+	export function focusPath(path: PathStep[], pos?: number): HTMLElement | undefined {
+		if (path[0] === VARIANT_DISCRIMINANT) {
+			document.getElementById(id ?? '')?.focus();
+			return undefined;
+		}
+		return cellsEl?.focusPath(path, pos);
+	}
 </script>
 
 <div class="qm-variant">
@@ -81,6 +106,7 @@
 	{#if cells}
 		{#key member}
 			<ObjectField
+				bind:this={cellsEl}
 				value={value ?? {}}
 				properties={cells}
 				{label}

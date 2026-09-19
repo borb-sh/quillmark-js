@@ -2,9 +2,9 @@
 // verbs take, both directions. Pure address math, no document and no surface.
 import { describe, it, expect } from 'vitest';
 import { fieldPathForAddr, addrForFieldPath } from '$lib/core';
-// Not on `/core`'s entry: the element split is the editor's ladder, not a hop a host
+// Not on `/core`'s entry: the nested split is the editor's ladder, not a hop a host
 // needs (`core/index.ts` carries what more than one surface speaks).
-import { elementAddrForFieldPath, nearestAddrForFieldPath } from '$lib/core/address.js';
+import { nestedAddrForFieldPath, nearestAddrForFieldPath } from '$lib/core/address.js';
 import { cardPath } from '$lib/core/address.js';
 
 describe('fieldPathForAddr', () => {
@@ -88,31 +88,53 @@ describe('addrForFieldPath', () => {
 	});
 });
 
-describe('elementAddrForFieldPath', () => {
-	it('reads the bracketed index the boundary emits', () => {
-		expect(elementAddrForFieldPath('main.keywords[0]')).toEqual({
+describe('nestedAddrForFieldPath', () => {
+	it('reads the whole step list past the field, index and key alike', () => {
+		expect(nestedAddrForFieldPath('main.keywords[0]')).toEqual({
 			field: { field: 'keywords' },
-			index: 0
+			path: [0]
 		});
-		expect(elementAddrForFieldPath('cards.indorsement[1].signature_block[2]')).toEqual({
+		expect(nestedAddrForFieldPath('main.vectors[0].tours[2].title')).toEqual({
+			field: { field: 'vectors' },
+			path: [0, 'tours', 2, 'title']
+		});
+		expect(nestedAddrForFieldPath('cards.indorsement[1].signature_block[2]')).toEqual({
 			field: { card: 1, field: 'signature_block' },
-			index: 2
+			path: [2]
+		});
+		expect(nestedAddrForFieldPath('main.contact.email')).toEqual({
+			field: { field: 'contact' },
+			path: ['email']
+		});
+		expect(nestedAddrForFieldPath('main.qualifications.flight_cc.detail')).toEqual({
+			field: { field: 'qualifications' },
+			path: ['flight_cc', 'detail']
 		});
 	});
 
-	it('does not read a dotted trailing digit as an index', () => {
-		expect(elementAddrForFieldPath('main.keywords.0')).toBeUndefined();
+	it('reads a dotted trailing digit as a key, which is what the grammar spells', () => {
+		expect(nestedAddrForFieldPath('main.keywords.0')).toEqual({
+			field: { field: 'keywords' },
+			path: ['0']
+		});
 	});
 
-	it('takes only a trailing index under a field', () => {
-		// A whole field, a card, and a body have no element; a deeper nesting names no
-		// single array either. Whether the field is an array is the caller's guard: this
-		// module holds the grammar and no schema.
-		expect(elementAddrForFieldPath('main.keywords')).toBeUndefined();
-		expect(elementAddrForFieldPath('main.body')).toBeUndefined();
-		expect(elementAddrForFieldPath('cards.indorsement[1]')).toBeUndefined();
-		expect(elementAddrForFieldPath('main.author.name')).toBeUndefined();
-		expect(elementAddrForFieldPath('')).toBeUndefined();
+	it('takes nothing a commit address can name', () => {
+		// A whole field, a card and a body have nothing inside them for a step to reach.
+		// Whether each rung is declared is the caller's guard: this module holds the
+		// grammar and no schema.
+		expect(nestedAddrForFieldPath('main.keywords')).toBeUndefined();
+		expect(nestedAddrForFieldPath('main.body')).toBeUndefined();
+		expect(nestedAddrForFieldPath('cards.indorsement[1]')).toBeUndefined();
+		expect(nestedAddrForFieldPath('cards.indorsement[1].body')).toBeUndefined();
+		expect(nestedAddrForFieldPath('')).toBeUndefined();
+	});
+
+	it('declines a head that is not a field', () => {
+		// The engine emits a field segment before any index, so `main[0]` names nothing;
+		// and a field-rooted path has no root this grammar can address.
+		expect(nestedAddrForFieldPath('main[0].x')).toBeUndefined();
+		expect(nestedAddrForFieldPath('recipients[0].name')).toBeUndefined();
 	});
 });
 

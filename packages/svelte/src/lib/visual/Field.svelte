@@ -27,6 +27,7 @@
 	import type { LeafRegistry } from './leaves.js';
 	import type { FieldModel, FieldSpan } from './structure.js';
 	import { VARIANT_DISCRIMINANT, ghostDefault, stringifyGhost } from './structure.js';
+	import MatrixField from './MatrixField.svelte';
 	import type { FieldDomIds } from './domid.js';
 	import ProseField from './ProseField.svelte';
 	import TextField from './TextField.svelte';
@@ -145,28 +146,29 @@
 	// restores a selection, a date field lands on its first segment, an array lands on
 	// its first element or on the add affordance that is all an empty one has, an
 	// object on its first property.
+	/** What a container control answers a nested landing with. Every container carries it
+	 *  — a repeater, a subform, a variant's cells, a matrix's members — because the
+	 *  boundary regions a leaf at every depth and the walk down is each rung consuming its
+	 *  own step (`leaves.ts`). */
+	interface Nested {
+		focus: () => void;
+		focusPath: (path: PathStep[], pos?: number) => HTMLElement | undefined;
+	}
 	let proseEl = $state<{ focus: () => void } | undefined>();
 	let dateEl = $state<{ focus: () => void } | undefined>();
-	let arrayEl = $state<
-		| {
-				focus: () => void;
-				focusElement: (k: number, pos?: number) => HTMLElement | undefined;
-				washBox: () => HTMLElement | undefined;
-		  }
-		| undefined
-	>();
-	let objectEl = $state<{ focus: () => void } | undefined>();
+	let arrayEl = $state<(Nested & { washBox: () => HTMLElement | undefined }) | undefined>();
+	let nestedEl = $state<Nested | undefined>();
 	function focusControl(): void {
-		const owner = proseEl ?? dateEl ?? arrayEl ?? objectEl;
+		const owner = proseEl ?? dateEl ?? arrayEl ?? nestedEl;
 		if (owner) return owner.focus();
 		document.getElementById(domIds.control)?.focus();
 	}
-	/** The array's per-ELEMENT landing, for the addresses the preview mints under an
-	 *  array field (`leaves.ts`); read at the call, so it tracks the mounted repeater.
-	 *  The row it settled in comes back with it, the wash being the landing's own
+	/** The per-LEAF landing under this field, for the addresses the boundary mints inside
+	 *  one (`leaves.ts`); read at the call, so it tracks the mounted control. The box the
+	 *  innermost rung settled in comes back with it, the wash being the landing's own
 	 *  granularity. */
-	function focusElement(k: number, pos?: number): HTMLElement | undefined {
-		return arrayEl?.focusElement(k, pos);
+	function focusPath(path: PathStep[], pos?: number): HTMLElement | undefined {
+		return (arrayEl ?? nestedEl)?.focusPath(path, pos);
 	}
 	// Only where `for` cannot reach; the labelable four are the browser's own, and a
 	// second handler over them would be a focus the label already placed.
@@ -185,9 +187,9 @@
 	 * rather than mount-once, because a retype can swap the control under a leaf key
 	 * that does not remount.
 	 *
-	 * An array carries the per-element lane as well; no other control has elements for
-	 * an address to name. `el` is the field-wide box, which an element landing does not
-	 * wash: that lane hands back its own row (`leaves.ts`).
+	 * A container carries the nested lane as well; a scalar has nothing inside it for an
+	 * address to name. `el` is the field-wide box, which a nested landing does not wash:
+	 * that lane hands back the box of the rung it settled in (`leaves.ts`).
 	 */
 	let controlEl = $state<HTMLElement | undefined>();
 	$effect(() => {
@@ -195,9 +197,14 @@
 		const key = leafKey;
 		const registry = leaves;
 		const wrapper = controlEl;
+		const nests =
+			field.control === 'array' ||
+			field.control === 'object' ||
+			field.control === 'variant' ||
+			field.control === 'matrix';
 		registry.registerControl(key, {
 			focus: focusControl,
-			focusElement: field.control === 'array' ? focusElement : undefined,
+			focusPath: nests ? focusPath : undefined,
 			get el() {
 				return arrayEl?.washBox() ?? wrapper;
 			}
@@ -214,10 +221,14 @@
 	 * rather than counted twice.
 	 */
 	const reportFocus = $derived(field.control === 'prose' ? undefined : () => onFocus?.(addr));
+
+	/** Which controls pair the label with chrome of their own and take the track with it:
+	 *  a repeater with its add chip and its cap, a matrix with its held count. */
+	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
 </script>
 
 <div class="qm-field" class:cell={span === 'cell'}>
-	{#if field.control !== 'array'}
+	{#if !ownsLabel}
 		<FieldLabel
 			label={field.label}
 			controlId={labelable ? domIds.control : undefined}
@@ -265,6 +276,7 @@
 				/>
 			{:else if field.control === 'variant'}
 				<VariantField
+					bind:this={nestedEl}
 					value={value as Record<string, unknown> | undefined}
 					schema={field.schema}
 					{ghostMember}
@@ -307,7 +319,7 @@
 				<ArrayField
 					bind:this={arrayEl}
 					value={value as unknown[] | undefined}
-					items={field.schema.items}
+					schema={field.schema}
 					label={field.label}
 					required={field.required}
 					description={field.description}
@@ -319,13 +331,26 @@
 				/>
 			{:else if field.control === 'object'}
 				<ObjectField
-					bind:this={objectEl}
+					bind:this={nestedEl}
 					value={value as Record<string, unknown> | undefined}
 					properties={field.schema.properties}
 					label={field.label}
 					idBase={domIds.control}
 					labelledBy={domIds.label}
 					{describedBy}
+					{contentAt}
+					onCommit={onCommitScalar}
+				/>
+			{:else if field.control === 'matrix'}
+				<MatrixField
+					bind:this={nestedEl}
+					value={value as Record<string, unknown> | undefined}
+					schema={field.schema}
+					label={field.label}
+					description={field.description}
+					labelId={domIds.label}
+					descriptionId={domIds.description}
+					idBase={domIds.control}
 					{contentAt}
 					onCommit={onCommitScalar}
 				/>
