@@ -293,12 +293,10 @@ describe('the grid arm', () => {
 		const tours = nested(open(vectors, 0), 'Tours');
 		// `tours` asks for the table and every cell is one line high, so it draws one.
 		const head = tours.querySelector<HTMLElement>(':scope > .qm-table-head')!;
-		expect([...head.querySelectorAll('.qm-table-col')].map((c) => c.textContent)).toEqual([
-			'Title',
-			'Season',
-			'Nights',
-			'Lead'
-		]);
+		// The name, without the `*` the obliged column carries beside it.
+		expect(
+			[...head.querySelectorAll('.qm-table-col')].map((c) => c.childNodes[0]?.textContent)
+		).toEqual(['Title', 'Season', 'Nights', 'Lead']);
 		// The header is chrome: the name each control is reached by is its own label.
 		expect(head.getAttribute('aria-hidden')).toBe('true');
 		expect(rows(tours)).toHaveLength(2);
@@ -308,6 +306,32 @@ describe('the grid arm', () => {
 			expect(row.querySelector('.qm-element-summary')).toBeNull();
 			expect(row.querySelectorAll('.qm-object-prop')).toHaveLength(4);
 		}
+	});
+
+	it('draws no header over nothing, and says which column asks', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		seedVectors(q, doc, [{ name: 'Alpha' }]);
+		const { target } = mountEditor(q, doc);
+		const tours = nested(
+			open(field(target, 'Vectors').querySelector<HTMLElement>('.qm-array')!, 0),
+			'Tours'
+		);
+
+		// A strip of column names above an empty list names columns the document has no
+		// line in; the rows box already holds that rule for itself.
+		expect(rows(tours)).toHaveLength(0);
+		expect(tours.querySelector(':scope > .qm-table-head')).toBeNull();
+
+		click(addChip(tours));
+		flushSync();
+		const head = tours.querySelector<HTMLElement>(':scope > .qm-table-head')!;
+		expect(head).not.toBeNull();
+		// `title` declares no `default:`, so the column asks — and its cell's own label,
+		// which carries the `*`, is off the page at the table rung.
+		const cols = [...head.querySelectorAll<HTMLElement>('.qm-table-col')];
+		expect(cols[0].querySelector('.qm-table-req')).not.toBeNull();
+		expect(cols[2].querySelector('.qm-table-req')).toBeNull();
 	});
 
 	it('carries the row machine, not a second one', async () => {

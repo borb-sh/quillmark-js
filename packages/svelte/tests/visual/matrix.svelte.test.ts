@@ -154,6 +154,36 @@ describe('the matrix control', () => {
 		expect(doc.getStored('qualifications')).toBeUndefined();
 	});
 
+	it('reads the tick at the floor\u2019s own coercion, not against `false` alone', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		// The quill-free store lane leaves a value exactly as it arrived, which is what
+		// this control reads: the engine resolves `0` and `"false"` to an unheld member,
+		// and a read testing identity against `false` drew both ticked.
+		doc.storeField('qualifications', {
+			flight_cc: { held: 0, year: 9 },
+			dodin_ops: { held: 'false' },
+			cyber_200: 0,
+			cyber_300: 1,
+			instructor: { year: 4 }
+		});
+		const target = mountEditor(q, doc);
+
+		expect(box(target, 'Flight CC').checked).toBe(false);
+		expect(box(target, 'DODIN Ops').checked).toBe(false);
+		expect(box(target, 'Cyber 200').checked).toBe(false);
+		expect(box(target, 'Cyber 300').checked).toBe(true);
+		// Key presence is the tick: a mapping naming no `held` is held.
+		expect(box(target, 'Instructor').checked).toBe(true);
+		expect(matrix(target).querySelector('.qm-matrix-count')?.textContent).toBe('2 of 5 held');
+
+		// An unheld member unfolds nothing, which is what keeps a column edit from
+		// landing `held: true` on a member the document said was not held: the subform the
+		// edit would come from is not mounted over it.
+		expect(member(target, 'Flight CC').querySelector('.qm-object')).toBeNull();
+		expect(member(target, 'Cyber 300').querySelector('.qm-object')).not.toBeNull();
+	});
+
 	it('names each tick by a real label, and walks a group with the arrow keys', () => {
 		const q = quill();
 		const doc = q.seedDocument();

@@ -32,7 +32,8 @@
 		matrixGroups,
 		matrixHeld,
 		matrixHeldCount,
-		matrixMember
+		matrixMember,
+		matrixMemberAt
 	} from './structure.js';
 	import { propertyDomIds } from './domid.js';
 	import FieldLabel from './FieldLabel.svelte';
@@ -96,13 +97,13 @@
 	const order = $derived(groups.map((g) => g.members.map((m) => m.id)));
 
 	function tick(id: string, on: boolean): void {
-		onCommit(matrixCommit(value, id, matrixMember(on, matrixColumns(value?.[id]))));
+		onCommit(matrixCommit(value, id, matrixMember(on, matrixColumns(matrixMemberAt(value, id)))));
 	}
 	/** A column written: the member is held by having been filled in, exactly as key
 	 *  presence is the tick. An emptied column has already left the object by the time
 	 *  this reads it, so a member the user has cleared back to nothing and unticked drops. */
 	function commitColumns(id: string, cols: Record<string, unknown>): void {
-		onCommit(matrixCommit(value, id, matrixMember(matrixHeld(value?.[id]), cols)));
+		onCommit(matrixCommit(value, id, matrixMember(matrixHeld(matrixMemberAt(value, id)), cols)));
 	}
 
 	/** Take the caret: the first member's box. An empty roster lands nothing. */
@@ -164,14 +165,17 @@
 		<span class="qm-matrix-count">{t.strings.matrixHeld(held, total)}</span>
 	</div>
 	<div class="qm-matrix-groups">
-		{#each groups as group, gi (group.label ?? gi)}
+		<!-- Keyed on position: a roster's blocks are a static, positional list, and two
+		     that share a heading are a quill the loader accepts — keying on the label
+		     would take the whole surface down on a duplicate key. -->
+		{#each groups as group, gi (gi)}
 			<div class="qm-matrix-group">
 				{#if group.label}
 					<span class="qm-matrix-group-label">{group.label}</span>
 				{/if}
 				{#each group.members as member, mi (member.id)}
 					{@const ids = idBase ? propertyDomIds(idBase, member.id) : undefined}
-					{@const on = matrixHeld(value?.[member.id])}
+					{@const on = matrixHeld(matrixMemberAt(value, member.id))}
 					<div class="qm-matrix-member" bind:this={memberEls[member.id]}>
 						<div class="qm-matrix-tick">
 							<input
@@ -194,7 +198,7 @@
 						{#if on && hasColumns}
 							<ObjectField
 								bind:this={subEls[member.id]}
-								value={matrixColumns(value?.[member.id])}
+								value={matrixColumns(matrixMemberAt(value, member.id))}
 								properties={columns}
 								label={`${label} ${member.title}`}
 								idBase={ids?.control}

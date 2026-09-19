@@ -33,7 +33,8 @@ import {
 	matrixColumns,
 	matrixMember,
 	matrixCommit,
-	matrixHeldCount
+	matrixHeldCount,
+	matrixMemberAt
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
 
@@ -606,6 +607,47 @@ describe('the matrix projection', () => {
 		// The columns are what is left when the tick comes off, at either spelling.
 		expect(matrixColumns(true)).toEqual({});
 		expect(matrixColumns({ held: false, detail: 'x' })).toEqual({ detail: 'x' });
+	});
+
+	it('reads the tick at the render floor\u2019s coercion, at either spelling', () => {
+		// The floor coerces: a number against zero, and the two strings a boolean spells.
+		// A value it refuses (`validation::type_mismatch`) renders at the blank, which for
+		// the synthesized cell is unheld. Identity against `false` drew every one of these
+		// ticked, and a column edit then wrote `held: true` over the document's own answer.
+		for (const unheld of [
+			0,
+			'false',
+			'',
+			'no',
+			null,
+			{ held: 0 },
+			{ held: 'false' },
+			{ held: '' },
+			{ held: null }
+		])
+			expect(matrixHeld(unheld)).toBe(false);
+		for (const held of [1, 'true', { held: 1 }, { held: 'true' }, { year: 9 }])
+			expect(matrixHeld(held)).toBe(true);
+		// And a prototype name is not a spelling of the tick.
+		expect(matrixHeld({ detail: 'x' })).toBe(true);
+		// An array is a shape the engine refuses for a member: unheld, and no columns to
+		// launder its indices into.
+		expect(matrixHeld([1, 2])).toBe(false);
+		expect(matrixColumns([1, 2])).toEqual({});
+	});
+
+	it('reads a member by its own key, which `constructor` is a legal spelling of', () => {
+		// A member id is a snake_case identifier and `constructor` is one, so a plain read
+		// answers with `Object.prototype`'s for a document that never mentioned it.
+		expect(matrixMemberAt({}, 'constructor')).toBeUndefined();
+		expect(matrixMemberAt(undefined, 'flight_cc')).toBeUndefined();
+		expect(matrixMemberAt({ flight_cc: true }, 'flight_cc')).toBe(true);
+		const roster = f({
+			type: 'matrix',
+			members: [{ values: { constructor: 'Constructor', flight_cc: 'Flight CC' } }]
+		});
+		expect(matrixHeldCount(roster, {})).toBe(0);
+		expect(matrixHeldCount(roster, { constructor: true })).toBe(1);
 	});
 
 	it('writes the object form, and drops an unheld member holding nothing', () => {

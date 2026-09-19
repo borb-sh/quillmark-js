@@ -48,7 +48,14 @@
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
 	import { emptyContent } from '../core/codec/index.js';
 	import { createLifespan } from '../core/teardown.js';
-	import { IdSeq, controlKind, elementSummary, propertyLabel, tabular } from './structure.js';
+	import {
+		IdSeq,
+		controlKind,
+		elementSummary,
+		obliged,
+		propertyLabel,
+		tabular
+	} from './structure.js';
 	import { holdInView } from './hold.js';
 	import Icon from './icons/Icon.svelte';
 	import TextField from './TextField.svelte';
@@ -487,14 +494,21 @@
 			>
 		</div>
 	</div>
-	{#if table}
+	{#if table && ids.length > 0}
 		<!-- The header names each column once for a reader who can see it; the name a
 		     control is reached by is the `<label for>` inside its own cell, which the
 		     table rung takes off the page (`ObjectField`, `layout="row"`). So these words
-		     are chrome, and announcing them a second time is noise. -->
+		     are chrome, and announcing them a second time is noise — and nothing focusable
+		     stands in them, an `aria-hidden` focus stop being a stop nothing can name.
+
+		     It is drawn over rows and never over nothing, the rule the rows box already
+		     holds for itself: a strip of column names above an empty list names columns
+		     the document has no line in. -->
 		<div class="qm-table-head" style="--row-cols: {columns.length}" aria-hidden="true">
 			{#each columns as [key, sub] (key)}
-				<span class="qm-table-col">{propertyLabel(key, sub)}</span>
+				<span class="qm-table-col"
+					>{propertyLabel(key, sub)}{#if obliged(sub)}<span class="qm-table-req">*</span>{/if}</span
+				>
 			{/each}
 		</div>
 	{/if}
@@ -856,6 +870,14 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	/* The obligation the cell's own label carries and the table rung clips: the `*` is
+	 the whole of what the surface says about it (VISUAL_EDITOR §"Structure mirrors the
+	 schema"), so a column that asks says so where its name is drawn. Decoration here —
+	 the header is out of the tree, and each control is still announced required by the
+	 label it is named by. */
+	.qm-table-req {
+		color: var(--_qm-danger);
+	}
 	.qm-table-row {
 		column-gap: var(--_qm-space-2);
 		row-gap: var(--_qm-space);
@@ -871,7 +893,8 @@
 			grid-template-columns: repeat(var(--row-cols), minmax(0, 1fr));
 		}
 		/* The column is named once, above, so each cell's own `<label for>` — what the
-		 control is actually reached by — leaves the page rather than the DOM. */
+		 control is actually reached by — leaves the page rather than the DOM: clipped and
+		 not `display: none`, which would take the name with it. */
 		.qm-table-row :global(.qm-field-label-row) {
 			position: absolute;
 			width: 1px;
@@ -879,6 +902,14 @@
 			overflow: hidden;
 			clip-path: inset(50%);
 			white-space: nowrap;
+		}
+		/* The guidance trigger goes out of the tree with it. A clipped box is still in the
+		 tab order, so a table of four columns over ten rows would otherwise stand forty
+		 focus stops in a 1×1 box nobody can see. What it opens is the `description`, which
+		 each control still names through `aria-describedby`; the trigger returns at the
+		 stacked rung, where the label it sits beside is drawn. */
+		.qm-table-row :global(.qm-field-hint) {
+			visibility: hidden;
 		}
 	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so

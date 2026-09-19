@@ -318,22 +318,51 @@ export function matrixGroups(schema: QuillFieldSchema): MatrixGroup[] {
 }
 
 /**
+ * The tick a stored cell carries, read as the render floor reads it: a boolean, a number
+ * against zero, or the two spellings a boolean coerces from. Anything else is a value the
+ * engine refuses (`validation::type_mismatch`) and renders at the blank, which for the
+ * synthesized cell is unheld.
+ *
+ * Identity against `false` is the trap this closes: a stored `0` or `"false"` renders
+ * unheld and would have drawn ticked, and a column edit would then have landed
+ * `held: true` on a member the document said was not.
+ */
+function tick(v: unknown): boolean {
+	if (typeof v === 'boolean') return v;
+	if (typeof v === 'number') return v !== 0;
+	return v === 'true';
+}
+
+/**
  * Whether a member is held. **Key presence is the tick** unless the mapping spells
  * otherwise, which is the variant precedent one type over: `cyber_200: true` is to
  * `{held: true}` what `classification: CUI` is to `{value: CUI}`. So the read takes
  * both rest forms — a document through the transport door has been conformed through
- * neither.
+ * neither — and reads the spelling each carries at the floor's own coercion.
  */
 export function matrixHeld(stored: unknown): boolean {
-	if (stored == null) return false;
-	if (typeof stored !== 'object') return stored !== false;
-	return (stored as Record<string, unknown>)[MATRIX_HELD] !== false;
+	if (stored == null || Array.isArray(stored)) return false;
+	if (typeof stored !== 'object') return tick(stored);
+	const member = stored as Record<string, unknown>;
+	return Object.hasOwn(member, MATRIX_HELD) ? tick(member[MATRIX_HELD]) : true;
+}
+
+/**
+ * A member's stored entry, by own key only. A member id is a snake_case identifier and
+ * `constructor` is one, so a plain read would answer with `Object.prototype`'s for a
+ * document that never mentioned the member — drawing it ticked, and writing that back.
+ */
+export function matrixMemberAt(value: Record<string, unknown> | undefined, id: string): unknown {
+	return value && Object.hasOwn(value, id) ? value[id] : undefined;
 }
 
 /** A member's written columns, the tick cell dropped: the container a column control
  *  commits into. Empty for the bare `true` spelling and for an absent member. */
 export function matrixColumns(stored: unknown): Record<string, unknown> {
-	if (stored == null || typeof stored !== 'object') return {};
+	// An array is a shape the engine refuses for a member (`validation::type_mismatch`)
+	// and renders at the blank; spread as a member it would launder its indices into
+	// column names and the next commit would write them.
+	if (stored == null || typeof stored !== 'object' || Array.isArray(stored)) return {};
 	const { [MATRIX_HELD]: _held, ...columns } = stored as Record<string, unknown>;
 	return columns;
 }
@@ -374,7 +403,7 @@ export function matrixHeldCount(
 ): number {
 	let n = 0;
 	for (const g of matrixGroups(schema))
-		for (const m of g.members) if (matrixHeld(value?.[m.id])) n++;
+		for (const m of g.members) if (matrixHeld(matrixMemberAt(value, m.id))) n++;
 	return n;
 }
 
