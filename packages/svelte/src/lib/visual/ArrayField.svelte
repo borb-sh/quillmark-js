@@ -57,6 +57,7 @@
 		tabular
 	} from './structure.js';
 	import { holdInView } from './hold.js';
+	import { reorder } from './motion.js';
 	import Icon from './icons/Icon.svelte';
 	import TextField from './TextField.svelte';
 	import ObjectField from './ObjectField.svelte';
@@ -294,9 +295,20 @@
 	 * remounts. Focus rides the moved node; a browser that drops it on the reinsertion
 	 * is answered after the flush, where the row is where it landed.
 	 */
+	// The row's arming window, the card stack's rule at the row's rung: `animate:` fires
+	// wherever a keyed slot's rect moved, and a row growing under the caret moves every
+	// row below it — a layout change with no trip in it. The move arms the gesture and
+	// the frame it lands in disarms it.
+	let reordering = false;
+	let reorderFrame = 0;
+	const isReordering = (): boolean => reordering;
+	span.onEnd(() => cancelAnimationFrame(reorderFrame));
+
 	function move(k: number, dir: -1 | 1): void {
 		const to = k + dir;
 		if (to < 0 || to >= ids.length) return;
+		reordering = true;
+		reorderFrame = requestAnimationFrame(() => (reordering = false));
 		const id = ids[k];
 		const held = document.activeElement;
 		const inside = held instanceof HTMLElement && rowEls[id]?.contains(held) === true;
@@ -436,6 +448,10 @@
 	function onElementKey(e: KeyboardEvent, k: number): void {
 		if (control === 'object' || e.isComposing) return;
 		if (e.key === 'Enter') {
+			// Claimed only where it acts: at the cap there is no sibling to open, and a key
+			// swallowed for a gesture that does not happen is a dead press. The count
+			// beside the add is what says why (§"A repeater's cap").
+			if (atMax) return;
 			e.preventDefault();
 			insertAfter(k);
 		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target)) {
@@ -513,13 +529,12 @@
 		</div>
 	{/if}
 	<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
-		{#each ids as id, k (id)}
-			{#if control === 'object'}
-				{#if table}
-					<!-- One line of the grid: the row's cells are the subform's, mounted in this
+		{#if control === 'object' && table}
+			{#each ids as id, k (id)}
+				<!-- One line of the grid: the row's cells are the subform's, mounted in this
 					     row's own columns rather than under a summary. Nothing opens, so the
 					     disclosure and the title go with it. -->
-					<!-- The twin binds on the row rather than on a control: a table row draws no
+				<!-- The twin binds on the row rather than on a control: a table row draws no
 					     summary, and its cells are what the keyboard is in when the gesture is
 					     made. The row is a named group with it, which is what the collapsed
 					     figure's summary says out loud and a grid of cells otherwise says only
@@ -528,18 +543,67 @@
 					     The key is delegated and never the row's own: every control the press
 					     can be made from is focusable and in the tab order, and the row is not
 					     a target. That is the case the rule is not about. -->
-					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-					<div
-						class="qm-array-row qm-table-row"
-						style="--row-cols: {columns.length}; --row-actions: 3"
-						role="group"
-						aria-label={rowName(k)}
-						bind:this={rowEls[id]}
-						onkeydown={(e) => onRowKey(e, k)}
-					>
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+				<div
+					class="qm-array-row qm-table-row"
+					animate:reorder={isReordering}
+					style="--row-cols: {columns.length}; --row-actions: 3"
+					role="group"
+					aria-label={rowName(k)}
+					bind:this={rowEls[id]}
+					onkeydown={(e) => onRowKey(e, k)}
+				>
+					<ObjectField
+						bind:this={rowSubEls[id]}
+						layout="row"
+						value={(arr[k] ?? {}) as Record<string, unknown>}
+						properties={items?.properties}
+						label={rowName(k)}
+						idBase={idBase != null ? `${idBase}-e-${id}` : undefined}
+						contentAt={(path) => contentAt([k, ...path])}
+						onCommit={(obj) => commitElement(k, obj)}
+					/>
+					{@render rowActions(k, rowName(k))}
+				</div>
+			{/each}
+		{:else if control === 'object'}
+			{#each ids as id, k (id)}
+				{@const open = openId === id}
+				{@const shown = elementTitle(k)}
+				<div
+					class="qm-array-row qm-element"
+					animate:reorder={isReordering}
+					class:open
+					style="--row-actions: 3"
+					bind:this={rowEls[id]}
+				>
+					<!-- The head is the row in collapsed form, and it is a box: the element IS
+						     a value, the way the enum trigger is, and the remove slab's grammar
+						     (the box's two end-side corners) needs corners to take. So a list of
+						     records measures like a list of inputs whatever the element type. -->
+					<div class="qm-element-head">
+						<button
+							type="button"
+							class="qm-control-box qm-focus-ring qm-element-summary"
+							aria-expanded={open}
+							onclick={(e) => toggleRow(id, e.currentTarget)}
+							onkeydown={(e) => onRowKey(e, k)}
+						>
+							<!-- Leading, and it rotates: trailing is the figure for pushing a new
+								     screen, where this unfolds in place. Same glyph, same rotation and
+								     same rung as the accordion's, so the surface has one disclosure. -->
+							<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
+							{#if shown}
+								<span class="qm-element-title">{shown}</span>
+							{:else}
+								<span class="qm-element-title untitled">{untitled(k)}</span>
+							{/if}
+						</button>
+						{@render rowActions(k, rowName(k))}
+					</div>
+					{#if open}
 						<ObjectField
 							bind:this={rowSubEls[id]}
-							layout="row"
 							value={(arr[k] ?? {}) as Record<string, unknown>}
 							properties={items?.properties}
 							label={rowName(k)}
@@ -547,55 +611,11 @@
 							contentAt={(path) => contentAt([k, ...path])}
 							onCommit={(obj) => commitElement(k, obj)}
 						/>
-						{@render rowActions(k, rowName(k))}
-					</div>
-				{:else}
-					{@const open = openId === id}
-					{@const shown = elementTitle(k)}
-					<div
-						class="qm-array-row qm-element"
-						class:open
-						style="--row-actions: 3"
-						bind:this={rowEls[id]}
-					>
-						<!-- The head is the row in collapsed form, and it is a box: the element IS
-						     a value, the way the enum trigger is, and the remove slab's grammar
-						     (the box's two end-side corners) needs corners to take. So a list of
-						     records measures like a list of inputs whatever the element type. -->
-						<div class="qm-element-head">
-							<button
-								type="button"
-								class="qm-control-box qm-focus-ring qm-element-summary"
-								aria-expanded={open}
-								onclick={(e) => toggleRow(id, e.currentTarget)}
-								onkeydown={(e) => onRowKey(e, k)}
-							>
-								<!-- Leading, and it rotates: trailing is the figure for pushing a new
-								     screen, where this unfolds in place. Same glyph, same rotation and
-								     same rung as the accordion's, so the surface has one disclosure. -->
-								<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
-								{#if shown}
-									<span class="qm-element-title">{shown}</span>
-								{:else}
-									<span class="qm-element-title untitled">{untitled(k)}</span>
-								{/if}
-							</button>
-							{@render rowActions(k, rowName(k))}
-						</div>
-						{#if open}
-							<ObjectField
-								bind:this={rowSubEls[id]}
-								value={(arr[k] ?? {}) as Record<string, unknown>}
-								properties={items?.properties}
-								label={rowName(k)}
-								idBase={idBase != null ? `${idBase}-e-${id}` : undefined}
-								contentAt={(path) => contentAt([k, ...path])}
-								onCommit={(obj) => commitElement(k, obj)}
-							/>
-						{/if}
-					</div>
-				{/if}
-			{:else}
+					{/if}
+				</div>
+			{/each}
+		{:else}
+			{#each ids as id, k (id)}
 				<div class="qm-array-row" style="--row-actions: 1" bind:this={rowEls[id]}>
 					{#if control === 'prose'}
 						<ProseValue
@@ -624,8 +644,8 @@
 						>
 					</div>
 				</div>
-			{/if}
-		{/each}
+			{/each}
+		{/if}
 	</div>
 </div>
 
