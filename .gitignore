@@ -149,6 +149,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Scratch files a review or a probe leaves beside the suite; never committed.
+# Scratch files a review or a probe leaves beside the suite; never committed. The suite
+# names what it is about, so a file naming its own throwaway-ness is one.
 packages/*/tests/**/z*.test.ts
 packages/*/src/**/z*.test.ts
+packages/*/tests/**/{tmp,scratch,probe,refute}*
+packages/*/src/**/{tmp,scratch,probe,refute}*
