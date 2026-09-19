@@ -255,6 +255,36 @@
 	transform: translate(-50%, -50%);
 }
 
+/* The capacity ladder: how many tracks a grid of fields steps to, off the width of
+ the query container it stands in. One recipe, because two grids read it — a section's
+ fields (`Card.svelte`) and a subform's properties (`ObjectField`), each over its own
+ container — and a ladder kept in two files agrees until one is retuned. Capacity is
+ the container's, not JavaScript's: nothing measures, so there is no observer to loop
+ and no re-packing to restructure the DOM under a prose leaf.
+
+ It steps 1 → 2 → 4, skipping 3: each rung is the width at which a track still clears
+ the comfortable field minimum, and an even capacity is what lets the half a subform
+ of one takes (`--cols-half`) land on a track boundary. A field ends on its track's
+ own edge, so a rung is `n * 220px + gaps`. A subform three rungs in stands three
+ `--_qm-nest` and three verticals narrower than its section, and steps down where the
+ section does not: the count is the width the tracks actually get. */
+:where(.qm-tracks) {
+	--cols: 1;
+	--cols-half: 1;
+}
+@container (min-width: 28rem) {
+	:where(.qm-tracks) {
+		--cols: 2;
+		--cols-half: 1;
+	}
+}
+@container (min-width: 57rem) {
+	:where(.qm-tracks) {
+		--cols: 4;
+		--cols-half: 2;
+	}
+}
+
 /* A floating list of choices: the enum's listbox and the card stack's kind menu.
  Both portal into the nearest `[data-qm-root]`, and both are picked from, so the
  surface (its edge, its inset, its ink) and the item (its pad, its radius, the

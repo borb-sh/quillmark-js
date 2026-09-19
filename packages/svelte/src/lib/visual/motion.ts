@@ -21,6 +21,33 @@ export function reorderTrips(node: HTMLElement): Animation[] {
 }
 
 /**
+ * The reorder gesture's arming window, for a keyed list that takes the trip. The
+ * reconcile that moves a slot is the trip, and every other reconcile that happens to
+ * move one is not; so the command arms the gesture and the frame it lands in disarms
+ * it, `animate:` asking at apply time, a microtask after the mutation and well inside
+ * that frame. `armed` is a getter rather than a value, so the flag stays out of the
+ * template and needs no reactivity for it. `cancel` is for the surface's teardown.
+ */
+export interface ReorderArm {
+	arm(): void;
+	armed(): boolean;
+	cancel(): void;
+}
+
+export function reorderArm(): ReorderArm {
+	let reordering = false;
+	let frame = 0;
+	return {
+		arm() {
+			reordering = true;
+			frame = requestAnimationFrame(() => (reordering = false));
+		},
+		armed: () => reordering,
+		cancel: () => cancelAnimationFrame(frame)
+	};
+}
+
+/**
  * Slide a keyed slot from where it was to where it now is.
  *
  * `armed` is why this is the reorder and not every reconcile: `animate:` fires wherever

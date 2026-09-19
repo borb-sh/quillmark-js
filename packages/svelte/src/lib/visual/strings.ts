@@ -52,26 +52,30 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	// ── Array control ─────────────────────────────────────────────────────────
 	arrayAdd: string;
 	arrayRemove: string;
+	/** The reorder pair on an `object` row, accessible names: the buttons are glyphs. */
+	arrayMoveUp: string;
+	arrayMoveDown: string;
+	/**
+	 * The count beside the add chip on an array declaring `max:`, the carrier a
+	 * disabled chip has no other way to state: `2 / 3`. Parametric, so a translator
+	 * spells the separator.
+	 */
+	arrayCount: (count: number, max: number) => string;
+	/**
+	 * A collapsed array element with nothing to summarize itself by: the label and the
+	 * 1-based index, which is what its accessible name already says. Parametric, so
+	 * word order stays the translator's.
+	 */
+	elementUntitled: (label: string, index: number) => string;
 
 	// ── Enum control ──────────────────────────────────────────────────────────
 	/** The tag on the unset sentinel's row, which is what tells it from the member it
 	 *  ghosts ({@link EnumField}). */
 	enumUnsetTag: string;
 
-	// ── Subform ───────────────────────────────────────────────────────────────
-	/**
-	 * What stands where a subform declines to recurse — a nested `array` or `object`
-	 * property, whose own figure would nest a field past the depth this one draws —
-	 * and where to edit that property instead. The whole sentence, since a translator
-	 * orders the kind within it.
-	 */
-	nestedUnsupported: (kind: string) => string;
-	/**
-	 * A collapsed array element whose first text property is empty: the label and the
-	 * 1-based index, which is what its accessible name already says. Parametric, so
-	 * word order stays the translator's.
-	 */
-	elementUntitled: (label: string, index: number) => string;
+	// ── Matrix control ────────────────────────────────────────────────────────
+	/** The count in the matrix's label row: how many of the roster are held. */
+	matrixHeld: (held: number, total: number) => string;
 
 	// ── Field chrome ──────────────────────────────────────────────────────────
 	/** The required marker's accessible name; the glyph itself is a `*`. */
@@ -166,9 +170,12 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	addCard: '+ Add Card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
-	enumUnsetTag: 'default',
-	nestedUnsupported: (kind) => `A nested ${kind} — edit this field in the source view.`,
+	arrayMoveUp: 'Move up',
+	arrayMoveDown: 'Move down',
+	arrayCount: (count, max) => `${count} / ${max}`,
 	elementUntitled: (label, index) => `${label} ${index}`,
+	enumUnsetTag: 'default',
+	matrixHeld: (held, total) => `${held} of ${total} held`,
 	fieldRequired: 'required',
 	formatGroup: 'Formatting',
 	formatBold: 'Bold (Mod-B)',

@@ -1,8 +1,10 @@
 <!--
  Type dispatch (VISUAL_EDITOR §"Structure mirrors the schema"). Given one projected
  {@link FieldModel} and its live value, render the label + the control the type
- maps to. Array controls own their label (paired with the add affordance in
- {@link ArrayField}); other types render the label here. Prose leaves take a
+ maps to. Array and matrix controls own their label (paired with the add affordance in
+ {@link ArrayField}, with the held count in {@link MatrixField}); other types render
+ the label here. A container control also takes the walk a nested address makes into
+ it ({@link FieldControl.focusPath}) and the diagnostics anchored inside it. Prose leaves take a
  parent-built live `addr` (its `card` a getter over the stable-id→index map) so
  a reorder re-targets without a remount; scalars, arrays, and objects commit
  their value up through `onCommitScalar`, which the parent lowers to the typed
@@ -24,9 +26,16 @@
 		ResolvedField
 	} from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
-	import type { LeafRegistry } from './leaves.js';
+	import type { LandingBox, LeafRegistry } from './leaves.js';
 	import type { FieldModel, FieldSpan } from './structure.js';
-	import { VARIANT_DISCRIMINANT, ghostDefault, stringifyGhost } from './structure.js';
+	import {
+		VARIANT_DISCRIMINANT,
+		arrayLayout,
+		ghostDefault,
+		isContainer,
+		stringifyGhost
+	} from './structure.js';
+	import { deepen } from './diagnostics.js';
 	import type { FieldDomIds } from './domid.js';
 	import ProseField from './ProseField.svelte';
 	import TextField from './TextField.svelte';
@@ -37,6 +46,7 @@
 	import ArrayField from './ArrayField.svelte';
 	import ObjectField from './ObjectField.svelte';
 	import VariantField from './VariantField.svelte';
+	import MatrixField from './MatrixField.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
 	import FieldLabel from './FieldLabel.svelte';
 
@@ -123,6 +133,13 @@
 	// reference must vanish with it: `aria-describedby` pointing at nothing describes
 	// nothing, and silently.
 	const describedBy = $derived(field.description ? domIds.description : undefined);
+	// Two controls own their label row, the add chip and the held count sharing it.
+	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
+
+	// A container walks its diagnostics down to the cell each names and draws the rest
+	// at its own foot (`diagnostics.ts`); every other control draws them here, under
+	// itself, there being nothing inside it for a path to name.
+	const deep = $derived(deepen(diagnostics));
 
 	/** The boundary's nested content read with this field's address already bound: an
 	 * array's elements, an object's properties, a variant's cells, and a subform's cells
@@ -145,28 +162,29 @@
 	// restores a selection, a date field lands on its first segment, an array lands on
 	// its first element or on the add affordance that is all an empty one has, an
 	// object on its first property.
+	/** What a container control exports: its focus, and the walk into it. */
+	type Inside = {
+		focus: () => void;
+		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+		washBox?: () => HTMLElement | undefined;
+	};
 	let proseEl = $state<{ focus: () => void } | undefined>();
 	let dateEl = $state<{ focus: () => void } | undefined>();
-	let arrayEl = $state<
-		| {
-				focus: () => void;
-				focusElement: (k: number, pos?: number) => HTMLElement | undefined;
-				washBox: () => HTMLElement | undefined;
-		  }
-		| undefined
-	>();
-	let objectEl = $state<{ focus: () => void } | undefined>();
+	let arrayEl = $state<Inside | undefined>();
+	let objectEl = $state<Inside | undefined>();
+	let variantEl = $state<Inside | undefined>();
+	let matrixEl = $state<Inside | undefined>();
+	const inside = (): Inside | undefined => arrayEl ?? objectEl ?? variantEl ?? matrixEl;
 	function focusControl(): void {
-		const owner = proseEl ?? dateEl ?? arrayEl ?? objectEl;
+		const owner = proseEl ?? dateEl ?? inside();
 		if (owner) return owner.focus();
 		document.getElementById(domIds.control)?.focus();
 	}
-	/** The array's per-ELEMENT landing, for the addresses the preview mints under an
-	 *  array field (`leaves.ts`); read at the call, so it tracks the mounted repeater.
-	 *  The row it settled in comes back with it, the wash being the landing's own
-	 *  granularity. */
-	function focusElement(k: number, pos?: number): HTMLElement | undefined {
-		return arrayEl?.focusElement(k, pos);
+	/** The landing at depth, for the addresses the boundary mints under a container
+	 *  (`leaves.ts`); read at the call, so it tracks the mounted control. The innermost
+	 *  row it settled in comes back with it, the wash being the landing's own granularity. */
+	function focusPath(steps: readonly PathStep[], pos?: number): LandingBox {
+		return inside()?.focusPath(steps, pos);
 	}
 	// Only where `for` cannot reach; the labelable four are the browser's own, and a
 	// second handler over them would be a focus the label already placed.
@@ -185,8 +203,8 @@
 	 * rather than mount-once, because a retype can swap the control under a leaf key
 	 * that does not remount.
 	 *
-	 * An array carries the per-element lane as well; no other control has elements for
-	 * an address to name. `el` is the field-wide box, which an element landing does not
+	 * A container carries the walk into it as well; no other control has an inside for
+	 * an address to name. `el` is the field-wide box, which a landing at depth does not
 	 * wash: that lane hands back its own row (`leaves.ts`).
 	 */
 	let controlEl = $state<HTMLElement | undefined>();
@@ -197,9 +215,9 @@
 		const wrapper = controlEl;
 		registry.registerControl(key, {
 			focus: focusControl,
-			focusElement: field.control === 'array' ? focusElement : undefined,
+			focusPath: isContainer(field.control) ? focusPath : undefined,
 			get el() {
-				return arrayEl?.washBox() ?? wrapper;
+				return inside()?.washBox?.() ?? wrapper;
 			}
 		});
 		return () => registry.unregisterControl(key);
@@ -217,7 +235,7 @@
 </script>
 
 <div class="qm-field" class:cell={span === 'cell'}>
-	{#if field.control !== 'array'}
+	{#if !ownsLabel}
 		<FieldLabel
 			label={field.label}
 			controlId={labelable ? domIds.control : undefined}
@@ -265,6 +283,7 @@
 				/>
 			{:else if field.control === 'variant'}
 				<VariantField
+					bind:this={variantEl}
 					value={value as Record<string, unknown> | undefined}
 					schema={field.schema}
 					{ghostMember}
@@ -276,6 +295,7 @@
 					onCommit={onCommitScalar}
 					{optionAllowed}
 					{enumDisallowed}
+					diagnostics={deep}
 				/>
 			{:else if field.control === 'number'}
 				<NumberField
@@ -308,6 +328,8 @@
 					bind:this={arrayEl}
 					value={value as unknown[] | undefined}
 					items={field.schema.items}
+					layout={arrayLayout(field.schema)}
+					max={field.schema.max}
 					label={field.label}
 					required={field.required}
 					description={field.description}
@@ -316,6 +338,7 @@
 					idBase={domIds.control}
 					{contentAt}
 					onCommit={onCommitScalar}
+					diagnostics={deep}
 				/>
 			{:else if field.control === 'object'}
 				<ObjectField
@@ -328,6 +351,21 @@
 					{describedBy}
 					{contentAt}
 					onCommit={onCommitScalar}
+					diagnostics={deep}
+				/>
+			{:else if field.control === 'matrix'}
+				<MatrixField
+					bind:this={matrixEl}
+					value={value as Record<string, unknown> | undefined}
+					schema={field.schema}
+					label={field.label}
+					description={field.description}
+					labelId={domIds.label}
+					descriptionId={domIds.description}
+					idBase={domIds.control}
+					{contentAt}
+					onCommit={onCommitScalar}
+					diagnostics={deep}
 				/>
 			{:else}
 				<TextField
@@ -340,7 +378,9 @@
 			{/if}
 		</div>
 
-		<DiagnosticList {diagnostics} />
+		{#if !isContainer(field.control)}
+			<DiagnosticList {diagnostics} />
+		{/if}
 	</div>
 </div>
 

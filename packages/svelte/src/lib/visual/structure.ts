@@ -7,9 +7,11 @@
 import {
 	VARIANT_DISCRIMINANT_KEY,
 	type Content,
+	type PathStep,
 	type PayloadItem,
 	type QuillCardSchema,
 	type QuillFieldSchema,
+	type QuillMatrixGroup,
 	type ResolvedField,
 	type Resolved
 } from '@quillmark/wasm';
@@ -24,7 +26,14 @@ export type ControlKind =
 	| 'boolean' // boolean → toggle
 	| 'date' // date / datetime → native date control
 	| 'array' // add/remove repeater
-	| 'object'; // nested subform
+	| 'object' // nested subform
+	| 'matrix'; // grouped ticks over a roster, columns under a held member
+
+/** The container controls: the ones a nested address walks into and a deep
+ *  diagnostic routes through. */
+export function isContainer(kind: ControlKind): boolean {
+	return kind === 'array' || kind === 'object' || kind === 'variant' || kind === 'matrix';
+}
 
 /** One field, projected: its schema, the control it renders as, and its layout hints. */
 export interface FieldModel {
@@ -221,6 +230,8 @@ export function controlKind(f: QuillFieldSchema): ControlKind {
 			return 'array';
 		case 'object':
 			return 'object';
+		case 'matrix':
+			return 'matrix';
 		default:
 			return 'text';
 	}
@@ -230,6 +241,229 @@ export function controlKind(f: QuillFieldSchema): ControlKind {
  *  crosses inside untyped container data with no type to read it off, so a literal here
  *  would be a second spelling of a reserved key. No variant may declare it. */
 export const VARIANT_DISCRIMINANT = VARIANT_DISCRIMINANT_KEY;
+
+/** The tick cell of a matrix member, the second reserved key beside the discriminant.
+ *  The boundary synthesizes it on every member and exports no constant for it, so this
+ *  is where the package spells it once (canon `SCHEMAS.md` §Matrix). */
+export const MATRIX_HELD = 'held';
+
+// ── The matrix ───────────────────────────────────────────────────────────────
+// A namespace whose keys the roster fixes: `members` is the roster alone, and the
+// `{held, …columns}` object each member desugars to is derived at parse and not
+// serialized, so the control composes it from `members` × `properties` here.
+
+/** One member of the roster, flattened for drawing: its id, its title, and the group
+ *  it sits in (`undefined` for an ungrouped block). */
+export interface MatrixMember {
+	id: string;
+	title: string;
+	group: string | undefined;
+}
+
+/** A roster block as the control draws it: the group label and its members, in
+ *  declaration order. */
+export interface MatrixBlock {
+	group: string | undefined;
+	members: MatrixMember[];
+}
+
+/** The roster as blocks, in declaration order. Own keys only: a schema map is
+ *  indexed by a document-supplied id, and `'toString' in values` is true of every
+ *  roster. */
+export function matrixBlocks(groups: QuillMatrixGroup[] | undefined): MatrixBlock[] {
+	return (groups ?? []).map((g) => ({
+		group: g.group,
+		members: Object.keys(g.values).map((id) => ({ id, title: g.values[id], group: g.group }))
+	}));
+}
+
+/** A member's stored payload, off the sparse map by own key: a document key can be
+ *  spelled `constructor`. */
+export function memberValue(map: Record<string, unknown> | undefined, id: string): unknown {
+	return map && Object.hasOwn(map, id) ? map[id] : undefined;
+}
+
+/**
+ * Whether a stored member is held. Key presence implies held unless the mapping
+ * spells otherwise (canon `SCHEMAS.md` §Matrix, the variant precedent): an absent key
+ * is unheld, a bare `true` is held, and a member object is held unless its `held` cell
+ * says not. The spellings the engine coerces to false — `false`, `0`, `"false"`,
+ * `null` — read false here; every other present value reads held, so a document the
+ * engine would refuse still draws the tick its key presence claims.
+ */
+export function matrixHeld(stored: unknown): boolean {
+	if (stored === undefined || stored === null) return false;
+	if (typeof stored === 'boolean') return stored;
+	if (typeof stored === 'number') return stored !== 0;
+	if (typeof stored === 'string') return stored !== 'false';
+	if (typeof stored === 'object') {
+		const obj = stored as Record<string, unknown>;
+		return Object.hasOwn(obj, MATRIX_HELD) ? matrixHeld(obj[MATRIX_HELD]) : true;
+	}
+	return true;
+}
+
+/** A member's columns: the member object with its `held` cell taken out, `{}` for the
+ *  bare and absent spellings. What the columns subform takes as its value. */
+export function matrixColumns(stored: unknown): Record<string, unknown> {
+	if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {};
+	const rest = { ...(stored as Record<string, unknown>) };
+	delete rest[MATRIX_HELD];
+	return rest;
+}
+
+/**
+ * The map after one member moves: `next` written under `id`, or the key dropped where
+ * `next` is `undefined`; a map left holding nothing is an unset field. Every other
+ * member rides through in the spelling the document had, so a stored `cyber_200: true`
+ * stays `true` while its neighbour is edited.
+ */
+export function commitMember(
+	map: Record<string, unknown> | undefined,
+	id: string,
+	next: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+	const out = { ...(map ?? {}) };
+	if (next === undefined) delete out[id];
+	else out[id] = next;
+	return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * The member a tick or an edit writes. Held with columns is the member object with an
+ * explicit `held: true`; unheld keeps the columns under `held: false`, so tick, type,
+ * untick, retick loses nothing; unheld with no columns is `undefined`, the key dropped.
+ * Which columns are blank is the engine's rule and not restated here: a column control
+ * that clears drops its key (`ObjectField`), so a member emptied by hand arrives with no
+ * columns and only then leaves the map.
+ */
+export function memberWrite(
+	held: boolean,
+	columns: Record<string, unknown>
+): Record<string, unknown> | undefined {
+	if (!held && Object.keys(columns).length === 0) return undefined;
+	return { [MATRIX_HELD]: held, ...columns };
+}
+
+/** The `object` a matrix member desugars to, for the schema walk: `held` beside the
+ *  declared columns. Composed here because the boundary serializes the roster alone. */
+export function matrixMemberSchema(matrix: QuillFieldSchema): QuillFieldSchema {
+	return {
+		type: 'object',
+		properties: {
+			[MATRIX_HELD]: { type: 'boolean', default: false },
+			...(matrix.properties ?? {})
+		}
+	};
+}
+
+/** Whether `id` is on the roster. */
+export function matrixDeclares(matrix: QuillFieldSchema, id: string): boolean {
+	return (matrix.members ?? []).some((g) => Object.hasOwn(g.values, id));
+}
+
+// ── The schema walk ──────────────────────────────────────────────────────────
+
+/**
+ * The schema at `steps` under `field`, or `undefined` where the schema declares no such
+ * place: an index under an `array`, a key under an `object`'s properties, a member id
+ * under a `matrix` and a key under that member, a cell of any world (or the
+ * discriminant) under a variant-bearing `enum`. The editor's copy of the boundary's
+ * `schema_at`, held here because the landing lane checks an address against the schema
+ * before it asks the mounted tree for it (VISUAL_EDITOR §Surface).
+ */
+export function schemaAt(
+	field: QuillFieldSchema,
+	steps: readonly PathStep[]
+): QuillFieldSchema | undefined {
+	let cursor: QuillFieldSchema | undefined = field;
+	for (const step of steps) {
+		if (!cursor) return undefined;
+		cursor = stepInto(cursor, step);
+	}
+	return cursor;
+}
+
+function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | undefined {
+	switch (controlKind(schema)) {
+		case 'array':
+			return typeof step === 'number' ? schema.items : undefined;
+		case 'object':
+			return typeof step === 'string' && Object.hasOwn(schema.properties ?? {}, step)
+				? schema.properties![step]
+				: undefined;
+		case 'matrix':
+			return typeof step === 'string' && matrixDeclares(schema, step)
+				? matrixMemberSchema(schema)
+				: undefined;
+		case 'variant': {
+			if (typeof step !== 'string') return undefined;
+			if (step === VARIANT_DISCRIMINANT) return { type: 'enum', values: schema.values };
+			// Which world is live is a value-time fact, so the walk unions the worlds, as
+			// the boundary's does.
+			for (const cells of Object.values(schema.variants ?? {}))
+				if (Object.hasOwn(cells, step)) return cells[step];
+			return undefined;
+		}
+		default:
+			return undefined;
+	}
+}
+
+// ── Row summaries and layouts ────────────────────────────────────────────────
+
+/** Whether a cell is one line tall by declaration: the shape a table column and a row
+ *  summary can hold. A `plaintext` leaf is inline at the codec whatever it declares. */
+export function shortCell(sub: QuillFieldSchema): boolean {
+	const kind = controlKind(sub);
+	if (kind === 'prose') return sub.type === 'plaintext' || !!sub.inline;
+	return (
+		kind === 'text' || kind === 'enum' || kind === 'number' || kind === 'boolean' || kind === 'date'
+	);
+}
+
+/**
+ * A collapsed row's own words: `items.ui.title` interpolated with the row's values
+ * where the schema declares one, else the first short text cell in declaration order
+ * — a `string`, or an inline `richtext` / `plaintext` — read through {@link titleText};
+ * `undefined` while the row has nothing to say for itself. `title` sits on `items.ui`,
+ * describing a row, where `layout` sits on the array's own `ui`, describing the array.
+ */
+export function rowSummary(items: QuillFieldSchema | undefined, row: unknown): string | undefined {
+	const values = (row ?? {}) as Record<string, unknown>;
+	const template = items?.ui?.title;
+	if (template && template.trim()) {
+		const shown = interpolateTitle(template, values).trim();
+		if (shown) return shown;
+	}
+	for (const [k, sub] of Object.entries(items?.properties ?? {})) {
+		const kind = controlKind(sub);
+		if (kind !== 'text' && !(kind === 'prose' && shortCell(sub))) continue;
+		const text = titleText(values[k]).trim();
+		if (text) return text;
+	}
+	return undefined;
+}
+
+/** How an `array` draws its elements. */
+export type ArrayLayout =
+	| 'list' // one row per element, an `object` row collapsing to a summary
+	| 'table'; // a grid over an `object` row's cells, a column per property
+
+/**
+ * The layout an array takes: `'table'` where the array's own `ui.layout` asks for it
+ * and every cell of the row is short (a block prose cell or a container declines it,
+ * at load width and every width after), else `'list'`. The request is the schema's and
+ * the answer is the surface's (canon `SCHEMAS.md`, borb-sh/quillmark#1825): a table
+ * composes by position, so a row that would stack inside a cell is not one.
+ */
+export function arrayLayout(field: QuillFieldSchema): ArrayLayout {
+	if (field.ui?.layout !== 'table') return 'list';
+	const items = field.items;
+	if (!items || controlKind(items) !== 'object') return 'list';
+	const cells = Object.values(items.properties ?? {});
+	return cells.length > 0 && cells.every(shortCell) ? 'table' : 'list';
+}
 
 /**
  * Which world's cells to draw: the authored discriminant when the container carries
@@ -406,11 +640,12 @@ export interface PlacedField {
  * An array declines whatever its items are: one-line elements make a one-line step,
  * but nothing holds two arrays to the same number of them, so the shorter of a packed
  * pair pays a cell of whitespace for every element the taller one has past it, and
- * pays more of it as the document is filled.
+ * pays more of it as the document is filled. A matrix declines as a roster does: its
+ * height is the roster's, and grows again under every member ticked open.
  */
 function packable(f: FieldModel): boolean {
 	if (!f.compact) return false;
-	if (f.control === 'object' || f.control === 'array' || f.control === 'variant') return false;
+	if (isContainer(f.control)) return false;
 	return f.control !== 'prose' || f.inline;
 }
 
@@ -463,12 +698,15 @@ export function interpolateTitle(template: string, values: Record<string, unknow
 
 /** A field value as title text. A parsed field rests as the authored string and a
  *  committed one as `Content`, whose `text` is the same words; a scalar reads as
- *  itself and any other container as nothing. */
+ *  itself; a variant container reads as its discriminant member, the one cell of it
+ *  that names the world; any other container as nothing. */
 export function titleText(v: unknown): string {
 	if (v == null) return '';
 	if (typeof v !== 'object') return String(v);
 	const text = (v as Partial<Content>).text;
-	return typeof text === 'string' ? text : '';
+	if (typeof text === 'string') return text;
+	const member = (v as Record<string, unknown>)[VARIANT_DISCRIMINANT];
+	return typeof member === 'string' ? member : '';
 }
 
 /** The field names a `{field}` title reads. */

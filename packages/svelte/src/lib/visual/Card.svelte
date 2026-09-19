@@ -332,7 +332,7 @@
 </section>
 
 {#snippet sectionFields(fields: FieldModel[])}
-	<div class="qm-fields">
+	<div class="qm-fields qm-tracks">
 		{#each placeFields(fields) as { field: f, span } (f.name)}
 			<Field
 				field={f}
@@ -584,32 +584,13 @@
 	.qm-group-panel-inner {
 		container-type: inline-size;
 	}
-	/* Capacity is the container's, not JavaScript's: nothing measures, so there is no
-	 observer to loop and no re-packing to restructure the DOM under a prose leaf.
-
-	 It steps 1 → 2 → 4, skipping 3: each rung is the width at which a track still clears
-	 the comfortable field minimum, and an even capacity is what lets the half a subform
-	 of one takes (`--cols-half`, `ObjectField`) land on a track boundary. A field ends on
-	 its track's own edge, so a rung is `n * 220px + gaps`. */
+	/* The count is the ladder's (`.qm-tracks`, controls.css), stepped by the container
+	 above; what this block owns is the grid the count fills. */
 	.qm-fields {
-		--cols: 1;
-		--cols-half: 1;
 		display: grid;
 		grid-template-columns: repeat(var(--cols), 1fr);
 		column-gap: var(--_qm-space-2);
 		row-gap: var(--_qm-space-3);
-	}
-	@container (min-width: 28rem) {
-		.qm-fields {
-			--cols: 2;
-			--cols-half: 1;
-		}
-	}
-	@container (min-width: 57rem) {
-		.qm-fields {
-			--cols: 4;
-			--cols-half: 2;
-		}
 	}
 	/* The nesting vertical, one `--_qm-nest` in from the card's edge with the panel's
 	 fields the same rung off it (ARCHITECTURE §"A plane is a tone"). `--_qm-border` and

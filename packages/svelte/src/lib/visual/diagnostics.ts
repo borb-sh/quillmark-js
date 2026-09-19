@@ -29,8 +29,8 @@
 // spine"); `resolveCardKey` bridges the absolute index → stable id, and
 // `fieldKeyToString` is the one shared string form both sides collapse to for the
 // `Map`.
-import type { Diagnostic } from '@quillmark/wasm';
-import { nearestAddrForFieldPath } from '../core/address.js';
+import type { Diagnostic, PathStep } from '@quillmark/wasm';
+import { nearestAddrForFieldPath, nestedAddrForFieldPath } from '../core/address.js';
 
 /** A field's routing address, and `/core`'s `Addr` structurally: an `Addr` is a
  * positional `FieldKey`, so `nearestAddrForFieldPath` is the path→key walk and
@@ -93,6 +93,66 @@ export function routeAndResolve(
 		const resolved = key && resolveCardKey(key, cardIds);
 		if (resolved) out.push({ key: resolved, diagnostic: d });
 	}
+	return out;
+}
+
+// ── Inside a field ──────────────────────────────────────────────────────────
+// Routing lands a diagnostic on the field that holds it (`nearestAddrForFieldPath`:
+// an `Addr` reaches a root and one field and no deeper). What the field then does
+// with it is a second walk, down the steps the path carries past the field: a
+// container hands each diagnostic to the cell its next step names, and draws at its
+// own foot the ones naming a step it does not hold. So `main.contact.email` draws under
+// the email cell, `main.revisions[0].pages` under the pages cell of an open row and
+// under the row's head while it is collapsed, and nothing is lost on the way down
+// (VISUAL_EDITOR §Diagnostics).
+
+/** A diagnostic with the steps still to walk from the control holding it. */
+export interface DeepDiagnostic {
+	steps: readonly PathStep[];
+	diagnostic: Diagnostic;
+}
+
+/** A field's routed diagnostics, each with its steps past the field: none for a
+ *  diagnostic anchored at the field itself, or one whose path is not a nested one
+ *  (a local commit error carries the field's own path). */
+export function deepen(diagnostics: Diagnostic[] | undefined): DeepDiagnostic[] {
+	return (diagnostics ?? []).map((d) => ({
+		steps: (d.path && nestedAddrForFieldPath(d.path)?.steps) || [],
+		diagnostic: d
+	}));
+}
+
+/** One rung of the walk: the diagnostics anchored here, and the rest bucketed by the
+ *  step they take next, each with that step consumed. */
+export interface DeepSplit {
+	here: Diagnostic[];
+	below: Map<PathStep, DeepDiagnostic[]>;
+}
+
+export function splitDeep(list: readonly DeepDiagnostic[] | undefined): DeepSplit {
+	const here: Diagnostic[] = [];
+	const below = new Map<PathStep, DeepDiagnostic[]>();
+	for (const d of list ?? []) {
+		if (d.steps.length === 0) {
+			here.push(d.diagnostic);
+			continue;
+		}
+		const [step, ...rest] = d.steps;
+		const bucket = below.get(step);
+		const next = { steps: rest, diagnostic: d.diagnostic };
+		if (bucket) bucket.push(next);
+		else below.set(step, [next]);
+	}
+	return { here, below };
+}
+
+/** The diagnostics a rung cannot hand down: the ones anchored here, plus every one
+ *  whose next step names nothing in `held`. Drawn at the rung's own foot, so a leaf the
+ *  tree does not draw still has its message read somewhere the user can see. */
+export function unrouted(split: DeepSplit, held: (step: PathStep) => boolean): Diagnostic[] {
+	const out = [...split.here];
+	for (const [step, list] of split.below)
+		if (!held(step)) for (const d of list) out.push(d.diagnostic);
 	return out;
 }
 

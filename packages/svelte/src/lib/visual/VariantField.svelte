@@ -10,12 +10,16 @@
  container with one cell written — and cells outside the drawn world ride through
  untouched rather than needing to be merged back. A content cell reads at the key it
  declares: the boundary's schema walk unions the worlds, so a dormant cell reads absent
- rather than raising.
+ rather than raising. A cell may be a container of its own, which the subform draws at
+ the next rung.
 -->
 <script lang="ts">
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
 	import EnumField from './EnumField.svelte';
 	import ObjectField from './ObjectField.svelte';
+	import DiagnosticList from './DiagnosticList.svelte';
+	import type { DeepDiagnostic } from './diagnostics.js';
+	import type { LandingBox } from './leaves.js';
 	import {
 		VARIANT_DISCRIMINANT,
 		commitDiscriminant,
@@ -43,6 +47,10 @@
 		onCommit: (v: Record<string, unknown> | undefined) => void;
 		optionAllowed?: (value: string) => boolean;
 		enumDisallowed?: 'hide' | 'disable';
+		/** The diagnostics routed into this field, each with its steps still to walk: one
+		 * naming a live cell draws under it; the rest — the discriminant's, a dormant
+		 * world's — draw at the field's foot. */
+		diagnostics?: readonly DeepDiagnostic[];
 	}
 	let {
 		value,
@@ -55,12 +63,40 @@
 		contentAt,
 		onCommit,
 		optionAllowed,
-		enumDisallowed
+		enumDisallowed,
+		diagnostics
 	}: Props = $props();
 
 	const member = $derived(variantMember(value, ghostMember));
 	const cells = $derived(variantCells(schema, member));
 	const discriminant = $derived(value?.[VARIANT_DISCRIMINANT] as string | undefined);
+
+	type Subform = {
+		focus: () => void;
+		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+	};
+	let cellsEl = $state<Subform | undefined>();
+
+	/** Take the caret: the discriminant's trigger, the field's own control. */
+	export function focus(): void {
+		if (id) document.getElementById(id)?.focus();
+	}
+	/** Land at `steps`: a live cell, and the rest of the walk inside it where the cell is
+	 *  a container; the discriminant, a dormant world's cell and a key no world declares
+	 *  land on the trigger ({@link FieldControl.focusPath}). */
+	export function focusPath(steps: readonly PathStep[], pos?: number): LandingBox {
+		const key = steps[0];
+		if (
+			typeof key === 'string' &&
+			key !== VARIANT_DISCRIMINANT &&
+			cells &&
+			Object.hasOwn(cells, key) &&
+			cellsEl
+		)
+			return cellsEl.focusPath(steps, pos);
+		focus();
+		return undefined;
+	}
 </script>
 
 <div class="qm-variant">
@@ -81,6 +117,7 @@
 	{#if cells}
 		{#key member}
 			<ObjectField
+				bind:this={cellsEl}
 				value={value ?? {}}
 				properties={cells}
 				{label}
@@ -89,8 +126,11 @@
 				{describedBy}
 				{contentAt}
 				onCommit={(obj) => onCommit(obj)}
+				{diagnostics}
 			/>
 		{/key}
+	{:else}
+		<DiagnosticList diagnostics={diagnostics?.map((d) => d.diagnostic)} />
 	{/if}
 </div>
 
