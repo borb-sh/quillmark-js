@@ -41,6 +41,10 @@
   else if world == "public" [Public · #data.distribution.license]
   else if world == "embargoed" [
     Embargoed#if data.distribution.lift_on != "" [ until #data.distribution.lift_on]#if data.distribution.held_by != "" [ · #data.distribution.held_by]
+    // A variant cell holding a record list. A row's `text` is a content cell, so it
+    // regions at `main.distribution.notices[i].text` through the loop; `party` is a
+    // scalar and reaches the preview through the field alone.
+    #for n in data.distribution.notices [ · #n.at("party", default: "")#if n.at("text", default: "") != "" [: #n.text]]
   ] else [Distribution unset]
 }
 
@@ -97,6 +101,24 @@
   #if poc.at("listed", default: false) [ · listed]
   #if poc.at("note", default: "") != "" [ · #poc.note]
 ]
+
+// A table's rows are all scalars, so the loop reaches the preview through the array's
+// own region and no row names itself. A date cell arrives as a native `datetime`, or as
+// the string blank where the row left it unset.
+#let contributors = data.at("contributors", default: ())
+#if contributors.len() > 0 {
+  v(4pt)
+  text(size: 9pt, {
+    strong[Contributors]
+    for c in contributors {
+      let since = c.at("since", default: none)
+      linebreak()
+      [#c.at("name", default: "") — #c.at("role", default: "author")]
+      if type(since) == datetime [ (since #since.display("[year]"))]
+      if c.at("lead", default: false) [ · lead]
+    }
+  })
+}
 
 #if data.at("epigraph", default: "") != "" {
   v(6pt)
@@ -186,6 +208,28 @@
           card-body
         },
       )
+    } else if kind == "figure" {
+      // A variant-bearing enum on a card rests as a container, read as the main
+      // card's `distribution` is; inside the `float` arm its `side` cell is present.
+      let placement = card.placement.value
+      let figure = block(
+        width: if placement == "float" { 60% } else { 100% },
+        inset: 6pt,
+        stroke: 0.5pt + luma(180),
+        {
+          card-body
+          if card.at("caption", default: "") != "" {
+            v(3pt)
+            text(size: 8.5pt, style: "italic", card.caption)
+          }
+        },
+      )
+      v(6pt)
+      if placement == "float" {
+        align(if card.placement.side == "start" { left } else { right }, figure)
+      } else {
+        figure
+      }
     } else if kind == "signoff" {
       v(10pt)
       // The region keys on this card's own `$path`, so a click lands on this
@@ -226,6 +270,15 @@
     #rev.at("note", default: "revised") (#str(rev.at("pages", default: 0)) pp)#if rev.at("detail", default: "") != "" [ — #rev.detail]
     #linebreak()
   ]
+  // The matrix arrives total, every member in roster order carrying `held`, its roster
+  // `title` and `group`, and the columns. Only a held member prints. `note` is a content
+  // cell, so it regions at `main.checks.<member>.note`; `held` and `severity` are
+  // scalars read through the loop and reach the preview through the field.
+  #let held-checks = data.at("checks", default: (:)).pairs().filter(p => p.at(1).held)
+  #if held-checks.len() > 0 [
+    Checked: #for (id, m) in held-checks [#m.title#if m.at("severity", default: "minor") == "major" [ (major)]#if m.at("note", default: "") != "" [: #m.note]; ]
+    #linebreak()
+  ]
   // A text widget over a boolean, so a boolean field reaches the region table the
   // same way the signature does — through a placement, not through a glyph span.
   // `form-field` keeps `text` and `signature`, so the mark is a character this plate
@@ -243,4 +296,22 @@
 #if data.at("colophon", default: "") != "" {
   v(4pt)
   text(font: mono-face, size: 8pt, data.colophon)
+}
+
+// ── Appendices ──────────────────────────────────────────────────────────────
+// The two-deep shape, after the colophon so the colophon keeps its page: the title's
+// second placement is the page-spanning case the geometry suite reads. An entry's
+// `label` and `note` are content cells, so each regions at
+// `main.appendices[i].entries[j].<cell>` through both loops; `title` and `page` are
+// scalars and reach the preview through `main.appendices` alone.
+#let appendices = data.at("appendices", default: ())
+#if appendices.len() > 0 {
+  v(10pt)
+  for (i, app) in appendices.enumerate() {
+    heading(level: 2, outlined: false)[Appendix #str(i + 1). #app.at("title", default: "")]
+    for entry in app.at("entries", default: ()) [
+      #entry.at("label", default: "") (p. #str(entry.at("page", default: 0)))#if entry.at("note", default: "") != "" [ — #entry.note]
+      #linebreak()
+    ]
+  }
 }

@@ -98,6 +98,42 @@ main:
         group: identity
       description: Signed by. Placed through the helper's `signature-field`, so its region comes from a widget rather than from glyph spans.
 
+    contributors:
+      type: array
+      max: 3
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+            description: As credited.
+          role:
+            type: enum
+            values:
+              - author
+              - reviewer
+              - editor
+            default: author
+          since:
+            type: date
+            default: ""
+            description: When they joined. Blank to omit.
+          lead:
+            type: boolean
+            default: false
+      default: []
+      example:
+        - name: Ada Lovelace
+          role: author
+          since: "2025-11-03"
+          lead: true
+        - name: Grace Hopper
+          role: reviewer
+      ui:
+        group: identity
+        layout: table
+      description: "Who worked on it. An `array` of `object` whose every cell is one line tall, asking for `ui.layout: table` on the array's own `ui` and granted it: a column per property under a header, rows that reorder. Capped at `max: 3`, so the add chip disables at three and the count beside it says why. Every cell is a scalar, so the plate's loop reaches the preview through the array's own region and no row of it is addressable on its own."
+
     abstract:
       type: richtext
       example: |
@@ -139,6 +175,52 @@ main:
       ui:
         group: content
       description: An inline richtext leaf carrying a literal default, so an unset one has a ghost to show.
+
+    appendices:
+      type: array
+      items:
+        type: object
+        ui:
+          title: "{title}"
+        properties:
+          title:
+            type: string
+            description: The appendix heading.
+          entries:
+            type: array
+            items:
+              type: object
+              properties:
+                label:
+                  type: plaintext
+                  inline: true
+                  description: What the entry is. The row's one title-bearing cell, and it is inline prose rather than a `string`.
+                page:
+                  type: integer
+                  default: 0
+                note:
+                  type: richtext
+                  inline: true
+                  default: ""
+            default: []
+            description: The appendix's entries, a record list one rung further in.
+      default: []
+      example:
+        - title: Sources
+          entries:
+            - label: Primary
+              page: 12
+              note: "Where the *claims* come from."
+            - label: Secondary
+              page: 14
+        - title: Glossary
+          entries:
+            - label: Terms
+              page: 20
+      ui:
+        group: content
+        layout: table
+      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `items.ui.title` template and a collapsed entry by its inline `plaintext` label, the fallback a row with no `string` cell takes. It asks for `ui.layout: table` and is declined — a row holding a list is not a line a spreadsheet holds — so it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
 
     columns:
       type: integer
@@ -216,7 +298,20 @@ main:
             type: string
             default: ""
             description: Who to ask about the hold.
-      description: "Who may have it. A field declaring `variants:`, so it rests as a container (`{value, …the member's fields}`) rather than a bare string. `embargoed` brings two cells into play and obliges one of them, required in that world and silent in every other; `public` brings a licence with a default to ghost; `internal` brings none, so the subform goes. An answer stranded by a flip is kept and warned, never dropped."
+          notices:
+            type: array
+            items:
+              type: object
+              properties:
+                party:
+                  type: string
+                text:
+                  type: richtext
+                  inline: true
+                  default: ""
+            default: []
+            description: Who was told of the hold, and what they were told. A variant cell holding a record list whose rows carry a `richtext` cell, so a container draws at the one depth a variant reaches and its content cells region under it.
+      description: "Who may have it. A field declaring `variants:`, so it rests as a container (`{value, …the member's fields}`) rather than a bare string. `embargoed` brings three cells into play and obliges one of them, required in that world and silent in every other; `public` brings a licence with a default to ghost; `internal` brings none, so the subform goes. An answer stranded by a flip is kept and warned, never dropped."
 
     handling:
       type: enum
@@ -286,7 +381,37 @@ main:
           detail: The caption named the wrong figure.
       ui:
         group: meta
-      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform, one at a time. A row's cells are read through the plate's loop binding, which carries no address, so only the content cell regions — `main.revisions[0].detail` is the fixture's one nested-row address, and the scalar cells beside it reach the preview through the array's own region."
+      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform, one at a time. A row's cells are read through the plate's loop binding, which carries no address, so only the content cell regions — `main.revisions[0].detail` is the fixture's one-rung nested-row address, and the scalar cells beside it reach the preview through the array's own region."
+
+    checks:
+      type: matrix
+      members:
+        - group: Editorial
+          values:
+            spelling: Spelling
+            citations: Citations
+            figures: Figures
+        - group: Production
+          values:
+            margins: Margins
+            fonts: Fonts
+        - values:
+            approved: Approved
+      properties:
+        note:
+          type: plaintext
+          inline: true
+          default: ""
+          description: What was found, in the checker's words.
+        severity:
+          type: enum
+          values:
+            - minor
+            - major
+          default: minor
+      ui:
+        group: meta
+      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Three roster blocks, the last ungrouped; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
 
     colophon:
       type: richtext
@@ -388,3 +513,35 @@ card_kinds:
         ui:
           compact: true
         description: YYYY-MM-DD. Blank renders a fill-in line.
+
+  figure:
+    description: A placed figure. Its `ui.title` names a variant-bearing enum, so the header reads the placement's member rather than the container the field rests as.
+    ui:
+      title: "{placement}"
+    fields:
+      placement:
+        type: enum
+        values:
+          - inline
+          - float
+        default: inline
+        example: float
+        variants:
+          float:
+            side:
+              type: enum
+              values:
+                - start
+                - end
+              default: end
+              description: Which margin the figure floats to.
+        description: How the figure sits in the flow. The one variant-bearing enum on a card kind, and the field the kind's title reads.
+      caption:
+        type: richtext
+        inline: true
+        default: ""
+        example: "A figure's *caption*."
+        description: Set under the figure.
+    body:
+      example: |
+        The figure's own note, which stands in for the figure.
