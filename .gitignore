@@ -148,3 +148,7 @@ packages/quillkit/client/public/quiver/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Scratch files a review or probe leaves behind; never committed.
+packages/*/tests/**/zz*.test.ts
+packages/*/src/**/zz*.test.ts
