@@ -149,6 +149,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Scratch files a review or probe leaves behind; never committed.
-packages/*/tests/**/zz*.test.ts
-packages/*/src/**/zz*.test.ts
+# Scratch files a review or a probe leaves beside the suite; never committed.
+packages/*/tests/**/z*.test.ts
+packages/*/src/**/z*.test.ts
