@@ -153,6 +153,9 @@
 	interface Nested {
 		focus: () => void;
 		focusPath: (path: PathStep[], pos?: number) => HTMLElement | undefined;
+		/** The box a wash blooms in, where the control owns the field's label track and
+		 *  the wrapper would wash the label with it. Absent on one that does not. */
+		washBox?: () => HTMLElement | undefined;
 	}
 	let proseEl = $state<{ focus: () => void } | undefined>();
 	let dateEl = $state<{ focus: () => void } | undefined>();
@@ -178,9 +181,10 @@
 	 * This field's landing handle. The wrapper is the bloom host rather than the
 	 * control: `bloomInside` appends an inset child and an `<input>` holds none. The
 	 * label is outside it, and stays out of the wash: an arrival marks where the caret
-	 * landed, which is the control. The one control that owns its label is the array, so
-	 * that one names its own box (`ArrayField.washBox`), read at the bloom the way
-	 * `focusElement` is read at the call.
+	 * landed, which is the control. A control that draws that label track itself — the
+	 * repeater and the matrix — stands inside the wrapper, so it names the box beneath
+	 * its own header (`washBox`) and the wash leaves the label and the count above it.
+	 * Read at the bloom, the way the nested lane is read at the call.
 	 *
 	 * A prose leaf is absent here — it registers its own controller from inside
 	 * `ProseField`, carrying the codec seam this handle has no half of — and reactive
@@ -206,7 +210,7 @@
 			focus: focusControl,
 			focusPath: nests ? focusPath : undefined,
 			get el() {
-				return arrayEl?.washBox() ?? wrapper;
+				return arrayEl?.washBox() ?? nestedEl?.washBox?.() ?? wrapper;
 			}
 		});
 		return () => registry.unregisterControl(key);

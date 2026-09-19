@@ -91,6 +91,7 @@
 		| undefined
 	> = $state({});
 	const memberEls: Record<string, HTMLElement | undefined> = $state({});
+	let groupsEl = $state<HTMLElement | undefined>();
 
 	/** Every member id in display order: what an arrow key walks and what the count sums.
 	 *  Flat, because the walk is per group and the lookup is not. */
@@ -109,6 +110,13 @@
 	/** Take the caret: the first member's box. An empty roster lands nothing. */
 	export function focus(): void {
 		for (const g of order) if (g.length) return void boxes[g[0]]?.focus();
+	}
+	/** The box an arrival wash blooms in (`core/bloom.ts`): the roster, not the header
+	 *  above it. This control owns the field's label track, so the wrapper `Field` blooms
+	 *  every other control inside would wash the label and the count here too — the rule
+	 *  a repeater already holds for its own rows. */
+	export function washBox(): HTMLElement | undefined {
+		return groupsEl;
 	}
 	/**
 	 * Land at `path` (`leaves.ts`): the first step is a member id, and the rest is that
@@ -164,7 +172,7 @@
 		     answer, and a roster the page prints in full has no add to offer. -->
 		<span class="qm-matrix-count">{t.strings.matrixHeld(held, total)}</span>
 	</div>
-	<div class="qm-matrix-groups">
+	<div class="qm-matrix-groups" bind:this={groupsEl}>
 		<!-- Keyed on position: a roster's blocks are a static, positional list, and two
 		     that share a heading are a quill the loader accepts — keying on the label
 		     would take the whole surface down on a duplicate key. -->

@@ -467,6 +467,41 @@ describe('a landing past the first rung', () => {
 		expect(memberEl.querySelector(':scope > .qm-bloom')).not.toBeNull();
 	});
 
+	it('washes the roster a label-owning control stands over, not the label above it', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const { target, editor } = mountEditor(q, doc);
+
+		// A control that draws the field's own label track stands inside the box `Field`
+		// would otherwise bloom, so the wash would paint the label and the count with it.
+		// Both repeater and matrix name the box beneath instead.
+		await editor.focusField('main.qualifications');
+		const matrixBloom = field(target, 'Qualifications').querySelector('.qm-bloom')!;
+		expect(matrixBloom.parentElement?.classList.contains('qm-matrix-groups')).toBe(true);
+		expect(matrixBloom.parentElement?.querySelector('.qm-matrix-count')).toBeNull();
+
+		await editor.focusField('main.vectors');
+		const arrayBloom = field(target, 'Vectors').querySelector('.qm-bloom')!;
+		expect(arrayBloom.parentElement?.querySelector('.qm-field-label')).toBeNull();
+	});
+
+	it('lands a variant where its own label points, which is the discriminant', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		q.writer(doc).set('distribution', { value: 'public' });
+		const { target, editor } = mountEditor(q, doc);
+
+		// `focusField` is the function a label click calls, so the two cannot land in
+		// different places: the cells of the live world are reached by their own labels,
+		// and by an address that names one.
+		const label = field(target, 'Distribution').querySelector('label')!;
+		await editor.focusField('main.distribution');
+		expect((document.activeElement as HTMLElement).id).toBe(label.getAttribute('for'));
+
+		await editor.focusField('main.distribution.license');
+		expect((document.activeElement as HTMLElement).id).not.toBe(label.getAttribute('for'));
+	});
+
 	it('lands a property path on the property, and a matrix member on its tick', async () => {
 		const q = quill();
 		const doc = q.seedDocument();

@@ -66,11 +66,14 @@
 		| { focus: () => void; focusPath: (path: PathStep[], pos?: number) => HTMLElement | undefined }
 		| undefined
 	>();
-	/** Take the caret: the first cell of the live world, or the discriminant when that
-	 *  world declares none — which is then the whole of the control. */
+	/** Take the caret: the discriminant, which is this field's own control and the one
+	 *  its `<label for>` names — so a label click and `focusField` cannot land in
+	 *  different places (VISUAL_EDITOR §"Focus and the preview bridge"). The cells are
+	 *  reached by their own labels, and by an address that names one. */
 	export function focus(): void {
-		if (cellsEl) return cellsEl.focus();
-		document.getElementById(id ?? '')?.focus();
+		const trigger = id != null ? document.getElementById(id) : null;
+		if (trigger) return trigger.focus();
+		cellsEl?.focus();
 	}
 	/**
 	 * Land at `path` (`leaves.ts`): the discriminant cell is the field's own control, and
@@ -81,7 +84,7 @@
 	 */
 	export function focusPath(path: PathStep[], pos?: number): HTMLElement | undefined {
 		if (path[0] === VARIANT_DISCRIMINANT) {
-			document.getElementById(id ?? '')?.focus();
+			focus();
 			return undefined;
 		}
 		const deeper = cellsEl?.focusPath(path, pos);
