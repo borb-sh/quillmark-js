@@ -4,13 +4,14 @@
 // are unit-testable in isolation (tests/visual/structure.test.ts). The reactive
 // orchestration (revision counter, live doc reads) lives in VisualEditor.svelte;
 // this module is the projection math it feeds.
-import type {
-	Content,
-	PayloadItem,
-	QuillCardSchema,
-	QuillFieldSchema,
-	ResolvedField,
-	Resolved
+import {
+	VARIANT_DISCRIMINANT_KEY,
+	type Content,
+	type PayloadItem,
+	type QuillCardSchema,
+	type QuillFieldSchema,
+	type ResolvedField,
+	type Resolved
 } from '@quillmark/wasm';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
@@ -225,9 +226,10 @@ export function controlKind(f: QuillFieldSchema): ControlKind {
 	}
 }
 
-/** The discriminant cell of a variant container (`VARIANT_DISCRIMINANT_KEY` upstream,
- *  which the boundary does not export). Reserved: no variant may declare it. */
-export const VARIANT_DISCRIMINANT = 'value';
+/** The discriminant cell of a variant container, off the boundary's own constant: it
+ *  crosses inside untyped container data with no type to read it off, so a literal here
+ *  would be a second spelling of a reserved key. No variant may declare it. */
+export const VARIANT_DISCRIMINANT = VARIANT_DISCRIMINANT_KEY;
 
 /**
  * Which world's cells to draw: the authored discriminant when the container carries

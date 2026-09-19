@@ -1,9 +1,11 @@
-/**
- * One page loaded in a real browser, over the debugging protocol it already speaks: a
- * spawn, an endpoint read off stderr, three protocol calls. Node's own `WebSocket` is
- * the transport, so a load costs the workspace no dependency, and the browser is
- * whatever the host has.
- */
+// One page loaded in a real browser, over the debugging protocol it already speaks: a
+// spawn, an endpoint read off stderr, three protocol calls. Node's own `WebSocket` is the
+// transport, so a load costs the workspace no dependency, and the browser is whatever the
+// host has.
+//
+// The workspace's, not one package's: quillkit's suite loads a laid site with it and
+// `scripts/playground.mjs` loads a served playground with it, which is how a CSS fact in
+// `@quillmark/svelte` is asked of a browser at all (CLAUDE.md §Verification).
 
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -12,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /** A Playwright cache, by its own layout: a versioned directory per build. */
-function cached(): string[] {
+function cached() {
 	const cache = process.env.PLAYWRIGHT_BROWSERS_PATH;
 	if (cache === undefined || !existsSync(cache)) return [];
 	// This repository's containers link the binary at the cache's root.
@@ -27,7 +29,7 @@ function cached(): string[] {
  * Playwright cache, then the package managers' paths on Linux and macOS. CI lands on
  * `/usr/bin/google-chrome`, the runner image shipping Chrome and no cache.
  */
-function candidates(): string[] {
+function candidates() {
 	return [
 		process.env.QUILLKIT_CHROME,
 		process.env.CHROME_PATH,
@@ -39,11 +41,11 @@ function candidates(): string[] {
 		'/snap/bin/chromium',
 		'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 		'/Applications/Chromium.app/Contents/MacOS/Chromium'
-	].filter((path): path is string => path !== undefined);
+	].filter((path) => path !== undefined);
 }
 
 /** The first candidate that is a binary, or a refusal naming the way out. */
-export function chrome(): string {
+export function chrome() {
 	const tried = candidates();
 	const at = tried.find((path) => existsSync(path) && statSync(path).isFile());
 	if (at === undefined)
@@ -53,18 +55,13 @@ export function chrome(): string {
 	return at;
 }
 
-export interface Viewport {
-	width: number;
-	height: number;
-}
-
 /**
  * `expression` owns its own waiting: the load event fires before a client has fetched
  * anything of its own, so what comes back is whatever the page holds when the
  * expression's promise settles.
  */
-export async function load<T>(url: string, expression: string, viewport: Viewport): Promise<T> {
-	const profile = await mkdtemp(join(tmpdir(), 'quillkit-chrome-'));
+export async function load(url, expression, viewport) {
+	const profile = await mkdtemp(join(tmpdir(), 'quillmark-chrome-'));
 	const child = spawn(
 		chrome(),
 		[
@@ -88,10 +85,10 @@ export async function load<T>(url: string, expression: string, viewport: Viewpor
 	);
 
 	try {
-		const endpoint = await new Promise<string>((ok, no) => {
+		const endpoint = await new Promise((ok, no) => {
 			let said = '';
 			const timer = setTimeout(() => no(new Error(`browser printed no endpoint: ${said}`)), 30_000);
-			child.stderr.on('data', (chunk: Buffer) => {
+			child.stderr.on('data', (chunk) => {
 				said += chunk.toString();
 				const match = /ws:\/\/\S+/.exec(said);
 				if (match) {
@@ -102,9 +99,9 @@ export async function load<T>(url: string, expression: string, viewport: Viewpor
 			child.on('error', no);
 		});
 
-		const targets = (await (
+		const targets = await (
 			await fetch(new URL('/json/list', endpoint.replace('ws:', 'http:')))
-		).json()) as { type: string; webSocketDebuggerUrl: string }[];
+		).json();
 		const page = targets.find((t) => t.type === 'page');
 		if (page === undefined) throw new Error('the browser opened no page');
 
@@ -115,19 +112,15 @@ export async function load<T>(url: string, expression: string, viewport: Viewpor
 		});
 
 		let last = 0;
-		const answers = new Map<number, (result: Record<string, unknown>) => void>();
-		const events = new Map<string, () => void>();
-		socket.onmessage = (message: MessageEvent) => {
-			const said = JSON.parse(String(message.data)) as {
-				id?: number;
-				method?: string;
-				result?: Record<string, unknown>;
-			};
+		const answers = new Map();
+		const events = new Map();
+		socket.onmessage = (message) => {
+			const said = JSON.parse(String(message.data));
 			if (said.id !== undefined) answers.get(said.id)?.(said.result ?? {});
 			else if (said.method !== undefined) events.get(said.method)?.();
 		};
-		const call = (method: string, params?: Record<string, unknown>) =>
-			new Promise<Record<string, unknown>>((ok) => {
+		const call = (method, params) =>
+			new Promise((ok) => {
 				const id = ++last;
 				answers.set(id, (result) => {
 					answers.delete(id);
@@ -135,7 +128,7 @@ export async function load<T>(url: string, expression: string, viewport: Viewpor
 				});
 				socket.send(JSON.stringify({ id, method, params }));
 			});
-		const fired = (method: string) => new Promise<void>((ok) => events.set(method, ok));
+		const fired = (method) => new Promise((ok) => events.set(method, ok));
 
 		await call('Page.enable');
 		// Armed before the navigation, the event being the answer to it.
@@ -143,14 +136,11 @@ export async function load<T>(url: string, expression: string, viewport: Viewpor
 		await call('Page.navigate', { url });
 		await loaded;
 
-		const answer = (await call('Runtime.evaluate', {
+		const answer = await call('Runtime.evaluate', {
 			expression,
 			awaitPromise: true,
 			returnByValue: true
-		})) as {
-			result: { value: T };
-			exceptionDetails?: { exception?: { description?: string } };
-		};
+		});
 		if (answer.exceptionDetails !== undefined)
 			throw new Error(answer.exceptionDetails.exception?.description ?? 'the page threw');
 		return answer.result.value;

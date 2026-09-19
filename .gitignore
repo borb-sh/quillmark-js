@@ -148,3 +148,13 @@ packages/quillkit/client/public/quiver/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Agent scratch in a package's tree. A throwaway probe belongs in the session's own
+# scratchpad, outside the worktree; these are the names four of them were written under
+# here, two of them committed before the rule existed. Brace alternation is not gitignore
+# syntax, so each marker is its own line.
+z*.test.ts
+tmp-*.test.ts
+scratch*.test.ts
+probe*.test.ts
+refute*.test.ts

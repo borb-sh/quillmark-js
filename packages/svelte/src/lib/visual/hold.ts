@@ -3,7 +3,7 @@
 // content, whose top never moves.
 
 import { flushSync } from 'svelte';
-import { rungMs } from './motion.js';
+import { rungMs, rungStyle } from '../core/rungs.js';
 
 /**
  * Run `change` and keep `anchor` inside the fold for the length of the move.
@@ -27,7 +27,7 @@ export function holdInView(anchor: HTMLElement | undefined, change: () => void):
 	flushSync();
 	const reveal = (): void => anchor.scrollIntoView({ block: 'nearest', behavior: 'instant' });
 	reveal();
-	const rung = rungMs(getComputedStyle(anchor), '--_qm-duration-slow');
+	const rung = rungMs(rungStyle(anchor), '--_qm-duration-slow');
 	if (rung === undefined) return;
 	const until = performance.now() + rung;
 	const step = (now: number): void => {
