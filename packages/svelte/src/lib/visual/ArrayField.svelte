@@ -505,10 +505,23 @@
 					<!-- One line of the grid: the row's cells are the subform's, mounted in this
 					     row's own columns rather than under a summary. Nothing opens, so the
 					     disclosure and the title go with it. -->
+					<!-- The twin binds on the row rather than on a control: a table row draws no
+					     summary, and its cells are what the keyboard is in when the gesture is
+					     made. The row is a named group with it, which is what the collapsed
+					     figure's summary says out loud and a grid of cells otherwise says only
+					     to the eye.
+
+					     The key is delegated and never the row's own: every control the press
+					     can be made from is focusable and in the tab order, and the row is not
+					     a target. That is the case the rule is not about. -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<div
 						class="qm-array-row qm-table-row"
 						style="--row-cols: {columns.length}; --row-actions: 3"
+						role="group"
+						aria-label={rowName(k)}
 						bind:this={rowEls[id]}
+						onkeydown={(e) => onRowKey(e, k)}
 					>
 						<ObjectField
 							bind:this={rowSubEls[id]}
@@ -702,9 +715,16 @@
 	 is the markup's fact and not the scale's. `:global`, because the box belongs to the
 	 child component's markup and the scope class stops at this component's. The longhand
 	 beats the family's `padding` shorthand without a specificity fight: this block is
-	 unlayered and `controls.css` is not. */
-	.qm-array-row :global(.qm-input),
-	.qm-array-row :global(.qm-control-box) {
+	 unlayered and `controls.css` is not.
+
+	 The child combinator is the whole of what keeps it to the row's own control: the
+	 custom property inherits, and an open row has a subform of boxes under it that the
+	 cluster does not stand in front of. A table row's cells are two boxes further down
+	 for the same reason, and keep the recipe's own inset; the end the cluster needs is
+	 the row's padding, one rule up. */
+	.qm-array-row > :global(.qm-input),
+	.qm-array-row > :global(.qm-control-box),
+	.qm-element-head > .qm-element-summary {
 		padding-inline-end: calc(var(--_qm-tap-min) * var(--row-actions));
 	}
 	/* The cluster's box: floor to ceiling at the end of the line it belongs to, so each
@@ -743,7 +763,7 @@
 	/* The box's end wall keeps the box's corners, and only the last slab is against it.
 	 Hover is where it says destructive, ink with fill, a tint alone being a wash under a
 	 label-toned glyph. */
-	.qm-remove {
+	.qm-row-actions .qm-remove {
 		border-start-end-radius: var(--_qm-radius-inner);
 		border-end-end-radius: var(--_qm-radius-inner);
 	}
@@ -860,14 +880,6 @@
 			clip-path: inset(50%);
 			white-space: nowrap;
 		}
-	}
-	/* A table row's cells end on their own tracks, so the end inset belongs to the row
-	 rather than to each box the way a one-control row spends it: each box takes back the
-	 recipe's own inline inset, which is the rung `--_qm-inset-control` spends on that
-	 axis. The pair itself is a `padding` shorthand and would drop this longhand whole. */
-	.qm-table-row :global(.qm-input),
-	.qm-table-row :global(.qm-control-box) {
-		padding-inline-end: var(--_qm-space-3);
 	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so
 	 the two read as one register. Inner radius: the chip family is the card's, and this

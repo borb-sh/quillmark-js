@@ -264,7 +264,9 @@ describe('a card titled by a variant-bearing field', () => {
 		// `strand` declares `ui.title: "{topic}"` over an `enum` carrying `variants:`, so
 		// the field rests as a container and the template reads it. `titleText` of an
 		// object with no `.text` was `''`, which is a card with no name at all.
-		const at = [...Array(doc.cardCount).keys()].find((i) => q.reader(doc).card(i).kind === 'strand');
+		const at = [...Array(doc.cardCount).keys()].find(
+			(i) => q.reader(doc).card(i).kind === 'strand'
+		);
 		expect(at).toBeDefined();
 		q.writer(doc).card(at!).set('topic', { value: 'experience' });
 		const { target } = mountEditor(q, doc);
@@ -328,6 +330,35 @@ describe('the grid arm', () => {
 		click([...rows(tours)[2].querySelectorAll<HTMLButtonElement>('.qm-row-actions button')][2]);
 		await tick();
 		expect(titles()).toEqual(['Two', 'One']);
+
+		// The keyboard twin reaches a table row too, which draws no summary to hang it
+		// on: the press is made from whichever cell the caret is in, and the row is what
+		// moves. Named as a group with it, so which row that is is said and not only seen.
+		expect(rows(tours)[0].getAttribute('aria-label')).toBe('Tours 1');
+		const cellInput = rows(tours)[1].querySelector<HTMLInputElement>('input')!;
+		cellInput.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true })
+		);
+		flushSync();
+		await tick();
+		expect(titles()).toEqual(['One', 'Two']);
+	});
+
+	it('spends the row\u2019s trailing inset on the row\u2019s own control, not on what it unfolds', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		seedVectors(q, doc, [{ name: 'Alpha', tours: ['One'] }]);
+		const { target } = mountEditor(q, doc);
+		const vectors = field(target, 'Vectors').querySelector<HTMLElement>('.qm-array')!;
+		const row = open(vectors, 0);
+
+		// `--row-actions` inherits, so a descendant rule would stand every control inside
+		// an open row off the end by three slabs the cluster does not cover. The row's own
+		// summary takes it; the subform under it is on the recipe's own inset.
+		const summary = row.querySelector<HTMLElement>('.qm-element-summary')!;
+		expect(summary.matches('.qm-element-head > .qm-element-summary')).toBe(true);
+		const nameInput = cell(row, 'Name').querySelector<HTMLInputElement>('input')!;
+		expect(nameInput.matches('.qm-array-row > .qm-input')).toBe(false);
 	});
 });
 
