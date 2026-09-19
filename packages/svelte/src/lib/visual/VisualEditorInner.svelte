@@ -872,21 +872,38 @@
 	function stepInto(at: QuillFieldSchema, step: PathStep): QuillFieldSchema | undefined {
 		const kind = controlKind(at);
 		if (typeof step === 'number') return kind === 'array' ? at.items : undefined;
-		if (kind === 'object') return at.properties?.[step];
+		// Every key read is an own key. A path segment is a string off a document address,
+		// and a schema map is a plain object, so `properties['toString']` answers with
+		// `Object.prototype`'s and a walk that took it would declare a rung the schema
+		// never did — and hand it to a control whose own maps answer the same way.
+		if (kind === 'object') return own(at.properties, step);
 		if (kind === 'variant') {
-			if (step === VARIANT_DISCRIMINANT) return at;
-			for (const cells of Object.values(at.variants ?? {})) if (cells[step]) return cells[step];
+			// The discriminant is a leaf: it holds the member and nothing under it, so a
+			// step past it names nothing rather than reading the container a second time.
+			if (step === VARIANT_DISCRIMINANT) return { type: 'string' };
+			for (const cells of Object.values(at.variants ?? {})) {
+				const cell = own(cells, step);
+				if (cell) return cell;
+			}
 			return undefined;
 		}
 		if (kind !== 'matrix') return undefined;
 		// A member is the object the loader expands it to — the columns plus the tick it
 		// synthesizes — which is never serialized, so the walk composes it here exactly as
 		// the control does (`structure.ts`).
-		if (!(at.members ?? []).some((g) => step in (g.values ?? {}))) return undefined;
+		if (!(at.members ?? []).some((g) => Object.hasOwn(g.values ?? {}, step))) return undefined;
 		return {
 			type: 'object',
 			properties: { ...(at.properties ?? {}), [MATRIX_HELD]: { type: 'boolean', default: false } }
 		};
+	}
+
+	/** A declared entry of a schema map, never an inherited one. */
+	function own(
+		map: Record<string, QuillFieldSchema> | undefined,
+		key: string
+	): QuillFieldSchema | undefined {
+		return map && Object.hasOwn(map, key) ? map[key] : undefined;
 	}
 </script>
 

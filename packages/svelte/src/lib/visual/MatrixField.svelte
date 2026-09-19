@@ -118,7 +118,9 @@
 	export function focusPath(path: PathStep[], pos?: number): HTMLElement | undefined {
 		const [id, ...rest] = path;
 		if (typeof id !== 'string') return undefined;
-		const box = boxes[id];
+		// An own key, never `Object.prototype`'s: the id is a string off an address, and
+		// this map is a plain object, so `boxes['toString']` answers with a function.
+		const box = Object.hasOwn(boxes, id) ? boxes[id] : undefined;
 		if (!box) {
 			focus();
 			return undefined;
@@ -259,6 +261,10 @@
 		flex-direction: column;
 		gap: var(--_qm-space);
 		min-width: 0;
+		/* The box a landing on this member blooms in, positioned for the wash's inset
+		   child the way every other landing box is (`core/bloom.ts`). */
+		position: relative;
+		border-radius: var(--_qm-radius-inner);
 	}
 	.qm-matrix-tick {
 		display: flex;

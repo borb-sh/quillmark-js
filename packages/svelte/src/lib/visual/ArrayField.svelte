@@ -357,9 +357,9 @@
 			return undefined;
 		}
 		if (control !== 'object') {
-			// A scalar or prose element is a leaf: nothing is inside it for a further step
-			// to name, so a longer path is an address this field cannot hold.
-			if (rest.length) return undefined;
+			// A scalar or prose element is a leaf: nothing inside it answers a further step,
+			// so the row is the deepest rung the address reaches and takes the caret there
+			// rather than abandoning the landing (`leaves.ts`).
 			const el = els[id];
 			if (!el) {
 				focus();

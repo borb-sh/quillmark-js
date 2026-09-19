@@ -161,7 +161,11 @@
 	/** Land in one property's cell, answering whether it took the caret. */
 	function landOn(cell: HTMLElement): boolean {
 		const key = cell.dataset.qmProp ?? '';
-		const owner = proseEls[key] ?? subEls[key];
+		// Own keys: a property name is the schema's string, and these are plain objects,
+		// so one spelled `toString` would otherwise read `Object.prototype`'s.
+		const owner =
+			(Object.hasOwn(proseEls, key) ? proseEls[key] : undefined) ??
+			(Object.hasOwn(subEls, key) ? subEls[key] : undefined);
 		if (owner) {
 			owner.focus();
 			return true;
@@ -191,9 +195,9 @@
 			focus();
 			return undefined;
 		}
-		const nested = subEls[key];
+		const nested = Object.hasOwn(subEls, key) ? subEls[key] : undefined;
 		if (rest.length && nested?.focusPath) return nested.focusPath(rest, pos) ?? cell;
-		const prose = proseEls[key];
+		const prose = Object.hasOwn(proseEls, key) ? proseEls[key] : undefined;
 		if (pos != null && prose?.setCaret) prose.setCaret(pos);
 		else landOn(cell);
 		return cell;
@@ -402,6 +406,13 @@
 		row-gap: var(--_qm-space-half);
 		align-items: start;
 		min-width: 0;
+		/* Positioned for the arrival wash, which is an inset child of the box a landing
+		   settled in (`core/bloom.ts`): a cell is that box wherever an address named one,
+		   and unpositioned it would paint over the nearest ancestor that is — the field —
+		   saying the field where the click said the cell. The radius is the control's own,
+		   so the corners are the box's rather than square over a rounded one. */
+		position: relative;
+		border-radius: var(--_qm-radius-inner);
 	}
 	/* A subform of one takes half the capacity: at full capacity a single track reads as
 	   truncated, and there are no sibling properties for it to line up with. A stranded

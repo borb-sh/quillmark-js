@@ -425,6 +425,24 @@ describe('a landing past the first rung', () => {
 		expect(vectors.querySelector(':scope > .qm-array-rows > .qm-bloom')).toBeNull();
 	});
 
+	it('blooms the box it settled in, which is a box a wash can sit inside', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const { target, editor } = mountEditor(q, doc);
+
+		// The wash is an inset child of the box the landing settled in, so that box has to
+		// be positioned or the paint resolves against the nearest ancestor that is — the
+		// field — saying the field where the click said the cell.
+		await editor.focusField('main.contact.email');
+		const cellEl = cell(field(target, 'Point of contact'), 'Email');
+		expect(cellEl.querySelector(':scope > .qm-bloom')).not.toBeNull();
+		expect(cellEl.classList.contains('qm-object-prop')).toBe(true);
+
+		await editor.focusField('main.qualifications.cyber_200.held');
+		const memberEl = (document.activeElement as HTMLElement).closest('.qm-matrix-member')!;
+		expect(memberEl.querySelector(':scope > .qm-bloom')).not.toBeNull();
+	});
+
 	it('lands a property path on the property, and a matrix member on its tick', async () => {
 		const q = quill();
 		const doc = q.seedDocument();
@@ -439,6 +457,69 @@ describe('a landing past the first rung', () => {
 		const box = document.activeElement as HTMLInputElement;
 		expect(box.type).toBe('checkbox');
 		expect(box.closest('.qm-matrix-member')?.textContent).toContain('Cyber 200');
+	});
+
+	it('reads own keys only: a prototype name is not a rung', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const errors: { code: string }[] = [];
+		const targetEl = document.createElement('div');
+		document.body.appendChild(targetEl);
+		const app = mount(VisualEditor, {
+			target: targetEl,
+			props: { doc, quill: q, onError: (e: { code: string }) => errors.push(e) }
+		}) as unknown as EditorRef;
+		flushSync();
+		cleanup = () => {
+			void unmount(app);
+			targetEl.remove();
+		};
+
+		// A step is a string off a document address and a schema map is a plain object, so
+		// `properties['toString']` answers with `Object.prototype`'s — a rung the schema
+		// never declared, handed to a control whose own maps answer the same way.
+		for (const path of [
+			'main.qualifications.toString',
+			'main.qualifications.constructor',
+			'main.contact.hasOwnProperty',
+			'main.vectors[0].toString',
+			'main.handling.valueOf'
+		]) {
+			await app.focusField(path);
+		}
+		expect(errors.every((e) => e.code === 'target-unknown')).toBe(true);
+		expect(errors).toHaveLength(5);
+	});
+
+	it('stops at a leaf: the discriminant holds a member and nothing under it', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const errors: { code: string }[] = [];
+		const targetEl = document.createElement('div');
+		document.body.appendChild(targetEl);
+		const app = mount(VisualEditor, {
+			target: targetEl,
+			props: { doc, quill: q, onError: (e: { code: string }) => errors.push(e) }
+		}) as unknown as EditorRef;
+		flushSync();
+		cleanup = () => {
+			void unmount(app);
+			targetEl.remove();
+		};
+
+		// The walk is checked to the end of the path, so a step past a leaf names nothing
+		// rather than reading the container it hangs off a second time: `value` is the
+		// discriminant cell, and `license` is a cell of a world beside it, not inside it.
+		await app.focusField('main.distribution.value.license');
+		// And a step past an array's own leaf element is no address either.
+		await app.focusField('main.keywords[0].nowhere');
+		expect(errors.map((e) => e.code)).toEqual(['target-unknown', 'target-unknown']);
+
+		// The rung itself still lands: the discriminant is the field's own control.
+		errors.length = 0;
+		await app.focusField('main.distribution.value');
+		expect(errors).toEqual([]);
+		expect((document.activeElement as HTMLElement)?.closest('.qm-variant')).not.toBeNull();
 	});
 
 	it('declines a step the schema does not declare, and says so', async () => {
