@@ -12,7 +12,8 @@
 		"packages/*"
 	],
 	"scripts": {
-		"dev": "npm run dev -w packages/playground",
+		"dev": "node scripts/playground.mjs",
+		"probe": "node scripts/playground.mjs --probe",
 		"dev:studio": "npm run dev -w packages/quillkit",
 		"build": "npm run build -w packages/quiver -w packages/svelte && npm run build -w packages/quillkit -w packages/playground",
 		"site": "node packages/quillkit/dist/bin/quillkit.js site --quiver fixtures --out site",
@@ -30,10 +31,10 @@
 		"gate": "npm run gate:fast && npm run build && npm run check:bundle && npm test"
 	},
 	"overrides": {
-		"@quillmark/wasm": "0.113.0"
+		"@quillmark/wasm": "0.114.0"
 	},
 	"devDependencies": {
-		"@quillmark/wasm": "0.113.0",
+		"@quillmark/wasm": "0.114.0",
 		"postcss": "^8.5.0",
 		"prettier": "^3.4.0",
 		"prettier-plugin-svelte": "^3.3.0"

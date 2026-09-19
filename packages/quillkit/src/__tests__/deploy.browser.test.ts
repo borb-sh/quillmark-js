@@ -1,6 +1,6 @@
 /**
  * The deploy as a reader reaches it: a site the bin laid, served under a subpath, opened
- * in a browser.
+ * in a browser (`scripts/browser.mjs`).
  *
  * The one test that loads what a consumer is served. Every other rule over built output
  * reads it as files — a path exists, a stylesheet survived the bundler — and a client
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import type { Server } from 'node:http';
 import { createStaticServer, listen } from '../serve.js';
 import { scratch } from './helpers/collection.js';
-import { load, type Viewport } from './helpers/browser.js';
+import { load, type Viewport } from '../../../../scripts/browser.mjs';
 
 const run = promisify(execFile);
 

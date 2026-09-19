@@ -188,9 +188,18 @@ describe('an array of objects', () => {
 		...arr.querySelectorAll<HTMLButtonElement>('.qm-element-summary')
 	];
 
+	/** A seeded document with `revisions` emptied. The fixture seeds one row so its plate
+	 *  has a nested row to region (PREVIEW.md §"Click bridge"); these three are about the
+	 *  array a hand fills from empty, so they clear it and drive the adds themselves. */
+	function emptied(q: Quill): Document {
+		const doc = q.seedDocument();
+		doc.storeField('revisions', []);
+		return doc;
+	}
+
 	it('adds an element open, and commits its cells through the subform', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = emptied(q);
 		const target = mountEditor(q, doc);
 
 		const arr = arrayField(target, 'Revisions');
@@ -206,7 +215,7 @@ describe('an array of objects', () => {
 		const props = [...arr.querySelectorAll<HTMLElement>('.qm-object-prop')];
 		expect(
 			props.map((p) => p.querySelector('.qm-field-label')?.textContent?.replace(/\s+/g, ' ').trim())
-		).toEqual(['Note *', 'Pages *']);
+		).toEqual(['Note *', 'Pages *', 'Detail']);
 
 		type(props[0].querySelector('input')!, 'First cut');
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut' }]);
@@ -218,7 +227,7 @@ describe('an array of objects', () => {
 
 	it('titles a collapsed row by its first string cell, and opens one at a time', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = emptied(q);
 		const target = mountEditor(q, doc);
 
 		const arr = arrayField(target, 'Revisions');
@@ -250,7 +259,7 @@ describe('an array of objects', () => {
 
 	it('drops the open row with its element, leaving no row opened in its place', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = emptied(q);
 		const target = mountEditor(q, doc);
 
 		const arr = arrayField(target, 'Revisions');

@@ -274,10 +274,19 @@ main:
             type: string
           pages:
             type: integer
+          detail:
+            type: plaintext
+            inline: true
+            default: ""
+            description: What changed, in the reviser's own words. The row's content cell, and so the one cell of a row the preview can land a click on.
       default: []
+      example:
+        - note: Fig. 2 relabelled
+          pages: 1
+          detail: The caption named the wrong figure.
       ui:
         group: meta
-      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform, one at a time."
+      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform, one at a time. A row's cells are read through the plate's loop binding, which carries no address, so only the content cell regions — `main.revisions[0].detail` is the fixture's one nested-row address, and the scalar cells beside it reach the preview through the array's own region."
 
     colophon:
       type: richtext

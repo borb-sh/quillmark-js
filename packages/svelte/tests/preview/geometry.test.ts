@@ -350,6 +350,42 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		}
 	});
 
+	it('gives a nested row its own region through its content cell, and nothing through its scalars', async () => {
+		// The nested-row address a landing has to resolve through, and the reason the
+		// fixture declares a content cell in a row at all: a content value carries its own
+		// spans, so it regions wherever a plate places it, while a scalar's address is the
+		// read path's and the codegen tracks a literal one only (PREVIEW.md §"Click bridge").
+		// The plate loops, so `note` and `pages` reach the preview through the array and
+		// `detail` reaches it as its own row.
+		const quill = core.Quill.fromTree(loadFixtureTree());
+		const doc = quill.seedDocument();
+		doc.storeField('revisions', [
+			{ note: 'Fig. 2 relabelled', pages: 1, detail: 'The caption named the wrong figure.' },
+			{ note: 'Year corrected', pages: 2, detail: 'Page 4 gave 2025.' }
+		]);
+		const engine = new Engine();
+		const session = await engine.open(quill, doc);
+		try {
+			const fields = [...new Set(session.regions().map((r) => r.field))];
+			expect(fields).toContain('main.revisions[0].detail');
+			expect(fields).toContain('main.revisions[1].detail');
+			expect(fields).not.toContain('main.revisions[0].note');
+
+			for (const cell of ['main.revisions[0].detail', 'main.revisions[1].detail']) {
+				const boxes = boxesForField(cell, session.fieldBoxes(cell), () => session.regions());
+				expect(boxes.length, `no box for ${cell}`).toBeGreaterThan(0);
+				// The row a click lands on is the row that was drawn, not its neighbour.
+				const [x0, y0, x1, y1] = boxes[0].rect;
+				const hit = session.positionAt(boxes[0].page, (x0 + x1) / 2, (y0 + y1) / 2);
+				expect(hit?.field, `${cell} does not answer its own box`).toBe(cell);
+			}
+		} finally {
+			session.free();
+			doc.free();
+			quill.free();
+		}
+	});
+
 	it('answers fieldAt wherever positionAt answers, at that field or the one holding it', async () => {
 		// The ladder's premise: `positionAt` over span-tracked content, `fieldAt` over
 		// every placement, the second a superset of the first. If it ever stopped being

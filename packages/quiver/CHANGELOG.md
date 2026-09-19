@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.114.0-0`.** Nothing here reads a schema, so the release's three new declarations — `type: matrix`, `ui.layout: "table"`, `max:` on an array — land outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. A quill packed by an older toolchain is unaffected: every addition is a key a quill may now declare, not one it must. What a consumer meets on the artifact's own terms is one new load warning, `quill::bodiless_card_kind`, on a card kind declaring `body.enabled: false`.
+
 ## v0.28.0 - 2026-09-16
 
 **The `@quillmark/wasm` peer floor is `>=0.113.0-0`.** Nothing here reads a line, a mark or a container, so the release's closing of the content vocabularies lands outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. What a consumer of those handles meets is on the artifact's own terms: a payload under `attrs`, a name outside a vocabulary refused wherever content is decoded, and a `Quill` whose `metadata` carries its five identity keys and no mirrored backend key. Canvas paint stops being a capability, so `Engine.supportsCanvas` is gone and `BackendDescriptor` is `formats` alone — a registry entry keeps working with a `canvas` key left on it, which is now ignored.

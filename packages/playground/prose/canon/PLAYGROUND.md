@@ -57,6 +57,12 @@ Every route opens its session over a quill from a **quiver**, not from the bundl
 
 One `Quiver` serves the page. Its quill cache is per canonical ref and lives as long as the quiver does, so a client-side navigation between routes reuses one materialization rather than paying for its own. Routes mint and free their own `Quill` from the tree the quiver hands back, so a route holds the handles it frees.
 
+## Reaching it from source
+
+What a unit test cannot reach is here — canvas paint, scroll virtualization, DPR, the click round-trip, and every CSS-level fact jsdom computes no layout for — and reaching it means serving the working tree, which is not what a dev server does unaided. The app resolves `@quillmark/svelte` and `@quillmark/quiver` through the workspace symlink to each one's `dist`, so what it serves is the last build. The partial sequences all fail silently: HMR alone, `--force` alone, and a rebuild without a restart each serve the previous CSS with no error, the scope hash on the served rule still matching while its body is the old one. So the sequence is one verb — `npm run dev` (`scripts/playground.mjs`) rebuilds both siblings, drops the Vite and SvelteKit caches, and restarts the server on a port it owns by pid, a name pattern being the wrong handle for a kill (`pkill -f vite` matches the shell that ran it).
+
+`npm run probe -- '<expr>'` is the same sequence with a question at the end, evaluated in a real browser against the served page and printed as JSON. It is how a CSS-level fact about a mounted surface is asked at all: jsdom computes no layout, so `@quillmark/svelte`'s own suite cannot see `position`, whether a `@container` rule matched, a clip, or which of two rules won. What an answer may then be committed as is CLAUDE.md §Verification's two shapes; what the probe is for is the pass before that, where what is wrong is not yet known.
+
 ## Links
 
 [ARCHITECTURE.md](../../../svelte/prose/canon/ARCHITECTURE.md) · [`THEMING.md`](../../../svelte/THEMING.md)

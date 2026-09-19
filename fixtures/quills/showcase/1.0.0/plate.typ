@@ -217,8 +217,13 @@
   #linebreak()
   #handling-note
   #linebreak()
+  // A row's cells are reached through the loop's own binding, which carries no
+  // address, and a scalar carries no span of its own — so `note` and `pages` reach the
+  // preview through `main.revisions` alone. A content cell's spans ride its value, so
+  // `detail` regions at `main.revisions[i].detail` wherever it is placed: the nested
+  // row address a landing resolves through.
   #for rev in data.at("revisions", default: ()) [
-    #rev.at("note", default: "revised") (#str(rev.at("pages", default: 0)) pp)
+    #rev.at("note", default: "revised") (#str(rev.at("pages", default: 0)) pp)#if rev.at("detail", default: "") != "" [ — #rev.detail]
     #linebreak()
   ]
   // A text widget over a boolean, so a boolean field reaches the region table the
