@@ -474,7 +474,10 @@ describe('a landing past the first rung', () => {
 
 		// A control that draws the field's own label track stands inside the box `Field`
 		// would otherwise bloom, so the wash would paint the label and the count with it.
-		// Both repeater and matrix name the box beneath instead.
+		// Both repeater and matrix name the box beneath instead. Parentage is the half a
+		// layout-free run can read: the wash is an inset absolute child, so the box it
+		// actually paints is the nearest positioned ancestor, which each of these two
+		// boxes is by its own rule — the CSS's to carry, and not restated here.
 		await editor.focusField('main.qualifications');
 		const matrixBloom = field(target, 'Qualifications').querySelector('.qm-bloom')!;
 		expect(matrixBloom.parentElement?.classList.contains('qm-matrix-groups')).toBe(true);

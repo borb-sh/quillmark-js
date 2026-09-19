@@ -247,6 +247,12 @@
 	 here is the schema's — a roster of four blocks wants four columns and no more, and
 	 `auto-fit` collapses the tracks it does not fill. */
 	.qm-matrix-groups {
+		/* The box `washBox` names, so it is the box the wash resolves against:
+		 `bloomInside` insets an absolute child, which takes its corners from here and
+		 its edges from the nearest positioned ancestor — the field, whose box starts at
+		 the label this control draws. */
+		position: relative;
+		border-radius: var(--_qm-radius-inner);
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: var(--_qm-space-3);
