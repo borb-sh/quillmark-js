@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.114.0.** `quillkit test` accepts three schema keys it refused as unknown — `ui.layout: table` on an `array` of `object`, `max:` on an array, and `items.ui.title` — and the `matrix` type, whose `members:` roster is a closed vocabulary a document ticks. `ui.layout` elsewhere is `quill::invalid_ui`; a `max:` shorter than a `default:` or `example:` fails the load rather than seeding a document that warns on arrival; and a card kind declaring `body.enabled: false` draws a new `quill::bodiless_card_kind` warning, a repeated record someone fills in being a row on the card that owns it rather than a card of its own. The studio draws all four: a short-celled row as a grid, a capped array's count beside its add, and a matrix as grouped ticks.
+
 ## v0.6.0 - 2026-09-16
 
 **The carried `@quillmark/wasm` is 0.113.0, and a quill loads under a stricter reader.** Five shapes `quillkit test` passed now fail the load, each naming itself: a `main:` that is not a mapping or carries an unknown key (`quill::invalid_card_schema`), a `ui.group` on a card with no `ui.groups` registry (`quill::implicit_group`, promoted from a warning a binding host never saw), more than 1000 declared fields on one card (`quill::too_many_fields`), a retired `Quill.yaml` key — `must_fill`, `enum`, `ui.order`, `richtext(inline)`, `markdown` — under serde's unknown-key text in place of its own sentence, and a vendored `packages/<dir>/` with no `typst.toml`, which is skipped with a `typst::package_manifest` warning where it used to load under a synthesized `@local/<dir>:0.1.0`. Write the two-line manifest the fallback stood in for.

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.114.0-0`.** Nothing here reads a schema, so the release's three new `ui`/constraint keys and its `matrix` type land outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. A quill packed by an older quiver loads unchanged — the keys are additions, and a quill declaring none of them is the quill it was.
+
 ## v0.28.0 - 2026-09-16
 
 **The `@quillmark/wasm` peer floor is `>=0.113.0-0`.** Nothing here reads a line, a mark or a container, so the release's closing of the content vocabularies lands outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. What a consumer of those handles meets is on the artifact's own terms: a payload under `attrs`, a name outside a vocabulary refused wherever content is decoded, and a `Quill` whose `metadata` carries its five identity keys and no mirrored backend key. Canvas paint stops being a capability, so `Engine.supportsCanvas` is gone and `BackendDescriptor` is `formats` alone — a registry entry keeps working with a `canvas` key left on it, which is now ignored.
