@@ -105,6 +105,14 @@ const LENGTH_LITERAL = /\b\d*\.?\d+(px|rem|em)\b/;
 /** The escape, with its reason. The lookahead keeps a comment's own closing delimiter from
  *  reading as one. */
 const MINT = /mint:\s*(?!\*\/)(\S[^*\n]*)/;
+/** Comments blanked, in the three shapes this workspace's sources carry them: a `qm-` name
+ *  a comment mentions is prose about a class, not a class drawn. The line form is guarded
+ *  on what precedes it, so a `https://` in a url is not a comment. */
+const decomment = (text) =>
+	text
+		.replace(/<!--[\s\S]*?-->/g, '')
+		.replace(/\/\*[\s\S]*?\*\//g, '')
+		.replace(/(^|[^:\w])\/\/[^\n]*/gm, '$1');
 /** A class in source, and never a dial: `--qm-space` carries `qm-space` after a dash too. */
 const CLASS_IN_SRC = /(?<![-\w])qm-[\w-]+/g;
 
@@ -303,9 +311,6 @@ if (process.argv.includes('--built')) {
 	];
 	const DEFINES = /(--[\w-]+)\s*:/g;
 	const READS = /var\(\s*(--[\w-]+)/g;
-	/** Block comments blanked: a shipped stylesheet is unminified, and its prose names the
-	 *  properties it is about. */
-	const decomment = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
 	const shipped = new Set();
 	for (const { at } of packages())
@@ -324,7 +329,9 @@ if (process.argv.includes('--built')) {
 			continue;
 		}
 		// Every text asset, not the stylesheets alone: a bundler may inline a sheet into a
-		// chunk, and the paint loop carries style declarations as JS strings.
+		// chunk, and the paint loop carries style declarations as JS strings. The sheets are
+		// the half that ships unminified, so their prose names the rungs it is about and is
+		// cut; a chunk's is already gone.
 		const defined = new Set();
 		const read = new Map();
 		for (const file of filesUnder(bundle, /\.(css|js|html)$/)) {
@@ -461,6 +468,37 @@ for (const c of [...promised].filter((c) => !classes.has(c)).sort())
 	errors.push(`THEMING.md: \`.${c}\` promised but carried by nothing in src/`);
 for (const c of SURFACE_CONTRACT.filter((c) => !promised.has(c)))
 	errors.push(`THEMING.md: \`.${c}\` is held at zero rank but not promised — settle which`);
+
+// ── One name, one thing ──────────────────────────────────────────────────────────
+// The preset's recipes and the surfaces' own chrome draw on one document under one `qm-`
+// prefix, so a chrome element wearing a recipe's name takes that recipe in silence: a
+// boolean control named `.qm-switch` stands its thumb at the pane band's touch floor,
+// three times the track holding it, at the widths where the band exists. Nothing else
+// sees it — the name is right in both files, the rule is right in both files, and no
+// unit test computes layout. The placement handles are the overlap a consumer is told
+// about, so they are the only one.
+
+const recipes = new Set();
+for (const scope of SCOPES.filter((s) => s.prefix === '--qmh-'))
+	for (const full of under(scope, /\.css$/)) {
+		const root = parse(readFileSync(full, 'utf8'), relative(ROOT, full), 1);
+		if (!root) continue;
+		for (const { sel } of selectorsOf(root))
+			for (const m of sel.matchAll(CLASS_IN_SRC)) recipes.add(m[0]);
+	}
+for (const scope of SCOPES.filter((s) => s.surface))
+	for (const full of under(scope, /\.(svelte|ts|css)$/)) {
+		const worn = new Set(
+			[...decomment(readFileSync(full, 'utf8')).matchAll(CLASS_IN_SRC)]
+				.map((m) => m[0])
+				.filter((c) => recipes.has(c) && !SURFACE_CONTRACT.includes(c))
+		);
+		for (const c of [...worn].sort())
+			errors.push(
+				`${relative(ROOT, full)}: draws \`.${c}\`, which the preset recipes for a host — ` +
+					`name the chrome's own (THEMING §"The shell")`
+			);
+	}
 
 report(
 	'Style check',

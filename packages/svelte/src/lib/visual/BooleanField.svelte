@@ -36,9 +36,12 @@
 	const local = syncedLocal(() => value ?? fallback ?? false);
 </script>
 
-<span class="qm-switch-wrap">
+<!-- Not `.qm-switch`: that name is the preset's pane band, whose narrow-viewport rule
+ stands every child of it at `--qmh-tap`, so a track wearing it grows a thumb three times
+ its own height over the labels around it (`preset/recipes.css`, held by `check:style`). -->
+<span class="qm-toggle-wrap">
 	<Switch.Root
-		class="qm-switch qm-focus-ring qm-tap-floor"
+		class="qm-toggle qm-focus-ring qm-tap-floor"
 		checked={local.value}
 		{id}
 		aria-label={id ? undefined : label}
@@ -48,7 +51,7 @@
 			onCommit(v);
 		}}
 	>
-		<Switch.Thumb class="qm-switch-thumb" />
+		<Switch.Thumb class="qm-toggle-thumb" />
 	</Switch.Root>
 </span>
 
@@ -60,7 +63,7 @@
 	 2.5.8's floor is half again that. The `<label for>` beside it forwards a press but
 	 stands at the label rung, so it is no taller: without the floor no region on the
 	 surface reaches this control at the size every other control on it holds. */
-	.qm-switch-wrap :global(.qm-switch) {
+	.qm-toggle-wrap :global(.qm-toggle) {
 		display: inline-flex;
 		align-items: center;
 		width: 1.75rem;
@@ -75,21 +78,21 @@
 		cursor: pointer;
 		transition: background var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	.qm-switch-wrap :global(.qm-switch[data-state='checked']) {
+	.qm-toggle-wrap :global(.qm-toggle[data-state='checked']) {
 		background: var(--_qm-accent);
 	}
 	/* The focus ring rides `.qm-focus-ring` on the switch (controls.css). */
 	/* The thumb reads on tone alone: the base surface over the track's `hover` rung
 	 unchecked, and over `--_qm-accent` checked. No edge of its own: a hairline around
 	 a 12px pill is a second box inside the track's. */
-	.qm-switch-wrap :global(.qm-switch-thumb) {
+	.qm-toggle-wrap :global(.qm-toggle-thumb) {
 		width: 0.75rem;
 		height: 0.75rem;
 		border-radius: var(--_qm-radius-pill);
 		background: var(--_qm-surface);
 		transition: translate var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	.qm-switch-wrap :global(.qm-switch-thumb[data-state='checked']) {
+	.qm-toggle-wrap :global(.qm-toggle-thumb[data-state='checked']) {
 		translate: 0.75rem;
 	}
 </style>
