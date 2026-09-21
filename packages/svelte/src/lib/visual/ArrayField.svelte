@@ -439,6 +439,12 @@
 	 * element wires neither: its row is a summary button, whose Enter is the
 	 * disclosure's. A table's cell wires both through the subform ({@link ObjectField}
 	 * `onCellKey`), Enter keeping the column it was pressed in.
+	 *
+	 * Riding the control is what decides which cells answer: a text cell and a prose
+	 * cell leave both keys free, where a select opens its list on Enter, a switch
+	 * toggles on it and a date segment edits on Backspace. So a table's row keys answer
+	 * from its text and prose columns, and the reorder, which rides the row rather than
+	 * a cell, answers from all of them alike.
 	 */
 	function onElementKey(e: KeyboardEvent, k: number, column?: string): void {
 		if (e.isComposing) return;
