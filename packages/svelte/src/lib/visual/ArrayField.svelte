@@ -790,13 +790,34 @@
 		color: var(--_qm-danger);
 	}
 	/* ── An object element ──────────────────────────────────────────────────────
-	 The row is a summary and the subform hangs under it. `row-gap` rather than a
-	 margin on the subform, because the distance between a control and what it has
-	 unfolded belongs to the thing stacking them: the variant field spends its own `gap` on
-	 exactly this, and what `ObjectField` adds is the cap on its own stroke, equal at both
-	 of its ends. */
+	 The row is a summary and the subform hangs under it. `row-gap` rather than a margin
+	 on the subform, because the distance between a control and what it has unfolded
+	 belongs to the thing stacking them; what `ObjectField` adds is the cap on its own
+	 stroke, equal at both of its ends.
+
+	 The distance inside an open row is the list's own, and the row then takes a rung of
+	 air from the rows either side of it, so what it unfolded is nearer the summary it
+	 hangs off than the sibling below. The wider distance on the inside is the inversion:
+	 a subform reading as the next row's preamble. A variant spends the wider rung on the
+	 same join and needs no such guard, a field carrying one control and no siblings for
+	 its cells to drift toward. */
 	.qm-element {
-		row-gap: var(--_qm-space-2);
+		row-gap: var(--_qm-space);
+	}
+	.qm-element.open {
+		margin-block: var(--_qm-space);
+	}
+	/* The inline distance is the stacker's too, and here it is a rung: the summary stands
+	 for the row rather than being a cell of it, so its subform's vertical takes the
+	 disclosure's own column — `--_qm-nest` in, the distance every stroke on the ladder
+	 keeps from the one outside it (ARCHITECTURE §"A plane is a tone"). Flush with the
+	 row's edge that stroke is collinear with the box above it and with the sibling row
+	 below, so a row's cells read as the list's own rung and the content of an open row
+	 stands outboard of the chevron that opened it. A variant's cells and a matrix's
+	 columns keep the flush edge: those sit beside the discriminant and the tick they are
+	 stored with, not under them. */
+	.qm-element > :global(.qm-object) {
+		margin-inline-start: var(--_qm-nest);
 	}
 	/* The slabs measure the head, not the row: an open element is the head plus
 	 everything it unfolded, and the controls belong to the line they sit on rather than

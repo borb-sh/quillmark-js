@@ -12,10 +12,12 @@
  an open section's vertical one `--_qm-nest` in where the field is in one, this one a rung
  further, the properties a rung inside it (ARCHITECTURE §"A plane is a tone").
 
- One figure wherever it mounts: a variant's cells under their discriminant, an array
- element's properties under its summary row and a matrix member's columns under its
- tick sit at the depth a field-level subform sits at, and the box above them states
- position rather than depth.
+ One figure wherever it mounts, and where its stroke lands is the stacker's. A
+ variant's cells and a matrix member's columns sit at the depth a field-level subform
+ sits at: each stands beside the cell it is stored with — the discriminant, the tick —
+ rather than inside it, so the box says which world or which member and not how deep.
+ An array element's properties hang a rung further in ({@link ArrayField}), the summary
+ above them standing for the whole row.
 
  A property's ghosted `default:` is the static schema `sub.default`, not the
  resolved provenance the top-level ghosts read (FIELD_PROVENANCE): `resolve`
