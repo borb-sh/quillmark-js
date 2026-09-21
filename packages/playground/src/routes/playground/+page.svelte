@@ -604,11 +604,24 @@
 		color: var(--qmh-alert);
 	}
 
+	/* Wraps, because nothing on this route scrolls: the cluster's min-content is wider than
+	   a phone's column, and what runs past the edge of a pinned, clipped workspace is
+	   reachable by nothing. */
 	.strip-actions {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--qmh-space-3);
 		margin-inline-start: auto;
+	}
+
+	/* A thumb's floor, on the axis that says the pointer is one rather than the width the
+	   split switches at: this is the band a finger drives control by control, and a phone
+	   in a wide window reaches it too. */
+	@media (pointer: coarse) {
+		.strip-actions .qm-control {
+			min-height: var(--qmh-tap);
+		}
 	}
 
 	/* The one pair on the strip whose value is a control rather than a readout, so the
