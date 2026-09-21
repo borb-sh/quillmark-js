@@ -172,4 +172,33 @@ describe('a diagnostic anchored at a nested leaf', () => {
 		);
 		expect(lines(contact)).toEqual(['bad email']);
 	});
+
+	it("keeps a variant's discriminant off the box its world's cells sit in", () => {
+		const q = quill();
+		mounted = mountEditor(q, q.seedDocument(), {
+			diagnostics: [
+				{ severity: 'error' as const, message: 'bad world', path: 'main.distribution.value' },
+				{ severity: 'error' as const, message: 'bad date', path: 'main.distribution.lift_on' }
+			]
+		});
+		openGroup(mounted.target, 'Metadata');
+		const dist = field(mounted.target, 'Distribution');
+		pick(dist.querySelector<HTMLElement>('.qm-select')!, 'embargoed');
+
+		// The live cell's draws under that cell.
+		expect(dist.querySelector('[data-qm-prop="lift_on"] .qm-diag-line')?.textContent).toBe(
+			'bad date'
+		);
+		// The discriminant's draws under the field, where the control it is about is —
+		// never at the subform's foot, which is inside a box holding the live world alone.
+		const variant = dist.querySelector<HTMLElement>('.qm-variant')!;
+		expect(
+			[...variant.querySelectorAll<HTMLElement>(':scope > .qm-diag-list .qm-diag-line')].map(
+				(l) => l.textContent
+			)
+		).toEqual(['bad world']);
+		expect(
+			variant.querySelectorAll(':scope > .qm-object > .qm-diag-list .qm-diag-line')
+		).toHaveLength(0);
+	});
 });

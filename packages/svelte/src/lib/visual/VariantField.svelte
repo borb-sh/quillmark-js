@@ -77,6 +77,26 @@
 	};
 	let cellsEl = $state<Subform | undefined>();
 
+	/** Whether a step names a cell the live world draws. The one test the landing and
+	 *  the diagnostics both read, so the cell a caret lands in is the cell a message
+	 *  draws under. The discriminant is the field's own control and no world's cell. */
+	function live(step: PathStep | undefined): boolean {
+		return (
+			typeof step === 'string' &&
+			step !== VARIANT_DISCRIMINANT &&
+			!!cells &&
+			Object.hasOwn(cells, step)
+		);
+	}
+	// The cells' own, and the field's: a diagnostic naming the discriminant or a world
+	// that is not drawn has no cell to sit under, and the subform's foot is inside a box
+	// holding the live world alone. So it draws under the field, where the control it is
+	// about is.
+	const inside = $derived((diagnostics ?? []).filter((d) => live(d.steps[0])));
+	const foot = $derived(
+		(diagnostics ?? []).filter((d) => !live(d.steps[0])).map((d) => d.diagnostic)
+	);
+
 	/** Take the caret: the discriminant's trigger, the field's own control. */
 	export function focus(): void {
 		if (id) document.getElementById(id)?.focus();
@@ -85,15 +105,7 @@
 	 *  a container; the discriminant, a dormant world's cell and a key no world declares
 	 *  land on the trigger ({@link FieldControl.focusPath}). */
 	export function focusPath(steps: readonly PathStep[], pos?: number): LandingBox {
-		const key = steps[0];
-		if (
-			typeof key === 'string' &&
-			key !== VARIANT_DISCRIMINANT &&
-			cells &&
-			Object.hasOwn(cells, key) &&
-			cellsEl
-		)
-			return cellsEl.focusPath(steps, pos);
+		if (live(steps[0]) && cellsEl) return cellsEl.focusPath(steps, pos);
 		focus();
 		return undefined;
 	}
@@ -126,12 +138,13 @@
 				{describedBy}
 				{contentAt}
 				onCommit={(obj) => onCommit(obj)}
-				{diagnostics}
+				diagnostics={inside}
 			/>
 		{/key}
-	{:else}
-		<DiagnosticList diagnostics={diagnostics?.map((d) => d.diagnostic)} />
 	{/if}
+	<!-- The field's own foot, drawn whether or not a world is: what the live world
+	     cannot hold belongs under the field rather than inside the box its cells sit in. -->
+	<DiagnosticList diagnostics={foot} />
 </div>
 
 <style>
