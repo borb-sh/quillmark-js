@@ -43,6 +43,11 @@
   render-error feed: a real consumer derives external diagnostics from
   `session.warnings` (wired here, `[]` for the reference quill) plus render errors.
 
+  Under a finger the readouts go and the controls stay: a column that wraps an address
+  over three lines spends a third of the body on what is read by comparison, and what
+  is being driven there is the surfaces. `?stats` is the way back, the hand that wants
+  an address on a phone being the only reader they have.
+
   Beside them is the one lane the canvas paint does not run: `session.render` writes
   the document out as a file, and the strip says what it cost or what refused it.
 
@@ -97,6 +102,10 @@
 	// switch band is not drawn, so the route holds one number at every width rather
 	// than a viewport in JS beside the one the stylesheet already has.
 	let shown = $state<1 | 2>(1);
+
+	// Whether the readouts stand where a finger drives. An attribute rather than a branch,
+	// so the stylesheet owns which pointer that is and the markup holds no second one.
+	let stats = $state(false);
 
 	// External diagnostics fed to the editor = live `session.warnings` + any
 	// injected render-error stand-ins (recomputed on every recompile).
@@ -318,6 +327,8 @@
 			const { Quill } = await init();
 			fixtures = await fixtureNames();
 			const params = new URLSearchParams(window.location.search);
+			// Chrome rather than a seed, so it rides no document and outlives a pick.
+			stats = params.has('stats');
 			const quill = Quill.fromTree(await loadFixtureTree(name));
 			created.unshift(quill);
 			const doc = quill.seedDocument();
@@ -426,7 +437,7 @@
 	     at its end is what opens them, and a control that goes while what it asked for
 	     loads is one a hand cannot get back to. -->
 	{#if fixtures.length > 0}
-		<div class="strip">
+		<div class="strip" data-stats={stats ? '' : undefined}>
 			<span class="stat"
 				><span class="qm-label">active</span>
 				<span class="qm-readout" data-testid="active-addr">{activeAddr}</span></span
@@ -615,12 +626,23 @@
 		margin-inline-start: auto;
 	}
 
-	/* A thumb's floor, on the axis that says the pointer is one rather than the width the
-	   split switches at: this is the band a finger drives control by control, and a phone
-	   in a wide window reaches it too. */
+	/* What a finger gets: the controls, at a thumb's floor, and no readouts. Keyed on the
+	   pointer rather than the width the split switches at, which is the preset's number and
+	   not this band's to restate — the readouts go where they are read by neither a hand on
+	   the harness nor a stranger, and a control is tapped at every width a finger reaches
+	   it. `?stats` stands them back up for the hand that wants an address on a phone. */
 	@media (pointer: coarse) {
 		.strip-actions .qm-control {
 			min-height: var(--qmh-tap);
+		}
+
+		.strip:not([data-stats]) .stat {
+			display: none;
+		}
+
+		/* Nothing left to read off the end of, so the controls hold the start edge. */
+		.strip:not([data-stats]) .strip-actions {
+			margin-inline-start: 0;
 		}
 	}
 
