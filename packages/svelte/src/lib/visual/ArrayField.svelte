@@ -505,7 +505,7 @@
 	     each block's one child: a branch inside the block would stand between them. -->
 	{#if table}
 		<div
-			class="qm-array-rows qm-table"
+			class="qm-array-rows qm-array-table"
 			class:empty={ids.length === 0}
 			style:--table-cols={columns.length}
 			bind:this={rowsEl}
@@ -514,9 +514,9 @@
 			     accessible name is the row's and the column's composed (`ObjectField`). The
 			     obligation mark and the guidance affordance ride the header, being the
 			     column's rather than any one cell's. -->
-			<div class="qm-table-head">
+			<div class="qm-array-table-head">
 				{#each columns as [key, sub] (key)}
-					<div class="qm-table-col">
+					<div class="qm-array-table-col">
 						<FieldLabel
 							label={columnTitle(key, sub)}
 							required={obliged(sub)}
@@ -531,7 +531,7 @@
 				<!-- The handler catches a key from the controls inside the row and adds no
 				     interaction of the row's own: the row is no tab stop. -->
 				<div
-					class="qm-array-row qm-table-row"
+					class="qm-array-row qm-array-table-row"
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
 					onkeydown={(e) => onRowKey(e, k)}
@@ -821,7 +821,10 @@
 		cursor: pointer;
 	}
 	/* No hover fill: a well does not fill under the pointer anywhere on this surface.
-	 The chevron's ink is the cue, which is the accordion header's own ladder. */
+	 The chevron's ink is the cue, which is the accordion header's own ladder. An open
+	 row's rule reaches its own head and stops: a row's subform holds rows of this same
+	 shape under this same scope, so a descendant's would turn every collapsed chevron
+	 inside an open row to the open face. */
 	.qm-element-summary :global(.qm-el-chevron) {
 		flex-shrink: 0;
 		display: block;
@@ -833,10 +836,10 @@
 			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-element-summary:hover :global(.qm-el-chevron),
-	.qm-element.open :global(.qm-el-chevron) {
+	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
 		color: var(--_qm-ink);
 	}
-	.qm-element.open :global(.qm-el-chevron) {
+	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
 		transform: rotate(90deg);
 	}
 	/* The title is the element's own value, so it reads at the ink a written value
@@ -852,49 +855,68 @@
 		font-style: italic;
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
-	 One grid over the header and every row: a column per property, floored at the
-	 narrowest track a control stays usable in and no wider than its widest cell, then a
-	 track for the row's own controls. The header and each row subgrid onto it, so a
-	 cell's edge is its column's whatever the row above it holds. The row packs at the
-	 start rather than sharing the field's leftover width between the columns: a table
-	 carries its own rhythm, and stretching four short cells across a field sets them
-	 apart by the width the card happens to have. Narrower than its columns, the table
-	 scrolls sideways inside its own box rather than crushing a cell; nothing measures,
-	 and nothing remounts. */
-	.qm-array-rows.qm-table {
+	 One grid over the header and every row: a column per property, then a track for the
+	 row's own controls. The header and each row subgrid onto it, so a cell's edge is its
+	 column's whatever the row above it holds. The row packs at the start rather than
+	 sharing the field's leftover width between the columns: a table carries its own
+	 rhythm, and stretching four short cells across a field sets them apart by the width
+	 the card happens to have.
+
+	 A track rests at what its cells cannot shrink below and grows no further than its
+	 widest, so a field too narrow for them all overflows this box and scrolls sideways.
+	 A fixed floor as the track's base would instead hand each column a share of the
+	 width and leave a control that does not shrink — a date's segments — painting over
+	 the column beside it; the floor rides the header cell, which every column has.
+
+	 The pad is the clip box's, the ring on a cell at this box's own edge reaching past
+	 its content; the margin takes the same distance back, so the tracks stand where the
+	 label row above them does.
+
+	 The names are the array's own: `.qm-table` is the codec's island (`prose.css`), an
+	 unscoped stylesheet in this package, and a box wearing that name takes the island's
+	 hairline whatever this block says. */
+	.qm-array-rows.qm-array-table {
 		display: grid;
 		grid-template-columns:
-			repeat(var(--table-cols), minmax(var(--_qm-track-min), max-content))
+			repeat(var(--table-cols), minmax(min-content, max-content))
 			auto;
 		justify-content: start;
 		column-gap: var(--_qm-space);
 		overflow-x: auto;
+		padding: var(--_qm-ring-reach);
+		margin: calc(-1 * var(--_qm-ring-reach));
 	}
-	.qm-table-head,
-	.qm-array-row.qm-table-row {
+	.qm-array-table-head,
+	.qm-array-row.qm-array-table-row {
 		display: grid;
 		grid-column: 1 / -1;
 		grid-template-columns: subgrid;
 		column-gap: var(--_qm-space);
 	}
-	.qm-array-row.qm-table-row {
+	.qm-array-row.qm-array-table-row {
 		align-items: start;
 	}
 	/* The header's cells are labels standing over columns, at the rung a field label
-	 stands at over its control. */
-	.qm-table-col {
-		min-width: 0;
+	 stands at over its control, and where the column's floor is stated: a column is a
+	 property and every one of them has a header, so the label carries the track's. */
+	.qm-array-table-col {
+		min-width: var(--_qm-track-min);
 	}
 	/* In a table the controls are a column, not a slab: in flow, at the row's end, and
-	 always drawn — a table's rows are many and the eye finds a control by its column. */
-	.qm-table-row .qm-row-actions {
+	 always drawn — a table's rows are many and the eye finds a control by its column —
+	 and standing on the row's line with the cells rather than at the top of it. */
+	.qm-array-table-row .qm-row-actions {
 		position: static;
 		opacity: 1;
-		align-self: start;
+		align-self: center;
 	}
-	.qm-table-row .qm-row-btn {
+	/* The slab's grammar goes with the slab: a button on the row's own plane takes the
+	 icon family's radius at all four corners, where one cut into a box takes that box's
+	 end-side pair and squares the rest. */
+	.qm-array-table-row .qm-row-btn {
 		height: auto;
 		min-height: var(--_qm-tap-min);
+		border-radius: var(--_qm-radius-inner);
 	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so
 	 the two read as one register. Inner radius: the chip family is the card's, and this

@@ -33,7 +33,7 @@ const rows = (q: Quill, doc: Document) =>
 	q.reader(doc).get('contributors') as Array<Record<string, unknown>>;
 const table = (target: HTMLElement) => field(target, 'Contributors');
 const headers = (t: HTMLElement) =>
-	[...t.querySelectorAll<HTMLElement>('.qm-table-head .qm-field-label')].map(
+	[...t.querySelectorAll<HTMLElement>('.qm-array-table-head .qm-field-label')].map(
 		(l) => l.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 	);
 // The cell's name is the row's and the column's composed, and `name` is obliged, so the
@@ -50,16 +50,16 @@ describe('an array<object> declaring ui.layout: table', () => {
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 
-		expect(t.querySelector('.qm-table')).not.toBeNull();
+		expect(t.querySelector('.qm-array-table')).not.toBeNull();
 		expect(t.querySelector('.qm-element-summary')).toBeNull();
 		// The obligation mark rides the header: `name` declares no default.
 		expect(headers(t)).toEqual(['Name *', 'Role', 'Since', 'Lead']);
-		expect(t.querySelectorAll('.qm-table-row')).toHaveLength(2);
+		expect(t.querySelectorAll('.qm-array-table-row')).toHaveLength(2);
 
 		// Each cell is the property's own control, named by the row and the column.
 		expect(nameCell(t, 0).value).toBe('Ada Lovelace');
 		expect(nameCell(t, 1).value).toBe('Grace Hopper');
-		const row = t.querySelector<HTMLElement>('.qm-table-row')!;
+		const row = t.querySelector<HTMLElement>('.qm-array-table-row')!;
 		expect(row.querySelector('.qm-select')?.getAttribute('aria-label')).toBe('Contributors 1 Role');
 		expect(row.querySelector('[role="switch"]')).not.toBeNull();
 		expect(row.querySelector('[data-date-field-segment]')).not.toBeNull();
@@ -89,7 +89,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 		await settle();
 		expect(rows(q, doc)).toHaveLength(3);
 		expect(rows(q, doc)[1]).toEqual({});
-		expect(t.querySelectorAll('.qm-table-row')).toHaveLength(3);
+		expect(t.querySelectorAll('.qm-array-table-row')).toHaveLength(3);
 		// Enter keeps its column: the new row's name cell takes the caret.
 		expect(document.activeElement).toBe(nameCell(t, 1));
 
@@ -143,7 +143,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 		const doc = q.seedDocument();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
-		const first = t.querySelector<HTMLElement>('.qm-table-row')!;
+		const first = t.querySelector<HTMLElement>('.qm-array-table-row')!;
 		expect(first.querySelector<HTMLButtonElement>('.qm-row-btn[title="Move up"]')?.disabled).toBe(
 			true
 		);
@@ -213,7 +213,7 @@ describe('a layout request the surface declines', () => {
 		openGroup(mounted.target, 'Content');
 		const f = field(mounted.target, 'Appendices');
 		expect(q.schema.main.fields.appendices.ui?.layout).toBe('table');
-		expect(f.querySelector('.qm-table')).toBeNull();
+		expect(f.querySelector('.qm-array-table')).toBeNull();
 		expect(f.querySelectorAll('.qm-element-summary')).toHaveLength(2);
 	});
 });

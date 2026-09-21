@@ -480,5 +480,14 @@
 		grid-row: auto;
 		grid-template-rows: none;
 		row-gap: var(--_qm-space-half);
+		/* A row is one line of controls, so a cell shorter than the box beside it stands
+		   on that line: a switch held at the top of a row a text box set the height of
+		   reads as a cell that slipped its track. */
+		align-items: center;
+	}
+	/* What the row could not hand down stands across it: a diagnostic in the first
+	   column alone would read as that column's. */
+	.qm-object-bare > :global(.qm-diag-list) {
+		grid-column: 1 / -1;
 	}
 </style>
