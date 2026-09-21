@@ -412,8 +412,10 @@
 	 * ({@link TextField}); so the input's own value is the truth. A prose element
 	 * commits every edit, so the committed `Content` is; an authored string, the
 	 * transport-door rest, is empty when it has no characters. A table's row is empty
-	 * when every cell of it is at its blank and the cell under the caret is too. */
-	function elementEmpty(k: number, target: EventTarget | null): boolean {
+	 * when the cell under the caret is and so is every cell beside it — beside, because
+	 * the caret's own committed value is the one that lags, and counting it twice would
+	 * hold the row full until a blur. */
+	function elementEmpty(k: number, target: EventTarget | null, column?: string): boolean {
 		if (control === 'prose') {
 			const el = arr[k];
 			if (typeof el === 'string') return el.length === 0;
@@ -425,7 +427,8 @@
 				target instanceof HTMLInputElement
 					? !target.value
 					: !target || !(target as HTMLElement).textContent;
-			return under && Object.values(row).every(cellBlank);
+			const beside = Object.entries(row).every(([c, v]) => c === column || cellBlank(v));
+			return under && beside;
 		}
 		return target instanceof HTMLInputElement && !target.value;
 	}
@@ -442,7 +445,7 @@
 		if (e.key === 'Enter') {
 			e.preventDefault();
 			insertAfter(k, column);
-		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target)) {
+		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target, column)) {
 			// Destructive with nothing to undo it, so it takes a deliberate press:
 			// `repeat` is a held key running on past the character it just cleared, and
 			// the emptiness test reads the state before this keystroke applies; so the

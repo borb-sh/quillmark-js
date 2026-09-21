@@ -122,6 +122,28 @@ describe('mergeDiagnostics', () => {
 		expect(m.get('main:x')?.length).toBe(1);
 		expect(m.get('main:y')?.length).toBe(1);
 	});
+	it('keeps one message failing two cells of one container, the key being the field', () => {
+		// Both rows key `main:appendices`; only the path tells them apart, and the walk
+		// past the field is the path's. Deduping without it draws on the first row alone.
+		const m = mergeDiagnostics([
+			{
+				key: { field: 'appendices' } as FieldKey,
+				diagnostic: err('expected integer', 'main.appendices[0].entries[0].page')
+			},
+			{
+				key: { field: 'appendices' } as FieldKey,
+				diagnostic: err('expected integer', 'main.appendices[1].entries[0].page')
+			}
+		]);
+		expect(m.get('main:appendices')?.map((d) => d.path)).toEqual([
+			'main.appendices[0].entries[0].page',
+			'main.appendices[1].entries[0].page'
+		]);
+	});
+	it('still dedupes one path reported by two producers', () => {
+		const one = { key: { field: 'appendices' } as FieldKey, diagnostic: err('e', 'main.a[0].b') };
+		expect(mergeDiagnostics([one], [{ ...one }]).get('main:appendices')).toHaveLength(1);
+	});
 });
 
 describe('the walk inside a field', () => {

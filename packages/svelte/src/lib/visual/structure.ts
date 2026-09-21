@@ -384,10 +384,15 @@ export function schemaAt(
 	return cursor;
 }
 
+/** What an array declaring no `items` holds, the walk's copy of the element control
+ *  {@link controlKind} names for one: a text element, so an index into such an array is
+ *  a place and not a refusal. */
+const UNDECLARED_ELEMENT: QuillFieldSchema = { type: 'string' };
+
 function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | undefined {
 	switch (controlKind(schema)) {
 		case 'array':
-			return typeof step === 'number' ? schema.items : undefined;
+			return typeof step === 'number' ? (schema.items ?? UNDECLARED_ELEMENT) : undefined;
 		case 'object':
 			return typeof step === 'string' && Object.hasOwn(schema.properties ?? {}, step)
 				? schema.properties![step]

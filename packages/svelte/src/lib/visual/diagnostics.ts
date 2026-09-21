@@ -158,9 +158,13 @@ export function unrouted(split: DeepSplit, held: (step: PathStep) => boolean): D
 
 /**
  * Merge N routed groups into `Map<fieldKeyToString(key), Diagnostic[]>`.
- * Dedupes an identical `(severity, message)` pair landing on the same key from
+ * Dedupes an identical `(path, severity, message)` quad landing on the same key from
  * more than one group (e.g. the same error present in both `validate()` and
  * an external feed). Producer order within a key.
+ *
+ * The key is the field, but the walk past it is the `path`'s ({@link deepen}), so two
+ * cells of one container share a key and differ only there: without `path` in the
+ * quad, one message failing two rows draws on the first row alone.
  */
 export function mergeDiagnostics(...groups: RoutedDiagnostic[][]): Map<string, Diagnostic[]> {
 	const byKey = new Map<string, Diagnostic[]>();
@@ -168,9 +172,14 @@ export function mergeDiagnostics(...groups: RoutedDiagnostic[][]): Map<string, D
 	for (const group of groups) {
 		for (const { key, diagnostic } of group) {
 			const k = fieldKeyToString(key);
-			// Collision-proof key: JSON-encode the triple so arbitrary `message` text
-			// can never merge two distinct triples into one (a real diagnostic dropped).
-			const dedupeKey = JSON.stringify([k, diagnostic.severity, diagnostic.message]);
+			// Collision-proof key: JSON-encode the quad so arbitrary `message` text
+			// can never merge two distinct quads into one (a real diagnostic dropped).
+			const dedupeKey = JSON.stringify([
+				k,
+				diagnostic.path ?? null,
+				diagnostic.severity,
+				diagnostic.message
+			]);
 			if (seen.has(dedupeKey)) continue;
 			seen.add(dedupeKey);
 			const arr = byKey.get(k);

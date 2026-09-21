@@ -194,9 +194,9 @@
 	 * This field's landing handle. The wrapper is the bloom host rather than the
 	 * control: `bloomInside` appends an inset child and an `<input>` holds none. The
 	 * label is outside it, and stays out of the wash: an arrival marks where the caret
-	 * landed, which is the control. The one control that owns its label is the array, so
-	 * that one names its own box (`ArrayField.washBox`), read at the bloom the way
-	 * `focusElement` is read at the call.
+	 * landed, which is the control. A control that owns its label (`ownsLabel`: the array
+	 * and the matrix) holds that row inside itself, so it names its own box
+	 * (`washBox`) and the bloom reads that in the wrapper's place.
 	 *
 	 * A prose leaf is absent here — it registers its own controller from inside
 	 * `ProseField`, carrying the codec seam this handle has no half of — and reactive

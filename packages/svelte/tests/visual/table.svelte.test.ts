@@ -100,6 +100,44 @@ describe('an array<object> declaring ui.layout: table', () => {
 		expect(rows(q, doc)[1].name).toBe('Grace Hopper');
 	});
 
+	it('removes a row cleared under the caret, the committed cell still lagging', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		mounted = mountEditor(q, doc);
+		const t = table(mounted.target);
+
+		press(nameCell(t, 0), 'Enter');
+		await settle();
+		type(nameCell(t, 1), 'Adele');
+		expect(rows(q, doc)[1]).toEqual({ name: 'Adele' });
+
+		// Cleared but not blurred: a text cell commits at `change`, so the row still reads
+		// `Adele` while the input reads empty. The caret's cell is the input's to answer.
+		const cell = nameCell(t, 1);
+		cell.value = '';
+		cell.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		expect(rows(q, doc)[1]).toEqual({ name: 'Adele' });
+
+		press(cell, 'Backspace');
+		await settle();
+		expect(rows(q, doc)).toHaveLength(2);
+		expect(rows(q, doc).map((r) => r.name)).toEqual(['Ada Lovelace', 'Grace Hopper']);
+	});
+
+	it('keeps a row whose other cells are filled, however empty the caret is', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		mounted = mountEditor(q, doc);
+		const t = table(mounted.target);
+
+		// Row 1 carries `role: reviewer`, so an empty name cell is not an empty row.
+		type(nameCell(t, 1), '');
+		press(nameCell(t, 1), 'Backspace');
+		await settle();
+		expect(rows(q, doc)).toHaveLength(2);
+	});
+
 	it('reorders a row from the actions column', () => {
 		const q = quill();
 		const doc = q.seedDocument();

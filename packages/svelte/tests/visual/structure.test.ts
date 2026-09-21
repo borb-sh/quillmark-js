@@ -610,6 +610,15 @@ describe('schemaAt', () => {
 		expect(schemaAt(f({ type: 'string' }), [0])).toBeUndefined();
 	});
 
+	it('takes an index into an array declaring no items, the text element it draws', () => {
+		// `controlKind` calls a missing `items` a text element, so an index into one is a
+		// place the tree mounts and the landing guard must not refuse.
+		const bare = f({ type: 'array' });
+		expect(schemaAt(bare, [0])?.type).toBe('string');
+		expect(schemaAt(bare, ['x'])).toBeUndefined();
+		expect(schemaAt(bare, [0, 'deeper'])).toBeUndefined();
+	});
+
 	it('walks a matrix member into its held cell and its columns', () => {
 		expect(schemaAt(matrix, ['a'])?.type).toBe('object');
 		expect(schemaAt(matrix, ['a', MATRIX_HELD])?.type).toBe('boolean');

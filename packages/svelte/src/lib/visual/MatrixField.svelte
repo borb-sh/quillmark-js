@@ -24,6 +24,7 @@
  spelled it.
 -->
 <script lang="ts">
+	import { tick as flush } from 'svelte';
 	import { wording } from './strings.js';
 
 	// The surface's words, ambient from the editor root; the package's English
@@ -119,8 +120,14 @@
 	const colEls: Record<string, Subform | undefined> = $state({});
 	let blocksEl = $state<HTMLElement | undefined>();
 
-	function tick(id: string, on: boolean): void {
+	/** A native checkbox carries its own state, so a commit the document declines leaves
+	 *  the face ticked over a map that says otherwise, `checked={held(id)}` having nothing
+	 *  new to write. The reassert after the flush is what the styled controls get from
+	 *  their synced local (`synced.svelte.ts`): the document is what the face reads. */
+	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
 		onCommit(commitMember(value, id, memberWrite(on, matrixColumns(memberValue(value, id)))));
+		await flush();
+		if (el.isConnected) el.checked = held(id);
 	}
 	/** A column edit lands on a held member: the subform draws under a tick alone. */
 	function commitColumns(id: string, columns: Record<string, unknown>): void {
@@ -208,7 +215,7 @@
 									id={tickId(m.id)}
 									checked={on}
 									bind:this={tickEls[m.id]}
-									onchange={(e) => tick(m.id, e.currentTarget.checked)}
+									onchange={(e) => tick(m.id, e.currentTarget.checked, e.currentTarget)}
 									onkeydown={(e) => onTickKey(e, block, m.id)}
 								/>
 								<Icon name="check" class="qm-tick-mark" />
