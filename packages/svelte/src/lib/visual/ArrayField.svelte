@@ -853,14 +853,20 @@
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
 	 One grid over the header and every row: a column per property, floored at the
-	 narrowest track a control stays usable in and sharing the rest, then a track for
-	 the row's own controls. The header and each row subgrid onto it, so a cell's edge is
-	 its column's whatever the row above it holds. Narrower than its columns, the table
+	 narrowest track a control stays usable in and no wider than its widest cell, then a
+	 track for the row's own controls. The header and each row subgrid onto it, so a
+	 cell's edge is its column's whatever the row above it holds. The row packs at the
+	 start rather than sharing the field's leftover width between the columns: a table
+	 carries its own rhythm, and stretching four short cells across a field sets them
+	 apart by the width the card happens to have. Narrower than its columns, the table
 	 scrolls sideways inside its own box rather than crushing a cell; nothing measures,
 	 and nothing remounts. */
 	.qm-array-rows.qm-table {
 		display: grid;
-		grid-template-columns: repeat(var(--table-cols), minmax(var(--_qm-track-min), 1fr)) auto;
+		grid-template-columns:
+			repeat(var(--table-cols), minmax(var(--_qm-track-min), max-content))
+			auto;
+		justify-content: start;
 		column-gap: var(--_qm-space);
 		overflow-x: auto;
 	}

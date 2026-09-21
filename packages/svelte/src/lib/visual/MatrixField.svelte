@@ -270,12 +270,16 @@
 	/* The blocks abreast: as many columns as the width holds at the track floor and never
 	 more than there are blocks, `auto-fit` collapsing the tracks it has no block for.
 	 Nothing measures, and a block's members stack inside their column at every count.
-	 Positioned for the wash's inset child (`washBox`), and rounded to the rung a row's
-	 box draws, as an array's rows are. */
+	 A block is as wide as its widest member and no wider, and the row packs at the start:
+	 the leftover stands after the last block rather than split between them, where three
+	 short rosters in a wide field read as three columns set far apart. Positioned for the
+	 wash's inset child (`washBox`), and rounded to the rung a row's box draws, as an
+	 array's rows are. */
 	.qm-matrix-blocks {
 		position: relative;
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(var(--_qm-track-min), 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(var(--_qm-track-min), max-content));
+		justify-content: start;
 		column-gap: var(--_qm-space-3);
 		row-gap: var(--_qm-space-3);
 		border-radius: var(--_qm-radius-inner);
