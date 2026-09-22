@@ -67,7 +67,8 @@ export const ICONS = {
 		['path', { d: 'M3 6h18' }],
 		['path', { d: 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }]
 	],
-	minus: [['path', { d: 'M5 12h14' }]]
+	minus: [['path', { d: 'M5 12h14' }]],
+	check: [['path', { d: 'M20 6 9 17l-5-5' }]]
 } as const satisfies Record<string, IconNode>;
 
 /** The closed set. A name that is not here is a compile error at the call site,

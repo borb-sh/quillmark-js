@@ -1,35 +1,45 @@
 <!--
  An `array` field → an add/remove repeater. Elements commit by value: every
- edit / add / remove rebuilds the whole array and hands it to the parent's typed
+ edit / add / remove / move rebuilds the whole array and hands it to the parent's typed
  `writer.set(field, wholeArray)` (arrays are not op-addressed). Element control
  by `items.type`: `richtext` / `plaintext` → a prose element
- ({@link ProseValue}), `object` → a summary row that opens onto a subform,
- everything else → a text input. The
- add chip sits in the label header row (space-between with the field label);
- {@link Field} skips its own label for array controls and hands this component the
- label track with it.
+ ({@link ProseValue}), `object` → a summary row that opens onto a subform, or a
+ table's row where the array asks for one and the cells are short, everything else →
+ a text input. The add chip sits in the label header row (space-between with the field
+ label); {@link Field} skips its own label for array controls and hands this component
+ the label track with it. An array declaring `max:` disables the chip at the cap and
+ draws the count beside it: a disabled button takes no focus, so a `title` reaches
+ neither a screen reader nor a touch user, and the count is the carrier.
 
  An `object` element collapses: the row is its own summary — a box, titled by the
- element's first `string` cell — and opens onto {@link ObjectField}, one at a time.
- Stacking the subforms instead would nest a field one level past the depth the
- subform's own vertical draws, once per row. Opening is therefore part of a landing rather than something the
- user does first: `focusElement` opens the row it is aimed at before it focuses.
+ row's `items.ui.title` template or its first short text cell ({@link rowSummary}) —
+ and opens onto {@link ObjectField}, one at a time. Stacking the subforms instead would
+ nest a field one level past the depth the subform's own vertical draws, once per row.
+ Opening is therefore part of a landing rather than something the user does first:
+ `focusPath` opens the row it is aimed at before it focuses, and hands the rest of the
+ walk to the subform it opened, which is how a row two closed boxes down is reached.
 
- The remove is inside the element: a slab over the end of the element's own box, taking
- its two end-side corners. So a row's box is the element's box, and an array's rows end
- where every other field's control does. On an object element that box is the summary
- rather than the open row: a destructive control belongs to the line it sits on, not to
- everything that line has unfolded.
+ The table (`layout: 'table'`, VISUAL_EDITOR §"Structure mirrors the schema") is the
+ same row machine in another presentation: the same ids, the same splices, the same
+ landing and the same keys, over rows that are always open, each cell the property's
+ ordinary control on the track the header names ({@link ObjectField} `bare`). A table
+ composes by position, so it recurses into nothing: `arrayLayout` declines it for a
+ row holding a container or a block prose cell.
 
- Keys carry the list without the mouse: Enter inserts a
- sibling below and takes the caret there, Backspace on an empty element removes it
- and hands focus back up the list.
+ The row's controls are inside the element: a slab over the end of the element's own
+ box, taking its two end-side corners — the remove, and on an `object` row the reorder
+ pair before it. So a row's box is the element's box, and an array's rows end where
+ every other field's control does. On an object element that box is the summary rather
+ than the open row: a destructive control belongs to the line it sits on, not to
+ everything that line has unfolded. A table's row spends its last track on them
+ instead, a table's actions being a column like any other.
 
- No reorder: an array's order is fixed at declaration/entry order. Elements
- carry a parallel session-id list, spliced with the values as one operation at
- whatever index a mutation names; so an element holds its id for life and the
- surviving order never permutes, which is what lets a keyed prose element survive an
- insert or a remove above it rather than remounting.
+ Keys carry the list without the mouse: Enter inserts a sibling below and takes the
+ caret there, Backspace on an empty element removes it and hands focus back up the
+ list, Alt+↑/↓ anywhere in an `object` row moves it. A move is one splice of the ids
+ and of the values together, the mechanism insert and remove use, so an element keeps
+ its id for life and no prose leaf inside it remounts; the open row stays open across
+ its own move, and `animate:reorder` holds the moving row as it holds a card.
 -->
 <script lang="ts">
 	import { wording } from './strings.js';
@@ -41,13 +51,24 @@
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
 	import { emptyContent } from '../core/codec/index.js';
 	import { createLifespan } from '../core/teardown.js';
-	import { IdSeq, controlKind } from './structure.js';
+	import {
+		IdSeq,
+		controlKind,
+		humanize,
+		obliged,
+		rowSummary,
+		type ArrayLayout
+	} from './structure.js';
+	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
+	import type { LandingBox } from './leaves.js';
 	import { holdInView } from './hold.js';
+	import { reorder, reorderArm } from './motion.js';
 	import Icon from './icons/Icon.svelte';
 	import TextField from './TextField.svelte';
 	import ObjectField from './ObjectField.svelte';
 	import ProseValue from './ProseValue.svelte';
 	import FieldLabel from './FieldLabel.svelte';
+	import DiagnosticList from './DiagnosticList.svelte';
 	import './controls.css';
 
 	/** The disclosure glyph, at the size the accordion's own chevron takes: one
@@ -57,6 +78,12 @@
 	interface Props {
 		value: unknown[] | undefined;
 		items: QuillFieldSchema | undefined;
+		/** How the elements draw: the record list, or the table an `array<object>` of
+		 * short cells asks for (`arrayLayout`). */
+		layout?: ArrayLayout;
+		/** The schema's `max:`, past which the add chip disables and Enter stops
+		 * inserting; `undefined` is no cap. */
+		max?: number;
 		/** Accessible-name prefix for the element controls (`label` + 1-based index). */
 		label?: string;
 		/** No-default field → a persistent required `*` on the label. */
@@ -82,10 +109,16 @@
 		 * control has spliced in and whose commit has yet to land, or was refused. */
 		contentAt: (path: PathStep[]) => Content | undefined;
 		onCommit: (arr: unknown[]) => void;
+		/** The diagnostics routed into this array, each with its steps still to walk: one
+		 * naming a row draws under that row — under its head while it is collapsed, under
+		 * the cell once it is open — and one naming no row draws at the list's foot. */
+		diagnostics?: readonly DeepDiagnostic[];
 	}
 	let {
 		value,
 		items,
+		layout = 'list',
+		max,
 		label,
 		required,
 		description,
@@ -93,7 +126,8 @@
 		descriptionId,
 		idBase,
 		contentAt,
-		onCommit
+		onCommit,
+		diagnostics
 	}: Props = $props();
 
 	// The element control is the item schema's own, with no departure: a content-typed
@@ -101,7 +135,14 @@
 	// `contentAt` whatever the element rests as. An array declaring no `items`
 	// has text elements.
 	const control = $derived(items ? controlKind(items) : 'text');
+	const table = $derived(layout === 'table' && control === 'object');
+	const columns = $derived(Object.entries(items?.properties ?? {}));
 	const arr = $derived((value ?? []) as unknown[]);
+	const atCap = $derived(max != null && arr.length >= max);
+	const routed = $derived(splitDeep(diagnostics));
+	const foot = $derived(
+		unrouted(routed, (step) => typeof step === 'number' && step >= 0 && step < arr.length)
+	);
 
 	// Parallel stable ids, one per element, kept in lockstep with the data below.
 	// Seeded eagerly so a non-empty array renders its rows on the first pass:
@@ -116,10 +157,7 @@
 		if (ids.length === n) return;
 		if (ids.length < n) ids = [...ids, ...seq.take(n - ids.length)];
 		else {
-			for (const id of ids.slice(n)) {
-				delete els[id];
-				delete rowEls[id];
-			}
+			for (const id of ids.slice(n)) drop(id);
 			ids = ids.slice(0, n);
 		}
 	});
@@ -142,34 +180,36 @@
 	const els: Record<string, { focus: () => void; setCaret?: (pos: number) => void } | undefined> =
 		$state({});
 	// The rows' own boxes, on the same key and dropped on the same paths: what an
-	// element landing blooms in ({@link focusElement}), and what an object row's
+	// element landing blooms in ({@link focusPath}), and what an object row's
 	// summary is found through. A row is a box whatever its element type, so the two
 	// element shapes register alike.
 	const rowEls: Record<string, HTMLElement | undefined> = $state({});
+	// A table row's cells, on the same key: the subform a landing and the column-keeping
+	// Enter hop reach into. Every table row is open, so there is one per row where the
+	// list holds one for the open row alone.
+	type Subform = {
+		focus: () => void;
+		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+	};
+	const cellEls: Record<string, Subform | undefined> = $state({});
 	let addEl: HTMLButtonElement | undefined = $state();
 	let rowsEl: HTMLElement | undefined = $state();
+	function drop(id: string): void {
+		delete els[id];
+		delete rowEls[id];
+		delete cellEls[id];
+	}
 
 	// ── Object elements: one open at a time ──────────────────────────────────────
 	// So an array of ten records is ten lines and one figure, whatever its length.
 	let openId = $state<string | undefined>(undefined);
 	// The open row's subform, for the landing below. One entry, never a map: only one
 	// row is open, so the ref is singular by the same rule the state is.
-	let openObjEl = $state<{ focus: () => void } | undefined>();
+	let openObjEl = $state<Subform | undefined>();
 
-	/** The property whose value titles a collapsed row: the first `string` cell in
-	 *  declaration order, which is the order a schema states its own priority in. */
-	const titleKey = $derived.by(() => {
-		for (const [k, sub] of Object.entries(items?.properties ?? {})) {
-			if (controlKind(sub) === 'text') return k;
-		}
-		return undefined;
-	});
-	/** A collapsed row's own words: the title cell's committed value, or `undefined`
-	 *  while it has none. */
+	/** A collapsed row's own words, or `undefined` while it has none. */
 	function elementTitle(k: number): string | undefined {
-		const el = arr[k] as Record<string, unknown> | undefined;
-		const v = titleKey ? el?.[titleKey] : undefined;
-		return typeof v === 'string' && v.trim() ? v : undefined;
+		return rowSummary(items, arr[k]);
 	}
 	/** What an untitled row reads as: the name its `aria-label` already spends,
 	 *  `label` + the 1-based index. */
@@ -183,10 +223,17 @@
 			openId = openId === id ? undefined : id;
 		});
 	}
+	const rowName = (k: number): string | undefined =>
+		label != null ? `${label} ${k + 1}` : undefined;
+	const columnTitle = (key: string, sub: QuillFieldSchema): string =>
+		sub.ui?.title ?? humanize(key);
 
 	// The awaited flush below is the only work that outlives a gesture here, so the
-	// span carries no cancellers: it is the liveness `focusAfterFlush` asks for.
+	// span carries the reorder's frame and nothing else: it is the liveness
+	// `focusAfterFlush` asks for.
 	const span = createLifespan();
+	const arm = reorderArm();
+	span.onEnd(arm.cancel);
 	onDestroy(() => span.end());
 
 	function emptyElement(): unknown {
@@ -204,8 +251,11 @@
 		copy[k] = next === undefined ? emptyElement() : next;
 		onCommit(copy);
 	}
-	/** Insert an empty element after `k` (`-1` prepends) and take focus to it. */
-	function insertAfter(k: number): void {
+	/** Insert an empty element after `k` (`-1` prepends) and take focus to it: into
+	 *  `column` where the gesture came from a table cell, so Enter keeps its column. A
+	 *  no-op at the cap: no editor gesture commits an element past `max:`. */
+	function insertAfter(k: number, column?: string): void {
+		if (atCap) return;
 		const id = seq.next();
 		const at = k + 1;
 		ids = [...ids.slice(0, at), id, ...ids.slice(at)];
@@ -214,8 +264,8 @@
 		onCommit(next);
 		// A row added is a row to fill in, so an object element arrives open: landing on
 		// a collapsed empty summary would make adding one a two-press gesture.
-		if (control === 'object') openId = id;
-		focusAfterFlush(id);
+		if (control === 'object' && !table) openId = id;
+		void focusAfterFlush(id, column);
 	}
 	function add(): void {
 		insertAfter(ids.length - 1);
@@ -224,8 +274,7 @@
 		const dropped = ids[k];
 		const next = ids.filter((_, i) => i !== k);
 		ids = next;
-		delete els[dropped];
-		delete rowEls[dropped];
+		drop(dropped);
 		// The open row can be the one removed; `openId` is cleared with it rather than
 		// left naming an element that has gone.
 		if (openId === dropped) openId = undefined;
@@ -234,7 +283,31 @@
 		// into its place; on the add affordance once the list is empty, which is then
 		// the only thing left to hold it. Clicking the remove needs this as much as the
 		// key does: the button under the pointer is part of what it destroys.
-		focusAfterFlush(next[Math.max(k - 1, 0)]);
+		void focusAfterFlush(next[Math.max(k - 1, 0)]);
+	}
+	/**
+	 * Move element `k` one slot: one splice of the ids and of the values together, so
+	 * the element keeps its id and everything mounted under it. A no-op at either edge.
+	 * The control that was pressed rides with the row, so it is focused again once the
+	 * flush has moved it: a node moved in the DOM is a node the browser blurred.
+	 */
+	function move(k: number, dir: -1 | 1): void {
+		const to = k + dir;
+		if (to < 0 || to >= ids.length) return;
+		const pressed = document.activeElement;
+		arm.arm();
+		const nextIds = ids.slice();
+		const [id] = nextIds.splice(k, 1);
+		nextIds.splice(to, 0, id);
+		ids = nextIds;
+		const next = arr.slice();
+		const [v] = next.splice(k, 1);
+		next.splice(to, 0, v);
+		onCommit(next);
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			if (pressed instanceof HTMLElement && pressed.isConnected) pressed.focus();
+		})();
 	}
 	/** Take the caret: the first element, or the add affordance when the list is empty;
 	 * which is then the only thing there is to land on, and the next thing the user
@@ -242,6 +315,7 @@
 	 * ask one function so they cannot disagree (`Field`, `leaves.ts`). */
 	export function focus(): void {
 		if (ids.length === 0) return void addEl?.focus();
+		if (table) return void cellEls[ids[0]]?.focus();
 		if (control === 'object') return focusObjectRow(ids[0]);
 		els[ids[0]]?.focus();
 	}
@@ -259,35 +333,47 @@
 	export function washBox(): HTMLElement | undefined {
 		return rowsEl;
 	}
-	/** Take the caret to element `k`, at USV `pos` where the row's control can take one:
-	 * what a landing on an element address resolves to (`leaves.ts`). The index resolves
-	 * to the element's session id here, at the call, never carried as one — an index is
-	 * stale the moment anything above it splices. Past the live list it falls back to
-	 * {@link focus}: the field is right and the row is gone, which is a landing off a
-	 * compile the document has moved past.
+	/**
+	 * Land at `steps`: element `steps[0]`, and the rest of the walk inside its subform,
+	 * at USV `pos` where the leaf the walk ends in can take one ({@link
+	 * FieldControl.focusPath}). The index resolves to the element's session id here, at
+	 * the call, never carried as one — an index is stale the moment anything above it
+	 * splices. Past the live list it falls back to {@link focus}: the field is right and
+	 * the row is gone, which is a landing off a compile the document has moved past.
 	 *
-	 * An absent `pos` is the placement rung, exactly as on `Landing`. A row that takes
-	 * no offset gets the bare focus: a `string` element, whose input has no coordinate
-	 * to spend one in and which the compile never addresses.
+	 * A collapsed row holds no control for a caret to land in, so opening it is part of
+	 * the landing rather than something the user does first, and the subform it opens
+	 * exists one flush later: that arm answers after the flush, with the rest of the
+	 * walk handed to the subform then. An absent `pos` is the placement rung, exactly as
+	 * on `Landing`; a row that takes no offset gets the bare focus.
 	 *
-	 * The row's box comes back with the landing: the arrival wash is the address's own
-	 * granularity, and one row is what an element address named. A fallback to the
-	 * field answers `undefined`, which is the field's box again (`leaves.ts`). */
-	export function focusElement(k: number, pos?: number): HTMLElement | undefined {
-		const id = ids[k];
-		// A collapsed row holds no control for a caret to land in, so opening it is part
-		// of the landing rather than something the user does first: a preview click that
-		// resolves into an element has to arrive somewhere the caret can sit.
-		if (control === 'object') {
-			if (id === undefined) {
-				focus();
-				return undefined;
-			}
-			openId = id;
-			void focusAfterFlush(id);
+	 * The row's box comes back with the landing, or the innermost row a deeper walk
+	 * opened: the arrival wash is the address's own granularity. A fallback to the field
+	 * answers `undefined`, which is the field's box again (`leaves.ts`).
+	 */
+	export function focusPath(steps: readonly PathStep[], pos?: number): LandingBox {
+		const [k, ...rest] = steps;
+		const id = typeof k === 'number' ? ids[k] : undefined;
+		if (id === undefined) {
+			focus();
+			return undefined;
+		}
+		if (table) {
+			const cells = cellEls[id];
+			if (rest.length && cells) void cells.focusPath(rest, pos);
+			else cells?.focus();
 			return rowEls[id];
 		}
-		const el = id === undefined ? undefined : els[id];
+		if (control === 'object') {
+			openId = id;
+			return (async () => {
+				if (!(await span.resumes(tick()))) return undefined;
+				if (rest.length && openObjEl) return (await openObjEl.focusPath(rest, pos)) ?? rowEls[id];
+				focusObjectRow(id);
+				return rowEls[id];
+			})();
+		}
+		const el = els[id];
 		if (!el) {
 			focus();
 			return undefined;
@@ -298,41 +384,74 @@
 	}
 	/** Focus element `id` after the flush, never in the same tick: a mutation commits
 	 * the array by value, so the parent re-derives and the row does not exist until
-	 * then. `undefined` is the empty list: the add affordance.
+	 * then. `undefined` is the empty list: the add affordance. `column` is a table
+	 * cell to land in rather than the row's first.
 	 *
 	 * The commit that schedules this can also remove the card holding the field, which
 	 * unmounts this component inside the window (core/teardown.ts). */
-	async function focusAfterFlush(id: string | undefined): Promise<void> {
+	async function focusAfterFlush(id: string | undefined, column?: string): Promise<void> {
 		if (!(await span.resumes(tick()))) return;
 		if (id === undefined) return void addEl?.focus();
+		if (table) {
+			const cells = cellEls[id];
+			if (column && cells) void cells.focusPath([column]);
+			else cells?.focus();
+			return;
+		}
 		if (control === 'object') return focusObjectRow(id);
 		els[id]?.focus();
+	}
+	/** Whether a cell's committed value is at its blank: unset, the empty string, or a
+	 *  `Content` with no characters. A boolean or a number is never blank. */
+	function cellBlank(v: unknown): boolean {
+		if (v === undefined || v === '') return true;
+		return typeof v === 'object' && v !== null && 'text' in v && (v as Content).text === '';
 	}
 	/** Whether element `k` reads empty to the user. A text element's committed value
 	 * lags the input: a cleared field commits at `change`, not per keystroke
 	 * ({@link TextField}); so the input's own value is the truth. A prose element
 	 * commits every edit, so the committed `Content` is; an authored string, the
-	 * transport-door rest, is empty when it has no characters. */
-	function elementEmpty(k: number, target: EventTarget | null): boolean {
+	 * transport-door rest, is empty when it has no characters. A table's row is empty
+	 * when the cell under the caret is and so is every cell beside it — beside, because
+	 * the caret's own committed value is the one that lags, and counting it twice would
+	 * hold the row full until a blur. */
+	function elementEmpty(k: number, target: EventTarget | null, column?: string): boolean {
 		if (control === 'prose') {
 			const el = arr[k];
 			if (typeof el === 'string') return el.length === 0;
 			return !(el as Content | undefined)?.text;
+		}
+		if (table) {
+			const row = (arr[k] ?? {}) as Record<string, unknown>;
+			const under =
+				target instanceof HTMLInputElement
+					? !target.value
+					: !target || !(target as HTMLElement).textContent;
+			const beside = Object.entries(row).every(([c, v]) => c === column || cellBlank(v));
+			return under && beside;
 		}
 		return target instanceof HTMLInputElement && !target.value;
 	}
 	/**
 	 * The element keyboard contract. Both keys ride the element control's own keydown
 	 * (the input's, or the PM view's through `handleDOMEvents`) since neither
-	 * surface is a place a keymap of this component's could sit. An `object` element
-	 * wires neither: its row is a summary button, whose Enter is the disclosure's.
+	 * surface is a place a keymap of this component's could sit. A collapsed `object`
+	 * element wires neither: its row is a summary button, whose Enter is the
+	 * disclosure's. A table's cell wires both through the subform ({@link ObjectField}
+	 * `onCellKey`), Enter keeping the column it was pressed in.
+	 *
+	 * Riding the control is what decides which cells answer: a text cell and a prose
+	 * cell leave both keys free, where a select opens its list on Enter, a switch
+	 * toggles on it and a date segment edits on Backspace. So a table's row keys answer
+	 * from its text and prose columns, and the reorder, which rides the row rather than
+	 * a cell, answers from all of them alike.
 	 */
-	function onElementKey(e: KeyboardEvent, k: number): void {
-		if (control === 'object' || e.isComposing) return;
+	function onElementKey(e: KeyboardEvent, k: number, column?: string): void {
+		if (e.isComposing) return;
 		if (e.key === 'Enter') {
 			e.preventDefault();
-			insertAfter(k);
-		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target)) {
+			insertAfter(k, column);
+		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target, column)) {
 			// Destructive with nothing to undo it, so it takes a deliberate press:
 			// `repeat` is a held key running on past the character it just cleared, and
 			// the emptiness test reads the state before this keystroke applies; so the
@@ -340,6 +459,15 @@
 			e.preventDefault();
 			remove(k);
 		}
+	}
+	/** The reorder's keyboard twin, on the row so it answers from the summary and from
+	 *  any cell an open row or a table row holds: Alt+↑/↓, the table island's own
+	 *  binding. */
+	function onRowKey(e: KeyboardEvent, k: number): void {
+		if (!e.altKey || e.isComposing) return;
+		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+		e.preventDefault();
+		move(k, e.key === 'ArrowUp' ? -1 : 1);
 	}
 </script>
 
@@ -363,67 +491,140 @@
 		{:else}
 			<span></span>
 		{/if}
-		<button
-			type="button"
-			class="qm-add-el qm-chip qm-focus-ring qm-tap-floor"
-			bind:this={addEl}
-			onclick={add}>{t.strings.arrayAdd}</button
-		>
+		<!-- The cap is drawn, not parked in a `title`: a disabled chip takes no focus and
+		     announces nothing, and disabled is a promise that there is a state in which
+		     you could, so the count says which state. -->
+		<span class="qm-array-add-slot">
+			{#if max != null}
+				<span class="qm-array-count">{t.strings.arrayCount(arr.length, max)}</span>
+			{/if}
+			<button
+				type="button"
+				class="qm-add-el qm-chip qm-focus-ring qm-tap-floor"
+				bind:this={addEl}
+				disabled={atCap}
+				onclick={add}>{t.strings.arrayAdd}</button
+			>
+		</span>
 	</div>
-	<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
-		{#each ids as id, k (id)}
-			{#if control === 'object'}
-				{@const open = openId === id}
-				{@const shown = elementTitle(k)}
-				<div class="qm-array-row qm-element" class:open bind:this={rowEls[id]}>
+	<!-- Three lists, one per row shape, because `animate:` is granted only to a keyed
+	     each block's one child: a branch inside the block would stand between them. -->
+	{#if table}
+		<div
+			class="qm-array-rows qm-array-table"
+			class:empty={ids.length === 0}
+			style:--table-cols={columns.length}
+			bind:this={rowsEl}
+		>
+			<!-- The header names the columns, so a cell carries no label of its own: its
+			     accessible name is the row's and the column's composed (`ObjectField`). The
+			     obligation mark and the guidance affordance ride the header, being the
+			     column's rather than any one cell's. -->
+			<div class="qm-array-table-head">
+				{#each columns as [key, sub] (key)}
+					<div class="qm-array-table-col">
+						<FieldLabel
+							label={columnTitle(key, sub)}
+							required={obliged(sub)}
+							description={sub.description}
+						/>
+					</div>
+				{/each}
+				<span></span>
+			</div>
+			{#each ids as id, k (id)}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<!-- The handler catches a key from the controls inside the row and adds no
+				     interaction of the row's own: the row is no tab stop. -->
+				<div
+					class="qm-array-row qm-array-table-row"
+					bind:this={rowEls[id]}
+					animate:reorder={arm.armed}
+					onkeydown={(e) => onRowKey(e, k)}
+				>
+					<ObjectField
+						bare
+						bind:this={cellEls[id]}
+						value={(arr[k] ?? {}) as Record<string, unknown>}
+						properties={items?.properties}
+						label={rowName(k)}
+						contentAt={(path) => contentAt([k, ...path])}
+						onCommit={(obj) => commitElement(k, obj)}
+						onCellKey={(e, column) => onElementKey(e, k, column)}
+						diagnostics={routed.below.get(k)}
+					/>
+					<div class="qm-row-actions">
+						{@render rowActions(k)}
+					</div>
+				</div>
+			{/each}
+		</div>
+	{:else if control === 'object'}
+		<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
+			{#each ids as id, k (id)}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<!-- As above: a key catch, not an interaction of the row's own. -->
+				<div
+					class="qm-array-row qm-element"
+					class:open={openId === id}
+					bind:this={rowEls[id]}
+					animate:reorder={arm.armed}
+					onkeydown={(e) => onRowKey(e, k)}
+				>
 					<!-- The head is the row in collapsed form, and it is a box: the element IS
-					     a value, the way the enum trigger is, and the remove slab's grammar
-					     (the box's two end-side corners) needs corners to take. So a list of
-					     records measures like a list of inputs whatever the element type. -->
+					     a value, the way the enum trigger is, and the slab's grammar (the box's
+					     end-side corners) needs corners to take. So a list of records measures
+					     like a list of inputs whatever the element type. -->
 					<div class="qm-element-head">
 						<button
 							type="button"
 							class="qm-control-box qm-focus-ring qm-element-summary"
-							aria-expanded={open}
+							aria-expanded={openId === id}
 							onclick={(e) => toggleRow(id, e.currentTarget)}
 						>
 							<!-- Leading, and it rotates: trailing is the figure for pushing a new
 							     screen, where this unfolds in place. Same glyph, same rotation and
 							     same rung as the accordion's, so the surface has one disclosure. -->
 							<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
-							{#if shown}
-								<span class="qm-element-title">{shown}</span>
+							{#if elementTitle(k)}
+								<span class="qm-element-title">{elementTitle(k)}</span>
 							{:else}
 								<span class="qm-element-title untitled">{untitled(k)}</span>
 							{/if}
 						</button>
-						<button
-							type="button"
-							class="qm-icon-btn qm-remove qm-focus-ring"
-							title={t.strings.arrayRemove}
-							onclick={() => remove(k)}><Icon name="minus" /></button
-						>
+						<div class="qm-row-actions">
+							{@render rowActions(k)}
+						</div>
 					</div>
-					{#if open}
+					{#if openId === id}
 						<ObjectField
 							bind:this={openObjEl}
 							value={(arr[k] ?? {}) as Record<string, unknown>}
 							properties={items?.properties}
-							label={label != null ? `${label} ${k + 1}` : undefined}
+							label={rowName(k)}
 							idBase={idBase != null ? `${idBase}-e-${id}` : undefined}
 							contentAt={(path) => contentAt([k, ...path])}
 							onCommit={(obj) => commitElement(k, obj)}
+							diagnostics={routed.below.get(k)}
 						/>
+					{:else}
+						<!-- A collapsed row draws no cell, so what its cells would have said is said
+						     under the head, where the row can be seen: the message names the leaf. -->
+						<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
 					{/if}
 				</div>
-			{:else}
+			{/each}
+		</div>
+	{:else}
+		<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
+			{#each ids as id, k (id)}
 				<div class="qm-array-row" bind:this={rowEls[id]}>
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
 							content={() => contentAt([k]) ?? emptyContent()}
 							plaintext={items?.type === 'plaintext'}
-							label={label != null ? `${label} ${k + 1}` : undefined}
+							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
 							onKey={(e) => onElementKey(e, k)}
 						/>
@@ -431,22 +632,51 @@
 						<TextField
 							bind:this={els[id]}
 							value={String(arr[k] ?? '')}
-							label={label != null ? `${label} ${k + 1}` : undefined}
+							label={rowName(k)}
 							onCommit={(v) => commitElement(k, v)}
 							onKey={(e) => onElementKey(e, k)}
 						/>
 					{/if}
-					<button
-						type="button"
-						class="qm-icon-btn qm-remove qm-focus-ring"
-						title={t.strings.arrayRemove}
-						onclick={() => remove(k)}><Icon name="minus" /></button
-					>
+					<div class="qm-row-actions">
+						<button
+							type="button"
+							class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
+							title={t.strings.arrayRemove}
+							onclick={() => remove(k)}><Icon name="minus" /></button
+						>
+					</div>
+					<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
 				</div>
-			{/if}
-		{/each}
-	</div>
+			{/each}
+		</div>
+	{/if}
+	<DiagnosticList diagnostics={foot} />
 </div>
+
+<!-- An `object` row's controls: the reorder pair, disabled at its edge as the card
+     header's is, then the remove. -->
+{#snippet rowActions(k: number)}
+	<button
+		type="button"
+		class="qm-icon-btn qm-row-btn qm-focus-ring"
+		title={t.strings.arrayMoveUp}
+		disabled={k === 0}
+		onclick={() => move(k, -1)}><Icon name="chevron-up" /></button
+	>
+	<button
+		type="button"
+		class="qm-icon-btn qm-row-btn qm-focus-ring"
+		title={t.strings.arrayMoveDown}
+		disabled={k === ids.length - 1}
+		onclick={() => move(k, 1)}><Icon name="chevron-down" /></button
+	>
+	<button
+		type="button"
+		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
+		title={t.strings.arrayRemove}
+		onclick={() => remove(k)}><Icon name="minus" /></button
+	>
+{/snippet}
 
 <style>
 	.qm-array {
@@ -463,6 +693,18 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--_qm-space-2);
+	}
+	.qm-array-add-slot {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--_qm-space-2);
+	}
+	/* The count reads at the label rung: it is a fact about the field, stated beside the
+	 chip in the register the chip rests at, and never a value. */
+	.qm-array-count {
+		font-size: var(--_qm-text-label);
+		color: var(--_qm-ink-label);
+		font-variant-numeric: tabular-nums;
 	}
 	/* The elements, in a box of their own: the arrival wash blooms here rather than over
 	 the wrapper `Field` hands this component (`washBox`), which is the label's box too.
@@ -490,65 +732,102 @@
 		position: relative;
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
+		row-gap: var(--_qm-space);
 		/* The corners the row's wash takes, an element landing blooming here rather than
-		 over the whole list (`focusElement`): the row draws no box of its own, so the
+		 over the whole list (`focusPath`): the row draws no box of its own, so the
 		 radius it lends the wash is the one its element's box draws. */
 		border-radius: var(--_qm-radius-inner);
 	}
-	/* The end inset the slab stands in, taken off whichever box the element drew:
-	 `.qm-input` is the text element, `.qm-control-box` the prose one and an object row's
-	 summary. `:global`, because the box belongs to the child component's markup and the
-	 scope class stops at this component's. The longhand beats the family's `padding` shorthand
-	 without a specificity fight: this block is unlayered and `controls.css` is not. */
-	.qm-array-row :global(.qm-input),
-	.qm-array-row :global(.qm-control-box) {
+	/* The end inset the slabs stand in, taken off whichever box the element drew:
+	 `.qm-input` is the text element, `.qm-control-box` the prose one — the row's own
+	 child, so a table's cells, which are boxes too, keep their inset — and an object
+	 row's summary, which stands three slabs off its end. `:global`, because the box
+	 belongs to the child component's markup and the scope class stops at this
+	 component's. The longhand beats the family's `padding` shorthand without a
+	 specificity fight: this block is unlayered and `controls.css` is not. */
+	.qm-array-row > :global(.qm-input),
+	.qm-array-row > :global(.qm-control-box) {
 		padding-inline-end: var(--_qm-tap-min);
+	}
+	.qm-element-summary {
+		padding-inline-end: calc(3 * var(--_qm-tap-min));
 	}
 	/* The box's end wall, floor to ceiling: a height of its own would leave a sliver of
 	 well above or below, and the corners it takes are the box's — the end-side pair keeps
-	 `.qm-icon-btn`'s radius, which is the same rung the box draws.
+	 `.qm-icon-btn`'s radius, which is the same rung the box draws; a slab standing before
+	 another gives up its corners on both sides.
 
 	 It comes up on its own row rather than on the field: a destructive control is offered
-	 by the row the pointer is on, not by every row at once. Hover is where it says
-	 destructive, ink with fill, a tint alone being a wash under a label-toned glyph. */
-	.qm-remove {
+	 by the row the pointer is on, not by every row at once, and the reorder pair beside
+	 it comes up with it. Hover is where the remove says destructive, ink with fill, a
+	 tint alone being a wash under a label-toned glyph. */
+	.qm-row-actions {
 		position: absolute;
 		inset-block: 0;
 		inset-inline-end: 0;
-		width: var(--_qm-tap-min);
+		display: flex;
 		color: var(--_qm-ink-label);
 		opacity: var(--_qm-opacity-idle);
-		border-start-start-radius: 0;
-		border-end-start-radius: 0;
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-row-btn {
+		height: 100%;
+		width: var(--_qm-tap-min);
+		padding: 0;
+		border-radius: 0;
 		transition:
-			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	.qm-remove :global(svg) {
+	.qm-row-btn:last-child {
+		border-start-end-radius: var(--_qm-radius-inner);
+		border-end-end-radius: var(--_qm-radius-inner);
+	}
+	.qm-row-btn :global(svg) {
 		width: var(--_qm-glyph-control);
 		height: var(--_qm-glyph-control);
 	}
-	.qm-array-row:hover .qm-remove,
-	.qm-array-row:focus-within .qm-remove {
+	.qm-array-row:hover .qm-row-actions,
+	.qm-array-row:focus-within .qm-row-actions {
 		opacity: 1;
 	}
-	.qm-remove:hover {
+	.qm-remove:hover:not(:disabled) {
 		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
 	}
 	/* ── An object element ──────────────────────────────────────────────────────
-	 The row is a summary and the subform hangs under it. `row-gap` rather than a
-	 margin on the subform, because the distance between a control and what it has
-	 unfolded belongs to the thing stacking them: the variant field spends its own `gap` on
-	 exactly this, and what `ObjectField` adds is the cap on its own stroke, equal at both
-	 of its ends. */
+	 The row is a summary and the subform hangs under it. `row-gap` rather than a margin
+	 on the subform, because the distance between a control and what it has unfolded
+	 belongs to the thing stacking them; what `ObjectField` adds is the cap on its own
+	 stroke, equal at both of its ends.
+
+	 The distance inside an open row is the list's own, and the row then takes a rung of
+	 air from the rows either side of it, so what it unfolded is nearer the summary it
+	 hangs off than the sibling below. The wider distance on the inside is the inversion:
+	 a subform reading as the next row's preamble. A variant spends the wider rung on the
+	 same join and needs no such guard, a field carrying one control and no siblings for
+	 its cells to drift toward. */
 	.qm-element {
-		row-gap: var(--_qm-space-2);
+		row-gap: var(--_qm-space);
 	}
-	/* The slab measures the head, not the row: an open element is the head plus
-	 everything it unfolded, and a destructive control belongs to the line it sits on
-	 rather than to all of that. Positioned, so `.qm-remove` anchors here. */
+	.qm-element.open {
+		margin-block: var(--_qm-space);
+	}
+	/* The inline distance is the stacker's too, and here it is a rung: the summary stands
+	 for the row rather than being a cell of it, so its subform's vertical takes the
+	 disclosure's own column — `--_qm-nest` in, the distance every stroke on the ladder
+	 keeps from the one outside it (ARCHITECTURE §"A plane is a tone"). Flush with the
+	 row's edge that stroke is collinear with the box above it and with the sibling row
+	 below, so a row's cells read as the list's own rung and the content of an open row
+	 stands outboard of the chevron that opened it. A variant's cells and a matrix's
+	 columns keep the flush edge: those sit beside the discriminant and the tick they are
+	 stored with, not under them. */
+	.qm-element > :global(.qm-object) {
+		margin-inline-start: var(--_qm-nest);
+	}
+	/* The slabs measure the head, not the row: an open element is the head plus
+	 everything it unfolded, and the controls belong to the line they sit on rather than
+	 to all of that. Positioned, so `.qm-row-actions` anchors here. */
 	.qm-element-head {
 		position: relative;
 		display: grid;
@@ -558,8 +837,7 @@
 	 in collapsed form the way the enum trigger is one, and the slab's grammar — the
 	 box's two end-side corners — needs a box with corners to take. It carries
 	 `.qm-control-box`, so the fill, the radius, the inset and the type are the recipe's
-	 (controls.css) and a list of records measures like the list of inputs beside it.
-	 The end inset the slab stands in arrives from the row's own rule above. */
+	 (controls.css) and a list of records measures like the list of inputs beside it. */
 	.qm-element-summary {
 		display: flex;
 		align-items: center;
@@ -570,7 +848,10 @@
 		cursor: pointer;
 	}
 	/* No hover fill: a well does not fill under the pointer anywhere on this surface.
-	 The chevron's ink is the cue, which is the accordion header's own ladder. */
+	 The chevron's ink is the cue, which is the accordion header's own ladder. An open
+	 row's rule reaches its own head and stops: a row's subform holds rows of this same
+	 shape under this same scope, so a descendant's would turn every collapsed chevron
+	 inside an open row to the open face. */
 	.qm-element-summary :global(.qm-el-chevron) {
 		flex-shrink: 0;
 		display: block;
@@ -582,10 +863,10 @@
 			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-element-summary:hover :global(.qm-el-chevron),
-	.qm-element.open :global(.qm-el-chevron) {
+	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
 		color: var(--_qm-ink);
 	}
-	.qm-element.open :global(.qm-el-chevron) {
+	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
 		transform: rotate(90deg);
 	}
 	/* The title is the element's own value, so it reads at the ink a written value
@@ -600,11 +881,76 @@
 		color: var(--_qm-ink-label);
 		font-style: italic;
 	}
+	/* ── A table ────────────────────────────────────────────────────────────────
+	 One grid over the header and every row: a column per property, then a track for the
+	 row's own controls. The header and each row subgrid onto it, so a cell's edge is its
+	 column's whatever the row above it holds. The row packs at the start rather than
+	 sharing the field's leftover width between the columns: a table carries its own
+	 rhythm, and stretching four short cells across a field sets them apart by the width
+	 the card happens to have.
+
+	 A track rests at what its cells cannot shrink below and grows no further than its
+	 widest, so a field too narrow for them all overflows this box and scrolls sideways.
+	 A fixed floor as the track's base would instead hand each column a share of the
+	 width and leave a control that does not shrink — a date's segments — painting over
+	 the column beside it; the floor rides the header cell, which every column has.
+
+	 The pad is the clip box's, the ring on a cell at this box's own edge reaching past
+	 its content; the margin takes the same distance back, so the tracks stand where the
+	 label row above them does.
+
+	 The names are the array's own: `.qm-table` is the codec's island (`prose.css`), an
+	 unscoped stylesheet in this package, and a box wearing that name takes the island's
+	 hairline whatever this block says. */
+	.qm-array-rows.qm-array-table {
+		display: grid;
+		grid-template-columns:
+			repeat(var(--table-cols), minmax(min-content, max-content))
+			auto;
+		justify-content: start;
+		column-gap: var(--_qm-space);
+		overflow-x: auto;
+		padding: var(--_qm-ring-reach);
+		margin: calc(-1 * var(--_qm-ring-reach));
+	}
+	.qm-array-table-head,
+	.qm-array-row.qm-array-table-row {
+		display: grid;
+		grid-column: 1 / -1;
+		grid-template-columns: subgrid;
+		column-gap: var(--_qm-space);
+	}
+	.qm-array-row.qm-array-table-row {
+		align-items: start;
+	}
+	/* The header's cells are labels standing over columns, at the rung a field label
+	 stands at over its control, and where the column's floor is stated: a column is a
+	 property and every one of them has a header, so the label carries the track's. */
+	.qm-array-table-col {
+		min-width: var(--_qm-track-min);
+	}
+	/* In a table the controls are a column, not a slab: in flow, at the row's end, and
+	 always drawn — a table's rows are many and the eye finds a control by its column —
+	 and standing on the row's line with the cells rather than at the top of it. */
+	.qm-array-table-row .qm-row-actions {
+		position: static;
+		opacity: 1;
+		align-self: center;
+	}
+	/* The slab's grammar goes with the slab: a button on the row's own plane takes the
+	 icon family's radius at all four corners, where one cut into a box takes that box's
+	 end-side pair and squares the rest. */
+	.qm-array-table-row .qm-row-btn {
+		height: auto;
+		min-height: var(--_qm-tap-min);
+		border-radius: var(--_qm-radius-inner);
+	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so
 	 the two read as one register. Inner radius: the chip family is the card's, and this
 	 box is a line of type. The chip's tap floor is given back (`.qm-tap-floor`),
 	 and the padding with it, so the drawn box is the line and the target is the floor.
-	 It rests dim and comes up under the pointer; empty, it is the way in. */
+	 It rests dim and comes up under the pointer; empty, it is the way in; at the cap it
+	 rests at the family's disabled rung and the count beside it says why. */
 	.qm-add-el {
 		padding: 0 var(--_qm-space);
 		font-weight: var(--_qm-weight-mid);
@@ -612,7 +958,7 @@
 		border-radius: var(--_qm-radius-inner);
 		opacity: var(--_qm-opacity-idle);
 	}
-	.qm-add-el:hover,
+	.qm-add-el:hover:not(:disabled),
 	.qm-add-el:focus-visible {
 		opacity: 1;
 	}
@@ -621,7 +967,7 @@
 	}
 	@media (hover: none) {
 		.qm-add-el,
-		.qm-remove {
+		.qm-row-actions {
 			opacity: var(--_qm-opacity-muted);
 		}
 	}

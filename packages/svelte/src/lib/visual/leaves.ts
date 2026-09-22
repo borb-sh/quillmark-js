@@ -16,7 +16,16 @@
 // its first segment, an array lands on its first element or its add affordance), so
 // the surface holds the answers it already gives a label click instead of re-deriving
 // them from markup.
+import type { PathStep } from '@quillmark/wasm';
 import type { FieldController } from '../core/codec/index.js';
+
+/**
+ * What a landing at depth hands back: the box the arrival wash blooms in, now or once
+ * the row it had to open has rendered. A row two closed boxes down does not exist
+ * until the row above it opens and flushes, so the innermost box is a promise wherever
+ * the walk had to open something on the way.
+ */
+export type LandingBox = HTMLElement | undefined | Promise<HTMLElement | undefined>;
 
 /**
  * A mounted field's landing handle: focus it, and the element the arrival wash blooms
@@ -29,22 +38,27 @@ import type { FieldController } from '../core/codec/index.js';
 export interface FieldControl {
 	focus(): void;
 	/**
-	 * Land in element `index` of a control that has elements, at USV `pos` where the
-	 * row's control can take one; resolving the index to the element's session id at
-	 * the call, with {@link focus}'s own answer for an index past the live list. Absent
-	 * on every control without elements.
+	 * Land at `steps` inside a control that has an inside — an array's element, an
+	 * object's property, a variant's cell, a matrix's member, and any of them under any
+	 * other — at USV `pos` where the leaf the walk ends in can take one. Each rung
+	 * resolves its own step at the call (an index to a session id, a key to a mounted
+	 * cell) and hands the rest to the control it opened, so nothing positional is
+	 * carried. A step the tree does not hold falls back to that rung's own
+	 * {@link focus}: the field is right and the row is gone. Absent on every control
+	 * with no inside.
 	 *
 	 * A landing, not a focus: an absent `pos` is the placement rung, exactly as on
-	 * `Landing`, and what a `pos` means is the row control's, the same way focusing is.
-	 * The place rides the call because the registry stays parent-keyed: a per-element
-	 * key is positional, in a registry whose doctrine is dodging positional churn.
+	 * `Landing`, and what a `pos` means is the leaf's, the same way focusing is. The
+	 * place rides the call because the registry stays parent-keyed: a per-element key is
+	 * positional, in a registry whose doctrine is dodging positional churn.
 	 *
-	 * Returns the element's own box, which is what the wash blooms in: the address
-	 * named one row, and a wash over the whole repeater says the field where the click
-	 * said the row. `undefined` is the fallback the index past the live list took, and
-	 * reads as {@link el}.
+	 * Returns the innermost row the address named, which is what the wash blooms in: a
+	 * box wider than the one the click resolved says the field where the pick said the
+	 * row. `undefined` is a landing that named no row — a property under a field-level
+	 * subform, or the fallback an index past the live list took — and reads as
+	 * {@link el}.
 	 */
-	focusElement?(index: number, pos?: number): HTMLElement | undefined;
+	focusPath?(steps: readonly PathStep[], pos?: number): LandingBox;
 	readonly el: HTMLElement;
 }
 

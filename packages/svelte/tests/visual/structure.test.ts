@@ -21,7 +21,18 @@ import {
 	bodyEnabled,
 	variantMember,
 	variantCells,
-	commitDiscriminant
+	commitDiscriminant,
+	rowSummary,
+	shortCell,
+	arrayLayout,
+	schemaAt,
+	matrixBlocks,
+	matrixHeld,
+	matrixColumns,
+	memberValue,
+	memberWrite,
+	commitMember,
+	MATRIX_HELD
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
 
@@ -41,6 +52,8 @@ describe('controlKind', () => {
 		expect(controlKind(f({ type: 'datetime' }))).toBe('date');
 		expect(controlKind(f({ type: 'array' }))).toBe('array');
 		expect(controlKind(f({ type: 'object' }))).toBe('object');
+		// Its own control, never the trailing arm's text input over a namespace.
+		expect(controlKind(f({ type: 'matrix', members: [] }))).toBe('matrix');
 	});
 
 	it('splits the enum on `variants:`, the key that changes its resting shape', () => {
@@ -122,6 +135,13 @@ describe('interpolateTitle + cardTitle', () => {
 		expect(titleText(['a', 'b'])).toBe('');
 		expect(titleText(12)).toBe('12');
 		expect(titleText(undefined)).toBe('');
+	});
+	it('reads a variant container by its discriminant member', () => {
+		// A `{field}` title over a variant-bearing enum names the world, which is the one
+		// cell of the container that does.
+		expect(titleText({ value: 'float', side: 'end' })).toBe('float');
+		expect(interpolateTitle('{placement}', { placement: { value: 'float' } })).toBe('float');
+		expect(titleText({ side: 'end' })).toBe('');
 	});
 	it('names the fields a title reads', () => {
 		expect(titleFields('{rank} {name}')).toEqual(['rank', 'name']);
@@ -422,7 +442,7 @@ describe('against the real showcase schema', () => {
 		expect(variantCells(byName.handling.schema, variantMember(undefined, ''))).toBeUndefined();
 		expect(
 			Object.keys(variantCells(byName.distribution.schema, variantMember(undefined, 'embargoed'))!)
-		).toEqual(['lift_on', 'held_by']);
+		).toEqual(['lift_on', 'held_by', 'notices']);
 		// A member is a value, not an id: one carries a space, and the cells hang off the
 		// spelling the schema declares rather than a humanized one.
 		expect(byName.handling.schema.values).toContain('CLOSE HOLD');
@@ -459,5 +479,221 @@ describe('against the real showcase schema', () => {
 		expect(sections.flatMap((s) => s.fields.map((m) => m.name)).sort()).toEqual(
 			models.map((m) => m.name).sort()
 		);
+	});
+});
+
+describe('rowSummary', () => {
+	const row = (properties: Record<string, QuillFieldSchema>, ui?: { title?: string }) =>
+		({ type: 'object', properties, ui }) as QuillFieldSchema;
+	const content = (text: string) => ({ text, lines: [], marks: [], islands: [] });
+
+	it('interpolates items.ui.title with the row, and falls through where it comes out blank', () => {
+		const items = row(
+			{ title: f({ type: 'string' }), note: f({ type: 'string' }) },
+			{ title: '{title}' }
+		);
+		expect(rowSummary(items, { title: 'Sources', note: 'n' })).toBe('Sources');
+		// The template names an empty cell: the cell rule takes over rather than the row
+		// reading as untitled beside a note it has.
+		expect(rowSummary(items, { note: 'n' })).toBe('n');
+		expect(rowSummary(items, {})).toBeUndefined();
+	});
+
+	it('falls back to the first short text cell: a string, or inline prose', () => {
+		const items = row({
+			page: f({ type: 'integer' }),
+			label: f({ type: 'plaintext', inline: true }),
+			note: f({ type: 'richtext', inline: true })
+		});
+		// No `string` cell: the inline `plaintext` is the first title-bearing one, read
+		// through `titleText` whichever rest form it has.
+		expect(rowSummary(items, { page: 3, label: 'Primary' })).toBe('Primary');
+		expect(rowSummary(items, { page: 3, label: content('Primary') })).toBe('Primary');
+		expect(rowSummary(items, { page: 3, note: content('only a note') })).toBe('only a note');
+		expect(rowSummary(items, { page: 3 })).toBeUndefined();
+	});
+
+	it('skips a block prose cell and every non-text cell', () => {
+		const items = row({
+			body: f({ type: 'richtext' }),
+			n: f({ type: 'number' }),
+			on: f({ type: 'boolean' })
+		});
+		expect(rowSummary(items, { body: content('para'), n: 1, on: true })).toBeUndefined();
+		expect(rowSummary(undefined, { x: 'y' })).toBeUndefined();
+	});
+});
+
+describe('arrayLayout', () => {
+	const short = {
+		name: f({ type: 'string' }),
+		role: f({ type: 'enum', values: ['a'] }),
+		since: f({ type: 'date' }),
+		lead: f({ type: 'boolean' }),
+		n: f({ type: 'integer' }),
+		tag: f({ type: 'plaintext' }),
+		line: f({ type: 'richtext', inline: true })
+	};
+	const arr = (properties: Record<string, QuillFieldSchema>, layout?: 'table') =>
+		({
+			type: 'array',
+			items: { type: 'object', properties },
+			ui: layout ? { layout } : undefined
+		}) as QuillFieldSchema;
+
+	it('answers table only where the array asks and every cell is short', () => {
+		expect(arrayLayout(arr(short, 'table'))).toBe('table');
+		expect(arrayLayout(arr(short))).toBe('list');
+		for (const [k, sub] of Object.entries(short)) expect(shortCell(sub), k).toBe(true);
+	});
+
+	it('declines for a block prose cell or a container, at every width', () => {
+		expect(arrayLayout(arr({ ...short, body: f({ type: 'richtext' }) }, 'table'))).toBe('list');
+		expect(
+			arrayLayout(
+				arr({ ...short, rows: f({ type: 'array', items: f({ type: 'string' }) }) }, 'table')
+			)
+		).toBe('list');
+		expect(
+			arrayLayout(arr({ ...short, sub: f({ type: 'object', properties: {} }) }, 'table'))
+		).toBe('list');
+		expect(arrayLayout(arr({}, 'table'))).toBe('list');
+		expect(
+			arrayLayout({
+				type: 'array',
+				items: f({ type: 'string' }),
+				ui: { layout: 'table' }
+			} as QuillFieldSchema)
+		).toBe('list');
+	});
+
+	it('reads the key off the array, never off items.ui', () => {
+		const wrong = {
+			type: 'array',
+			items: { type: 'object', properties: short, ui: { layout: 'table' } }
+		} as QuillFieldSchema;
+		expect(arrayLayout(wrong)).toBe('list');
+	});
+});
+
+describe('schemaAt', () => {
+	const matrix = f({
+		type: 'matrix',
+		members: [{ group: 'G', values: { a: 'A', b: 'B' } }],
+		properties: { note: f({ type: 'plaintext', inline: true }) }
+	});
+	const vectors = f({
+		type: 'array',
+		items: {
+			type: 'object',
+			properties: {
+				tours: f({
+					type: 'array',
+					items: { type: 'object', properties: { title: f({ type: 'plaintext' }) } }
+				})
+			}
+		}
+	});
+	const variant = f({
+		type: 'enum',
+		values: ['x', 'y'],
+		variants: { y: { note: f({ type: 'string' }) } }
+	});
+
+	it('walks an index under an array, a key under an object, rung by rung', () => {
+		expect(schemaAt(vectors, [0, 'tours', 2, 'title'])?.type).toBe('plaintext');
+		expect(schemaAt(vectors, [0, 'tours'])?.type).toBe('array');
+		expect(schemaAt(vectors, [])).toBe(vectors);
+		expect(schemaAt(vectors, ['tours'])).toBeUndefined();
+		expect(schemaAt(vectors, [0, 'nothing'])).toBeUndefined();
+		expect(schemaAt(vectors, [0, 'tours', 'x'])).toBeUndefined();
+		expect(schemaAt(f({ type: 'string' }), [0])).toBeUndefined();
+	});
+
+	it('takes an index into an array declaring no items, the text element it draws', () => {
+		// `controlKind` calls a missing `items` a text element, so an index into one is a
+		// place the tree mounts and the landing guard must not refuse.
+		const bare = f({ type: 'array' });
+		expect(schemaAt(bare, [0])?.type).toBe('string');
+		expect(schemaAt(bare, ['x'])).toBeUndefined();
+		expect(schemaAt(bare, [0, 'deeper'])).toBeUndefined();
+	});
+
+	it('walks a matrix member into its held cell and its columns', () => {
+		expect(schemaAt(matrix, ['a'])?.type).toBe('object');
+		expect(schemaAt(matrix, ['a', MATRIX_HELD])?.type).toBe('boolean');
+		expect(schemaAt(matrix, ['b', 'note'])?.type).toBe('plaintext');
+		expect(schemaAt(matrix, ['c'])).toBeUndefined();
+		expect(schemaAt(matrix, ['a', 'nope'])).toBeUndefined();
+		// A prototype key is not on the roster.
+		expect(schemaAt(matrix, ['toString'])).toBeUndefined();
+	});
+
+	it('walks a variant into the discriminant and the union of its worlds', () => {
+		expect(schemaAt(variant, ['value'])?.type).toBe('enum');
+		expect(schemaAt(variant, ['note'])?.type).toBe('string');
+		expect(schemaAt(variant, ['other'])).toBeUndefined();
+	});
+});
+
+describe('the matrix helpers', () => {
+	it('flattens the roster by own keys, in declaration order', () => {
+		const blocks = matrixBlocks([
+			{ group: 'G', values: { a: 'A', b: 'B' } },
+			{ values: { c: 'C' } }
+		]);
+		expect(blocks).toEqual([
+			{
+				group: 'G',
+				members: [
+					{ id: 'a', title: 'A', group: 'G' },
+					{ id: 'b', title: 'B', group: 'G' }
+				]
+			},
+			{ group: undefined, members: [{ id: 'c', title: 'C', group: undefined }] }
+		]);
+		expect(matrixBlocks(undefined)).toEqual([]);
+	});
+
+	it('reads held off both rest forms, key presence implying held', () => {
+		expect(matrixHeld(undefined)).toBe(false);
+		expect(matrixHeld(true)).toBe(true);
+		expect(matrixHeld({ note: 'x' })).toBe(true);
+		expect(matrixHeld({ held: false, note: 'x' })).toBe(false);
+		expect(matrixHeld({ held: true })).toBe(true);
+		// The spellings the engine coerces to false.
+		for (const v of [false, 0, 'false', null, { held: 0 }, { held: 'false' }, { held: null }])
+			expect(matrixHeld(v), JSON.stringify(v)).toBe(false);
+		// Everything else present reads held, `{}` and `1` and `"true"` among them.
+		for (const v of [1, 'true', {}, { held: 1 }, { held: {} }])
+			expect(matrixHeld(v), JSON.stringify(v)).toBe(true);
+	});
+
+	it('reads a member off the map by own key', () => {
+		expect(memberValue({ a: true }, 'a')).toBe(true);
+		expect(memberValue({ a: true }, 'b')).toBeUndefined();
+		expect(memberValue({}, 'constructor')).toBeUndefined();
+		expect(memberValue(undefined, 'a')).toBeUndefined();
+	});
+
+	it('takes the columns off a member, held aside', () => {
+		expect(matrixColumns({ held: true, note: 'x' })).toEqual({ note: 'x' });
+		expect(matrixColumns(true)).toEqual({});
+		expect(matrixColumns(undefined)).toEqual({});
+		expect(matrixColumns(['x'])).toEqual({});
+	});
+
+	it('writes a member with an explicit held, and drops an unheld one with no columns', () => {
+		expect(memberWrite(true, {})).toEqual({ held: true });
+		expect(memberWrite(true, { note: 'x' })).toEqual({ held: true, note: 'x' });
+		expect(memberWrite(false, { note: 'x' })).toEqual({ held: false, note: 'x' });
+		expect(memberWrite(false, {})).toBeUndefined();
+	});
+
+	it('commits one member into the map and leaves the rest as spelled', () => {
+		expect(commitMember({ a: true }, 'b', { held: true })).toEqual({ a: true, b: { held: true } });
+		expect(commitMember({ a: true, b: { held: true } }, 'b', undefined)).toEqual({ a: true });
+		expect(commitMember({ a: true }, 'a', undefined)).toBeUndefined();
+		expect(commitMember(undefined, 'a', { held: true })).toEqual({ a: { held: true } });
 	});
 });

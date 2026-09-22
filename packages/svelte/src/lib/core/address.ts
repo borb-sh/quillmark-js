@@ -13,7 +13,7 @@
 // The grammar is the boundary's, reached through the init gate (`core()`):
 // `parseDocPath` / `formatDocPath` are on the awaited surface, and the verbs here are
 // pure and sync on both sides of it.
-import type { Addr, DocPathSeg, HitGranularity } from '@quillmark/wasm';
+import type { Addr, DocPathSeg, HitGranularity, PathStep } from '@quillmark/wasm';
 import { core } from './lifecycle.js';
 
 /**
@@ -101,7 +101,7 @@ export function cardPath(index: number, kinds: readonly string[]): DocPath | und
 /**
  * The inverse: a canonical `DocPath` back to the `Addr` the document verbs take, or
  * `undefined` for a path that names no single commit address — a nested or
- * array-element path (`main.keywords[0]`, which {@link elementAddrForFieldPath} and
+ * array-element path (`main.keywords[0]`, which {@link nestedAddrForFieldPath} and
  * {@link nearestAddrForFieldPath} take instead), a field-rooted one, or a malformed
  * one. A bare card and a `.body` terminal both land on the field-less `{card: i}`
  * the body leaf answers to.
@@ -132,25 +132,36 @@ export function nearestAddrForFieldPath(path: DocPath): Addr | undefined {
 }
 
 /**
- * An array element's address, split: `main.keywords[0]` lands here, and anything
- * {@link addrForFieldPath} can name — or whose trailing segment is not an index —
- * does not. `regions()`, `positionAt` and `formatDocPath` all spell the index
- * segment bracketed, so there is one spelling to read and none to bridge.
+ * A nested address, split: the field's `Addr`, and the steps from it to the leaf.
+ * `main.keywords[0]` is `{field: keywords, steps: [0]}`,
+ * `main.vectors[0].tours[2].title` is `[0, 'tours', 2, 'title']`, and
+ * `main.contact.email` is `['email']`: an index segment reads as a number and a key as
+ * a string, the `PathStep` grammar `reader.getContentAt` walks. Anything
+ * {@link addrForFieldPath} can name — a field, a body, a card — has no steps and lands
+ * here as `undefined`; so does a body with something after it, a body holding no
+ * cells. Whether the schema declares each step is the caller's to check: this module
+ * holds the grammar and no schema. `regions()`, `positionAt` and `formatDocPath` all
+ * spell the index segment bracketed, so there is one spelling to read and none to
+ * bridge.
  */
-export function elementAddrForFieldPath(path: DocPath): ElementAddr | undefined {
+export function nestedAddrForFieldPath(path: DocPath): NestedAddr | undefined {
 	const segs = segsOf(path);
-	if (!segs) return undefined;
-	const last = segs[segs.length - 1];
-	if (last?.seg !== 'index') return undefined;
-	const field = addrForSegs(segs.slice(0, -1));
-	// A body has no elements: the parent must name a field.
-	return field?.field != null ? { field, index: last.index } : undefined;
+	if (!segs || segs.length < 3) return undefined;
+	const field = addrForSegs(segs.slice(0, 2));
+	if (field?.field == null) return undefined;
+	const steps: PathStep[] = [];
+	for (const seg of segs.slice(2)) {
+		if (seg.seg === 'index') steps.push(seg.index);
+		else if (seg.seg === 'field') steps.push(seg.name);
+		else return undefined;
+	}
+	return { field, steps };
 }
 
-/** An array element's address: the array's `Addr`, and which element of it. */
-export interface ElementAddr {
+/** A nested address: the field's `Addr`, and the steps from it to the leaf. */
+export interface NestedAddr {
 	field: Addr;
-	index: number;
+	steps: PathStep[];
 }
 
 /** `parseDocPath`, with a malformed path as `undefined` rather than a throw. The gate

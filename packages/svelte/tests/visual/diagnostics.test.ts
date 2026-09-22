@@ -5,6 +5,9 @@ import { describe, it, expect } from 'vitest';
 import type { Diagnostic } from '@quillmark/wasm';
 import {
 	resolveCardKey,
+	deepen,
+	splitDeep,
+	unrouted,
 	routeAndResolve,
 	mergeDiagnostics,
 	type FieldKey
@@ -118,5 +121,67 @@ describe('mergeDiagnostics', () => {
 		const m = mergeDiagnostics(a, b);
 		expect(m.get('main:x')?.length).toBe(1);
 		expect(m.get('main:y')?.length).toBe(1);
+	});
+	it('keeps one message failing two cells of one container, the key being the field', () => {
+		// Both rows key `main:appendices`; only the path tells them apart, and the walk
+		// past the field is the path's. Deduping without it draws on the first row alone.
+		const m = mergeDiagnostics([
+			{
+				key: { field: 'appendices' } as FieldKey,
+				diagnostic: err('expected integer', 'main.appendices[0].entries[0].page')
+			},
+			{
+				key: { field: 'appendices' } as FieldKey,
+				diagnostic: err('expected integer', 'main.appendices[1].entries[0].page')
+			}
+		]);
+		expect(m.get('main:appendices')?.map((d) => d.path)).toEqual([
+			'main.appendices[0].entries[0].page',
+			'main.appendices[1].entries[0].page'
+		]);
+	});
+	it('still dedupes one path reported by two producers', () => {
+		const one = { key: { field: 'appendices' } as FieldKey, diagnostic: err('e', 'main.a[0].b') };
+		expect(mergeDiagnostics([one], [{ ...one }]).get('main:appendices')).toHaveLength(1);
+	});
+});
+
+describe('the walk inside a field', () => {
+	it('deepens a routed diagnostic into the steps past its field', () => {
+		expect(deepen([err('e', 'main.appendices[0].entries[1].page')])).toEqual([
+			{
+				steps: [0, 'entries', 1, 'page'],
+				diagnostic: err('e', 'main.appendices[0].entries[1].page')
+			}
+		]);
+		// A field's own path, and a local commit error carrying one, have no steps.
+		expect(deepen([err('e', 'main.subject')])[0].steps).toEqual([]);
+		expect(deepen([err('e')])[0].steps).toEqual([]);
+		expect(deepen(undefined)).toEqual([]);
+	});
+
+	it('splits one rung: what anchors here, and what steps on, bucketed by its next step', () => {
+		const split = splitDeep([
+			{ steps: [], diagnostic: err('here') },
+			{ steps: [0, 'page'], diagnostic: err('row0') },
+			{ steps: [0, 'note'], diagnostic: err('row0b') },
+			{ steps: [2], diagnostic: err('row2') }
+		]);
+		expect(split.here).toEqual([err('here')]);
+		expect([...split.below.keys()]).toEqual([0, 2]);
+		expect(split.below.get(0)).toEqual([
+			{ steps: ['page'], diagnostic: err('row0') },
+			{ steps: ['note'], diagnostic: err('row0b') }
+		]);
+		expect(split.below.get(2)).toEqual([{ steps: [], diagnostic: err('row2') }]);
+	});
+
+	it('hands back what a rung cannot route on, so nothing is lost on the way down', () => {
+		const split = splitDeep([
+			{ steps: [], diagnostic: err('here') },
+			{ steps: [0, 'x'], diagnostic: err('held') },
+			{ steps: [9, 'x'], diagnostic: err('gone') }
+		]);
+		expect(unrouted(split, (step) => step === 0)).toEqual([err('here'), err('gone')]);
 	});
 });

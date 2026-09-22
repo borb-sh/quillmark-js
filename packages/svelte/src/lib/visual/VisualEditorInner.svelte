@@ -24,7 +24,7 @@
 	import {
 		addrForFieldPath,
 		cardPath,
-		elementAddrForFieldPath,
+		nestedAddrForFieldPath,
 		fieldPathForAddr,
 		type DocPath,
 		type Landing
@@ -36,7 +36,9 @@
 		Addr,
 		CardAddr,
 		Diagnostic,
+		PathStep,
 		PayloadItem,
+		QuillFieldSchema,
 		Resolved,
 		ResolvedField
 	} from '@quillmark/wasm';
@@ -47,6 +49,8 @@
 	import {
 		IdSeq,
 		controlKind,
+		isContainer,
+		schemaAt,
 		fieldModels,
 		groupOrder,
 		groupSections,
@@ -75,7 +79,7 @@
 	} from './diagnostics.js';
 	import { fieldDomIds, groupPanelId } from './domid.js';
 	import { createLeafRegistry, type FieldControl } from './leaves.js';
-	import { reorder, reorderTrips } from './motion.js';
+	import { reorder, reorderArm, reorderTrips } from './motion.js';
 	import { tipsChannel } from './tips.js';
 	import { patchEditorExt } from './ext.js';
 	import Card from './Card.svelte';
@@ -424,26 +428,17 @@
 			return undefined;
 		}
 	}
-	// The reorder gesture's arming window: the reconcile that moves a
-	// slot is the trip, and every other reconcile that happens to move one is not. Read
-	// through a getter rather than passed as a value, so the flag stays out of the
-	// template and needs no reactivity for it: `animate:` asks at apply time, which is a
-	// microtask after the mutation and well inside the frame that disarms it.
-	let reordering = false;
-	let reorderFrame = 0;
-	function armReorder(): void {
-		reordering = true;
-		reorderFrame = requestAnimationFrame(() => (reordering = false));
-	}
-	span.onEnd(() => cancelAnimationFrame(reorderFrame));
-	const isReordering = (): boolean => reordering;
+	// The reorder gesture's arming window (`motion.ts`): the reconcile that moves a slot
+	// is the trip, and every other reconcile that happens to move one is not.
+	const arm = reorderArm();
+	span.onEnd(arm.cancel);
 
 	function moveCardById(id: string, dir: -1 | 1): void {
 		const from = cardIndexOf(id);
 		if (from < 0) return;
 		const to = from + dir;
 		if (to < 0 || to >= doc.cardCount) return;
-		armReorder();
+		arm.arm();
 		doc.moveCard(from, to);
 		const w = cardIds.slice();
 		const [x] = w.splice(from, 1);
@@ -691,7 +686,8 @@
 		// click is one discrete act, and its commonest target is the leaf already focused
 		// (where landing a caret changes nothing on screen) or one off-screen, where the
 		// browser's focus-scroll moves the page and leaves the caret to be hunted for.
-		bloomInside(land(found, at.granularity === 'segment' ? undefined : at.pos));
+		const box = await land(found, at.granularity === 'segment' ? undefined : at.pos);
+		if (span.alive) bloomInside(box);
 	}
 	/** The active leaf's controller: the formatting popover's observation seam.
 	 *  `undefined` for a focused form control, which holds no marks to toggle. */
@@ -730,20 +726,22 @@
 
 	/**
 	 * Put the caret in a revealed target, at the finest grain it can take: a USV offset
-	 * in a prose leaf or an array element, a bare focus everywhere else. A form control
-	 * has no coordinate to spend an offset in (an `<input type="number">` refuses a
-	 * selection outright), which is also the whole of what a click on plate-placed ink
-	 * can mean. An element is no `createField` leaf, so the offset goes down the element
-	 * lane instead, where what it means is the row control's (`leaves.ts`).
+	 * in a prose leaf or a nested content cell, a bare focus everywhere else. A form
+	 * control has no coordinate to spend an offset in (an `<input type="number">`
+	 * refuses a selection outright), which is also the whole of what a click on
+	 * plate-placed ink can mean. A cell is no `createField` leaf, so the offset goes
+	 * down the container's walk instead, where what it means is the leaf's (`leaves.ts`).
 	 *
 	 * Hands back the box the arrival wash blooms in, which is the landing's own
-	 * granularity rather than the registry's: an element lands in one row and says so
-	 * over that row, and everything else — the field, and a row the document has since
-	 * dropped — over the field's box.
+	 * granularity rather than the registry's: a walk lands in one row and says so over
+	 * the innermost row it opened, and everything else — the field, a property under a
+	 * field-level subform, and a row the document has since dropped — over the field's
+	 * box. Async because a row two closed boxes down exists only once the row above it
+	 * has opened and flushed.
 	 */
-	function land(found: Landed, pos: number | undefined): HTMLElement {
-		if (found.element != null && found.control.focusElement) {
-			return found.control.focusElement(found.element, pos) ?? found.control.el;
+	async function land(found: Landed, pos: number | undefined): Promise<HTMLElement> {
+		if (found.steps && found.control.focusPath) {
+			return (await found.control.focusPath(found.steps, pos)) ?? found.control.el;
 		}
 		if (pos != null) {
 			const prose = leaves.prose(found.key);
@@ -772,7 +770,8 @@
 	export async function focusField(field: DocPath): Promise<void> {
 		const found = await revealLeaf(field);
 		if (!found) return missed(`no mounted field at ${field}`, field);
-		bloomInside(land(found, undefined));
+		const box = await land(found, undefined);
+		if (span.alive) bloomInside(box);
 	}
 	/** Seed a card of `kind` and insert it at `at` (default: the end). Returns the new
 	 *  card's session key, or `undefined` when the quill seeds no card of that kind. */
@@ -802,11 +801,11 @@
 		reportError(onError, { code: 'target-unknown', severity: 'dev', message, path });
 	}
 
-	/** What a `DocPath` resolves to in the mounted tree: a leaf key, and the array
-	 *  element within it when the address names one. */
+	/** What a `DocPath` resolves to in the mounted tree: a leaf key, and the steps from
+	 *  that field to the leaf when the address names one inside it. */
 	interface LeafTarget {
 		key: string;
-		element?: number;
+		steps?: PathStep[];
 	}
 	/** A resolved target with the handle the registry holds for it. */
 	type Landed = LeafTarget & { control: FieldControl };
@@ -816,11 +815,13 @@
 	 * diagnostics take.
 	 *
 	 * Two rungs, because the boundary mints addresses at a finer granularity than
-	 * `Addr` can name: a `richtext[]` element surfaces as `main.keywords[0]`. The
-	 * second rung reads that trailing index segment under a field the schema declares
-	 * an array — which is why the ladder is the editor's (VISUAL_EDITOR.md §Surface):
-	 * the preview carries no schema, and truncating the address there is worse than
-	 * guessing, since `pos` is an offset into the element's own content.
+	 * `Addr` can name: a `richtext[]` element surfaces as `main.keywords[0]`, a nested
+	 * row's cell as `main.vectors[0].tours[2].title`. The second rung reads the steps
+	 * past the field against the schema, rung by rung — an index under a declared
+	 * array, a key under a declared object, variant or matrix — which is why the ladder
+	 * is the editor's (VISUAL_EDITOR.md §Surface): the preview carries no schema, and
+	 * truncating the address there is worse than guessing, since `pos` is an offset
+	 * into the leaf's own content.
 	 */
 	function leafTargetFor(field: DocPath): LeafTarget | undefined {
 		const direct = addrForFieldPath(field);
@@ -828,22 +829,25 @@
 			const resolved = resolveCardKey(direct, cardIds);
 			return resolved ? { key: fieldKeyToString(resolved) } : undefined;
 		}
-		const element = elementAddrForFieldPath(field);
-		if (!element || !isArrayField(element.field)) return undefined;
-		const resolved = resolveCardKey(element.field, cardIds);
-		return resolved ? { key: fieldKeyToString(resolved), element: element.index } : undefined;
+		const nested = nestedAddrForFieldPath(field);
+		if (!nested) return undefined;
+		const declared = declaredField(nested.field);
+		if (!declared || !isContainer(controlKind(declared))) return undefined;
+		if (!schemaAt(declared, nested.steps)) return undefined;
+		const resolved = resolveCardKey(nested.field, cardIds);
+		return resolved ? { key: fieldKeyToString(resolved), steps: nested.steps } : undefined;
 	}
 
-	/** The guard the element rung stands on. Asked of `controlKind`, so what the ladder
-	 *  tests is the control the tree mounted — the one holding a `focusElement` — and
-	 *  not a second reading of the schema beside it. */
-	function isArrayField(addr: Addr): boolean {
-		if (addr.field == null) return false;
+	/** The schema the field at `addr` declares, off the live card's kind: the guard the
+	 *  nested rung stands on. Asked of `controlKind` and `schemaAt`, so what the ladder
+	 *  tests is the control the tree mounted — the one holding a `focusPath` — and not a
+	 *  second reading of the schema beside it. */
+	function declaredField(addr: Addr): QuillFieldSchema | undefined {
+		if (addr.field == null) return undefined;
 		const kind = addr.card == null ? undefined : model.cards[addr.card]?.kind;
 		const schema = quill.schema;
 		const card = addr.card == null ? schema.main : kind ? schema.card_kinds?.[kind] : undefined;
-		const declared = card?.fields?.[addr.field];
-		return !!declared && controlKind(declared) === 'array';
+		return card?.fields?.[addr.field];
 	}
 </script>
 
@@ -883,7 +887,7 @@
 	 rather than being slid across. It is also the shape `animate:` asks for, being the
 	 keyed block's only child. -->
 	{#each model.cards as c, i (c.id)}
-		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={isReordering}>
+		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed}>
 			<Card
 				bind:this={cardRefs[i]}
 				card={titled(c)}

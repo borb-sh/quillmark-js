@@ -130,9 +130,11 @@ describe('a variant enum field', () => {
 		expect(cellLabels(target)).toEqual([]);
 
 		// `lift_on` declares no `default:` and is obliged; `held_by` declares `""` and is
-		// not. The pair is what the axis buys: required *in this world*.
+		// not. The pair is what the axis buys: required *in this world*. `notices` is the
+		// world's third cell, a record list drawn at the next rung and labelled by its
+		// own header row.
 		pickWorld(target, 'embargoed');
-		expect(cellLabels(target)).toEqual(['Lift on *', 'Held by']);
+		expect(cellLabels(target)).toEqual(['Lift on *', 'Held by', 'Notices']);
 
 		// One world's cells are not the other's: the flip retires both and brings the
 		// licence in, rather than accumulating a union of every world's fields.
