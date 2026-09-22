@@ -1,7 +1,8 @@
 <!--
  A `matrix` field → ticks over the roster, columns unfolding under a held member
  (VISUAL_EDITOR §"Structure mirrors the schema", canon `SCHEMAS.md` §Matrix). The
- roster is one flat list; each member is a real checkbox bound to its `held` cell with
+ roster is one flat list, one member to a row, or abreast on the section's track ladder
+ under `ui.compact`; each member is a real checkbox bound to its `held` cell with
  its title as the `<label for>`, an unheld member reading at the label ink and a held
  one at the value ink. A held member unfolds its columns beneath its title, drawn by
  {@link ObjectField} over the matrix's `properties` at the member's key, the way a
@@ -89,6 +90,7 @@
 	}: Props = $props();
 
 	const members = $derived(matrixMembers(schema.members));
+	const compact = $derived(!!schema.ui?.compact);
 	const hasColumns = $derived(Object.keys(schema.properties ?? {}).length > 0);
 	const held = (id: string): boolean => matrixHeld(memberValue(value, id));
 	const heldCount = $derived(members.filter((m) => held(m.id)).length);
@@ -190,7 +192,7 @@
 		{/if}
 		<span class="qm-matrix-count">{t.strings.matrixHeld(heldCount, members.length)}</span>
 	</div>
-	<div class="qm-matrix-roster" bind:this={rosterEl}>
+	<div class="qm-matrix-roster" class:qm-tracks={compact} class:compact bind:this={rosterEl}>
 		{#each members as m (m.id)}
 			{@const on = held(m.id)}
 			{@const deep = routed.below.get(m.id)}
@@ -268,6 +270,15 @@
 		min-width: 0;
 		border-radius: var(--_qm-radius-inner);
 	}
+	/* Compact, the members stand abreast in reading order at the count the ladder gives
+	 the width (`.qm-tracks`, controls.css), a held member's columns unfolding inside its
+	 own track. */
+	.qm-matrix-roster.compact {
+		display: grid;
+		grid-template-columns: repeat(var(--cols), 1fr);
+		align-items: start;
+		column-gap: var(--_qm-space-2);
+	}
 	/* A member is a row: positioned for the wash a landing on it blooms, rounded to the
 	 rung the rows around it draw. */
 	.qm-member {
@@ -276,6 +287,15 @@
 		flex-direction: column;
 		gap: var(--_qm-space);
 		border-radius: var(--_qm-radius-inner);
+	}
+	/* Compact, the members stand abreast in reading order at the count the ladder gives
+	 the width (`.qm-tracks`, controls.css), a held member's columns unfolding inside its
+	 own track. */
+	.qm-matrix-roster.compact {
+		display: grid;
+		grid-template-columns: repeat(var(--cols), 1fr);
+		align-items: start;
+		column-gap: var(--_qm-space-2);
 	}
 	/* The tick and its title on one line, the line holding the tap floor a tick alone
 	 would not reach: the title is the target, the `for` carrying its press to the input. */

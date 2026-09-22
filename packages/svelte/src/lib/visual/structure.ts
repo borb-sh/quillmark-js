@@ -639,7 +639,8 @@ export interface PlacedField {
  * but nothing holds two arrays to the same number of them, so the shorter of a packed
  * pair pays a cell of whitespace for every element the taller one has past it, and
  * pays more of it as the document is filled. A matrix declines as a roster does: its
- * height is the roster's, and grows again under every member ticked open.
+ * height is the roster's, and grows again under every member ticked open. Its hint
+ * reaches the roster instead, whose members stand abreast (`MatrixField`).
  */
 function packable(f: FieldModel): boolean {
 	if (!f.compact) return false;

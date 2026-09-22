@@ -405,7 +405,8 @@ main:
           default: minor
       ui:
         group: meta
-      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Six members on one flat roster; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
+        compact: true
+      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
 
     colophon:
       type: richtext

@@ -67,6 +67,8 @@ describe('a matrix field', () => {
 			expect(m.querySelector(`label[for="${t.id}"]`)).not.toBeNull();
 		}
 		expect(count(m)).toBe('0 of 6 held');
+		// `ui.compact` sets the roster on the track ladder rather than packing the field.
+		expect(m.querySelector('.qm-matrix-roster')?.classList.contains('qm-tracks')).toBe(true);
 		// A matrix seeds empty, so nothing is stored and no member unfolds.
 		expect(m.querySelectorAll('.qm-object')).toHaveLength(0);
 		expect(m.querySelector('input[type="text"]')).toBeNull();
