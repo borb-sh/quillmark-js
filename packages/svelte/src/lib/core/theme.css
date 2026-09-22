@@ -336,9 +336,11 @@
 	   through the icon's `size`, so a stylesheet beats the SVG presentation attribute
 	   and one rung is the whole of what a control draws. */
 	--_qm-glyph-control: 14px;
-	/* The narrowest track a control stays usable in: a table's column and a matrix's
-	   group column floor at it, rise no further than their content, and a row of them
-	   scrolls sideways rather than crushing a cell. What the field has spare stands
+	/* The narrowest track a control that fills its width stays usable in: a table's
+	   column and a matrix's group column floor at it, rise no further than their
+	   content, and a row of them scrolls sideways rather than crushing a cell. A column
+	   drawing a mark takes no floor — a switch is one width at every width, so there is
+	   no width for it to be usable in (`ArrayField`). What the field has spare stands
 	   after the last column, an inner grid carrying its own rhythm rather than the
 	   card's. Under the field minimum the capacity ladder steps at (`.qm-tracks`), since
 	   a cell in a row has the header to name it and no label of its own to fit. A

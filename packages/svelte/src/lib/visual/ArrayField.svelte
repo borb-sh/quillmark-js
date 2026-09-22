@@ -541,7 +541,7 @@
 				     column's rather than any one cell's. -->
 				<div class="qm-array-table-head">
 					{#each columns as [key, sub] (key)}
-						<div class="qm-array-table-col">
+						<div class="qm-array-table-col" class:mark={controlKind(sub) === 'boolean'}>
 							<FieldLabel
 								label={columnTitle(key, sub)}
 								required={obliged(sub)}
@@ -955,9 +955,20 @@
 	}
 	/* The header's cells are labels standing over columns, at the rung a field label
 	 stands at over its control, and where the column's floor is stated: a column is a
-	 property and every one of them has a header, so the label carries the track's. */
+	 property and every one of them has a header, so the label carries the track's.
+
+	 A switch column carries none. The floor is the width a control that fills its track
+	 stays usable at, and a switch is a mark: one width at every width, so the rest of
+	 the floor is whitespace the column spends on nothing and the table scrolls that much
+	 sooner. Without it the column rests at its header's own width, its cells still
+	 clearing the mark, which no track can shrink below. It is the table's to state
+	 because the table is where a column is a width of its own; in a section's grid and
+	 in a subform's, a boolean stands in a track its neighbours share. */
 	.qm-array-table-col {
 		min-width: var(--_qm-track-min);
+	}
+	.qm-array-table-col.mark {
+		min-width: 0;
 	}
 	/* The remove is the row's last track, pinned to the end edge of the box the table
 	 scrolls in: sticky, so it rests in its track while the table fits and rides over
