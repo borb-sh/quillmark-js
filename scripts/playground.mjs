@@ -48,8 +48,9 @@ const port = Number(flag('--port', 5173));
 const route = flag('--route', '/playground');
 const viewport = { width: Number(flag('--width', 1440)), height: Number(flag('--height', 900)) };
 const probe = flag('--probe', undefined);
-if (args.includes('--probe') && probe === undefined)
+if (args.includes('--probe') && (probe === undefined || probe.startsWith('--')))
 	throw new Error('--probe takes the expression to evaluate, or `@<file>` to read it off disk');
+const expression = probe?.startsWith('@') ? readFileSync(probe.slice(1), 'utf8') : probe;
 const url = `http://localhost:${port}${route}`;
 
 const say = (what) => console.error(`playground: ${what}`);
@@ -95,6 +96,8 @@ async function answers() {
 }
 
 await stopPrevious();
+if (await answers())
+	throw new Error(`something else answers at ${url}; stop it, or pass --port <n>`);
 
 say('building @quillmark/quiver and @quillmark/svelte');
 await run('npm', ['run', 'build', '-w', 'packages/quiver', '-w', 'packages/svelte']);
@@ -121,24 +124,27 @@ const stop = () => {
 		// Already down.
 	}
 };
-process.on('SIGINT', () => {
-	stop();
-	process.exit(130);
-});
+// The server is its own group, so no signal this process takes reaches it: every way
+// out takes it down, a throw included.
+process.on('exit', stop);
+for (const [signal, code] of [
+	['SIGINT', 130],
+	['SIGTERM', 143],
+	['SIGHUP', 129]
+])
+	process.on(signal, () => process.exit(code));
 
-for (let tries = 0; tries < 300 && !(await answers()); tries++)
+let exited = false;
+server.once('exit', () => (exited = true));
+for (let tries = 0; tries < 300 && !exited && !(await answers()); tries++)
 	await new Promise((wake) => setTimeout(wake, 100));
-if (!(await answers())) {
-	stop();
-	throw new Error(`the dev server never answered at ${url}`);
-}
+if (exited || !(await answers())) throw new Error(`the dev server never answered at ${url}`);
 
 if (probe === undefined) {
 	say(`serving ${url} — Ctrl-C to stop`);
 	await new Promise(() => {});
 }
 
-const expression = probe.startsWith('@') ? readFileSync(probe.slice(1), 'utf8') : probe;
 try {
 	say(`asking ${url} at ${viewport.width}×${viewport.height}`);
 	console.log(JSON.stringify(await load(url, expression, viewport), null, 2));

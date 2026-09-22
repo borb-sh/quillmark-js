@@ -17,7 +17,7 @@
 // is the mechanism — a bare marker is a suppression. A derivation is exempt throughout,
 // being the place its scale's defaults are minted.
 //
-// Three rules sit beside the table:
+// Four rules sit beside the table:
 //
 //   · A private rung is defined only in its scope's derivation. Minting one elsewhere
 //     forks the scale rather than trying a value in it, so the escape does not reach it.
@@ -30,6 +30,9 @@
 //   · Every `--qm-*` dial a surface consumes is documented in THEMING.md, and every
 //     `.qm-*` class the doc promises is carried by something in `src/` — the halves a
 //     consumer is hurt by. The reverse halves warn, so prose may run ahead of code.
+//   · A surface draws no class the preset recipes for a host, the contract classes aside:
+//     one document holds both under one prefix, so chrome wearing a recipe's name takes
+//     that recipe (§"One name, one thing" below).
 //
 // `--built <dirs…>` runs the other end instead (`npm run check:bundle`, after
 // `npm run build`): in a built consumer, every rung a shipped stylesheet mints and the
@@ -40,8 +43,8 @@
 // than listed, and it is presence against absence, so a renamed scale and a retuned dial
 // both leave it green.
 //
-// What is outside it: `.ts` (`preview/paint.ts` carries declarations in JS strings), a
-// value's own shape past its axis, and the shadow, pole and cross-scope rules — all
+// What is outside it: a declaration in `.ts` (`preview/paint.ts` carries them in JS
+// strings), a value's own shape past its axis, and the shadow, pole and cross-scope rules — all
 // review's, and visible in a diff.
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -311,11 +314,14 @@ if (process.argv.includes('--built')) {
 	];
 	const DEFINES = /(--[\w-]+)\s*:/g;
 	const READS = /var\(\s*(--[\w-]+)/g;
+	/** Block comments blanked, the one form CSS has: a `//` in a shipped sheet is a
+	 *  `url(//…)` or a string, and a minified sheet is one line it would cut short. */
+	const deblock = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
 	const shipped = new Set();
 	for (const { at } of packages())
 		for (const file of filesUnder(join(at, 'dist'), /\.css$/, { skip: bundles }))
-			for (const [, name] of decomment(readFileSync(file, 'utf8')).matchAll(DEFINES))
+			for (const [, name] of deblock(readFileSync(file, 'utf8')).matchAll(DEFINES))
 				shipped.add(name);
 
 	if (!shipped.size)
@@ -336,7 +342,7 @@ if (process.argv.includes('--built')) {
 		const read = new Map();
 		for (const file of filesUnder(bundle, /\.(css|js|html)$/)) {
 			const raw = readFileSync(file, 'utf8');
-			const text = file.endsWith('.css') ? decomment(raw) : raw;
+			const text = file.endsWith('.css') ? deblock(raw) : raw;
 			for (const [, name] of text.matchAll(DEFINES)) defined.add(name);
 			for (const [, name] of text.matchAll(READS)) if (!read.has(name)) read.set(name, file);
 		}

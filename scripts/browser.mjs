@@ -83,6 +83,16 @@ export async function load(url, expression, viewport) {
 		// children writing into the profile.
 		{ detached: true }
 	);
+	// Its own group is out of reach of the signal that ends this process, so an exit that
+	// skips the `finally` below takes it down here.
+	const kill = () => {
+		try {
+			process.kill(-child.pid, 'SIGKILL');
+		} catch {
+			// Gone already.
+		}
+	};
+	process.once('exit', kill);
 
 	try {
 		const endpoint = await new Promise((ok, no) => {
@@ -116,15 +126,18 @@ export async function load(url, expression, viewport) {
 		const events = new Map();
 		socket.onmessage = (message) => {
 			const said = JSON.parse(String(message.data));
-			if (said.id !== undefined) answers.get(said.id)?.(said.result ?? {});
+			if (said.id !== undefined) answers.get(said.id)?.(said);
 			else if (said.method !== undefined) events.get(said.method)?.();
 		};
+		// A call the browser refuses answers with `error` in place of `result`: a page that
+		// navigated under an evaluation destroys the context it was running in.
 		const call = (method, params) =>
-			new Promise((ok) => {
+			new Promise((ok, no) => {
 				const id = ++last;
-				answers.set(id, (result) => {
+				answers.set(id, (said) => {
 					answers.delete(id);
-					ok(result);
+					if (said.error !== undefined) no(new Error(`${method}: ${said.error.message}`));
+					else ok(said.result ?? {});
 				});
 				socket.send(JSON.stringify({ id, method, params }));
 			});
@@ -145,10 +158,14 @@ export async function load(url, expression, viewport) {
 			throw new Error(answer.exceptionDetails.exception?.description ?? 'the page threw');
 		return answer.result.value;
 	} finally {
+		process.off('exit', kill);
 		// The group, then the wait: a removal racing the tree's last flush finds a
 		// directory refilling under it.
-		if (child.pid !== undefined) process.kill(-child.pid, 'SIGKILL');
-		await new Promise((gone) => child.once('exit', gone));
+		const gone = new Promise((done) =>
+			child.exitCode !== null || child.signalCode !== null ? done() : child.once('exit', done)
+		);
+		kill();
+		await gone;
 		await rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 	}
 }
