@@ -68,6 +68,19 @@ describe('an array<object> declaring ui.layout: table', () => {
 		expect(row.querySelectorAll('.qm-field-label')).toHaveLength(0);
 	});
 
+	it('gives up the track floor on the column a switch stands in', () => {
+		const q = quill();
+		mounted = mountEditor(q, q.seedDocument());
+		const t = table(mounted.target);
+
+		// `lead` is the boolean, and the floor is the header's to carry: a mark is one
+		// width at every width, so its column rests at its own name and the rest of the
+		// table keeps the width a control that fills its track needs.
+		expect(
+			[...t.querySelectorAll('.qm-array-table-col')].map((c) => c.classList.contains('mark'))
+		).toEqual([false, false, false, true]);
+	});
+
 	it('commits a cell into its row, the array committing whole', () => {
 		const q = quill();
 		const doc = q.seedDocument();
