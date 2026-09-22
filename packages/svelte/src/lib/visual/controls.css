@@ -256,9 +256,10 @@
 }
 
 /* The capacity ladder: how many tracks a grid of fields steps to, off the width of
- the query container it stands in. One recipe, because two grids read it — a section's
- fields (`Card.svelte`) and a subform's properties (`ObjectField`), each over its own
- container — and a ladder kept in two files agrees until one is retuned. Capacity is
+ the query container it stands in. One recipe, because three grids read it — a section's
+ fields (`Card.svelte`), a subform's properties (`ObjectField`), each over its own
+ container, and a compact matrix's members (`MatrixField`) — and a ladder kept in
+ several files agrees until one is retuned. Capacity is
  the container's, not JavaScript's: nothing measures, so there is no observer to loop
  and no re-packing to restructure the DOM under a prose leaf.
 

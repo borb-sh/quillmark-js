@@ -202,8 +202,7 @@ describe('Delete on an empty line takes the line', () => {
 					n.island_block.create({
 						id: 'isl-0',
 						islandType: 'table',
-						props: { header: [], rows: [], aligns: [] },
-						loss: 'lossless'
+						props: { header: [], rows: [], aligns: [] }
 					})
 				),
 				0

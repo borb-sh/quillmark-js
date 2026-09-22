@@ -36,8 +36,7 @@ const table = (attrs: Attrs): PMNode => S.nodes.island_block.create(attrs);
 const TABLE: Attrs = {
 	id: 'isl-0',
 	islandType: 'table',
-	props: { header: ['h'], rows: [['a']] },
-	loss: 'lossless'
+	props: { header: ['h'], rows: [['a']] }
 };
 
 /** A block leaf's plugin stack over `over`, mounted: where a paste lands. */
@@ -78,8 +77,7 @@ describe('a copy and a paste carry the whole node', () => {
 					S.nodes.island_inline.create({
 						id: 'isl-1',
 						islandType: 'image',
-						props: { src: 'a.png' },
-						loss: 'lossless'
+						props: { src: 'a.png' }
 					}),
 					S.text(' after')
 				)
@@ -192,15 +190,6 @@ describe('what the parse rules refuse', () => {
 			`<p><span data-qm-island="image" data-qm-island-id="isl-0" data-qm-island-props='${props}'></span></p>`
 		);
 		expect(back.child(0).child(0).attrs.props).toEqual({ url: 'http://a%0Ab/c', alt: 'x' });
-	});
-
-	// `loss` is a closed set too, and an island under-claims rather than over-claims:
-	// a degraded table that re-crossed as lossless would promote on the next cell edit.
-	it('a loss class outside the set reads as the weakest one', () => {
-		const back = parse(
-			'<div data-qm-island="table" data-qm-island-id="isl-0" data-qm-island-loss="perfect"></div>'
-		);
-		expect(back.child(0).attrs.loss).toBe('unrepresentable');
 	});
 
 	// A `start` the store would normalize away is one the leaf would go on drawing: a

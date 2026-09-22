@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The `@quillmark/wasm` peer floor is `>=0.114.0-0`.** Nothing here reads a schema, so the release's three new declarations — `type: matrix`, `ui.layout: "table"`, `max:` on an array — land outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. A quill packed by an older toolchain is unaffected: every addition is a key a quill may now declare, not one it must. What a consumer meets on the artifact's own terms is one new load warning, `quill::bodiless_card_kind`, on a card kind declaring `body.enabled: false`.
+**The `@quillmark/wasm` peer floor is `>=0.115.0-0`.** Nothing here reads a schema or a content, so the span's declarations — `type: matrix`, `ui.layout: "table"`, `max:` on an array — and its cuts land outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. Two cuts reach a packed quill: a matrix `members:` is one flat `{id: Title}` mapping, the list of `{group, values}` blocks failing at load, and a `ui.layout: table` column that is not a leaf is `quill::table_column_not_flat`. What a consumer meets on the artifact's own terms is one new load warning, `quill::bodiless_card_kind`, on a card kind declaring `body.enabled: false`.
 
 ## v0.28.0 - 2026-09-16
 

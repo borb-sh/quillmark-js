@@ -219,8 +219,7 @@ main:
               page: 20
       ui:
         group: content
-        layout: table
-      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `items.ui.title` template and a collapsed entry by its inline `plaintext` label, the fallback a row with no `string` cell takes. It asks for `ui.layout: table` and is declined — a row holding a list is not a line a spreadsheet holds — so it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
+      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `items.ui.title` template and a collapsed entry by its inline `plaintext` label, the fallback a row with no `string` cell takes. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
 
     columns:
       type: integer
@@ -386,17 +385,12 @@ main:
     checks:
       type: matrix
       members:
-        - group: Editorial
-          values:
-            spelling: Spelling
-            citations: Citations
-            figures: Figures
-        - group: Production
-          values:
-            margins: Margins
-            fonts: Fonts
-        - values:
-            approved: Approved
+        spelling: Spelling
+        citations: Citations
+        figures: Figures
+        margins: Margins
+        fonts: Fonts
+        approved: Approved
       properties:
         note:
           type: plaintext
@@ -411,7 +405,8 @@ main:
           default: minor
       ui:
         group: meta
-      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Three roster blocks, the last ungrouped; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
+        compact: true
+      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
 
     colophon:
       type: richtext

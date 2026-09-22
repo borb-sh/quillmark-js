@@ -271,7 +271,7 @@
     #linebreak()
   ]
   // The matrix arrives total, every member in roster order carrying `held`, its roster
-  // `title` and `group`, and the columns. Only a held member prints. `note` is a content
+  // `title`, and the columns. Only a held member prints. `note` is a content
   // cell, so it regions at `main.checks.<member>.note`; `held` and `severity` are
   // scalars read through the loop and reach the preview through the field.
   #let held-checks = data.at("checks", default: (:)).pairs().filter(p => p.at(1).held)

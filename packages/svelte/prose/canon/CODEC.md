@@ -27,7 +27,7 @@ Every edit lowers. `overwrite(addr, rt)` is left with two cases, neither a shape
 
 ## Decode: content → PM
 
-Fold the flat lines into the tree: group consecutive lines by common `containers` prefix (a shared `[ListItem]` path is one item's paragraphs; `[ListItem, Quote]` a quote nested in it), and join `continues` runs into one block (a code fence's lines → one `code_block`; a paragraph's hard breaks → one paragraph with `hard_break` nodes). The line `kind` selects the block node, and the set is closed (§Vocabularies): `para` → paragraph, `heading{level}`, `code{lang}`, `rule` → horizontal_rule, `island` → a block island node.
+Fold the flat lines into the tree: group consecutive lines by common `containers` prefix (a shared `[ListItem]` path is one item's paragraphs; `[ListItem, Quote]` a quote nested in it), and join `continues` runs into one block (a code fence's lines → one `code_block`; a paragraph's hard breaks → one paragraph with `hard_break` nodes). The line `kind` selects the block node, and the set is closed (§Vocabularies): `para` → paragraph, `heading{level}`, `code{lang}`, `rule` → horizontal_rule. A `para` line holding nothing but the slot of a block island (a `table`) is that island's block node: which markup is a block is the island's type to say, not the line's.
 
 **A continuation's metadata is its head's.** The fold takes `kind`, `containers` and `lang` off the line that opens a block and reads nothing off a continuation, which is the reading quillmark's own Markdown export and Typst lowering take of the same lines (`traverse::segment`). A continuation disagreeing with its head is therefore not a second reading of the block but a value nothing renders, and settling it is the store's rather than the fold's: it clears a `continues` the model cannot carry — across a container boundary, on line 0, after a block of one line — and the projection restates the head's kind on the next commit.
 
@@ -37,7 +37,7 @@ Contiguity plus an equal path is the whole of what makes one container, so `inst
 
 **Absent is zero, on both sides.** The canonical form omits a zero `instance`, so the fold reads an absent key as the zero it stands for and the projection spells the field only where it is not zero. Spelling it regardless would leave the projection unequal to a read of the same container, and the line-metadata comparison that decides whether an edit emits `lineOps` (§Encode) would answer "changed" for every edit inside a list or a quote.
 
-Marks apply over their `[start, end)` range; PM splits inline nodes at mark boundaries, so free overlap of *different* formatting kinds is representable without loss (`strong[0,4)` + `emph[2,6)` → text nodes `{strong}`, `{strong,emph}`, `{emph}`). An island slot inside a `Para` line decodes to an inline node (an image); an `Island`-kind line decodes to a block node (a table), either carrying the island `id` and typed props.
+Marks apply over their `[start, end)` range; PM splits inline nodes at mark boundaries, so free overlap of *different* formatting kinds is representable without loss (`strong[0,4)` + `emph[2,6)` → text nodes `{strong}`, `{strong,emph}`, `{emph}`). An island slot decodes to an inline node (an image) unless it is a block island alone on its line, which decodes to a block node (a table), either carrying the island `id` and typed props.
 
 Two mark kinds do **not** become PM marks: see §Marks.
 
@@ -53,7 +53,7 @@ Two mark kinds do **not** become PM marks: see §Marks.
 
 Everything reads against the *final* content, so the bundle reads the same way `applyChange` applies it. **A slot never rides the `delta`**: `applyChange` throws `IslandSlotInInsert` on an insert that carries one, so `lower` strips every slot inside the splice's inserted region and hands it to the island channel instead (`splitIslands`). That is what keeps island creation, and a splice that happens to span an existing slot, on the op path.
 
-A **block** island is one bundle of three channels: the `delta` inserts the `\n` that opens the line, an island op places the slot, a `setKind` tags the line `island`. Stage order is what makes it expressible: `{ op: "split" }` could not open that line, since line ops run after island ops.
+A **block** island is one bundle of two channels: the `delta` inserts the `\n` that opens the line and an island op places the slot. The line is a `para`, and the island backing its slot is what makes it a block.
 
 **The projection is total over the schema.** Every PM document the leaf's keymaps can reach projects to a valid `Content`, which is a statement about the keymaps as much as about `pmToContent`: a projection carrying more text segments than lines fails the content's `LineCountMismatch` invariant, and `lower` then under-specifies the bundle rather than refusing it — `applyChange` takes it, nothing reaches `onError`, and the field diverges from the leaf for the rest of the session. So a `\n` inside any textblock is the line boundary it is: `code_block` counts its own into `continues` lines, and so does every other textblock, where a `\n` arrives from a join that ran no `clearIncompatible` pass. `hard_break` is declared `linebreakReplacement`, so the passes that do run convert `\n` ⇄ break rather than flattening to a space, and a break is a `continues` line either way. The property is asserted as one (`tests/codec/roundtrip.test.ts`), over the chain the leaf runs — `decode → press → pmToContent → lower → applyChange` — rather than per fixed case.
 
@@ -78,7 +78,7 @@ The content mark set is two algebra classes, and they route to two different PM 
 
 ## Islands
 
-A table or figure is one `U+FFFC` slot plus one `Island {id, type, props, loss}`. Decode maps it to a PM leaf node (block or inline by the slot's line); encode writes the slot char and the entry with its `id` preserved (stable identity, like an anchor). The **whole entry rides the node**, `loss` included: `applyChange` stores the class an island op hands it and re-derives nothing, so an edit that did not carry the class back would promote a degraded table to lossless on its first cell edit.
+A table or figure is one `U+FFFC` slot plus one `Island {id, type, props}`. Decode maps it to a PM leaf node (block or inline by the island's type, `isBlockIsland`); encode writes the slot char, on a `para` line of its own for a block, and the entry with its `id` preserved (stable identity, like an anchor). The **whole entry rides the node**: `applyChange` stores what an island op hands it and re-derives nothing.
 
 The type is closed (§Vocabularies) and its props shape is pinned upstream: `ContentIsland.props` is `TableProps` for `table` and `ImageProps` for `image`, so a discriminant check narrows the payload with no guard to call.
 
@@ -140,21 +140,20 @@ An island the NodeView cannot read keeps the literal placeholder the node's `toD
 
 ## Vocabularies: five closed sets
 
-Five of the content's discriminants name their whole vocabulary: a mark `type`, an island `type`, an island's `loss`, a line `kind`, and a container name. A name outside one is refused wherever content is decoded, and a stored row holding one stops opening, so nothing this tier reads can carry a construct it does not know. Every member spells its payload in one `attrs` bag (`props` for an island), so the tag and the payload are one read.
+Four of the content's discriminants name their whole vocabulary: a mark `type`, an island `type`, a line `kind`, and a container name. A name outside one is refused wherever content is decoded, and a stored row holding one stops opening, so nothing this tier reads can carry a construct it does not know. Every member spells its payload in one `attrs` bag (`props` for an island), so the tag and the payload are one read.
 
 | Axis | Members |
 | --- | --- |
-| line `kind` | `para`, `heading`, `code`, `island`, `rule` |
+| line `kind` | `para`, `heading`, `code`, `rule` |
 | container | `list_item`, `quote` |
 | mark `type` | `strong`, `emph`, `underline`, `strike`, `code`, `link`, `anchor` |
 | island `type` | `table`, `image` |
-| island `loss` | `lossless`, `degraded`, `unrepresentable` |
 
-Reading is a discriminant check: `line.kind === 'heading'` reaches `line.attrs.level`, `m.type === 'link'` reaches `m.attrs.url`, with no guard in between. Writing is a literal the checker admits or rejects. **What the codec must not do is restate a set as a literal check**, which compiles unchanged against a widened union and silently refuses — or worse, flattens — the member it does not know. Each of the five places that names a set names it against the boundary's own: an exhaustive `switch` closed by a `never` for the line kinds and the marks, a `satisfies` for the container left after the list, and a `Record` keyed by the union for the island `type` and `loss` the DOM reader admits.
+Reading is a discriminant check: `line.kind === 'heading'` reaches `line.attrs.level`, `m.type === 'link'` reaches `m.attrs.url`, with no guard in between. Writing is a literal the checker admits or rejects. **What the codec must not do is restate a set as a literal check**, which compiles unchanged against a widened union and silently refuses — or worse, flattens — the member it does not know. Each of the four places that names a set names it against the boundary's own: an exhaustive `switch` closed by a `never` for the line kinds and the marks, a `satisfies` for the container left after the list, and a `Record` keyed by the union for the island `type` the DOM reader admits and the decode reads a block off.
 
 **The PM schema names the whole vocabulary and nothing beside it.** Lowering restates every line's metadata as soon as any of it changed (§Encode), so a construct the PM tree cannot hold is destroyed by the first keystroke anywhere in the field — which is why an open set would need an inert carrier to ride on. There is nothing to carry: no decode produces a name outside a set and no write takes one, so every node, mark and attribute in the schema stands for a member.
 
-**The one door with no decode behind it is the DOM.** A paste reaches a node without ever having been a `Content`, so the island rule refuses a type outside the vocabulary and under-claims a `loss` outside it, and `props` — opaque JSON on the way through — is read for its shape at the reader that indexes it (§"The table island").
+**The one door with no decode behind it is the DOM.** A paste reaches a node without ever having been a `Content`, so the island rule refuses a type outside the vocabulary, and `props` — opaque JSON on the way through — is read for its shape at the reader that indexes it (§"The table island").
 
 ## Inline mode
 
