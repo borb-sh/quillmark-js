@@ -462,7 +462,7 @@
 	   subgrid onto the row that holds them, so a cell's edge is the column's. No
 	   vertical, no inset, no capacity of its own, and one row per cell, the label having
 	   moved up to the header. `.qm-array-row` is the row (`ArrayField`), which spends
-	   the last track on the row's own controls; this box takes the rest. */
+	   the last track on the row's remove; this box takes the rest. */
 	.qm-object-bare {
 		display: grid;
 		grid-template-columns: subgrid;
