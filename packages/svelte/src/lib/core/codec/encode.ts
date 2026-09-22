@@ -175,7 +175,7 @@ function scanBlock(
 			acc.lastContentEndPm = nodePos + 1;
 			break;
 		case 'island_block':
-			beginLine(acc, nodePos, containers, { kind: 'island' });
+			beginLine(acc, nodePos, containers, { kind: 'para' });
 			acc.runs.push({ kind: 'atom', pmStart: nodePos, usvStart: acc.usvEnd });
 			appendText(acc, ISLAND_SLOT);
 			acc.islands.push(islandEntryFromNode(node.attrs as IslandNodeAttrs));

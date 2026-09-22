@@ -780,7 +780,7 @@ describe('the table NodeView', () => {
 	it('an island whose props no reader can index keeps the literal placeholder', () => {
 		const doc = quill().seedDocument();
 		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS, loss: 'unrepresentable' };
+		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS };
 		doc.overwrite({}, rt);
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		expect(field.el.querySelector('table')).toBeNull();
@@ -1188,7 +1188,7 @@ describe('a pointer press on the island resolves to a caret', () => {
 	it('an island drawing no interior keeps the click: the rule, not an exception', () => {
 		const doc = quill().seedDocument();
 		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS, loss: 'unrepresentable' };
+		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS };
 		doc.overwrite({}, rt);
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		// Dispatched at the island rather than through it: PM's own mousedown wants a

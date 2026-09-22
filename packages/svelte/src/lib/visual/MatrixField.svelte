@@ -1,8 +1,7 @@
 <!--
- A `matrix` field → grouped ticks over the roster, columns unfolding under a held
- member (VISUAL_EDITOR §"Structure mirrors the schema", canon `SCHEMAS.md` §Matrix).
- The roster's blocks are columns, as many abreast as the width holds and never more
- than there are blocks; each member is a real checkbox bound to its `held` cell with
+ A `matrix` field → ticks over the roster, columns unfolding under a held member
+ (VISUAL_EDITOR §"Structure mirrors the schema", canon `SCHEMAS.md` §Matrix). The
+ roster is one flat list; each member is a real checkbox bound to its `held` cell with
  its title as the `<label for>`, an unheld member reading at the label ink and a held
  one at the value ink. A held member unfolds its columns beneath its title, drawn by
  {@link ObjectField} over the matrix's `properties` at the member's key, the way a
@@ -19,7 +18,8 @@
  unheld with no columns leaves the map (`memberWrite`). What is blank per column is the
  engine's rule and not restated: a column control that clears drops its key, so the
  editor drops a member it has emptied rather than deciding skippability for itself.
- The read takes both rest forms — `true` and `{held, …columns}` — and the write lands
+ The read takes both rest forms — a bare tick and `{held?, …columns}`, whose `held` rests
+ at `false` where the mapping names none — and the write lands
  one, on the member edited alone; every other member rides through as the document
  spelled it.
 -->
@@ -34,13 +34,12 @@
 	import {
 		MATRIX_HELD,
 		commitMember,
-		matrixBlocks,
 		matrixColumns,
 		matrixDeclares,
 		matrixHeld,
+		matrixMembers,
 		memberValue,
-		memberWrite,
-		type MatrixBlock
+		memberWrite
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
@@ -89,8 +88,7 @@
 		diagnostics
 	}: Props = $props();
 
-	const blocks = $derived(matrixBlocks(schema.members));
-	const members = $derived(blocks.flatMap((b) => b.members));
+	const members = $derived(matrixMembers(schema.members));
 	const hasColumns = $derived(Object.keys(schema.properties ?? {}).length > 0);
 	const held = (id: string): boolean => matrixHeld(memberValue(value, id));
 	const heldCount = $derived(members.filter((m) => held(m.id)).length);
@@ -118,7 +116,7 @@
 	const memberEls: Record<string, HTMLElement | undefined> = $state({});
 	const tickEls: Record<string, HTMLInputElement | undefined> = $state({});
 	const colEls: Record<string, Subform | undefined> = $state({});
-	let blocksEl = $state<HTMLElement | undefined>();
+	let rosterEl = $state<HTMLElement | undefined>();
 
 	/** A native checkbox carries its own state, so a commit the document declines leaves
 	 *  the face ticked over a map that says otherwise, `checked={held(id)}` having nothing
@@ -133,11 +131,11 @@
 	function commitColumns(id: string, columns: Record<string, unknown>): void {
 		onCommit(commitMember(value, id, memberWrite(true, columns)));
 	}
-	/** Arrow keys walk the members of one block, the way a listbox walks its options;
-	 *  Space toggles, being the checkbox's own. */
-	function onTickKey(e: KeyboardEvent, block: MatrixBlock, id: string): void {
+	/** Arrow keys walk the roster, the way a listbox walks its options; Space toggles,
+	 *  being the checkbox's own. */
+	function onTickKey(e: KeyboardEvent, id: string): void {
 		if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-		const ids = block.members.map((m) => m.id);
+		const ids = members.map((m) => m.id);
 		const next = ids.indexOf(id) + (e.key === 'ArrowDown' ? 1 : -1);
 		if (next < 0 || next >= ids.length) return;
 		e.preventDefault();
@@ -153,7 +151,7 @@
 	/** The box an arrival wash blooms in: the roster, not the label row above it, this
 	 *  component owning the field's label as an array does. */
 	export function washBox(): HTMLElement | undefined {
-		return blocksEl;
+		return rosterEl;
 	}
 	/**
 	 * Land at `steps`: a member, or a column under it ({@link FieldControl.focusPath}).
@@ -192,55 +190,47 @@
 		{/if}
 		<span class="qm-matrix-count">{t.strings.matrixHeld(heldCount, members.length)}</span>
 	</div>
-	<div class="qm-matrix-blocks" bind:this={blocksEl}>
-		{#each blocks as block, b (b)}
-			<div class="qm-matrix-block" role="group" aria-label={block.group}>
-				<!-- Drawn for an ungrouped block too, empty: the blocks stand abreast, and a
-				     member with no title over it would float at the line its neighbours'
-				     titles hold. -->
-				<span class="qm-matrix-group">{block.group ?? ''}</span>
-				{#each block.members as m (m.id)}
-					{@const on = held(m.id)}
-					{@const deep = routed.below.get(m.id)}
-					<div class="qm-member" class:held={on} bind:this={memberEls[m.id]}>
-						<div class="qm-member-head">
-							<!-- A real checkbox with its face drawn here: the UA's face is shadow DOM no
-							     dial reaches, so the input is `appearance: none` and the box and the
-							     mark beside it read the rungs. The mark is the surface's one check
-							     glyph, shown by the input's own state. -->
-							<span class="qm-tick">
-								<input
-									type="checkbox"
-									class="qm-tick-input qm-focus-ring"
-									id={tickId(m.id)}
-									checked={on}
-									bind:this={tickEls[m.id]}
-									onchange={(e) => tick(m.id, e.currentTarget.checked, e.currentTarget)}
-									onkeydown={(e) => onTickKey(e, block, m.id)}
-								/>
-								<Icon name="check" class="qm-tick-mark" />
-							</span>
-							<label class="qm-member-title" for={tickId(m.id)}>{m.title}</label>
-						</div>
-						{#if on && hasColumns}
-							<!-- The columns, one rung in, the way a variant's cells unfold under the
-							     discriminant. Keyed by member id above, so a tick elsewhere leaves this
-							     subform mounted and the caret in it. -->
-							<ObjectField
-								bind:this={colEls[m.id]}
-								value={matrixColumns(memberValue(value, m.id))}
-								properties={schema.properties}
-								label={`${label ?? ''} ${m.title}`.trim()}
-								idBase={memberBase(m.id)}
-								contentAt={(path) => contentAt([m.id, ...path])}
-								onCommit={(columns) => commitColumns(m.id, columns)}
-								diagnostics={deep}
-							/>
-						{:else}
-							<DiagnosticList diagnostics={deep?.map((d) => d.diagnostic)} />
-						{/if}
-					</div>
-				{/each}
+	<div class="qm-matrix-roster" bind:this={rosterEl}>
+		{#each members as m (m.id)}
+			{@const on = held(m.id)}
+			{@const deep = routed.below.get(m.id)}
+			<div class="qm-member" class:held={on} bind:this={memberEls[m.id]}>
+				<div class="qm-member-head">
+					<!-- A real checkbox with its face drawn here: the UA's face is shadow DOM no
+					     dial reaches, so the input is `appearance: none` and the box and the
+					     mark beside it read the rungs. The mark is the surface's one check
+					     glyph, shown by the input's own state. -->
+					<span class="qm-tick">
+						<input
+							type="checkbox"
+							class="qm-tick-input qm-focus-ring"
+							id={tickId(m.id)}
+							checked={on}
+							bind:this={tickEls[m.id]}
+							onchange={(e) => tick(m.id, e.currentTarget.checked, e.currentTarget)}
+							onkeydown={(e) => onTickKey(e, m.id)}
+						/>
+						<Icon name="check" class="qm-tick-mark" />
+					</span>
+					<label class="qm-member-title" for={tickId(m.id)}>{m.title}</label>
+				</div>
+				{#if on && hasColumns}
+					<!-- The columns, one rung in, the way a variant's cells unfold under the
+					     discriminant. Keyed by member id above, so a tick elsewhere leaves this
+					     subform mounted and the caret in it. -->
+					<ObjectField
+						bind:this={colEls[m.id]}
+						value={matrixColumns(memberValue(value, m.id))}
+						properties={schema.properties}
+						label={`${label ?? ''} ${m.title}`.trim()}
+						idBase={memberBase(m.id)}
+						contentAt={(path) => contentAt([m.id, ...path])}
+						onCommit={(columns) => commitColumns(m.id, columns)}
+						diagnostics={deep}
+					/>
+				{:else}
+					<DiagnosticList diagnostics={deep?.map((d) => d.diagnostic)} />
+				{/if}
 			</div>
 		{/each}
 	</div>
@@ -267,37 +257,16 @@
 		color: var(--_qm-ink-label);
 		font-variant-numeric: tabular-nums;
 	}
-	/* The blocks abreast: as many columns as the width holds at the track floor and never
-	 more than there are blocks, `auto-fit` collapsing the tracks it has no block for.
-	 Nothing measures, and a block's members stack inside their column at every count.
-	 A block is as wide as its widest member and no wider, and the row packs at the start:
-	 the leftover stands after the last block rather than split between them, where three
-	 short rosters in a wide field read as three columns set far apart. Positioned for the
-	 wash's inset child (`washBox`), and rounded to the rung a row's box draws, as an
-	 array's rows are. */
-	.qm-matrix-blocks {
+	/* The roster, one member to a row in declaration order. Positioned for the wash's
+	 inset child (`washBox`), and rounded to the rung a row's box draws, as an array's
+	 rows are. */
+	.qm-matrix-roster {
 		position: relative;
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(var(--_qm-track-min), max-content));
-		justify-content: start;
-		column-gap: var(--_qm-space-3);
-		row-gap: var(--_qm-space-3);
-		border-radius: var(--_qm-radius-inner);
-	}
-	.qm-matrix-block {
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space);
 		min-width: 0;
-	}
-	/* A block's name, at the label rung: it names a set the way a field label names a
-	 control, and ranks under the field's label by position alone. */
-	.qm-matrix-group {
-		font-size: var(--_qm-text-label);
-		font-weight: var(--_qm-weight-mid);
-		line-height: var(--_qm-leading-tight);
-		min-height: 1lh;
-		color: var(--_qm-ink-label);
+		border-radius: var(--_qm-radius-inner);
 	}
 	/* A member is a row: positioned for the wash a landing on it blooms, rounded to the
 	 rung the rows around it draw. */

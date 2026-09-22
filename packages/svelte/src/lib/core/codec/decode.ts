@@ -3,13 +3,13 @@
 // nodes; a code fence's lines → one `code_block`), nest by shared `containers`
 // prefix (`list_item`/`quote` → lists/blockquote), select the block node by
 // `kind`, apply marks over their `[start,end)` USV ranges (PM splits inline nodes
-// at mark boundaries), and lower island slots to leaf nodes (inline in a `para`
-// line, block on an `island` line). Anchors are not applied here; they are
-// decorations (field.ts). Positions throughout are USV; `Array.from` iterates by
+// at mark boundaries), and lower island slots to leaf nodes (block where a block
+// island's slot stands alone on its line, inline otherwise). Anchors are not
+// applied here; they are decorations (field.ts). Positions throughout are USV; `Array.from` iterates by
 // code point so an astral char is one unit, never a surrogate half.
 import { DOMSerializer, type Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
 import type { Content, ContentContainer, ContentLine, ContentMark } from '@quillmark/wasm';
-import { ISLAND_SLOT, type IslandNodeAttrs } from './islands.js';
+import { ISLAND_SLOT, isBlockIsland, type IslandNodeAttrs } from './islands.js';
 import { descriptorOf, markKey, pmMarkFromContent } from './marks.js';
 import { hasMarks, isInlineSchema, takesLineBreak } from './schema.js';
 
@@ -211,10 +211,6 @@ function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: Isla
 	switch (line.kind) {
 		case 'rule':
 			return schema.nodes.horizontal_rule.create();
-		case 'island': {
-			const attrs = islandAttrs(cursor);
-			return attrs ? schema.nodes.island_block.create(attrs) : schema.nodes.paragraph.create();
-		}
 		case 'code': {
 			// One code_block: the segments' texts joined by literal `\n`, no marks.
 			const text = leaf.segments.map((s) => s.text).join('\n');
@@ -223,6 +219,8 @@ function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: Isla
 		}
 		case 'para':
 		case 'heading': {
+			if (line.kind === 'para' && blockIslandLine(leaf, cursor))
+				return schema.nodes.island_block.create(islandAttrs(cursor)!);
 			// Inline content, the segment boundary a `hard_break` in a paragraph and a space
 			// in a heading, which takes none (`schema.ts` §`takesLineBreak`). A stored heading
 			// carries no continuation — the store clears one after a block of a single line —
@@ -245,15 +243,23 @@ function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: Isla
 	}
 }
 
-/** Consume the next island entry as PM node attrs (text-order matched to slots):
- *  the whole entry, `loss` included, which an island edit has to write back
- *  (`islands.ts`). `null` where a slot has no entry behind it, which is a malformed
- *  content: the slot draws an empty paragraph or nothing at all, so the decode stays
- *  total without minting a node whose `type` the vocabulary would refuse on the way
- *  back. */
+/** Whether a `para` leaf is one block island: a single line holding its slot alone,
+ *  backed by an island whose markup is a block. The island is the one fact; the line
+ *  carries no kind of its own for it. */
+function blockIslandLine(leaf: Leaf, cursor: IslandCursor): boolean {
+	if (leaf.segments.length !== 1 || leaf.segments[0].text !== ISLAND_SLOT) return false;
+	const isl = cursor.rt.islands[cursor.i];
+	return isl != null && isBlockIsland(isl.type);
+}
+
+/** Consume the next island entry as PM node attrs (text-order matched to slots): the
+ *  whole entry, which an island edit has to write back (`islands.ts`). `null` where a
+ *  slot has no entry behind it, which is a malformed content: the slot draws nothing
+ *  and its line an empty paragraph, so the decode stays total without minting a node
+ *  whose `type` the vocabulary would refuse on the way back. */
 function islandAttrs(cursor: IslandCursor): IslandNodeAttrs | null {
 	const isl = cursor.rt.islands[cursor.i++];
-	return isl ? { id: isl.id, islandType: isl.type, props: isl.props, loss: isl.loss } : null;
+	return isl ? { id: isl.id, islandType: isl.type, props: isl.props } : null;
 }
 
 /**

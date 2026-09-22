@@ -382,7 +382,7 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		expect(commits()).toBe(before + 1);
 		// The empty block the run was typed in is replaced, and a paragraph after the
 		// island is the exit.
-		expect(field.getContent().lines.map((l) => l.kind)).toEqual(['island', 'para']);
+		expect(field.getContent().lines.map((l) => l.kind)).toEqual(['para', 'para']);
 		field.destroy();
 	});
 
@@ -394,7 +394,7 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		// The paragraph keeps every character but the run, and the island opens after it
 		// rather than splitting it.
 		expect(stored.text).toBe('para \n￼\n');
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'island', 'para']);
+		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
 		field.destroy();
 	});
 
@@ -407,14 +407,13 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		const body = doc.main.body;
 		expect(body.islands.map((i) => i.id)).toEqual(['isl-0']);
 		expect(body.islands[0].type).toBe('table');
-		expect(body.islands[0].loss).toBe('lossless');
 		const props = body.islands[0].props as TableProps;
 		expect(props.header).toHaveLength(3);
 		expect(props.rows).toHaveLength(2);
 		// The island opened a line of its own, and a paragraph after it: a block island
 		// at the end of a body would otherwise leave nowhere to type.
 		expect(body.text).toBe('para\n￼\n');
-		expect(body.lines.map((l) => l.kind)).toEqual(['para', 'island', 'para']);
+		expect(body.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
 		// And the caret is in the fresh table rather than on it.
 		const focused = (field as FieldController & LeafViews).focusedView();
 		expect((field as FieldController & LeafViews).nestedViews()).toContain(focused);
@@ -425,7 +424,7 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		const { field, view } = leaf('');
 		typeAt(field, view, 0, '/tab');
 		field.slashPick('table');
-		expect(field.getContent().lines.map((l) => l.kind)).toEqual(['island', 'para']);
+		expect(field.getContent().lines.map((l) => l.kind)).toEqual(['para', 'para']);
 		field.destroy();
 	});
 
@@ -464,7 +463,7 @@ describe('a pick lands in the container the caret was writing in', () => {
 		pick(field, view, 0);
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha\n￼\nbeta');
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'island', 'para']);
+		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
 		expect(stored.lines[1].containers).toEqual([item(0)]);
 		field.destroy();
 	});
@@ -473,7 +472,7 @@ describe('a pick lands in the container the caret was writing in', () => {
 		const { field, view } = leaf('1. alpha\n2. beta');
 		pick(field, view, 6);
 		const stored = field.getContent();
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'island', 'para']);
+		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para', 'para']);
 		expect(stored.lines[2].containers).toEqual([item(1, true)]);
 		field.destroy();
 	});
@@ -499,7 +498,7 @@ describe('a pick lands in the container the caret was writing in', () => {
 		pick(field, view, 6);
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha\nbeta\n￼\n');
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'island', 'para']);
+		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para', 'para']);
 		// The exit is the item's: the island opened inside it, so the way out is there too.
 		expect(stored.lines[3].containers).toEqual([item(1)]);
 		field.destroy();

@@ -74,7 +74,11 @@ describe('island round-trip (id preserved)', () => {
 	it('image (inline island) survives decode → pmToContent → normalize', () => {
 		const rt = md('![alt text](img.png)');
 		expect(rt.islands[0].type).toBe('image');
-		const back = pmToContent(decode(rt, blockSchema));
+		// Alone on its line and still inline: the island's type, not the line, says block.
+		const decoded = decode(rt, blockSchema);
+		expect(decoded.child(0).type.name).toBe('paragraph');
+		expect(decoded.child(0).child(0).type.name).toBe('island_inline');
+		const back = pmToContent(decoded);
 		expect(back.islands).toHaveLength(1);
 		expect(back.islands[0].type).toBe('image');
 		expect(back.islands[0].id).toBe(rt.islands[0].id);
@@ -86,6 +90,7 @@ describe('island round-trip (id preserved)', () => {
 		const rt = md('| a | b |\n|---|---|\n| 1 | 2 |');
 		expect(rt.islands[0].type).toBe('table');
 		const decoded = decode(rt, blockSchema);
+		expect(rt.lines[0].kind).toBe('para');
 		expect(decoded.child(0).type.name).toBe('island_block');
 		const back = pmToContent(decoded);
 		expect(back.islands[0].type).toBe('table');
@@ -297,7 +302,7 @@ describe('inline runs against the per-code-point definition', () => {
 			text: 'ab￼cd',
 			lines: [{ containers: [], kind: 'para' }],
 			marks: [{ start: 2, end: 5, type: 'strong' } as never],
-			islands: [{ id: 'i1', type: 'table', props: null, loss: null } as never]
+			islands: [{ id: 'i1', type: 'table', props: null } as never]
 		};
 		const para = decode(rt, blockSchema).child(0);
 		const tail = para.child(para.childCount - 1);

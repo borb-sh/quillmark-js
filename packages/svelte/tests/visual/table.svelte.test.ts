@@ -3,8 +3,6 @@
 // `contributors`. The table is the record list's row machine in another presentation:
 // the same ids, splices and landing over rows that are always open, each cell the
 // property's ordinary control under a header and the remove alone at the row's end.
-// The request is declined where a row is not a line: `appendices` asks and draws the
-// record list.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
@@ -226,17 +224,5 @@ describe('an array declaring max:', () => {
 		const q = quill();
 		mounted = mountEditor(q, q.seedDocument());
 		expect(count(field(mounted.target, 'Authors'))).toBeUndefined();
-	});
-});
-
-describe('a layout request the surface declines', () => {
-	it('draws the record list where a row holds a container', () => {
-		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
-		openGroup(mounted.target, 'Content');
-		const f = field(mounted.target, 'Appendices');
-		expect(q.schema.main.fields.appendices.ui?.layout).toBe('table');
-		expect(f.querySelector('.qm-array-table')).toBeNull();
-		expect(f.querySelectorAll('.qm-element-summary')).toHaveLength(2);
 	});
 });

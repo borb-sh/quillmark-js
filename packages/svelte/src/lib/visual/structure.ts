@@ -11,7 +11,6 @@ import {
 	type PayloadItem,
 	type QuillCardSchema,
 	type QuillFieldSchema,
-	type QuillMatrixGroup,
 	type ResolvedField,
 	type Resolved
 } from '@quillmark/wasm';
@@ -252,29 +251,16 @@ export const MATRIX_HELD = 'held';
 // `{held, …columns}` object each member desugars to is derived at parse and not
 // serialized, so the control composes it from `members` × `properties` here.
 
-/** One member of the roster, flattened for drawing: its id, its title, and the group
- *  it sits in (`undefined` for an ungrouped block). */
+/** One member of the roster: its id and its title. */
 export interface MatrixMember {
 	id: string;
 	title: string;
-	group: string | undefined;
 }
 
-/** A roster block as the control draws it: the group label and its members, in
- *  declaration order. */
-export interface MatrixBlock {
-	group: string | undefined;
-	members: MatrixMember[];
-}
-
-/** The roster as blocks, in declaration order. Own keys only: a schema map is
- *  indexed by a document-supplied id, and `'toString' in values` is true of every
- *  roster. */
-export function matrixBlocks(groups: QuillMatrixGroup[] | undefined): MatrixBlock[] {
-	return (groups ?? []).map((g) => ({
-		group: g.group,
-		members: Object.keys(g.values).map((id) => ({ id, title: g.values[id], group: g.group }))
-	}));
+/** The roster's members, in declaration order. Own keys only: a schema map is indexed
+ *  by a document-supplied id, and `'toString' in members` is true of every roster. */
+export function matrixMembers(roster: Record<string, string> | undefined): MatrixMember[] {
+	return roster ? Object.keys(roster).map((id) => ({ id, title: roster[id] })) : [];
 }
 
 /** A member's stored payload, off the sparse map by own key: a document key can be
@@ -284,22 +270,28 @@ export function memberValue(map: Record<string, unknown> | undefined, id: string
 }
 
 /**
- * Whether a stored member is held. Key presence implies held unless the mapping
- * spells otherwise (canon `SCHEMAS.md` §Matrix, the variant precedent): an absent key
- * is unheld, a bare `true` is held, and a member object is held unless its `held` cell
- * says not. The spellings the engine coerces to false — `false`, `0`, `"false"`,
- * `null` — read false here; every other present value reads held, so a document the
- * engine would refuse still draws the tick its key presence claims.
+ * Whether a stored member is held. A bare scalar is the tick and a mapping is the member
+ * object, whose `held` cell resolves as every absent cell does, to its `default:` of
+ * `false` (canon `SCHEMAS.md` §Matrix): an absent key is unheld, a bare `true` is held,
+ * and a member object is held only where its `held` cell says so. The spellings the
+ * engine coerces to false — `false`, `0`, `"false"`, `null` — read false here; every other
+ * present scalar reads held, so a document the engine would refuse still draws the tick
+ * its spelling claims.
  */
 export function matrixHeld(stored: unknown): boolean {
-	if (stored === undefined || stored === null) return false;
-	if (typeof stored === 'boolean') return stored;
-	if (typeof stored === 'number') return stored !== 0;
-	if (typeof stored === 'string') return stored !== 'false';
-	if (typeof stored === 'object') {
-		const obj = stored as Record<string, unknown>;
-		return Object.hasOwn(obj, MATRIX_HELD) ? matrixHeld(obj[MATRIX_HELD]) : true;
-	}
+	if (typeof stored === 'object' && stored !== null)
+		return (
+			Object.hasOwn(stored, MATRIX_HELD) && tickOf((stored as Record<string, unknown>)[MATRIX_HELD])
+		);
+	return tickOf(stored);
+}
+
+/** A tick's scalar reading: absent and the engine's false spellings unheld, the rest held. */
+function tickOf(v: unknown): boolean {
+	if (v === undefined || v === null) return false;
+	if (typeof v === 'boolean') return v;
+	if (typeof v === 'number') return v !== 0;
+	if (typeof v === 'string') return v !== 'false';
 	return true;
 }
 
@@ -359,7 +351,7 @@ export function matrixMemberSchema(matrix: QuillFieldSchema): QuillFieldSchema {
 
 /** Whether `id` is on the roster. */
 export function matrixDeclares(matrix: QuillFieldSchema, id: string): boolean {
-	return (matrix.members ?? []).some((g) => Object.hasOwn(g.values, id));
+	return matrix.members != null && Object.hasOwn(matrix.members, id);
 }
 
 // ── The schema walk ──────────────────────────────────────────────────────────
@@ -457,10 +449,11 @@ export type ArrayLayout =
 
 /**
  * The layout an array takes: `'table'` where the array's own `ui.layout` asks for it
- * and every cell of the row is short (a block prose cell or a container declines it,
- * at load width and every width after), else `'list'`. The request is the schema's and
- * the answer is the surface's (canon `SCHEMAS.md`, borb-sh/quillmark#1825): a table
- * composes by position, so a row that would stack inside a cell is not one.
+ * and every cell of the row is short (a block prose cell declines it, at load width and
+ * every width after), else `'list'`. That every column is a leaf is the loader's
+ * contract (`quill::table_column_not_flat`); whether a leaf fits a cell is the surface's
+ * answer (canon `SCHEMAS.md`): a table composes by position, so a row that would stack
+ * inside a cell is not one.
  */
 export function arrayLayout(field: QuillFieldSchema): ArrayLayout {
 	if (field.ui?.layout !== 'table') return 'list';

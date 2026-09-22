@@ -26,7 +26,7 @@ import {
 	shortCell,
 	arrayLayout,
 	schemaAt,
-	matrixBlocks,
+	matrixMembers,
 	matrixHeld,
 	matrixColumns,
 	memberValue,
@@ -53,7 +53,7 @@ describe('controlKind', () => {
 		expect(controlKind(f({ type: 'array' }))).toBe('array');
 		expect(controlKind(f({ type: 'object' }))).toBe('object');
 		// Its own control, never the trailing arm's text input over a namespace.
-		expect(controlKind(f({ type: 'matrix', members: [] }))).toBe('matrix');
+		expect(controlKind(f({ type: 'matrix', members: {} }))).toBe('matrix');
 	});
 
 	it('splits the enum on `variants:`, the key that changes its resting shape', () => {
@@ -579,7 +579,7 @@ describe('arrayLayout', () => {
 describe('schemaAt', () => {
 	const matrix = f({
 		type: 'matrix',
-		members: [{ group: 'G', values: { a: 'A', b: 'B' } }],
+		members: { a: 'A', b: 'B' },
 		properties: { note: f({ type: 'plaintext', inline: true }) }
 	});
 	const vectors = f({
@@ -637,35 +637,25 @@ describe('schemaAt', () => {
 });
 
 describe('the matrix helpers', () => {
-	it('flattens the roster by own keys, in declaration order', () => {
-		const blocks = matrixBlocks([
-			{ group: 'G', values: { a: 'A', b: 'B' } },
-			{ values: { c: 'C' } }
+	it('reads the roster by own keys, in declaration order', () => {
+		expect(matrixMembers({ b: 'B', a: 'A' })).toEqual([
+			{ id: 'b', title: 'B' },
+			{ id: 'a', title: 'A' }
 		]);
-		expect(blocks).toEqual([
-			{
-				group: 'G',
-				members: [
-					{ id: 'a', title: 'A', group: 'G' },
-					{ id: 'b', title: 'B', group: 'G' }
-				]
-			},
-			{ group: undefined, members: [{ id: 'c', title: 'C', group: undefined }] }
-		]);
-		expect(matrixBlocks(undefined)).toEqual([]);
+		expect(matrixMembers(undefined)).toEqual([]);
 	});
 
-	it('reads held off both rest forms, key presence implying held', () => {
+	it('reads held off both rest forms, a mapping unheld unless it names `held`', () => {
 		expect(matrixHeld(undefined)).toBe(false);
 		expect(matrixHeld(true)).toBe(true);
-		expect(matrixHeld({ note: 'x' })).toBe(true);
+		expect(matrixHeld({ note: 'x' })).toBe(false);
 		expect(matrixHeld({ held: false, note: 'x' })).toBe(false);
 		expect(matrixHeld({ held: true })).toBe(true);
-		// The spellings the engine coerces to false.
-		for (const v of [false, 0, 'false', null, { held: 0 }, { held: 'false' }, { held: null }])
+		// The spellings the engine coerces to false, and a mapping naming no tick.
+		for (const v of [false, 0, 'false', null, {}, { held: 0 }, { held: 'false' }, { held: null }])
 			expect(matrixHeld(v), JSON.stringify(v)).toBe(false);
-		// Everything else present reads held, `{}` and `1` and `"true"` among them.
-		for (const v of [1, 'true', {}, { held: 1 }, { held: {} }])
+		// Every other present tick reads held, `1` and `"true"` among them.
+		for (const v of [1, 'true', { held: 1 }, { held: {} }])
 			expect(matrixHeld(v), JSON.stringify(v)).toBe(true);
 	});
 

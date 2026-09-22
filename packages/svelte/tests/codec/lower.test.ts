@@ -398,22 +398,12 @@ describe('the island channel — an island edit lowers op-wise', () => {
 		expect(anchorAt(doc.main.body, 'a1')).toBe(2);
 	});
 
-	it('a degraded island keeps its class: `loss` is authored, never re-stamped', () => {
-		const rt = md(TABLE_MD);
-		rt.islands[0].loss = 'degraded';
-		const { doc, oldRt, bundle } = lowerEdit(rt, (s) => retypeCell(s, 'HEAD'));
-		expect(oldRt.islands[0].loss).toBe('degraded'); // the node carried it out
-		doc.applyChange({}, bundle);
-		expect(doc.main.body.islands[0].loss).toBe('degraded');
-	});
-
-	it('a block island lowers to delta → islandOps → lineOps, and anchors survive', () => {
+	it('a block island lowers to delta → islandOps, and anchors survive', () => {
 		const rt = md('one\n\ntwo');
 		rt.marks.push({ start: 1, end: 1, type: 'anchor', attrs: { id: 'a1' } });
 		const entry = {
 			id: 'isl-0',
 			islandType: 'table',
-			loss: 'lossless',
 			props: { header: [{ text: 'h', marks: [] }], rows: [], aligns: ['none'] }
 		};
 		const { doc, bundle } = lowerEdit(
@@ -421,12 +411,12 @@ describe('the island channel — an island edit lowers op-wise', () => {
 			(s) => s.tr.insert(s.doc.child(0).nodeSize, blockSchema.nodes.island_block.create(entry)),
 			{ newAnchors: [{ id: 'a1', pos: 1 }] }
 		);
-		// The delta opens the line, the island op places the slot, the line op tags it.
+		// The delta opens the line and the island op places the slot; the island is what
+		// says the line is a block, which rests as a `para`.
 		expect(bundle.delta?.ops).toContainEqual({ insert: '\n' });
 		expect(bundle.islandOps).toEqual([
 			expect.objectContaining({ op: 'insert', at: 4, id: 'isl-0', type: 'table' })
 		]);
-		expect(bundle.lineOps).toContainEqual({ op: 'setKind', line: 1, kind: 'island' });
 		doc.applyChange({}, bundle);
 		expect(doc.main.body.text).toBe('one\n￼\ntwo');
 		expect(doc.main.body.islands.map((i) => i.id)).toEqual(['isl-0']);
