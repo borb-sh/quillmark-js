@@ -270,7 +270,9 @@
 	function add(): void {
 		insertAfter(ids.length - 1);
 	}
-	function remove(k: number): void {
+	/** Remove element `k`: into `column` where the gesture came from a table cell, so
+	 *  Backspace keeps its column as Enter does. */
+	function remove(k: number, column?: string): void {
 		const dropped = ids[k];
 		const next = ids.filter((_, i) => i !== k);
 		ids = next;
@@ -283,7 +285,7 @@
 		// into its place; on the add affordance once the list is empty, which is then
 		// the only thing left to hold it. Clicking the remove needs this as much as the
 		// key does: the button under the pointer is part of what it destroys.
-		void focusAfterFlush(next[Math.max(k - 1, 0)]);
+		void focusAfterFlush(next[Math.max(k - 1, 0)], column);
 	}
 	/**
 	 * Move element `k` one slot: one splice of the ids and of the values together, so
@@ -457,7 +459,7 @@
 			// the emptiness test reads the state before this keystroke applies; so the
 			// press that empties an element never also removes it.
 			e.preventDefault();
-			remove(k);
+			remove(k, column);
 		}
 	}
 	/** The reorder's keyboard twin, on the row so it answers from the summary and from
@@ -522,7 +524,7 @@
 			     column's rather than any one cell's. -->
 			<div class="qm-array-table-head">
 				{#each columns as [key, sub] (key)}
-					<div class="qm-array-table-col">
+					<div class="qm-array-table-col" class:fixed={controlKind(sub) === 'boolean'}>
 						<FieldLabel
 							label={columnTitle(key, sub)}
 							required={obliged(sub)}
@@ -806,12 +808,19 @@
 	 hangs off than the sibling below. The wider distance on the inside is the inversion:
 	 a subform reading as the next row's preamble. A variant spends the wider rung on the
 	 same join and needs no such guard, a field carrying one control and no siblings for
-	 its cells to drift toward. */
+	 its cells to drift toward.
+
+	 The air is against a sibling row and nothing else: the label row above the first and
+	 the foot below the last are not rows a subform could read as, and a rung spent there
+	 moves the summary that was just pressed. */
 	.qm-element {
 		row-gap: var(--_qm-space);
 	}
-	.qm-element.open {
-		margin-block: var(--_qm-space);
+	.qm-element.open:not(:first-child) {
+		margin-block-start: var(--_qm-space);
+	}
+	.qm-element.open:not(:last-child) {
+		margin-block-end: var(--_qm-space);
 	}
 	/* The inline distance is the stacker's too, and here it is a rung: the summary stands
 	 for the row rather than being a cell of it, so its subform's vertical takes the
@@ -925,9 +934,16 @@
 	}
 	/* The header's cells are labels standing over columns, at the rung a field label
 	 stands at over its control, and where the column's floor is stated: a column is a
-	 property and every one of them has a header, so the label carries the track's. */
+	 property and every one of them has a header, so the label carries the track's. The
+	 floor is for a control that shrinks — a text, a number, an enum trigger, each `width:
+	 100%` over a `min-content` of nothing. A switch is one width at every rung and its
+	 header one word, so a boolean column takes no floor: floored, it stands the actions
+	 a track's worth of nothing off the last cell. */
 	.qm-array-table-col {
 		min-width: var(--_qm-track-min);
+	}
+	.qm-array-table-col.fixed {
+		min-width: 0;
 	}
 	/* In a table the controls are a column, not a slab: in flow, at the row's end, and
 	 always drawn — a table's rows are many and the eye finds a control by its column —
