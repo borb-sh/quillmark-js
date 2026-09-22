@@ -22,9 +22,11 @@
  The table (`layout: 'table'`, VISUAL_EDITOR §"Structure mirrors the schema") is the
  same row machine in another presentation: the same ids, the same splices, the same
  landing and the same keys, over rows that are always open, each cell the property's
- ordinary control on the track the header names ({@link ObjectField} `bare`). A table
- composes by position, so it recurses into nothing: `arrayLayout` declines it for a
- row holding a container or a block prose cell.
+ ordinary control on the track the header names ({@link ObjectField} `bare`). Every
+ row of it open, the whole of it stands where an open row's subform stands: a rung
+ inside the field, behind the subform's vertical. A table composes by position, so it
+ recurses into nothing: `arrayLayout` declines it for a row holding a container or a
+ block prose cell.
 
  The row's controls are inside the element: a slab over the end of the element's own
  box, taking its two end-side corners — the remove, and on an `object` row the reorder
@@ -510,54 +512,51 @@
 	<!-- Three lists, one per row shape, because `animate:` is granted only to a keyed
 	     each block's one child: a branch inside the block would stand between them. -->
 	{#if table}
-		<div
-			class="qm-array-rows qm-array-table"
-			class:empty={ids.length === 0}
-			style:--table-cols={columns.length}
-			bind:this={rowsEl}
-		>
-			<!-- The header names the columns, so a cell carries no label of its own: its
-			     accessible name is the row's and the column's composed (`ObjectField`). The
-			     obligation mark and the guidance affordance ride the header, being the
-			     column's rather than any one cell's. -->
-			<div class="qm-array-table-head">
-				{#each columns as [key, sub] (key)}
-					<div class="qm-array-table-col">
-						<FieldLabel
-							label={columnTitle(key, sub)}
-							required={obliged(sub)}
-							description={sub.description}
+		<div class="qm-array-rows qm-array-table" class:empty={ids.length === 0} bind:this={rowsEl}>
+			<div class="qm-array-table-scroller" style:--table-cols={columns.length}>
+				<!-- The header names the columns, so a cell carries no label of its own: its
+				     accessible name is the row's and the column's composed (`ObjectField`). The
+				     obligation mark and the guidance affordance ride the header, being the
+				     column's rather than any one cell's. -->
+				<div class="qm-array-table-head">
+					{#each columns as [key, sub] (key)}
+						<div class="qm-array-table-col">
+							<FieldLabel
+								label={columnTitle(key, sub)}
+								required={obliged(sub)}
+								description={sub.description}
+							/>
+						</div>
+					{/each}
+					<span></span>
+				</div>
+				{#each ids as id, k (id)}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<!-- The handler catches a key from the controls inside the row and adds no
+					     interaction of the row's own: the row is no tab stop. -->
+					<div
+						class="qm-array-row qm-array-table-row"
+						bind:this={rowEls[id]}
+						animate:reorder={arm.armed}
+						onkeydown={(e) => onRowKey(e, k)}
+					>
+						<ObjectField
+							bare
+							bind:this={cellEls[id]}
+							value={(arr[k] ?? {}) as Record<string, unknown>}
+							properties={items?.properties}
+							label={rowName(k)}
+							contentAt={(path) => contentAt([k, ...path])}
+							onCommit={(obj) => commitElement(k, obj)}
+							onCellKey={(e, column) => onElementKey(e, k, column)}
+							diagnostics={routed.below.get(k)}
 						/>
+						<div class="qm-row-actions">
+							{@render rowActions(k)}
+						</div>
 					</div>
 				{/each}
-				<span></span>
 			</div>
-			{#each ids as id, k (id)}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<!-- The handler catches a key from the controls inside the row and adds no
-				     interaction of the row's own: the row is no tab stop. -->
-				<div
-					class="qm-array-row qm-array-table-row"
-					bind:this={rowEls[id]}
-					animate:reorder={arm.armed}
-					onkeydown={(e) => onRowKey(e, k)}
-				>
-					<ObjectField
-						bare
-						bind:this={cellEls[id]}
-						value={(arr[k] ?? {}) as Record<string, unknown>}
-						properties={items?.properties}
-						label={rowName(k)}
-						contentAt={(path) => contentAt([k, ...path])}
-						onCommit={(obj) => commitElement(k, obj)}
-						onCellKey={(e, column) => onElementKey(e, k, column)}
-						diagnostics={routed.below.get(k)}
-					/>
-					<div class="qm-row-actions">
-						{@render rowActions(k)}
-					</div>
-				</div>
-			{/each}
 		</div>
 	{:else if control === 'object'}
 		<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
@@ -882,33 +881,48 @@
 		font-style: italic;
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
-	 One grid over the header and every row: a column per property, then a track for the
-	 row's own controls. The header and each row subgrid onto it, so a cell's edge is its
-	 column's whatever the row above it holds. The row packs at the start rather than
-	 sharing the field's leftover width between the columns: a table carries its own
-	 rhythm, and stretching four short cells across a field sets them apart by the width
-	 the card happens to have.
+	 Every row of it is open, so it stands where an open row's subform stands: a rung
+	 inside the field, behind the subform's vertical and between its caps (`ObjectField`,
+	 ARCHITECTURE §"A plane is a tone"). The stroke is what says the header's labels are
+	 the field's insides: on the field's own edge at the label's register, labels abreast
+	 over boxes are the figure a row of compact fields draws. A corner reads square at a
+	 stroke, so the wash takes none here.
+
+	 The grid is a box inside the stroke, and the one that scrolls: the stroke and the
+	 inset hold still while the columns move, and the clip is the inset's edge rather than
+	 the stroke's. One grid over the header and every row: a column per property, then a
+	 track for the row's own controls. The header and each row subgrid onto it, so a
+	 cell's edge is its column's whatever the row above it holds. The row packs at the
+	 start rather than sharing the field's leftover width between the columns: a table
+	 carries its own rhythm, and stretching four short cells across a field sets them
+	 apart by the width the card happens to have.
 
 	 A track rests at what its cells cannot shrink below and grows no further than its
-	 widest, so a field too narrow for them all overflows this box and scrolls sideways.
-	 A fixed floor as the track's base would instead hand each column a share of the
-	 width and leave a control that does not shrink — a date's segments — painting over
-	 the column beside it; the floor rides the header cell, which every column has.
+	 widest, so a field too narrow for them all overflows the grid's box and scrolls
+	 sideways. A fixed floor as the track's base would instead hand each column a share of
+	 the width and leave a control that does not shrink — a date's segments — painting
+	 over the column beside it; the floor rides the header cell, which every column has.
 
-	 The pad is the clip box's, the ring on a cell at this box's own edge reaching past
-	 its content; the margin takes the same distance back, so the tracks stand where the
-	 label row above them does.
+	 The pad is the clip box's, the ring on a cell at that box's own edge reaching past
+	 its content; the margin takes the same distance back, so the tracks stand a nest in
+	 from the label row above them and the caps keep their rung.
 
 	 The names are the array's own: `.qm-table` is the codec's island (`prose.css`), an
 	 unscoped stylesheet in this package, and a box wearing that name takes the island's
 	 hairline whatever this block says. */
 	.qm-array-rows.qm-array-table {
+		border-inline-start: var(--_qm-vertical-width) solid var(--_qm-border);
+		padding-inline-start: var(--_qm-nest);
+		padding-block: var(--_qm-space);
+		border-radius: 0;
+	}
+	.qm-array-table-scroller {
 		display: grid;
 		grid-template-columns:
 			repeat(var(--table-cols), minmax(min-content, max-content))
 			auto;
 		justify-content: start;
-		column-gap: var(--_qm-space);
+		gap: var(--_qm-space);
 		overflow-x: auto;
 		padding: var(--_qm-ring-reach);
 		margin: calc(-1 * var(--_qm-ring-reach));
