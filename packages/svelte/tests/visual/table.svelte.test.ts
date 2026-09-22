@@ -158,6 +158,10 @@ describe('an array<object> declaring ui.layout: table', () => {
 		flushSync();
 		expect(rows(q, doc).map((r) => r.name)).toEqual(['Grace Hopper']);
 		expect(nameCell(t, 0).value).toBe('Grace Hopper');
+		// A pressed remove lands on the row above's: the button is pinned, so the clip
+		// stays where the pointer left it.
+		await settle();
+		expect(document.activeElement).toBe(t.querySelector('.qm-array-table-row > .qm-remove'));
 	});
 
 	it('lands a field landing on the first cell, and a row address on that row', async () => {

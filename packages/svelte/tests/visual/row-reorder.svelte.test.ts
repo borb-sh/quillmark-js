@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // Reorder on an `object` row (VISUAL_EDITOR §"Settled and open"): ↑/↓ on the row's
 // head, disabled at either edge, and Alt+↑/↓ from anywhere in the row as the keyboard
-// twin. One splice of the ids and the values together, then the array commits whole,
-// so the element keeps its id and everything mounted under it. Driven off the
-// reference quill's `revisions` with three rows.
+// twin, the nearest row answering. One splice of the ids and the values together, then
+// the array commits whole, so the element keeps its id and everything mounted under it.
+// Driven off the reference quill's `revisions` with three rows, and off `appendices`
+// for a row inside a row.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
@@ -123,6 +124,27 @@ describe('reorder on an object row', () => {
 		// The keyed row moved as one node: the subform's input is the same element.
 		expect(arr.querySelector('.qm-element.open input[type="text"]')).toBe(input);
 		expect(order(q, doc)).toEqual(['B', 'A', 'C']);
+	});
+
+	it('answers from the nearest row alone: a press in a nested row leaves the record around it', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		mounted = mountEditor(q, doc);
+		openGroup(mounted.target, 'Content');
+		const outer = field(mounted.target, 'Appendices');
+		summaries(outer)[0].click();
+		flushSync();
+		// The open appendix's own list, a rung in: its rows are its own, not this field's.
+		const inner = outer.querySelector<HTMLElement>('.qm-element.open .qm-array')!;
+		expect(summaryTexts(inner)).toEqual(['Primary', 'Secondary']);
+		const n = mounted.changes.length;
+
+		press(summaries(inner)[0], 'ArrowDown', { altKey: true });
+		flushSync();
+		expect(summaryTexts(inner)).toEqual(['Secondary', 'Primary']);
+		expect(summaryTexts(outer)).toEqual(['Sources', 'Glossary']);
+		// One move, one commit: the key reached the appendix row and was not its to answer.
+		expect(mounted.changes.length).toBe(n + 1);
 	});
 
 	it('offers no reorder on a scalar or prose row', () => {

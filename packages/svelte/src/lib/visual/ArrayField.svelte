@@ -40,11 +40,11 @@
 
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
  caret there, Backspace on an empty element removes it and hands focus back up the
- list, Alt+↑/↓ anywhere in an `object` row of the list moves it. A move is one splice
- of the ids and of the values together, the mechanism insert and remove use, so an
- element keeps its id for life and no prose leaf inside it remounts; the open row stays
- open across its own move, and `animate:reorder` holds the moving row as it holds a
- card.
+ list, Alt+↑/↓ anywhere in an `object` row of the list moves it, the nearest row
+ answering and never the record around a nested one. A move is one splice of the ids
+ and of the values together, the mechanism insert and remove use, so an element keeps
+ its id for life and no prose leaf inside it remounts; the open row stays open across
+ its own move, and `animate:reorder` holds the moving row as it holds a card.
 -->
 <script lang="ts">
 	import { wording } from './strings.js';
@@ -275,7 +275,15 @@
 	function add(): void {
 		insertAfter(ids.length - 1);
 	}
-	function remove(k: number): void {
+	/** Remove element `k`. Focus lands on the element before it, or on the one that
+	 *  slid into its place; on the add affordance once the list is empty, which is then
+	 *  the only thing left to hold it. Clicking the remove needs this as much as the key
+	 *  does: the button under the pointer is part of what it destroys. A table lands on
+	 *  the control the gesture came from: `column`, so Backspace keeps its column as
+	 *  Enter does, or the remove where `fromRemove` says one was pressed, which is
+	 *  pinned and so keeps the clip where the pointer left it, where the first cell
+	 *  would scroll the box back to its start on every press. */
+	function remove(k: number, column?: string, fromRemove = false): void {
 		const dropped = ids[k];
 		const next = ids.filter((_, i) => i !== k);
 		ids = next;
@@ -284,11 +292,7 @@
 		// left naming an element that has gone.
 		if (openId === dropped) openId = undefined;
 		onCommit(arr.filter((_, i) => i !== k));
-		// Focus lands on the element before the removed one, or on the one that slid
-		// into its place; on the add affordance once the list is empty, which is then
-		// the only thing left to hold it. Clicking the remove needs this as much as the
-		// key does: the button under the pointer is part of what it destroys.
-		void focusAfterFlush(next[Math.max(k - 1, 0)]);
+		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove);
 	}
 	/**
 	 * Move element `k` one slot: one splice of the ids and of the values together, so
@@ -390,14 +394,25 @@
 	/** Focus element `id` after the flush, never in the same tick: a mutation commits
 	 * the array by value, so the parent re-derives and the row does not exist until
 	 * then. `undefined` is the empty list: the add affordance. `column` is a table
-	 * cell to land in rather than the row's first.
+	 * cell to land in rather than the row's first, and `fromRemove` the row's remove.
 	 *
 	 * The commit that schedules this can also remove the card holding the field, which
 	 * unmounts this component inside the window (core/teardown.ts). */
-	async function focusAfterFlush(id: string | undefined, column?: string): Promise<void> {
+	async function focusAfterFlush(
+		id: string | undefined,
+		column?: string,
+		fromRemove = false
+	): Promise<void> {
 		if (!(await span.resumes(tick()))) return;
 		if (id === undefined) return void addEl?.focus();
 		if (table) {
+			// Without the focus scroll: the remove is pinned, so it is in view where it
+			// stands, and the scroll the browser would make is to its unpinned place at
+			// the row's end.
+			if (fromRemove)
+				return void rowEls[id]
+					?.querySelector<HTMLElement>('.qm-remove')
+					?.focus({ preventScroll: true });
 			const cells = cellEls[id];
 			if (column && cells) void cells.focusPath([column]);
 			else cells?.focus();
@@ -461,14 +476,19 @@
 			// the emptiness test reads the state before this keystroke applies; so the
 			// press that empties an element never also removes it.
 			e.preventDefault();
-			remove(k);
+			remove(k, column);
 		}
 	}
 	/** The reorder's keyboard twin, on the row so it answers from the summary and from
-	 *  any cell an open row holds: Alt+↑/↓, the table island's own binding. */
+	 *  any cell an open row holds: Alt+↑/↓, the table island's own binding. The nearest
+	 *  row answers, or none does: a press inside a nested row is that row's whether it
+	 *  holds a reorder or not, so a key in a table's cell or a list of strings' input
+	 *  moves nothing, and never the record around it. */
 	function onRowKey(e: KeyboardEvent, k: number): void {
 		if (!e.altKey || e.isComposing) return;
 		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+		const nearest = e.target instanceof Element ? e.target.closest('.qm-array-row') : null;
+		if (nearest !== e.currentTarget) return;
 		e.preventDefault();
 		move(k, e.key === 'ArrowUp' ? -1 : 1);
 	}
@@ -544,12 +564,7 @@
 							onCellKey={(e, column) => onElementKey(e, k, column)}
 							diagnostics={routed.below.get(k)}
 						/>
-						<button
-							type="button"
-							class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
-							title={t.strings.arrayRemove}
-							onclick={() => remove(k)}><Icon name="minus" /></button
-						>
+						{@render removeButton(k)}
 					</div>
 				{/each}
 			</div>
@@ -558,7 +573,8 @@
 		<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
 			{#each ids as id, k (id)}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<!-- As above: a key catch, not an interaction of the row's own. -->
+				<!-- The handler catches a key from the controls inside the row and adds no
+				     interaction of the row's own: the row is no tab stop. -->
 				<div
 					class="qm-array-row qm-element"
 					class:open={openId === id}
@@ -633,12 +649,7 @@
 						/>
 					{/if}
 					<div class="qm-row-actions">
-						<button
-							type="button"
-							class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
-							title={t.strings.arrayRemove}
-							onclick={() => remove(k)}><Icon name="minus" /></button
-						>
+						{@render removeButton(k)}
 					</div>
 					<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
 				</div>
@@ -647,6 +658,17 @@
 	{/if}
 	<DiagnosticList diagnostics={foot} />
 </div>
+
+<!-- The remove, one button wherever a row ends: a scalar row's slab, a record row's
+     slab after its reorder pair, a table row's last track. -->
+{#snippet removeButton(k: number)}
+	<button
+		type="button"
+		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
+		title={t.strings.arrayRemove}
+		onclick={() => remove(k, undefined, true)}><Icon name="minus" /></button
+	>
+{/snippet}
 
 <!-- An `object` row's controls: the reorder pair, disabled at its edge as the card
      header's is, then the remove. -->
@@ -665,12 +687,7 @@
 		disabled={k === ids.length - 1}
 		onclick={() => move(k, 1)}><Icon name="chevron-down" /></button
 	>
-	<button
-		type="button"
-		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
-		title={t.strings.arrayRemove}
-		onclick={() => remove(k)}><Icon name="minus" /></button
-	>
+	{@render removeButton(k)}
 {/snippet}
 
 <style>
@@ -901,7 +918,9 @@
 
 	 The pad is the clip box's, the ring on a cell at that box's own edge reaching past
 	 its content; the margin takes the same distance back, so the tracks stand a nest in
-	 from the label row above them and the caps keep their rung.
+	 from the label row above them and the caps keep their rung. The box keeps the
+	 remove's track clear of the scrolls it makes itself, so a cell scrolled into view
+	 lands beside the pinned button rather than under it.
 
 	 The names are the array's own: `.qm-table` is the codec's island (`prose.css`), an
 	 unscoped stylesheet in this package, and a box wearing that name takes the island's
@@ -920,6 +939,7 @@
 		justify-content: start;
 		gap: var(--_qm-space);
 		overflow-x: auto;
+		scroll-padding-inline-end: calc(var(--_qm-tap-min) + var(--_qm-space));
 		padding: var(--_qm-ring-reach);
 		margin: calc(-1 * var(--_qm-ring-reach));
 	}
@@ -947,9 +967,9 @@
 	 its column. The header's end cell pins with it, or the labels would scroll under
 	 nothing while the cells scroll under a plane.
 
-	 The inset is the content box's, where the ring's reach still fits inside the clip;
-	 the plane spread over that same reach hides the sliver of cell the pad would show
-	 past the button, and the ring paints over it.
+	 The inset is the content box's, so the ring's reach fits inside the clip; the plane
+	 spread over that same reach hides the sliver of cell the pad would show past the
+	 button, and the ring paints over it.
 
 	 The slab's grammar goes with the slab: a button on the row's own plane takes the
 	 icon family's radius at all four corners, where one cut into a box takes that box's
