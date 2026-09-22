@@ -386,17 +386,12 @@ main:
     checks:
       type: matrix
       members:
-        - group: Editorial
-          values:
-            spelling: Spelling
-            citations: Citations
-            figures: Figures
-        - group: Production
-          values:
-            margins: Margins
-            fonts: Fonts
-        - values:
-            approved: Approved
+        spelling: Spelling
+        citations: Citations
+        figures: Figures
+        margins: Margins
+        fonts: Fonts
+        approved: Approved
       properties:
         note:
           type: plaintext
@@ -411,7 +406,7 @@ main:
           default: minor
       ui:
         group: meta
-      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Three roster blocks, the last ungrouped; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
+      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. A six-member roster; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
 
     colophon:
       type: richtext

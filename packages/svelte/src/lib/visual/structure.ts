@@ -11,7 +11,6 @@ import {
 	type PayloadItem,
 	type QuillCardSchema,
 	type QuillFieldSchema,
-	type QuillMatrixGroup,
 	type ResolvedField,
 	type Resolved
 } from '@quillmark/wasm';
@@ -252,29 +251,17 @@ export const MATRIX_HELD = 'held';
 // `{held, …columns}` object each member desugars to is derived at parse and not
 // serialized, so the control composes it from `members` × `properties` here.
 
-/** One member of the roster, flattened for drawing: its id, its title, and the group
- *  it sits in (`undefined` for an ungrouped block). */
+/** One member of the roster, drawn: its id and its title. */
 export interface MatrixMember {
 	id: string;
 	title: string;
-	group: string | undefined;
 }
 
-/** A roster block as the control draws it: the group label and its members, in
- *  declaration order. */
-export interface MatrixBlock {
-	group: string | undefined;
-	members: MatrixMember[];
-}
-
-/** The roster as blocks, in declaration order. Own keys only: a schema map is
- *  indexed by a document-supplied id, and `'toString' in values` is true of every
- *  roster. */
-export function matrixBlocks(groups: QuillMatrixGroup[] | undefined): MatrixBlock[] {
-	return (groups ?? []).map((g) => ({
-		group: g.group,
-		members: Object.keys(g.values).map((id) => ({ id, title: g.values[id], group: g.group }))
-	}));
+/** The roster in declaration order. Own keys only: a schema map is indexed by a
+ *  document-supplied id, and `'toString' in roster` is true of every roster. */
+export function matrixMembers(roster: Record<string, string> | undefined): MatrixMember[] {
+	const members = roster ?? {};
+	return Object.keys(members).map((id) => ({ id, title: members[id] }));
 }
 
 /** A member's stored payload, off the sparse map by own key: a document key can be
@@ -359,7 +346,7 @@ export function matrixMemberSchema(matrix: QuillFieldSchema): QuillFieldSchema {
 
 /** Whether `id` is on the roster. */
 export function matrixDeclares(matrix: QuillFieldSchema, id: string): boolean {
-	return (matrix.members ?? []).some((g) => Object.hasOwn(g.values, id));
+	return Object.hasOwn(matrix.members ?? {}, id);
 }
 
 // ── The schema walk ──────────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-// The matrix control (VISUAL_EDITOR §"Structure mirrors the schema"): grouped ticks
-// over the roster, columns unfolding under a held member, one sparse map committed
-// whole. Driven off the reference quill's `checks` — three blocks, the last ungrouped,
-// two columns — and read back through the document.
+// The matrix control (VISUAL_EDITOR §"Structure mirrors the schema"): ticks over the
+// roster, columns unfolding under a held member, one sparse map committed whole.
+// Driven off the reference quill's `checks` — six members, two columns — and read
+// back through the document.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
@@ -47,19 +47,14 @@ const tick = (m: HTMLElement, title: string) =>
 const count = (m: HTMLElement) => m.querySelector('.qm-matrix-count')?.textContent;
 
 describe('a matrix field', () => {
-	it('draws the roster as blocks of real checkboxes, each titled by a label for it', () => {
+	it('draws the roster as real checkboxes, each titled by a label for it', () => {
 		const q = quill();
 		mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
 
-		expect(m.querySelectorAll('.qm-matrix-block')).toHaveLength(3);
-		// The ungrouped block keeps an empty title slot, so its members stand level with
-		// the grouped blocks' rather than at their titles' line.
-		expect([...m.querySelectorAll('.qm-matrix-group')].map((g) => g.textContent)).toEqual([
-			'Editorial',
-			'Production',
-			''
-		]);
+		// A roster declaring columns stacks: a tick unfolds inside the member's own box,
+		// so nothing beside it is sized off content that a tick reveals.
+		expect(m.querySelector('.qm-matrix-roster.tiled')).toBeNull();
 		const ticks = [...m.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
 		expect(ticks).toHaveLength(6);
 		for (const t of ticks) {
@@ -131,7 +126,7 @@ describe('a matrix field', () => {
 		expect(stored(doc)).toBeUndefined();
 	});
 
-	it('walks the members of a block with the arrow keys', () => {
+	it('walks the roster with the arrow keys', () => {
 		const q = quill();
 		mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
@@ -139,13 +134,15 @@ describe('a matrix field', () => {
 		spelling.focus();
 		press(spelling, 'ArrowDown');
 		expect(document.activeElement).toBe(tick(m, 'Citations'));
-		press(tick(m, 'Citations'), 'ArrowDown');
-		expect(document.activeElement).toBe(tick(m, 'Figures'));
-		// The block's edge is the walk's: the next block is reached by Tab, not by arrow.
-		press(tick(m, 'Figures'), 'ArrowDown');
-		expect(document.activeElement).toBe(tick(m, 'Figures'));
-		press(tick(m, 'Figures'), 'ArrowUp');
-		expect(document.activeElement).toBe(tick(m, 'Citations'));
+		press(tick(m, 'Citations'), 'ArrowUp');
+		expect(document.activeElement).toBe(spelling);
+		// The roster's edge is the walk's: past it the caret stays where it is.
+		press(spelling, 'ArrowUp');
+		expect(document.activeElement).toBe(spelling);
+		const approved = tick(m, 'Approved');
+		approved.focus();
+		press(approved, 'ArrowDown');
+		expect(document.activeElement).toBe(approved);
 	});
 
 	it('lands a member address on its tick and a column address on that column', async () => {
