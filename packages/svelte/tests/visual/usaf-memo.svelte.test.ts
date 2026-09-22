@@ -159,7 +159,6 @@ describe('the shipped quill on the surface', () => {
 		// for: the whole world is fillable here, so a CUI document can be finished from
 		// this surface.
 		expect(field.querySelectorAll('.qm-object-prop .ProseMirror')).toHaveLength(4);
-		expect(field.querySelectorAll('.qm-object-prop .qm-unsupported')).toHaveLength(0);
 	});
 
 	// What the cells rest as, both ways. The read is the one a variant's key answers

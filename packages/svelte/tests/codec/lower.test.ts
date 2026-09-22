@@ -417,6 +417,9 @@ describe('the island channel — an island edit lowers op-wise', () => {
 		expect(bundle.islandOps).toEqual([
 			expect.objectContaining({ op: 'insert', at: 4, id: 'isl-0', type: 'table' })
 		]);
+		expect(bundle.lineOps ?? []).not.toContainEqual(
+			expect.objectContaining({ op: 'setKind', kind: 'island' })
+		);
 		doc.applyChange({}, bundle);
 		expect(doc.main.body.text).toBe('one\n￼\ntwo');
 		expect(doc.main.body.islands.map((i) => i.id)).toEqual(['isl-0']);

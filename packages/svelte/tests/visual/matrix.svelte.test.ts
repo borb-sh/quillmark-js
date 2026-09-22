@@ -90,6 +90,11 @@ describe('a matrix field', () => {
 		expect(spelling.querySelector('.ProseMirror')).not.toBeNull();
 		expect(spelling.querySelector('.qm-select')).not.toBeNull();
 		expect(member(m, 'Citations').querySelector('.qm-object')).toBeNull();
+		// The columns are a group the member's title names, so each reads under its member.
+		const group = spelling.querySelector<HTMLElement>('.qm-object')!;
+		expect(document.getElementById(group.getAttribute('aria-labelledby') ?? '')?.textContent).toBe(
+			'Spelling'
+		);
 
 		pick(spelling.querySelector<HTMLElement>('.qm-select')!, 'major');
 		expect(stored(doc)).toEqual({ spelling: { held: true, severity: 'major' } });
@@ -152,6 +157,9 @@ describe('a matrix field', () => {
 		expect(document.activeElement).toBe(approved);
 		spelling.focus();
 		press(spelling, 'ArrowUp');
+		expect(document.activeElement).toBe(spelling);
+		// A modified arrow is another binding's: the row around a nested matrix moves on Alt.
+		press(spelling, 'ArrowDown', { altKey: true });
 		expect(document.activeElement).toBe(spelling);
 	});
 

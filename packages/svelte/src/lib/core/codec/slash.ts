@@ -372,10 +372,7 @@ const SLASH_COMMANDS: Record<string, Command> = {
 		state.schema.nodes.island_block.create({
 			id: mintIslandId(state.doc),
 			islandType: 'table',
-			props: newTable(),
-			// A table the editor builds is a pipe table by construction, so markdown
-			// carries it whole; `loss` is authored and never re-derived (CODEC §Islands).
-			loss: 'lossless'
+			props: newTable()
 		})
 	)
 };

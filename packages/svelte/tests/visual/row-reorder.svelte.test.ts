@@ -78,6 +78,42 @@ describe('reorder on an object row', () => {
 		expect(rowButton(arr, 1, 'Move down')).toBe(down);
 	});
 
+	it('hands the focus to the twin arrow when a move carries the pressed one to its edge', async () => {
+		const q = quill();
+		const doc = threeRows(q);
+		mounted = mountEditor(q, doc);
+		const arr = revisions(mounted.target);
+
+		const down = rowButton(arr, 1, 'Move down');
+		down.focus();
+		down.click();
+		flushSync();
+		expect(order(q, doc)).toEqual(['A', 'C', 'B']);
+		await settle();
+		expect(down.disabled).toBe(true);
+		expect(document.activeElement).toBe(rowButton(arr, 2, 'Move up'));
+	});
+
+	it('leaves a key a cell already took to that cell', () => {
+		const q = quill();
+		const doc = threeRows(q);
+		mounted = mountEditor(q, doc);
+		const arr = revisions(mounted.target);
+		summaries(arr)[1].click();
+		flushSync();
+		const input = arr.querySelector<HTMLInputElement>('.qm-element.open input[type="text"]')!;
+		// Cancelable, as a key off the keyboard is, so the cell's `preventDefault` lands.
+		input.addEventListener('keydown', (e) => e.preventDefault(), { once: true });
+		press(input, 'ArrowDown', { altKey: true, cancelable: true });
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
+
+		// Alt with another modifier is a different chord, not the reorder.
+		press(input, 'ArrowDown', { altKey: true, shiftKey: true, cancelable: true });
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
+		press(input, 'ArrowDown', { altKey: true, cancelable: true });
+		expect(order(q, doc)).toEqual(['A', 'C', 'B']);
+	});
+
 	it('moves the row by Alt+arrow from its summary, and keeps the open row open', async () => {
 		const q = quill();
 		const doc = threeRows(q);

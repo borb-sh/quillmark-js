@@ -186,7 +186,7 @@ An `enum` declaring `variants:` rests as a container, `{value: <member>, …that
 
 **`ui.compact` is inert everywhere a variant carries it**: on the field, whose height is the live world's cell count and so moves on a pick rather than only with the document, and inside it, the cells being the object subform's own grid, which reads no `ui`.
 
-The field commits whole and holds no per-cell write address, `Addr` reaching a root and one field: a diagnostic anchored at `main.<field>.<cell>` routes to the field that draws it, exactly as an object property's does (§Diagnostics). A variant cannot nest — the boundary rejects one below card level at load — so the control appears at a card's own field list and nowhere else; its cells may be containers of their own, drawn at the next rung.
+The field commits whole and holds no per-cell write address, `Addr` reaching a root and one field: a diagnostic anchored at `main.<field>.<cell>` routes to the field that draws it, exactly as an object property's does (§Diagnostics). A variant stands at a card's own field list or at a typed dictionary's property, which the object subform draws at the next rung as it draws any container; an array element, a matrix column and another variant's cell refuse one at load (`quill::variant_placement`). Its cells may be containers of their own, drawn at the next rung.
 
 ## The matrix
 

@@ -298,7 +298,8 @@
 	 * Move element `k` one slot: one splice of the ids and of the values together, so
 	 * the element keeps its id and everything mounted under it. A no-op at either edge.
 	 * The control that was pressed rides with the row, so it is focused again once the
-	 * flush has moved it: a node moved in the DOM is a node the browser blurred.
+	 * flush has moved it: a node moved in the DOM is a node the browser blurred. An arrow
+	 * the move carried to its edge is disabled and takes no focus, so its twin does.
 	 */
 	function move(k: number, dir: -1 | 1): void {
 		const to = k + dir;
@@ -315,7 +316,14 @@
 		onCommit(next);
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
-			if (pressed instanceof HTMLElement && pressed.isConnected) pressed.focus();
+			if (!(pressed instanceof HTMLElement) || !pressed.isConnected) return;
+			const target =
+				pressed instanceof HTMLButtonElement && pressed.disabled
+					? [pressed.previousElementSibling, pressed.nextElementSibling].find(
+							(b) => b instanceof HTMLButtonElement && !b.disabled
+						)
+					: pressed;
+			if (target instanceof HTMLElement) target.focus();
 		})();
 	}
 	/** Take the caret: the first element, or the add affordance when the list is empty;
@@ -485,12 +493,17 @@
 	 *  holds a reorder or not, so a key in a table's cell or a list of strings' input
 	 *  moves nothing, and never the record around it. */
 	function onRowKey(e: KeyboardEvent, k: number): void {
-		if (!e.altKey || e.isComposing) return;
+		if (!e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+		// A cell that took the key — a select opening, a date segment stepping, a prose
+		// leaf joining — owns it.
+		if (e.defaultPrevented) return;
 		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
 		const nearest = e.target instanceof Element ? e.target.closest('.qm-array-row') : null;
 		if (nearest !== e.currentTarget) return;
+		const dir = e.key === 'ArrowUp' ? -1 : 1;
+		if (k + dir < 0 || k + dir >= ids.length) return;
 		e.preventDefault();
-		move(k, e.key === 'ArrowUp' ? -1 : 1);
+		move(k, dir);
 	}
 </script>
 
@@ -756,7 +769,7 @@
 	 row's summary, which stands three slabs off its end. `:global`, because the box
 	 belongs to the child component's markup and the scope class stops at this
 	 component's. The longhand beats the family's `padding` shorthand without a
-	 specificity fight: this block is unlayered and `controls.css` is not. */
+	 specificity fight: `controls.css` ranks the family at zero inside `:where()`. */
 	.qm-array-row > :global(.qm-input),
 	.qm-array-row > :global(.qm-control-box) {
 		padding-inline-end: var(--_qm-tap-min);
@@ -799,8 +812,12 @@
 		width: var(--_qm-glyph-control);
 		height: var(--_qm-glyph-control);
 	}
-	.qm-array-row:hover .qm-row-actions,
-	.qm-array-row:focus-within .qm-row-actions {
+	/* Child combinators: a nested array shares this scope, and a row's hover is not its
+	 open subform's rows'. */
+	.qm-array-row:hover > .qm-row-actions,
+	.qm-array-row:focus-within > .qm-row-actions,
+	.qm-array-row:hover > .qm-element-head > .qm-row-actions,
+	.qm-array-row:focus-within > .qm-element-head > .qm-row-actions {
 		opacity: 1;
 	}
 	.qm-remove:hover:not(:disabled) {

@@ -10,7 +10,6 @@ import { quill } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
-	openGroup,
 	press,
 	settle,
 	stubLayout,

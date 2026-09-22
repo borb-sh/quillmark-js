@@ -164,7 +164,6 @@ describe('an object field', () => {
 		];
 		const leaf = props[4].querySelector<HTMLElement>('.ProseMirror')!;
 		expect(leaf).not.toBeNull();
-		expect(props[4].querySelector('.qm-unsupported')).toBeNull();
 		// `plaintext`, so the asterisks are characters: nothing was lowered from them.
 		expect(leaf.textContent).toBe('ask for *Ada*, not Augusta');
 		expect(leaf.querySelector('em, strong')).toBeNull();

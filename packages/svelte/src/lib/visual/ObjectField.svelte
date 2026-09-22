@@ -3,10 +3,10 @@
  committing the whole object by value on any nested change. A scalar property draws
  its own control, a content property mounts the by-value prose leaf ({@link
  ProseValue}) over the boundary's nested read, and a container property — an `array`,
- an `object`, a `matrix` — mounts its own control here, at the next rung of the same
- figure. Depth is bounded by what is open, not by the schema: a repeater inside a
- subform is collapsed rows again, one open at a time, so an open row under an open row
- is one figure two rungs in.
+ an `object`, a `matrix`, a variant — mounts its own control here, at the next rung of
+ the same figure. Depth is bounded by what is open, not by the schema: a repeater inside
+ a subform is collapsed rows again, one open at a time, so an open row under an open
+ row is one figure two rungs in.
 
  The nesting is a vertical at `--_qm-border`, the ladder's last stroke: the card's edge,
  an open section's vertical one `--_qm-nest` in where the field is in one, this one a rung
@@ -49,6 +49,7 @@
 	import ProseValue from './ProseValue.svelte';
 	import ArrayField from './ArrayField.svelte';
 	import MatrixField from './MatrixField.svelte';
+	import VariantField from './VariantField.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
 	import ObjectField from './ObjectField.svelte';
 	import './controls.css';
@@ -144,6 +145,9 @@
 		| undefined
 	> = $state({});
 	let rootEl = $state<HTMLElement | undefined>();
+	/** A handle by property name, own keys only: a property can be named `constructor`. */
+	const ref = <T,>(map: Record<string, T | undefined>, key: string): T | undefined =>
+		Object.hasOwn(map, key) ? map[key] : undefined;
 	const FOCUSABLE = 'input, select, button, [tabindex]:not([tabindex="-1"])';
 	/** Take the caret: the first property that has somewhere to put it, in document
 	 * order — a subform has no single control of its own to land on. An empty subform
@@ -165,9 +169,9 @@
 			focus();
 			return undefined;
 		}
-		const nested = nestedEls[key];
+		const nested = ref(nestedEls, key);
 		if (nested) return nested.focusPath(rest, pos);
-		const prose = proseEls[key];
+		const prose = ref(proseEls, key);
 		if (prose) {
 			if (pos != null) prose.setCaret(pos);
 			else prose.focus();
@@ -194,7 +198,7 @@
 	/** Land in one property's cell, answering whether it took the caret. */
 	function landOn(cell: HTMLElement): boolean {
 		const key = cell.dataset.qmProp ?? '';
-		const owned = nestedEls[key] ?? proseEls[key];
+		const owned = ref(nestedEls, key) ?? ref(proseEls, key);
 		if (owned) {
 			owned.focus();
 			return true;
@@ -240,11 +244,15 @@
 			{@const describes = sub.description && ids ? ids.description : undefined}
 			{@const deep = routed.below.get(key)}
 			{@const own = isContainer(kind) ? undefined : deep?.map((d) => d.diagnostic)}
-			<!-- `for` reaches the four labelable controls; the date field's focus lives on a
-			     segment and a prose cell is a `contenteditable`, so those take the click
-			     handoff instead, exactly as `Field` does one level up. -->
+			<!-- `for` reaches the labelable controls, a variant through its discriminant; the
+			     date field's focus lives on a segment and a prose cell is a `contenteditable`,
+			     so those take the click handoff instead, exactly as `Field` does one level up. -->
 			{@const labelable =
-				kind === 'text' || kind === 'enum' || kind === 'number' || kind === 'boolean'}
+				kind === 'text' ||
+				kind === 'enum' ||
+				kind === 'variant' ||
+				kind === 'number' ||
+				kind === 'boolean'}
 			<!-- A container takes the full span at every depth: its rows are the document's
 			     to count, and a track beside it would stand in a column of whitespace
 			     (`packable`). -->
@@ -366,6 +374,20 @@
 						labelId={ids?.label}
 						descriptionId={describes}
 						idBase={ids?.control}
+						contentAt={(path) => contentAt([key, ...path])}
+						onCommit={(v) => commitProp(key, v)}
+						diagnostics={deep}
+					/>
+				{:else if kind === 'variant'}
+					<VariantField
+						bind:this={nestedEls[key]}
+						value={obj[key] as Record<string, unknown> | undefined}
+						schema={sub}
+						ghostMember={sub.default as string | undefined}
+						label={title(key, sub)}
+						id={ids?.control}
+						labelledBy={ids?.label}
+						describedBy={describes}
 						contentAt={(path) => contentAt([key, ...path])}
 						onCommit={(v) => commitProp(key, v)}
 						diagnostics={deep}
