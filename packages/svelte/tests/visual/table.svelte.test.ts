@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // The table (`ui.layout: table`) and the cap (`max:`), both on the reference quill's
 // `contributors`. The table is the record list's row machine in another presentation:
-// the same ids, splices, keys and landing over rows that are always open, each cell the
-// property's ordinary control under a header. The request is declined where a row is
-// not a line: `appendices` asks and draws the record list.
+// the same ids, splices and landing over rows that are always open, each cell the
+// property's ordinary control under a header and the remove alone at the row's end.
+// The request is declined where a row is not a line: `appendices` asks and draws the
+// record list.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
@@ -138,19 +139,24 @@ describe('an array<object> declaring ui.layout: table', () => {
 		expect(rows(q, doc)).toHaveLength(2);
 	});
 
-	it('reorders a row from the actions column', () => {
+	it('carries the remove alone: no reorder by button, and none by key', async () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 		const first = t.querySelector<HTMLElement>('.qm-array-table-row')!;
-		expect(first.querySelector<HTMLButtonElement>('.qm-row-btn[title="Move up"]')?.disabled).toBe(
-			true
-		);
+		expect([...first.querySelectorAll('.qm-row-btn')].map((b) => b.getAttribute('title'))).toEqual([
+			'Remove'
+		]);
 
-		first.querySelector<HTMLButtonElement>('.qm-row-btn[title="Move down"]')!.click();
+		// The list's keyboard twin has no sibling here, so it answers nothing.
+		press(nameCell(t, 0), 'ArrowDown', { altKey: true });
+		await settle();
+		expect(rows(q, doc).map((r) => r.name)).toEqual(['Ada Lovelace', 'Grace Hopper']);
+
+		first.querySelector<HTMLButtonElement>('.qm-row-btn.qm-remove')!.click();
 		flushSync();
-		expect(rows(q, doc).map((r) => r.name)).toEqual(['Grace Hopper', 'Ada Lovelace']);
+		expect(rows(q, doc).map((r) => r.name)).toEqual(['Grace Hopper']);
 		expect(nameCell(t, 0).value).toBe('Grace Hopper');
 	});
 

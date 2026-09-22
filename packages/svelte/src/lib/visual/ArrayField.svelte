@@ -21,27 +21,30 @@
 
  The table (`layout: 'table'`, VISUAL_EDITOR §"Structure mirrors the schema") is the
  same row machine in another presentation: the same ids, the same splices, the same
- landing and the same keys, over rows that are always open, each cell the property's
- ordinary control on the track the header names ({@link ObjectField} `bare`). Every
- row of it open, the whole of it stands where an open row's subform stands: a rung
- inside the field, behind the subform's vertical. A table composes by position, so it
- recurses into nothing: `arrayLayout` declines it for a row holding a container or a
- block prose cell.
+ landing and the same cell keys, over rows that are always open, each cell the
+ property's ordinary control on the track the header names ({@link ObjectField}
+ `bare`). Every row of it open, the whole of it stands where an open row's subform
+ stands: a rung inside the field, behind the subform's vertical. A table composes by
+ position, so it recurses into nothing: `arrayLayout` declines it for a row holding a
+ container or a block prose cell.
 
  The row's controls are inside the element: a slab over the end of the element's own
  box, taking its two end-side corners — the remove, and on an `object` row the reorder
  pair before it. So a row's box is the element's box, and an array's rows end where
  every other field's control does. On an object element that box is the summary rather
  than the open row: a destructive control belongs to the line it sits on, not to
- everything that line has unfolded. A table's row spends its last track on them
- instead, a table's actions being a column like any other.
+ everything that line has unfolded. A table's row carries the remove alone, in its last
+ track and pinned to the end edge of the box the table scrolls in: every cell of the
+ row is on the line, so a mis-order is a retype as it is in a list of strings, and the
+ one gesture the row keeps never needs a scroll to reach.
 
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
  caret there, Backspace on an empty element removes it and hands focus back up the
- list, Alt+↑/↓ anywhere in an `object` row moves it. A move is one splice of the ids
- and of the values together, the mechanism insert and remove use, so an element keeps
- its id for life and no prose leaf inside it remounts; the open row stays open across
- its own move, and `animate:reorder` holds the moving row as it holds a card.
+ list, Alt+↑/↓ anywhere in an `object` row of the list moves it. A move is one splice
+ of the ids and of the values together, the mechanism insert and remove use, so an
+ element keeps its id for life and no prose leaf inside it remounts; the open row stays
+ open across its own move, and `animate:reorder` holds the moving row as it holds a
+ card.
 -->
 <script lang="ts">
 	import { wording } from './strings.js';
@@ -445,8 +448,7 @@
 	 * Riding the control is what decides which cells answer: a text cell and a prose
 	 * cell leave both keys free, where a select opens its list on Enter, a switch
 	 * toggles on it and a date segment edits on Backspace. So a table's row keys answer
-	 * from its text and prose columns, and the reorder, which rides the row rather than
-	 * a cell, answers from all of them alike.
+	 * from its text and prose columns.
 	 */
 	function onElementKey(e: KeyboardEvent, k: number, column?: string): void {
 		if (e.isComposing) return;
@@ -463,8 +465,7 @@
 		}
 	}
 	/** The reorder's keyboard twin, on the row so it answers from the summary and from
-	 *  any cell an open row or a table row holds: Alt+↑/↓, the table island's own
-	 *  binding. */
+	 *  any cell an open row holds: Alt+↑/↓, the table island's own binding. */
 	function onRowKey(e: KeyboardEvent, k: number): void {
 		if (!e.altKey || e.isComposing) return;
 		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
@@ -528,18 +529,10 @@
 							/>
 						</div>
 					{/each}
-					<span></span>
+					<span class="qm-array-table-head-end"></span>
 				</div>
 				{#each ids as id, k (id)}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<!-- The handler catches a key from the controls inside the row and adds no
-					     interaction of the row's own: the row is no tab stop. -->
-					<div
-						class="qm-array-row qm-array-table-row"
-						bind:this={rowEls[id]}
-						animate:reorder={arm.armed}
-						onkeydown={(e) => onRowKey(e, k)}
-					>
+					<div class="qm-array-row qm-array-table-row" bind:this={rowEls[id]}>
 						<ObjectField
 							bare
 							bind:this={cellEls[id]}
@@ -551,9 +544,12 @@
 							onCellKey={(e, column) => onElementKey(e, k, column)}
 							diagnostics={routed.below.get(k)}
 						/>
-						<div class="qm-row-actions">
-							{@render rowActions(k)}
-						</div>
+						<button
+							type="button"
+							class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
+							title={t.strings.arrayRemove}
+							onclick={() => remove(k)}><Icon name="minus" /></button
+						>
 					</div>
 				{/each}
 			</div>
@@ -891,7 +887,7 @@
 	 The grid is a box inside the stroke, and the one that scrolls: the stroke and the
 	 inset hold still while the columns move, and the clip is the inset's edge rather than
 	 the stroke's. One grid over the header and every row: a column per property, then a
-	 track for the row's own controls. The header and each row subgrid onto it, so a
+	 track for the row's remove. The header and each row subgrid onto it, so a
 	 cell's edge is its column's whatever the row above it holds. The row packs at the
 	 start rather than sharing the field's leftover width between the columns: a table
 	 carries its own rhythm, and stretching four short cells across a field sets them
@@ -943,21 +939,33 @@
 	.qm-array-table-col {
 		min-width: var(--_qm-track-min);
 	}
-	/* In a table the controls are a column, not a slab: in flow, at the row's end, and
-	 always drawn — a table's rows are many and the eye finds a control by its column —
-	 and standing on the row's line with the cells rather than at the top of it. */
-	.qm-array-table-row .qm-row-actions {
-		position: static;
-		opacity: 1;
-		align-self: center;
-	}
-	/* The slab's grammar goes with the slab: a button on the row's own plane takes the
+	/* The remove is the row's last track, pinned to the end edge of the box the table
+	 scrolls in: sticky, so it rests in its track while the table fits and rides over
+	 the cells once the box scrolls, on the card's plane so what passes under it is
+	 hidden rather than overprinted, and stretched to the row so no cell shows above or
+	 below it. Always drawn: a table's rows are many and the eye finds the control by
+	 its column. The header's end cell pins with it, or the labels would scroll under
+	 nothing while the cells scroll under a plane.
+
+	 The inset is the content box's, where the ring's reach still fits inside the clip;
+	 the plane spread over that same reach hides the sliver of cell the pad would show
+	 past the button, and the ring paints over it.
+
+	 The slab's grammar goes with the slab: a button on the row's own plane takes the
 	 icon family's radius at all four corners, where one cut into a box takes that box's
 	 end-side pair and squares the rest. */
-	.qm-array-table-row .qm-row-btn {
+	.qm-array-table-row > .qm-remove,
+	.qm-array-table-head-end {
+		position: sticky;
+		inset-inline-end: 0;
+		background: var(--_qm-surface);
+		box-shadow: 0 0 0 var(--_qm-ring-reach) var(--_qm-surface);
+	}
+	.qm-array-table-row > .qm-remove {
+		align-self: stretch;
 		height: auto;
-		min-height: var(--_qm-tap-min);
 		border-radius: var(--_qm-radius-inner);
+		color: var(--_qm-ink-label);
 	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so
 	 the two read as one register. Inner radius: the chip family is the card's, and this
