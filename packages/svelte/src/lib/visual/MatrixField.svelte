@@ -284,7 +284,12 @@
 	 its own, which leaves the block at the width its titles take, and a note typed into a
 	 track a title wide shows ten characters of itself. Twice the track floor is the field
 	 minimum the capacity ladder steps at (`.qm-tracks`, one rung being two of them), so
-	 the columns unfold at the width a field's control gets. */
+	 the columns unfold at the width a field's control gets.
+
+	 A row of blocks stands off the row above it by a rung wider than the columns stand
+	 apart: a block wrapped under another has no name over it where an ungrouped one is
+	 declared, and the gap alone says it is a block of its own rather than a member set
+	 apart from the one above. */
 	.qm-matrix-blocks {
 		--block-min: var(--_qm-track-min);
 		position: relative;
@@ -292,7 +297,7 @@
 		grid-template-columns: repeat(auto-fit, minmax(var(--block-min), max-content));
 		justify-content: start;
 		column-gap: var(--_qm-space-3);
-		row-gap: var(--_qm-space-3);
+		row-gap: var(--_qm-space-5);
 		border-radius: var(--_qm-radius-inner);
 	}
 	.qm-matrix.columns .qm-matrix-blocks {
@@ -316,11 +321,12 @@
 		gap: var(--_qm-space);
 		min-width: 0;
 	}
-	/* A block's name, at the label rung: it names a set the way a field label names a
-	 control, and ranks under the field's label by position alone. */
+	/* A block's name, at the label size in the count's weight: it names a set the way a
+	 field label names a control, and it stands one line under that label on the same
+	 edge, so the weight is what ranks it. The field's label is the one mid-weight line
+	 over the roster; the name and the held count are facts about the set beneath it. */
 	.qm-matrix-group {
 		font-size: var(--_qm-text-label);
-		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		color: var(--_qm-ink-label);
 	}
