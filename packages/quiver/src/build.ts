@@ -16,8 +16,8 @@ import { isDraft } from './semver.js';
 export interface BuildOptions {
 	/**
 	 * Pack versions below `MIN_PUBLISHED_VERSION` too. Off by default: the
-	 * artifact is a deployment, and the draft space is not part of one. An
-	 * author's own viewer turns it on, which is the only caller that should.
+	 * artifact is a deployment, and the draft space is not part of one. A
+	 * viewer of the collection as it stands turns it on.
 	 */
 	drafts?: boolean;
 }

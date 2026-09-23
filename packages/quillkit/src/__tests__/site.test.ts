@@ -45,6 +45,26 @@ describe('laying a site out', () => {
 		expect(existsSync(join(out, 'quiver', pointer.manifest))).toBe(true);
 	});
 
+	it('packs the draft space only when asked', async () => {
+		// The fixture's `usaf_memo` is `0.0.0`, under quiver's floor.
+		const refs = async (drafts?: boolean): Promise<string[]> => {
+			const out = join(await temp.dir(), 'site');
+			const collection = await temp.collection();
+			await laySite({ collection, out, client: await stubClient(), drafts });
+			const quiver = join(out, 'quiver');
+			const { manifest } = JSON.parse(await readFile(join(quiver, 'latest.json'), 'utf8')) as {
+				manifest: string;
+			};
+			const { quills } = JSON.parse(await readFile(join(quiver, manifest), 'utf8')) as {
+				quills: Array<{ name: string; version: string }>;
+			};
+			return quills.map((q) => `${q.name}@${q.version}`);
+		};
+
+		expect(await refs()).not.toContain('usaf_memo@0.0.0');
+		expect(await refs(true)).toContain('usaf_memo@0.0.0');
+	});
+
 	it('owns its output: a previous generation does not bleed through', async () => {
 		const out = join(await temp.dir(), 'site');
 		await mkdir(out, { recursive: true });
