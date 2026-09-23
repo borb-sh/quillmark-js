@@ -31,6 +31,12 @@ export interface PaintLoop {
 // any other gap: the stack breathes on the same rhythm the cards do.
 const PAGE_GAP = 'var(--_qm-space-4)';
 
+// The least raster density, in device pixels per CSS pixel. Glyphs rasterize
+// unhinted, so a raster at a 1× or fractional ratio (1.25, 1.5; browser zoom)
+// is resampled nearly 1:1 and small text smears; a raster at least twice the
+// box is downsampled instead, which keeps body text legible.
+const MIN_DENSITY = 2;
+
 export function createPaintLoop(
 	session: LiveSession,
 	container: HTMLElement,
@@ -120,7 +126,7 @@ export function createPaintLoop(
 			canvases.set(slot.page, canvas);
 		}
 		const layoutScale = (slot.el.clientWidth || slot.size.widthPt) / slot.size.widthPt;
-		const densityScale = (window.devicePixelRatio || 1) * zoom;
+		const densityScale = Math.max(window.devicePixelRatio || 1, MIN_DENSITY) * zoom;
 		try {
 			const result = session.paint(ctx, slot.page, { layoutScale, densityScale });
 			canvas.style.width = `${result.layoutWidth}px`;
