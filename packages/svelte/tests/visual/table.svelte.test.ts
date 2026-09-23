@@ -158,6 +158,10 @@ describe('an array<object> declaring ui.layout: table', () => {
 		expect([...first.querySelectorAll('.qm-row-btn')].map((b) => b.getAttribute('title'))).toEqual([
 			'Remove'
 		]);
+		// Named with the row it acts on; the action alone is the tooltip.
+		expect(first.querySelector('.qm-row-btn')?.getAttribute('aria-label')).toBe(
+			'Remove Contributors 1'
+		);
 
 		// The list's keyboard twin has no sibling here, so it answers nothing.
 		press(nameCell(t, 0), 'ArrowDown', { altKey: true });
@@ -200,6 +204,9 @@ describe('an array declaring max:', () => {
 		const t = table(mounted.target);
 		expect(count(t)).toBe('2 / 3');
 		expect(addChip(t).disabled).toBe(false);
+		// The chip is described by the count, so focusing it says how many are left.
+		const described = addChip(t).getAttribute('aria-describedby');
+		expect(document.getElementById(described ?? '')?.textContent).toBe('2 / 3');
 
 		addChip(t).click();
 		flushSync();

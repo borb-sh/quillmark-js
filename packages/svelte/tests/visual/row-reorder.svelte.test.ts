@@ -63,6 +63,7 @@ describe('reorder on an object row', () => {
 		expect(rowButton(arr, 0, 'Move up').disabled).toBe(true);
 		expect(rowButton(arr, 2, 'Move down').disabled).toBe(true);
 		expect(rowButton(arr, 1, 'Move up').disabled).toBe(false);
+		expect(rowButton(arr, 1, 'Move up').getAttribute('aria-label')).toBe('Move up Revisions 2');
 
 		const down = rowButton(arr, 0, 'Move down');
 		down.focus();

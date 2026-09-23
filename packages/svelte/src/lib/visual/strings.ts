@@ -56,6 +56,12 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	arrayMoveUp: string;
 	arrayMoveDown: string;
 	/**
+	 * A row control's accessible name, the action and the row it acts on: `Remove
+	 * Authors 2`. The action alone stays the tooltip. Parametric, so word order stays
+	 * the translator's.
+	 */
+	arrayRowAction: (action: string, row: string) => string;
+	/**
 	 * The count beside the add chip on an array declaring `max:`, the carrier a
 	 * disabled chip has no other way to state: `2 / 3`. Parametric, so a translator
 	 * spells the separator.
@@ -172,6 +178,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	arrayRemove: 'Remove',
 	arrayMoveUp: 'Move up',
 	arrayMoveDown: 'Move down',
+	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
 	elementUntitled: (label, index) => `${label} ${index}`,
 	enumUnsetTag: 'default',

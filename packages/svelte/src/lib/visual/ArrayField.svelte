@@ -230,6 +230,15 @@
 	}
 	const rowName = (k: number): string | undefined =>
 		label != null ? `${label} ${k + 1}` : undefined;
+	/** A row control's name: its action, and the row, where the row has a name. */
+	const rowAction = (action: string, k: number): string => {
+		const row = rowName(k);
+		return row != null ? t.strings.arrayRowAction(action, row) : action;
+	};
+	// The count's id, for the chip it describes: off the field's id space where there is
+	// one, else this instance's own.
+	const uid = $props.id();
+	const countId = $derived(`${idBase ?? `qm-${uid}`}-count`);
 	const columnTitle = (key: string, sub: QuillFieldSchema): string =>
 		sub.ui?.title ?? humanize(key);
 
@@ -532,12 +541,13 @@
 		     you could, so the count says which state. -->
 		<span class="qm-array-add-slot">
 			{#if max != null}
-				<span class="qm-array-count">{t.strings.arrayCount(arr.length, max)}</span>
+				<span class="qm-array-count" id={countId}>{t.strings.arrayCount(arr.length, max)}</span>
 			{/if}
 			<button
 				type="button"
 				class="qm-add-el qm-chip qm-focus-ring qm-tap-floor"
 				bind:this={addEl}
+				aria-describedby={max != null ? countId : undefined}
 				disabled={atCap}
 				onclick={add}>{t.strings.arrayAdd}</button
 			>
@@ -679,6 +689,7 @@
 		type="button"
 		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
 		title={t.strings.arrayRemove}
+		aria-label={rowAction(t.strings.arrayRemove, k)}
 		onclick={() => remove(k, undefined, true)}><Icon name="minus" /></button
 	>
 {/snippet}
@@ -690,6 +701,7 @@
 		type="button"
 		class="qm-icon-btn qm-row-btn qm-focus-ring"
 		title={t.strings.arrayMoveUp}
+		aria-label={rowAction(t.strings.arrayMoveUp, k)}
 		disabled={k === 0}
 		onclick={() => move(k, -1)}><Icon name="chevron-up" /></button
 	>
@@ -697,6 +709,7 @@
 		type="button"
 		class="qm-icon-btn qm-row-btn qm-focus-ring"
 		title={t.strings.arrayMoveDown}
+		aria-label={rowAction(t.strings.arrayMoveDown, k)}
 		disabled={k === ids.length - 1}
 		onclick={() => move(k, 1)}><Icon name="chevron-down" /></button
 	>

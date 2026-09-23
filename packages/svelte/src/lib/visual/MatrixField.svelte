@@ -136,17 +136,6 @@
 	function commitColumns(id: string, columns: Record<string, unknown>): void {
 		onCommit(commitMember(value, id, memberWrite(true, columns)));
 	}
-	/** Arrow keys walk the roster, the way a listbox walks its options; Space toggles,
-	 *  being the checkbox's own. */
-	function onTickKey(e: KeyboardEvent, id: string): void {
-		if (e.altKey || e.shiftKey || e.ctrlKey || e.metaKey) return;
-		if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-		const ids = members.map((m) => m.id);
-		const next = ids.indexOf(id) + (e.key === 'ArrowDown' ? 1 : -1);
-		if (next < 0 || next >= ids.length) return;
-		e.preventDefault();
-		ref(tickEls, ids[next])?.focus();
-	}
 
 	/** Take the caret: the first member's tick. Reached by a label click and by the
 	 *  editor's landing verbs, which ask one function so they cannot disagree. */
@@ -219,7 +208,6 @@
 							checked={on}
 							bind:this={tickEls[m.id]}
 							onchange={(e) => tick(m.id, e.currentTarget.checked, e.currentTarget)}
-							onkeydown={(e) => onTickKey(e, m.id)}
 						/>
 						<Icon name="check" class="qm-tick-mark" />
 					</span>
