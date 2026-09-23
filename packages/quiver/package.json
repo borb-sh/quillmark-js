@@ -1,6 +1,6 @@
 {
 	"name": "@quillmark/quiver",
-	"version": "0.28.0",
+	"version": "0.29.0",
 	"description": "A quiver of Quillmark quills: load one, pack one, hand out quills.",
 	"type": "module",
 	"license": "Apache-2.0",
