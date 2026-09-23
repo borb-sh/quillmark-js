@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.8.0 - 2026-09-23
+
 **`quillkit site --drafts` packs the draft space.** Versions below `0.1.0` reach the laid-out quiver, so a deployed studio previews a collection's prototypes as `quillkit studio` does locally. Without the flag `site` takes quiver's floor as before.
 
 ## v0.7.0 - 2026-09-23
