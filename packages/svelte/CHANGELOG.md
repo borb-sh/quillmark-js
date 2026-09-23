@@ -6,6 +6,8 @@
 
 **The preview paints at twice the box at the least.** Its raster density is `devicePixelRatio` floored at 2, so a 1× display and a fractional one (1.25, 1.5, browser zoom) downsample a denser raster rather than resampling one at their own ratio, which left small text soft. A display at 2 or above paints as before; below it, a mounted page costs up to four times the pixels it did.
 
+**A page's canvas fills its slot.** It was sized in pixels from each paint's result, so between a resize and the repaint after it the ink sat off the box the click and scroll geometry measure. It is `100%` of the slot now: a resize stretches the raster in place until the repaint sharpens it.
+
 ## v0.12.0 - 2026-09-23
 
 **The `@quillmark/wasm` peer floor is `>=0.115.0-0`, and the surface draws what that release typed.** A card kind declaring `body.enabled: false` warns at load (`quill::bodiless_card_kind`), which a host surfacing load warnings will show. **An island stores its value, not its provenance**: the island node and its clipboard form drop `loss` (`data-qm-island-loss`), which the artifact no longer carries. **A block island's line is a `para`**: a table decodes off the island backing a lone slot rather than off an `island` line kind the artifact no longer has, and lands through the `delta` and one island op. Stored rows spelling either retired form still open. **A typed dictionary's property may open a variant world** (`header.classification`), and the subform draws it as a card-level variant draws: the discriminant's select, the live world's cells a rung in, a landing and a diagnostic walking into it by its path.

@@ -4,10 +4,10 @@
 // pages, per the paint contract). Builds the per-page slot elements bridge.ts
 // attaches its own listeners to; owns `pageSize` caching and
 // slot-count reconciliation across an `apply` (`ChangeSet.pageCount` can differ
-// from the previous compile; pages can be added or removed). A ResizeObserver
-// plus a DPR media-query listener repaint mounted pages when the container's CSS
-// width or `devicePixelRatio` changes, so a frozen canvas never outlives the
-// page box it fills.
+// from the previous compile; pages can be added or removed). A canvas fills its
+// slot, so its ink stays on the box the click and scroll geometry measure; a
+// ResizeObserver plus a DPR media-query listener repaint mounted pages when the
+// container's CSS width or `devicePixelRatio` changes, so the raster stays sharp.
 import type { LiveSession, PageSize } from '@quillmark/wasm';
 
 /** One page's DOM slot: the box bridge.ts measures against, plus its cached geometry. */
@@ -106,16 +106,19 @@ export function createPaintLoop(
 	}
 
 	// Rasterize `slot` into its canvas (creating the canvas if this is its first
-	// paint since mounting). `layoutScale` is derived from the slot's own current
-	// CSS width, so layout width tracks the container per the zoom settled
-	// decision; `canvas.style.*` is then set from the authoritative PaintResult,
-	// never guessed.
+	// paint since mounting), at the slot's own current CSS width.
 	function paintSlot(slot: PageSlot): void {
 		let canvas = canvases.get(slot.page);
 		if (!canvas) {
 			canvas = document.createElement('canvas');
 			canvas.className = 'qm-page-canvas';
-			Object.assign(canvas.style, { position: 'absolute', inset: '0', display: 'block' });
+			Object.assign(canvas.style, {
+				position: 'absolute',
+				inset: '0',
+				display: 'block',
+				width: '100%',
+				height: '100%'
+			});
 		}
 		// Contextless canvas: bail before registering, so `updateBand` still sees
 		// the page as unmounted and retries instead of keeping a blank page.
@@ -128,9 +131,7 @@ export function createPaintLoop(
 		const layoutScale = (slot.el.clientWidth || slot.size.widthPt) / slot.size.widthPt;
 		const densityScale = Math.max(window.devicePixelRatio || 1, MIN_DENSITY) * zoom;
 		try {
-			const result = session.paint(ctx, slot.page, { layoutScale, densityScale });
-			canvas.style.width = `${result.layoutWidth}px`;
-			canvas.style.height = `${result.layoutHeight}px`;
+			session.paint(ctx, slot.page, { layoutScale, densityScale });
 		} catch (err) {
 			// A paint that throws must not abort the band loop; `updateBand` runs in
 			// the IntersectionObserver callback and sweeps every entry, so an
@@ -201,14 +202,12 @@ export function createPaintLoop(
 	// not here: reconcile → `session.pageSize` must run after the controller's
 	// `pageCount` gate, since `pageSize` throws for a page the count excludes.
 
-	// ── Keep mounted rasters in step with the display ───────────────────────────
-	// Every paint freezes `canvas.style.width/height` to the box width at that
-	// paint (paintSlot). A page that stays mounted while the container's CSS width
-	// or `devicePixelRatio` shifts would otherwise keep a stale raster the %-space
-	// click/scroll math silently drifts off of: the box tracks the container, the
-	// ink does not. Two observers close the gap by repainting mounted pages from
-	// their current box; canvases are `position:absolute`, so a repaint can't feed
-	// back into layout (and thus can't re-trigger the resize observer).
+	// ── Keep mounted rasters sharp ──────────────────────────────────────────────
+	// A canvas stretches with its slot, so a page that stays mounted while the
+	// container's CSS width or `devicePixelRatio` shifts keeps its place and goes
+	// soft. Two observers repaint mounted pages from their current box; canvases
+	// are `position:absolute`, so a repaint can't feed back into layout (and thus
+	// can't re-trigger the resize observer).
 
 	// Repaint mounted pages (all, or a given subset) from their live geometry: the
 	// one path resize, DPR, and zoom share; each `paintSlot` re-reads the slot's
