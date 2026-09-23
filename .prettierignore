@@ -3,10 +3,8 @@ package-lock.json
 # Hand-formatted canon and design prose and the reference-quill fixture tree:
 # prettier would collapse aligned code-sketch comments and churn a test input.
 #
-# Prettier resolves its ignore files against the cwd, not the workspace root, so a run
-# started inside a package reads that package's and never this one — which is how canon
-# got reformatted once with nothing failing. Each package carries its own copy of the
-# lines a cwd there can reach; what is left below is the root's alone.
+# Prettier reads the ignore file at its cwd, so a run started inside a package reads that
+# package's copy and never this one; each package repeats the lines its cwd reaches.
 **/prose/
 fixtures/
 

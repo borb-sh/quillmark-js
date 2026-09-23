@@ -6,6 +6,10 @@
 
 **The carried `@quillmark/wasm` is 0.115.0, and a quill may declare three shapes it could not.** `type: matrix` with a `members:` roster, one flat `{id: Title}` mapping, `ui.layout: "table"` on an `array<object>`, and `max:` on an array all load and reach `schema()`; `quillkit test` passes what it passed, every addition being a key a quill may declare rather than one it must. Every column of a `ui.layout: table` array is a leaf, a container column failing the load (`quill::table_column_not_flat`). A matrix member stored as a mapping is ticked only where it names `held: true`: `{ detail: X }` is unheld with its detail retained, and nothing reports it. Two more are worth knowing before an author writes one. A `max:` never gates render — an overflowing document warns `validation::cardinality` at the field's own path and renders — while a `default:` or `example:` longer than the cap fails the load (`quill::{default,example}_over_max`). And a card kind declaring `body.enabled: false` warns (`quill::bodiless_card_kind`): a repeated record someone fills in is a row, an `array<object>` on the card that owns it, and the warning says so at load rather than at review. It is a warning and not a refusal because a bodiless positional kind — a page break, a rule, an inserted signature block — is a card, and nothing in `Quill.yaml` tells the loader which it is looking at.
 
+**The studio fills what the carried release loads.** The client compiles `@quillmark/svelte` in, so what that package releases is what an author here works in: a `matrix` draws its roster as ticks with columns under a held member, a `ui.layout: table` array a grid, a `max:` a disabled add chip beside its count, and a container nested at any depth its own control at the next rung, where the studio drew a line pointing at the source view. A preview click at a nested address opens each row on the way to the cell it names.
+
+**0.6.0's notes misname both siblings its client carries, and 0.2.2's the quiver.** `carried.json` reads each sibling's manifest at the commit a release builds from, and a sibling whose own release has not merged yet states its previous version over source that is already the next one's. 0.6.0 compiles in `@quillmark/svelte` 0.11.0 and `@quillmark/quiver` 0.28.0 under 0.10.1 and 0.27.0; 0.2.2 compiles in `@quillmark/quiver` 0.22.0 under 0.21.0. The 0.2.2 section is corrected here. Those tarballs' `carried.json`, and the `__CARRIED__` their clients report, keep the numbers they were built with.
+
 ## v0.6.0 - 2026-09-16
 
 **The carried `@quillmark/wasm` is 0.113.0, and a quill loads under a stricter reader.** Five shapes `quillkit test` passed now fail the load, each naming itself: a `main:` that is not a mapping or carries an unknown key (`quill::invalid_card_schema`), a `ui.group` on a card with no `ui.groups` registry (`quill::implicit_group`, promoted from a warning a binding host never saw), more than 1000 declared fields on one card (`quill::too_many_fields`), a retired `Quill.yaml` key — `must_fill`, `enum`, `ui.order`, `richtext(inline)`, `markdown` — under serde's unknown-key text in place of its own sentence, and a vendored `packages/<dir>/` with no `typst.toml`, which is skipped with a `typst::package_manifest` warning where it used to load under a synthesized `@local/<dir>:0.1.0`. Write the two-line manifest the fallback stood in for.
@@ -78,7 +82,7 @@ The studio's paint stops following the caret when the focus lands on a leaf that
 
 ## v0.2.2 - 2026-08-13
 
-Carries `@quillmark/svelte` 0.4.0, `@quillmark/quiver` 0.21.0, `@quillmark/wasm` 0.104.0.
+Carries `@quillmark/svelte` 0.4.0, `@quillmark/quiver` 0.22.0, `@quillmark/wasm` 0.104.0.
 
 The carried `@quillmark/wasm` is 0.104.0. The studio and `test` name no field address and read no schema domain, so the release's breaks reach neither; a quill under test that authors the retired `enum:` modifier now fails to parse, which is the studio reporting what the engine will.
 

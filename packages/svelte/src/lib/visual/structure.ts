@@ -26,7 +26,7 @@ export type ControlKind =
 	| 'date' // date / datetime → native date control
 	| 'array' // add/remove repeater
 	| 'object' // nested subform
-	| 'matrix'; // grouped ticks over a roster, columns under a held member
+	| 'matrix'; // ticks over a roster, columns under a held member
 
 /** The container controls: the ones a nested address walks into and a deep
  *  diagnostic routes through. */
@@ -436,7 +436,7 @@ export function rowSummary(items: QuillFieldSchema | undefined, row: unknown): s
 	for (const [k, sub] of Object.entries(items?.properties ?? {})) {
 		const kind = controlKind(sub);
 		if (kind !== 'text' && !(kind === 'prose' && shortCell(sub))) continue;
-		const text = titleText(values[k]).trim();
+		const text = titleText(ownValue(values, k)).trim();
 		if (text) return text;
 	}
 	return undefined;
@@ -504,12 +504,12 @@ export function commitDiscriminant(
 
 /**
  * Whether the schema obliges a cell: `default:`'s absence, which is the whole of the
- * obligation (DOCUMENT_MODEL). A typed dictionary is exempt — a namespace declares no
- * `default:` at all, and `validate` anchors obligation on the leaves under it, so
- * reading one off the container would mark every subform required.
+ * obligation (DOCUMENT_MODEL). A typed dictionary and a matrix are exempt — a namespace
+ * declares no `default:` at all, and `validate` anchors obligation on the leaves under
+ * it, so reading one off the container would mark every subform required.
  */
 export function obliged(schema: QuillFieldSchema): boolean {
-	return schema.type !== 'object' && schema.default === undefined;
+	return schema.type !== 'object' && schema.type !== 'matrix' && schema.default === undefined;
 }
 
 /** `foo_bar` → `Foo bar`: the label fallback when a field declares no `ui.title`. */
@@ -691,8 +691,13 @@ export function fieldValues(items: readonly PayloadItem[]): Record<string, unkno
 /** Interpolate a `{field}` card-title template against live field values. */
 export function interpolateTitle(template: string, values: Record<string, unknown>): string {
 	return template.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_m, name: string) =>
-		titleText(values[name])
+		titleText(ownValue(values, name))
 	);
+}
+
+/** A value by own key: a template or a declaration can name `constructor`. */
+function ownValue(values: Record<string, unknown>, name: string): unknown {
+	return Object.hasOwn(values, name) ? values[name] : undefined;
 }
 
 /** A field value as title text. A parsed field rests as the authored string and a

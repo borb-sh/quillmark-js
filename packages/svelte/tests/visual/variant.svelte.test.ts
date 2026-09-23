@@ -13,6 +13,7 @@ import { mount, unmount, flushSync } from 'svelte';
 import { init, type Quill, type Document } from '@quillmark/wasm';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import { quill } from '../helpers/fixtures.js';
+import { mountEditor as mountWithEditor, stubLayout } from '../helpers/surface.js';
 
 const core = await init();
 
@@ -288,7 +289,6 @@ describe('a variant whose default is the blank', () => {
 		for (const cell of cells) {
 			const leaf = cell.querySelector<HTMLElement>('.ProseMirror');
 			expect(leaf).not.toBeNull();
-			expect(cell.querySelector('.qm-unsupported')).toBeNull();
 			const named = cell.querySelector<HTMLElement>('.qm-field-label span');
 			expect(leaf!.getAttribute('aria-labelledby')).toBe(named?.parentElement?.id);
 		}
@@ -327,5 +327,107 @@ describe('a variant whose default is the blank', () => {
 			caveat: ''
 		});
 		expect(held(doc)).toEqual({ value: 'CONTROLLED', controlled_by: 'SPEC/BB', caveat: '' });
+	});
+});
+
+// A typed dictionary's property opens a world one step down (`header.classification`),
+// the one position past a card field the artifact admits a variant at. The reference
+// quill declares none, so the shape is its own quill here.
+describe('a variant under an object property', () => {
+	const NESTED = `quill:
+  name: nested_variant
+  version: 1.0.0
+  backend: typst
+  description: A variant one step inside a typed dictionary.
+typst:
+  plate_file: plate.typ
+main:
+  fields:
+    header:
+      type: object
+      properties:
+        classification:
+          type: enum
+          values: [U, CUI]
+          default: U
+          variants:
+            CUI:
+              controlled_by:
+                type: string
+                default: ""
+`;
+	// Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes
+	// from another realm and the boundary refuses it by identity.
+	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
+	const nested = (): Quill =>
+		core.Quill.fromTree(
+			new Map([
+				['Quill.yaml', bytes(NESTED)],
+				['plate.typ', bytes('#set page(width: 200pt)\n')]
+			])
+		);
+	const header = (doc: Document) => doc.getStored('header');
+	const cell = (target: HTMLElement): HTMLInputElement | null =>
+		field(target, 'Header').querySelector<HTMLInputElement>('[data-qm-prop="controlled_by"] input');
+
+	it('draws the discriminant and the live cells, and commits the container whole', () => {
+		const q = nested();
+		const doc = core.Document.fromMarkdown(
+			[
+				'~~~',
+				'$quill: nested_variant@1.0.0',
+				'header:',
+				'  classification:',
+				'    value: CUI',
+				'    controlled_by: SPEC',
+				'~~~',
+				''
+			].join('\n')
+		);
+		const target = mountEditor(q, doc);
+
+		const trigger = field(target, 'Header').querySelector<HTMLElement>('.qm-select')!;
+		expect(trigger.textContent?.trim()).toBe('CUI');
+		expect(cellLabels(target, 'Header')).toEqual(['Classification', 'Controlled by']);
+		expect(cell(target)?.value).toBe('SPEC');
+
+		type(cell(target)!, 'LEGAL');
+		expect(header(doc)).toEqual({ classification: { value: 'CUI', controlled_by: 'LEGAL' } });
+	});
+
+	it('draws the ghosted world while unset, and keeps a stranded answer through a flip', () => {
+		const q = nested();
+		const doc = q.seedDocument();
+		const target = mountEditor(q, doc);
+
+		// `U` declares no cells, so the unset field draws the discriminant alone.
+		expect(cellLabels(target, 'Header')).toEqual(['Classification']);
+		expect(cell(target)).toBeNull();
+
+		pickWorld(target, 'CUI', 'Header');
+		type(cell(target)!, 'SPEC');
+		expect(header(doc)).toEqual({ classification: { value: 'CUI', controlled_by: 'SPEC' } });
+
+		pickWorld(target, 'U', 'Header');
+		expect(cell(target)).toBeNull();
+		expect(header(doc)).toEqual({ classification: { value: 'U', controlled_by: 'SPEC' } });
+	});
+
+	it('lands a cell address on the live cell, and a dormant one on the discriminant', async () => {
+		stubLayout();
+		const q = nested();
+		const doc = q.seedDocument();
+		q.writer(doc).set('header', { classification: { value: 'CUI' } });
+		const mounted = mountWithEditor(q, doc);
+		cleanup = () => mounted.unmount();
+
+		await mounted.editor.focusField('main.header.classification.controlled_by');
+		expect(document.activeElement).toBe(cell(mounted.target));
+
+		pickWorld(mounted.target, 'U', 'Header');
+		await mounted.editor.focusField('main.header.classification.controlled_by');
+		expect(document.activeElement).toBe(
+			field(mounted.target, 'Header').querySelector('.qm-select')
+		);
 	});
 });

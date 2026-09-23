@@ -20,9 +20,8 @@
  engine's rule and not restated: a column control that clears drops its key, so the
  editor drops a member it has emptied rather than deciding skippability for itself.
  The read takes both rest forms — a bare tick and `{held?, …columns}`, whose `held` rests
- at `false` where the mapping names none — and the write lands
- one, on the member edited alone; every other member rides through as the document
- spelled it.
+ at `false` where the mapping names none — and the write lands one, on the member edited
+ alone; every other member rides through as the document spelled it.
 -->
 <script lang="ts">
 	import { tick as flush } from 'svelte';
@@ -107,6 +106,7 @@
 	/** The tick is the member's `held` cell, so its id is the one that cell's label
 	 *  would take: the column subform below it derives its own names from the same base. */
 	const tickId = (id: string): string => propertyDomIds(memberBase(id), MATRIX_HELD).control;
+	const titleId = (id: string): string => propertyDomIds(memberBase(id), MATRIX_HELD).label;
 
 	// The member boxes, the ticks and the column subforms, keyed by member id — the
 	// roster's own key, stable for the schema's life. `$state` for the binding's sake
@@ -119,6 +119,9 @@
 	const tickEls: Record<string, HTMLInputElement | undefined> = $state({});
 	const colEls: Record<string, Subform | undefined> = $state({});
 	let rosterEl = $state<HTMLElement | undefined>();
+	/** A ref by member id, own keys only: an id can be spelled `constructor`. */
+	const ref = <T,>(map: Record<string, T | undefined>, id: string): T | undefined =>
+		Object.hasOwn(map, id) ? map[id] : undefined;
 
 	/** A native checkbox carries its own state, so a commit the document declines leaves
 	 *  the face ticked over a map that says otherwise, `checked={held(id)}` having nothing
@@ -133,22 +136,12 @@
 	function commitColumns(id: string, columns: Record<string, unknown>): void {
 		onCommit(commitMember(value, id, memberWrite(true, columns)));
 	}
-	/** Arrow keys walk the roster, the way a listbox walks its options; Space toggles,
-	 *  being the checkbox's own. */
-	function onTickKey(e: KeyboardEvent, id: string): void {
-		if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-		const ids = members.map((m) => m.id);
-		const next = ids.indexOf(id) + (e.key === 'ArrowDown' ? 1 : -1);
-		if (next < 0 || next >= ids.length) return;
-		e.preventDefault();
-		tickEls[ids[next]]?.focus();
-	}
 
 	/** Take the caret: the first member's tick. Reached by a label click and by the
 	 *  editor's landing verbs, which ask one function so they cannot disagree. */
 	export function focus(): void {
 		const first = members[0];
-		if (first) tickEls[first.id]?.focus();
+		if (first) ref(tickEls, first.id)?.focus();
 	}
 	/** The box an arrival wash blooms in: the roster, not the label row above it, this
 	 *  component owning the field's label as an array does. */
@@ -162,7 +155,8 @@
 	 * where they are not — the address names the column, and what is drawn for it is
 	 * the tick that would open it. One rule keyed on the address, never on the
 	 * document, so one address lands in one place. A member off the roster falls back
-	 * to {@link focus}. The member's box comes back: it is the row the address named.
+	 * to {@link focus}. The innermost row the walk opened comes back, else the member's
+	 * box: the member is the row the address named.
 	 */
 	export function focusPath(steps: readonly PathStep[], pos?: number): LandingBox {
 		const [id, ...rest] = steps;
@@ -171,10 +165,14 @@
 			return undefined;
 		}
 		const column = rest[0];
-		const cells = colEls[id];
-		if (column !== undefined && column !== MATRIX_HELD && cells) void cells.focusPath(rest, pos);
-		else tickEls[id]?.focus();
-		return memberEls[id];
+		const cells = ref(colEls, id);
+		const member = ref(memberEls, id);
+		if (column !== undefined && column !== MATRIX_HELD && cells) {
+			const inner = cells.focusPath(rest, pos);
+			return inner instanceof Promise ? inner.then((box) => box ?? member) : (inner ?? member);
+		}
+		ref(tickEls, id)?.focus();
+		return member;
 	}
 </script>
 
@@ -210,11 +208,10 @@
 							checked={on}
 							bind:this={tickEls[m.id]}
 							onchange={(e) => tick(m.id, e.currentTarget.checked, e.currentTarget)}
-							onkeydown={(e) => onTickKey(e, m.id)}
 						/>
 						<Icon name="check" class="qm-tick-mark" />
 					</span>
-					<label class="qm-member-title" for={tickId(m.id)}>{m.title}</label>
+					<label class="qm-member-title" id={titleId(m.id)} for={tickId(m.id)}>{m.title}</label>
 				</div>
 				{#if on && hasColumns}
 					<!-- The columns, one rung in, the way a variant's cells unfold under the
@@ -226,6 +223,7 @@
 						properties={schema.properties}
 						label={`${label ?? ''} ${m.title}`.trim()}
 						idBase={memberBase(m.id)}
+						labelledBy={titleId(m.id)}
 						contentAt={(path) => contentAt([m.id, ...path])}
 						onCommit={(columns) => commitColumns(m.id, columns)}
 						diagnostics={deep}
@@ -287,15 +285,6 @@
 		flex-direction: column;
 		gap: var(--_qm-space);
 		border-radius: var(--_qm-radius-inner);
-	}
-	/* Compact, the members stand abreast in reading order at the count the ladder gives
-	 the width (`.qm-tracks`, controls.css), a held member's columns unfolding inside its
-	 own track. */
-	.qm-matrix-roster.compact {
-		display: grid;
-		grid-template-columns: repeat(var(--cols), 1fr);
-		align-items: start;
-		column-gap: var(--_qm-space-2);
 	}
 	/* The tick and its title on one line, the line holding the tap floor a tick alone
 	 would not reach: the title is the target, the `for` carrying its press to the input. */

@@ -132,7 +132,7 @@ main:
       ui:
         group: identity
         layout: table
-      description: "Who worked on it. An `array` of `object` whose every cell is one line tall, asking for `ui.layout: table` on the array's own `ui` and granted it: a column per property under a header, rows that reorder. Capped at `max: 3`, so the add chip disables at three and the count beside it says why. Every cell is a scalar, so the plate's loop reaches the preview through the array's own region and no row of it is addressable on its own."
+      description: "Who worked on it. An `array` of `object` whose every cell is one line tall, asking for `ui.layout: table` on the array's own `ui` and granted it: a column per property under a header, each row carrying its remove alone. Capped at `max: 3`, so the add chip disables at three and the count beside it says why. Every cell is a scalar, so the plate's loop reaches the preview through the array's own region and no row of it is addressable on its own."
 
     abstract:
       type: richtext

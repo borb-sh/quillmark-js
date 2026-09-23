@@ -90,6 +90,11 @@ describe('a matrix field', () => {
 		expect(spelling.querySelector('.ProseMirror')).not.toBeNull();
 		expect(spelling.querySelector('.qm-select')).not.toBeNull();
 		expect(member(m, 'Citations').querySelector('.qm-object')).toBeNull();
+		// The columns are a group the member's title names, so each reads under its member.
+		const group = spelling.querySelector<HTMLElement>('.qm-object')!;
+		expect(document.getElementById(group.getAttribute('aria-labelledby') ?? '')?.textContent).toBe(
+			'Spelling'
+		);
 
 		pick(spelling.querySelector<HTMLElement>('.qm-select')!, 'major');
 		expect(stored(doc)).toEqual({ spelling: { held: true, severity: 'major' } });
@@ -133,25 +138,17 @@ describe('a matrix field', () => {
 		expect(stored(doc)).toBeUndefined();
 	});
 
-	it('walks the roster with the arrow keys', () => {
+	it('keys as a checkbox group: every tick a tab stop, and no arrow walk', () => {
 		const q = quill();
 		mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
+		const ticks = [...m.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+		for (const t of ticks) expect(t.tabIndex).toBe(0);
 		const spelling = tick(m, 'Spelling');
 		spelling.focus();
-		press(spelling, 'ArrowDown');
-		expect(document.activeElement).toBe(tick(m, 'Citations'));
-		press(tick(m, 'Citations'), 'ArrowDown');
-		expect(document.activeElement).toBe(tick(m, 'Figures'));
-		// The roster's ends are the walk's.
-		const approved = tick(m, 'Approved');
-		approved.focus();
-		press(approved, 'ArrowDown');
-		expect(document.activeElement).toBe(approved);
-		press(spelling, 'ArrowUp');
-		expect(document.activeElement).toBe(approved);
-		spelling.focus();
-		press(spelling, 'ArrowUp');
+		press(spelling, 'ArrowDown', { cancelable: true });
+		expect(document.activeElement).toBe(spelling);
+		press(spelling, 'ArrowDown', { altKey: true, cancelable: true });
 		expect(document.activeElement).toBe(spelling);
 	});
 

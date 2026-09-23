@@ -32,6 +32,7 @@ import {
 	memberValue,
 	memberWrite,
 	commitMember,
+	obliged,
 	MATRIX_HELD
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
@@ -521,6 +522,22 @@ describe('rowSummary', () => {
 		});
 		expect(rowSummary(items, { body: content('para'), n: 1, on: true })).toBeUndefined();
 		expect(rowSummary(undefined, { x: 'y' })).toBeUndefined();
+	});
+
+	it('reads a cell by own key: a declared name can be one every object inherits', () => {
+		const items = row({ constructor: f({ type: 'string' }) }, { title: '{toString}' });
+		expect(rowSummary(items, {})).toBeUndefined();
+		expect(rowSummary(items, { constructor: 'Ada' })).toBe('Ada');
+		expect(interpolateTitle('{constructor}', {})).toBe('');
+	});
+});
+
+describe('obliged', () => {
+	it('reads default absence at a leaf, and nothing at a namespace', () => {
+		expect(obliged(f({ type: 'string' }))).toBe(true);
+		expect(obliged(f({ type: 'string', default: '' }))).toBe(false);
+		expect(obliged(f({ type: 'object', properties: {} }))).toBe(false);
+		expect(obliged(f({ type: 'matrix', members: { a: 'A' } }))).toBe(false);
 	});
 });
 
