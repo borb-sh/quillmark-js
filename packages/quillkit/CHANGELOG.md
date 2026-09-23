@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`quillkit site --drafts` packs the draft space.** Versions below `0.1.0` reach the laid-out quiver, so a deployed studio previews a collection's prototypes as `quillkit studio` does locally. Without the flag `site` takes quiver's floor as before.
+
 ## v0.7.0 - 2026-09-23
 
 **The carried `@quillmark/wasm` is 0.115.0, and a quill may declare three shapes it could not.** `type: matrix` with a `members:` roster, one flat `{id: Title}` mapping, `ui.layout: "table"` on an `array<object>`, and `max:` on an array all load and reach `schema()`; `quillkit test` passes what it passed, every addition being a key a quill may declare rather than one it must. Every column of a `ui.layout: table` array is a leaf, a container column failing the load (`quill::table_column_not_flat`). A matrix member stored as a mapping is ticked only where it names `held: true`: `{ detail: X }` is unheld with its detail retained, and nothing reports it. Two more are worth knowing before an author writes one. A `max:` never gates render — an overflowing document warns `validation::cardinality` at the field's own path and renders — while a `default:` or `example:` longer than the cap fails the load (`quill::{default,example}_over_max`). And a card kind declaring `body.enabled: false` warns (`quill::bodiless_card_kind`): a repeated record someone fills in is a row, an `array<object>` on the card that owns it, and the warning says so at load rather than at review. It is a warning and not a refusal because a bodiless positional kind — a page break, a rule, an inserted signature block — is a card, and nothing in `Quill.yaml` tells the loader which it is looking at.
