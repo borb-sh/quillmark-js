@@ -26,6 +26,9 @@ export interface SiteOptions {
 	 *  What this is for is the suite, which asserts the layout over a stub rather than
 	 *  waiting on a Vite build to prove a copy. */
 	client?: string;
+	/** Pack the draft space too (QUIVER §"The draft floor"): a deploy that previews a
+	 *  collection's prototypes rather than publishing its releases. */
+	drafts?: boolean;
 }
 
 /**
@@ -72,7 +75,12 @@ export function assertClient(dist: string): void {
 }
 
 /** Returns the site root, resolved. */
-export async function laySite({ collection, out, client }: SiteOptions): Promise<string> {
+export async function laySite({
+	collection,
+	out,
+	client,
+	drafts = false
+}: SiteOptions): Promise<string> {
 	const dist = client ?? CLIENT;
 	assertClient(dist);
 	assertSafeOut(collection, out);
@@ -82,7 +90,7 @@ export async function laySite({ collection, out, client }: SiteOptions): Promise
 
 	await rm(at, { recursive: true, force: true });
 	await cp(dist, at, { recursive: true });
-	await build(collection, join(at, 'quiver'));
+	await build(collection, join(at, 'quiver'), { drafts });
 
 	// What the client fetches first: its absence reads there as a quiver that is not
 	// present rather than a layout that is wrong.

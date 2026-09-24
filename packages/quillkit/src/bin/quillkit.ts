@@ -169,7 +169,11 @@ async function site(): Promise<void> {
 	// ordinary layout, and it is the same directory either way for the ordinary run from
 	// the collection's own root. A cwd-relative default parts from it exactly when
 	// `--quiver` points elsewhere, and then writes the layout wherever the shell stood.
-	const at = await laySite({ collection: source, out: flag('--out') ?? join(source, 'site') });
+	const at = await laySite({
+		collection: source,
+		out: flag('--out') ?? join(source, 'site'),
+		drafts: argv.includes('--drafts')
+	});
 	console.log(`quillkit site: ${at}`);
 }
 
@@ -184,7 +188,7 @@ function usage(): void {
 			'  quillkit test   [--quiver <dir>]',
 			'  quillkit build  [--quiver <dir>] [--out <dir>]',
 			'  quillkit studio [--quiver <dir>] [--out <dir>] [--port <n>] [--host <addr>]',
-			'  quillkit site   [--quiver <dir>] [--out <dir>]'
+			'  quillkit site   [--quiver <dir>] [--out <dir>] [--drafts]'
 		].join('\n')
 	);
 }

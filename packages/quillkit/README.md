@@ -21,7 +21,7 @@ That client compiles in its own copies of both libraries and the engine, which y
 | `quillkit studio` | the local loop: pack, serve, repack on save                        |
 | `quillkit site`   | the deploy layout: the client at a root, a built quiver beneath it |
 
-Every verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build`, `studio` and `site` take `--out <dir>`, and `studio` takes `--port <n>` and `--host <addr>`.
+Every verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build`, `studio` and `site` take `--out <dir>`, `studio` takes `--port <n>` and `--host <addr>`, and `site` takes `--drafts`.
 
 ## Gating
 
@@ -73,6 +73,8 @@ npx quillkit test && npx quillkit site --out ./site
 ```
 
 **The gate runs first, here and in every recipe below.** `site` packs files and opens none of them — it stats each `Quill.yaml` as a sentinel and never parses it — so a quill that does not compile packs cleanly and reports itself in the client. That is what the local loop wants and what a deploy does not, and nothing in `site` supplies it.
+
+**`--drafts` packs the versions below `0.1.0` too.** Without it `site` takes quiver's draft floor, as a deployment should; with it the site is a preview of the collection as it stands, prototypes included, which is what `studio` serves locally.
 
 The client resolves its quiver against `document.baseURI` and its assets relatively, so one build serves a root, a subpath and a preview URL with no rebuild. A `?quill=` link needs no rewrite rule either: a query participates in no file resolution, and relative resolution drops it. The arrangement itself is two rules: the client's files at some base with a built quiver at `quiver/` under that same base, and no quiver inside the client, since one packed there would occupy the URL the built one is served from.
 
