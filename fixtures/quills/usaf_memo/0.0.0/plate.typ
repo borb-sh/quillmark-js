@@ -1,5 +1,5 @@
 #import "@local/quillmark-helper:0.1.0": (
-  data, display, field-region, form-field, signature-field,
+  data, display, form-field, signature-field,
 )
 #import "@local/tonguetoquill-usaf-memo:5.0.0": (
   backmatter, date-pattern, frontmatter, indorsement, mainmatter,
@@ -16,10 +16,26 @@
 // leaves no glyphs and takes no space from the flow, and the seal stands alone.
 #let letterhead_lines = data.letterhead_title
 
-// Body text size, in points. Also the height of one line of the indorsement
-// header, which is what an omitted indorsement date reserves for its fill-in
-// widget (`date-placeholder-slot`, whose slot is `1em` tall and 1in wide).
+// Body text size, in points. Also the height of one line of a date header,
+// which is what an omitted date reserves for its fill-in widget
+// (`date-placeholder-slot`, whose slot is `1em` tall and 1in wide).
 #let body_font_size = data.font_size * 1pt
+
+// A blank date is dated by hand at signing: an empty AcroForm text box sized
+// to the slot the package reserves for it, bound to the date's address so a
+// preview routes a click on the unfilled slot there. Built only when there is
+// no date to print: a widget over a printed date would offer an edit that the
+// rendered document does not carry back.
+#let fill-in-date(name, field) = form-field(
+  name,
+  type: "text",
+  width: 1in,
+  height: body_font_size,
+  field: field,
+)
+
+// `display` returns `none` for a blank date, the fill-in case.
+#let memo_date = display("date", date-pattern(memo-style: memo_style))
 
 #show: frontmatter.with(
   letterhead-title: letterhead_lines.at(0, default: ""),
@@ -39,23 +55,8 @@
   // `display` places the field's *content* projection instead: the glyphs are
   // born in the generated helper, so the memo date stays click-to-edit however
   // deep the package formats it.
-  //
-  // A blank date means today's, and the plate stamps it rather than falling
-  // through to `frontmatter`'s own `datetime.today()`: package-born ink carries
-  // no address, so the one date a memo never types would be the one date a
-  // preview cannot click. `field-region` claims that ink for the field instead.
-  //
-  // The stamp is markup, not the bare `str` `.display()` returns: a `str` off a
-  // function call carries no source position, and ink with none is unclaimable.
-  date: {
-    let pattern = date-pattern(memo-style: memo_style)
-    let authored = display("date", pattern)
-    if authored != none {
-      authored
-    } else {
-      field-region("date", [#datetime.today().display(pattern)])
-    }
-  },
+  date: memo_date,
+  ..if memo_date == none { (date-field: fill-in-date("Date", "date")) },
 
   memo-for: data.memo_for,
 
@@ -186,18 +187,8 @@
       ),
       ..if card.format != "" { (format: card.format) },
       date: resolved_date,
-      // An omitted date becomes an empty AcroForm text box the endorser types
-      // the signing date into, sized to the slot the package reserves for it.
-      // Built only when there is no date to print: a widget over a printed date
-      // would offer an edit that the rendered document does not carry back.
       ..if resolved_date == none {
-        (date-field: form-field(
-          "Ind_" + str(i) + "_Date",
-          type: "text",
-          width: 1in,
-          height: body_font_size,
-          field: card.at("$path") + "date",
-        ))
+        (date-field: fill-in-date("Ind_" + str(i) + "_Date", card.at("$path") + "date"))
       },
       ..if card.action != "" { (action: card.action) },
       approval-authority: i == last_indorsement_index,

@@ -8,6 +8,10 @@
   memo-for: none,
   memo-from: none,
   date: none,
+  // Fill-in widget for an omitted `date`, anchored in the date slot (see
+  // `date-placeholder-slot`). Without one the slot is ruled for a handwritten
+  // date.
+  date-field: none,
   references: none,
   letterhead-title: "DEPARTMENT OF THE AIR FORCE",
   letterhead-caption: "[YOUR SQUADRON/UNIT NAME]",
@@ -35,8 +39,6 @@
     memo-style in ("usaf", "daf"),
     message: "memo-style must be \"usaf\" or \"daf\"",
   )
-
-  let actual-date = if date == none { datetime.today() } else { date }
 
   // The banner is `LEVEL` or `LEVEL//SUFFIX`. `classification-level` is an enum
   // (a `str`), but `dissemination` may arrive as content, which `str + str`
@@ -206,14 +208,14 @@
 
   [#metadata((
     subject: subject,
-    original-date: actual-date,
+    original-date: date,
     original-from: first-or-value(memo-from),
     body-font: body-font,
     font-size: font-size,
     memo-style: memo-style,
   )) <usaf-memo-config>]
 
-  render-date-section(actual-date, memo-style: memo-style)
+  render-date-section(date, memo-style: memo-style, field: date-field)
   render-for-section(memo-for, memo-for-cols)
   if not falsey(memo-from) { render-from-section(memo-from) }
   // Blank entries are dropped first so a stub `- ` left under `references:`

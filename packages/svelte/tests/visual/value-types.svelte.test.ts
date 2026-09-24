@@ -283,3 +283,22 @@ describe('an array of objects', () => {
 		expect(summaries(arr)[0].getAttribute('aria-expanded')).toBe('true');
 	});
 });
+
+describe('a date field', () => {
+	it("writes today's local date as an authored value", () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const target = mountEditor(q, doc);
+
+		const date = field(target, 'Issued');
+		date.querySelector<HTMLButtonElement>('.qm-date-today')!.click();
+		flushSync();
+
+		const now = new Date();
+		const pad = (n: number) => String(n).padStart(2, '0');
+		const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+		expect(read(q, doc, 'issued')).toBe(local);
+		// Authored now, so no segment still ghosts the `default:`.
+		expect(date.querySelector('.qm-date-segment[data-ghosted]')).toBeNull();
+	});
+});

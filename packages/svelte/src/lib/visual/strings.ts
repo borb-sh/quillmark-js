@@ -79,6 +79,10 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	 *  ghosts ({@link EnumField}). */
 	enumUnsetTag: string;
 
+	// ── Date control ──────────────────────────────────────────────────────────
+	/** The action that writes the local calendar date into a date field. */
+	dateToday: string;
+
 	// ── Matrix control ────────────────────────────────────────────────────────
 	/** The count in the matrix's label row: how many of the roster are held. */
 	matrixHeld: (held: number, total: number) => string;
@@ -182,6 +186,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	arrayCount: (count, max) => `${count} / ${max}`,
 	elementUntitled: (label, index) => `${label} ${index}`,
 	enumUnsetTag: 'default',
+	dateToday: 'Today',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
 	fieldRequired: 'required',
 	formatGroup: 'Formatting',

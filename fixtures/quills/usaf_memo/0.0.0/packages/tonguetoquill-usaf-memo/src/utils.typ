@@ -144,8 +144,8 @@
 
 /// Reserves the space a date occupies, for a date unknown at compile time.
 ///
-/// Used for indorsements whose signing date is not known when the memo is
-/// rendered: the endorser supplies it after the fact. The reserved box is one
+/// Used for a memo or indorsement date not known when the memo is rendered:
+/// the signer supplies it after the fact. The reserved box is one
 /// line tall and sits on the baseline, so the slot lines up with where a
 /// printed date would sit and takes exactly the space one would take.
 ///

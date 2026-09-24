@@ -1,10 +1,13 @@
 <!--
  A `date` (or `datetime`) field → a styled segmented date field on bits-ui. The
- stored value is a string (fixture uses `YYYY-MM-DD`, blank to mean "today at
- render"); a cleared control commits `undefined` (the unset rung): the parent
- removes the field, so the memo quill's blank-date → `datetime.today`
- substitution applies. The value-object a date field lowers to is a
- render-time concern: the editor only sees the stored string.
+ stored value is a string (`YYYY-MM-DD`); a cleared control commits `undefined`
+ (the unset rung): the parent removes the field, and what a blank date renders as
+ is the plate's. The value-object a date field lowers to is a render-time concern:
+ the editor only sees the stored string.
+
+ "Today" writes the local calendar date as an authored value. A date the render
+ took from its clock would change with the day it was rendered on; the stamp is
+ fixed at the moment the user chose it.
 
  Styled rather than a native `<input type="date">`: that control's calendar popup
  is UA-owned and reaches no dial. `DateField` (segments, no
@@ -36,9 +39,12 @@
 -->
 <script lang="ts">
 	import { DateField as BitsDateField } from 'bits-ui';
-	import { parseDate, type DateValue } from '@internationalized/date';
+	import { getLocalTimeZone, parseDate, today, type DateValue } from '@internationalized/date';
 	import { syncedLocal } from './synced.svelte.js';
+	import { wording } from './strings.js';
 	import './controls.css';
+
+	const t = wording();
 
 	interface Props {
 		value: string | undefined;
@@ -99,6 +105,11 @@
 	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
 	const ghost = $derived(local.value === '' ? fallbackDate : undefined);
 
+	function commit(v: string | undefined): void {
+		local.value = v ?? '';
+		onCommit(v);
+	}
+
 	// What one segment prints, and whether that text is shown-never-written.
 	//
 	// An unfilled segment is always shown-never-written, whether it prints the
@@ -136,8 +147,7 @@
 		onValueChange={(d) => {
 			// `CalendarDate.toString()` is exactly `YYYY-MM-DD`. A cleared or
 			// half-typed field yields undefined: the unset rung.
-			local.value = d?.toString() ?? '';
-			onCommit(d?.toString());
+			commit(d?.toString());
 		}}
 	>
 		<!-- `data-ghosted` states the rung the way the enum trigger does. The date
@@ -168,6 +178,11 @@
 			{/snippet}
 		</BitsDateField.Input>
 	</BitsDateField.Root>
+	<button
+		type="button"
+		class="qm-date-today qm-chip qm-focus-ring qm-tap-floor"
+		onclick={() => commit(today(getLocalTimeZone()).toString())}>{t.strings.dateToday}</button
+	>
 </span>
 
 <style>
@@ -176,11 +191,24 @@
 	/* The box is `.qm-control-box` (controls.css), carried on the primitive's own
 	   element beside `.qm-focus-ring-within`; the segments inherit its size and ink
 	   rungs, so the field and its neighbours agree without a second rule. */
+	.qm-date-wrap {
+		display: flex;
+		align-items: center;
+		gap: var(--_qm-space-half);
+	}
 	.qm-date-wrap :global(.qm-date) {
 		display: flex;
 		align-items: center;
-		width: 100%;
+		flex: 1;
+		min-width: 0;
 		box-sizing: border-box;
+	}
+	/* A chip beside a box: the tap floor is given back (`.qm-tap-floor`) and the
+	 padding with it, so the row keeps the box's height. */
+	.qm-date-today {
+		padding: 0 var(--_qm-space);
+		line-height: var(--_qm-leading-tight);
+		border-radius: var(--_qm-radius-inner);
 	}
 	/* The ring rides `.qm-focus-ring-within` (controls.css) rather than the plain
 	   marker: focus lives on the segment, so it rings the field, not the segment
