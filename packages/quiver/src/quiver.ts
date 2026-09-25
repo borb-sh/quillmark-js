@@ -3,9 +3,9 @@
  * `QuiverLoader`, source-backed or built, so what a quiver reads is the loader's
  * business and never the class's.
  *
- * Browser-safe: only `fromBuiltUrl`, `fromBuiltFiles` and the instance API live
- * here. The filesystem factories are free functions in `./node.js`; the class is
- * the same either way.
+ * Browser-safe: only `fromBytes`, `fromUrl` and the instance API live here. The
+ * filesystem factories are free functions in `./node.js`; the class is the same either
+ * way.
  */
 
 import { QuiverError } from './errors.js';
@@ -14,7 +14,7 @@ import type { Quill } from '@quillmark/wasm';
 import { parseQuillRef } from './ref.js';
 import { matchesSemverSelector } from './semver.js';
 
-/** Loader strategy: source or build output. Package-internal. */
+/** Loader strategy: source layout or artifact. Package-internal. */
 export interface QuiverLoader {
 	loadTree(name: string, version: string): Promise<Map<string, Uint8Array>>;
 }
@@ -49,9 +49,9 @@ export class Quiver {
 	readonly #quillCache: Map<string, Promise<Quill>> = new Map();
 
 	/**
-	 * Private constructor. A Quiver comes from a factory (`Quiver.fromBuiltUrl`,
-	 * `Quiver.fromBuiltFiles`, or `fromDir` / `fromBuiltDir` from
-	 * `@quillmark/quiver/node`), which is what names the thing being read.
+	 * Private constructor. A Quiver comes from a factory (`Quiver.fromBytes`,
+	 * `Quiver.fromUrl`, or `fromDir` from `@quillmark/quiver/node`), which is what names
+	 * the thing being read.
 	 */
 	private constructor(
 		name: string,
@@ -70,63 +70,53 @@ export class Quiver {
 	}
 
 	/**
-	 * Browser-safe factory. Loads build output from an HTTP/HTTPS URL.
+	 * Reads an artifact from its bytes, as `build` wrote them. The bytes are copied, so the
+	 * caller's buffer stays the caller's. Quills are inflated out of them as they are asked
+	 * for.
 	 *
-	 * Origin-relative URLs (e.g. `/quivers/foo/`) are accepted in browser
-	 * environments. `file://` URLs are rejected — to load build output from
-	 * disk in Node, use `fromBuiltDir(path)` from `@quillmark/quiver/node`.
-	 *
-	 * `seed` answers for the artifact bytes the caller already holds, keyed by
-	 * artifact-relative path; the URL serves the rest. Seeding `latest.json`
-	 * settles which catalog this process reads at deploy time rather than at
-	 * cache-revalidation time. Seeded bytes are digest-checked as fetched ones
-	 * are.
-	 *
-	 * Throws `transport_error` on network/HTTP failure, `quiver_invalid`
-	 * on format errors.
+	 * Throws `quiver_invalid` on anything but a whole artifact in a format this reader takes,
+	 * naming the upgrade where the format is newer.
 	 */
-	static async fromBuiltUrl(
-		url: string,
-		opts?: { seed?: ReadonlyMap<string, Uint8Array> }
-	): Promise<Quiver> {
-		if (url.startsWith('file://')) {
-			throw new QuiverError(
-				'transport_error',
-				`Quiver.fromBuiltUrl requires an http(s):// or origin-relative URL; got "${url}". For local build output, use import { fromBuiltDir } from '@quillmark/quiver/node'.`
-			);
-		}
-		const { HttpTransport } = await import('./transports/http-transport.js');
-		const { loadBuiltQuiver } = await import('./built-loader.js');
-		const http = new HttpTransport(url);
-
-		if (opts?.seed === undefined) return loadBuiltQuiver(http);
-
-		const { MemoryTransport } = await import('./transports/memory-transport.js');
-		return loadBuiltQuiver(new MemoryTransport(opts.seed, http));
+	static async fromBytes(bytes: Uint8Array): Promise<Quiver> {
+		const { readArtifact } = await import('./artifact.js');
+		return readArtifact(bytes.slice());
 	}
 
 	/**
-	 * Browser-safe factory. Loads build output from the bytes themselves, keyed
-	 * by artifact-relative path (`latest.json`, `manifest.<digest>.json`,
-	 * `<name>@<x.y.z>.<digest>.zip`, `store/<hash>`) — the shape `build` writes
-	 * and `fromBuiltDir` reads back.
+	 * Fetches an artifact whole and reads it. The request revalidates with the origin
+	 * (`no-cache`: a 304 still serves from the browser's cache), so a release reaches the
+	 * next load rather than the next cache expiry. Origin-relative URLs are accepted in a
+	 * browser. A file on disk is `fromBytes` over its contents.
 	 *
-	 * Nothing is fetched, so a runtime whose artifact is not on a path it can
-	 * read (a serverless function, a bundler that inlines it, a test) reaches
-	 * one without fetching its own static output back over its own load
-	 * balancer.
-	 *
-	 * The map must carry the whole artifact; a missing path is a
-	 * `transport_error` naming it. To hold part and fetch the rest, pass the map
-	 * as `fromBuiltUrl`'s `seed`.
-	 *
-	 * Throws `quiver_invalid` on format errors, `transport_error` on a path the
-	 * map does not carry.
+	 * Throws `transport_error` on a `file:` URL, a network failure or a non-2xx answer, and
+	 * `quiver_invalid` as `fromBytes` does.
 	 */
-	static async fromBuiltFiles(files: ReadonlyMap<string, Uint8Array>): Promise<Quiver> {
-		const { MemoryTransport } = await import('./transports/memory-transport.js');
-		const { loadBuiltQuiver } = await import('./built-loader.js');
-		return loadBuiltQuiver(new MemoryTransport(files));
+	static async fromUrl(url: string): Promise<Quiver> {
+		if (url.startsWith('file:')) {
+			throw new QuiverError(
+				'transport_error',
+				`Quiver.fromUrl requires an http(s):// or origin-relative URL; got "${url}". For a file on disk, read it and pass the bytes to Quiver.fromBytes.`
+			);
+		}
+
+		let bytes: Uint8Array;
+		try {
+			const response = await globalThis.fetch(url, { cache: 'no-cache' });
+			if (!response.ok) {
+				throw new QuiverError('transport_error', `HTTP ${response.status} fetching "${url}"`);
+			}
+			bytes = new Uint8Array(await response.arrayBuffer());
+		} catch (err) {
+			if (err instanceof QuiverError) throw err;
+			throw new QuiverError(
+				'transport_error',
+				`Network error fetching "${url}": ${(err as Error).message}`,
+				{ cause: err }
+			);
+		}
+
+		const { readArtifact } = await import('./artifact.js');
+		return readArtifact(bytes);
 	}
 
 	/** Returns all known quill names, sorted lexicographically. */

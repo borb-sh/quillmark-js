@@ -1,7 +1,7 @@
 // Main browser-safe entrypoint.
 //
-// Exposes only browser-safe surface. The Node-only factories (`fromDir`,
-// `fromBuiltDir`, `build`) live at `@quillmark/quiver/node`.
+// Exposes only browser-safe surface. The Node-only factories (`fromDir`, `build`) live
+// at `@quillmark/quiver/node`.
 export { QuiverError } from './errors.js';
 export type { QuiverErrorCode } from './errors.js';
 export { Quiver } from './quiver.js';

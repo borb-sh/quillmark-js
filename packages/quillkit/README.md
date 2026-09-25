@@ -14,14 +14,14 @@ That client compiles in its own copies of both libraries and the engine, which y
 
 ## The verbs
 
-| Verb              | What it does                                                       |
-| ----------------- | ------------------------------------------------------------------ |
-| `quillkit test`   | the gate: every quill's example document compiles and renders      |
-| `quillkit build`  | pack the source layout into a servable artifact                    |
-| `quillkit studio` | the local loop: pack, serve, repack on save                        |
-| `quillkit site`   | the deploy layout: the client at a root, a built quiver beneath it |
+| Verb              | What it does                                                         |
+| ----------------- | -------------------------------------------------------------------- |
+| `quillkit test`   | the gate: every quill's example document compiles and renders        |
+| `quillkit build`  | pack the source layout into one servable file                        |
+| `quillkit studio` | the local loop: pack, serve, repack on save                          |
+| `quillkit site`   | the deploy layout: the client at a root, the packed quiver beside it |
 
-Every verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build`, `studio` and `site` take `--out <dir>`, `studio` takes `--port <n>` and `--host <addr>`, and `site` takes `--drafts`.
+Every verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build` and `studio` take `--out <file>` (`build`'s defaults to `dist/quiver.qv`), `site` takes `--out <dir>` and `--drafts`, and `studio` takes `--port <n>` and `--host <addr>`.
 
 ## Gating
 
@@ -66,7 +66,7 @@ The client renders through the `@quillmark/wasm` it was built against, and the h
 
 ## Shipping it
 
-`site` writes the arrangement a deploy serves (the client at the root, a built quiver at `quiver/` beneath it, which is where the client looks) and asserts both halves of it.
+`site` writes the arrangement a deploy serves (the client at the root, the packed quiver beside it as `quiver.qv`, which is where the client looks) and asserts both halves of it.
 
 ```sh
 npx quillkit test && npx quillkit site --out ./site
@@ -76,20 +76,20 @@ npx quillkit test && npx quillkit site --out ./site
 
 **`--drafts` packs the versions below `0.1.0` too.** Without it `site` takes quiver's draft floor, as a deployment should; with it the site is a preview of the collection as it stands, prototypes included, which is what `studio` serves locally.
 
-The client resolves its quiver against `document.baseURI` and its assets relatively, so one build serves a root, a subpath and a preview URL with no rebuild. A `?quill=` link needs no rewrite rule either: a query participates in no file resolution, and relative resolution drops it. The arrangement itself is two rules: the client's files at some base with a built quiver at `quiver/` under that same base, and no quiver inside the client, since one packed there would occupy the URL the built one is served from.
+The client resolves its quiver against `document.baseURI` and its assets relatively, so one build serves a root, a subpath and a preview URL with no rebuild. A `?quill=` link needs no rewrite rule either: a query participates in no file resolution, and relative resolution drops it. The arrangement itself is two rules: the client's files at some base with `quiver.qv` at that same base, and no `quiver.qv` inside the client, since one packed there would occupy the URL the built one is served from.
 
 ### What a host owes it
 
 Four rules, the same on every host:
 
-| Rule                                          | Why                                                                                                                    |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| serve `assets/*` immutable                    | hash-named, so revalidating one can only return 304: a wasted round-trip per asset per visit                           |
-| do not cache `quiver/latest.json` at the edge | the one name in the artifact carrying no digest, and a stale one pins readers to old quills                            |
-| a missing path is a 404                       | an SPA fallback — the commonest default there is — answers 200 with the client's HTML, which then fails a digest check |
-| serve over https                              | `crypto.subtle` is secure-context-only, and without it arriving bytes go unchecked                                     |
+| Rule                       | Why                                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| serve `assets/*` immutable | hash-named, so revalidating one can only return 304: a wasted round-trip per asset per visit                                     |
+| revalidate everything else | `index.html` and `quiver.qv` keep their names across releases, so a cached copy pins readers to the old client or the old quills |
+| a missing path is a 404    | an SPA fallback — the commonest default there is — answers 200 with the client's HTML, which the reader names as not a quiver    |
+| serve over https           | the packed quiver carries no digest: it is trusted as the client is, having arrived by the same road                             |
 
-The second rule covers the edge alone. The browser layer is the loader's own — `latest.json` fetched `no-cache`, every digest-carrying name `force-cache` — so a host that sets no cache header at all is already correct there. An edge serving one generation's pointer after the next has shipped is the one staleness the addressing cannot catch.
+The first two are the cache policy. The client fetches `quiver.qv` `no-cache`, which closes the browser's layer; the edge's is the host's, and what breaks it is a blanket `immutable` over the whole directory rather than over `assets/*`.
 
 On Vercel, a `vercel.json` at the repository root is the whole of it — a missing path is already a 404 and everything but `assets/*` already revalidates:
 
@@ -164,4 +164,4 @@ A deployed quiver is frozen at a commit, so the repack loop is the local one, ov
 
 ## Refusals
 
-`build` and `site` clear what they write, so an `--out` that is, or contains, your collection or the working directory is refused rather than deleted. `build` assembles each generation beside its output and moves it in whole, so a client reading mid-pack sees the previous one and a failed pack leaves it serving.
+`site` clears what it writes, so an `--out` that is, or contains, your collection or the working directory is refused rather than deleted. `build` writes its file beside the destination and renames it on, so a client reading mid-pack sees the previous one and a failed pack leaves it serving.

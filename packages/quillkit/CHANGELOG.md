@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+**The packed quiver is one file, `quiver.qv`.** `site` lays it beside the client, where the client fetches it off `document.baseURI`; `build --out <file>` writes it, defaulting to `dist/quiver.qv`; `studio` packs it under the collection's `node_modules/.quillkit/` and serves it at `/quiver.qv`. The collection's `@quillmark/quiver` has to be the release that writes it, and the client reads it with the copy it bundles, refusing a newer format by name in the page.
+
+**A host owes a deploy two cache rules**: `assets/*` immutable, everything else revalidating. The edge rule for `quiver/latest.json` is gone with the file, and https is required because the artifact carries no digest of its own rather than because `crypto.subtle` needs a secure context. A host answering the artifact's path with its index page is named in the page as the SPA fallback it is.
+
+**`studio`'s server reads a response's length and body off one descriptor**, so a repack renaming a new file over the path mid-request serves one whole file rather than one file's length over another's bytes.
+
 ## v0.8.0 - 2026-09-23
 
 **`quillkit site --drafts` packs the draft space.** Versions below `0.1.0` reach the laid-out quiver, so a deployed studio previews a collection's prototypes as `quillkit studio` does locally. Without the flag `site` takes quiver's floor as before.

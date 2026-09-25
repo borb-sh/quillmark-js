@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Server } from 'node:http';
@@ -25,25 +25,26 @@ afterEach(async () => {
 	for (const at of temps.splice(0)) await rm(at, { recursive: true, force: true });
 });
 
-/** A client root and a quiver root, mounted the way `quillkit studio` mounts them. */
-async function serveFixture(): Promise<{ base: string; client: string; quiver: string }> {
+/** A client root and an artifact, mounted the way `quillkit studio` mounts them. */
+async function serveFixture(): Promise<{ base: string; client: string; artifact: string }> {
 	const client = await temp();
-	const quiver = await temp();
+	const packed = await temp();
 	await writeFile(join(client, 'index.html'), '<!doctype html>');
 	await mkdir(join(client, 'assets'), { recursive: true });
 	await writeFile(join(client, 'assets', 'wasm_bg.wasm'), Buffer.from([0, 0x61, 0x73, 0x6d]));
 	await writeFile(join(client, 'assets', 'index.js'), '// client');
-	await writeFile(join(quiver, 'latest.json'), '{"format":1,"manifest":"manifest.abc.json"}');
-	await writeFile(join(quiver, 'secret-outside'), 'not reachable from the client mount');
+	const artifact = join(packed, 'quiver.qv');
+	await writeFile(artifact, 'the artifact');
+	await writeFile(join(packed, 'secret-beside'), 'not reachable through the file mount');
 
 	const mounts: Mount[] = [
-		{ prefix: '/quiver', root: quiver },
+		{ path: '/quiver.qv', file: artifact },
 		{ prefix: '', root: client }
 	];
 	const server = createStaticServer(mounts);
 	servers.push(server);
 	const port = await listen(server, 0, '127.0.0.1');
-	return { base: `http://127.0.0.1:${port}`, client, quiver };
+	return { base: `http://127.0.0.1:${port}`, client, artifact };
 }
 
 describe('serving', () => {
@@ -63,20 +64,32 @@ describe('serving', () => {
 		expect(res.headers.get('content-type')).toContain('text/html');
 	});
 
-	it('serves the quiver mount ahead of the client', async () => {
-		// The longest prefix wins, so `/quiver/…` reaches the pack rather than resolving
-		// to a missing file under the client.
+	it('serves the artifact at its path, ahead of the client root', async () => {
 		const { base } = await serveFixture();
-		const res = await fetch(`${base}/quiver/latest.json`);
+		const res = await fetch(`${base}/quiver.qv`);
 		expect(res.status).toBe(200);
-		expect(await res.json()).toMatchObject({ format: 1 });
+		expect(await res.text()).toBe('the artifact');
+	});
+
+	it('serves the artifact a repack renamed over the path', async () => {
+		const { base, artifact } = await serveFixture();
+		await writeFile(`${artifact}.next`, 'the next artifact, longer');
+		await rename(`${artifact}.next`, artifact);
+		const res = await fetch(`${base}/quiver.qv`);
+		expect(await res.text()).toBe('the next artifact, longer');
+	});
+
+	it('a file mount answers its one path and nothing beside it', async () => {
+		const { base } = await serveFixture();
+		expect((await fetch(`${base}/quiver.qv/secret-beside`)).status).toBe(404);
+		expect((await fetch(`${base}/secret-beside`)).status).toBe(404);
 	});
 
 	it('answers nothing from a cache', async () => {
 		// An author repacks under this server; an answer from a cache would be an answer
-		// about the previous generation.
+		// about the previous artifact.
 		const { base } = await serveFixture();
-		const res = await fetch(`${base}/quiver/latest.json`);
+		const res = await fetch(`${base}/quiver.qv`);
 		expect(res.headers.get('cache-control')).toBe('no-store');
 	});
 

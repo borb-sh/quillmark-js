@@ -19,6 +19,10 @@ import { fileURLToPath } from 'node:url';
  */
 export const CLIENT = fileURLToPath(new URL('../dist/client/', import.meta.url));
 
+/** The artifact's name beside the client, which `client/quiver.ts` resolves off the
+ *  document's base. */
+export const ARTIFACT = 'quiver.qv';
+
 /** True when `at` is `abs` or an ancestor of it. */
 export function within(at: string, abs: string): boolean {
 	const rel = relative(at, abs);

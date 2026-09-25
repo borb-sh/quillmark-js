@@ -19,6 +19,7 @@ import { existsSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { Quiver } from '@quillmark/quiver';
 import { scratch } from './helpers/collection.js';
 
 const run = promisify(execFile);
@@ -87,14 +88,21 @@ describe('quillkit test', () => {
 });
 
 describe('quillkit build', () => {
-	it('packs a collection into the directory it was pointed at', async () => {
-		const out = join(await temp.dir(), 'dist');
+	it('packs a collection into the file it was pointed at', async () => {
+		const out = join(await temp.dir(), 'dist', 'quiver.qv');
 		const { stdout } = await run(process.execPath, [BIN, 'build', '--out', out], {
 			cwd: await temp.collection()
 		});
 
 		expect(stdout).toContain('quillkit build:');
-		expect(existsSync(join(out, 'latest.json'))).toBe(true);
+		expect(existsSync(out)).toBe(true);
+	}, 60_000);
+
+	it('packs into dist/quiver.qv by default', async () => {
+		const cwd = await temp.collection();
+		await run(process.execPath, [BIN, 'build'], { cwd });
+
+		expect(existsSync(join(cwd, 'dist', 'quiver.qv'))).toBe(true);
 	}, 60_000);
 });
 
@@ -106,7 +114,7 @@ describe('quillkit site', () => {
 
 		expect(stdout).toContain('quillkit site:');
 		expect(existsSync(join(out, 'index.html'))).toBe(true);
-		expect(existsSync(join(out, 'quiver', 'latest.json'))).toBe(true);
+		expect(existsSync(join(out, 'quiver.qv'))).toBe(true);
 	}, 60_000);
 
 	it('refuses an out that would delete the collection', async () => {
@@ -134,7 +142,7 @@ describe('quillkit site', () => {
 });
 
 describe('quillkit studio', () => {
-	it('packs, serves the client at the root and the quiver beneath it', async () => {
+	it('packs, serves the client at the root and the artifact beside it', async () => {
 		const source = await temp.collection();
 		const child = spawn(process.execPath, [BIN, 'studio', '--quiver', source, '--port', '0'], {
 			stdio: ['ignore', 'pipe', 'pipe']
@@ -159,9 +167,10 @@ describe('quillkit studio', () => {
 			expect(index.status).toBe(200);
 			expect(index.headers.get('content-type')).toContain('text/html');
 
-			const pointer = await fetch(new URL('quiver/latest.json', url));
-			expect(pointer.status).toBe(200);
-			expect(await pointer.json()).toMatchObject({ format: 1 });
+			const artifact = await fetch(new URL('quiver.qv', url));
+			expect(artifact.status).toBe(200);
+			const quiver = await Quiver.fromBytes(new Uint8Array(await artifact.arrayBuffer()));
+			expect(quiver.quillNames()).toContain('showcase');
 		} finally {
 			child.kill('SIGTERM');
 		}

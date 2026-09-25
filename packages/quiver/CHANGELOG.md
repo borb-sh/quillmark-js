@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+**A built quiver is one file.** `build(src, outFile)` writes a single zip: `quiver.json` (the format, the collection's name and description, and each quill's font map), each quill's files under `quills/<name>/<version>/`, and every font once under `fonts/<sha256>`. It is written beside its destination and renamed on, so a reader sees the previous file or the next and a failed build leaves the previous one in place; the staging tree, `.prev` and the destructive-write refusals go with the directory they guarded. The same source packs to the same bytes. Nothing written by an earlier release reads here, nor the reverse (MIGRATION.md).
+
+**Two loaders read it: `Quiver.fromBytes(bytes)` and `Quiver.fromUrl(url)`.** `fromBuiltUrl`, `fromBuiltDir`, `fromBuiltFiles` and the `seed` option are removed, and the three transports with them. `fromUrl` fetches the file once, whole, `no-cache`. `fromBytes` copies the bytes, checks the document and the layout whole, and inflates a quill's files and fonts when it is first asked for.
+
+**One version, read first.** `quiver.json` carries `format`; one above the reader's is `quiver_invalid` naming the upgrade, ahead of any field the reader does not know. The document is closed past it. The pointer's open `format` and the manifest's closed `version` are gone.
+
+**No digests.** Names carry no hash and nothing is checked against one, so `crypto.subtle` is not reached and a page on plain `http` is not a special case. The per-fetch ceilings go too: one budget (256 MiB unpacked, 32 MiB a file, 16384 files) is spent off the central directory where the file is opened, and by `build` before it writes. Bytes that are an HTML page are refused naming the SPA fallback that served them.
+
 ## v0.29.0 - 2026-09-23
 
 **The `@quillmark/wasm` peer floor is `>=0.115.0-0`.** Nothing here reads a schema or a content, so the span's declarations — `type: matrix`, `ui.layout: "table"`, `max:` on an array — and its cuts land outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. Two cuts reach a packed quill: a matrix `members:` is one flat `{id: Title}` mapping, the list of `{group, values}` blocks failing at load, and a `ui.layout: table` column that is not a leaf is `quill::table_column_not_flat`. What a consumer meets on the artifact's own terms is one new load warning, `quill::bodiless_card_kind`, on a card kind declaring `body.enabled: false`.

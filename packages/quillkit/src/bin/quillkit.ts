@@ -9,7 +9,7 @@
 
 import { join, resolve } from 'node:path';
 import { loadEngine, loadQuiverNode } from '../collection.js';
-import { CLIENT } from '../paths.js';
+import { ARTIFACT, CLIENT } from '../paths.js';
 import { createStaticServer, listen, type Mount } from '../serve.js';
 import { assertClient, laySite } from '../site.js';
 import { serialize, watchCollection } from '../watch.js';
@@ -99,7 +99,7 @@ async function test(): Promise<void> {
 
 async function build(): Promise<void> {
 	const source = collection();
-	const out = flag('--out') ?? 'dist';
+	const out = flag('--out') ?? join('dist', ARTIFACT);
 	const { build: packQuiver } = await loadQuiverNode(source);
 	console.log(`quillkit build: ${source} → ${out}`);
 	await packQuiver(source, out);
@@ -114,7 +114,7 @@ async function studio(): Promise<void> {
 	const source = collection();
 	// Under the collection's `node_modules` by default, which is both out of the way
 	// and already excluded from the watch.
-	const out = resolve(flag('--out') ?? join(source, 'node_modules', '.quillkit', 'quiver'));
+	const out = resolve(flag('--out') ?? join(source, 'node_modules', '.quillkit', ARTIFACT));
 	// Checked as `site` checks it, and for the same reason: a missing client is a mount
 	// that answers 404 to every request, which reads as a broken tool rather than as a
 	// tree with the bin compiled and the client not.
@@ -129,12 +129,11 @@ async function studio(): Promise<void> {
 	// Drafts included: this is the author's own viewer, and a quill under 0.1.0 is
 	// what an author is most likely to be looking at.
 	const pack = serialize(() => packQuiver(source, out, { drafts: true }));
-	// Before the server, so the first request finds a whole generation rather than an
-	// empty directory.
+	// Before the server, so the first request finds an artifact rather than a 404.
 	await pack();
 
 	const mounts: Mount[] = [
-		{ prefix: '/quiver', root: out },
+		{ path: `/${ARTIFACT}`, file: out },
 		{ prefix: '', root: CLIENT }
 	];
 	const bound = await listen(createStaticServer(mounts), port, host);
@@ -143,7 +142,7 @@ async function studio(): Promise<void> {
 		pack().then(
 			() => console.log('repacked'),
 			// A quiver mid-edit is invalid as often as not (a half-written `Quill.yaml`).
-			// A failed pack never reaches the swap, so the last good generation stays
+			// A failed pack never reaches the rename, so the last good artifact stays
 			// served and the failure is a line rather than an exit.
 			(err: unknown) => console.error(`pack failed: ${message(err)}`)
 		);
@@ -186,8 +185,8 @@ function usage(): void {
 		[
 			'Usage:',
 			'  quillkit test   [--quiver <dir>]',
-			'  quillkit build  [--quiver <dir>] [--out <dir>]',
-			'  quillkit studio [--quiver <dir>] [--out <dir>] [--port <n>] [--host <addr>]',
+			'  quillkit build  [--quiver <dir>] [--out <file>]',
+			'  quillkit studio [--quiver <dir>] [--out <file>] [--port <n>] [--host <addr>]',
 			'  quillkit site   [--quiver <dir>] [--out <dir>] [--drafts]'
 		].join('\n')
 	);

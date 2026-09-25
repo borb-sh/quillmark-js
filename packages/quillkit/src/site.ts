@@ -1,12 +1,12 @@
 /**
- * Lay a servable site out: the client at the root, a built quiver beside it under
- * `quiver/`. A deploy is that arrangement and nothing else, written here once, so a
+ * Lay a servable site out: the client at the root, the artifact beside it as
+ * `quiver.qv`. A deploy is that arrangement and nothing else, written here once, so a
  * consumer's `scripts`, this repository's CI and a Pages job all reach it by running
  * `quillkit site`.
  *
  * The client resolves its quiver from `document.baseURI` (`client/quiver.ts`), so
  * the tree it is laid into decides what it loads. Both halves of that are asserted rather
- * than assumed: a `quiver/` inside the client would occupy the URL the built one is
+ * than assumed: a `quiver.qv` inside the client would occupy the URL the built one is
  * served from, and the winner would be whichever copy landed last.
  */
 
@@ -14,7 +14,7 @@ import { existsSync } from 'node:fs';
 import { cp, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { loadQuiverNode } from './collection.js';
-import { CLIENT, within } from './paths.js';
+import { ARTIFACT, CLIENT, within } from './paths.js';
 
 export interface SiteOptions {
 	/** The source quiver: `Quiver.yaml` at its root. */
@@ -61,16 +61,16 @@ export function assertSafeOut(collection: string, out: string): void {
 /**
  * The client half of the layout, checked before anything is deleted.
  *
- * A client carrying a `quiver/` of its own is the one failure this cannot recover from
+ * A client carrying a `quiver.qv` of its own is the one failure this cannot recover from
  * silently: it would shadow the author's at the same URL, and which one the reader gets
  * would depend on copy order.
  */
 export function assertClient(dist: string): void {
 	if (!existsSync(join(dist, 'index.html')))
 		throw new Error(`No client at ${dist}: quillkit carries one at dist/client`);
-	if (existsSync(join(dist, 'quiver')))
+	if (existsSync(join(dist, ARTIFACT)))
 		throw new Error(
-			`${dist}/quiver exists: a client carries no quiver, and it would shadow the site's`
+			`${dist}/${ARTIFACT} exists: a client carries no quiver, and it would shadow the site's`
 		);
 }
 
@@ -90,12 +90,12 @@ export async function laySite({
 
 	await rm(at, { recursive: true, force: true });
 	await cp(dist, at, { recursive: true });
-	await build(collection, join(at, 'quiver'), { drafts });
+	await build(collection, join(at, ARTIFACT), { drafts });
 
-	// What the client fetches first: its absence reads there as a quiver that is not
-	// present rather than a layout that is wrong.
-	if (!existsSync(join(at, 'quiver', 'latest.json')))
-		throw new Error(`${at}/quiver holds no pointer: "${collection}" built nothing`);
+	// What the client fetches: its absence reads there as a quiver that is not present
+	// rather than a layout that is wrong.
+	if (!existsSync(join(at, ARTIFACT)))
+		throw new Error(`${at} holds no ${ARTIFACT}: "${collection}" built nothing`);
 
 	return at;
 }

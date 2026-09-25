@@ -102,8 +102,8 @@ dist
 packages/*/build/
 
 # The fixture quiver, packed into each app's served tree before dev/build.
-packages/playground/static/quiver/
-packages/quillkit/client/public/quiver/
+packages/playground/static/quiver.qv
+packages/quillkit/client/public/quiver.qv
 
 # The client laid out beside a built quiver, the way a deploy serves it (`npm run site`).
 /site/

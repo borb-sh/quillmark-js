@@ -18,23 +18,17 @@ import { QuiverError } from './errors.js';
 const ZIP_EPOCH = new Date(1980, 0, 1, 0, 0, 0, 0);
 
 /**
- * What a bundle may hold. Deflate tops out near 1032:1, so a megabyte of zip is a
- * gigabyte resident and the bundle is what a reader inflates to find that out.
+ * What an artifact may hold. Deflate tops out near 1032:1, so a megabyte of zip is a
+ * gigabyte resident and the zip is what a reader inflates to find that out.
  *
  * The ceiling is a constant rather than something a consumer raises, because a quiver
  * is a dependency pinned like any other (README, "What a quiver is trusted to be") and
  * what a budget bounds there is a build that packed something enormous. Both ends spend
- * it, so an artifact no loader would read is refused where it is written.
- *
- * Fonts are not in here: `build` writes them to the store and the manifest names them,
- * leaving a bundle its markdown, its Typst, and what those inline.
- *
- * `built-loader.ts` spends it on the wire too. A deflate of what fits inside it is within
- * zip framing of that, so one number bounds both ends and the fetch needs no second.
+ * it, so an artifact no reader would take is refused where it is written.
  */
-export const MAX_BUNDLE_BYTES = 64 * 1024 * 1024;
-const MAX_ENTRY_BYTES = 16 * 1024 * 1024;
-const MAX_BUNDLE_ENTRIES = 2048;
+export const MAX_ARTIFACT_BYTES = 256 * 1024 * 1024;
+const MAX_ENTRY_BYTES = 32 * 1024 * 1024;
+const MAX_ENTRIES = 16384;
 
 /**
  * The budget, spent one entry at a time. Throws `quiver_invalid`.
@@ -42,30 +36,29 @@ const MAX_BUNDLE_ENTRIES = 2048;
  * Unpacking spends the sizes the central directory declares, and those are the sizes
  * fflate allocates: each entry inflates into a buffer of exactly its declared size,
  * which never grows. So a header cannot buy more than it declares — it can only
- * understate itself and truncate its own entry, which is the corrupt bundle the digest
- * already answers.
+ * understate itself and truncate its own entry, which a quill then fails to load from.
  */
-function bundleBudget(): (name: string, size: number) => void {
+function budget(): (name: string, size: number) => void {
 	let total = 0;
 	let count = 0;
 	return (name, size) => {
-		if (++count > MAX_BUNDLE_ENTRIES) {
+		if (++count > MAX_ENTRIES) {
 			throw new QuiverError(
 				'quiver_invalid',
-				`Bundle holds over ${MAX_BUNDLE_ENTRIES} files, the most one may hold`
+				`Artifact holds over ${MAX_ENTRIES} files, the most one may hold`
 			);
 		}
 		if (size > MAX_ENTRY_BYTES) {
 			throw new QuiverError(
 				'quiver_invalid',
-				`Bundled file "${name}" is ${size} bytes, over the ${MAX_ENTRY_BYTES} one file may be`
+				`Packed file "${name}" is ${size} bytes, over the ${MAX_ENTRY_BYTES} one file may be`
 			);
 		}
 		total += size;
-		if (total > MAX_BUNDLE_BYTES) {
+		if (total > MAX_ARTIFACT_BYTES) {
 			throw new QuiverError(
 				'quiver_invalid',
-				`Bundle unpacks to over ${MAX_BUNDLE_BYTES} bytes, the most one may hold`
+				`Artifact unpacks to over ${MAX_ARTIFACT_BYTES} bytes, the most one may hold`
 			);
 		}
 	};
@@ -77,7 +70,7 @@ function bundleBudget(): (name: string, size: number) => void {
  * Throws `quiver_invalid` where the budget is spent.
  */
 export function packFiles(files: Record<string, Uint8Array>): Uint8Array {
-	const spend = bundleBudget();
+	const spend = budget();
 	const sorted = Object.keys(files).sort();
 	const input: Record<string, [Uint8Array, { mtime: Date }]> = {};
 	for (const key of sorted) {
@@ -89,18 +82,37 @@ export function packFiles(files: Record<string, Uint8Array>): Uint8Array {
 }
 
 /**
- * Unpack a zip into a flat file map.
- * Returns { path: Uint8Array } for every file entry in the archive.
- * Throws `quiver_invalid` where the budget is spent. fflate filters and inflates one
- * entry per pass, so the entries the budget already took are resident when it throws —
- * bounded, being what fit inside it.
+ * Every entry's name, and the bytes of those `keep` takes. The budget is spent over the
+ * whole central directory whichever entries are inflated, so every read of an artifact
+ * holds the same ceiling. fflate filters and inflates one entry per pass, so the entries
+ * the budget already took are resident when it throws — bounded, being what fit inside it.
+ *
+ * Throws `quiver_invalid` where the budget is spent or the bytes are no zip.
  */
-export function unpackFiles(data: Uint8Array): Record<string, Uint8Array> {
-	const spend = bundleBudget();
-	return unzipSync(data, {
-		filter: ({ name, originalSize }) => {
-			spend(name, originalSize);
-			return true;
-		}
-	});
+export function unpackFiles(
+	data: Uint8Array,
+	keep: (name: string) => boolean = () => true
+): { names: string[]; files: Record<string, Uint8Array> } {
+	const spend = budget();
+	const names: string[] = [];
+	let files: Record<string, Uint8Array>;
+	try {
+		files = unzipSync(data, {
+			filter: ({ name, originalSize }) => {
+				spend(name, originalSize);
+				names.push(name);
+				return keep(name);
+			}
+		});
+	} catch (err) {
+		if (err instanceof QuiverError) throw err;
+		throw new QuiverError(
+			'quiver_invalid',
+			`Artifact is not a readable zip: ${(err as Error).message}`,
+			{
+				cause: err
+			}
+		);
+	}
+	return { names, files };
 }

@@ -2,6 +2,39 @@
 
 Upgrade notes per range. The [CHANGELOG](CHANGELOG.md) is the full record; this page is the subset that breaks a working consumer, ordered by how late you find out.
 
+## 0.29 → 0.30
+
+### The artifact is one file
+
+`build(src, out)` writes one file at `out` rather than a tree under it. Every artifact packed by 0.29 or earlier is unreadable to 0.30, and 0.30's is unreadable to 0.29: re-run `build` and redeploy the file together with whatever reads it. Nothing in the source layout changes.
+
+```js
+// 0.29
+await build(root, './public/quivers/my-quiver');
+const quiver = await Quiver.fromBuiltUrl('/quivers/my-quiver/');
+
+// 0.30
+await build(root, './public/quiver.qv');
+const quiver = await Quiver.fromUrl('/quiver.qv');
+```
+
+A browser reading a 0.29 tree under 0.30 fetches whatever the host answers at the new URL. A 404 is a `transport_error` naming the status, and an index page served in its place is a `quiver_invalid` naming the SPA fallback.
+
+### Four loaders become two
+
+| 0.29                             | 0.30                                                       |
+| -------------------------------- | ---------------------------------------------------------- |
+| `Quiver.fromBuiltUrl(dirUrl)`    | `Quiver.fromUrl(fileUrl)`                                  |
+| `fromBuiltDir(dir)` from `/node` | `Quiver.fromBytes(await readFile(file))`                   |
+| `Quiver.fromBuiltFiles(map)`     | `Quiver.fromBytes(bytes)`, the file's bytes in one buffer  |
+| `fromBuiltUrl(url, { seed })`    | `Quiver.fromBytes(bytes)` over what you hold, or `fromUrl` |
+
+`fromBuiltDir`, `fromBuiltUrl` and `fromBuiltFiles` are gone rather than aliased, so plain JavaScript meets a `TypeError` naming the missing function.
+
+### What a host serves
+
+`latest.json` and its edge-cache rule are gone. The file is fetched `no-cache` and revalidated like `index.html`; nothing about it is `immutable`. Content digests are gone with the names that carried them, so there is nothing for `crypto.subtle` to check and no pass-through on plain `http`: serve the file and its client over https, from one deploy.
+
 ## 0.16 → 0.19
 
 ### Runtime, not build time

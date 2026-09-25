@@ -12,14 +12,13 @@ Upgrading from an earlier version: [`MIGRATION.md`](MIGRATION.md).
 
 ## Loading a quiver
 
-A quiver has one authored shape, the **source layout** (`Quiver.yaml` at the package root, quills under `quills/<name>/<x.y.z>/`), published as an npm package. Browsers cannot read that layout, so `build(src, out)` packs it at deploy time and the output is served as static assets. Each loader names exactly what it reads; there is no auto-detection.
+A quiver has one authored shape, the **source layout** (`Quiver.yaml` at the package root, quills under `quills/<name>/<x.y.z>/`), published as an npm package. Browsers cannot read that layout, so `build(src, outFile)` packs it at deploy time into **one file**, served as a static asset. Each loader names exactly what it reads; there is no auto-detection.
 
-| Loader                         | Reads                     | Import                   |
-| ------------------------------ | ------------------------- | ------------------------ |
-| `fromDir(path)`                | the source layout         | `@quillmark/quiver/node` |
-| `fromBuiltDir(path)`           | build output, off disk    | `@quillmark/quiver/node` |
-| `Quiver.fromBuiltUrl(url)`     | build output, over HTTP   | `@quillmark/quiver`      |
-| `Quiver.fromBuiltFiles(files)` | build output, from memory | `@quillmark/quiver`      |
+| Loader                    | Reads                    | Import                   |
+| ------------------------- | ------------------------ | ------------------------ |
+| `fromDir(path)`           | the source layout        | `@quillmark/quiver/node` |
+| `Quiver.fromBytes(bytes)` | the packed file's bytes  | `@quillmark/quiver`      |
+| `Quiver.fromUrl(url)`     | the packed file, fetched | `@quillmark/quiver`      |
 
 The filesystem factories are free functions from `/node`; the two that reach no filesystem are statics on `Quiver`. Importing `/node` adds nothing to the class, so a bundler drops the verbs you do not call.
 
@@ -57,16 +56,16 @@ const canonicalRef = quiver.resolve('memo'); // "memo@1.1.0"
 
 ## Consuming a quiver (browser)
 
-Build at deploy time, serve the output as static files:
+Build at deploy time, serve the file beside your app:
 
 ```ts
 // build script (Node) — typically wired into your existing build pipeline
 import { build } from '@quillmark/quiver/node';
 
-await build('./node_modules/@org/my-quiver', './public/quivers/my-quiver');
+await build('./node_modules/@org/my-quiver', './public/quiver.qv');
 ```
 
-`build` owns its output path outright: it assembles a generation in `<outDir>.stage`, moves it in whole, and deletes the one it replaced. A reader fetching mid-build sees the previous generation rather than a torn tree, and a build that throws leaves it serving. An `outDir` that is, or contains, the source quiver or the working directory is refused with a `transport_error` rather than deleted.
+`build` writes the file beside its destination and renames it on, so a reader sees the previous file or the next one, never a torn one, and a build that throws leaves the previous one in place.
 
 Quills below `0.1.0` are drafts and are left out: they stay in the source layout, which `fromDir` reads whole, and reach the artifact only under `build(src, out, { drafts: true })`. A quill with no version above the floor is absent from the built catalog entirely.
 
@@ -75,7 +74,7 @@ Quills below `0.1.0` are drafts and are left out: they stay in the source layout
 import { Engine, init } from '@quillmark/wasm';
 import { Quiver } from '@quillmark/quiver';
 
-const quiver = await Quiver.fromBuiltUrl('/quivers/my-quiver/');
+const quiver = await Quiver.fromUrl('/quiver.qv');
 const engine = new Engine();
 
 const { Document } = await init(); // the gate is the only door to Document
@@ -84,55 +83,28 @@ const quill = await quiver.getQuill(doc.quillRef);
 const result = await engine.render(quill, doc, { format: 'pdf' });
 ```
 
-A CDN URL works the same way, for consumers who cannot run a Node build step of their own — a collection you publish, on a host you pick, and pinned like the dependency [it is](#what-a-quiver-is-trusted-to-be).
+`fromUrl` fetches the file once, whole, revalidating with the origin (`no-cache`: a 304 still serves from the browser's cache), so a release reaches the next load. Serve it the way you serve your `index.html` — revalidated, never `immutable` — and serve it over https. A host that answers a missing path with its index page serves HTML where the file should be; the reader names that case as a `quiver_invalid` rather than a broken zip.
 
-## Server-side runtime (Node, packed artifact on disk)
+A file packed by a newer `@quillmark/quiver` than the reader is refused with the upgrade named.
 
-Where the packed artifact ships in the deployment image, `fromBuiltDir` reads it from disk, avoiding the self-fetch round-trip `fromBuiltUrl` would force on a self-hosted deployment and letting the source quiver stay a `devDependency`:
+## Server-side runtime
 
-```ts
-import { fromBuiltDir } from '@quillmark/quiver/node';
-
-// Packed at build time, e.g. into ./static/quills/my-quiver
-const quiver = await fromBuiltDir('./static/quills/my-quiver');
-```
-
-## Server-side runtime (no filesystem)
-
-A serverless function's packed artifact is not on a path the invocation can read, so `fromBuiltDir` cannot see it. Hand over the bytes instead, keyed by artifact-relative path as `build` writes them (`latest.json`, `manifest.<digest>.json`, `<name>@<x.y.z>.<digest>.zip`, `store/<hash>`):
+A server with the file in its image, or a function with it inlined by a bundler, holds bytes rather than a URL:
 
 ```ts
+import { readFile } from 'node:fs/promises';
 import { Quiver } from '@quillmark/quiver';
 
-const quiver = await Quiver.fromBuiltFiles(artifactFiles); // Map<string, Uint8Array>
+const quiver = await Quiver.fromBytes(await readFile('./static/quiver.qv'));
 ```
 
-Nothing is fetched, so nothing self-fetches over your own load balancer. The map must carry the whole artifact; a path it lacks is a `transport_error` naming that path.
-
-Where inlining the bundles and fonts is not practical, hold the two small documents and let the host serve the rest:
-
-```ts
-const quiver = await Quiver.fromBuiltUrl('/quills/my-quiver/', {
-	seed: new Map([
-		['latest.json', pointerBytes],
-		[manifestName, manifestBytes]
-	])
-});
-```
-
-The seed answers first and the URL serves what it does not carry. Seeding `latest.json` also settles which catalog the process reads at deploy time rather than at cache-revalidation time. Seeded bytes are checked against the digest in their name exactly as fetched bytes are.
-
-## The `latest.json` pointer
-
-`Quiver.fromBuiltUrl(url)` first fetches `<url>/latest.json`, a stable-named pointer to the current manifest. Everything behind that pointer is content-addressed and checked against the digest in its name; the pointer itself is not, so a cache layer can serve a stale one and silently pin the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), and every other request is `force-cache`, a digest-carrying name being entitled to whatever the cache already holds. Both are the browser layer only: a stale CDN edge is answered by that host's cache headers, and `quillkit`'s README states the whole contract for a deploy serving a client over one.
-
-The check itself needs `crypto.subtle`, which a browser exposes only in a secure context. An `https` page, `http://localhost` and Node have one; a page served over plain `http` to anything else — a dev host on a LAN address, a staging box without a certificate — has none, and there every fetch passes through unchecked.
+Nothing is fetched, so nothing self-fetches over your own load balancer. The bytes are copied, and each quill is inflated out of them when it is first asked for.
 
 ## What a quiver is trusted to be
 
 **A quill is a template the backend executes, so loading a quiver runs its author's code.** Point one at a source you would take a dependency from — an npm package or a git tag, pinned like any other — because nothing here sandboxes a quill, and a collection assembled from anywhere else is a decision to make on purpose.
 
-Content addressing is an integrity check and not a provenance one: the digest in each name catches a corrupted object, a partial sync and a name reused across releases, and says nothing about who packed the bytes. Where the primitive behind it is absent the page is no secure context either, so the pointer, the manifest, the digests and the client itself all arrived over the same unauthenticated channel — which is the whole of why a built quiver is served over `https`.
+The packed file carries no signature and no digest: it is trusted as the page reading it is, having arrived by the same road. Serve both over `https`, from one deploy.
 
 ## Error handling
 
@@ -176,7 +148,7 @@ A consumer reaches an installed quiver by resolving `<specifier>/Quiver.yaml`, w
 
 ## Authoring is [quillkit](../quillkit#readme)'s
 
-This package is a library: it loads a quiver and packs one, and it has no CLI. The verbs a quill author runs (gate, pack, look at, deploy) are `quillkit`'s, and it resolves this package out of the collection's own `node_modules`. Depend on it here and the version you pin is the format your quiver is packed in:
+This package is a library: it loads a quiver and packs one, and it has no CLI. The verbs a quill author runs (gate, pack, look at, deploy) are `quillkit`'s, and it resolves this package out of the collection's own `node_modules`, so the copy that packs is the copy the gate renders through:
 
 ```sh
 npm install --save-dev @quillmark/quiver @quillmark/wasm quillkit

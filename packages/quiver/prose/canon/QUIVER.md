@@ -1,45 +1,60 @@
 # Quiver
 
-> **Implementation**: `src/` · `src/transports/`
+> **Implementation**: `src/`
 
 ## TL;DR
 
-A quiver is a collection of quills, addressed by ref and resolved to a `Quill`. This package loads one from wherever it lives (a source directory, a packed artifact on disk, a URL), packs one for a browser, and hands out quills. The **loaders** never render: `@quillmark/wasm` does that, and the handles pass to it untouched. Nothing here is a verb an author types either: this is the library a collection depends on, and [quillkit](../../../quillkit/prose/canon/QUILLKIT.md) is the tool that resolves it.
+A quiver is a collection of quills, addressed by ref and resolved to a `Quill`. This package reads one from where it lives (a source directory, or the one file `build` packs it into), packs one for a browser, and hands out quills. The **loaders** never render: `@quillmark/wasm` does that, and the handles pass to it untouched. Nothing here is a verb an author types either: this is the library a collection depends on, and [quillkit](../../../quillkit/prose/canon/QUILLKIT.md) is the tool that resolves it.
 
-## One authored shape, four deployments
+## One authored shape, one packed file
 
-Authors write **one** layout: `Quiver.yaml` at the package root, quills under `quills/<name>/<x.y.z>/`, published as an npm package or a git tag. The deployment-topology decision belongs to the consumer, not the author, so the author flow stays one command and the loaders fan out below it.
+Authors write **one** layout: `Quiver.yaml` at the package root, quills under `quills/<name>/<x.y.z>/`, published as an npm package or a git tag. A browser cannot read that layout, so `build(src, outFile)` packs it into **one file** at deploy time, and every consumer that is not reading the source reads that file.
 
 The loaders name exactly what they read; there is no auto-detection and no branching on artifact shape.
 
-| Deployment | Holds | Loader | Where |
-| --- | --- | --- | --- |
-| Author machine, CI | the source layout | `fromDir(path)` | `/node` |
-| Browser | nothing | `Quiver.fromBuiltUrl(url)` | anywhere |
-| Server with a filesystem | build output in its image | `fromBuiltDir(path)` | `/node` |
-| Server without one | build output in memory | `Quiver.fromBuiltFiles(files)` | anywhere |
+| Holds | Loader | Where |
+| --- | --- | --- |
+| the source layout | `fromDir(path)` | `/node` |
+| the artifact's bytes | `Quiver.fromBytes(bytes)` | anywhere |
+| the artifact's URL | `Quiver.fromUrl(url)` | anywhere |
 
-A consumer holding part of an artifact passes it as `fromBuiltUrl`'s `seed`: the fourth row with the heavy bytes left on the host.
+A server with the artifact in its image reads the file and passes the bytes; a serverless function with it inlined by a bundler passes the bytes it holds; a browser passes the URL. There is no transport to choose, because a caller holds either bytes or a URL, and `fromUrl` is a fetch in front of `fromBytes`.
 
-Reaching a quiver installed from npm is not a fifth: `dirname(createRequire(import.meta.url).resolve('<pkg>/Quiver.yaml'))` handed to `fromDir` or `build` is one line at the call site, where the resolution base belongs to the caller and the `exports`-map subpath it lands on is visible rather than a rule this package documents and holds.
+Reaching a quiver installed from npm is not a fourth row: `dirname(createRequire(import.meta.url).resolve('<pkg>/Quiver.yaml'))` handed to `fromDir` or `build` is one line at the call site, where the resolution base belongs to the caller and the `exports`-map subpath it lands on is visible rather than a rule this package documents and holds.
 
-**The table is the removal test.** This package is published, so its callers are mostly outside this workspace and "nothing here calls it" is measured on a sample that excludes them: the playground is a browser and quillkit is a tool, so no node in this repository runs `fromBuiltDir` or `fromBuiltFiles`. Surface comes out when no row needs it, which is not the same question.
+**The table is the removal test.** This package is published, so its callers are mostly outside this workspace and "nothing here calls it" is measured on a sample that excludes them. Surface comes out when no row needs it, which is not the same question.
 
 **Every export names `default` beside `import`.** A tool resolving this package from a consumer's tree walks the exports map under CJS conditions whatever its own module system, so a subpath offering `import` alone is invisible to it. Every verb quillkit runs reaches this package that way, out of the collection's own tree; `@quillmark/wasm` names both, which is why its engine discovery works at all.
 
-The `/node` factories are free functions, not statics: the class stays browser-pure, the entry that reads a filesystem imports nothing onto it, and a bundler drops the verbs a consumer does not call. The statics are the two that reach no filesystem, so what is on the class is what runs anywhere. Construction itself is sealed: `Quiver` has a private constructor and the loader seam is reachable from no entry in `exports`. There is no public transport API (auth headers, custom fetch, `AbortSignal`) and no consumer story asking for one; a sealed seam keeps that option clean, a half-open one lets dependents grow on an unsupported surface.
+The `/node` factories are free functions, not statics: the class stays browser-pure, the entry that reads a filesystem imports nothing onto it, and a bundler drops the verbs a consumer does not call. The statics are the two that reach no filesystem, so what is on the class is what runs anywhere. Construction itself is sealed: `Quiver` has a private constructor and the loader seam is reachable from no entry in `exports`. There is no public fetch API (auth headers, custom fetch, `AbortSignal`) and no consumer story asking for one: a caller needing any of it fetches the bytes itself and calls `fromBytes`.
 
-Browsers cannot read the source layout, so `build(src, out)` packs it at deploy time and the output is served as static assets. `fromBuiltDir` exists for the server that ships the packed artifact in its own image: it avoids the self-fetch round-trip `fromBuiltUrl` would force on a self-hosted deployment, and lets the source quiver stay a devDependency. It carries `transports/fs-built-transport.ts` and the path-escape validation reading manifest-named files off a disk needs.
+## The artifact
 
-`fromBuiltFiles` buys the same property where the artifact is not on a path the process can read, which is a serverless function: the packed tree is outside the invocation's filesystem, so handing over the bytes is what is left. It carries `transports/memory-transport.ts`, which needs no path-escape validation: a map has nothing to escape into.
+One zip, conventionally `quiver.qv`:
 
-`build` owns `out` outright: the previous generation never bleeds into the new one. An `out` that is, or contains, the source quiver or the working directory is refused rather than cleared: `--out .` and a slipped `--out ..` are one keystroke away and the deletion is unrecoverable. An `out` nested *inside* the source (`dist/` under the quiver root) is the ordinary layout and stays allowed, since the scan reads the source before the first write.
+| Path | Holds |
+| --- | --- |
+| `quiver.json` | the format, the collection's `name` and `description`, and per quill its `name`, `version` and a map of font paths to their SHA-256 |
+| `quills/<name>/<version>/…` | each quill's files, fonts excepted |
+| `fonts/<sha256>` | each font once, however many quills carry it |
 
-## The generation lands whole
+Fonts are the heavy bytes and the ones quills share, so they are stored once by full-width hash and put back at each quill's own paths when it is read. The full 64 hex chars, because the store is keyed by hash and two distinct fonts sharing a prefix would merge into one entry.
 
-A build is never observably half-written. It is assembled in `<out>.stage` and moved in, and the tree it replaces is deleted after. Packing straight into `out` would leave a window seconds wide where the pointer is missing or names a manifest whose bundles have not landed, and a client reading it there reports a broken quiver for an edit that was fine; a build that throws would leave that window open until the next one.
+**The artifact is opened whole and inflated by the quill.** `fromBytes` reads the central directory, `quiver.json` and nothing else, and checks the layout against the document: every entry is one the document accounts for, and every font a quill names is present. A torn or hand-assembled file fails there, whole, rather than at whichever quill a reader happens to open first. `getQuill` inflates that quill's files and its fonts out of the held bytes and nothing more, so the catalog is resident from the first moment and the quills cost what is asked for.
 
-The property belongs here rather than to whatever is serving, because the directory is this function's and no caller can close a window inside it. What remains is two renames: a directory rename refuses a non-empty target, so the outgoing generation steps aside first. Between the two it is only at `.prev`, so a second rename that throws puts it back, and the sweep that clears the siblings spares it where even that fails: what the window costs is a torn read, never both generations. The staging siblings are named off `out` and cleared with it, which is why the destructive-write refusals are checked over all three.
+`build` writes it deterministically: entries sorted, one fixed mtime, the document serialized in catalog order. The same source packs to the same bytes.
+
+## One file, one version
+
+**`quiver.json` states the format, and it is read before anything else is believed.** Skew is the ordinary case rather than the broken one: a collection is packed by whatever copy of this package the author's CI installs, and read by the copy frozen inside whichever client is laid over it. A `format` above the reader's is refused with the upgrade named; a reader takes every format up to its own.
+
+The document is closed past that: a field it does not know is refused. That closure is what makes the number load-bearing rather than decorative. A field added to a closed document is one an older reader rejects as an unknown key, naming neither what happened nor what to do; the format is what that reader reads first instead. So an addition moves the number, and an unknown field under a newer format is answered by the format rather than by the field.
+
+## The file is replaced whole
+
+`build` writes the artifact beside its destination under a name unique to the build, then renames it on. A rename on one filesystem is atomic, so a reader sees the previous file or the next one and never a torn one, and a build that throws removes its temp file and leaves the previous artifact in place. The unique name is what lets two builds aimed at one file land in either order without writing into each other.
+
+Nothing is cleared. `build` owns one path, and a destination it cannot rename onto (a directory, a parent that is a file) is a `transport_error` that leaves nothing behind.
 
 ## The draft floor
 
@@ -47,37 +62,31 @@ The property belongs here rather than to whatever is serving, because the direct
 
 The source layout keeps every version, and `fromDir` reads them all: the filter is `build`'s alone, which is what leaves an author's own tooling and `quillkit test` looking at the whole tree. `build(src, out, { drafts: true })` turns it off, for a viewer rather than a deployment — `quillkit studio` packs through this function to serve an author their own collection, where a floor would hide the quill most likely to be under the cursor, and `quillkit site --drafts` lays out a preview of the same.
 
-A quill with nothing above the floor is absent from the manifest rather than present and empty, and a quiver of nothing but drafts builds a pointer over an empty catalog. Which of the two ran is not stamped anywhere: the manifest is closed and carries its own version, so a field there costs a version bump to record a fact about a directory under `node_modules` that no deployment reads.
+A quill with nothing above the floor is absent from the artifact rather than present and empty, and a quiver of nothing but drafts packs an empty catalog. Which of the two ran is not stamped anywhere: the document is closed and carries its own format, so a field there costs a format bump to record a fact no deployment reads.
 
-## The pointer
+## Fetched whole, revalidated
 
-`fromBuiltUrl` fetches `<url>/latest.json` first: a stable-named, non-content-addressed pointer to the current manifest. Everything behind it is content-addressed and safe to cache forever; that one filename is not. A CDN edge or a browser cache can serve a stale pointer after a release and silently pin the client to the old catalog, with no error, and per-host cache headers fix one serving layer at a time. The pointer is therefore the one request fetched `no-cache` (revalidate with the origin, a 304 still serving from disk), which closes the browser-cache layer and nothing above it.
+`fromUrl` fetches the file once, `no-cache`: the browser revalidates with the origin, and a 304 still serves from disk. A release therefore reaches the next load rather than the next cache expiry, and there is exactly one request to get right. The layer above the browser's is the host's, and the rule it owes is the one it owes the client's own `index.html`: revalidate everything that is not hash-named ([quillkit's README](../../../quillkit/README.md#what-a-host-owes-it) carries the deploy contract).
 
-**Both halves of that are the transport's to say, not a host's.** A name carrying its own digest is entitled to a cached response whatever its age, so every fetch but the pointer is `force-cache`. Left at the default it would cost a revalidation per name per load on any host serving `max-age=0`, which is the commonest static-host default and the one the artifact knows better than. What a header still owns is the layer above the browser's, and the client's own bundle beside the artifact, which this reads nothing of.
+A host answering a missing path with its index page (an SPA fallback, the commonest static-host default) serves HTML where the artifact should be. The reader names that case, rather than reporting a zip it cannot open.
 
-**The pointer states the format, and is the one document here that reads past what it knows.** Skew is the ordinary case rather than the broken one: a collection is packed by whatever copy of this package the author's CI installs, and read by the copy frozen inside whichever client is laid over it. `latest.json` is what a reader of any age fetches first, so it is where a format change announces itself. That works only if unknown keys pass through, since a pointer parsed strictly refuses the announcement along with everything else. A `format` above the reader's is named as such, with the upgrade named too; absent means a build from before the marker, which is format 1. The manifest behind it stays closed, carrying its own `version` and rejecting fields it does not know: it is reached only once the format is agreed.
+## What the file does not carry
 
-That closure is what makes the manifest's `version` load-bearing rather than decorative. A field added to a closed document is a field an older reader rejects as an unknown key, naming neither what happened nor what to do; the version is what that reader reads first instead, and a manifest above its own is refused with the upgrade named, the way the pointer's format is. So an addition here moves the number, and a reader takes every version up to its own: version 2 carries the quiver's `description`, and version 1 is the same document without it.
+**No digest.** Integrity is the channel's and the deploy's: the artifact is served over https, from the same deploy as the client reading it, so it arrives by the same authenticated road as the code that reads it, and the host rule that keeps a client current keeps the artifact beside it current too. A digest would add a check for the one case this shape does not have, bytes from a source the deployer does not control, and it is integrity rather than provenance anyway: it says the bytes are the bytes a name claims, and nothing about who packed them. What a consumer owns is the choice of source, stated for them in the [README](../../README.md#what-a-quiver-is-trusted-to-be).
 
-The fetch is skippable by holding the answer. `fromBuiltUrl(url, { seed })` reads the map before the network, so a deployment carrying `latest.json` closes the layer above the one `no-cache` closes: which catalog the process reads is settled by what shipped rather than by what a cache returns.
+**A budget, held where the zip is opened**: a ceiling on what the artifact unpacks to, on any one file inside it, and on how many there are, spent off the sizes the central directory declares and refused as `quiver_invalid` at the entry that trips it. Deflate tops out near 1032:1, so what a megabyte of zip costs a reader is a gigabyte of resident bytes, and it finds out by allocating them. The ceiling is a constant rather than an option a consumer raises: what a budget answers is a build that packed something enormous, not an artifact chosen to be hostile, which is a thing to refuse by choosing the source. `build` spends the same budget, so a collection over it is refused by the build that packs it, named, rather than by whatever reads the artifact later.
 
-Seeded bytes are checked exactly as fetched bytes are, because the check reads the digest in the name and a name arrives the same way whoever holds it. A deployment shipping one generation's pointer beside another's manifest fails on the digest rather than serving a catalog nobody packed.
+## What grows it back
 
-## Content addressing is checked, not asserted
+Each piece this shape does without answers one trigger, and meeting the trigger is what brings the piece back:
 
-Every name but the pointer carries the SHA-256 of what it names, and the loader hashes what arrives before using it: a manifest against the digest in the pointer's filename, a bundle against the digest in the manifest's, a font against its full-width store key. That check is what turns "safe to cache forever" into a property: it catches a corrupted CDN object, a partial sync, and a name reused across releases, and it reports `transport_error`, so the caches that evict on error let a retry succeed. Where no digest primitive exists (`crypto.subtle` is secure-context-only, so a page served over plain `http` to something other than localhost has none) the fetch passes through unchecked rather than failing.
+| Trigger | Brings back |
+| --- | --- |
+| a collection large enough that fetching it whole is felt, or releases frequent enough that re-fetching unchanged fonts is | per-quill files fetched on demand, content-addressed names, a font store shared across releases |
+| an artifact deployed apart from the clients reading it | a stable pointer over immutable names, and a store that keeps old generations |
+| bytes from a source the deployer does not control | a digest per name, checked on arrival |
 
-Bundle and manifest names carry 32 hex chars; the width answers a chosen prefix rather than a collision, and `digest.ts` states what that buys. Store keys are the full 64, because the store is keyed by hash and two distinct fonts sharing a prefix would merge into one entry.
-
-**The check is integrity, not provenance.** It says the bytes are the bytes the name claims and nothing about who packed them, so what a consumer owns is the choice of source, stated for them in the [README](../../README.md#what-a-quiver-is-trusted-to-be).
-
-**A bundle carries a budget**: a ceiling on what it unpacks to, on any one file inside it, and on how many there are, spent off the sizes the central directory declares and refused as `quiver_invalid` at the entry that trips it. fflate filters and inflates in one pass, so the entries the budget already took are resident when it throws — bounded, being what fit inside it. Deflate tops out near 1032:1, so what a megabyte of zip costs a reader is a gigabyte of resident bytes, and it finds out by allocating them.
-
-The ceiling is a constant rather than an option a consumer raises, because the check above is integrity and not provenance: what a budget answers is a build that packed something enormous, not an artifact chosen to be hostile, which is a thing to refuse by choosing the source. `packFiles` spends the same budget, so a quill over it is refused by the build that packs it, named, rather than by whatever reads the artifact later. Fonts sit outside it, being store entries the manifest names rather than bundle entries.
-
-**The budget is spent on the wire too.** Each fetch carries the ceiling for what it asked for: the unpack budget for a bundle, a smaller one for a font, smaller again for the pointer and the manifest. `HttpTransport` holds it — a `Content-Length` over it is refused before a byte is read, and a body that runs past it is cancelled mid-stream, `quiver_invalid` either way. Every other refusal above is a verdict on bytes that have all arrived: a digest is what the whole response hashes to, a budget what its zip declares. So without a ceiling at the socket, a response no reader would accept costs a browser tab before anything can say so. `FsBuiltTransport` and `MemoryTransport` ignore the number: a file is read at the size it is, and a held buffer is already held.
-
-What the addressing does not buy is a stale-pointer fallback: `build` replaces its output rather than adding to it, so a client pinned to a stale pointer gets 404s rather than a stale-but-working catalog. That costs nothing while an artifact and its clients deploy together; where they deploy independently, an append-only store with garbage collection is what buys it back.
+None fires for an artifact that ships with its client, which is every deployment `quillkit site` writes.
 
 ## getQuill is the seam
 
@@ -91,11 +100,11 @@ One narrower verb sits beside it: `resolve(ref)` returns the canonical ref witho
 
 The quill cache is the only one. A fetched tree lives for the length of the materialization that consumes it and no longer: a second cache holding trees would buy a retry after a `Quill.fromTree` throw its refetch, which is a round-trip saved on the path where the quill is broken, against a cache to evict, coalesce and reason about on every path where it is not.
 
-`resolve` is **sync**, and so are `quillNames()` and `versionsOf()`: the catalog is materialized as the quiver is built (`fromBuiltUrl` fetches `latest.json`, `fromDir` scans the source tree), and `QuiverLoader` carries one verb, `loadTree`, which resolution never reaches. A promise there would price I/O the design does not admit.
+`resolve` is **sync**, and so are `quillNames()` and `versionsOf()`: the catalog is materialized as the quiver is built (`fromBytes` reads `quiver.json`, `fromDir` scans the source tree), and `QuiverLoader` carries one verb, `loadTree`, which resolution never reaches. A promise there would price I/O the design does not admit.
 
-Every catalog row is a name a ref can spell. Both loaders hold the row to the charset `parseQuillRef` takes, so what `quillNames()` hands out is what `getQuill` takes back; a source directory or a manifest entry outside it is a `quiver_invalid` naming it, not a row the one verb lists and the other refuses.
+Every catalog row is a name a ref can spell. Both loaders hold the row to the charset `parseQuillRef` takes, so what `quillNames()` hands out is what `getQuill` takes back; a source directory or a `quiver.json` entry outside it is a `quiver_invalid` naming it, not a row the one verb lists and the other refuses.
 
-`name` and `description` are what `Quiver.yaml` says the collection is, and both reach the class by the same road: parsed off the source tree, written into the manifest by `build`, read back out of it by every built loader. A surface over a quiver has no other authored sentence to print — everything else it can show about a collection is a name a directory happens to carry.
+`name` and `description` are what `Quiver.yaml` says the collection is, and both reach the class by the same road: parsed off the source tree, written into `quiver.json` by `build`, read back out of it by `fromBytes`. A surface over a quiver has no other authored sentence to print — everything else it can show about a collection is a name a directory happens to carry.
 
 ## The render boundary
 
@@ -113,6 +122,6 @@ Every error is a `QuiverError` carrying a `code`, a human-readable `message`, an
 
 This package has no `bin`. Loading a quiver and packing one are library functions; the verbs a quill author types are [quillkit](../../../quillkit/prose/canon/QUILLKIT.md)'s, which resolves this package out of the collection's own `node_modules` and calls them.
 
-**What that buys is stated there; what it costs is stated here.** This version number is a format number. `build` writes the pointer, the manifest names and the digest widths, and `fromBuiltUrl` reads them, so a collection depending on this package pins both halves at once, and a release here is a release of the format. A verb added to a CLI must not move it.
+**What that buys is stated there; what it costs is stated here.** `build` writes the format and `fromBytes` reads it, so a collection depending on this package pins both halves at once. The file names its own format, so a reader meeting a newer one says so rather than misreading it; what the pin still holds is that the copy which packs is the copy `quillkit test` renders through, one wasm module behind both the quills and the engine. A verb added to a CLI must not move it.
 
 The name stays the artifact's. `quiver` is the plain word that reads right inside an ambiguous sentence (the quiver is stale, the quiver has no quills), and `Quiver.yaml` at a collection's root is what an author names the thing after. A bin lands in a namespace it shares with every other tool a consumer installs, which is a place for a coined word rather than a plain one.

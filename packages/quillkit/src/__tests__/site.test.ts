@@ -13,7 +13,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { CLIENT } from '../paths.js';
+import { Quiver } from '@quillmark/quiver';
+import { ARTIFACT, CLIENT } from '../paths.js';
 import { assertClient, assertSafeOut, laySite } from '../site.js';
 import { scratch } from './helpers/collection.js';
 
@@ -30,19 +31,15 @@ async function stubClient(): Promise<string> {
 }
 
 describe('laying a site out', () => {
-	it('puts the client at the root and the quiver beneath it', async () => {
+	it('puts the client at the root and the artifact beside it', async () => {
 		const out = join(await temp.dir(), 'site');
 		await laySite({ collection: await temp.collection(), out, client: await stubClient() });
 
 		expect(existsSync(join(out, 'index.html'))).toBe(true);
 		expect(existsSync(join(out, 'assets', 'index.js'))).toBe(true);
-		// Where the client looks: `new URL('quiver/', document.baseURI)`.
-		expect(existsSync(join(out, 'quiver', 'latest.json'))).toBe(true);
-
-		const pointer = JSON.parse(await readFile(join(out, 'quiver', 'latest.json'), 'utf8')) as {
-			manifest: string;
-		};
-		expect(existsSync(join(out, 'quiver', pointer.manifest))).toBe(true);
+		// Where the client looks: `new URL('quiver.qv', document.baseURI)`.
+		const quiver = await Quiver.fromBytes(await readFile(join(out, ARTIFACT)));
+		expect(quiver.quillNames()).toEqual(['showcase']);
 	});
 
 	it('packs the draft space only when asked', async () => {
@@ -51,14 +48,8 @@ describe('laying a site out', () => {
 			const out = join(await temp.dir(), 'site');
 			const collection = await temp.collection();
 			await laySite({ collection, out, client: await stubClient(), drafts });
-			const quiver = join(out, 'quiver');
-			const { manifest } = JSON.parse(await readFile(join(quiver, 'latest.json'), 'utf8')) as {
-				manifest: string;
-			};
-			const { quills } = JSON.parse(await readFile(join(quiver, manifest), 'utf8')) as {
-				quills: Array<{ name: string; version: string }>;
-			};
-			return quills.map((q) => `${q.name}@${q.version}`);
+			const quiver = await Quiver.fromBytes(await readFile(join(out, ARTIFACT)));
+			return quiver.quillNames().flatMap((n) => quiver.versionsOf(n).map((v) => `${n}@${v}`));
 		};
 
 		expect(await refs()).not.toContain('usaf_memo@0.0.0');
@@ -116,7 +107,7 @@ describe('the client assertion', () => {
 		// It would occupy the URL the author's is served from, and the winner would be
 		// whichever copy landed last.
 		const dist = await stubClient();
-		await mkdir(join(dist, 'quiver'), { recursive: true });
+		await writeFile(join(dist, ARTIFACT), 'a stray pack');
 
 		expect(() => assertClient(dist)).toThrow(/shadow/);
 	});
@@ -139,9 +130,9 @@ describe('the client this package carries', () => {
 		const html = await readFile(join(CLIENT, 'index.html'), 'utf8');
 		expect(html).not.toContain('/main.ts');
 
-		// `vite build` runs with `copyPublicDir: false` precisely so a dev run's packed
-		// tree cannot ride into the tarball.
-		expect(existsSync(join(CLIENT, 'quiver'))).toBe(false);
+		// `vite build` runs with `copyPublicDir: false` precisely so a dev run's pack cannot
+		// ride into the tarball.
+		expect(existsSync(join(CLIENT, ARTIFACT))).toBe(false);
 		expect(() => assertClient(CLIENT)).not.toThrow();
 	});
 });

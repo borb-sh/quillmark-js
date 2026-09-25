@@ -8,7 +8,7 @@ import { defineConfig } from 'vite';
 // `runtime::init_failed`, so the package stays unbundled.
 //
 // The reference quill is not a bundler input at all: it is packed into
-// `static/quiver/` before dev and build, and fetched at runtime. So nothing here
+// `static/quiver.qv` before dev and build, and fetched at runtime. So nothing here
 // reaches outside the app root.
 export default defineConfig({
 	plugins: [sveltekit()],

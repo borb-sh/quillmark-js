@@ -10,7 +10,7 @@ import { carried } from '../../scripts/carried.mjs';
 //
 // The pack, as this repository serves the client over it. `quillkit studio` is the
 // loop an author runs and this is not a second copy of it: the pack is `build`, which
-// lands a generation whole, and what is left here is the two things a dev server adds
+// replaces its file whole, and what is left here is the two things a dev server adds
 // and a bin has no use for: the first pack before the server exists, and a repack
 // signalled over the socket the page already holds. What this buys over the bin is
 // HMR on the client's own chrome, which is what the dev server is for.
@@ -27,7 +27,7 @@ const SOURCE = fileURLToPath(new URL('../../fixtures', import.meta.url));
 /** Vite's verbatim-copy tree, which is the dev server's alone: the built client
  *  carries no quiver, and `quillkit site` lays one beside it. Generated, and
  *  gitignored. */
-const OUT = fileURLToPath(new URL('client/public/quiver', import.meta.url));
+const OUT = fileURLToPath(new URL('client/public/quiver.qv', import.meta.url));
 /** One repack per settled burst: an editor's save arrives as several watcher events. */
 const SETTLE_MS = 80;
 /** The dev-only signal that a repack landed. The client answers it by minting a
@@ -48,8 +48,8 @@ function settle(ms: number, fn: () => void): () => void {
 }
 
 function quiverSource(): Plugin {
-	// Serialized rather than concurrent: `build` owns its output directory, so two
-	// overlapping packs would race over one tree. Both arms chain, so a pack queues onto
+	// Serialized rather than concurrent: two overlapping packs of one source would land
+	// in whichever order they finish, not the order they started. Both arms chain, so a pack queues onto
 	// a settled promise whichever way the last one went; a rejected link would answer
 	// every later pack with the first failure instead of running it.
 	const run = (): Promise<void> => build(SOURCE, OUT);
@@ -78,8 +78,8 @@ function quiverSource(): Plugin {
 				void pack().then(
 					() => server.hot.send({ type: 'custom', event: REPACKED }),
 					// A quiver mid-edit is invalid as often as not (a half-written
-					// `Quill.yaml`). A failed pack never reaches the swap, so the last
-					// good generation stays served and the failure is a log line.
+					// `Quill.yaml`). A failed pack never reaches the rename, so the last
+					// good artifact stays served and the failure is a log line.
 					(err: unknown) =>
 						server.config.logger.error(
 							`[studio] quiver pack failed: ${err instanceof Error ? err.message : String(err)}`

@@ -85,6 +85,6 @@ jobs:
           node "$RUNNER_TEMP/tool/dist/bin/quillkit.js" site --quiver fixtures --out "$RUNNER_TEMP/site"
           test -f "$RUNNER_TEMP/site/index.html" \
             || { echo "::error::the tarball laid no client at the site root"; exit 1; }
-          test -f "$RUNNER_TEMP/site/quiver/latest.json" \
-            || { echo "::error::the tarball laid no quiver under the site"; exit 1; }
+          test -f "$RUNNER_TEMP/site/quiver.qv" \
+            || { echo "::error::the tarball laid no quiver beside the client"; exit 1; }
           node scripts/check-style.mjs --built "$RUNNER_TEMP/site"

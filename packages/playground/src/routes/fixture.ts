@@ -1,7 +1,6 @@
-// Where the playground's quills come from: a built quiver served under `/quiver/`,
-// packed from the workspace fixture tree by `scripts/build-quiver.mjs`. Pointer →
-// manifest → content-addressed bundle, the browser consumer path in full
-// (PLAYGROUND §"Quiver, not bundler").
+// Where the playground's quills come from: the artifact served as `/quiver.qv`, packed
+// from the workspace fixture tree by `scripts/build-quiver.mjs`. The browser consumer
+// path in full (PLAYGROUND §"Quiver, not bundler").
 //
 // One `Quiver` for the page. Its quill cache is per canonical ref and lives as long
 // as the quiver does, so routes share one materialization across client-side
@@ -17,7 +16,7 @@ let quiverP: Promise<Quiver> | undefined;
 // A rejected promise is not nullish and would memoize the failure for the page's life, so
 // the memo clears before the rejection reaches the caller: the next call fetches again.
 function quiver(): Promise<Quiver> {
-	return (quiverP ??= Quiver.fromBuiltUrl(`${base}/quiver/`).catch((err: unknown) => {
+	return (quiverP ??= Quiver.fromUrl(`${base}/quiver.qv`).catch((err: unknown) => {
 		quiverP = undefined;
 		throw err;
 	}));

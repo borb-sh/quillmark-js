@@ -1,24 +1,22 @@
 /**
- * The static server `studio` serves the loop over. It composes two roots rather than
- * copying one into the other: the client out of this package, the packed quiver out of
- * the tree the packer swaps. A repack replaces a directory the server reads per
- * request, so nothing here is told a pack happened.
+ * The static server `studio` serves the loop over. It composes the client's root and the
+ * one artifact file rather than copying either into the other: the client out of this
+ * package, the artifact wherever the packer writes it. A repack replaces a file the
+ * server reads per request, so nothing here is told a pack happened.
  *
  * Two things a general-purpose static server gets wrong for this, which is why this one
  * is written rather than borrowed: `.wasm` must be served as `application/wasm`, and a
  * path escaping its root must be refused.
  */
 
-import { createReadStream, statSync } from 'node:fs';
+import { closeSync, createReadStream, fstatSync, openSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, resolve } from 'node:path';
 import { within } from './paths.js';
 
 /**
- * What the two roots hold: the client `vite build` emits, and a packed quiver's pointer,
- * manifests and bundles. Fonts carry no type because they carry no extension either,
- * being dehydrated into `store/<sha256>`; anything unlisted falls back to
- * `application/octet-stream`, which is right for opaque bytes.
+ * What the client `vite build` emits. Anything unlisted, the artifact included, falls
+ * back to `application/octet-stream`, which is right for opaque bytes.
  *
  * `.wasm` is the one that is not a nicety: `@quillmark/wasm` ships wasm-bindgen's web
  * target, which instantiates by streaming, and `WebAssembly.instantiateStreaming`
@@ -32,31 +30,35 @@ const TYPES: Record<string, string> = {
 	'.json': 'application/json; charset=utf-8',
 	'.png': 'image/png',
 	'.svg': 'image/svg+xml',
-	'.wasm': 'application/wasm',
-	'.zip': 'application/zip'
+	'.wasm': 'application/wasm'
 };
 
-export interface Mount {
-	/** URL prefix, leading slash and no trailing one. `''` is the root mount. */
-	prefix: string;
-	root: string;
-}
-
-/** A file a request may have, and its length off the stat that found it. */
-export interface Served {
-	at: string;
-	size: number;
-}
+/** A directory served under a prefix, or one file served at one path. */
+export type Mount =
+	| {
+			/** URL prefix, leading slash and no trailing one. `''` is the root mount. */
+			prefix: string;
+			root: string;
+	  }
+	| {
+			/** The one URL path this answers, leading slash included. */
+			path: string;
+			file: string;
+	  };
 
 /**
  * What each request resolves against. The mounts are fixed before the server listens,
  * so the longest-prefix order and each root are settled once rather than per request.
  */
-export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
-	// Longest prefix first, so `/quiver/…` reaches the pack rather than the client.
-	const ordered = [...mounts]
-		.sort((a, b) => b.prefix.length - a.prefix.length)
-		.map((m) => ({ prefix: m.prefix, root: resolve(m.root) }));
+export function fileResolver(mounts: Mount[]): (url: string) => string | null {
+	const files = new Map<string, string>();
+	const roots: { prefix: string; root: string }[] = [];
+	for (const m of mounts) {
+		if ('file' in m) files.set(m.path, resolve(m.file));
+		else roots.push({ prefix: m.prefix, root: resolve(m.root) });
+	}
+	// Longest prefix first, so a nested mount is reached ahead of the client's.
+	const ordered = roots.sort((a, b) => b.prefix.length - a.prefix.length);
 
 	return (url) => {
 		let path: string;
@@ -67,6 +69,9 @@ export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
 			return null;
 		}
 		if (path.includes('\0')) return null;
+
+		const pinned = files.get(path);
+		if (pinned !== undefined) return isFile(pinned) ? pinned : null;
 
 		const mount = ordered.find(
 			(m) => m.prefix === '' || path === m.prefix || path.startsWith(`${m.prefix}/`)
@@ -83,22 +88,21 @@ export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
 		// request text would have to anticipate each spelling.
 		if (!within(mount.root, at)) return null;
 
-		// One stat answers all three questions the response has: is it there, is it a
-		// file, how long is it. A second would read a tree a repack swaps under the
-		// server, and the length it read would not be the body's.
-		let stats;
-		try {
-			stats = statSync(at);
-		} catch {
-			return null;
-		}
-		return stats.isFile() ? { at, size: stats.size } : null;
+		return isFile(at) ? at : null;
 	};
+}
+
+function isFile(at: string): boolean {
+	try {
+		return statSync(at).isFile();
+	} catch {
+		return false;
+	}
 }
 
 /** The file a request names, or null when it names none it may have. */
 export function fileFor(mounts: Mount[], url: string): string | null {
-	return fileResolver(mounts)(url)?.at ?? null;
+	return fileResolver(mounts)(url);
 }
 
 /**
@@ -115,28 +119,37 @@ export function createStaticServer(mounts: Mount[]): Server {
 			return;
 		}
 
-		const found = resolveFile(req.url ?? '/');
-		if (found === null) {
+		// The length and the body come off one descriptor: a repack renames a new file over
+		// the path at any moment, and a length read off the path would be one file's while
+		// the body streamed another's.
+		const at = resolveFile(req.url ?? '/');
+		let fd: number | undefined;
+		try {
+			if (at !== null) fd = openSync(at, 'r');
+		} catch {
+			// Gone between the resolve and the open: as absent as never there.
+		}
+		if (at === null || fd === undefined) {
 			res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('not found\n');
 			return;
 		}
 
 		res.writeHead(200, {
-			'content-type': TYPES[extname(found.at).toLowerCase()] ?? 'application/octet-stream',
-			'content-length': found.size,
+			'content-type': TYPES[extname(at).toLowerCase()] ?? 'application/octet-stream',
+			'content-length': fstatSync(fd).size,
 			'cache-control': 'no-store'
 		});
 		if (req.method === 'HEAD') {
+			closeSync(fd);
 			res.end();
 			return;
 		}
 
-		const stream = createReadStream(found.at);
-		// A repack removes the file between the stat and the open, and a `ReadStream`
-		// that errors with nothing listening throws out of the event loop and takes the
-		// studio down mid-session. The head is already written, so the answer is a
-		// destroyed response rather than a status: a body short of the length it
-		// declared has to be a read a client can tell from a whole one.
+		const stream = createReadStream('', { fd });
+		// A `ReadStream` that errors with nothing listening throws out of the event loop and
+		// takes the studio down mid-session. The head is already written, so the answer is a
+		// destroyed response rather than a status: a body short of the length it declared
+		// has to be a read a client can tell from a whole one.
 		stream.on('error', () => res.destroy());
 		// `pipe` unpipes on a closed destination and leaves the source paused, so a client
 		// that cancels mid-body would leave the fd open for the life of the server.

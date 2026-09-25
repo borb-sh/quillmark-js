@@ -1,8 +1,8 @@
 /**
  * The repack trigger: what counts as a source change, and how many changes one repack
- * answers. The pack itself is quiver's `build`, which lands a generation whole
- * (QUIVER §"The generation lands whole"), so nothing here needs to know a client is
- * reading the tree it writes.
+ * answers. The pack itself is quiver's `build`, which replaces its file whole
+ * (QUIVER §"The file is replaced whole"), so nothing here needs to know a client is
+ * reading the file it writes.
  */
 
 import { watch } from 'node:fs';
@@ -81,8 +81,8 @@ export function watchCollection(
 
 /**
  * Run `job` one at a time, chaining onto a settled queue whichever way the last one
- * went. `build` owns its output directory, so two overlapping packs would race over one
- * tree; and a rejected link left in the chain would answer every later pack with the
+ * went. Two overlapping packs of one source land in whichever order they finish rather
+ * than the order they started; and a rejected link left in the chain would answer every later pack with the
  * first failure instead of running it, which a quiver mid-edit reaches on the first
  * half-written `Quill.yaml`.
  */

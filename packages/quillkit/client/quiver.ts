@@ -1,7 +1,6 @@
-// Where studio's quills come from: the built quiver the Node half packs, served beside
-// the client and read back with `Quiver.fromBuiltUrl` (pointer, manifest, one
-// content-addressed bundle, fonts dehydrated into a store). The browser consumer path
-// in full, which is what an author-facing surface owes the loader it is a surface for.
+// Where studio's quills come from: the artifact the Node half packs, served beside the
+// client as one file and read back with `Quiver.fromUrl`. The browser consumer path in
+// full, which is what an author-facing surface owes the loader it is a surface for.
 //
 // The base is a runtime fact, taken off the document's own, and nothing here is
 // workspace-relative: the same client serves a dev server, a subpath, and a published
@@ -21,13 +20,13 @@ export interface Catalog {
 }
 
 /**
- * A fresh `Quiver` over the served tree. Minted rather than cached: a repack yields a
- * new content-addressed manifest and pointer, and the quill cache lives as long as the
- * quiver does, so the client drops the quiver instead of invalidating it. The pointer
- * is already fetched `no-cache`, so nothing here works around a cache.
+ * A fresh `Quiver` over the served artifact. Minted rather than cached: a repack
+ * replaces the file, and the quill cache lives as long as the quiver does, so the client
+ * drops the quiver instead of invalidating it. The file is already fetched `no-cache`,
+ * so nothing here works around a cache.
  */
 export function openQuiver(): Promise<Quiver> {
-	return Quiver.fromBuiltUrl(new URL('quiver/', document.baseURI).href);
+	return Quiver.fromUrl(new URL('quiver.qv', document.baseURI).href);
 }
 
 export function catalogOf(quiver: Quiver): Catalog {

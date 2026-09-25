@@ -15,21 +15,20 @@
  *      resolve.
  *
  * The last block closes the loop the package exists for, against the
- * workspace's reference quill rather than a toy: source layout → `build` →
- * transport fetch → digest check → font rehydration → `Quill.fromTree` →
- * `engine.render`. The apps walk the same loop, but only under a human.
+ * workspace's reference quill rather than a toy: source layout → `build` → one file →
+ * font rehydration → `Quill.fromTree` → `engine.render`. The apps walk the same loop, but only under a human.
  *
  * The Typst backend load makes this the slowest test in the suite (seconds).
  * It is kept in its own file so it stays cheap to skip locally.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init, Engine } from '@quillmark/wasm';
-import { build, fromBuiltDir, fromDir } from '../node.js';
+import { Quiver, build, fromDir } from '../node.js';
 
 const core = await init();
 
@@ -39,8 +38,8 @@ const core = await init();
 const RENDER_FIXTURE = fileURLToPath(new URL('./fixtures/render-quiver', import.meta.url));
 
 // The workspace's reference quiver: `showcase@1.0.0`, a published-shape quill with a
-// Typst package tree, an image asset, and five fonts the build dehydrates into
-// `store/`; beside it `usaf_memo@0.0.0`, which a build leaves out as a draft.
+// Typst package tree, an image asset, and five fonts the build stores once under
+// `fonts/`; beside it `usaf_memo@0.0.0`, which a build leaves out as a draft.
 const REFERENCE_QUIVER = fileURLToPath(new URL('../../../../fixtures', import.meta.url));
 
 describe('Engine.render against a quiver quill', () => {
@@ -124,15 +123,15 @@ describe('Engine.render against a quiver quill', () => {
 	}, 60000);
 });
 
-describe('the reference quill, source → build → fetch → render', () => {
-	// One test, the whole pipeline. The HTTP and filesystem transports share the
-	// path validation, digest check, and unzip path, so `fromBuiltDir` covers
-	// both without a server.
+describe('the reference quill, source → build → read → render', () => {
+	// `fromUrl` is a fetch in front of `fromBytes`, so the bytes off disk cover the
+	// pipeline without a server.
 	let outDir: string;
+	const packed = (): Promise<Quiver> => readFile(join(outDir, 'quiver.qv')).then(Quiver.fromBytes);
 
 	beforeAll(async () => {
 		outDir = await mkdtemp(join(tmpdir(), 'quiver-reference-'));
-		await build(REFERENCE_QUIVER, join(outDir, 'packed'));
+		await build(REFERENCE_QUIVER, join(outDir, 'quiver.qv'));
 	}, 60000);
 
 	afterAll(async () => {
@@ -140,7 +139,7 @@ describe('the reference quill, source → build → fetch → render', () => {
 	});
 
 	it('packs the reference quiver and renders it back out of the artifact', async () => {
-		const built = await fromBuiltDir(join(outDir, 'packed'));
+		const built = await packed();
 		// The source quiver carries two quills and the artifact carries one: `usaf_memo`
 		// sits at `0.0.0`, under the draft floor, so a build leaves it out. It is a copy
 		// of a shipped quill rather than that release, and the version is what says so —
@@ -152,8 +151,8 @@ describe('the reference quill, source → build → fetch → render', () => {
 		const quill = await built.getQuill('showcase');
 		expect(quill.backendId).toBe('typst');
 
-		// The fonts left the bundle at build time and came back from `store/` on
-		// fetch. Typst substitutes for a missing face rather than failing, so the
+		// The fonts left the quill's files at build time and came back from `fonts/` on
+		// read. Typst substitutes for a missing face rather than failing, so the
 		// rehydration is asserted here rather than left to the render.
 		const tree = quill.toTree();
 		const fonts = [...tree.keys()].filter((p) => /\.(ttf|otf)$/i.test(p));
@@ -171,11 +170,11 @@ describe('the reference quill, source → build → fetch → render', () => {
 	}, 120000);
 
 	it('round-trips the tree byte for byte', async () => {
-		// Zip, dehydrate, fetch, rehydrate: the quill that comes back out is the
+		// Zip, store the fonts by hash, read, rehydrate: the quill that comes back out is the
 		// quill that went in. A build that drops, truncates, or reorders a file
 		// shows up here rather than as a typesetting error downstream.
 		const source = await (await fromDir(REFERENCE_QUIVER)).getQuill('showcase@1.0.0');
-		const built = await (await fromBuiltDir(join(outDir, 'packed'))).getQuill('showcase@1.0.0');
+		const built = await (await packed()).getQuill('showcase@1.0.0');
 
 		const before = source.toTree();
 		const after = built.toTree();

@@ -13,8 +13,6 @@ import { Quiver, createQuiver } from './quiver.js';
 import { scanSourceQuiver, SourceLoader } from './source-loader.js';
 import { buildQuiver } from './build.js';
 import type { BuildOptions } from './build.js';
-import { loadBuiltQuiver } from './built-loader.js';
-import { FsBuiltTransport } from './transports/fs-built-transport.js';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -41,37 +39,22 @@ export async function fromDir(pathOrFileUrl: string): Promise<Quiver> {
 }
 
 /**
- * Loads a packed (build-output) quiver from a local directory containing
- * `latest.json` and the manifest/bundle/store files written by `build`.
- * Symmetric to `Quiver.fromBuiltUrl(url)` but reads from disk instead of HTTP:
- * no network required.
- *
- * Use this for server-side runtime when a packed artifact ships in the
- * deployment image; consumers can keep source quivers as devDependencies and
- * avoid self-fetching over their own load balancer.
- *
- * Throws `quiver_invalid` on format errors, `transport_error` on I/O failure.
- */
-export async function fromBuiltDir(dirPath: string): Promise<Quiver> {
-	return loadBuiltQuiver(new FsBuiltTransport(dirPath));
-}
-
-/**
- * Reads the Source Quiver at sourceDir, validates it, and writes the runtime
- * build artifact to outDir, which the build clears first and therefore owns.
+ * Reads the Source Quiver at sourceDir, validates it, and writes the artifact to
+ * outFile: one file, which `Quiver.fromBytes` and `Quiver.fromUrl` read back. The file
+ * is replaced whole, never written in place.
  *
  * Quills below `0.1.0` are drafts: they stay in the source layout, which
  * `fromDir` reads whole, and reach the artifact only under `{ drafts: true }`.
  *
- * Throws `quiver_invalid` on source validation failures, `transport_error` on
- * I/O failures and on an outDir holding the source quiver or the cwd.
+ * Throws `quiver_invalid` on source validation failures and on a collection over the
+ * budget a reader holds, `transport_error` on I/O failures.
  */
 export async function build(
 	sourceDir: string,
-	outDir: string,
+	outFile: string,
 	options?: BuildOptions
 ): Promise<void> {
-	return buildQuiver(sourceDir, outDir, options);
+	return buildQuiver(sourceDir, outFile, options);
 }
 
 // The rest of the public surface, so a Node consumer needs one import.
