@@ -289,6 +289,7 @@
 						value={obj[key] as string | undefined}
 						values={sub.values ?? []}
 						fallback={sub.default as string | undefined}
+						blankTitle={sub.ui?.blank_title}
 						onCommit={(v) => commitProp(key, v)}
 					/>
 				{:else if kind === 'number'}
