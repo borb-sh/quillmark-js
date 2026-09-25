@@ -85,6 +85,15 @@ export function decode(rt: Content, schema: Schema): PMNode {
 	return schema.nodes.doc.create(null, blocks.length ? blocks : schema.nodes.paragraph.create());
 }
 
+/** Whether `rt` decodes under an inline schema with nothing dropped: one plain
+ *  paragraph line, no container, no island. Marks are the schema's own business
+ *  (`plaintextSchema` declares none). */
+export function fitsInline(rt: Content): boolean {
+	if (rt.islands.length > 0 || rt.lines.length > 1) return false;
+	const line = rt.lines[0];
+	return !line || (line.kind === 'para' && line.containers.length === 0);
+}
+
 /** Inline / plaintext decode: one paragraph, containers and islands stripped. */
 function decodeInline(
 	rt: Content,

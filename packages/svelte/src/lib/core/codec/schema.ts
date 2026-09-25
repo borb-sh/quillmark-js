@@ -208,6 +208,12 @@ export const inlineSchema = new Schema({ nodes: inlineNodes, marks });
  */
 export const plaintextSchema = new Schema({ nodes: inlineNodes, marks: {} });
 
+/** The schema a leaf of the declared type mounts: `plaintext` is inline at the
+ *  codec whatever it declares, and a `richtext` is block unless it declares `inline`. */
+export function leafSchema(opts: { plaintext?: boolean; inline?: boolean }): Schema {
+	return opts.plaintext ? plaintextSchema : opts.inline ? inlineSchema : blockSchema;
+}
+
 /** Whether `schema` can carry formatting at all: false for {@link plaintextSchema}
  *  alone. What a mark command asks before it offers itself. */
 export function hasMarks(schema: Schema): boolean {

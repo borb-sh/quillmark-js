@@ -35,7 +35,14 @@
 <script lang="ts">
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
 	import { emptyContent } from '../core/codec/index.js';
-	import { arrayLayout, controlKind, humanize, isContainer, obliged } from './structure.js';
+	import {
+		arrayLayout,
+		controlKind,
+		humanize,
+		isContainer,
+		obliged,
+		shortCell
+	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
 	import { wording } from './strings.js';
@@ -255,8 +262,14 @@
 				kind === 'boolean'}
 			<!-- A container takes the full span at every depth: its rows are the document's
 			     to count, and a track beside it would stand in a column of whitespace
-			     (`packable`). -->
-			<div class="qm-object-prop" class:qm-prop-full={isContainer(kind)} data-qm-prop={key}>
+			     (`packable`). A block prose cell spans it too, and keeps its label row. -->
+			{@const block = kind === 'prose' && !shortCell(sub)}
+			<div
+				class="qm-object-prop"
+				class:qm-prop-full={isContainer(kind)}
+				class:qm-prop-wide={block}
+				data-qm-prop={key}
+			>
 				{#if ids && kind !== 'array' && kind !== 'matrix'}
 					<FieldLabel
 						label={title(key, sub)}
@@ -323,6 +336,7 @@
 						bind:this={proseEls[key]}
 						content={() => contentAt([key]) ?? emptyContent()}
 						plaintext={sub.type === 'plaintext'}
+						{block}
 						label={named}
 						labelledBy={ids?.label}
 						describedBy={describes}
@@ -468,6 +482,12 @@
 	   the card's, where this one sits inside a figure the nesting has already narrowed. */
 	.qm-object-prop:only-child {
 		grid-column: span var(--cols-half);
+	}
+	/* A block prose property holds paragraphs, so a track beside it stands in whitespace
+	   once it grows (`packable`); its label still rides the row above it. */
+	.qm-object-prop.qm-prop-wide,
+	.qm-object-prop.qm-prop-wide:only-child {
+		grid-column: 1 / -1;
 	}
 	/* A container property takes the whole row and its own rows: its label rides inside
 	   the control it draws (a repeater's header, a matrix's) or above a subform of its

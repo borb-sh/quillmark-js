@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	decode,
+	fitsInline,
 	pmToContent,
 	rendersHref,
 	blockSchema,
@@ -100,6 +101,14 @@ describe('island round-trip (id preserved)', () => {
 });
 
 describe('inline / plaintext constraints', () => {
+	it('fitsInline admits one plain paragraph and refuses what the inline decode drops', () => {
+		expect(fitsInline(md(''))).toBe(true);
+		expect(fitsInline(md('plain **bold** end'))).toBe(true);
+		for (const src of ['a\n\nb', 'one  \ntwo', '- one\n- two', '- one', '# Title', '> quoted']) {
+			expect(fitsInline(md(src)), src).toBe(false);
+		}
+	});
+
 	it('inline schema decodes to exactly one paragraph', () => {
 		const doc = decode(md('a\n\nb\n\nc'), inlineSchema);
 		expect(doc.childCount).toBe(1);

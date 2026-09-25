@@ -4,12 +4,12 @@
  `object`'s property, a variant's cell ({@link ObjectField}). None of them is
  `applyChange`-addressable: `Addr.field` is a flat name, so `keywords[0]` and
  `contact.note` have no op address. So this is not a `createField` leaf: it mounts a
- minimal PM view over the codec's decode/encode + inline schema, and on every edit
+ minimal PM view over the codec's decode/encode and a leaf schema, and on every edit
  hands the re-encoded `Content` up to the parent — {@link ArrayField}, which commits
  the whole array, or {@link ObjectField}, which commits the whole container
- (`writer.set(field, next)`). Anchors inside a value are dropped on that write:
- acceptable for inline refs. Mounts once per stable key (an element's session id, a
- property's name), so the parent's re-derive leaves the caret where it is.
+ (`writer.set(field, next)`). Anchors inside a value are dropped on that write.
+ Mounts once per stable key (an element's session id, a property's name), so the
+ parent's re-derive leaves the caret where it is.
 
  The content is read, not passed: `reader.getContentAt(addr, path)` decodes through
  the codec the leaf's own declared type names, so what it rests as — the content
@@ -17,10 +17,14 @@
  being the row's or the cell's business. Read once, at mount, since that is when this
  leaf takes its state.
 
- One textblock wherever it mounts, no islands and no slash menu. `plaintext` is
- inline at the codec, so that is the declared shape for every plaintext leaf; a block
- `richtext` is held one rung narrower than it declares, having no room for a second
- paragraph in the figure a repeater row and a subform cell draw.
+ The schema is the declared type's where the parent has room for it: a subform's
+ block `richtext` cell takes the block schema and the full row ({@link ObjectField}).
+ An array element is one textblock whatever it declares, since Enter there is the
+ repeater's. No islands are editable and there is no slash menu at either width.
+
+ A narrowed leaf over content that holds more than one plain paragraph draws it
+ read-only and commits nothing: the inline decode joins lines and drops containers
+ and islands, so the first keystroke would write that loss back.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
@@ -28,14 +32,15 @@
 	import { EditorView } from 'prosemirror-view';
 	import {
 		decode,
+		fitsInline,
+		leafSchema,
 		pmToContent,
-		inlineSchema,
-		plaintextSchema,
 		proseAttributes,
 		proseLeafPlugins,
 		buildLineIndex,
 		usvToPM
 	} from '../core/codec/index.js';
+	import { wording } from './strings.js';
 	import './controls.css';
 	import type { Content } from '@quillmark/wasm';
 
@@ -48,6 +53,9 @@
 		/** The mark-free schema (a `plaintext` leaf): literal text, no formatting,
 		 * exactly as the scalar field of that type mounts. */
 		plaintext?: boolean;
+		/** The block schema, for a block `richtext` the parent draws at full width.
+		 * Absent, the leaf is one textblock. */
+		block?: boolean;
 		/** Accessible name for the editable region, where nothing else names it: an
 		 * array has no per-element label. A cell with a label element takes
 		 * `labelledBy`. */
@@ -67,6 +75,7 @@
 	let {
 		content,
 		plaintext = false,
+		block = false,
 		label,
 		labelledBy,
 		describedBy,
@@ -74,7 +83,11 @@
 		onKey
 	}: Props = $props();
 
+	const t = wording();
+	const uid = $props.id();
+	const heldId = `${uid}-held`;
 	let containerEl: HTMLDivElement | undefined = $state();
+	let held = $state(false);
 	let view: EditorView | undefined;
 	/** Take the caret: what a parent placing focus on this leaf calls. The view's
 	 * focus, not the element's: a PM view restores its selection, where a bare DOM
@@ -108,30 +121,29 @@
 
 	onMount(() => {
 		if (!containerEl) return;
-		// An inline, value-by-value leaf: the same keymap and plugin stack a
-		// `createField` leaf mounts (shared `proseLeafPlugins`), minus the
-		// anchor-position plugin (anchors are dropped on the parent's value write, per
-		// the header). Its own `dispatchTransaction` hands `Content` up.
-		//
-		// The schema is the declared type's, as `createField` picks it: `plaintext`
-		// declares no mark types, so there is nothing to toggle, to paste in, or to
-		// mint a shorthand with.
-		const schema = plaintext ? plaintextSchema : inlineSchema;
-		const pmDoc = decode(content(), schema);
+		// The same keymap and plugin stack a `createField` leaf mounts (shared
+		// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
+		// the parent's value write, per the header.
+		const inline = plaintext || !block;
+		const schema = leafSchema({ plaintext, inline });
+		const rt = content();
+		held = inline && !fitsInline(rt);
 		const state = EditorState.create({
-			doc: pmDoc,
-			plugins: proseLeafPlugins(schema, { inline: true })
+			doc: decode(rt, schema),
+			plugins: proseLeafPlugins(schema, { inline })
 		});
+		const describedByAll = [describedBy, held ? heldId : undefined].filter(Boolean).join(' ');
 		const mounted = new EditorView(containerEl, {
 			state,
+			editable: () => !held,
 			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
 			// (`proseAttributes`), so a cell carrying a label element and a row carrying
 			// none cannot name their regions by different rules.
-			attributes: proseAttributes({ label, labelledBy, describedBy }),
+			attributes: proseAttributes({ label, labelledBy, describedBy: describedByAll || undefined }),
 			dispatchTransaction(tr) {
 				const next = mounted.state.apply(tr);
 				mounted.updateState(next);
-				if (tr.docChanged) onChange(pmToContent(next.doc));
+				if (tr.docChanged && !held) onChange(pmToContent(next.doc));
 			},
 			handleDOMEvents: {
 				keydown: (_v, e) => {
@@ -154,6 +166,9 @@
  line of prose measure one line. Width is the row's or the cell's to give: the leaf
  fills the track it is placed in. -->
 <div bind:this={containerEl} class="qm-prose-value qm-control-box qm-focus-ring-within"></div>
+{#if held}
+	<span id={heldId} class="qm-prose-held-note">{t.strings.proseHeld}</span>
+{/if}
 
 <style>
 	/* Caret-primary, matching ProseField: the contenteditable's own outline is
@@ -161,5 +176,9 @@
 	   controls.css), which is where the box is. */
 	.qm-prose-value :global(.ProseMirror) {
 		outline: none;
+	}
+	.qm-prose-held-note {
+		font-size: var(--_qm-text-label);
+		color: var(--_qm-ink-label);
 	}
 </style>
