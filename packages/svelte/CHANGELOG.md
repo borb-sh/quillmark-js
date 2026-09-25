@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+**The preview paints at twice the box at the least.** Its raster density is `devicePixelRatio` floored at 2, so a 1× display and a fractional one (1.25, 1.5, browser zoom) downsample a denser raster rather than resampling one at their own ratio, which left small text soft. A display at 2 or above paints as before; below it, a mounted page costs up to four times the pixels it did.
+
+**A page's canvas fills its slot.** It was sized in pixels from each paint's result, so between a resize and the repaint after it the ink sat off the box the click and scroll geometry measure. It is `100%` of the slot now: a resize stretches the raster in place until the repaint sharpens it.
 **A block `richtext` cell on a record row holds paragraphs and lists.** An `object` property declaring `richtext` without `inline` mounts the block schema and spans the subform's row, where it mounted one textblock beside a sibling cell and its first edit committed a list back as one joined paragraph. A by-value leaf that stays one textblock — an array element, whatever its `items` declares, or a `plaintext` cell — over anything but one plain paragraph draws its content read-only with a note, as a focusable read-only textbox, and commits nothing; the trailing newline a YAML `|` scalar keeps does not count. `VisualStrings.proseHeld` is the note's wording.
 
 ## v0.12.0 - 2026-09-23
