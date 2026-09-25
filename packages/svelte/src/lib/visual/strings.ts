@@ -86,6 +86,9 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	// ── Field chrome ──────────────────────────────────────────────────────────
 	/** The required marker's accessible name; the glyph itself is a `*`. */
 	fieldRequired: string;
+	/** Under a prose leaf holding more structure than it can edit (paragraphs, a list,
+	 *  an island in a one-line cell), which it draws read-only rather than flatten. */
+	proseHeld: string;
 
 	// ── Formatting popover ────────────────────────────────────────────────────
 	formatGroup: string;
@@ -184,6 +187,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	enumUnsetTag: 'default',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
 	fieldRequired: 'required',
+	proseHeld: 'Holds more than this field can edit here.',
 	formatGroup: 'Formatting',
 	formatBold: 'Bold (Mod-B)',
 	formatEmphasis: 'Emphasis (Mod-I)',

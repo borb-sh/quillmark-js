@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A block `richtext` cell on a record row holds paragraphs and lists.** An `object` property declaring `richtext` without `inline` mounts the block schema and spans the subform's row, where it mounted one textblock beside a sibling cell and its first edit committed a list back as one joined paragraph. A by-value leaf that stays one textblock — an array element, whatever its `items` declares, or a `plaintext` cell — over anything but one plain paragraph draws its content read-only with a note, as a focusable read-only textbox, and commits nothing; the trailing newline a YAML `|` scalar keeps does not count. `VisualStrings.proseHeld` is the note's wording.
+
 ## v0.12.0 - 2026-09-23
 
 **The `@quillmark/wasm` peer floor is `>=0.115.0-0`, and the surface draws what that release typed.** A card kind declaring `body.enabled: false` warns at load (`quill::bodiless_card_kind`), which a host surfacing load warnings will show. **An island stores its value, not its provenance**: the island node and its clipboard form drop `loss` (`data-qm-island-loss`), which the artifact no longer carries. **A block island's line is a `para`**: a table decodes off the island backing a lone slot rather than off an `island` line kind the artifact no longer has, and lands through the `delta` and one island op. Stored rows spelling either retired form still open. **A typed dictionary's property may open a variant world** (`header.classification`), and the subform draws it as a card-level variant draws: the discriminant's select, the live world's cells a rung in, a landing and a diagnostic walking into it by its path.
