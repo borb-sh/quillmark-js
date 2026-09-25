@@ -116,6 +116,7 @@
 		value={discriminant}
 		values={schema.values ?? []}
 		fallback={ghostMember}
+		blankTitle={schema.ui?.blank_title}
 		{id}
 		{describedBy}
 		onCommit={(v) => onCommit(commitDiscriminant(value, v))}

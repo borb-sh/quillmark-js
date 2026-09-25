@@ -25,6 +25,8 @@
 		value: string | undefined;
 		values: string[];
 		fallback?: string;
+		/** The schema's `ui.blank_title`: what the blank draws as, in place of the em dash. */
+		blankTitle?: string;
 		/** Accessible name for a trigger nothing else names: an object property, whose
 		 * name is the field label plus the property's. A field's own trigger takes `id`
 		 * instead and is named by the `<label for>` beside it (the trigger is a
@@ -47,6 +49,7 @@
 		value,
 		values,
 		fallback,
+		blankTitle,
 		label,
 		id,
 		describedBy,
@@ -66,8 +69,9 @@
 	// the package's rather than the primitive's.
 	const local = syncedLocal(() => value ?? UNSET);
 
-	/** An empty enum member has no glyph of its own; an em dash stands in for it. */
-	const dash = (v: string | undefined) => v || '—';
+	/** The blank has no glyph of its own: the quill's `ui.blank_title` stands in for
+	 * it, else an em dash. */
+	const dash = (v: string | undefined) => v || blankTitle || '—';
 
 	const unset = $derived(local.value === UNSET);
 	const ghostText = $derived(dash(fallback));

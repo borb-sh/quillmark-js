@@ -275,6 +275,7 @@
 					value={value as string | undefined}
 					values={field.schema.values ?? []}
 					fallback={ghost as string | undefined}
+					blankTitle={field.schema.ui?.blank_title}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}
