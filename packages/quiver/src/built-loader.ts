@@ -10,6 +10,7 @@ import { unpackFiles } from './bundle.js';
 import { isQuillName } from './ref.js';
 import { isCanonicalSemver, compareSemver } from './semver.js';
 import { FORMAT, INDEX } from './format.js';
+import { isFont, isZip } from './signature.js';
 import type { Quiver, QuiverLoader } from './quiver.js';
 import { createQuiver } from './quiver.js';
 
@@ -27,8 +28,8 @@ interface BuiltIndex {
 }
 
 /**
- * Bytes at an artifact-relative path. `revalidate` marks `quiver.json`, the one name
- * carrying no digest; every other name is safe to answer from a cache.
+ * Bytes at an artifact-relative path. `revalidate` marks `quiver.json`, the one name read
+ * that carries no digest; every other name read is safe to answer from a cache.
  */
 export type ArtifactReader = (path: string, revalidate: boolean) => Promise<Uint8Array>;
 
@@ -84,8 +85,15 @@ export function filesReader(files: ReadonlyMap<string, Uint8Array>): ArtifactRea
 const BUNDLE_RE = /^[A-Za-z0-9_-]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9a-f]+\.zip$/;
 const FONT_HASH_RE = /^[0-9a-f]{64}$/;
 
+/** Bytes a host answered with that are not the file named: a `transport_error`, so an
+ *  evicting cache and the reread below both get their turn. */
+function refused(path: string, what: string): QuiverError {
+	return new QuiverError('transport_error', `"${path}" arrived as something other than ${what}`);
+}
+
 class BuiltLoader implements QuiverLoader {
 	readonly #fonts = new Map<string, Promise<Uint8Array>>();
+	#rereading: Promise<BuiltIndex> | undefined;
 
 	constructor(
 		private readonly read: ArtifactReader,
@@ -95,7 +103,8 @@ class BuiltLoader implements QuiverLoader {
 	/**
 	 * A tab holding the previous generation's index asks for names the next one deleted,
 	 * so a failed read rereads `quiver.json` once and retries under that entry where it
-	 * names other files.
+	 * names other files. A reread refusing the index is the error that explains the
+	 * failure, and is the one thrown.
 	 */
 	async loadTree(name: string, version: string): Promise<Map<string, Uint8Array>> {
 		const key = `${name}@${version}`;
@@ -103,18 +112,36 @@ class BuiltLoader implements QuiverLoader {
 		try {
 			return await this.#treeOf(entry);
 		} catch (err) {
-			const fresh = await readIndex(this.read).then(
-				(index) => index.entries.get(key),
-				() => undefined
-			);
+			let index: BuiltIndex;
+			try {
+				index = await this.#reread();
+			} catch (reread) {
+				throw reread instanceof QuiverError && reread.code === 'quiver_invalid' ? reread : err;
+			}
+			const fresh = index.entries.get(key);
 			if (fresh === undefined || sameFiles(fresh, entry)) throw err;
-			this.entries.set(key, fresh);
 			return this.#treeOf(fresh);
 		}
 	}
 
+	/** One reread in flight, taking every entry both generations carry. */
+	#reread(): Promise<BuiltIndex> {
+		return (this.#rereading ??= readIndex(this.read)
+			.then((index) => {
+				for (const [key, entry] of index.entries) {
+					if (this.entries.has(key)) this.entries.set(key, entry);
+				}
+				return index;
+			})
+			.finally(() => {
+				this.#rereading = undefined;
+			}));
+	}
+
 	async #treeOf(entry: BuiltQuillEntry): Promise<Map<string, Uint8Array>> {
-		const files = unpackFiles(await this.read(entry.bundle, false));
+		const zip = await this.read(entry.bundle, false);
+		if (!isZip(zip)) throw refused(entry.bundle, 'a zip');
+		const files = unpackFiles(zip);
 		await Promise.all(
 			Object.entries(entry.fonts).map(async ([path, hash]) => {
 				files[path] = await this.#font(hash);
@@ -127,10 +154,16 @@ class BuiltLoader implements QuiverLoader {
 	#font(hash: string): Promise<Uint8Array> {
 		let bytes = this.#fonts.get(hash);
 		if (bytes === undefined) {
-			bytes = this.read(`fonts/${hash}`, false).catch((err: unknown) => {
-				this.#fonts.delete(hash);
-				throw err;
-			});
+			const path = `fonts/${hash}`;
+			bytes = this.read(path, false)
+				.then((font) => {
+					if (!isFont(font)) throw refused(path, 'a font');
+					return font;
+				})
+				.catch((err: unknown) => {
+					this.#fonts.delete(hash);
+					throw err;
+				});
 			this.#fonts.set(hash, bytes);
 		}
 		return bytes;

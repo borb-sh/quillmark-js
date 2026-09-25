@@ -113,7 +113,7 @@ Nothing is fetched, so nothing self-fetches over your own load balancer. The map
 
 `Quiver.fromBuiltUrl(url)` first fetches `<url>/quiver.json`: the format and the catalog, naming each quill's bundle and fonts. Every other name carries the digest of its own bytes, so a changed file is a changed name and is safe to cache forever; `quiver.json` is not, and a cache layer serving a stale one silently pins the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), and every other request is `force-cache`. Both are the browser layer only: a stale CDN edge is answered by that host's cache headers, and `quillkit`'s README states the whole contract for a deploy serving a client over one.
 
-A `getQuill` reads one bundle and the fonts it names, nothing of another quill. Fonts are stored once by hash, so a release that edits a template re-downloads that quill's bundle and not its fonts. A tab still holding the previous release's `quiver.json` rereads it once when a name it asks for is gone.
+A `getQuill` reads one bundle and the fonts it names, nothing of another quill. Fonts are stored once by hash, so a release that edits a template re-downloads that quill's bundle and not its fonts. A tab still holding the previous release's `quiver.json` rereads it once when a read fails.
 
 ## What a quiver is trusted to be
 

@@ -161,7 +161,7 @@ describe('quillkit studio', () => {
 
 			const catalog = await fetch(new URL('quiver/quiver.json', url));
 			expect(catalog.status).toBe(200);
-			expect(await catalog.json()).toMatchObject({ format: 1 });
+			expect(await catalog.json()).toHaveProperty('quills');
 		} finally {
 			child.kill('SIGTERM');
 		}

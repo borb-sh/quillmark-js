@@ -140,7 +140,7 @@ A Typst IDE: studio shows a quill, it does not edit the plate or the schema. Not
 
 Studio is headed for features that write quill source (a schema editor, a form quill-ifier), and today every arrow points one way: disk → HTTP → browser. Those need an arrow back, and it is the first thing between the client and its server that is not a static file.
 
-The rule that keeps it from leaking: **quiver owns the authored source layout and every door onto it; a door moves bytes into the layout and does not know what the bytes mean.** A door that must parse a `Quill.yaml` to do its job is studio's, not quiver's, and quillkit's job is to hang the door rather than to decide what goes through it. Quiver already owns the safety the layout implies (the path-escape rejection reading manifest-named files off a disk, the destructive-write refusals in `build`), which is the concrete reason a client cannot reimplement it correctly.
+The rule that keeps it from leaking: **quiver owns the authored source layout and every door onto it; a door moves bytes into the layout and does not know what the bytes mean.** A door that must parse a `Quill.yaml` to do its job is studio's, not quiver's, and quillkit's job is to hang the door rather than to decide what goes through it. Quiver already owns the safety the layout implies (the name validation that keeps what `quiver.json` lists inside the artifact on a disk, the destructive-write refusals in `build`), which is the concrete reason a client cannot reimplement it correctly.
 
 No write door yet. Designing a protocol before there is an editor to shape it is how the wrong protocol gets built; the rule is what makes the right one land when it arrives.
 

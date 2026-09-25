@@ -122,8 +122,31 @@ describe('the pack assertion', () => {
 	// pinned behind the client packs a tree the client fetches nothing of.
 	it('refuses a pack the client cannot read, naming the upgrade', async () => {
 		const out = await temp.dir();
-		await writeFile(join(out, 'latest.json'), '{"format":1}');
 		expect(() => assertPacked(out, '/work/quiver')).toThrow(/Upgrade it in the collection/);
+	});
+
+	it('is what `laySite` asks of the pack it wrote', async () => {
+		// A collection whose quiver packs only the format-1 pointer.
+		const collection = await temp.dir();
+		const quiver = join(collection, 'node_modules', '@quillmark', 'quiver');
+		await mkdir(quiver, { recursive: true });
+		await writeFile(
+			join(quiver, 'package.json'),
+			JSON.stringify({ name: '@quillmark/quiver', exports: { './node': './node.js' } })
+		);
+		await writeFile(
+			join(quiver, 'node.js'),
+			`const { mkdir, writeFile } = require('node:fs/promises');
+exports.build = async (_, out) => {
+	await mkdir(out, { recursive: true });
+	await writeFile(out + '/latest.json', '{"format":1}');
+};`
+		);
+
+		const out = join(await temp.dir(), 'site');
+		await expect(laySite({ collection, out, client: await stubClient() })).rejects.toThrow(
+			/holds no quiver\.json/
+		);
 	});
 });
 

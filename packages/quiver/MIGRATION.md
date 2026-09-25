@@ -6,7 +6,7 @@ Upgrade notes per range. The [CHANGELOG](CHANGELOG.md) is the full record; this 
 
 ### Rebuild every artifact, and move quiver and quillkit together
 
-A built quiver is `quiver.json` beside one bundle per quill and a `fonts/` directory. The `latest.json` pointer, the hashed manifest and `store/` are gone, and a reader of either shape reads nothing of the other: an old artifact under 0.30 is a `transport_error` on `quiver.json`, and a 0.30 artifact under an older reader one on `latest.json`. Re-run `build`; nothing in the source layout changes.
+A built quiver is `quiver.json` beside one bundle per quill and a `fonts/` directory. The hashed manifest and `store/` are gone, and `latest.json` carries only `format`, now 2. An old artifact under 0.30 is a `transport_error` on `quiver.json`; a 0.30 artifact under an older reader is refused with the upgrade named. Re-run `build`; nothing in the source layout changes.
 
 `quillkit`'s client carries its own copy of this package's reader and packs through the collection's, so a collection upgrades `@quillmark/quiver` in the same change as `quillkit`. `quillkit site` and `quillkit studio` refuse a pack with no `quiver.json`, naming the upgrade.
 
@@ -14,9 +14,9 @@ A host rule naming `quiver/latest.json` now names `quiver/quiver.json`.
 
 ### Runtime, not build time
 
-**`Quiver.fromBuiltUrl(url, { seed })` takes no `seed`.** The option is ignored rather than refused, so a seeded call fetches what it used to hold. Hold the whole artifact and call `Quiver.fromBuiltFiles(files)`, or fetch it.
+**`Quiver.fromBuiltUrl(url, { seed })` takes no `seed`.** TypeScript refuses the second argument; plain JavaScript ignores it, so a seeded call fetches what it used to hold. Hold the whole artifact and call `Quiver.fromBuiltFiles(files)`, or fetch it.
 
-**Fetched bytes are not checked against their names**, and no fetch carries a byte ceiling; a bundle's unpack budget is unchanged. Serve the artifact over `https`, which is what answers a corrupted byte.
+**Fetched bytes are not checked against their names**, and no fetch carries a byte ceiling; a bundle's unpack budget is unchanged. A bundle that does not open as a zip and a font that does not open as a font are refused, and `build` refuses a font file of the second kind where it packs it. Serve the artifact over `https`, which is what answers a corrupted byte.
 
 ## 0.16 → 0.19
 

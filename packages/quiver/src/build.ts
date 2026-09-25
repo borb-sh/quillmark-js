@@ -8,7 +8,8 @@
 
 import { QuiverError } from './errors.js';
 import { packFiles } from './bundle.js';
-import { FORMAT, INDEX } from './format.js';
+import { FORMAT, INDEX, LEGACY_POINTER } from './format.js';
+import { isFont } from './signature.js';
 import { isDraft } from './semver.js';
 
 /** Options for {@link buildQuiver}. */
@@ -80,10 +81,11 @@ function assertSafeOutDir(
 /**
  * Reads a Source Quiver, validates it, and writes the build output to outDir.
  *
- * Output layout. Every name but the index carries the SHA-256 of what it names,
- * which is what makes it safe to cache forever:
+ * Output layout. Every name but the two JSON documents carries the SHA-256 of what it
+ * names, which is what makes it safe to cache forever:
  *   outDir/
  *     quiver.json                       # the format and the catalog
+ *     latest.json                       # the format alone, for a reader of format 1
  *     <name>@<version>.<sha256:32>.zip  # one bundle per quill
  *     fonts/
  *       <sha256>                        # dehydrated font bytes (full hash, no ext)
@@ -162,8 +164,6 @@ export async function buildQuiver(
 			fonts: Record<string, string>;
 		}> = [];
 
-		// Font hashes already written. A font shared across quills or versions is written
-		// once.
 		const stored = new Set<string>();
 
 		for (const [quillName, versions] of catalog) {
@@ -181,6 +181,16 @@ export async function buildQuiver(
 					if (!FONT_EXT.test(rel)) {
 						contentRecord[rel] = bytes;
 						continue;
+					}
+
+					// The loader refuses what does not open as a font, so the build refuses it
+					// first, where the author it names can do something about it.
+					if (!isFont(bytes)) {
+						throw new QuiverError(
+							'quiver_invalid',
+							`Quill "${quillName}@${version}": "${rel}" is not a TrueType, OpenType, WOFF or WOFF2 font`,
+							{ quiverName: meta.name, version }
+						);
 					}
 
 					// Full width: fonts are keyed by hash, so two distinct fonts sharing a
@@ -247,10 +257,11 @@ export async function buildQuiver(
 
 		try {
 			await writeFile(join(stage, INDEX), JSON.stringify(index, null, 2), 'utf-8');
+			await writeFile(join(stage, LEGACY_POINTER), JSON.stringify({ format: FORMAT }), 'utf-8');
 		} catch (err) {
 			throw new QuiverError(
 				'transport_error',
-				`Failed to write "${join(outDir, INDEX)}": ${(err as Error).message}`,
+				`Failed to write "${join(outDir, INDEX)}" or its legacy pointer: ${(err as Error).message}`,
 				{ cause: err }
 			);
 		}

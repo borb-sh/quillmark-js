@@ -63,6 +63,10 @@ function makeBundle(files: Record<string, string>): Uint8Array {
 	return packFiles(input);
 }
 
+/** An OpenType signature and then `tail`: bytes the loader takes as a font. */
+const font = (...tail: number[]): Uint8Array =>
+	new Uint8Array([...new TextEncoder().encode('OTTO'), ...tail]);
+
 /** Distinct 64-hex keys; the loader reads a font's name and never hashes its bytes. */
 const fontKey = (n: number): string => n.toString(16).padStart(64, '0');
 const bundleName = (name: string, version: string, tag = 'a'): string =>
@@ -158,7 +162,7 @@ describe('loadBuiltQuiver — tree rehydration', () => {
 	});
 
 	it('rehydrates fonts at correct paths', async () => {
-		const fontBytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+		const fontBytes = font(0xde, 0xad, 0xbe, 0xef);
 		const artifact = makeArtifact('sample', [
 			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': [fontKey(1), fontBytes] } }
 		]);
@@ -171,8 +175,8 @@ describe('loadBuiltQuiver — tree rehydration', () => {
 
 	it('reads one bundle and its own fonts, and nothing of another quill', async () => {
 		const artifact = makeArtifact('sample', [
-			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), new Uint8Array([1])] } },
-			{ name: 'resume', version: '2.0.0', fonts: { 'b.ttf': [fontKey(2), new Uint8Array([2])] } }
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), font(1)] } },
+			{ name: 'resume', version: '2.0.0', fonts: { 'b.ttf': [fontKey(2), font(2)] } }
 		]);
 		const q = await loadBuiltQuiver(artifact.read);
 		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
@@ -196,29 +200,83 @@ describe('loadBuiltQuiver — the index revalidates', () => {
 
 describe('loadBuiltQuiver — a newer generation', () => {
 	// A tab holds the index it booted with; a deploy since has replaced the files it names.
-	function redeploy(artifact: MemArtifact, files: Record<string, string>): void {
-		artifact.files.delete(bundleName('memo', '1.0.0'));
-		const next = indexOf('sample', [{ name: 'memo', version: '1.0.0' }]);
-		(next['quills'] as { bundle: string }[])[0]!.bundle = bundleName('memo', '1.0.0', 'b');
+	const MEMO = bundleName('memo', '1.0.0');
+
+	/** Replace `memo@1.0.0` with a generation of its own, deleting what it replaced. */
+	function redeploy(artifact: MemArtifact, spec: QuillSpec, tag: string): void {
+		const next = indexOf('sample', [spec]);
+		const entry = (next['quills'] as { bundle: string }[])[0]!;
+		const before = new Set(artifact.files.keys());
+		entry.bundle = bundleName('memo', '1.0.0', tag);
+		for (const path of before) artifact.files.delete(path);
 		artifact.files.set('quiver.json', enc.encode(JSON.stringify(next)));
-		artifact.files.set(bundleName('memo', '1.0.0', 'b'), makeBundle(files));
+		artifact.files.set(
+			entry.bundle,
+			makeBundle(spec.files ?? { 'Quill.yaml': `name: ${spec.name}\n` })
+		);
+		for (const [key, bytes] of Object.values(spec.fonts ?? {})) {
+			artifact.files.set(`fonts/${key}`, bytes);
+		}
 	}
 
 	it("a bundle the next generation deleted is read under that generation's name", async () => {
 		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
 		const q = await loadBuiltQuiver(artifact.read);
-		redeploy(artifact, { 'Quill.yaml': 'name: memo\n# next\n' });
+		redeploy(
+			artifact,
+			{ name: 'memo', version: '1.0.0', files: { 'Quill.yaml': 'name: memo\n# next\n' } },
+			'b'
+		);
 
 		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
 		expect(new TextDecoder().decode(tree.get('Quill.yaml'))).toBe('name: memo\n# next\n');
 	});
 
+	it('a font the next generation replaced is read under its new name', async () => {
+		// The bundle's name is a digest of what is not a font, so a release changing only a
+		// font keeps it.
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), font(1)] } }
+		]);
+		const q = await loadBuiltQuiver(artifact.read);
+		redeploy(
+			artifact,
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(2), font(2)] } },
+			'a'
+		);
+
+		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		expect(tree.get('a.ttf')).toEqual(font(2));
+	});
+
+	it('one reread serves every quill the tab opens after it', async () => {
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0' },
+			{ name: 'resume', version: '2.0.0' }
+		]);
+		const q = await loadBuiltQuiver(artifact.read);
+		const next = indexOf('sample', [
+			{ name: 'memo', version: '1.0.0' },
+			{ name: 'resume', version: '2.0.0' }
+		]);
+		for (const entry of next['quills'] as { name: string; version: string; bundle: string }[]) {
+			artifact.files.delete(entry.bundle);
+			entry.bundle = bundleName(entry.name, entry.version, 'b');
+			artifact.files.set(entry.bundle, makeBundle({ 'Quill.yaml': `name: ${entry.name}\n` }));
+		}
+		artifact.files.set('quiver.json', enc.encode(JSON.stringify(next)));
+
+		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		await loadTreeViaGetQuill(q, 'resume', '2.0.0');
+		expect(artifact.log.filter((p) => p === 'quiver.json')).toHaveLength(2);
+	});
+
 	it('a failure the index does not explain is the original error', async () => {
 		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
-		artifact.files.delete(bundleName('memo', '1.0.0'));
+		artifact.files.delete(MEMO);
 
 		const q = await loadBuiltQuiver(artifact.read);
-		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(/not found/);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
 		expect(artifact.log.filter((p) => p === 'quiver.json')).toHaveLength(2);
 	});
 
@@ -231,15 +289,82 @@ describe('loadBuiltQuiver — a newer generation', () => {
 			enc.encode(JSON.stringify({ format: FORMAT, name: 'sample', quills: [] }))
 		);
 
-		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
+	});
+
+	it('a reread that cannot reach quiver.json is the original error', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		const q = await loadBuiltQuiver(artifact.read);
+		artifact.files.clear();
+
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
+	});
+
+	it('a reread refusing a newer format is the error thrown', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		const q = await loadBuiltQuiver(artifact.read);
+		artifact.files.clear();
+		artifact.files.set(
+			'quiver.json',
+			enc.encode(JSON.stringify({ format: FORMAT + 1, name: 'sample', quills: [] }))
 		);
+
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(/Upgrade @quillmark\/quiver/);
+	});
+});
+
+describe('loadBuiltQuiver — a host answering with something else', () => {
+	// An SPA fallback answers a missing name 200 with the client's page.
+	const page = enc.encode('<!doctype html><title>studio</title>');
+
+	it('a page where a bundle was → transport_error naming it', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		artifact.files.set(bundleName('memo', '1.0.0'), page);
+
+		const q = await loadBuiltQuiver(artifact.read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining('other than a zip')
+			})
+		);
+	});
+
+	it('a page where a font was → transport_error naming it', async () => {
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), font(1)] } }
+		]);
+		artifact.files.set(`fonts/${fontKey(1)}`, page);
+
+		const q = await loadBuiltQuiver(artifact.read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining(
+					`"fonts/${fontKey(1)}" arrived as something other than a font`
+				)
+			})
+		);
+	});
+
+	it('takes every font signature build writes', async () => {
+		const signatures = ['\0\x01\0\0', 'OTTO', 'true', 'ttcf', 'wOFF', 'wOF2'];
+		const fonts = Object.fromEntries(
+			signatures.map((magic, i): [string, [string, Uint8Array]] => [
+				`${i}.ttf`,
+				[fontKey(i + 1), enc.encode(`${magic}rest`)]
+			])
+		);
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0', fonts }]);
+
+		const tree = await loadTreeViaGetQuill(await loadBuiltQuiver(artifact.read), 'memo', '1.0.0');
+		expect([...tree.keys()].filter((p) => p.endsWith('.ttf'))).toHaveLength(signatures.length);
 	});
 });
 
 describe('loadBuiltQuiver — font coalescing', () => {
 	it('two concurrent loads sharing a font read it exactly once', async () => {
-		const shared: [string, Uint8Array] = [fontKey(1), new Uint8Array([1, 2, 3])];
+		const shared: [string, Uint8Array] = [fontKey(1), font(1, 2, 3)];
 		const artifact = makeArtifact('coalesce-test', [
 			{ name: 'quillA', version: '1.0.0', fonts: { 'fonts/shared.ttf': shared } },
 			{ name: 'quillB', version: '1.0.0', fonts: { 'fonts/shared.ttf': shared } }
@@ -253,18 +378,18 @@ describe('loadBuiltQuiver — font coalescing', () => {
 	});
 
 	it('a failed font read is not cached', async () => {
-		const font: [string, Uint8Array] = [fontKey(1), new Uint8Array([1, 2, 3, 4])];
+		const body: [string, Uint8Array] = [fontKey(1), font(1, 2, 3, 4)];
 		const artifact = makeArtifact('sample', [
-			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': font } }
+			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': body } }
 		]);
-		artifact.files.delete(`fonts/${font[0]}`);
+		artifact.files.delete(`fonts/${body[0]}`);
 
 		const q = await loadBuiltQuiver(artifact.read);
 		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(QuiverError);
 
-		artifact.files.set(`fonts/${font[0]}`, font[1]);
+		artifact.files.set(`fonts/${body[0]}`, body[1]);
 		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
-		expect(tree.get('fonts/body.ttf')).toEqual(font[1]);
+		expect(tree.get('fonts/body.ttf')).toEqual(body[1]);
 	});
 });
 

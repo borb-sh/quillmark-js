@@ -1,6 +1,6 @@
 // Where the playground's quills come from: a built quiver served under `/quiver/`,
-// packed from the workspace fixture tree by `scripts/build-quiver.mjs`. Pointer →
-// manifest → content-addressed bundle, the browser consumer path in full
+// packed from the workspace fixture tree by `scripts/build-quiver.mjs`. `quiver.json` →
+// content-addressed bundle and fonts, the browser consumer path in full
 // (PLAYGROUND §"Quiver, not bundler").
 //
 // One `Quiver` for the page. Its quill cache is per canonical ref and lives as long

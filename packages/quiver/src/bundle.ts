@@ -29,7 +29,7 @@ const ZIP_EPOCH = new Date(1980, 0, 1, 0, 0, 0, 0);
  * Fonts are not in here: `build` writes them under `fonts/` and `quiver.json` names them,
  * leaving a bundle its markdown, its Typst, and what those inline.
  */
-export const MAX_BUNDLE_BYTES = 64 * 1024 * 1024;
+const MAX_BUNDLE_BYTES = 64 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 16 * 1024 * 1024;
 const MAX_BUNDLE_ENTRIES = 2048;
 

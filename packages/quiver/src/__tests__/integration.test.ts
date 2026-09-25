@@ -9,7 +9,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, rm, readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { Quiver, build, fromBuiltDir } from '../node.js';
@@ -215,6 +215,25 @@ describe('Integration: build → fromBuiltDir → resolve → getQuill', () => {
 		}
 	});
 
+	it('fromBuiltDir on a missing bundle throws transport_error naming its path', async () => {
+		const outDir = tempDir();
+		tmpDirs.push(outDir);
+		await build(SAMPLE_FIXTURE, outDir);
+		const { quills } = JSON.parse(await readFile(join(outDir, 'quiver.json'), 'utf-8')) as {
+			quills: Array<{ name: string; version: string; bundle: string }>;
+		};
+		const memo = quills.find((q) => q.name === 'memo' && q.version === '1.0.0')!;
+		await rm(join(outDir, memo.bundle));
+
+		const built = await fromBuiltDir(outDir);
+		await expect(built.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining(join(outDir, memo.bundle))
+			})
+		);
+	});
+
 	it('fromBuiltDir on missing directory throws transport_error', async () => {
 		await expect(fromBuiltDir(join(tmpdir(), `does-not-exist-${randomUUID()}`))).rejects.toThrow(
 			expect.objectContaining({ code: 'transport_error' })
@@ -239,7 +258,7 @@ describe('Integration: build → fromBuiltFiles → getQuill', () => {
 		const files = new Map<string, Uint8Array>();
 		for (const path of await readdir(outDir, { recursive: true })) {
 			const bytes = await readFile(join(outDir, path)).catch(() => undefined);
-			if (bytes !== undefined) files.set(path, bytes);
+			if (bytes !== undefined) files.set(path.split(sep).join('/'), bytes);
 		}
 
 		const { calls, restore } = mockQuillFromTree();

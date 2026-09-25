@@ -7,6 +7,10 @@ import { buildQuiver } from '../build.js';
 import { unpackFiles } from '../bundle.js';
 import { FORMAT } from '../format.js';
 
+/** An OpenType signature and then `tail`: bytes the build takes as a font. */
+const font = (...tail: number[]): Uint8Array =>
+	new Uint8Array([...new TextEncoder().encode('OTTO'), ...tail]);
+
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -71,6 +75,18 @@ describe('buildQuiver — happy path (sample-quiver fixture)', () => {
 
 		expect((await indexOf(out)).format).toBe(FORMAT);
 	});
+
+	it('leaves a reader of format 1 the format and nothing more', async () => {
+		// What that reader fetches first and reads `format` off before anything else, so it
+		// refuses the artifact with the upgrade named.
+		const out = tempDir();
+		tmpDirs.push(out);
+		await buildQuiver(SAMPLE_FIXTURE, out);
+
+		const pointer = JSON.parse(await readFile(join(out, 'latest.json'), 'utf-8')) as unknown;
+		expect(pointer).toEqual({ format: FORMAT });
+		expect(FORMAT).toBeGreaterThan(1);
+	});
 });
 
 describe('buildQuiver — font dehydration & deduplication', () => {
@@ -87,7 +103,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		const out = tempDir();
 		tmpDirs.push(src, out);
 
-		const sharedFontBytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+		const sharedFontBytes = font(1, 2, 3, 4, 5, 6, 7, 8);
 
 		await seedSourceQuiver(src, {
 			name: 'font-test',
@@ -115,7 +131,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		const out = tempDir();
 		tmpDirs.push(src, out);
 
-		const fontBytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+		const fontBytes = font(0xde, 0xad, 0xbe, 0xef);
 
 		await seedSourceQuiver(src, {
 			name: 'font-test',
@@ -137,6 +153,28 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 
 		expect(Object.keys(bundleFiles)).toContain('Quill.yaml');
 		expect(Object.keys(bundleFiles)).not.toContain('fonts/font.otf');
+	});
+
+	it('refuses a font file that does not open as a font, naming it', async () => {
+		const src = tempDir();
+		const out = tempDir();
+		tmpDirs.push(src, out);
+		await seedSourceQuiver(src, {
+			quills: [
+				{
+					name: 'memo',
+					version: '1.0.0',
+					fonts: [{ path: 'fonts/body.ttf', content: new TextEncoder().encode('<html>') }]
+				}
+			]
+		});
+
+		await expect(buildQuiver(src, out)).rejects.toThrow(
+			expect.objectContaining({
+				code: 'quiver_invalid',
+				message: expect.stringContaining('"fonts/body.ttf" is not a TrueType')
+			})
+		);
 	});
 
 	it("carries Quiver.yaml's description into quiver.json", async () => {
@@ -348,7 +386,7 @@ describe('buildQuiver — every name but the index carries the digest of its own
 				{
 					name: 'memo',
 					version: '1.0.0',
-					fonts: [{ path: 'fonts/body.ttf', content: new Uint8Array([1, 2, 3, 4]) }]
+					fonts: [{ path: 'fonts/body.ttf', content: font(1, 2, 3, 4) }]
 				}
 			]
 		});
