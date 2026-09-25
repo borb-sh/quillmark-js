@@ -109,6 +109,20 @@ describe('inline / plaintext constraints', () => {
 		}
 	});
 
+	it('fitsInline admits the trailing newline a YAML block scalar keeps, and nothing past it', () => {
+		const para: Content['lines'][number] = { containers: [], kind: 'para' };
+		const plain = (text: string, lines: Content['lines']): Content => ({
+			text,
+			lines,
+			marks: [],
+			islands: []
+		});
+		expect(fitsInline(plain('one line\n', [para, para]))).toBe(true);
+		expect(fitsInline(plain('one\ntwo', [para, para]))).toBe(false);
+		expect(fitsInline(plain('one\ntwo\n', [para, para, para]))).toBe(false);
+		expect(fitsInline(plain('one\n', [para, { ...para, continues: true }]))).toBe(false);
+	});
+
 	it('inline schema decodes to exactly one paragraph', () => {
 		const doc = decode(md('a\n\nb\n\nc'), inlineSchema);
 		expect(doc.childCount).toBe(1);

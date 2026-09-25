@@ -85,13 +85,17 @@ export function decode(rt: Content, schema: Schema): PMNode {
 	return schema.nodes.doc.create(null, blocks.length ? blocks : schema.nodes.paragraph.create());
 }
 
-/** Whether `rt` decodes under an inline schema with nothing dropped: one plain
- *  paragraph line, no container, no island. Marks are the schema's own business
- *  (`plaintextSchema` declares none). */
+/** Whether `rt` decodes under an inline schema with nothing but whitespace dropped:
+ *  one plain paragraph line, no container, no island. A trailing empty line is the
+ *  newline a YAML `|` scalar keeps, and costs a space. Marks are the schema's own
+ *  business (`plaintextSchema` declares none). */
 export function fitsInline(rt: Content): boolean {
-	if (rt.islands.length > 0 || rt.lines.length > 1) return false;
-	const line = rt.lines[0];
-	return !line || (line.kind === 'para' && line.containers.length === 0);
+	if (rt.islands.length > 0) return false;
+	const plain = (line: ContentLine | undefined): boolean =>
+		!line || (line.kind === 'para' && line.containers.length === 0);
+	const [first, second, ...rest] = rt.lines;
+	if (rest.length > 0 || !plain(first)) return false;
+	return !second || (plain(second) && !second.continues && rt.text.endsWith('\n'));
 }
 
 /** Inline / plaintext decode: one paragraph, containers and islands stripped. */

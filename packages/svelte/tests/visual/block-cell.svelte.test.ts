@@ -36,11 +36,18 @@ main:
             type: string
           details:
             type: richtext
+          address:
+            type: plaintext
       default: []
     notes:
       type: array
       items:
         type: richtext
+      default: []
+    tags:
+      type: array
+      items:
+        type: plaintext
       default: []
 `;
 // Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes from
@@ -63,10 +70,16 @@ const load = (): Document =>
 			'    details: |',
 			'      - Analyzed patterns',
 			'      - Building pipelines',
+			'    address: |',
+			'      12 Main St',
+			'      Springfield',
 			'notes:',
 			'  - |',
 			'    - one',
 			'    - two',
+			'tags:',
+			'  - |',
+			'    plain block scalar',
 			'~~~',
 			''
 		].join('\n')
@@ -77,6 +90,23 @@ afterEach(() => {
 	mounted?.unmount();
 	mounted = undefined;
 });
+
+/** A paste as the DOM delivers one: jsdom implements no `DataTransfer`, and `getData`
+ *  is all ProseMirror's paste handler reads. */
+function paste(el: HTMLElement, text: string): void {
+	const event = new Event('paste', { bubbles: true, cancelable: true });
+	Object.defineProperty(event, 'clipboardData', {
+		value: { getData: (type: string) => (type === 'text/plain' ? text : '') }
+	});
+	el.dispatchEvent(event);
+	flushSync();
+}
+
+/** The note a held leaf draws, inside its own box and naming nothing but itself. */
+function heldNote(leaf: HTMLElement): HTMLElement | null {
+	const note = document.getElementById(leaf.getAttribute('aria-describedby') ?? '');
+	return note && leaf.closest('.qm-control-box')?.contains(note) ? note : null;
+}
 
 const listItems = (rt: Content): string[] =>
 	rt.lines
@@ -110,22 +140,53 @@ describe('a block richtext cell on a record row', () => {
 });
 
 describe('a narrowed leaf over structure it cannot hold', () => {
-	it('draws read-only with a note, and commits nothing', () => {
+	it('draws the structure read-only, as a focusable textbox with a note, and commits nothing', () => {
 		const q = probe();
 		const doc = load();
 		const before = JSON.stringify(doc.getStored('notes'));
 		mounted = mountEditor(q, doc);
-		const notes = field(mounted.target, 'Notes');
-		const leaf = notes.querySelector<HTMLElement>('.ProseMirror')!;
+		const leaf = field(mounted.target, 'Notes').querySelector<HTMLElement>('.ProseMirror')!;
 
 		expect(leaf.getAttribute('contenteditable')).toBe('false');
-		const noteId = leaf.getAttribute('aria-describedby')!;
-		expect(document.getElementById(noteId)?.textContent).not.toBe('');
+		expect(leaf.getAttribute('role')).toBe('textbox');
+		expect(leaf.getAttribute('aria-readonly')).toBe('true');
+		expect(leaf.tabIndex).toBe(0);
+		expect(heldNote(leaf)).not.toBeNull();
+		expect([...leaf.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['one', 'two']);
 
-		press(leaf, 'Backspace');
-		press(leaf, 'Delete');
+		paste(leaf, 'pasted');
 		expect(JSON.stringify(doc.getStored('notes'))).toBe(before);
 		expect(mounted.changes).toEqual([]);
+		doc.free();
+	});
+
+	it('holds a multi-line plaintext cell on a record row', () => {
+		const q = probe();
+		const doc = load();
+		mounted = mountEditor(q, doc);
+		const jobs = field(mounted.target, 'Jobs');
+		summaries(jobs)[0].click();
+		flushSync();
+		const leaf = jobs.querySelector<HTMLElement>('[data-qm-prop="address"] .ProseMirror')!;
+
+		expect(leaf.getAttribute('contenteditable')).toBe('false');
+		expect(heldNote(leaf)).not.toBeNull();
+		// The line break a narrowed decode would have joined to a space.
+		expect(leaf.querySelector('p')?.innerHTML).toBe('12 Main St<br>Springfield');
+		doc.free();
+	});
+
+	it('edits a one-line value a YAML block scalar left a trailing newline on', () => {
+		const q = probe();
+		const doc = load();
+		mounted = mountEditor(q, doc);
+		const leaf = field(mounted.target, 'Tags').querySelector<HTMLElement>('.ProseMirror')!;
+
+		expect(leaf.getAttribute('contenteditable')).toBe('true');
+		expect(leaf.hasAttribute('aria-describedby')).toBe(false);
+		paste(leaf, 'new ');
+		expect(mounted.changes.at(-1)?.path).toBe('main.tags');
+		expect(String((doc.getStored('tags') as unknown[])[0])).toContain('new plain block scalar');
 		doc.free();
 	});
 });

@@ -187,7 +187,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	enumUnsetTag: 'default',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
 	fieldRequired: 'required',
-	proseHeld: 'Holds more than this field edits. Change it in the source.',
+	proseHeld: 'Holds more than this field can edit here.',
 	formatGroup: 'Formatting',
 	formatBold: 'Bold (Mod-B)',
 	formatEmphasis: 'Emphasis (Mod-I)',

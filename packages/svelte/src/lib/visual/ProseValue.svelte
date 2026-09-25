@@ -20,17 +20,20 @@
  The schema is the declared type's where the parent has room for it: a subform's
  block `richtext` cell takes the block schema and the full row ({@link ObjectField}).
  An array element is one textblock whatever it declares, since Enter there is the
- repeater's. No islands are editable and there is no slash menu at either width.
+ repeater's. There is no slash menu at either width, and an island draws as its
+ placeholder: an atom a keystroke can delete and no view edits.
 
- A narrowed leaf over content that holds more than one plain paragraph draws it
- read-only and commits nothing: the inline decode joins lines and drops containers
- and islands, so the first keystroke would write that loss back.
+ A narrowed leaf over anything but one plain paragraph is held: the inline decode
+ joins lines and drops containers and islands, so the first keystroke would write
+ that loss back. A held leaf draws its content on the block schema, read-only, with a
+ note inside its box, and commits nothing.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { EditorState, Selection } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import {
+		blockSchema,
 		decode,
 		fitsInline,
 		leafSchema,
@@ -86,7 +89,7 @@
 	const t = wording();
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
-	let containerEl: HTMLDivElement | undefined = $state();
+	let editorEl: HTMLDivElement | undefined = $state();
 	let held = $state(false);
 	let view: EditorView | undefined;
 	/** Take the caret: what a parent placing focus on this leaf calls. The view's
@@ -120,38 +123,54 @@
 	}
 
 	onMount(() => {
-		if (!containerEl) return;
+		if (!editorEl) return;
 		// The same keymap and plugin stack a `createField` leaf mounts (shared
 		// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
 		// the parent's value write, per the header.
 		const inline = plaintext || !block;
-		const schema = leafSchema({ plaintext, inline });
 		const rt = content();
 		held = inline && !fitsInline(rt);
+		const schema = held ? blockSchema : leafSchema({ plaintext, inline });
 		const state = EditorState.create({
 			doc: decode(rt, schema),
-			plugins: proseLeafPlugins(schema, { inline })
+			plugins: held ? [] : proseLeafPlugins(schema, { inline })
 		});
-		const describedByAll = [describedBy, held ? heldId : undefined].filter(Boolean).join(' ');
-		const mounted = new EditorView(containerEl, {
-			state,
-			editable: () => !held,
-			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
-			// (`proseAttributes`), so a cell carrying a label element and a row carrying
-			// none cannot name their regions by different rules.
-			attributes: proseAttributes({ label, labelledBy, describedBy: describedByAll || undefined }),
-			dispatchTransaction(tr) {
-				const next = mounted.state.apply(tr);
-				mounted.updateState(next);
-				if (tr.docChanged && !held) onChange(pmToContent(next.doc));
-			},
-			handleDOMEvents: {
-				keydown: (_v, e) => {
-					onKey?.(e);
-					return false;
+		const attributes = proseAttributes({
+			label,
+			labelledBy,
+			describedBy: [describedBy, held ? heldId : undefined].filter(Boolean).join(' ') || undefined
+		});
+		const mounted = new EditorView(
+			{ mount: editorEl },
+			{
+				state,
+				editable: () => !held,
+				// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
+				// (`proseAttributes`), so a cell carrying a label element and a row carrying
+				// none cannot name their regions by different rules. A non-editable view is
+				// no textbox to assistive tech or to Tab, so a held leaf states both itself.
+				attributes: held
+					? {
+							...attributes,
+							role: 'textbox',
+							'aria-readonly': 'true',
+							'aria-multiline': 'true',
+							tabindex: '0'
+						}
+					: attributes,
+				dispatchTransaction(tr) {
+					const next = mounted.state.apply(tr);
+					mounted.updateState(next);
+					if (tr.docChanged && !held) onChange(pmToContent(next.doc));
+				},
+				handleDOMEvents: {
+					keydown: (_v, e) => {
+						onKey?.(e);
+						return false;
+					}
 				}
 			}
-		});
+		);
 		view = mounted;
 		return () => {
 			view = undefined;
@@ -165,10 +184,15 @@
  like the text cell beside it. No floor: the reset in `core/codec/prose.css` makes one
  line of prose measure one line. Width is the row's or the cell's to give: the leaf
  fills the track it is placed in. -->
-<div bind:this={containerEl} class="qm-prose-value qm-control-box qm-focus-ring-within"></div>
-{#if held}
-	<span id={heldId} class="qm-prose-held-note">{t.strings.proseHeld}</span>
-{/if}
+<div class="qm-prose-value qm-control-box qm-focus-ring-within">
+	<div bind:this={editorEl}></div>
+	<!-- Inside the box, so the cell or row holds one child either way: a subform cell's
+	     subgrid has a row for the label and one for the box, and an array row's slabs
+	     stand the box's height. -->
+	{#if held}
+		<span id={heldId} class="qm-prose-held-note">{t.strings.proseHeld}</span>
+	{/if}
+</div>
 
 <style>
 	/* Caret-primary, matching ProseField: the contenteditable's own outline is
@@ -178,6 +202,7 @@
 		outline: none;
 	}
 	.qm-prose-held-note {
+		display: block;
 		font-size: var(--_qm-text-label);
 		color: var(--_qm-ink-label);
 	}

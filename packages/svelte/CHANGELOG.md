@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A block `richtext` cell on a record row holds paragraphs and lists.** An `object` property declaring `richtext` without `inline` mounts the block schema and spans the subform's row, where it mounted one textblock beside a sibling cell and its first edit committed a list back as one joined paragraph. A leaf that stays one textblock — an array element, whatever its `items` declares — draws read-only with a note over content holding more than one plain paragraph, and commits nothing. `VisualStrings.proseHeld` is the note's wording.
+**A block `richtext` cell on a record row holds paragraphs and lists.** An `object` property declaring `richtext` without `inline` mounts the block schema and spans the subform's row, where it mounted one textblock beside a sibling cell and its first edit committed a list back as one joined paragraph. A by-value leaf that stays one textblock — an array element, whatever its `items` declares, or a `plaintext` cell — over anything but one plain paragraph draws its content read-only with a note, as a focusable read-only textbox, and commits nothing; the trailing newline a YAML `|` scalar keeps does not count. `VisualStrings.proseHeld` is the note's wording.
 
 ## v0.12.0 - 2026-09-23
 
