@@ -80,6 +80,7 @@ const load = (): Document =>
 			'tags:',
 			'  - |',
 			'    plain block scalar',
+			'  - plain scalar',
 			'~~~',
 			''
 		].join('\n')
@@ -176,17 +177,24 @@ describe('a narrowed leaf over structure it cannot hold', () => {
 		doc.free();
 	});
 
-	it('edits a one-line value a YAML block scalar left a trailing newline on', () => {
+	it('holds a plaintext element a YAML block scalar left a trailing newline on, and edits a plain one', () => {
 		const q = probe();
 		const doc = load();
 		mounted = mountEditor(q, doc);
-		const leaf = field(mounted.target, 'Tags').querySelector<HTMLElement>('.ProseMirror')!;
+		const [block, plain] = field(mounted.target, 'Tags').querySelectorAll<HTMLElement>(
+			'.ProseMirror'
+		);
 
-		expect(leaf.getAttribute('contenteditable')).toBe('true');
-		expect(leaf.hasAttribute('aria-describedby')).toBe(false);
-		paste(leaf, 'new ');
+		// `plaintext` is verbatim, so the newline is a second line the narrowed decode
+		// would drop.
+		expect(block.getAttribute('contenteditable')).toBe('false');
+		expect(heldNote(block)).not.toBeNull();
+
+		expect(plain.getAttribute('contenteditable')).toBe('true');
+		expect(plain.hasAttribute('aria-describedby')).toBe(false);
+		paste(plain, 'new ');
 		expect(mounted.changes.at(-1)?.path).toBe('main.tags');
-		expect(String((doc.getStored('tags') as unknown[])[0])).toContain('new plain block scalar');
+		expect((doc.getStored('tags') as unknown[])[1]).toBe('new plain scalar');
 		doc.free();
 	});
 });
