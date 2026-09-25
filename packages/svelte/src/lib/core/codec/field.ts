@@ -39,7 +39,7 @@ import { createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
-import { blockSchema, inlineSchema, plaintextSchema } from './schema.js';
+import { leafSchema } from './schema.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
 import { focusSlashItem, runSlashItem, slashPlugin, type SlashState } from './slash.js';
 
@@ -269,7 +269,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// The declared type picks the schema, and the schema is the whole of what
 	// `plaintext` suppresses: no mark types to toggle, to paste in, or to mint a
 	// shorthand with (`schema.ts`).
-	const schema: Schema = plaintext ? plaintextSchema : inline ? inlineSchema : blockSchema;
+	const schema: Schema = leafSchema({ plaintext, inline });
 	// Bound once and held: the reader is a `{quill, doc}` pair that reads live, so
 	// every read below sees the commit before it.
 	const reader: DocumentReader = opts.quill.reader(doc);
