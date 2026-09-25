@@ -8,8 +8,8 @@
 
 import { QuiverError } from './errors.js';
 import { packFiles } from './bundle.js';
-import { NAME_DIGEST_LENGTH } from './digest.js';
-import { MANIFEST_VERSION, POINTER_FORMAT } from './format.js';
+import { FORMAT, INDEX, LEGACY_POINTER } from './format.js';
+import { isFont } from './signature.js';
 import { isDraft } from './semver.js';
 
 /** Options for {@link buildQuiver}. */
@@ -21,6 +21,9 @@ export interface BuildOptions {
 	 */
 	drafts?: boolean;
 }
+
+/** Hex chars of SHA-256 in a bundle's name: enough that a changed bundle never reuses one. */
+const NAME_DIGEST_LENGTH = 32;
 
 /** Font file extensions recognised by the builder (case-insensitive). */
 const FONT_EXT = /\.(ttf|otf|woff|woff2)$/i;
@@ -78,14 +81,14 @@ function assertSafeOutDir(
 /**
  * Reads a Source Quiver, validates it, and writes the build output to outDir.
  *
- * Output layout. Every name but the pointer carries the SHA-256 of what it
- * names, which is what the loader checks on fetch:
+ * Output layout. Every name but the two JSON documents carries the SHA-256 of what it
+ * names, which is what makes it safe to cache forever:
  *   outDir/
- *     latest.json                     # the format, and a stable pointer to the manifest
- *     manifest.<sha256:32>.json       # hashed manifest
+ *     quiver.json                       # the format and the catalog
+ *     latest.json                       # the format alone, for a reader of format 1
  *     <name>@<version>.<sha256:32>.zip  # one bundle per quill
- *     store/
- *       <sha256>                      # dehydrated font bytes (full hash, no ext)
+ *     fonts/
+ *       <sha256>                        # dehydrated font bytes (full hash, no ext)
  *
  * A generation is assembled beside outDir and moved in whole, so a reader
  * fetching mid-build reads the previous one rather than a torn tree, and a
@@ -93,7 +96,7 @@ function assertSafeOutDir(
  *
  * Versions below `MIN_PUBLISHED_VERSION` are drafts and are left out unless
  * `options.drafts` asks for them; a quill with nothing above the floor is
- * absent from the manifest entirely.
+ * absent from `quiver.json` entirely.
  *
  * Throws:
  *   - `quiver_invalid` on source validation failures (propagated from scanner)
@@ -145,7 +148,7 @@ export async function buildQuiver(
 	async function packGeneration(): Promise<void> {
 		try {
 			await rm(stage, { recursive: true, force: true });
-			await mkdir(join(stage, 'store'), { recursive: true });
+			await mkdir(join(stage, 'fonts'), { recursive: true });
 		} catch (err) {
 			throw new QuiverError(
 				'transport_error',
@@ -154,15 +157,13 @@ export async function buildQuiver(
 			);
 		}
 
-		const manifestQuills: Array<{
+		const quills: Array<{
 			name: string;
 			version: string;
 			bundle: string;
 			fonts: Record<string, string>;
 		}> = [];
 
-		// Font hashes already in the store. The store is content-addressed, so a font
-		// shared across quills or versions is written once.
 		const stored = new Set<string>();
 
 		for (const [quillName, versions] of catalog) {
@@ -182,18 +183,28 @@ export async function buildQuiver(
 						continue;
 					}
 
-					// Full width: the store is keyed by hash, so two distinct fonts
-					// sharing a prefix would merge into one entry.
+					// The loader refuses what does not open as a font, so the build refuses it
+					// first, where the author it names can do something about it.
+					if (!isFont(bytes)) {
+						throw new QuiverError(
+							'quiver_invalid',
+							`Quill "${quillName}@${version}": "${rel}" is not a TrueType, OpenType, WOFF or WOFF2 font`,
+							{ quiverName: meta.name, version }
+						);
+					}
+
+					// Full width: fonts are keyed by hash, so two distinct fonts sharing a
+					// prefix would merge into one file.
 					const hash = createHash('sha256').update(bytes).digest('hex');
 					fonts[rel] = hash;
 					if (stored.has(hash)) continue;
 
 					try {
-						await writeFile(join(stage, 'store', hash), bytes);
+						await writeFile(join(stage, 'fonts', hash), bytes);
 					} catch (err) {
 						throw new QuiverError(
 							'transport_error',
-							`Failed to write font store entry "${join(outDir, 'store', hash)}": ${(err as Error).message}`,
+							`Failed to write font "${join(outDir, 'fonts', hash)}": ${(err as Error).message}`,
 							{ cause: err }
 						);
 					}
@@ -231,44 +242,26 @@ export async function buildQuiver(
 					);
 				}
 
-				manifestQuills.push({ name: quillName, version, bundle: bundleName, fonts });
+				quills.push({ name: quillName, version, bundle: bundleName, fonts });
 			}
 		}
 
-		const manifest = {
-			version: MANIFEST_VERSION,
+		// The format is stamped here and read first, so a client older than the tree says so
+		// rather than misreading it.
+		const index = {
+			format: FORMAT,
 			name: meta.name,
 			...(meta.description === undefined ? {} : { description: meta.description }),
-			quills: manifestQuills
+			quills
 		};
 
-		const manifestJson = JSON.stringify(manifest, null, 2);
-		const manifestHash = createHash('sha256')
-			.update(manifestJson)
-			.digest('hex')
-			.slice(0, NAME_DIGEST_LENGTH);
-		const manifestFileName = `manifest.${manifestHash}.json`;
-
 		try {
-			await writeFile(join(stage, manifestFileName), manifestJson, 'utf-8');
+			await writeFile(join(stage, INDEX), JSON.stringify(index, null, 2), 'utf-8');
+			await writeFile(join(stage, LEGACY_POINTER), JSON.stringify({ format: FORMAT }), 'utf-8');
 		} catch (err) {
 			throw new QuiverError(
 				'transport_error',
-				`Failed to write manifest "${join(outDir, manifestFileName)}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
-
-		// The format is stamped here and read first, so a client older than the tree
-		// says so rather than misreading it.
-		const pointer = { format: POINTER_FORMAT, manifest: manifestFileName };
-
-		try {
-			await writeFile(join(stage, 'latest.json'), JSON.stringify(pointer), 'utf-8');
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Failed to write pointer "${join(outDir, 'latest.json')}": ${(err as Error).message}`,
+				`Failed to write "${join(outDir, INDEX)}" or its legacy pointer: ${(err as Error).message}`,
 				{ cause: err }
 			);
 		}

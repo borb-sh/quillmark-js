@@ -92,10 +92,19 @@ export async function laySite({
 	await cp(dist, at, { recursive: true });
 	await build(collection, join(at, 'quiver'), { drafts });
 
-	// What the client fetches first: its absence reads there as a quiver that is not
-	// present rather than a layout that is wrong.
-	if (!existsSync(join(at, 'quiver', 'latest.json')))
-		throw new Error(`${at}/quiver holds no pointer: "${collection}" built nothing`);
+	assertPacked(join(at, 'quiver'), collection);
 
 	return at;
+}
+
+/**
+ * What the client fetches first. The packer is the collection's copy of quiver and the
+ * reader is the client's, so a pack without it is one the client cannot read, and in the
+ * browser that reads as a quiver that is not present rather than a pin that is behind.
+ */
+export function assertPacked(out: string, collection: string): void {
+	if (!existsSync(join(out, 'quiver.json')))
+		throw new Error(
+			`${out} holds no quiver.json: "${collection}" packs through a @quillmark/quiver this client does not read. Upgrade it in the collection.`
+		);
 }

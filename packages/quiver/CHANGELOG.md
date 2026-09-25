@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+**A built quiver is `quiver.json`, one bundle per quill, and `fonts/`.** `quiver.json` carries the format and the catalog, and is the one name fetched `no-cache`; every bundle and font name carries the digest of its bytes and is fetched `force-cache`. The hashed manifest and `store/` are gone, and `latest.json` carries only `format`, so a reader of format 1 refuses a format-2 artifact by name; every artifact is rebuilt (MIGRATION.md). `getQuill` still reads one bundle and the fonts it names, and a font shared across quills or versions is still written once.
+
+**`quiver.json` states `format` and is closed.** The format is read before the key check, so a newer document is refused as newer with the upgrade named; past it, an unknown field is `quiver_invalid`.
+
+**A tab outliving a release reads the next one's names.** A failed bundle or font read rereads `quiver.json` once, takes every entry both generations carry, and retries under the entry it now names where that entry names other files; otherwise the first error stands, unless the reread refused the index itself. Concurrent failures share one reread.
+
+**A bundle has to open as a zip and a font as a font.** A host answering a missing name with its own page answers 200, and a font nothing parses reaches Typst, which substitutes for it silently; either is now a `transport_error` naming the path. `build` refuses a font file that does not open as TrueType, OpenType, WOFF or WOFF2.
+
+**Nothing checks fetched bytes against their names, and no fetch carries a byte ceiling.** The digests are for caching and https answers a corrupted byte, so `crypto.subtle` and the plain-http pass-through go with the check. A bundle's unpack budget is unchanged. `Quiver.fromBuiltUrl` takes no `seed`, and `fromBuiltDir` reads each name `quiver.json` lists off disk, a validated name carrying no separator.
+
 ## v0.29.0 - 2026-09-23
 
 **The `@quillmark/wasm` peer floor is `>=0.115.0-0`.** Nothing here reads a schema or a content, so the span's declarations — `type: matrix`, `ui.layout: "table"`, `max:` on an array — and its cuts land outside this package; the floor rises because a quiver hands out `Quill` handles the consumer's copy of the artifact has to load. Two cuts reach a packed quill: a matrix `members:` is one flat `{id: Title}` mapping, the list of `{group, values}` blocks failing at load, and a `ui.layout: table` column that is not a leaf is `quill::table_column_not_flat`. What a consumer meets on the artifact's own terms is one new load warning, `quill::bodiless_card_kind`, on a card kind declaring `body.enabled: false`.

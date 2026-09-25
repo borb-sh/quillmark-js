@@ -22,7 +22,7 @@
   preview says what refused. The edit that answers it tries the open again.
 
   A repack of the source quiver arrives as one dev-server signal and is answered by
-  minting a fresh `Quiver`: the manifest is content-addressed and the quill cache
+  minting a fresh `Quiver`: a repack writes a new `quiver.json`, and the quill cache
   lives as long as the quiver does, so the quiver is dropped rather than invalidated.
   The document crosses (STUDIO §"The document survives the quill"), which is what
   makes an edit to a schema an edit to the thing the author is holding.

@@ -8,8 +8,8 @@
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdir, rm, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, rm, readFile, readdir } from 'node:fs/promises';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { Quiver, build, fromBuiltDir } from '../node.js';
@@ -142,13 +142,13 @@ describe('Integration: fromBuiltUrl error cases', () => {
 		);
 	});
 
-	it('fromBuiltUrl with malformed latest.json throws quiver_invalid', async () => {
+	it('fromBuiltUrl with malformed quiver.json throws quiver_invalid', async () => {
 		const outDir = tempDir();
 		tmpDirs.push(outDir);
 		await mkdir(outDir, { recursive: true });
 
 		const { writeFile } = await import('node:fs/promises');
-		await writeFile(join(outDir, 'latest.json'), 'not-json');
+		await writeFile(join(outDir, 'quiver.json'), 'not-json');
 
 		const baseUrl = 'https://mock.cdn.example.com/malformed/';
 		mockFetch = makeMockFetch(outDir, baseUrl);
@@ -215,9 +215,65 @@ describe('Integration: build → fromBuiltDir → resolve → getQuill', () => {
 		}
 	});
 
+	it('fromBuiltDir on a missing bundle throws transport_error naming its path', async () => {
+		const outDir = tempDir();
+		tmpDirs.push(outDir);
+		await build(SAMPLE_FIXTURE, outDir);
+		const { quills } = JSON.parse(await readFile(join(outDir, 'quiver.json'), 'utf-8')) as {
+			quills: Array<{ name: string; version: string; bundle: string }>;
+		};
+		const memo = quills.find((q) => q.name === 'memo' && q.version === '1.0.0')!;
+		await rm(join(outDir, memo.bundle));
+
+		const built = await fromBuiltDir(outDir);
+		await expect(built.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining(join(outDir, memo.bundle))
+			})
+		);
+	});
+
 	it('fromBuiltDir on missing directory throws transport_error', async () => {
 		await expect(fromBuiltDir(join(tmpdir(), `does-not-exist-${randomUUID()}`))).rejects.toThrow(
 			expect.objectContaining({ code: 'transport_error' })
 		);
+	});
+});
+
+describe('Integration: build → fromBuiltFiles → getQuill', () => {
+	const tmpDirs: string[] = [];
+
+	afterEach(async () => {
+		for (const d of tmpDirs.splice(0)) {
+			await rm(d, { recursive: true, force: true });
+		}
+	});
+
+	it('loads from the bytes `build` wrote, and names a path the map lacks', async () => {
+		const outDir = tempDir();
+		tmpDirs.push(outDir);
+		await build(SAMPLE_FIXTURE, outDir);
+
+		const files = new Map<string, Uint8Array>();
+		for (const path of await readdir(outDir, { recursive: true })) {
+			const bytes = await readFile(join(outDir, path)).catch(() => undefined);
+			if (bytes !== undefined) files.set(path.split(sep).join('/'), bytes);
+		}
+
+		const { calls, restore } = mockQuillFromTree();
+		try {
+			const built = await Quiver.fromBuiltFiles(files);
+			expect(built.quillNames()).toEqual(['memo', 'resume']);
+			await built.getQuill('memo@1.0.0');
+			expect(calls[0]!.has('Quill.yaml')).toBe(true);
+
+			const partial = new Map([['quiver.json', files.get('quiver.json')!]]);
+			await expect((await Quiver.fromBuiltFiles(partial)).getQuill('memo@1.0.0')).rejects.toThrow(
+				/No bytes held for "memo@1\.0\.0\./
+			);
+		} finally {
+			restore();
+		}
 	});
 });

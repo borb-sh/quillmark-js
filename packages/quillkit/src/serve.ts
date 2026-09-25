@@ -15,9 +15,9 @@ import { extname, resolve } from 'node:path';
 import { within } from './paths.js';
 
 /**
- * What the two roots hold: the client `vite build` emits, and a packed quiver's pointer,
- * manifests and bundles. Fonts carry no type because they carry no extension either,
- * being dehydrated into `store/<sha256>`; anything unlisted falls back to
+ * What the two roots hold: the client `vite build` emits, and a packed quiver's
+ * `quiver.json` and bundles. Fonts carry no type because they carry no extension either,
+ * being dehydrated into `fonts/<sha256>`; anything unlisted falls back to
  * `application/octet-stream`, which is right for opaque bytes.
  *
  * `.wasm` is the one that is not a nicety: `@quillmark/wasm` ships wasm-bindgen's web

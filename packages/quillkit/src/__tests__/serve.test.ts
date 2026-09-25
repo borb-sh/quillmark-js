@@ -33,7 +33,7 @@ async function serveFixture(): Promise<{ base: string; client: string; quiver: s
 	await mkdir(join(client, 'assets'), { recursive: true });
 	await writeFile(join(client, 'assets', 'wasm_bg.wasm'), Buffer.from([0, 0x61, 0x73, 0x6d]));
 	await writeFile(join(client, 'assets', 'index.js'), '// client');
-	await writeFile(join(quiver, 'latest.json'), '{"format":1,"manifest":"manifest.abc.json"}');
+	await writeFile(join(quiver, 'quiver.json'), '{"format":1,"name":"q","quills":[]}');
 	await writeFile(join(quiver, 'secret-outside'), 'not reachable from the client mount');
 
 	const mounts: Mount[] = [
@@ -67,7 +67,7 @@ describe('serving', () => {
 		// The longest prefix wins, so `/quiver/…` reaches the pack rather than resolving
 		// to a missing file under the client.
 		const { base } = await serveFixture();
-		const res = await fetch(`${base}/quiver/latest.json`);
+		const res = await fetch(`${base}/quiver/quiver.json`);
 		expect(res.status).toBe(200);
 		expect(await res.json()).toMatchObject({ format: 1 });
 	});
@@ -76,7 +76,7 @@ describe('serving', () => {
 		// An author repacks under this server; an answer from a cache would be an answer
 		// about the previous generation.
 		const { base } = await serveFixture();
-		const res = await fetch(`${base}/quiver/latest.json`);
+		const res = await fetch(`${base}/quiver/quiver.json`);
 		expect(res.headers.get('cache-control')).toBe('no-store');
 	});
 

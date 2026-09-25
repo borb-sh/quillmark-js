@@ -99,7 +99,7 @@ const quiver = await fromBuiltDir('./static/quills/my-quiver');
 
 ## Server-side runtime (no filesystem)
 
-A serverless function's packed artifact is not on a path the invocation can read, so `fromBuiltDir` cannot see it. Hand over the bytes instead, keyed by artifact-relative path as `build` writes them (`latest.json`, `manifest.<digest>.json`, `<name>@<x.y.z>.<digest>.zip`, `store/<hash>`):
+A serverless function's packed artifact is not on a path the invocation can read, so `fromBuiltDir` cannot see it. Hand over the bytes instead, keyed by artifact-relative path as `build` writes them (`quiver.json`, `<name>@<x.y.z>.<digest>.zip`, `fonts/<hash>`):
 
 ```ts
 import { Quiver } from '@quillmark/quiver';
@@ -109,30 +109,17 @@ const quiver = await Quiver.fromBuiltFiles(artifactFiles); // Map<string, Uint8A
 
 Nothing is fetched, so nothing self-fetches over your own load balancer. The map must carry the whole artifact; a path it lacks is a `transport_error` naming that path.
 
-Where inlining the bundles and fonts is not practical, hold the two small documents and let the host serve the rest:
+## The `quiver.json` index
 
-```ts
-const quiver = await Quiver.fromBuiltUrl('/quills/my-quiver/', {
-	seed: new Map([
-		['latest.json', pointerBytes],
-		[manifestName, manifestBytes]
-	])
-});
-```
+`Quiver.fromBuiltUrl(url)` first fetches `<url>/quiver.json`: the format and the catalog, naming each quill's bundle and fonts. Every other name carries the digest of its own bytes, so a changed file is a changed name and is safe to cache forever; `quiver.json` is not, and a cache layer serving a stale one silently pins the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), and every other request is `force-cache`. Both are the browser layer only: a stale CDN edge is answered by that host's cache headers, and `quillkit`'s README states the whole contract for a deploy serving a client over one.
 
-The seed answers first and the URL serves what it does not carry. Seeding `latest.json` also settles which catalog the process reads at deploy time rather than at cache-revalidation time. Seeded bytes are checked against the digest in their name exactly as fetched bytes are.
-
-## The `latest.json` pointer
-
-`Quiver.fromBuiltUrl(url)` first fetches `<url>/latest.json`, a stable-named pointer to the current manifest. Everything behind that pointer is content-addressed and checked against the digest in its name; the pointer itself is not, so a cache layer can serve a stale one and silently pin the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), and every other request is `force-cache`, a digest-carrying name being entitled to whatever the cache already holds. Both are the browser layer only: a stale CDN edge is answered by that host's cache headers, and `quillkit`'s README states the whole contract for a deploy serving a client over one.
-
-The check itself needs `crypto.subtle`, which a browser exposes only in a secure context. An `https` page, `http://localhost` and Node have one; a page served over plain `http` to anything else — a dev host on a LAN address, a staging box without a certificate — has none, and there every fetch passes through unchecked.
+A `getQuill` reads one bundle and the fonts it names, nothing of another quill. Fonts are stored once by hash, so a release that edits a template re-downloads that quill's bundle and not its fonts. A tab still holding the previous release's `quiver.json` rereads it once when a read fails.
 
 ## What a quiver is trusted to be
 
 **A quill is a template the backend executes, so loading a quiver runs its author's code.** Point one at a source you would take a dependency from — an npm package or a git tag, pinned like any other — because nothing here sandboxes a quill, and a collection assembled from anywhere else is a decision to make on purpose.
 
-Content addressing is an integrity check and not a provenance one: the digest in each name catches a corrupted object, a partial sync and a name reused across releases, and says nothing about who packed the bytes. Where the primitive behind it is absent the page is no secure context either, so the pointer, the manifest, the digests and the client itself all arrived over the same unauthenticated channel — which is the whole of why a built quiver is served over `https`.
+Nothing checks fetched bytes against their names: the digests are there for caching, and what answers a corrupted or substituted byte is the channel. `quiver.json`, the bundles and the client itself arrive over the same one, which is the whole of why a built quiver is served over `https`.
 
 ## Error handling
 

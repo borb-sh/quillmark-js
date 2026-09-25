@@ -1,20 +1,14 @@
 /**
- * Tests for built-loader.ts — all scenarios use an in-memory mock transport
- * so no filesystem or network is needed.
- *
- * Fixtures are content-addressed the way `build` writes them: a name carries
- * the digest of its own bytes, and the loader checks it on fetch. A fixture
- * whose name lies about its bytes is therefore a tamper case, not a shortcut,
- * and the ones below that do it say so.
+ * Tests for built-loader.ts — all scenarios read an in-memory artifact, so no filesystem
+ * or network is needed.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { loadBuiltQuiver } from '../built-loader.js';
-import { MAX_BUNDLE_BYTES, packFiles } from '../bundle.js';
-import { NAME_DIGEST_LENGTH, sha256Hex } from '../digest.js';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { filesReader, httpReader, loadBuiltQuiver } from '../built-loader.js';
+import type { ArtifactReader } from '../built-loader.js';
+import { packFiles } from '../bundle.js';
 import { QuiverError } from '../errors.js';
-import { MANIFEST_VERSION, POINTER_FORMAT } from '../format.js';
-import type { BuiltTransport, FetchOptions } from '../built-loader.js';
+import { FORMAT } from '../format.js';
 import { mockQuillFromTree } from './helpers/mock-engine.js';
 
 // The Quiver tree path is private (`getQuill` → the loader). To observe the
@@ -38,52 +32,28 @@ async function loadTreeViaGetQuill(
 	return treeStub.calls[before]!;
 }
 
-// ─── In-memory mock transport ─────────────────────────────────────────────────
-
-class MemTransport implements BuiltTransport {
-	private readonly store: Map<string, Uint8Array>;
-	readonly fetchLog: string[] = [];
+/** A mutable artifact, logging every read. */
+class MemArtifact {
+	readonly files: Map<string, Uint8Array>;
+	readonly log: string[] = [];
 	readonly revalidated: string[] = [];
-	/** Path → the ceiling the loader named for it. */
-	readonly ceilings: Map<string, number> = new Map();
 
 	constructor(entries: Record<string, Uint8Array>) {
-		this.store = new Map(Object.entries(entries));
+		this.files = new Map(Object.entries(entries));
 	}
 
-	async fetchBytes(relativePath: string, opts: FetchOptions): Promise<Uint8Array> {
-		this.fetchLog.push(relativePath);
-		this.ceilings.set(relativePath, opts.maxBytes);
-		if (opts.revalidate === true) this.revalidated.push(relativePath);
-		const bytes = this.store.get(relativePath);
+	readonly read: ArtifactReader = async (path, revalidate) => {
+		this.log.push(path);
+		if (revalidate) this.revalidated.push(path);
+		const bytes = this.files.get(path);
 		if (bytes === undefined) {
-			throw new QuiverError('transport_error', `MemTransport: not found: "${relativePath}"`);
+			throw new QuiverError('transport_error', `MemArtifact: not found: "${path}"`);
 		}
 		return bytes;
-	}
-
-	set(path: string, bytes: Uint8Array): void {
-		this.store.set(path, bytes);
-	}
-
-	delete(path: string): void {
-		this.store.delete(path);
-	}
+	};
 }
-
-// ─── Fixture builders ─────────────────────────────────────────────────────────
 
 const enc = new TextEncoder();
-
-/** The full digest, as a font store entry is keyed. */
-async function fullDigest(bytes: Uint8Array): Promise<string> {
-	return (await sha256Hex(bytes))!;
-}
-
-/** The truncated digest a bundle or manifest filename carries. */
-async function nameDigest(bytes: Uint8Array): Promise<string> {
-	return (await fullDigest(bytes)).slice(0, NAME_DIGEST_LENGTH);
-}
 
 function makeBundle(files: Record<string, string>): Uint8Array {
 	const input: Record<string, Uint8Array> = {};
@@ -93,74 +63,58 @@ function makeBundle(files: Record<string, string>): Uint8Array {
 	return packFiles(input);
 }
 
-function makePointer(manifestFileName: string): Uint8Array {
-	return enc.encode(JSON.stringify({ manifest: manifestFileName }));
-}
+/** An OpenType signature and then `tail`: bytes the loader takes as a font. */
+const font = (...tail: number[]): Uint8Array =>
+	new Uint8Array([...new TextEncoder().encode('OTTO'), ...tail]);
+
+/** Distinct 64-hex keys; the loader reads a font's name and never hashes its bytes. */
+const fontKey = (n: number): string => n.toString(16).padStart(64, '0');
+const bundleName = (name: string, version: string, tag = 'a'): string =>
+	`${name}@${version}.${tag.repeat(32)}.zip`;
 
 interface QuillSpec {
 	name: string;
 	version: string;
 	/** Content files, zipped into the bundle. */
 	files?: Record<string, string>;
-	/** Dehydrated fonts, keyed by their path in the quill tree. */
-	fonts?: Record<string, Uint8Array>;
+	/** Dehydrated fonts: tree path → [key, bytes]. */
+	fonts?: Record<string, [string, Uint8Array]>;
 }
 
-interface Artifact {
-	transport: MemTransport;
-	manifestBytes: Uint8Array;
-	manifestFileName: string;
-	/** "name@version" → the bundle filename the manifest points at. */
-	bundles: Record<string, string>;
+function indexOf(name: string, quills: QuillSpec[]): Record<string, unknown> {
+	return {
+		format: FORMAT,
+		name,
+		quills: quills.map((q) => ({
+			name: q.name,
+			version: q.version,
+			bundle: bundleName(q.name, q.version),
+			fonts: Object.fromEntries(Object.entries(q.fonts ?? {}).map(([p, [key]]) => [p, key]))
+		}))
+	};
 }
 
-/**
- * A packed artifact whose every name is the digest of its own bytes: the shape
- * `build` writes.
- */
-async function makeArtifact(quiverName: string, quills: QuillSpec[]): Promise<Artifact> {
-	const entries: Record<string, Uint8Array> = {};
-	const bundles: Record<string, string> = {};
-	const manifestQuills = [];
-
+/** A packed artifact of the shape `build` writes. */
+function makeArtifact(quiverName: string, quills: QuillSpec[]): MemArtifact {
+	const entries: Record<string, Uint8Array> = {
+		'quiver.json': enc.encode(JSON.stringify(indexOf(quiverName, quills)))
+	};
 	for (const q of quills) {
-		const zip = makeBundle(q.files ?? { 'Quill.yaml': `name: ${q.name}\n` });
-		const bundle = `${q.name}@${q.version}.${await nameDigest(zip)}.zip`;
-		entries[bundle] = zip;
-		bundles[`${q.name}@${q.version}`] = bundle;
-
-		const fonts: Record<string, string> = {};
-		for (const [path, bytes] of Object.entries(q.fonts ?? {})) {
-			const hash = await fullDigest(bytes);
-			entries[`store/${hash}`] = bytes;
-			fonts[path] = hash;
-		}
-
-		manifestQuills.push({ name: q.name, version: q.version, bundle, fonts });
+		entries[bundleName(q.name, q.version)] = makeBundle(
+			q.files ?? { 'Quill.yaml': `name: ${q.name}\n` }
+		);
+		for (const [key, bytes] of Object.values(q.fonts ?? {})) entries[`fonts/${key}`] = bytes;
 	}
-
-	const manifestBytes = enc.encode(
-		JSON.stringify({ version: 1, name: quiverName, quills: manifestQuills })
-	);
-	const manifestFileName = `manifest.${await nameDigest(manifestBytes)}.json`;
-	entries[manifestFileName] = manifestBytes;
-	entries['latest.json'] = makePointer(manifestFileName);
-
-	return { transport: new MemTransport(entries), manifestBytes, manifestFileName, bundles };
+	return new MemArtifact(entries);
 }
 
-/**
- * A pointer plus a manifest of arbitrary shape, named after its own bytes so
- * the fetch verifies and the manifest parser is what rejects it.
- */
-async function transportWith(manifest: Record<string, unknown>): Promise<MemTransport> {
-	const bytes = enc.encode(JSON.stringify(manifest));
-	const name = `manifest.${await nameDigest(bytes)}.json`;
-	return new MemTransport({ 'latest.json': makePointer(name), [name]: bytes });
+/** An artifact whose `quiver.json` is the given document and nothing else. */
+function indexed(doc: Record<string, unknown>): MemArtifact {
+	return new MemArtifact({ 'quiver.json': enc.encode(JSON.stringify(doc)) });
 }
 
 /** The minimal three-quill fixture most tests below run against. */
-function buildMinimalArtifact(): Promise<Artifact> {
+function buildMinimalArtifact(): MemArtifact {
 	return makeArtifact('sample', [
 		{
 			name: 'memo',
@@ -172,11 +126,9 @@ function buildMinimalArtifact(): Promise<Artifact> {
 	]);
 }
 
-async function loadMinimal() {
-	return loadBuiltQuiver((await buildMinimalArtifact()).transport);
+function loadMinimal() {
+	return loadBuiltQuiver(buildMinimalArtifact().read);
 }
-
-// ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('loadBuiltQuiver — happy path', () => {
 	it('quillNames() returns sorted quill names', async () => {
@@ -189,20 +141,14 @@ describe('loadBuiltQuiver — happy path', () => {
 		expect(q.versionsOf('resume')).toEqual(['2.0.0']);
 	});
 
-	it("carries the manifest's description", async () => {
+	it('carries the description', async () => {
 		const q = await loadBuiltQuiver(
-			await transportWith({
-				version: MANIFEST_VERSION,
-				name: 'sample',
-				description: 'A sample quiver',
-				quills: []
-			})
+			indexed({ format: FORMAT, name: 'sample', description: 'A sample quiver', quills: [] }).read
 		);
 		expect(q.description).toBe('A sample quiver');
 	});
 
-	// The fixtures are version 1, so this is the back-compat read too.
-	it('a manifest without a description carries undefined', async () => {
+	it('an index without a description carries undefined', async () => {
 		expect((await loadMinimal()).description).toBeUndefined();
 	});
 });
@@ -216,180 +162,242 @@ describe('loadBuiltQuiver — tree rehydration', () => {
 	});
 
 	it('rehydrates fonts at correct paths', async () => {
-		const fontBytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
-		const { transport } = await makeArtifact('sample', [
-			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': fontBytes } }
+		const fontBytes = font(0xde, 0xad, 0xbe, 0xef);
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': [fontKey(1), fontBytes] } }
 		]);
 
-		const q = await loadBuiltQuiver(transport);
+		const q = await loadBuiltQuiver(artifact.read);
 		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
 
-		expect(tree.has('fonts/body.ttf')).toBe(true);
 		expect(tree.get('fonts/body.ttf')).toEqual(fontBytes);
+	});
+
+	it('reads one bundle and its own fonts, and nothing of another quill', async () => {
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), font(1)] } },
+			{ name: 'resume', version: '2.0.0', fonts: { 'b.ttf': [fontKey(2), font(2)] } }
+		]);
+		const q = await loadBuiltQuiver(artifact.read);
+		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+
+		expect(artifact.log.sort()).toEqual(
+			['quiver.json', bundleName('memo', '1.0.0'), `fonts/${fontKey(1)}`].sort()
+		);
 	});
 });
 
-describe('loadBuiltQuiver — content addressing is checked', () => {
-	// The digest in a name is what makes "safe to cache forever" a property.
-	// Each case swaps bytes behind a name the manifest already committed to: a
-	// corrupted CDN object, a partial sync, a name reused across releases.
+describe('loadBuiltQuiver — the index revalidates', () => {
+	it('asks the reader to revalidate quiver.json and nothing else', async () => {
+		const artifact = buildMinimalArtifact();
+		const q = await loadBuiltQuiver(artifact.read);
+		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
 
-	it('bundle bytes that do not match the name in the manifest → transport_error', async () => {
-		const { transport, bundles } = await makeArtifact('sample', [
-			{ name: 'memo', version: '1.0.0' }
-		]);
-		transport.set(bundles['memo@1.0.0']!, makeBundle({ 'Quill.yaml': 'name: substituted\n' }));
-
-		const q = await loadBuiltQuiver(transport);
-		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
-		);
+		expect(artifact.revalidated).toEqual(['quiver.json']);
+		expect(artifact.log.length).toBeGreaterThan(1);
 	});
+});
 
-	it('manifest bytes that do not match the pointer name → transport_error', async () => {
-		const { transport, manifestFileName } = await buildMinimalArtifact();
-		transport.set(manifestFileName, enc.encode('{"version":1,"name":"other","quills":[]}'));
+describe('loadBuiltQuiver — a newer generation', () => {
+	// A tab holds the index it booted with; a deploy since has replaced the files it names.
+	const MEMO = bundleName('memo', '1.0.0');
 
-		await expect(loadBuiltQuiver(transport)).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
+	/** Replace `memo@1.0.0` with a generation of its own, deleting what it replaced. */
+	function redeploy(artifact: MemArtifact, spec: QuillSpec, tag: string): void {
+		const next = indexOf('sample', [spec]);
+		const entry = (next['quills'] as { bundle: string }[])[0]!;
+		const before = new Set(artifact.files.keys());
+		entry.bundle = bundleName('memo', '1.0.0', tag);
+		for (const path of before) artifact.files.delete(path);
+		artifact.files.set('quiver.json', enc.encode(JSON.stringify(next)));
+		artifact.files.set(
+			entry.bundle,
+			makeBundle(spec.files ?? { 'Quill.yaml': `name: ${spec.name}\n` })
 		);
-	});
+		for (const [key, bytes] of Object.values(spec.fonts ?? {})) {
+			artifact.files.set(`fonts/${key}`, bytes);
+		}
+	}
 
-	it('font bytes that do not match their store key → transport_error', async () => {
-		const fontBytes = new Uint8Array([1, 2, 3, 4]);
-		const { transport } = await makeArtifact('sample', [
-			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': fontBytes } }
-		]);
-		transport.set(`store/${await fullDigest(fontBytes)}`, new Uint8Array([9, 9, 9]));
-
-		const q = await loadBuiltQuiver(transport);
-		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
+	it("a bundle the next generation deleted is read under that generation's name", async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		const q = await loadBuiltQuiver(artifact.read);
+		redeploy(
+			artifact,
+			{ name: 'memo', version: '1.0.0', files: { 'Quill.yaml': 'name: memo\n# next\n' } },
+			'b'
 		);
-	});
 
-	it('a retry after a mismatch refetches — the bad bytes are not cached', async () => {
-		const fontBytes = new Uint8Array([1, 2, 3, 4]);
-		const { transport } = await makeArtifact('sample', [
-			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': fontBytes } }
-		]);
-		const storePath = `store/${await fullDigest(fontBytes)}`;
-		transport.set(storePath, new Uint8Array([9, 9, 9]));
-
-		const q = await loadBuiltQuiver(transport);
-		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(QuiverError);
-
-		transport.set(storePath, fontBytes);
 		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
-		expect(tree.get('fonts/body.ttf')).toEqual(fontBytes);
+		expect(new TextDecoder().decode(tree.get('Quill.yaml'))).toBe('name: memo\n# next\n');
 	});
-});
 
-describe('loadBuiltQuiver — the pointer revalidates', () => {
-	it('asks the transport to revalidate latest.json and nothing else', async () => {
-		const { transport } = await buildMinimalArtifact();
-		const q = await loadBuiltQuiver(transport);
-		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
-
-		expect(transport.revalidated).toEqual(['latest.json']);
-		expect(transport.fetchLog.length).toBeGreaterThan(1);
-	});
-});
-
-describe('loadBuiltQuiver — every fetch carries a ceiling', () => {
-	// One ceiling per path rather than one for the artifact: a pointer, a font and a
-	// bundle are three different sizes of thing.
-	it("names one per path, and a bundle's is what it unpacks to", async () => {
-		const font = new Uint8Array([1, 2, 3]);
-		const { transport, manifestFileName, bundles } = await makeArtifact('capped', [
-			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': font } }
+	it('a font the next generation replaced is read under its new name', async () => {
+		// The bundle's name is a digest of what is not a font, so a release changing only a
+		// font keeps it.
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), font(1)] } }
 		]);
-		const q = await loadBuiltQuiver(transport);
+		const q = await loadBuiltQuiver(artifact.read);
+		redeploy(
+			artifact,
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(2), font(2)] } },
+			'a'
+		);
+
+		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		expect(tree.get('a.ttf')).toEqual(font(2));
+	});
+
+	it('one reread serves every quill the tab opens after it', async () => {
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0' },
+			{ name: 'resume', version: '2.0.0' }
+		]);
+		const q = await loadBuiltQuiver(artifact.read);
+		const next = indexOf('sample', [
+			{ name: 'memo', version: '1.0.0' },
+			{ name: 'resume', version: '2.0.0' }
+		]);
+		for (const entry of next['quills'] as { name: string; version: string; bundle: string }[]) {
+			artifact.files.delete(entry.bundle);
+			entry.bundle = bundleName(entry.name, entry.version, 'b');
+			artifact.files.set(entry.bundle, makeBundle({ 'Quill.yaml': `name: ${entry.name}\n` }));
+		}
+		artifact.files.set('quiver.json', enc.encode(JSON.stringify(next)));
+
 		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		await loadTreeViaGetQuill(q, 'resume', '2.0.0');
+		expect(artifact.log.filter((p) => p === 'quiver.json')).toHaveLength(2);
+	});
 
-		const { ceilings, fetchLog } = transport;
-		expect([...ceilings.keys()].sort()).toEqual([...new Set(fetchLog)].sort());
+	it('a failure the index does not explain is the original error', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		artifact.files.delete(MEMO);
 
-		const bundle = ceilings.get(bundles['memo@1.0.0']!)!;
-		const store = ceilings.get(`store/${await fullDigest(font)}`)!;
-		const pointer = ceilings.get('latest.json')!;
+		const q = await loadBuiltQuiver(artifact.read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
+		expect(artifact.log.filter((p) => p === 'quiver.json')).toHaveLength(2);
+	});
 
-		expect(bundle).toBe(MAX_BUNDLE_BYTES);
-		expect(pointer).toBe(ceilings.get(manifestFileName));
-		expect(pointer).toBeLessThan(store);
-		expect(store).toBeLessThan(bundle);
+	it('a quill the next generation dropped is the original error', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		const q = await loadBuiltQuiver(artifact.read);
+		artifact.files.clear();
+		artifact.files.set(
+			'quiver.json',
+			enc.encode(JSON.stringify({ format: FORMAT, name: 'sample', quills: [] }))
+		);
+
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
+	});
+
+	it('a reread that cannot reach quiver.json is the original error', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		const q = await loadBuiltQuiver(artifact.read);
+		artifact.files.clear();
+
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
+	});
+
+	it('a reread refusing a newer format is the error thrown', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		const q = await loadBuiltQuiver(artifact.read);
+		artifact.files.clear();
+		artifact.files.set(
+			'quiver.json',
+			enc.encode(JSON.stringify({ format: FORMAT + 1, name: 'sample', quills: [] }))
+		);
+
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(/Upgrade @quillmark\/quiver/);
+	});
+});
+
+describe('loadBuiltQuiver — a host answering with something else', () => {
+	// An SPA fallback answers a missing name 200 with the client's page.
+	const page = enc.encode('<!doctype html><title>studio</title>');
+
+	it('a page where a bundle was → transport_error naming it', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		artifact.files.set(bundleName('memo', '1.0.0'), page);
+
+		const q = await loadBuiltQuiver(artifact.read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining('other than a zip')
+			})
+		);
+	});
+
+	it('a page where a font was → transport_error naming it', async () => {
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), font(1)] } }
+		]);
+		artifact.files.set(`fonts/${fontKey(1)}`, page);
+
+		const q = await loadBuiltQuiver(artifact.read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining(
+					`"fonts/${fontKey(1)}" arrived as something other than a font`
+				)
+			})
+		);
+	});
+
+	it('takes every font signature build writes', async () => {
+		const signatures = ['\0\x01\0\0', 'OTTO', 'true', 'ttcf', 'wOFF', 'wOF2'];
+		const fonts = Object.fromEntries(
+			signatures.map((magic, i): [string, [string, Uint8Array]] => [
+				`${i}.ttf`,
+				[fontKey(i + 1), enc.encode(`${magic}rest`)]
+			])
+		);
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0', fonts }]);
+
+		const tree = await loadTreeViaGetQuill(await loadBuiltQuiver(artifact.read), 'memo', '1.0.0');
+		expect([...tree.keys()].filter((p) => p.endsWith('.ttf'))).toHaveLength(signatures.length);
 	});
 });
 
 describe('loadBuiltQuiver — font coalescing', () => {
-	it('two concurrent loadTree calls sharing a font fetch it exactly once', async () => {
-		const fontBytes = new Uint8Array([1, 2, 3]);
-		const { transport } = await makeArtifact('coalesce-test', [
-			{ name: 'quillA', version: '1.0.0', fonts: { 'fonts/shared.ttf': fontBytes } },
-			{ name: 'quillB', version: '1.0.0', fonts: { 'fonts/shared.ttf': fontBytes } }
+	it('two concurrent loads sharing a font read it exactly once', async () => {
+		const shared: [string, Uint8Array] = [fontKey(1), font(1, 2, 3)];
+		const artifact = makeArtifact('coalesce-test', [
+			{ name: 'quillA', version: '1.0.0', fonts: { 'fonts/shared.ttf': shared } },
+			{ name: 'quillB', version: '1.0.0', fonts: { 'fonts/shared.ttf': shared } }
 		]);
 
-		const q = await loadBuiltQuiver(transport);
+		const q = await loadBuiltQuiver(artifact.read);
 		treeStub = mockQuillFromTree();
-
-		// Fire both concurrently. Each getQuill drives the loader, which coalesces
-		// the shared font fetch.
 		await Promise.all([q.getQuill('quillA@1.0.0'), q.getQuill('quillB@1.0.0')]);
 
-		const storeFetches = transport.fetchLog.filter((p) => p.startsWith('store/'));
-		expect(storeFetches).toHaveLength(1);
+		expect(artifact.log.filter((p) => p.startsWith('fonts/'))).toHaveLength(1);
+	});
+
+	it('a failed font read is not cached', async () => {
+		const body: [string, Uint8Array] = [fontKey(1), font(1, 2, 3, 4)];
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': body } }
+		]);
+		artifact.files.delete(`fonts/${body[0]}`);
+
+		const q = await loadBuiltQuiver(artifact.read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(QuiverError);
+
+		artifact.files.set(`fonts/${body[0]}`, body[1]);
+		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		expect(tree.get('fonts/body.ttf')).toEqual(body[1]);
 	});
 });
 
-describe('loadBuiltQuiver — invalid pointer', () => {
-	// Truncated bytes are what a partial sync of an immutable-CDN quiver leaves behind, and
-	// the raw SyntaxError would escape every QuiverError handler downstream.
-	it('latest.json that is not JSON → quiver_invalid', async () => {
-		const transport = new MemTransport({
-			'latest.json': enc.encode('{"manifest": "manifest.')
-		});
-		await expect(loadBuiltQuiver(transport)).rejects.toThrow(
-			expect.objectContaining({ code: 'quiver_invalid' })
-		);
-	});
-
-	it('latest.json missing manifest field → quiver_invalid', async () => {
-		const transport = new MemTransport({
-			'latest.json': enc.encode(JSON.stringify({ other: 'value' }))
-		});
-		await expect(loadBuiltQuiver(transport)).rejects.toThrow(
-			expect.objectContaining({ code: 'quiver_invalid' })
-		);
-	});
-
-	// The pointer is where a newer format announces itself, so it is the one document
-	// here that reads past what it knows. A reader that rejected unknown keys could
-	// never be told the format moved — it would fail on the telling.
-	it('latest.json with an unknown field loads', async () => {
-		const artifact = await buildMinimalArtifact();
-		artifact.transport.set(
-			'latest.json',
-			enc.encode(JSON.stringify({ manifest: artifact.manifestFileName, aFieldFromLater: true }))
-		);
-		const quiver = await loadBuiltQuiver(artifact.transport);
-		expect(quiver.quillNames()).toContain('memo');
-	});
-
-	it('a pointer with no format is this format', async () => {
-		// What every build before the marker wrote, and what `makePointer` still writes.
-		const quiver = await loadBuiltQuiver((await buildMinimalArtifact()).transport);
-		expect(quiver.quillNames()).toContain('memo');
-	});
-
+describe('loadBuiltQuiver — the format', () => {
 	it('a format above this loader → quiver_invalid naming the upgrade', async () => {
-		const artifact = await buildMinimalArtifact();
-		artifact.transport.set(
-			'latest.json',
-			enc.encode(
-				JSON.stringify({ format: POINTER_FORMAT + 1, manifest: artifact.manifestFileName })
-			)
-		);
-		await expect(loadBuiltQuiver(artifact.transport)).rejects.toThrow(
+		await expect(
+			loadBuiltQuiver(indexed({ format: FORMAT + 1, name: 'test', quills: [] }).read)
+		).rejects.toThrow(
 			expect.objectContaining({
 				code: 'quiver_invalid',
 				message: expect.stringContaining('Upgrade @quillmark/quiver')
@@ -397,235 +405,189 @@ describe('loadBuiltQuiver — invalid pointer', () => {
 		);
 	});
 
-	it('a non-integer format → quiver_invalid', async () => {
-		const artifact = await buildMinimalArtifact();
-		artifact.transport.set(
-			'latest.json',
-			enc.encode(JSON.stringify({ format: '1', manifest: artifact.manifestFileName }))
-		);
-		await expect(loadBuiltQuiver(artifact.transport)).rejects.toThrow(
+	// The format is read before the key check, so a newer document is refused as newer.
+	it('a format above this loader wins over a field this loader does not know', async () => {
+		await expect(
+			loadBuiltQuiver(indexed({ format: FORMAT + 1, name: 't', quills: [], later: 1 }).read)
+		).rejects.toThrow(/Upgrade @quillmark\/quiver/);
+	});
+
+	it('an absent format → quiver_invalid', async () => {
+		await expect(loadBuiltQuiver(indexed({ name: 'test', quills: [] }).read)).rejects.toThrow(
 			expect.objectContaining({ code: 'quiver_invalid' })
 		);
 	});
 
-	it('manifest filename carrying too short a digest → quiver_invalid', async () => {
-		// Under-width names weaken the check they exist to carry, so they are
-		// rejected rather than checked loosely.
-		const transport = new MemTransport({
-			'latest.json': makePointer('manifest.abc123.json')
-		});
-		await expect(loadBuiltQuiver(transport)).rejects.toThrow(
-			expect.objectContaining({ code: 'quiver_invalid' })
-		);
+	it('a non-integer format → quiver_invalid', async () => {
+		await expect(
+			loadBuiltQuiver(indexed({ format: '1', name: 'test', quills: [] }).read)
+		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
 	});
 });
 
-describe('loadBuiltQuiver — invalid manifest', () => {
-	it('a version above the reader names the upgrade', async () => {
-		await expect(
-			loadBuiltQuiver(
-				await transportWith({ version: MANIFEST_VERSION + 1, name: 'test', quills: [] })
-			)
-		).rejects.toThrow(
-			expect.objectContaining({
-				code: 'quiver_invalid',
-				message: expect.stringContaining('Upgrade')
-			})
+describe('loadBuiltQuiver — invalid index', () => {
+	// Truncated bytes are what a partial sync leaves behind, and the raw SyntaxError would
+	// escape every QuiverError handler downstream.
+	it('quiver.json that is not JSON → quiver_invalid', async () => {
+		const artifact = new MemArtifact({ 'quiver.json': enc.encode('{"format": 1, "na') });
+		await expect(loadBuiltQuiver(artifact.read)).rejects.toThrow(
+			expect.objectContaining({ code: 'quiver_invalid' })
 		);
 	});
 
-	it('a non-integer version → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(await transportWith({ version: '1', name: 'test', quills: [] }))
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
+	it('a missing quiver.json → transport_error', async () => {
+		await expect(loadBuiltQuiver(new MemArtifact({}).read)).rejects.toThrow(
+			expect.objectContaining({ code: 'transport_error' })
+		);
 	});
 
 	it('a non-string description → quiver_invalid', async () => {
 		await expect(
-			loadBuiltQuiver(
-				await transportWith({
-					version: MANIFEST_VERSION,
-					name: 'test',
-					description: 7,
-					quills: []
-				})
-			)
+			loadBuiltQuiver(indexed({ format: FORMAT, name: 'test', description: 7, quills: [] }).read)
 		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
 	});
 
 	it('unknown top-level field → quiver_invalid', async () => {
 		await expect(
-			loadBuiltQuiver(await transportWith({ version: 1, name: 'test', quills: [], extra: true }))
+			loadBuiltQuiver(indexed({ format: FORMAT, name: 'test', quills: [], extra: true }).read)
 		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
 	});
 
+	const withQuill = (quill: Record<string, unknown>) =>
+		loadBuiltQuiver(
+			indexed({
+				format: FORMAT,
+				name: 'test',
+				quills: [
+					{ name: 'foo', version: '1.0.0', bundle: bundleName('foo', '1.0.0'), fonts: {}, ...quill }
+				]
+			}).read
+		);
+
 	it('a quill entry named outside the ref charset → quiver_invalid', async () => {
 		await expect(
-			loadBuiltQuiver(
-				await transportWith({
-					version: 1,
-					name: 'test',
-					quills: [
-						{
-							name: 'my.quill',
-							version: '1.0.0',
-							bundle: `my.quill@1.0.0.${'a'.repeat(NAME_DIGEST_LENGTH)}.zip`,
-							fonts: {}
-						}
-					]
-				})
-			)
+			withQuill({ name: 'my.quill', bundle: bundleName('my.quill', '1.0.0') })
 		).rejects.toThrow(/is not a name a ref can spell/);
 	});
 
 	it('non-canonical semver in quill entry → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(
-				await transportWith({
-					version: 1,
-					name: 'test',
-					quills: [
-						{
-							name: 'foo',
-							version: '1.0', // non-canonical — missing patch
-							bundle: 'foo@1.0.zip',
-							fonts: {}
-						}
-					]
-				})
-			)
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
-	});
-});
-
-describe('loadBuiltQuiver — missing bundle or store entry', () => {
-	it("manifest references a bundle zip that transport can't fetch → transport_error", async () => {
-		const { transport, bundles } = await makeArtifact('test', [{ name: 'foo', version: '1.0.0' }]);
-		transport.delete(bundles['foo@1.0.0']!);
-
-		const q = await loadBuiltQuiver(transport);
-		await expect(q.getQuill('foo@1.0.0')).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
-		);
-	});
-
-	it('manifest references a font hash not in store → transport_error', async () => {
-		const fontBytes = new Uint8Array([7, 7, 7]);
-		const { transport } = await makeArtifact('test', [
-			{ name: 'foo', version: '1.0.0', fonts: { 'fonts/missing.ttf': fontBytes } }
-		]);
-		transport.delete(`store/${await fullDigest(fontBytes)}`);
-
-		const q = await loadBuiltQuiver(transport);
-		await expect(q.getQuill('foo@1.0.0')).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
-		);
-	});
-});
-
-describe('loadBuiltQuiver — path validation (security)', () => {
-	it('pointer manifest with path traversal → quiver_invalid', async () => {
-		const transport = new MemTransport({
-			'latest.json': enc.encode(JSON.stringify({ manifest: '../../etc/passwd' }))
-		});
-		await expect(loadBuiltQuiver(transport)).rejects.toThrow(
+		await expect(withQuill({ version: '1.0', bundle: 'foo@1.0.zip' })).rejects.toThrow(
 			expect.objectContaining({ code: 'quiver_invalid' })
 		);
 	});
 
-	it('pointer manifest with absolute path → quiver_invalid', async () => {
-		const transport = new MemTransport({
-			'latest.json': enc.encode(JSON.stringify({ manifest: '/etc/passwd' }))
-		});
-		await expect(loadBuiltQuiver(transport)).rejects.toThrow(
+	// A name read off `quiver.json` becomes a path on every reader, `fromBuiltDir`'s a
+	// filesystem one, so no validated name carries a separator.
+	it.each([
+		['a bundle with path traversal', { bundle: '../../etc/passwd' }],
+		['an absolute bundle', { bundle: '/etc/passwd' }],
+		['a bundle in a subdirectory', { bundle: `x/${bundleName('foo', '1.0.0')}` }],
+		['a font hash with path traversal', { fonts: { 'a.ttf': '../../etc/passwd' } }],
+		// 32 hex chars: a full-width MD5, not a SHA-256.
+		['a font hash that is not a full SHA-256', { fonts: { 'a.ttf': 'ab'.repeat(16) } }]
+	])('%s → quiver_invalid', async (_, quill) => {
+		await expect(withQuill(quill)).rejects.toThrow(
 			expect.objectContaining({ code: 'quiver_invalid' })
 		);
 	});
 
-	it('manifest bundle with path traversal → quiver_invalid', async () => {
+	it('duplicate name@version → quiver_invalid', async () => {
+		const entry = { name: 'foo', version: '1.0.0', fonts: {} };
 		await expect(
 			loadBuiltQuiver(
-				await transportWith({
-					version: 1,
-					name: 'test',
-					quills: [{ name: 'evil', version: '1.0.0', bundle: '../../etc/passwd', fonts: {} }]
-				})
-			)
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
-	});
-
-	it('manifest font hash with path traversal → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(
-				await transportWith({
-					version: 1,
+				indexed({
+					format: FORMAT,
 					name: 'test',
 					quills: [
-						{
-							name: 'evil',
-							version: '1.0.0',
-							bundle: 'evil@1.0.0.aabbccddeeff0011223344556677889a.zip',
-							fonts: { 'fonts/body.ttf': '../../etc/passwd' }
-						}
+						{ ...entry, bundle: bundleName('foo', '1.0.0', 'a') },
+						{ ...entry, bundle: bundleName('foo', '1.0.0', 'b') }
 					]
-				})
-			)
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
-	});
-
-	it('manifest font hash that is not a full SHA-256 → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(
-				await transportWith({
-					version: 1,
-					name: 'test',
-					quills: [
-						{
-							name: 'evil',
-							version: '1.0.0',
-							bundle: 'evil@1.0.0.aabbccddeeff0011223344556677889a.zip',
-							// 32 hex chars: a full-width MD5, not a SHA-256.
-							fonts: { 'fonts/body.ttf': 'aabbccddeeff00112233445566778899' }
-						}
-					]
-				})
-			)
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
-	});
-});
-
-describe('loadBuiltQuiver — duplicate entry detection', () => {
-	it('duplicate name@version in manifest → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(
-				await transportWith({
-					version: 1,
-					name: 'test',
-					quills: [
-						{
-							name: 'foo',
-							version: '1.0.0',
-							bundle: 'foo@1.0.0.aabbccddeeff0011223344556677889a.zip',
-							fonts: {}
-						},
-						{
-							name: 'foo',
-							version: '1.0.0',
-							bundle: 'foo@1.0.0.ddeeffaabbcc0011223344556677889b.zip',
-							fonts: {}
-						}
-					]
-				})
+				}).read
 			)
 		).rejects.toThrow(/Duplicate quill entry/);
 	});
 
 	it('same name but different versions is not a duplicate', async () => {
-		const { transport } = await makeArtifact('test', [
+		const artifact = makeArtifact('test', [
 			{ name: 'foo', version: '1.0.0' },
 			{ name: 'foo', version: '2.0.0' }
 		]);
-		const q = await loadBuiltQuiver(transport);
+		const q = await loadBuiltQuiver(artifact.read);
 		expect(q.versionsOf('foo')).toEqual(['2.0.0', '1.0.0']);
+	});
+});
+
+describe('filesReader', () => {
+	it('drops a leading ./ or / from a key', async () => {
+		const read = filesReader(
+			new Map([
+				['./quiver.json', new Uint8Array([1])],
+				['/fonts/x', new Uint8Array([2])]
+			])
+		);
+		expect(await read('quiver.json', true)).toEqual(new Uint8Array([1]));
+		expect(await read('fonts/x', false)).toEqual(new Uint8Array([2]));
+	});
+
+	it('a path the map lacks → transport_error naming it', async () => {
+		await expect(filesReader(new Map())('quiver.json', true)).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining('quiver.json')
+			})
+		);
+	});
+});
+
+describe('httpReader', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	function stubFetch(answer: () => Promise<Response>): { url: string; init?: RequestInit }[] {
+		const calls: { url: string; init?: RequestInit }[] = [];
+		vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+			calls.push({ url, init });
+			return answer();
+		});
+		return calls;
+	}
+
+	it('reads the path under the base, with or without its trailing slash', async () => {
+		const calls = stubFetch(async () => new Response(new Uint8Array([7])));
+		expect(await httpReader('https://cdn.example.com/q')('quiver.json', true)).toEqual(
+			new Uint8Array([7])
+		);
+		await httpReader('/q/')('fonts/x', false);
+		expect(calls.map((c) => c.url)).toEqual([
+			'https://cdn.example.com/q/quiver.json',
+			'/q/fonts/x'
+		]);
+	});
+
+	// A digest-carrying name is entitled to whatever the cache holds; `quiver.json` is not.
+	it('revalidates what it is told to and takes the cache for the rest', async () => {
+		const calls = stubFetch(async () => new Response(new Uint8Array()));
+		const read = httpReader('/q/');
+		await read('quiver.json', true);
+		await read(bundleName('memo', '1.0.0'), false);
+		expect(calls.map((c) => c.init?.cache)).toEqual(['no-cache', 'force-cache']);
+	});
+
+	it('an HTTP error → transport_error naming the status', async () => {
+		stubFetch(async () => new Response(null, { status: 404 }));
+		await expect(httpReader('/q/')('quiver.json', true)).rejects.toThrow(
+			expect.objectContaining({ code: 'transport_error', message: expect.stringContaining('404') })
+		);
+	});
+
+	it('a network failure → transport_error carrying it as cause', async () => {
+		const cause = new TypeError('Network failure');
+		stubFetch(async () => {
+			throw cause;
+		});
+		await expect(httpReader('/q/')('quiver.json', true)).rejects.toThrow(
+			expect.objectContaining({ code: 'transport_error', cause })
+		);
 	});
 });

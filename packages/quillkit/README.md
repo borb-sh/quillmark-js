@@ -82,14 +82,14 @@ The client resolves its quiver against `document.baseURI` and its assets relativ
 
 Four rules, the same on every host:
 
-| Rule                                          | Why                                                                                                                    |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| serve `assets/*` immutable                    | hash-named, so revalidating one can only return 304: a wasted round-trip per asset per visit                           |
-| do not cache `quiver/latest.json` at the edge | the one name in the artifact carrying no digest, and a stale one pins readers to old quills                            |
-| a missing path is a 404                       | an SPA fallback — the commonest default there is — answers 200 with the client's HTML, which then fails a digest check |
-| serve over https                              | `crypto.subtle` is secure-context-only, and without it arriving bytes go unchecked                                     |
+| Rule                                          | Why                                                                                                                                      |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| serve `assets/*` immutable                    | hash-named, so revalidating one can only return 304: a wasted round-trip per asset per visit                                             |
+| do not cache `quiver/quiver.json` at the edge | the one name the loader reads that carries no digest, and a stale one pins readers to old quills                                         |
+| a missing path is a 404                       | an SPA fallback — the commonest default there is — answers 200 with the client's HTML, which the loader refuses as not the file it named |
+| serve over https                              | nothing checks the artifact's bytes against their names, so the channel is what answers a corrupted or substituted one                   |
 
-The second rule covers the edge alone. The browser layer is the loader's own — `latest.json` fetched `no-cache`, every digest-carrying name `force-cache` — so a host that sets no cache header at all is already correct there. An edge serving one generation's pointer after the next has shipped is the one staleness the addressing cannot catch.
+The second rule covers the edge alone. The browser layer is the loader's own — `quiver.json` fetched `no-cache`, every digest-carrying name `force-cache` — so a host that sets no cache header at all is already correct there. An edge serving one generation's `quiver.json` after the next has shipped is the one staleness the addressing cannot catch.
 
 On Vercel, a `vercel.json` at the repository root is the whole of it — a missing path is already a 404 and everything but `assets/*` already revalidates:
 

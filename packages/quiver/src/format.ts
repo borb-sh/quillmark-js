@@ -1,22 +1,17 @@
-/**
- * The built artifact's format, stamped into `latest.json` and refused to be read past
- * (QUIVER §"The pointer" for why the pointer carries it and reads past keys it does not
- * know).
- *
- * It moves when a reader assuming it would misread a tree rather than fail on it: a
- * renamed pointer field, a second pointer, a store keyed by something other than the
- * full hash. A change confined to the manifest's own shape moves the manifest's
- * `version` instead.
- */
-export const POINTER_FORMAT = 1;
+/** The one name a reader fetches that carries no digest: the catalog, and where every
+ *  other name is read off. */
+export const INDEX = 'quiver.json';
 
 /**
- * The manifest's shape, stated in the document and refused to be read past. Version 2
- * carries the quiver's `description`; version 1 is the same document without it.
- *
- * The manifest is closed, so a field added to it is a field an older reader rejects as an
- * unknown key, naming neither what happened nor what to do. The version is what that
- * reader reads first instead, and a manifest above its own is refused with the upgrade
- * named.
+ * The artifact's format, stamped into `quiver.json` and refused to be read past (QUIVER
+ * §"The index"). Any change a reader assuming the previous shape would misread or reject
+ * moves it: `quiver.json` is closed, so an added field is one of those.
  */
-export const MANIFEST_VERSION = 2;
+export const FORMAT = 2;
+
+/**
+ * What a reader of format 1 fetches first. It reads `format` off it before anything else,
+ * so a file carrying this format and nothing more is refused there with the upgrade named,
+ * rather than as a missing file. No reader of this format reads it.
+ */
+export const LEGACY_POINTER = 'latest.json';
