@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdir, rm, readFile } from 'node:fs/promises';
+import { mkdir, rm, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -142,13 +142,13 @@ describe('Integration: fromBuiltUrl error cases', () => {
 		);
 	});
 
-	it('fromBuiltUrl with malformed latest.json throws quiver_invalid', async () => {
+	it('fromBuiltUrl with malformed quiver.json throws quiver_invalid', async () => {
 		const outDir = tempDir();
 		tmpDirs.push(outDir);
 		await mkdir(outDir, { recursive: true });
 
 		const { writeFile } = await import('node:fs/promises');
-		await writeFile(join(outDir, 'latest.json'), 'not-json');
+		await writeFile(join(outDir, 'quiver.json'), 'not-json');
 
 		const baseUrl = 'https://mock.cdn.example.com/malformed/';
 		mockFetch = makeMockFetch(outDir, baseUrl);
@@ -219,5 +219,42 @@ describe('Integration: build → fromBuiltDir → resolve → getQuill', () => {
 		await expect(fromBuiltDir(join(tmpdir(), `does-not-exist-${randomUUID()}`))).rejects.toThrow(
 			expect.objectContaining({ code: 'transport_error' })
 		);
+	});
+});
+
+describe('Integration: build → fromBuiltFiles → getQuill', () => {
+	const tmpDirs: string[] = [];
+
+	afterEach(async () => {
+		for (const d of tmpDirs.splice(0)) {
+			await rm(d, { recursive: true, force: true });
+		}
+	});
+
+	it('loads from the bytes `build` wrote, and names a path the map lacks', async () => {
+		const outDir = tempDir();
+		tmpDirs.push(outDir);
+		await build(SAMPLE_FIXTURE, outDir);
+
+		const files = new Map<string, Uint8Array>();
+		for (const path of await readdir(outDir, { recursive: true })) {
+			const bytes = await readFile(join(outDir, path)).catch(() => undefined);
+			if (bytes !== undefined) files.set(path, bytes);
+		}
+
+		const { calls, restore } = mockQuillFromTree();
+		try {
+			const built = await Quiver.fromBuiltFiles(files);
+			expect(built.quillNames()).toEqual(['memo', 'resume']);
+			await built.getQuill('memo@1.0.0');
+			expect(calls[0]!.has('Quill.yaml')).toBe(true);
+
+			const partial = new Map([['quiver.json', files.get('quiver.json')!]]);
+			await expect((await Quiver.fromBuiltFiles(partial)).getQuill('memo@1.0.0')).rejects.toThrow(
+				/No bytes held for "memo@1\.0\.0\./
+			);
+		} finally {
+			restore();
+		}
 	});
 });

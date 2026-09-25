@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`site` and `studio` refuse a pack with no `quiver.json`.** The client reads the quiver through the copy of `@quillmark/quiver` it was built with and packs through the collection's, so a collection pinned behind the client packs a tree the client fetches nothing of; the verb names the upgrade instead. The host rule naming `quiver/latest.json` names `quiver/quiver.json`, and https is owed because nothing checks the artifact's bytes against their names.
+
 ## v0.8.0 - 2026-09-23
 
 **`quillkit site --drafts` packs the draft space.** Versions below `0.1.0` reach the laid-out quiver, so a deployed studio previews a collection's prototypes as `quillkit studio` does locally. Without the flag `site` takes quiver's floor as before.

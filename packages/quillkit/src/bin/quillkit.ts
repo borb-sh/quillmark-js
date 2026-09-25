@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { loadEngine, loadQuiverNode } from '../collection.js';
 import { CLIENT } from '../paths.js';
 import { createStaticServer, listen, type Mount } from '../serve.js';
-import { assertClient, laySite } from '../site.js';
+import { assertClient, assertPacked, laySite } from '../site.js';
 import { serialize, watchCollection } from '../watch.js';
 
 const argv = process.argv.slice(2);
@@ -132,6 +132,7 @@ async function studio(): Promise<void> {
 	// Before the server, so the first request finds a whole generation rather than an
 	// empty directory.
 	await pack();
+	assertPacked(out, source);
 
 	const mounts: Mount[] = [
 		{ prefix: '/quiver', root: out },

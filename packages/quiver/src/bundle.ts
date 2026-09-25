@@ -26,11 +26,8 @@ const ZIP_EPOCH = new Date(1980, 0, 1, 0, 0, 0, 0);
  * what a budget bounds there is a build that packed something enormous. Both ends spend
  * it, so an artifact no loader would read is refused where it is written.
  *
- * Fonts are not in here: `build` writes them to the store and the manifest names them,
+ * Fonts are not in here: `build` writes them under `fonts/` and `quiver.json` names them,
  * leaving a bundle its markdown, its Typst, and what those inline.
- *
- * `built-loader.ts` spends it on the wire too. A deflate of what fits inside it is within
- * zip framing of that, so one number bounds both ends and the fetch needs no second.
  */
 export const MAX_BUNDLE_BYTES = 64 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 16 * 1024 * 1024;
@@ -42,8 +39,8 @@ const MAX_BUNDLE_ENTRIES = 2048;
  * Unpacking spends the sizes the central directory declares, and those are the sizes
  * fflate allocates: each entry inflates into a buffer of exactly its declared size,
  * which never grows. So a header cannot buy more than it declares — it can only
- * understate itself and truncate its own entry, which is the corrupt bundle the digest
- * already answers.
+ * understate itself and truncate its own entry, which is a corrupt bundle rather than an
+ * allocation.
  */
 function bundleBudget(): (name: string, size: number) => void {
 	let total = 0;

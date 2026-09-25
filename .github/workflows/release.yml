@@ -116,7 +116,7 @@ jobs:
           node "$RUNNER_TEMP/tool/dist/bin/quillkit.js" site --quiver fixtures --out "$RUNNER_TEMP/site"
           test -f "$RUNNER_TEMP/site/index.html" \
             || { echo "::error::the tarball laid no client at the site root"; exit 1; }
-          test -f "$RUNNER_TEMP/site/quiver/latest.json" \
+          test -f "$RUNNER_TEMP/site/quiver/quiver.json" \
             || { echo "::error::the tarball laid no quiver under the site"; exit 1; }
           # The stamp the notes below render. Asserted here rather than there,
           # because that step runs after the tag.

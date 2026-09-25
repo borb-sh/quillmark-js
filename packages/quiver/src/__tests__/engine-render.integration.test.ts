@@ -16,7 +16,7 @@
  *
  * The last block closes the loop the package exists for, against the
  * workspace's reference quill rather than a toy: source layout → `build` →
- * transport fetch → digest check → font rehydration → `Quill.fromTree` →
+ * read → font rehydration → `Quill.fromTree` →
  * `engine.render`. The apps walk the same loop, but only under a human.
  *
  * The Typst backend load makes this the slowest test in the suite (seconds).
@@ -40,7 +40,7 @@ const RENDER_FIXTURE = fileURLToPath(new URL('./fixtures/render-quiver', import.
 
 // The workspace's reference quiver: `showcase@1.0.0`, a published-shape quill with a
 // Typst package tree, an image asset, and five fonts the build dehydrates into
-// `store/`; beside it `usaf_memo@0.0.0`, which a build leaves out as a draft.
+// `fonts/`; beside it `usaf_memo@0.0.0`, which a build leaves out as a draft.
 const REFERENCE_QUIVER = fileURLToPath(new URL('../../../../fixtures', import.meta.url));
 
 describe('Engine.render against a quiver quill', () => {
@@ -125,9 +125,8 @@ describe('Engine.render against a quiver quill', () => {
 });
 
 describe('the reference quill, source → build → fetch → render', () => {
-	// One test, the whole pipeline. The HTTP and filesystem transports share the
-	// path validation, digest check, and unzip path, so `fromBuiltDir` covers
-	// both without a server.
+	// One test, the whole pipeline. Every reader shares the index validation and the
+	// unzip path, so `fromBuiltDir` covers them without a server.
 	let outDir: string;
 
 	beforeAll(async () => {
@@ -152,8 +151,8 @@ describe('the reference quill, source → build → fetch → render', () => {
 		const quill = await built.getQuill('showcase');
 		expect(quill.backendId).toBe('typst');
 
-		// The fonts left the bundle at build time and came back from `store/` on
-		// fetch. Typst substitutes for a missing face rather than failing, so the
+		// The fonts left the bundle at build time and came back from `fonts/` on
+		// read. Typst substitutes for a missing face rather than failing, so the
 		// rehydration is asserted here rather than left to the render.
 		const tree = quill.toTree();
 		const fonts = [...tree.keys()].filter((p) => /\.(ttf|otf)$/i.test(p));

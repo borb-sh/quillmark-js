@@ -14,7 +14,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLIENT } from '../paths.js';
-import { assertClient, assertSafeOut, laySite } from '../site.js';
+import { assertClient, assertPacked, assertSafeOut, laySite } from '../site.js';
 import { scratch } from './helpers/collection.js';
 
 const temp = scratch('quillkit-site-');
@@ -37,12 +37,11 @@ describe('laying a site out', () => {
 		expect(existsSync(join(out, 'index.html'))).toBe(true);
 		expect(existsSync(join(out, 'assets', 'index.js'))).toBe(true);
 		// Where the client looks: `new URL('quiver/', document.baseURI)`.
-		expect(existsSync(join(out, 'quiver', 'latest.json'))).toBe(true);
-
-		const pointer = JSON.parse(await readFile(join(out, 'quiver', 'latest.json'), 'utf8')) as {
-			manifest: string;
+		const { quills } = JSON.parse(await readFile(join(out, 'quiver', 'quiver.json'), 'utf8')) as {
+			quills: Array<{ bundle: string }>;
 		};
-		expect(existsSync(join(out, 'quiver', pointer.manifest))).toBe(true);
+		expect(quills.length).toBeGreaterThan(0);
+		for (const { bundle } of quills) expect(existsSync(join(out, 'quiver', bundle))).toBe(true);
 	});
 
 	it('packs the draft space only when asked', async () => {
@@ -51,11 +50,7 @@ describe('laying a site out', () => {
 			const out = join(await temp.dir(), 'site');
 			const collection = await temp.collection();
 			await laySite({ collection, out, client: await stubClient(), drafts });
-			const quiver = join(out, 'quiver');
-			const { manifest } = JSON.parse(await readFile(join(quiver, 'latest.json'), 'utf8')) as {
-				manifest: string;
-			};
-			const { quills } = JSON.parse(await readFile(join(quiver, manifest), 'utf8')) as {
+			const { quills } = JSON.parse(await readFile(join(out, 'quiver', 'quiver.json'), 'utf8')) as {
 				quills: Array<{ name: string; version: string }>;
 			};
 			return quills.map((q) => `${q.name}@${q.version}`);
@@ -119,6 +114,16 @@ describe('the client assertion', () => {
 		await mkdir(join(dist, 'quiver'), { recursive: true });
 
 		expect(() => assertClient(dist)).toThrow(/shadow/);
+	});
+});
+
+describe('the pack assertion', () => {
+	// The collection's copy of quiver packs and the client's copy reads, so a collection
+	// pinned behind the client packs a tree the client fetches nothing of.
+	it('refuses a pack the client cannot read, naming the upgrade', async () => {
+		const out = await temp.dir();
+		await writeFile(join(out, 'latest.json'), '{"format":1}');
+		expect(() => assertPacked(out, '/work/quiver')).toThrow(/Upgrade it in the collection/);
 	});
 });
 

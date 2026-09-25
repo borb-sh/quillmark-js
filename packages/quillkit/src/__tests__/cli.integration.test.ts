@@ -94,7 +94,7 @@ describe('quillkit build', () => {
 		});
 
 		expect(stdout).toContain('quillkit build:');
-		expect(existsSync(join(out, 'latest.json'))).toBe(true);
+		expect(existsSync(join(out, 'quiver.json'))).toBe(true);
 	}, 60_000);
 });
 
@@ -106,7 +106,7 @@ describe('quillkit site', () => {
 
 		expect(stdout).toContain('quillkit site:');
 		expect(existsSync(join(out, 'index.html'))).toBe(true);
-		expect(existsSync(join(out, 'quiver', 'latest.json'))).toBe(true);
+		expect(existsSync(join(out, 'quiver', 'quiver.json'))).toBe(true);
 	}, 60_000);
 
 	it('refuses an out that would delete the collection', async () => {
@@ -159,9 +159,9 @@ describe('quillkit studio', () => {
 			expect(index.status).toBe(200);
 			expect(index.headers.get('content-type')).toContain('text/html');
 
-			const pointer = await fetch(new URL('quiver/latest.json', url));
-			expect(pointer.status).toBe(200);
-			expect(await pointer.json()).toMatchObject({ format: 1 });
+			const catalog = await fetch(new URL('quiver/quiver.json', url));
+			expect(catalog.status).toBe(200);
+			expect(await catalog.json()).toMatchObject({ format: 1 });
 		} finally {
 			child.kill('SIGTERM');
 		}

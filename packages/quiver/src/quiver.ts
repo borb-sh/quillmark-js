@@ -76,57 +76,36 @@ export class Quiver {
 	 * environments. `file://` URLs are rejected — to load build output from
 	 * disk in Node, use `fromBuiltDir(path)` from `@quillmark/quiver/node`.
 	 *
-	 * `seed` answers for the artifact bytes the caller already holds, keyed by
-	 * artifact-relative path; the URL serves the rest. Seeding `latest.json`
-	 * settles which catalog this process reads at deploy time rather than at
-	 * cache-revalidation time. Seeded bytes are digest-checked as fetched ones
-	 * are.
-	 *
 	 * Throws `transport_error` on network/HTTP failure, `quiver_invalid`
 	 * on format errors.
 	 */
-	static async fromBuiltUrl(
-		url: string,
-		opts?: { seed?: ReadonlyMap<string, Uint8Array> }
-	): Promise<Quiver> {
+	static async fromBuiltUrl(url: string): Promise<Quiver> {
 		if (url.startsWith('file://')) {
 			throw new QuiverError(
 				'transport_error',
 				`Quiver.fromBuiltUrl requires an http(s):// or origin-relative URL; got "${url}". For local build output, use import { fromBuiltDir } from '@quillmark/quiver/node'.`
 			);
 		}
-		const { HttpTransport } = await import('./transports/http-transport.js');
-		const { loadBuiltQuiver } = await import('./built-loader.js');
-		const http = new HttpTransport(url);
-
-		if (opts?.seed === undefined) return loadBuiltQuiver(http);
-
-		const { MemoryTransport } = await import('./transports/memory-transport.js');
-		return loadBuiltQuiver(new MemoryTransport(opts.seed, http));
+		const { httpReader, loadBuiltQuiver } = await import('./built-loader.js');
+		return loadBuiltQuiver(httpReader(url));
 	}
 
 	/**
 	 * Browser-safe factory. Loads build output from the bytes themselves, keyed
-	 * by artifact-relative path (`latest.json`, `manifest.<digest>.json`,
-	 * `<name>@<x.y.z>.<digest>.zip`, `store/<hash>`) — the shape `build` writes
-	 * and `fromBuiltDir` reads back.
+	 * by artifact-relative path (`quiver.json`, `<name>@<x.y.z>.<digest>.zip`,
+	 * `fonts/<hash>`) — the shape `build` writes and `fromBuiltDir` reads back.
 	 *
 	 * Nothing is fetched, so a runtime whose artifact is not on a path it can
 	 * read (a serverless function, a bundler that inlines it, a test) reaches
 	 * one without fetching its own static output back over its own load
 	 * balancer.
 	 *
-	 * The map must carry the whole artifact; a missing path is a
-	 * `transport_error` naming it. To hold part and fetch the rest, pass the map
-	 * as `fromBuiltUrl`'s `seed`.
-	 *
 	 * Throws `quiver_invalid` on format errors, `transport_error` on a path the
 	 * map does not carry.
 	 */
 	static async fromBuiltFiles(files: ReadonlyMap<string, Uint8Array>): Promise<Quiver> {
-		const { MemoryTransport } = await import('./transports/memory-transport.js');
-		const { loadBuiltQuiver } = await import('./built-loader.js');
-		return loadBuiltQuiver(new MemoryTransport(files));
+		const { filesReader, loadBuiltQuiver } = await import('./built-loader.js');
+		return loadBuiltQuiver(filesReader(files));
 	}
 
 	/** Returns all known quill names, sorted lexicographically. */

@@ -14,7 +14,9 @@ import { scanSourceQuiver, SourceLoader } from './source-loader.js';
 import { buildQuiver } from './build.js';
 import type { BuildOptions } from './build.js';
 import { loadBuiltQuiver } from './built-loader.js';
-import { FsBuiltTransport } from './transports/fs-built-transport.js';
+import { QuiverError } from './errors.js';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -42,7 +44,7 @@ export async function fromDir(pathOrFileUrl: string): Promise<Quiver> {
 
 /**
  * Loads a packed (build-output) quiver from a local directory containing
- * `latest.json` and the manifest/bundle/store files written by `build`.
+ * `quiver.json` and the bundles and fonts written by `build`.
  * Symmetric to `Quiver.fromBuiltUrl(url)` but reads from disk instead of HTTP:
  * no network required.
  *
@@ -53,7 +55,19 @@ export async function fromDir(pathOrFileUrl: string): Promise<Quiver> {
  * Throws `quiver_invalid` on format errors, `transport_error` on I/O failure.
  */
 export async function fromBuiltDir(dirPath: string): Promise<Quiver> {
-	return loadBuiltQuiver(new FsBuiltTransport(dirPath));
+	return loadBuiltQuiver(async (path) => {
+		const file = join(dirPath, path);
+		try {
+			const buf = await readFile(file);
+			return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+		} catch (err) {
+			throw new QuiverError(
+				'transport_error',
+				`Failed to read "${file}": ${(err as Error).message}`,
+				{ cause: err }
+			);
+		}
+	});
 }
 
 /**

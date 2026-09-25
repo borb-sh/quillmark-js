@@ -2,11 +2,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, rm, writeFile, readFile, access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { buildQuiver } from '../build.js';
 import { unpackFiles } from '../bundle.js';
-import { NAME_DIGEST_LENGTH, sha256Hex } from '../digest.js';
-import { MANIFEST_VERSION, POINTER_FORMAT } from '../format.js';
+import { FORMAT } from '../format.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
@@ -47,12 +46,9 @@ async function seedSourceQuiver(
 	}
 }
 
-/** The manifest the pointer names, parsed. */
-async function manifestOf(out: string): Promise<Record<string, unknown>> {
-	const ptr = JSON.parse(await readFile(join(out, 'latest.json'), 'utf-8')) as {
-		manifest: string;
-	};
-	return JSON.parse(await readFile(join(out, ptr.manifest), 'utf-8')) as Record<string, unknown>;
+/** `quiver.json`, parsed. */
+async function indexOf(out: string): Promise<Record<string, unknown>> {
+	return JSON.parse(await readFile(join(out, 'quiver.json'), 'utf-8')) as Record<string, unknown>;
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -73,10 +69,7 @@ describe('buildQuiver — happy path (sample-quiver fixture)', () => {
 		tmpDirs.push(out);
 		await buildQuiver(SAMPLE_FIXTURE, out);
 
-		const pointer = JSON.parse(await readFile(join(out, 'latest.json'), 'utf-8')) as {
-			format: number;
-		};
-		expect(pointer.format).toBe(POINTER_FORMAT);
+		expect((await indexOf(out)).format).toBe(FORMAT);
 	});
 });
 
@@ -89,7 +82,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		}
 	});
 
-	it('stores the shared font exactly once in store/', async () => {
+	it('writes the shared font exactly once under fonts/', async () => {
 		const src = tempDir();
 		const out = tempDir();
 		tmpDirs.push(src, out);
@@ -114,9 +107,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 
 		await buildQuiver(src, out);
 
-		const { readdir } = await import('node:fs/promises');
-		const storeEntries = await readdir(join(out, 'store'));
-		expect(storeEntries).toHaveLength(1);
+		expect(await readdir(join(out, 'fonts'))).toHaveLength(1);
 	});
 
 	it('bundle zip does NOT contain the font file', async () => {
@@ -139,28 +130,21 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 
 		await buildQuiver(src, out);
 
-		const ptr = JSON.parse(await readFile(join(out, 'latest.json'), 'utf-8')) as {
-			manifest: string;
-		};
-		const manifest = JSON.parse(await readFile(join(out, ptr.manifest), 'utf-8')) as {
-			quills: Array<{ bundle: string }>;
-		};
+		const { quills } = (await indexOf(out)) as { quills: Array<{ bundle: string }> };
 
-		const bundleBytes = await readFile(join(out, manifest.quills[0]!.bundle));
+		const bundleBytes = await readFile(join(out, quills[0]!.bundle));
 		const bundleFiles = unpackFiles(bundleBytes);
 
 		expect(Object.keys(bundleFiles)).toContain('Quill.yaml');
 		expect(Object.keys(bundleFiles)).not.toContain('fonts/font.otf');
 	});
 
-	it("carries Quiver.yaml's description into the manifest", async () => {
+	it("carries Quiver.yaml's description into quiver.json", async () => {
 		const out = tempDir();
 		tmpDirs.push(out);
 		await buildQuiver(SAMPLE_FIXTURE, out);
 
-		const manifest = await manifestOf(out);
-		expect(manifest.version).toBe(MANIFEST_VERSION);
-		expect(manifest.description).toBe('A sample quiver for testing');
+		expect((await indexOf(out)).description).toBe('A sample quiver for testing');
 	});
 
 	it('omits the description a Quiver.yaml does not carry', async () => {
@@ -170,7 +154,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		await seedSourceQuiver(src, { quills: [{ name: 'quillA', version: '1.0.0' }] });
 		await buildQuiver(src, out);
 
-		expect(await manifestOf(out)).not.toHaveProperty('description');
+		expect(await indexOf(out)).not.toHaveProperty('description');
 	});
 });
 
@@ -183,7 +167,7 @@ describe('buildQuiver — determinism', () => {
 		}
 	});
 
-	it('packing the same source twice yields an identical manifest filename', async () => {
+	it('packing the same source twice yields an identical quiver.json', async () => {
 		const out1 = tempDir();
 		const out2 = tempDir();
 		tmpDirs.push(out1, out2);
@@ -191,14 +175,9 @@ describe('buildQuiver — determinism', () => {
 		await buildQuiver(SAMPLE_FIXTURE, out1);
 		await buildQuiver(SAMPLE_FIXTURE, out2);
 
-		const ptr1 = JSON.parse(await readFile(join(out1, 'latest.json'), 'utf-8')) as {
-			manifest: string;
-		};
-		const ptr2 = JSON.parse(await readFile(join(out2, 'latest.json'), 'utf-8')) as {
-			manifest: string;
-		};
-
-		expect(ptr1.manifest).toBe(ptr2.manifest);
+		expect(await readFile(join(out1, 'quiver.json'), 'utf-8')).toBe(
+			await readFile(join(out2, 'quiver.json'), 'utf-8')
+		);
 	});
 });
 
@@ -239,10 +218,9 @@ describe('buildQuiver — the generation lands whole', () => {
 		}
 	});
 
-	/** The pointer's manifest name, which moves whenever the packed content does. */
-	async function pointerOf(out: string): Promise<string> {
-		const raw = await readFile(join(out, 'latest.json'), 'utf-8');
-		return (JSON.parse(raw) as { manifest: string }).manifest;
+	/** `quiver.json` as written, which moves whenever the packed content does. */
+	async function indexText(out: string): Promise<string> {
+		return readFile(join(out, 'quiver.json'), 'utf-8');
 	}
 
 	it('leaves no staging tree behind', async () => {
@@ -266,13 +244,11 @@ describe('buildQuiver — the generation lands whole', () => {
 		await buildQuiver(SAMPLE_FIXTURE, out);
 
 		await expect(access(join(out, 'stale.txt'))).rejects.toThrow();
-		// Every name the pointer reaches has landed: a whole tree moves in, so a
-		// client never reads a manifest whose bundles are not there yet.
-		const manifest = JSON.parse(await readFile(join(out, await pointerOf(out)), 'utf-8')) as {
-			quills: Array<{ bundle: string }>;
-		};
-		expect(manifest.quills.length).toBeGreaterThan(0);
-		for (const quill of manifest.quills) await access(join(out, quill.bundle));
+		// Every name the index reaches has landed: a whole tree moves in, so a client
+		// never reads an index whose bundles are not there yet.
+		const { quills } = (await indexOf(out)) as { quills: Array<{ bundle: string }> };
+		expect(quills.length).toBeGreaterThan(0);
+		for (const quill of quills) await access(join(out, quill.bundle));
 	});
 
 	it('a failed build leaves the last good generation serving', async () => {
@@ -283,15 +259,15 @@ describe('buildQuiver — the generation lands whole', () => {
 		tmpDirs.push(src, out);
 		await seedSourceQuiver(src, { quills: [{ name: 'memo', version: '1.0.0' }] });
 		await buildQuiver(src, out);
-		const good = await pointerOf(out);
+		const good = await indexText(out);
 
 		await writeFile(join(src, 'Quiver.yaml'), 'name: [unclosed');
 		await expect(buildQuiver(src, out)).rejects.toThrow();
-		expect(await pointerOf(out)).toBe(good);
+		expect(await indexText(out)).toBe(good);
 
 		await writeFile(join(src, 'Quiver.yaml'), 'name: recovered\n');
 		await buildQuiver(src, out);
-		expect(await pointerOf(out)).not.toBe(good);
+		expect(await indexText(out)).not.toBe(good);
 	});
 });
 
@@ -348,14 +324,12 @@ describe('buildQuiver — outDir guard', () => {
 		await seedSourceQuiver(src, { quills: [{ name: 'memo', version: '1.0.0' }] });
 
 		await buildQuiver(src, join(src, 'dist'));
-		await access(join(src, 'dist', 'latest.json'));
+		await access(join(src, 'dist', 'quiver.json'));
 	});
 });
 
-describe('buildQuiver — every name carries the digest of its own bytes', () => {
-	// What the loader checks on fetch. If the build's hash and the loader's ever
-	// disagree, nothing downstream loads at all, so the round trip is pinned here
-	// rather than at each end separately.
+describe('buildQuiver — every name but the index carries the digest of its own bytes', () => {
+	// What makes a name safe to cache forever: a changed byte is a changed name.
 	const tmpDirs: string[] = [];
 
 	afterEach(async () => {
@@ -364,7 +338,7 @@ describe('buildQuiver — every name carries the digest of its own bytes', () =>
 		}
 	});
 
-	it('manifest, bundle, and store names are SHA-256 of their contents', async () => {
+	it('bundle and font names are SHA-256 of their contents', async () => {
 		const src = tempDir();
 		const out = tempDir();
 		tmpDirs.push(src, out);
@@ -380,33 +354,20 @@ describe('buildQuiver — every name carries the digest of its own bytes', () =>
 		});
 		await buildQuiver(src, out);
 
-		const pointer = JSON.parse(await readFile(join(out, 'latest.json'), 'utf-8')) as {
-			manifest: string;
-		};
-		const manifestBytes = new Uint8Array(await readFile(join(out, pointer.manifest)));
-		const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as {
+		const { quills } = (await indexOf(out)) as {
 			quills: Array<{ bundle: string; fonts: Record<string, string> }>;
 		};
+		const digestOf = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
-		const digestOf = async (bytes: Uint8Array) => (await sha256Hex(bytes))!;
-		const short = (hex: string) => hex.slice(0, NAME_DIGEST_LENGTH);
-
-		expect(pointer.manifest).toBe(`manifest.${short(await digestOf(manifestBytes))}.json`);
-
-		const [entry] = manifest.quills;
-		const zipBytes = new Uint8Array(await readFile(join(out, entry!.bundle)));
-		expect(entry!.bundle).toBe(`memo@1.0.0.${short(await digestOf(zipBytes))}.zip`);
+		const [entry] = quills;
+		const zipBytes = await readFile(join(out, entry!.bundle));
+		expect(entry!.bundle).toBe(`memo@1.0.0.${digestOf(zipBytes).slice(0, 32)}.zip`);
 
 		const fontHash = entry!.fonts['fonts/body.ttf']!;
-		const fontBytes = new Uint8Array(await readFile(join(out, 'store', fontHash)));
-		// Full width, not truncated: the store is keyed by hash, so two distinct
-		// fonts sharing a prefix would merge into one entry.
-		expect(fontHash).toBe(await digestOf(fontBytes));
+		// Full width, not truncated: fonts are keyed by hash, so two distinct fonts
+		// sharing a prefix would merge into one file.
+		expect(fontHash).toBe(digestOf(await readFile(join(out, 'fonts', fontHash))));
 		expect(fontHash).toHaveLength(64);
-
-		// The width is the claim (`digest.ts`), and `short` above would hold at any of
-		// them, so it is pinned here.
-		expect(pointer.manifest).toMatch(/^manifest\.[0-9a-f]{32}\.json$/);
 	});
 });
 
@@ -448,14 +409,13 @@ describe('buildQuiver — the draft floor', () => {
 		}
 	});
 
-	/** `<name>@<version>` for every quill the manifest carries. */
+	/** `<name>@<version>` for every quill `quiver.json` carries. */
 	async function refsOf(out: string): Promise<string[]> {
-		const manifest = await manifestOf(out);
-		const quills = manifest['quills'] as Array<{ name: string; version: string }>;
+		const quills = (await indexOf(out))['quills'] as Array<{ name: string; version: string }>;
 		return quills.map((q) => `${q.name}@${q.version}`).sort();
 	}
 
-	it('leaves versions below 0.1.0 out of the manifest', async () => {
+	it('leaves versions below 0.1.0 out of quiver.json', async () => {
 		const src = tempDir();
 		const out = tempDir();
 		tmpDirs.push(src, out);
@@ -488,7 +448,7 @@ describe('buildQuiver — the draft floor', () => {
 	});
 
 	it('writes no bundle for a version it left out', async () => {
-		// The manifest is the catalog, but an unreferenced bundle beside it would
+		// quiver.json is the catalog, but an unreferenced bundle beside it would
 		// still be a draft served off the artifact's own origin.
 		const src = tempDir();
 		const out = tempDir();
@@ -530,7 +490,7 @@ describe('buildQuiver — the draft floor', () => {
 
 	it('builds an empty catalog rather than throwing when every quill is a draft', async () => {
 		// A quiver whose quills are all under the floor is a valid quiver that
-		// publishes nothing, so the pointer lands and names an empty manifest.
+		// publishes nothing, so quiver.json lands with an empty catalog.
 		const src = tempDir();
 		const out = tempDir();
 		tmpDirs.push(src, out);
@@ -539,6 +499,6 @@ describe('buildQuiver — the draft floor', () => {
 		await buildQuiver(src, out);
 
 		expect(await refsOf(out)).toEqual([]);
-		await expect(access(join(out, 'latest.json'))).resolves.toBeUndefined();
+		await expect(access(join(out, 'quiver.json'))).resolves.toBeUndefined();
 	});
 });
