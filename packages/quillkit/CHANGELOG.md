@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.9.0 - 2026-09-26
+
 **The carried `@quillmark/wasm` is 0.116.0, and a quill that loaded may not.** `ui.title` on a field, on `main` or on a card kind fails the load: the label is a top-level `title` beside `description`. A `{field}` token in a `title` fails as `quill::title_template`, and a `title` on an array's `items` as `quill::title_on_items`. `body.unsupported` fails as `quill::invalid_body`. An unquoted `version: 1.10` loads as `1.10` where it loaded as `1.1`. **A seed answers nothing**: `quillkit test` renders, and studio opens on, a document with every field absent and every body empty, where both filled each field from its `example:` and each body from `body.example`. A plate that rendered the examples and fails on the blank fails the gate. A `typst:` key other than `plate_file`, `typst.packages` among them, warns `typst::unknown_key`, and a plate at a subdirectory `plate_file` resolves a bare path from its own directory.
 
 **`site` and `studio` refuse a pack with no `quiver.json`.** The client reads the quiver through the copy of `@quillmark/quiver` it was built with and packs through the collection's, so a collection pinned behind the client packs a tree the client fetches nothing of; the verb names the upgrade instead. The host rule naming `quiver/latest.json` names `quiver/quiver.json`, and https is owed because nothing checks the artifact's bytes against their names.
