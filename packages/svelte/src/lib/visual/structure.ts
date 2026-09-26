@@ -44,7 +44,7 @@ export interface FieldModel {
 	/** `ui.compact`: asks to share a row with adjacent compacts. A request, not a
 	 * guarantee: `placeFields` declines it for the shapes that grow (see `packable`). */
 	compact: boolean;
-	/** Display label: `ui.title` when set, else the humanized field name. */
+	/** Display label: `title` when set, else the humanized field name. */
 	label: string;
 	/** Schema `description`: authoring help rendered beside the label,
 	 * undefined when the field declares none. Chrome-only; never gates. */
@@ -420,19 +420,12 @@ export function shortCell(sub: QuillFieldSchema): boolean {
 }
 
 /**
- * A collapsed row's own words: `items.ui.title` interpolated with the row's values
- * where the schema declares one, else the first short text cell in declaration order
- * — a `string`, or an inline `richtext` / `plaintext` — read through {@link titleText};
- * `undefined` while the row has nothing to say for itself. `title` sits on `items.ui`,
- * describing a row, where `layout` sits on the array's own `ui`, describing the array.
+ * A collapsed row's own words: the first short text cell in declaration order — a
+ * `string`, or an inline `richtext` / `plaintext` — read through {@link titleText};
+ * `undefined` while the row has nothing to say for itself.
  */
 export function rowSummary(items: QuillFieldSchema | undefined, row: unknown): string | undefined {
 	const values = (row ?? {}) as Record<string, unknown>;
-	const template = items?.ui?.title;
-	if (template && template.trim()) {
-		const shown = interpolateTitle(template, values).trim();
-		if (shown) return shown;
-	}
 	for (const [k, sub] of Object.entries(items?.properties ?? {})) {
 		const kind = controlKind(sub);
 		if (kind !== 'text' && !(kind === 'prose' && shortCell(sub))) continue;
@@ -512,7 +505,7 @@ export function obliged(schema: QuillFieldSchema): boolean {
 	return schema.type !== 'object' && schema.type !== 'matrix' && schema.default === undefined;
 }
 
-/** `foo_bar` → `Foo bar`: the label fallback when a field declares no `ui.title`. */
+/** `foo_bar` → `Foo bar`: the label fallback when a field declares no `title`. */
 export function humanize(name: string): string {
 	const spaced = name.replace(/_/g, ' ').trim();
 	return spaced ? spaced[0].toUpperCase() + spaced.slice(1) : spaced;
@@ -526,7 +519,7 @@ export function fieldModels(cardSchema: QuillCardSchema): FieldModel[] {
 		control: controlKind(schema),
 		group: schema.ui?.group,
 		compact: !!schema.ui?.compact,
-		label: schema.ui?.title ?? humanize(name),
+		label: schema.title ?? humanize(name),
 		description: schema.description,
 		required: obliged(schema),
 		inline: !!schema.inline,
@@ -688,14 +681,7 @@ export function fieldValues(items: readonly PayloadItem[]): Record<string, unkno
 	return values;
 }
 
-/** Interpolate a `{field}` card-title template against live field values. */
-export function interpolateTitle(template: string, values: Record<string, unknown>): string {
-	return template.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_m, name: string) =>
-		titleText(ownValue(values, name))
-	);
-}
-
-/** A value by own key: a template or a declaration can name `constructor`. */
+/** A value by own key: a declaration can name `constructor`. */
 function ownValue(values: Record<string, unknown>, name: string): unknown {
 	return Object.hasOwn(values, name) ? values[name] : undefined;
 }
@@ -713,27 +699,19 @@ export function titleText(v: unknown): string {
 	return typeof member === 'string' ? member : '';
 }
 
-/** The field names a `{field}` title reads. */
-export function titleFields(template: string | undefined): string[] {
-	if (!template) return [];
-	return [...template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((m) => m[1]);
-}
-
 /**
  * Resolve a card instance's header title: the per-instance `$ext.editor.title`
- * override wins; else the schema `ui.title` (literal or `{field}` template
- * interpolated); else the humanized kind. Empty overrides fall through so a
- * cleared rename reverts to the schema title.
+ * override wins; else the kind's schema `title`; else the humanized kind. Empty
+ * overrides fall through so a cleared rename reverts to the schema title.
  */
 export function cardTitle(
 	cardSchema: QuillCardSchema | undefined,
 	kind: string,
-	values: Record<string, unknown>,
 	extTitle: string | undefined
 ): string {
 	if (extTitle && extTitle.trim()) return extTitle;
-	const t = cardSchema?.ui?.title;
-	if (t && t.trim()) return interpolateTitle(t, values);
+	const t = cardSchema?.title;
+	if (t && t.trim()) return t;
 	return humanize(kind);
 }
 

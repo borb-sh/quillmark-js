@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.116.0-0`.** **A label is the quill's top-level `title`**: a field's label, a subform property's, a table column's and a card header's read `title` where they read `ui.title`, which the artifact refuses at load. A `{field}` token in a title is a load error too, so a card header is the kind's literal title and no longer follows an edit to the field it named, and a collapsed `object` row summarizes by its first short text cell, the `items.ui.title` template gone. **A card of an undeclared kind renders**: the preview opens over it and leaves it out, where the engine refused the document, and the editor still draws it in its recovery shell. **A seeded card is empty**: an added card carries the document's `$seed` overlay for its kind and nothing else, where it carried every field's `example:` and the kind's `body.example`.
+
 **The preview paints at twice the box at the least.** Its raster density is `devicePixelRatio` floored at 2, so a 1× display and a fractional one (1.25, 1.5, browser zoom) downsample a denser raster rather than resampling one at their own ratio, which left small text soft. A display at 2 or above paints as before; below it, a mounted page costs up to four times the pixels it did.
 
 **A page's canvas fills its slot.** It was sized in pixels from each paint's result, so between a resize and the repaint after it the ink sat off the box the click and scroll geometry measure. It is `100%` of the slot now: a resize stretches the raster in place until the repaint sharpens it.

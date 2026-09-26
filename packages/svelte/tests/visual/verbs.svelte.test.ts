@@ -10,7 +10,7 @@ import { init, type Document, type Quill } from '@quillmark/wasm';
 import type { EditorError } from '$lib/core';
 import type { ActiveLeaf, CardId, EditorChange } from '$lib/visual';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 
 const core = await init();
 
@@ -78,7 +78,7 @@ const leafKeys = (slot: HTMLElement) =>
 describe('the card verbs', () => {
 	it('insert, move, retype and remove, all reported as the click is', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		const { target, editor, changes } = mountEditor(q, doc);
 		// The blueprint seeds one card per declared kind; the verbs are asserted
 		// against that count rather than a number pinned to the fixture's inventory.
@@ -120,7 +120,7 @@ describe('the card verbs', () => {
 
 	it('inserts at a given index, and clamps one outside the stack', () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, q.seedDocument());
+		const { target, editor } = mountEditor(q, template());
 		const seeded = slots(target).length;
 
 		const first = editor.insertCard('section', 0);
@@ -135,7 +135,7 @@ describe('the card verbs', () => {
 
 	it('focuses a leaf by its path', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, q.seedDocument());
+		const { target, editor } = mountEditor(q, template());
 
 		await editor.focusField('cards.section[0].body');
 		await tick();
@@ -152,7 +152,7 @@ describe('the card verbs', () => {
 describe('the landing verbs over a form control', () => {
 	it('focuses a string field, revealing the collapsed group holding it', async () => {
 		const q = quill();
-		const { target, editor, errors } = mountEditor(q, q.seedDocument());
+		const { target, editor, errors } = mountEditor(q, template());
 
 		// `meta` is not the initially-expanded group, so the control starts inside
 		// an `inert` panel: the reveal is half of the landing, not a nicety.
@@ -184,7 +184,7 @@ describe('the landing verbs over a form control', () => {
 	// there for is what restores it.
 	it('reveals a group instantly, and animates again for a header click', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, q.seedDocument());
+		const { target, editor } = mountEditor(q, template());
 		const header = [...target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>
 			h.textContent?.includes('Metadata')
 		);
@@ -202,7 +202,7 @@ describe('the landing verbs over a form control', () => {
 
 	it('focuses an array field at its first element, and a date field at its first segment', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		// The array's own answer to "focus this field", the one its label click takes.
 		await editor.focusField('main.authors');
@@ -218,7 +218,7 @@ describe('the landing verbs over a form control', () => {
 
 	it('reports the focused control as the active leaf, as a prose leaf reports', async () => {
 		const q = quill();
-		const { editor, active } = mountEditor(q, q.seedDocument());
+		const { editor, active } = mountEditor(q, template());
 
 		await editor.focusField('main.tracking_id');
 		await tick();
@@ -233,7 +233,7 @@ describe('the landing verbs over a form control', () => {
 
 	it('lands a preview hit on a control by focusing it, placing no caret', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		// A `pos` a control has no coordinate to spend: the field is revealed and
 		// focused, which is the whole of what a click on plate-placed ink can mean.
@@ -246,7 +246,7 @@ describe('the landing verbs over a form control', () => {
 
 	it('lands a pick that carries no caret, the rung a plate-placed field answers on', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		// `main.signature_block` is placed with its content untracked: the preview's
 		// second rung names the field and has no offset to hand over.
@@ -264,7 +264,7 @@ describe('the landing verbs over a form control', () => {
 describe('a landing on an array element', () => {
 	it('takes the row the address names rather than the first', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		await editor.setCaret({ field: 'main.keywords[1]', pos: 4 });
 		await tick();
@@ -277,7 +277,7 @@ describe('a landing on an array element', () => {
 
 	it('places the caret at the offset the compile resolved, inside the row', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		// `keywords[0]` is `*Schema* shapes`: 13 USV of content, the markup stripped.
 		// USV 5 is inside the emphasized word, so a caret that landed on the row and
@@ -292,7 +292,7 @@ describe('a landing on an array element', () => {
 
 	it('takes the row with a bare focus for a segment hit and for a pick with no pos', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		await editor.setCaret({ field: 'main.keywords[0]', pos: 5, granularity: 'cluster' });
 		await tick();
@@ -312,7 +312,7 @@ describe('a landing on an array element', () => {
 
 	it('clamps an offset past the row to its end', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		// A landing off a compile the row's value has moved past: the field and the row
 		// are right and the offset is not, which clamps rather than throws.
@@ -326,7 +326,7 @@ describe('a landing on an array element', () => {
 
 	it('falls back to the field for a row this document no longer has', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		// A landing off a compile the document has moved past: the field is right and
 		// the row is gone, so the array's own focus answer stands.
@@ -341,7 +341,7 @@ describe('a landing on an array element', () => {
 describe('a verb handed a target the surface does not hold', () => {
 	it('no-ops and reports target-unknown at dev, for a card and for a path', async () => {
 		const q = quill();
-		const { target, editor, changes, errors } = mountEditor(q, q.seedDocument());
+		const { target, editor, changes, errors } = mountEditor(q, template());
 
 		editor.removeCard('c99');
 		editor.moveCard('c99', 1);
@@ -360,7 +360,7 @@ describe('a verb handed a target the surface does not hold', () => {
 
 	it('reports an element path whose array is not one, through either verb', async () => {
 		const q = quill();
-		const { editor, errors } = mountEditor(q, q.seedDocument());
+		const { editor, errors } = mountEditor(q, template());
 
 		// The element rung is schema-guarded: a trailing index under a field that is no
 		// array is a nested address the tree mounts nothing at, and reading it as a row

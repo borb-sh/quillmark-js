@@ -9,7 +9,7 @@ import { init, type Quill, type Document } from '@quillmark/wasm';
 import { createField } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { EditorView } from 'prosemirror-view';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 
 const core = await init();
 
@@ -21,10 +21,10 @@ function mount(): HTMLElement {
 const viewOf = (f: FieldController): EditorView =>
 	(f as FieldController & { view: EditorView }).view;
 
-/** A saved document: seeded, written, serialized, and parsed back. */
+/** A saved document: templated, written, serialized, and parsed back. */
 function loaded(): { q: Quill; doc: Document } {
 	const q = quill();
-	const seed = q.seedDocument();
+	const seed = template();
 	q.writer(seed).set('title', 'Reloaded title');
 	const doc = core.Document.fromMarkdown(seed.toMarkdown());
 	seed.free();

@@ -41,15 +41,17 @@ Two guardrails hold across both: the playground consumes only the public subpath
 
 The reference quill declares a field for every control and three card kinds, so the schema reaches the branches a harness is for. What a shipped quill asks of the surfaces is the other half, and `usaf_memo` is what asks it (`fixtures/Quiver.yaml`). So **which quill is a control**, at the end of `/playground`'s strip, where the seed variants below it are flags: the answer changes what both surfaces are, rather than reaching a branch a hand went looking for.
 
+A quill opens on its template document, `fixtures/templates/<name>.md`, which the pack serves beside the quiver, and on its seed where it ships none: a seed leaves every field and body empty, and a harness over empty controls reaches no value branch.
+
 Picking tears the shell down and stands it back up, so one session is live at a time. The surfaces come down before their handles do. The readouts reset with them, each having named something in the document that went.
 
 The strip is drawn from the moment the catalog is known rather than with the panes: the picker at its end is what opens them, and a control that goes while what it asked for loads is one a hand cannot get back to.
 
 What is in the list is the **pack's call**, not the route's. `usaf_memo` is held at `0.0.0`, under the quiver's floor, so `--drafts` is what puts it in the served tree: `predev` asks for it, `prebuild` does not, and a deploy serves the reference quill alone. An axis holding one value is printed rather than offered, so a deploy's strip states the quill where a dev server's offers two.
 
-Two branches are not a schema's to declare — a guidance channel a consumer supplies, and a card whose kind the schema cannot project — and those are **query flags on `/playground`**, read once per open and applied to the seeded document: `?tips`, `?foreign`. They carry no chrome, because the only reader is a hand driving the harness, and a switch for one would be a control on the landing page for everyone else.
+Two branches are not a schema's to declare — a guidance channel a consumer supplies, and a card whose kind the schema cannot project — and those are **query flags on `/playground`**, read once per open and applied to the opened document: `?tips`, `?foreign`. They carry no chrome, because the only reader is a hand driving the harness, and a switch for one would be a control on the landing page for everyone else.
 
-`?foreign` reaches a second branch with it: the engine refuses a document holding a kind the schema does not declare, so the route opens without a session. The editor binds `doc` and `quill` and needs none, so the shell stands, the band says what refused, and the preview track waits — which is what makes the recovery shell reachable at all. The retype or delete it offers tries the open again.
+`?foreign` draws the recovery shell: the engine renders past a kind the schema does not declare and warns `validation::unknown_card`, so the preview leaves the card out and the shell is the one surface that reaches it. The retype it offers puts the card on the page.
 
 ## Quiver, not bundler
 

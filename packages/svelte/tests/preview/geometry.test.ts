@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { init, Engine, type ContentHit, type FieldRegion, type PageSize } from '@quillmark/wasm';
 import { boxesForField, rectToPercent, clickToPdfPt, pxToPt } from '$lib/preview/geometry.js';
-import { loadFixtureTree } from '../helpers/fixtures.js';
+import { loadFixtureTree, template } from '../helpers/fixtures.js';
 
 const core = await init();
 
@@ -83,7 +83,7 @@ describe('geometry: against a real compiled session (showcase)', () => {
 	it('forward-transforms a title fieldBox to %, then inverse-transforms its center back to a positionAt hit on title', async () => {
 		const tree = loadFixtureTree();
 		const quill = core.Quill.fromTree(tree);
-		const doc = quill.seedDocument();
+		const doc = template();
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
 		try {
@@ -112,7 +112,7 @@ describe('geometry: against a real compiled session (showcase)', () => {
 	it('title surfaces multiple fieldBoxes across pages (letterhead + colophon)', async () => {
 		const tree = loadFixtureTree();
 		const quill = core.Quill.fromTree(tree);
-		const doc = quill.seedDocument();
+		const doc = template();
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
 		try {
@@ -139,7 +139,7 @@ describe('geometry: against a real compiled session (showcase)', () => {
 		// never promised (that promise is `title`-specific, tested above).
 		const tree = loadFixtureTree();
 		const quill = core.Quill.fromTree(tree);
-		const doc = quill.seedDocument();
+		const doc = template();
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
 		try {
@@ -189,7 +189,7 @@ describe('geometry: against a real compiled session (showcase)', () => {
 	it('a slack only ever fills a miss: every exact hit answers the same under one', async () => {
 		const tree = loadFixtureTree();
 		const quill = core.Quill.fromTree(tree);
-		const doc = quill.seedDocument();
+		const doc = template();
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
 		try {
@@ -260,7 +260,7 @@ describe('boxesForField', () => {
 describe('geometry: the addresses a compile serves (showcase)', () => {
 	it('gives every regions() address a box, and a declared array one off its elements', async () => {
 		const quill = core.Quill.fromTree(loadFixtureTree());
-		const doc = quill.seedDocument();
+		const doc = template();
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
 		try {
@@ -298,7 +298,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		// The invariant above, over a plate nobody here wrote: a region a real quill's
 		// plate mints is a region this tier has to be able to box.
 		const quill = core.Quill.fromTree(loadFixtureTree('usaf_memo'));
-		const doc = quill.seedDocument();
+		const doc = template('usaf_memo');
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
 		try {
@@ -319,7 +319,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 
 	it('gives a live variant cell its own region, and a box under the field that draws it', async () => {
 		const quill = core.Quill.fromTree(loadFixtureTree());
-		const doc = quill.seedDocument();
+		const doc = template();
 		// The cells of a world nobody picked print nothing, so the address exists only
 		// once the document is in that world with the cell written.
 		doc.storeField('handling', {
@@ -358,7 +358,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		// The plate loops, so `note` and `pages` reach the preview through the array and
 		// `detail` reaches it as its own row.
 		const quill = core.Quill.fromTree(loadFixtureTree());
-		const doc = quill.seedDocument();
+		const doc = template();
 		doc.storeField('revisions', [
 			{ note: 'Fig. 2 relabelled', pages: 1, detail: 'The caption named the wrong figure.' },
 			{ note: 'Year corrected', pages: 2, detail: 'Page 4 gave 2025.' }
@@ -395,7 +395,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		// is a prefix of the finer on a path boundary. The ladder reads `positionAt`
 		// first, so the finer one is what a click lands on.
 		const quill = core.Quill.fromTree(loadFixtureTree());
-		const doc = quill.seedDocument();
+		const doc = template();
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
 		try {

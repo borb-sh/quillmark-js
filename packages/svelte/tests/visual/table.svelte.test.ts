@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -44,7 +44,7 @@ const addChip = (t: HTMLElement) => t.querySelector<HTMLButtonElement>('.qm-add-
 describe('an array<object> declaring ui.layout: table', () => {
 	it('draws a header of column labels and a row of ordinary controls per element', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 
@@ -67,7 +67,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 	it('gives up the track floor on the column a switch stands in', () => {
 		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
+		mounted = mountEditor(q, template());
 		const t = table(mounted.target);
 
 		// `lead` is the boolean, and the floor is the header's to carry: a mark is one
@@ -80,7 +80,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 	it('commits a cell into its row, the array committing whole', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 
@@ -92,7 +92,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 	it('inserts a row below on Enter, keeping the column, and removes an empty row on Backspace', async () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 
@@ -113,7 +113,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 	it('removes a row cleared under the caret, the committed cell still lagging', async () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 
@@ -138,7 +138,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 	it('keeps a row whose other cells are filled, however empty the caret is', async () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 
@@ -151,7 +151,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 	it('carries the remove alone: no reorder by button, and none by key', async () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 		const first = t.querySelector<HTMLElement>('.qm-array-table-row')!;
@@ -180,7 +180,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 	it('lands a field landing on the first cell, and a row address on that row', async () => {
 		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
+		mounted = mountEditor(q, template());
 		const t = table(mounted.target);
 
 		await mounted.editor.focusField('main.contributors');
@@ -199,7 +199,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 describe('an array declaring max:', () => {
 	it('draws the count, disables the add chip at the cap, and re-enables on remove', async () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 		expect(count(t)).toBe('2 / 3');
@@ -228,7 +228,7 @@ describe('an array declaring max:', () => {
 
 	it('draws no count on an array with no cap', () => {
 		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
+		mounted = mountEditor(q, template());
 		expect(count(field(mounted.target, 'Authors'))).toBeUndefined();
 	});
 });

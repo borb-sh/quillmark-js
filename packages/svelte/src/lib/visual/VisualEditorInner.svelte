@@ -56,7 +56,6 @@
 		groupSections,
 		groupLabel,
 		cardTitle,
-		titleFields,
 		fieldValues,
 		bodyEnabled,
 		humanize,
@@ -157,7 +156,6 @@
 	 */
 	function bump(source: ChangeSource, cardId?: CardId, at?: Addr | number): void {
 		revision++;
-		liveTitles = {};
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
 		onChange?.({ source, cardId, path });
@@ -282,33 +280,7 @@
 		const plain = normalize(addr);
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
-		refreshTitle(plain, cardId);
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
-	}
-
-	/** A card's header after a prose commit to a field its `{field}` title names: the
-	 *  one piece of the model that lane changes, held beside the model and dropped on
-	 *  the next bump, which rebuilds it from the document. The kind is the derived
-	 *  tree's ({@link liveKinds}), so the document is read only for a title that
-	 *  names the field. */
-	let liveTitles = $state<Record<CardId, string>>({});
-	function refreshTitle(addr: Addr, cardId: CardId): void {
-		const { card: at, field } = addr;
-		if (field == null) return;
-		const shown = at == null ? model.main : model.cards[at];
-		if (!shown) return;
-		const cardSchema = at == null ? quill.schema.main : quill.schema.card_kinds?.[shown.kind];
-		if (!titleFields(cardSchema?.ui?.title).includes(field)) return;
-		const live = at == null ? doc.main : doc.cards[at];
-		if (!live) return;
-		liveTitles = {
-			...liveTitles,
-			[cardId]: cardTitle(cardSchema, shown.kind, fieldValues(live.payloadItems), undefined)
-		};
-	}
-	function titled(c: CardModel): CardModel {
-		const t = liveTitles[c.id];
-		return t == null ? c : { ...c, titlePlaceholder: t };
 	}
 
 	// ── Commit routing ──────────────────────────────────────────────────────────
@@ -600,7 +572,7 @@
 			// `main` always resolves `schema.main`, so it is never unschemable.
 			unschemable: !isMain && !cardSchema,
 			titleOverride: extEditor?.title ?? '',
-			titlePlaceholder: cardTitle(cardSchema, kind, values, undefined),
+			titlePlaceholder: cardTitle(cardSchema, kind, undefined),
 			values,
 			provenance: provenanceMap(rows.fields),
 			sections,
@@ -858,7 +830,7 @@
 	<div class="qm-primary">
 		<Card
 			bind:this={mainCard}
-			card={titled(model.main)}
+			card={model.main}
 			{doc}
 			{quill}
 			isFirst={true}
@@ -890,7 +862,7 @@
 		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed}>
 			<Card
 				bind:this={cardRefs[i]}
-				card={titled(c)}
+				card={c}
 				{doc}
 				{quill}
 				isFirst={i === 0}

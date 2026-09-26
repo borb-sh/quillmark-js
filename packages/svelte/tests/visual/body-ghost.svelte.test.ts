@@ -5,17 +5,17 @@
 // function of `kind`; one wanting them to differ writes a function of `cardId`.
 // Neither is the editor's to decide.
 //
-// The ghosts observed are the notes'. The reference quill seeds main's body from
-// its `body.example`, and a body with content carries no placeholder decoration;
-// main is asked all the same, which is what `seen` is read for. `note` is the kind
-// declaring no body example, so every note in the stack mounts an empty leaf.
+// The ghosts observed are the notes'. The reference template writes main's body,
+// and a body with content carries no placeholder decoration; main is asked all the
+// same, which is what `seen` is read for. The template leaves the note's body empty,
+// and a seeded card's body is empty, so every note in the stack mounts an empty leaf.
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount, unmount, flushSync } from 'svelte';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import type { VisualEditorProps } from '$lib/visual/props';
 import type { BodyPlaceholderContext } from '$lib/visual/structure';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 
 const BUILT_IN = DEFAULT_VISUAL_STRINGS.bodyGhost;
 
@@ -25,11 +25,11 @@ afterEach(() => {
 	cleanup = undefined;
 });
 
-/** Mount over a document carrying one added note beyond the seed, so the kind
+/** Mount over a document carrying one added note beyond the template, so the kind
  *  appears more than once and per-card wording has something to distinguish. */
 function mountEditor(props: Partial<VisualEditorProps> = {}) {
 	const q = quill();
-	const doc = q.seedDocument();
+	const doc = template();
 	const card = q.seedCard('note', doc.seedOverlay('note'));
 	if (card) doc.insertCard(card, doc.cardCount);
 	const target = document.createElement('div');

@@ -66,11 +66,11 @@ Studio draws with `@quillmark/svelte/preset`, the same import a third-party cons
 
 ## The document is the blueprint's
 
-Studio holds one document and it starts as the schema's own: `seedDocument()` over the `example:` values in `Quill.yaml`. Nothing of studio's outlives the tab — no file it is read from at boot, none it writes, no store it reseeds from.
+Studio holds one document and it starts as the schema's own: `seedDocument()`, one card per kind with every field absent and every body empty, each rendering its `default:` or its blank. Nothing of studio's outlives the tab — no file it is read from at boot, none it writes, no store it reseeds from.
 
-**Reload is the reseed.** A boot seeds, and the carry keeps a running session on the document in hand, so an `example:` edited mid-session does not appear until the page reloads. F5 is the whole of that verb, and it costs a keystroke rather than a control.
+**Reload is the reseed.** A boot seeds, and the carry keeps a running session on the document in hand, so a `default:` edited mid-session does not appear on a field the document holds until the page reloads. F5 is the whole of that verb, and it costs a keystroke rather than a control.
 
-**What that costs.** The failures that only a long list, a wrapping value or an empty optional reveal are invisible here, and to `quillkit test` with it: neither renders a document the schema did not write. The corpus *is* the `example:` block, so an author buys that coverage by writing examples that are uncomfortable rather than tidy.
+**What that costs.** The failures that only a long list, a wrapping value or an empty optional reveal are invisible here, and to `quillkit test` with it: neither renders a document with an answer in it. The seed is the blank, so a filled field's page is judged by typing the value into the form.
 
 ## The document has doors
 
@@ -110,13 +110,13 @@ What crosses is the document, as its canonical markdown, landed through the boun
 
 **Showing what stranded is the point**, so those diagnostics reach the controls they name rather than being swallowed as a load warning. They describe the document as it *arrived*, so they are dropped at the first edit and the schema producer speaks for it from then on.
 
-**A card kind the schema stopped declaring strands nothing.** Conform keeps the card whole and emits no `conform::*` diagnostic, so nothing reaches a control; `quill.validate` names it and `Engine.open` refuses the document it stands in. The document still lands, and the editor draws that card in its recovery shell — the one surface it is reachable from — so what the refusal costs is the paint.
+**A card kind the schema stopped declaring strands nothing.** Conform keeps the card whole and emits no `conform::*` diagnostic, so nothing reaches a control; `quill.validate` warns `validation::unknown_card` and the engine renders past it. The document lands, and the editor draws that card in its recovery shell — the one surface it is reachable from — so what it costs is the card's ink.
 
 Two edges the loop turns on. A ref that went away under the author (a version directory renamed) leaves the document nothing to land in, so whatever the catalog now holds is seeded instead. And a quill the quiver will not **materialize** — a `Quill.yaml` mid-edit — leaves nothing to stand a surface on: the document waits it out as text, the panes go empty, the errors say why, and the next repack that resolves gets it back. A plate that will not compile is not that edge. The quill materializes and the document lands, so the surfaces stand and the line to open is carried where the paint would be.
 
 An open takes as long as the backend takes to load and compile a page, which is long enough for a second repack to land inside one, so the loser of two overlapping opens drops what it built instead of both writing the same slot.
 
-A *pick*, unlike a repack, carries nothing. A different quill is a different document, and its seeded example is where "what is this quill like to use" starts.
+A *pick*, unlike a repack, carries nothing. A different quill is a different document, and its seed is where "what is this quill like to use" starts.
 
 ## The errors
 

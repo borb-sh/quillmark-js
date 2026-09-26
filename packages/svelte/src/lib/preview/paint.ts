@@ -131,7 +131,7 @@ export function createPaintLoop(
 		const layoutScale = (slot.el.clientWidth || slot.size.widthPt) / slot.size.widthPt;
 		const densityScale = Math.max(window.devicePixelRatio || 1, MIN_DENSITY) * zoom;
 		try {
-			session.paint(ctx, slot.page, { layoutScale, densityScale });
+			session.paint(ctx, slot.page, layoutScale * densityScale);
 		} catch (err) {
 			// A paint that throws must not abort the band loop; `updateBand` runs in
 			// the IntersectionObserver callback and sweeps every entry, so an

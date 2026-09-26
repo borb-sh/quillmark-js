@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mount, unmount, flushSync, tick } from 'svelte';
 import type { Quill, Document } from '@quillmark/wasm';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 
 // jsdom implements neither, and the wash is `Element.animate`: a run that never
 // finishes leaves the node in place, which is what the host assertions read. The
@@ -59,7 +59,7 @@ function washHost(target: HTMLElement): HTMLElement | undefined {
 describe('the arrival wash', () => {
 	it('washes the row an element landing named, not the list around it', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, q.seedDocument());
+		const { target, editor } = mountEditor(q, template());
 
 		await editor.setCaret({ field: 'main.keywords[1]', pos: 4, granularity: 'cluster' });
 		await tick();
@@ -72,7 +72,7 @@ describe('the arrival wash', () => {
 
 	it('washes the whole list where the address named the field', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, q.seedDocument());
+		const { target, editor } = mountEditor(q, template());
 
 		await editor.focusField('main.keywords');
 		await tick();
@@ -82,7 +82,7 @@ describe('the arrival wash', () => {
 
 	it('washes the list again where the row is one this document no longer has', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, q.seedDocument());
+		const { target, editor } = mountEditor(q, template());
 
 		// A landing off a compile the document has moved past: the field is right and
 		// the row is gone, so the landing falls back to the field and the wash with it.
