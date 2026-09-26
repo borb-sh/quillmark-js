@@ -42,6 +42,7 @@
 		exampleGhost,
 		humanize,
 		isContainer,
+		mountKey,
 		obliged,
 		optionalCell,
 		printedText,
@@ -260,7 +261,7 @@
 	<!-- The grid is one box in, so the wrapper can be the query container it reads its
 	     capacity from: a container cannot query itself. -->
 	<div class="qm-object-grid qm-tracks">
-		{#each entries as [key, sub] (key)}
+		{#each entries as [key, sub] (mountKey(key, sub))}
 			{@const kind = controlKind(sub)}
 			{@const ids = idBase && !bare ? propertyDomIds(idBase, key) : undefined}
 			{@const named = ids ? undefined : fallbackName(key, sub)}

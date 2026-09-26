@@ -42,9 +42,9 @@ class MemArtifact {
 		this.files = new Map(Object.entries(entries));
 	}
 
-	readonly read: ArtifactReader = async (path, revalidate) => {
+	readonly read: ArtifactReader = async (path, mode) => {
 		this.log.push(path);
-		if (revalidate) this.revalidated.push(path);
+		if (mode === 'no-cache') this.revalidated.push(path);
 		const bytes = this.files.get(path);
 		if (bytes === undefined) {
 			throw new QuiverError('transport_error', `MemArtifact: not found: "${path}"`);
@@ -348,17 +348,49 @@ describe('loadBuiltQuiver — a host answering with something else', () => {
 	});
 
 	it('takes every font signature build writes', async () => {
-		const signatures = ['\0\x01\0\0', 'OTTO', 'true', 'ttcf', 'wOFF', 'wOF2'];
+		const signatures: [string, string][] = [
+			['\0\x01\0\0', 'ttf'],
+			['OTTO', 'otf'],
+			['true', 'ttf'],
+			['ttcf', 'ttf'],
+			['wOFF', 'woff'],
+			['wOF2', 'woff2']
+		];
 		const fonts = Object.fromEntries(
-			signatures.map((magic, i): [string, [string, Uint8Array]] => [
-				`${i}.ttf`,
+			signatures.map(([magic, ext], i): [string, [string, Uint8Array]] => [
+				`${i}.${ext}`,
 				[fontKey(i + 1), enc.encode(`${magic}rest`)]
 			])
 		);
 		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0', fonts }]);
 
 		const tree = await loadTreeViaGetQuill(await loadBuiltQuiver(artifact.read), 'memo', '1.0.0');
-		expect([...tree.keys()].filter((p) => p.endsWith('.ttf'))).toHaveLength(signatures.length);
+		expect([...tree.keys()].filter((p) => /^\d\./.test(p))).toHaveLength(signatures.length);
+	});
+
+	// The engine parses sfnt alone; a WOFF under `.ttf` would reach Typst and be substituted.
+	it('a .ttf holding WOFF bytes → transport_error naming it', async () => {
+		const artifact = makeArtifact('sample', [
+			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), enc.encode('wOF2rest')] } }
+		]);
+
+		const q = await loadBuiltQuiver(artifact.read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow('other than a font');
+	});
+
+	// `force-cache` would answer the page again on every retry and every reload of the tab.
+	it('a page the cache holds where a bundle is → read once past the cache', async () => {
+		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
+		const bundle = bundleName('memo', '1.0.0');
+		const modes: string[] = [];
+		const read: ArtifactReader = async (path, mode) => {
+			if (path === bundle) modes.push(mode);
+			return path === bundle && mode === 'force-cache' ? page : artifact.read(path, mode);
+		};
+
+		const tree = await loadTreeViaGetQuill(await loadBuiltQuiver(read), 'memo', '1.0.0');
+		expect(tree.size).toBeGreaterThan(0);
+		expect(modes).toEqual(['force-cache', 'reload']);
 	});
 });
 
@@ -525,12 +557,12 @@ describe('filesReader', () => {
 				['/fonts/x', new Uint8Array([2])]
 			])
 		);
-		expect(await read('quiver.json', true)).toEqual(new Uint8Array([1]));
-		expect(await read('fonts/x', false)).toEqual(new Uint8Array([2]));
+		expect(await read('quiver.json', 'no-cache')).toEqual(new Uint8Array([1]));
+		expect(await read('fonts/x', 'force-cache')).toEqual(new Uint8Array([2]));
 	});
 
 	it('a path the map lacks → transport_error naming it', async () => {
-		await expect(filesReader(new Map())('quiver.json', true)).rejects.toThrow(
+		await expect(filesReader(new Map())('quiver.json', 'no-cache')).rejects.toThrow(
 			expect.objectContaining({
 				code: 'transport_error',
 				message: expect.stringContaining('quiver.json')
@@ -555,28 +587,28 @@ describe('httpReader', () => {
 
 	it('reads the path under the base, with or without its trailing slash', async () => {
 		const calls = stubFetch(async () => new Response(new Uint8Array([7])));
-		expect(await httpReader('https://cdn.example.com/q')('quiver.json', true)).toEqual(
+		expect(await httpReader('https://cdn.example.com/q')('quiver.json', 'no-cache')).toEqual(
 			new Uint8Array([7])
 		);
-		await httpReader('/q/')('fonts/x', false);
+		await httpReader('/q/')('fonts/x', 'force-cache');
 		expect(calls.map((c) => c.url)).toEqual([
 			'https://cdn.example.com/q/quiver.json',
 			'/q/fonts/x'
 		]);
 	});
 
-	// A digest-carrying name is entitled to whatever the cache holds; `quiver.json` is not.
-	it('revalidates what it is told to and takes the cache for the rest', async () => {
+	it('fetches under the cache mode it is given', async () => {
 		const calls = stubFetch(async () => new Response(new Uint8Array()));
 		const read = httpReader('/q/');
-		await read('quiver.json', true);
-		await read(bundleName('memo', '1.0.0'), false);
-		expect(calls.map((c) => c.init?.cache)).toEqual(['no-cache', 'force-cache']);
+		await read('quiver.json', 'no-cache');
+		await read(bundleName('memo', '1.0.0'), 'force-cache');
+		await read(bundleName('memo', '1.0.0'), 'reload');
+		expect(calls.map((c) => c.init?.cache)).toEqual(['no-cache', 'force-cache', 'reload']);
 	});
 
 	it('an HTTP error → transport_error naming the status', async () => {
 		stubFetch(async () => new Response(null, { status: 404 }));
-		await expect(httpReader('/q/')('quiver.json', true)).rejects.toThrow(
+		await expect(httpReader('/q/')('quiver.json', 'no-cache')).rejects.toThrow(
 			expect.objectContaining({ code: 'transport_error', message: expect.stringContaining('404') })
 		);
 	});
@@ -586,7 +618,7 @@ describe('httpReader', () => {
 		stubFetch(async () => {
 			throw cause;
 		});
-		await expect(httpReader('/q/')('quiver.json', true)).rejects.toThrow(
+		await expect(httpReader('/q/')('quiver.json', 'no-cache')).rejects.toThrow(
 			expect.objectContaining({ code: 'transport_error', cause })
 		);
 	});

@@ -209,6 +209,28 @@ describe('a plaintext field declaring `inline`', () => {
 		doc.free();
 	});
 
+	// The newline a YAML `|` scalar keeps opens an empty second line, which the leaf
+	// drops rather than joins: a space there is one a click at the end types after.
+	it('holds a `|` scalar’s trailing newline as nothing, and an edit stores no space', () => {
+		const q = probe();
+		const doc = core.Document.fromMarkdown(
+			['~~~', '$quill: plain_probe@0.1.0', 'line: |', '  solo', '~~~', ''].join('\n')
+		);
+		expect(doc.getStored('line')).toBe('solo\n');
+		const errors: string[] = [];
+		const { f, view } = leaf(q, doc, 'line', true, errors);
+
+		expect(view.editable).toBe(true);
+		expect(view.state.doc.toString()).toBe('doc(paragraph("solo"))');
+		caretAtEnd(view);
+		view.dispatch(view.state.tr.insertText('!'));
+
+		expect(errors).toEqual([]);
+		expect(doc.getStored('line')).toBe('solo!');
+		f.destroy();
+		doc.free();
+	});
+
 	it.each([
 		['trailing spaces', 'one line  '],
 		['leading spaces', '  one line'],

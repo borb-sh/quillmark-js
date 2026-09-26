@@ -12,7 +12,7 @@
 
 **A tab outliving a release reads the next one's names.** A failed bundle or font read rereads `quiver.json` once, takes every entry both generations carry, and retries under the entry it now names where that entry names other files; otherwise the first error stands, unless the reread refused the index itself. Concurrent failures share one reread.
 
-**A bundle has to open as a zip and a font as a font.** A host answering a missing name with its own page answers 200, and a font nothing parses reaches Typst, which substitutes for it silently; either is now a `transport_error` naming the path. `build` refuses a font file that does not open as TrueType, OpenType, WOFF or WOFF2.
+**A bundle has to open as a zip and a font as a font.** A host answering a missing name with its own page answers 200, and a font nothing parses reaches Typst, which substitutes for it silently; either is now a `transport_error` naming the path. A read that fails from the cache is read once more with `reload`, so a page a host answered under a bundle's or a font's name does not stay cached under it. A `.ttf` or `.otf` has to open as TrueType, OpenType or a collection of either, the one kind the engine parses, and a `.woff` or `.woff2` as WOFF; `build` refuses a font file that does not open as its extension names.
 
 **Nothing checks fetched bytes against their names, and no fetch carries a byte ceiling.** The digests are for caching and https answers a corrupted byte, so `crypto.subtle` and the plain-http pass-through go with the check. A bundle's unpack budget is unchanged. `Quiver.fromBuiltUrl` takes no `seed`, and `fromBuiltDir` reads each name `quiver.json` lists off disk, a validated name carrying no separator.
 
