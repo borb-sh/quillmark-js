@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.13.0 - 2026-09-26
+
 **The `@quillmark/wasm` peer floor is `>=0.116.0-0`.** **A label is the quill's top-level `title`**: a field's label, a subform property's, a table column's and a card header's read `title` where they read `ui.title`, which the artifact refuses at load. A `{field}` token in a title is a load error too, so a card header is the kind's literal title and no longer follows an edit to the field it named, and a collapsed `object` row summarizes by its first short text cell, the `items.ui.title` template gone. **A card of an undeclared kind renders**: the preview opens over it and leaves it out, where the engine refused the document, and the editor still draws it in its recovery shell. **A seeded card is empty**: an added card carries the document's `$seed` overlay for its kind and nothing else, where it carried every field's `example:` and the kind's `body.example`.
 
 **An empty free-text field ghosts its `example:`.** An unset `string`, `plaintext` or `richtext` field whose `default:` prints nothing — none declared, or a type-empty one such as `default: ""` — shows its `example:` in the empty control, at rest and on focus, with no prefix, and a subform's, a variant's and a table's cells show their own; an optional cell shows it in `None`'s stead while it holds the focus. A number, a date, a boolean, an enum and an array show none. A `richtext` example ghosts as the text it renders rather than as its markdown. A prose leaf's ghost now wraps and grows the leaf past its first line, where it hung over what followed; an inline leaf's keeps to its one line. `createField` takes `example` and its controller `setExample`, beside `placeholder` and `setPlaceholder`.
