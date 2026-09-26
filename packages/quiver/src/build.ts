@@ -185,10 +185,10 @@ export async function buildQuiver(
 
 					// The loader refuses what does not open as a font, so the build refuses it
 					// first, where the author it names can do something about it.
-					if (!isFont(bytes)) {
+					if (!isFont(bytes, rel)) {
 						throw new QuiverError(
 							'quiver_invalid',
-							`Quill "${quillName}@${version}": "${rel}" is not a TrueType, OpenType, WOFF or WOFF2 font`,
+							`Quill "${quillName}@${version}": "${rel}" does not open as the font its extension names`,
 							{ quiverName: meta.name, version }
 						);
 					}

@@ -28,21 +28,21 @@ interface BuiltIndex {
 }
 
 /**
- * Bytes at an artifact-relative path. `revalidate` marks `quiver.json`, the one name read
- * that carries no digest; every other name read is safe to answer from a cache.
+ * Bytes at an artifact-relative path, under a `fetch` cache mode. `no-cache` is
+ * `quiver.json`'s, the one name read that carries no digest; every other name is read
+ * `force-cache`, and `reload` once a cached answer failed, since a digest in a name
+ * does not stop a host's page from being cached under it.
  */
-export type ArtifactReader = (path: string, revalidate: boolean) => Promise<Uint8Array>;
+export type ReadMode = 'no-cache' | 'force-cache' | 'reload';
+export type ArtifactReader = (path: string, mode: ReadMode) => Promise<Uint8Array>;
 
 export function httpReader(base: string): ArtifactReader {
 	const root = base.endsWith('/') ? base : `${base}/`;
-	return async (path, revalidate) => {
+	return async (path, mode) => {
 		const url = `${root}${path}`;
 		let response: Response;
 		try {
-			// `no-cache` revalidates with the origin, a 304 still serving from disk.
-			// `force-cache` takes a cached response whatever its age, which a name carrying
-			// its own digest is entitled to.
-			response = await globalThis.fetch(url, { cache: revalidate ? 'no-cache' : 'force-cache' });
+			response = await globalThis.fetch(url, { cache: mode });
 		} catch (err) {
 			throw new QuiverError(
 				'transport_error',
@@ -85,10 +85,29 @@ export function filesReader(files: ReadonlyMap<string, Uint8Array>): ArtifactRea
 const BUNDLE_RE = /^[A-Za-z0-9_-]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9a-f]+\.zip$/;
 const FONT_HASH_RE = /^[0-9a-f]{64}$/;
 
-/** Bytes a host answered with that are not the file named: a `transport_error`, so an
- *  evicting cache and the reread below both get their turn. */
+/** Bytes a host answered with that are not the file named: a `transport_error`, so the
+ *  reread below gets its turn. */
 function refused(path: string, what: string): QuiverError {
 	return new QuiverError('transport_error', `"${path}" arrived as something other than ${what}`);
+}
+
+/** A cached read that fails, by transport or by `opens`, is read once more past the cache,
+ *  which replaces what the cache held. */
+async function readChecked(
+	read: ArtifactReader,
+	path: string,
+	opens: (bytes: Uint8Array) => boolean,
+	what: string
+): Promise<Uint8Array> {
+	try {
+		const cached = await read(path, 'force-cache');
+		if (opens(cached)) return cached;
+	} catch {
+		// The reload's answer is the one that stands.
+	}
+	const bytes = await read(path, 'reload');
+	if (!opens(bytes)) throw refused(path, what);
+	return bytes;
 }
 
 class BuiltLoader implements QuiverLoader {
@@ -139,31 +158,26 @@ class BuiltLoader implements QuiverLoader {
 	}
 
 	async #treeOf(entry: BuiltQuillEntry): Promise<Map<string, Uint8Array>> {
-		const zip = await this.read(entry.bundle, false);
-		if (!isZip(zip)) throw refused(entry.bundle, 'a zip');
+		const zip = await readChecked(this.read, entry.bundle, isZip, 'a zip');
 		const files = unpackFiles(zip);
 		await Promise.all(
 			Object.entries(entry.fonts).map(async ([path, hash]) => {
-				files[path] = await this.#font(hash);
+				files[path] = await this.#font(hash, path);
 			})
 		);
 		return new Map(Object.entries(files));
 	}
 
 	/** One read per hash, coalesced; a failure is evicted so a retry reads again. */
-	#font(hash: string): Promise<Uint8Array> {
+	#font(hash: string, rel: string): Promise<Uint8Array> {
 		let bytes = this.#fonts.get(hash);
 		if (bytes === undefined) {
-			const path = `fonts/${hash}`;
-			bytes = this.read(path, false)
-				.then((font) => {
-					if (!isFont(font)) throw refused(path, 'a font');
-					return font;
-				})
-				.catch((err: unknown) => {
+			bytes = readChecked(this.read, `fonts/${hash}`, (font) => isFont(font, rel), 'a font').catch(
+				(err: unknown) => {
 					this.#fonts.delete(hash);
 					throw err;
-				});
+				}
+			);
 			this.#fonts.set(hash, bytes);
 		}
 		return bytes;
@@ -189,7 +203,7 @@ function assertNoUnknownKeys(
 async function readIndex(read: ArtifactReader): Promise<BuiltIndex> {
 	let bytes: Uint8Array;
 	try {
-		bytes = await read(INDEX, true);
+		bytes = await read(INDEX, 'no-cache');
 	} catch (err) {
 		if (err instanceof QuiverError) throw err;
 		throw new QuiverError('transport_error', `Failed to read ${INDEX}: ${(err as Error).message}`, {

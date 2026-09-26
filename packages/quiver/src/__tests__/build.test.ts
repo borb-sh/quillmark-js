@@ -172,7 +172,9 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		await expect(buildQuiver(src, out)).rejects.toThrow(
 			expect.objectContaining({
 				code: 'quiver_invalid',
-				message: expect.stringContaining('"fonts/body.ttf" is not a TrueType')
+				message: expect.stringContaining(
+					'"fonts/body.ttf" does not open as the font its extension names'
+				)
 			})
 		);
 	});
