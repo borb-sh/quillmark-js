@@ -11,7 +11,7 @@
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
 	import './controls.css';
-	import type { Document, Quill, Addr } from '@quillmark/wasm';
+	import type { Document, Quill, Addr, Diagnostic } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
 
 	interface Props {
@@ -50,6 +50,9 @@
 		/** The editor's leaf registry (`leaves.ts`). Registering the controller is what
 		 *  makes this leaf a caret target and not merely a focus one. */
 		leaves?: LeafRegistry;
+		/** The diagnostics routed to this field, which a leaf declaring `inline` holds by
+		 *  (`createField`). */
+		diagnostics?: Diagnostic[];
 	}
 
 	let {
@@ -68,10 +71,14 @@
 		onCaretMove,
 		onChange,
 		onError,
-		leaves
+		leaves,
+		diagnostics
 	}: Props = $props();
 
 	let containerEl: HTMLDivElement | undefined = $state();
+	let held = $state(false);
+	const uid = $props.id();
+	const heldId = `${uid}-held`;
 
 	// Handed to the codec as a getter: the island chrome redraws on each render, so a
 	// locale swap reaches a mounted table without remounting the leaf and losing the caret.
@@ -114,7 +121,12 @@
 			onFocus,
 			onCaretMove,
 			onChange,
-			onError
+			onError,
+			diagnostics,
+			heldNoteId: heldId,
+			onHold: (next) => {
+				held = next;
+			}
 		});
 		leaves?.registerProse(leafKey, controller);
 		return () => {
@@ -129,8 +141,15 @@
 	$effect(() => {
 		controller?.setPlaceholder(placeholder);
 	});
+
+	// Each set the editor routes to an `inline` leaf re-evaluates its hold, against the
+	// value stored now.
+	$effect(() => {
+		if (inline) controller?.applyExternal(diagnostics ?? []);
+	});
 </script>
 
+<!-- The note sits inside the box, after the view `createField` prepends. -->
 <div
 	bind:this={containerEl}
 	class="qm-prose"
@@ -138,7 +157,11 @@
 	class:qm-focus-ring-within={!unframed}
 	class:qm-prose-block={block}
 	data-leaf-key={leafKey}
-></div>
+>
+	{#if held}
+		<span id={heldId} class="qm-prose-held-note">{t.strings.proseHeld}</span>
+	{/if}
+</div>
 <SlashMenu menu={slash} leaf={() => controller} label={t.strings.slashLabel} />
 
 <style>

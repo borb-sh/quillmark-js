@@ -90,16 +90,21 @@ export function decode(rt: Content, schema: Schema): PMNode {
 }
 
 /** Whether `rt` decodes under an inline schema with nothing but whitespace dropped:
- *  one plain paragraph line, no container, no island. A trailing empty line is the
- *  newline a YAML `|` scalar keeps, and costs a space. Marks are the schema's own
- *  business (`plaintextSchema` declares none). */
+ *  upstream's `inline` rule, or one plain line and the empty one a trailing `\n`
+ *  opens. That newline is the one a YAML `|` scalar keeps, which upstream refuses
+ *  (`trailingNewline`) and the inline decode joins at the cost of a space. Marks are
+ *  the schema's own business (`plaintextSchema` declares none). */
 export function fitsInline(rt: Content): boolean {
-	if (rt.islands.length > 0) return false;
-	const plain = (line: ContentLine | undefined): boolean =>
-		!line || (line.kind === 'para' && line.containers.length === 0);
-	const [first, second, ...rest] = rt.lines;
-	if (rest.length > 0 || !plain(first)) return false;
-	return !second || (plain(second) && !second.continues && rt.text.endsWith('\n'));
+	if (core().isInline(rt)) return true;
+	const plain = (line: ContentLine): boolean =>
+		line.kind === 'para' && line.containers.length === 0;
+	return (
+		rt.islands.length === 0 &&
+		rt.lines.length === 2 &&
+		rt.lines.every(plain) &&
+		!rt.lines[1].continues &&
+		rt.text.endsWith('\n')
+	);
 }
 
 /** Whether `rt` decodes under `plainSchema` losing nothing but its marks, which the

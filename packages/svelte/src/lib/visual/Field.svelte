@@ -13,7 +13,8 @@
  `diagnostics` is the routed `Diagnostic[]` for this field (VisualEditor's
  `diagByKey`, merging `quill.validate`, local commit errors, and the external
  `diagnostics` prop (VISUAL_EDITOR §Diagnostics)) rendered via the shared
- `DiagnosticList`, non-gating.
+ `DiagnosticList`, non-gating; a prose leaf declaring `inline` also holds by them
+ (`createField`).
 -->
 <script lang="ts">
 	import type {
@@ -269,6 +270,7 @@
 					{onChange}
 					{onError}
 					{leaves}
+					{diagnostics}
 				/>
 			{:else if field.control === 'enum'}
 				<EnumField

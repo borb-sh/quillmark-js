@@ -2,12 +2,13 @@
 // A `plaintext` field is multi-line unless it declares `inline`: upstream's literal
 // codec reads one line per `\n`, so a leaf narrowed to one textblock would join an
 // address's lines and commit the joined text on the first edit. Without `inline` the
-// leaf runs paragraphs and hard breaks; with it, one textblock. The reference quill
-// declares no `plaintext` field without `inline`, so the schema is built here.
+// leaf runs paragraphs and hard breaks, held over content upstream's `isPlain` refuses;
+// with it, one textblock. The reference quill declares no `plaintext` field without
+// `inline`, so the schema is built here.
 import { describe, it, expect } from 'vitest';
 import { init, type Document, type Quill } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
-import { TextSelection } from 'prosemirror-state';
+import { Selection, TextSelection } from 'prosemirror-state';
 import { createField, type FieldController } from '$lib/core/codec';
 import { mount, press } from './_util.js';
 
@@ -123,6 +124,49 @@ describe('a plaintext field declaring `inline`', () => {
 
 		expect(view.state.schema.nodes.hard_break).toBeUndefined();
 		expect(view.state.doc.toString()).toBe('doc(paragraph("One line"))');
+		f.destroy();
+		doc.free();
+	});
+});
+
+describe('a plaintext field without `inline` over content `isPlain` refuses', () => {
+	it('holds, and releases on the re-hydrate that leaves it plain', () => {
+		const q = probe();
+		const doc = load();
+		doc.overwrite({ field: 'address' }, core.importMarkdown('- one\n- two'));
+		const before = JSON.stringify(doc.getStored('address'));
+		const holds: boolean[] = [];
+		const f = createField({
+			doc,
+			quill: q,
+			addr: { field: 'address' },
+			container: mount(),
+			plaintext: true,
+			onHold: (held) => holds.push(held)
+		});
+		const view = viewOf(f);
+		expect(holds).toEqual([true]);
+		expect(view.editable).toBe(false);
+		expect(view.state.doc.firstChild?.type.name).toBe('bullet_list');
+		view.dispatch(view.state.tr.insertText('Z', Selection.atStart(view.state.doc).from));
+		expect(JSON.stringify(doc.getStored('address'))).toBe(before);
+
+		q.writer(doc).set('address', '12 Main St\nSpringfield');
+		f.applyExternal();
+		expect(holds).toEqual([true, false]);
+		expect(view.editable).toBe(true);
+		expect(view.dom.innerHTML).toBe('<p>12 Main St<br>Springfield</p>');
+		f.destroy();
+		doc.free();
+	});
+
+	it('does not hold for a mark alone, which the decode drops', () => {
+		const q = probe();
+		const doc = load();
+		doc.overwrite({ field: 'address' }, core.importMarkdown('**12** Main St'));
+		const { f, view } = leaf(q, doc, 'address');
+		expect(view.editable).toBe(true);
+		expect(view.dom.innerHTML).toBe('<p>12 Main St</p>');
 		f.destroy();
 		doc.free();
 	});

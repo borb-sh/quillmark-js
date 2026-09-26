@@ -113,6 +113,13 @@
 :where(.qm-input)::placeholder {
 	color: var(--_qm-ink-label);
 }
+/* The note a held prose leaf draws inside its box, under the text it is about
+   (`ProseField`, `ProseValue`). */
+:where(.qm-prose-held-note) {
+	display: block;
+	font-size: var(--_qm-text-label);
+	color: var(--_qm-ink-label);
+}
 
 /* The second recipe, and it is not the box above: a field is a box because you
  type into it. A button rests with no fill; the surface arrives on hover, off the

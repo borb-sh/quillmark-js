@@ -176,7 +176,7 @@ Markdown never represents an edit, and the clipboard is not how it reaches a fie
 
 ## Reconciliation
 
-The content normalizes on write (marks sorted and same-kind-unioned, zero-width formatting dropped, invariants enforced), so `decode ∘ lower` is idempotent only *up to normalization*: a projected PM doc and the re-decoded stored content agree after normalize, not byte-for-byte. The editor holds its optimistic PM state and re-hydrates a field only on an **external** content change (another edit source, a paste, a `revise`), gated by canonical-content equality scoped to the field that changed. Caret continuity across a leaf's *own* edits is not this gate at all: it is PM's `StepMap`, inside the leaf the codec mounts, which is why an own-edit never re-hydrates and never moves a caret.
+The content normalizes on write (marks sorted and same-kind-unioned, zero-width formatting dropped, invariants enforced), so `decode ∘ lower` is idempotent only *up to normalization*: a projected PM doc and the re-decoded stored content agree after normalize, not byte-for-byte. The editor holds its optimistic PM state and re-hydrates a field only on an **external** content change (another edit source, a paste, a `revise`), gated by canonical-content equality scoped to the field that changed, or where the hold a field declaring `inline` reads off its diagnostics flips (VISUAL_EDITOR §"Structure mirrors the schema"). Caret continuity across a leaf's *own* edits is not this gate at all: it is PM's `StepMap`, inside the leaf the codec mounts, which is why an own-edit never re-hydrates and never moves a caret.
 
 ## Seams
 
