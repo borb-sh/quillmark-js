@@ -1,82 +1,42 @@
-# The whole gate, over the whole workspace, in one job: every package runs each verb its
-# own way, and a verb name means one thing. Nothing runs elsewhere. One test loads the
-# built client in a browser (CLAUDE.md §Verification), which the runner image's Google
-# Chrome answers; nothing else here needs one and nothing installs one.
+# The gate in two jobs that run at once, each a run of the root's verbs and neither naming a
+# package: `check` is every verb but the suites, `test` is the suites. Each builds for itself,
+# since the suites spawn and read built artifacts too. One test loads the built client in a
+# browser (CLAUDE.md §Verification), which the runner image's Google Chrome answers; nothing
+# here installs one.
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
-  # release-prepare.yml opens the release PR as `GITHUB_TOKEN`, whose events fire no
-  # workflow runs; `workflow_dispatch` is the exception, so that job dispatches this
-  # workflow at the release branch and the checks land on the PR's head commit.
+  # release-prepare.yml opens the release PR as `GITHUB_TOKEN`, whose events fire no workflow
+  # runs, so it dispatches this workflow at the release branch.
   workflow_dispatch:
 
-# One run per ref: a new push cancels the in-flight run for the same PR/branch.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  ci:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-
-      # `prepare` builds quiver's and ui's dist here, which is what the playground
-      # then type-checks against.
       - run: npm ci
-
-      - name: Lint (prettier)
-        run: npm run lint
-
-      - name: Check (types)
-        run: npm run check
-
-      - name: Docs (section pointers, the boundary pin)
-        run: npm run check:docs
-
-      - name: Style scales
-        run: npm run check:style
-
-      - name: Dependency law
-        run: npm run check:deps
-
-      # Before the suite: quillkit is reached through the bin an author runs, and the
-      # client it serves is `vite build`'s output, so both are built artifacts the
-      # suite spawns and reads rather than modules it imports.
-      - name: Build
-        run: npm run build
-
-      # After the build, because the claim is about built bytes: a stylesheet a module
-      # side-effect imports is a bundler's to prune, and nothing before the build can
-      # see whether it survived.
-      - name: Bundled scales
-        run: npm run check:bundle
-
-      - name: Test (vitest)
-        run: npm test
-
-      # After the build, because publint reads the `dist` the manifest points at.
-      - name: Package (publint)
-        run: npm run check:pack
-
-      # The deploy, rehearsed from the TARBALL rather than the worktree, which is the one
-      # thing nothing above reaches: the suite lays a site out of `dist/`, and a `files`
-      # field that stopped shipping the client passes every check up to here and fails in
-      # a consumer's deploy. `npm pack` on a directory runs its `prepack`, so this is the
-      # published artifact, and the bundle half reads the laid client rather than inferring
-      # it from the build path. No upload: a rehearsal is not a deploy, and this
-      # repository's Pages holds the playground.
+      - run: npm run gate:fast
+      - run: npm run build
+      - run: npm run check:bundle
+      - run: npm run check:pack
+      # The deploy, laid from the tarball rather than the worktree: a `files` field that stopped
+      # shipping the client passes every verb above and fails in a consumer's deploy. `npm pack`
+      # runs `prepack`, so this is the published artifact.
       - name: Deploy layout, from the tarball
         run: |
           mkdir -p "$RUNNER_TEMP/pack" "$RUNNER_TEMP/tool"
@@ -88,3 +48,15 @@ jobs:
           test -f "$RUNNER_TEMP/site/quiver/quiver.json" \
             || { echo "::error::the tarball laid no quiver under the site"; exit 1; }
           node scripts/check-style.mjs --built "$RUNNER_TEMP/site"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
