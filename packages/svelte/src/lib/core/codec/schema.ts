@@ -213,11 +213,15 @@ export const plaintextSchema = new Schema({ nodes: inlineNodes, marks: {} });
  * A `plaintext` field without `inline`: paragraphs and hard breaks, no marks, no
  * islands, no containers, which is the shape `Content::is_plain` admits. Mark-free
  * for the reason {@link plaintextSchema} is.
+ *
+ * A paragraph and a break both store one `\n`, so a paragraph here is a line and
+ * says so (`data-qm-line`): `prose.css` draws a run of them at the leading, and a
+ * boundary reads as the one line down that a break does.
  */
 export const plainSchema = new Schema({
 	nodes: {
 		doc: { content: 'paragraph+' },
-		paragraph: blockNodes.paragraph,
+		paragraph: { ...blockNodes.paragraph, toDOM: () => ['p', { 'data-qm-line': '' }, 0] },
 		text: inlineLeafNodes.text,
 		hard_break: inlineLeafNodes.hard_break
 	},

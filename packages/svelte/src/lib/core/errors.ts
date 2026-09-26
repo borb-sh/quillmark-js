@@ -30,8 +30,9 @@ export type EditorErrorCode =
 	 *  the whole projection instead, so the store is correct and this field's
 	 *  identity anchors were paid. */
 	| 'commit-fallback'
-	/** The overwrite fallback also failed: the optimistic PM state stands and the
-	 *  store is stale for this field. The one code here that leaves damage. */
+	/** The overwrite fallback also failed, or the typed writer refused a `plaintext`
+	 *  leaf's text: the optimistic PM state stands and the store is stale for this
+	 *  field. The one code here that leaves damage. */
 	| 'commit-lost'
 	/** A card operation (add, move, remove, retype) that threw. The document is
 	 *  unchanged; the boundary's mutators are transactional. */

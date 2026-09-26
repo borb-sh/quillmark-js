@@ -184,10 +184,14 @@ describe('the hold on a narrowed field', () => {
 				.filter((d) => d.path === 'main.subtitle')
 				.map((d) => d.code)
 		).toEqual(['validation::not_plain']);
+		const before = JSON.stringify(doc.getStored('subtitle'));
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'subtitle', holds, true);
 		expect(holds).toEqual([true]);
 		expect(viewOf(field).editable).toBe(false);
+		// A plaintext leaf commits through the typed writer, which would store it joined.
+		keystroke(viewOf(field));
+		expect(JSON.stringify(doc.getStored('subtitle'))).toBe(before);
 		field.destroy();
 	});
 
@@ -223,20 +227,21 @@ describe('plaintext fields fire no markdown input rules', () => {
 
 	it('a plaintext field does NOT fire the strong rule — delimiters and no-marks survive', () => {
 		const doc = template();
+		const before = doc.getStored('subtitle') as string;
 		const field = createField({
 			doc,
 			quill: quill(),
-			addr: { field: 'colophon' }, // default-only → decodes empty, first edit installs
+			addr: { field: 'subtitle' }, // `plaintext`, `inline: true`
 			container: mount(),
-			plaintext: true
+			plaintext: true,
+			inline: true
 		});
 		const view = viewOf(field);
 		view.dispatch(view.state.tr.insertText('**x*', 1)); // literal; the closing `*` fires the rule
 		expect(fireClosingStar(view)).toBeFalsy(); // no rule to match → not intercepted
 		view.dispatch(view.state.tr.insertText('*', view.state.selection.head));
-		const rt = doc.getStored('colophon') as { text: string; marks: unknown[] };
-		expect(rt.text).toBe('**x**');
-		expect(rt.marks).toHaveLength(0);
+		// The literal string, the field's rest form: no mark had anywhere to land.
+		expect(doc.getStored('subtitle')).toBe(`**x**${before}`);
 		field.destroy();
 	});
 

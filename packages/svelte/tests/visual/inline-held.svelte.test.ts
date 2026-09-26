@@ -236,7 +236,9 @@ describe('a top-level plaintext field over content upstream does not call plain'
 		revalidate(mounted);
 		const leaf = leafOf(mounted.target, 'Address');
 		expect(leaf.getAttribute('contenteditable')).toBe('true');
-		expect(leaf.innerHTML).toBe('<p>12 Main St<br>Springfield</p>');
+		expect([...leaf.querySelectorAll('p')].map((p) => p.innerHTML)).toEqual([
+			'12 Main St<br>Springfield'
+		]);
 		doc.free();
 	});
 });
