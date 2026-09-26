@@ -32,7 +32,14 @@ export type { SlashState, SlashStrings } from './slash.js';
 
 // Schemas (the decode/encode target; the VisualEditor mounts them). `hasMarks` is
 // what a mark surface asks before offering itself over a leaf.
-export { blockSchema, inlineSchema, plaintextSchema, leafSchema, hasMarks } from './schema.js';
+export {
+	blockSchema,
+	inlineSchema,
+	plaintextSchema,
+	plainSchema,
+	leafSchema,
+	hasMarks
+} from './schema.js';
 
 // The url edge: `rendersHref` is the link gate the prompt re-asks on submit, and
 // `storableUrl` the encode the store's own refusal requires of the value it takes
@@ -44,7 +51,7 @@ export { rendersHref, storableUrl } from './urls.js';
 // The barrel carries what has an off-barrel caller, and nothing else. A symbol
 // reached only by relative import within `codec/` stays off it: an export nothing
 // imports is surface that still has to stay honest.
-export { decode, fitsInline, renderContent, usvLength } from './decode.js';
+export { decode, fitsInline, fitsPlain, renderContent, usvLength } from './decode.js';
 export { pmToContent, contentEdit, lower } from './encode.js';
 export type { ContentEdit } from './encode.js';
 export { usvToPM, pmToUsv, buildLineIndex } from './positions.js';

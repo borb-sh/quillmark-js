@@ -5,16 +5,18 @@ import { describe, it, expect } from 'vitest';
 import {
 	decode,
 	fitsInline,
+	fitsPlain,
 	pmToContent,
 	rendersHref,
 	blockSchema,
 	inlineSchema,
-	plaintextSchema
+	plaintextSchema,
+	plainSchema
 } from '$lib/core/codec';
 import type { Content } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { pmMarkFromContent } from '$lib/core/codec/marks.js';
-import { md, normalize, contentEqual, titleContent, bodyContent } from './_util.js';
+import { md, normalize, contentEqual, titleContent, bodyContent, quill } from './_util.js';
 
 /** decode → pmToContent, both sides normalized through the real content. */
 function reContent(rt: Content): Content {
@@ -144,6 +146,34 @@ describe('inline / plaintext constraints', () => {
 		const anyMark = doc.child(0).children.some((n) => n.marks.length > 0);
 		expect(anyMark).toBe(false);
 		expect(doc.child(0).textContent).toBe('plain bold em');
+	});
+
+	// What upstream's literal codec reads out of a string: a lone `\n` between two
+	// written lines continues the paragraph, and every other `\n` opens one.
+	it.each([
+		['a lone newline', 'a\nb', 'doc(paragraph("a", hard_break, "b"))'],
+		['a blank line', 'a\n\nb', 'doc(paragraph("a"), paragraph, paragraph("b"))'],
+		['a trailing newline', 'a\n', 'doc(paragraph("a"), paragraph)'],
+		['a leading newline', '\na', 'doc(paragraph, paragraph("a"))'],
+		['trailing spaces', 'a  \nb  ', 'doc(paragraph("a  ", hard_break, "b  "))']
+	])('the plain schema holds %s, and projects back to the same lines', (_, value, shape) => {
+		const doc = quill().seedDocument();
+		doc.storeField('errata', [value]);
+		const rt = quill().reader(doc).getContentAt('errata', [0])!;
+		doc.free();
+
+		const pm = decode(rt, plainSchema);
+		expect(pm.toString()).toBe(shape);
+		expect(pmToContent(pm).text).toBe(value);
+		expect(contentEqual(normalize(pmToContent(pm)), normalize(rt))).toBe(true);
+	});
+
+	it('fitsPlain asks upstream whether the lines are plain, marks set aside', () => {
+		expect(fitsPlain(md('one  \ntwo\n\nthree'))).toBe(true);
+		expect(fitsPlain(md('plain **bold** end'))).toBe(true);
+		for (const src of ['- one', '# Title', '> quoted', '```\ncode\n```', '![i](a.png)']) {
+			expect(fitsPlain(md(src)), src).toBe(false);
+		}
 	});
 });
 

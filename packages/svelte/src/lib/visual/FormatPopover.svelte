@@ -142,9 +142,10 @@
 		const selection = view?.state.selection;
 		const formattable = selection instanceof TextSelection && !selection.empty;
 		// …in a leaf that has formatting at all. A `plaintext` leaf declares no mark
-		// types (`plaintextSchema`), so this surface withholds itself over one entirely,
-		// the way it never rises over the text input a `string` field draws: the value is
-		// literal text, and a mark on it is a value the boundary refuses to coerce back.
+		// types (`plaintextSchema`, `plainSchema`), so this surface withholds itself over
+		// one entirely, the way it never rises over the text input a `string` field draws:
+		// the value is literal text, and a mark on it is a value the boundary refuses to
+		// coerce back.
 		if (
 			!view ||
 			!view.hasFocus() ||

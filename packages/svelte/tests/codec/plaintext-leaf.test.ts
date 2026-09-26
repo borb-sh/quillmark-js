@@ -5,7 +5,7 @@
 // eat every `*` a plaintext author typed, then commit a delta computed against text
 // the document never held.
 //
-// The one suite that does not run on the reference quill: that quill declares both
+// A suite that does not run on the reference quill: that quill declares both
 // types (`subtitle` plaintext, `epigraph` inline richtext) but no two fields differing
 // in nothing else. So the schema is built here and stays minimal: two content fields
 // differing only in declared type, which is the entire variable.
@@ -115,12 +115,10 @@ describe('a plaintext leaf over an authored string', () => {
 	});
 
 	it('commits the first edit CLEANLY, taking no recovery path', () => {
-		// The commit half, and the reason the leaf gates on the rest form rather than on
-		// mere presence. `applyChange` reads an authored string as markdown whatever the
-		// declared type, so a delta over the literal content meets a shorter pre-image and
-		// is refused; the value survives (the whole-field install fallback catches it)
-		// but the host is handed a `commit-fallback` error for an ordinary keystroke.
-		// Choosing `install` up front is what makes the first edit unremarkable.
+		// The commit half. `applyChange` reads an authored string as markdown whatever the
+		// declared type, so a delta over the literal content would meet a shorter
+		// pre-image and be refused. The leaf takes no op path at all: it hands its text to
+		// the typed writer, which rests the field as the literal string.
 		const q = probeQuill();
 		const doc = authored();
 		const errors: string[] = [];
@@ -138,13 +136,13 @@ describe('a plaintext leaf over an authored string', () => {
 		expect(errors).toEqual([]);
 		expect(field.getContent().text).toBe(`!${AUTHORED}`);
 		expect(q.reader(doc).getContent('note')!.text).toBe(`!${AUTHORED}`);
-		// The commit brought the field to content rest, so the next edit takes ops.
-		expect(typeof doc.getStored('note')).toBe('object');
+		// The literal string, asterisks unescaped: the rest form `toMarkdown` round-trips.
+		expect(doc.getStored('note')).toBe(`!${AUTHORED}`);
 
-		// And an op-grained edit over that rest form is still literal.
+		// And the next edit over that rest form is still literal.
 		view.dispatch(view.state.tr.insertText('?', 2));
 		expect(errors).toEqual([]);
-		expect(field.getContent().text).toBe(`!?${AUTHORED}`);
+		expect(doc.getStored('note')).toBe(`!?${AUTHORED}`);
 
 		field.destroy();
 		doc.free();
@@ -205,7 +203,7 @@ describe('a plaintext leaf carries no marks', () => {
 	it('opens a value that already carries one, and drops it on the next commit', () => {
 		// The state an older build left behind: a strong mark on a plaintext field, which
 		// renders as a coercion error. Decode strips it, so the leaf shows the text, and
-		// the first keystroke commits the stripped content back.
+		// the first keystroke commits the text back as the literal string.
 		const doc = authored();
 		const marked: Content = {
 			text: AUTHORED,
@@ -223,8 +221,8 @@ describe('a plaintext leaf carries no marks', () => {
 
 		view.dispatch(view.state.tr.insertText('!', 1));
 		expect(codes).toEqual([]);
-		expect((doc.getStored('note') as Content).marks).toHaveLength(0);
-		expect(field.getContent().text).toBe(`!${AUTHORED}`);
+		expect(doc.getStored('note')).toBe(`!${AUTHORED}`);
+		expect(field.getContent().marks).toHaveLength(0);
 
 		field.destroy();
 		doc.free();

@@ -522,10 +522,13 @@ describe('rowSummary', () => {
 	it('skips a block prose cell and every non-text cell', () => {
 		const items = row({
 			body: f({ type: 'richtext' }),
+			address: f({ type: 'plaintext' }),
 			n: f({ type: 'number' }),
 			on: f({ type: 'boolean' })
 		});
-		expect(rowSummary(items, { body: content('para'), n: 1, on: true })).toBeUndefined();
+		expect(
+			rowSummary(items, { body: content('para'), address: 'a', n: 1, on: true })
+		).toBeUndefined();
 		expect(rowSummary(undefined, { x: 'y' })).toBeUndefined();
 	});
 
@@ -578,12 +581,13 @@ describe('optional cells', () => {
 		}
 	});
 
-	it('keep the base type’s shape: a `plaintext?` cell is one line, a table column', () => {
-		expect(shortCell(f({ type: 'plaintext?' }))).toBe(true);
+	it('keep the base type’s shape: an inline `plaintext?` cell is one line, a table column', () => {
+		expect(shortCell(f({ type: 'plaintext?', inline: true }))).toBe(true);
+		expect(shortCell(f({ type: 'plaintext?' }))).toBe(false);
 		expect(shortCell(f({ type: 'richtext?' }))).toBe(false);
 		const items = f({
 			type: 'object',
-			properties: { note: f({ type: 'plaintext?' }), on: f({ type: 'boolean?' }) }
+			properties: { note: f({ type: 'plaintext?', inline: true }), on: f({ type: 'boolean?' }) }
 		});
 		expect(arrayLayout(f({ type: 'array', items, ui: { layout: 'table' } }))).toBe('table');
 		expect(rowSummary(items, { note: 'Primary' })).toBe('Primary');
@@ -641,7 +645,7 @@ describe('arrayLayout', () => {
 		since: f({ type: 'date' }),
 		lead: f({ type: 'boolean' }),
 		n: f({ type: 'integer' }),
-		tag: f({ type: 'plaintext' }),
+		tag: f({ type: 'plaintext', inline: true }),
 		line: f({ type: 'richtext', inline: true })
 	};
 	const arr = (properties: Record<string, QuillFieldSchema>, layout?: 'table') =>
@@ -659,6 +663,7 @@ describe('arrayLayout', () => {
 
 	it('declines for a block prose cell or a container, at every width', () => {
 		expect(arrayLayout(arr({ ...short, body: f({ type: 'richtext' }) }, 'table'))).toBe('list');
+		expect(arrayLayout(arr({ ...short, address: f({ type: 'plaintext' }) }, 'table'))).toBe('list');
 		expect(
 			arrayLayout(
 				arr({ ...short, rows: f({ type: 'array', items: f({ type: 'string' }) }) }, 'table')

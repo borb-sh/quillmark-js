@@ -47,10 +47,11 @@ function chainKeymaps(...maps: Record<string, Command>[]): Record<string, Comman
 	return out;
 }
 
-/** The block-schema body's structural keys: `{}` for the inline/plaintext schemas,
- * whose leaves declare neither lists nor code blocks. The argument list is the
- * precedence order VISUAL_EDITOR §Chrome states, so a new link is one more argument
- * at its place in that order rather than a nesting to read inside out.
+/** A multi-block leaf's structural keys, each link binding only what its schema
+ * declares: over `plainSchema`, which holds neither lists nor code blocks nor islands,
+ * the block link and the break link alone. The argument list is the precedence order
+ * VISUAL_EDITOR §Chrome states, so a new link is one more argument at its place in that
+ * order rather than a nesting to read inside out.
  *
  * The slash menu is innermost of the three, and it is conditional rather than
  * schema-gated: the keys exist only where a menu can be drawn (`slash`), because Enter

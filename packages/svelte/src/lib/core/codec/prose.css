@@ -71,6 +71,14 @@ li.ProseMirror-selectednode::after {
 	margin-top: var(--_qm-space-3);
 }
 
+/* A plain leaf's paragraph is a line of literal text (`schema.ts` §`plainSchema`), and
+   a boundary between two stores the one `\n` a hard break does. So no rhythm: a gap
+   would draw a blank line the value does not hold, and the two spellings of one string
+   would read apart. */
+.ProseMirror > [data-qm-line] + [data-qm-line] {
+	margin-top: 0;
+}
+
 /* A blockquote's UA indent was its only mark, and the reset above takes it. The rule
    and the inset carry it instead: the same hairline every surface reads, so a quote
    reads as set apart without a fill or a second box. */

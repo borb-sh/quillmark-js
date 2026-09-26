@@ -4,9 +4,10 @@
 // Each set is closed upstream, so the schema names its whole vocabulary and carries
 // nothing inert. `blockSchema` is the full field; `inlineSchema` is the constrained
 // single-textblock form for `richtext(inline)` (one paragraph, no block split, no
-// containers, no islands) and `plaintextSchema` is that one without marks: same
-// decode/lower/position machinery, narrower shape. Anchors are not marks here
-// (decorations).
+// containers, no islands) and `plaintextSchema` is that one without marks, for
+// `plaintext(inline)`; `plainSchema` is a `plaintext` field without `inline`,
+// paragraphs and hard breaks and nothing else. Same decode/lower/position machinery,
+// narrower shapes. Anchors are not marks here (decorations).
 //
 // `toDOM` and `parseDOM` are one tier, not two halves of a rendering: a copy and a
 // paste inside one body run the whole document through them (CODEC §"Markdown at the
@@ -198,8 +199,8 @@ const inlineNodes: Record<string, NodeSpec> = {
 export const inlineSchema = new Schema({ nodes: inlineNodes, marks });
 
 /**
- * The inline schema with no mark types at all: a `plaintext` field, whose value is
- * literal text the boundary refuses to coerce back once it carries a mark.
+ * The inline schema with no mark types at all: a `plaintext(inline)` field, whose
+ * value is literal text the boundary refuses to coerce back once it carries a mark.
  *
  * Declaring none is what makes that structural rather than a rule each path
  * restates: `toggleMark` has no type to apply, the mark input rules build nothing,
@@ -208,21 +209,47 @@ export const inlineSchema = new Schema({ nodes: inlineNodes, marks });
  */
 export const plaintextSchema = new Schema({ nodes: inlineNodes, marks: {} });
 
-/** The schema a leaf of the declared type mounts: `plaintext` is inline at the
- *  codec whatever it declares, and a `richtext` is block unless it declares `inline`. */
+/**
+ * A `plaintext` field without `inline`: paragraphs and hard breaks, no marks, no
+ * islands, no containers, which is the shape `Content::is_plain` admits. Mark-free
+ * for the reason {@link plaintextSchema} is.
+ *
+ * A paragraph and a break both store one `\n`, so a paragraph here is a line and
+ * says so (`data-qm-line`): `prose.css` draws a run of them at the leading, and a
+ * boundary reads as the one line down that a break does.
+ */
+export const plainSchema = new Schema({
+	nodes: {
+		doc: { content: 'paragraph+' },
+		paragraph: { ...blockNodes.paragraph, toDOM: () => ['p', { 'data-qm-line': '' }, 0] },
+		text: inlineLeafNodes.text,
+		hard_break: inlineLeafNodes.hard_break
+	},
+	marks: {}
+});
+
+/** The schema a leaf of the declared type mounts: `inline` narrows either type to one
+ *  textblock, and `plaintext` takes its marks away. */
 export function leafSchema(opts: { plaintext?: boolean; inline?: boolean }): Schema {
-	return opts.plaintext ? plaintextSchema : opts.inline ? inlineSchema : blockSchema;
+	if (opts.plaintext) return opts.inline ? plaintextSchema : plainSchema;
+	return opts.inline ? inlineSchema : blockSchema;
 }
 
-/** Whether `schema` can carry formatting at all: false for {@link plaintextSchema}
- *  alone. What a mark command asks before it offers itself. */
+/** Whether `schema` can carry formatting at all: false for the two plaintext schemas.
+ *  What a mark command asks before it offers itself. */
 export function hasMarks(schema: Schema): boolean {
 	return Object.keys(schema.marks).length > 0;
 }
 
-/** True for the constrained inline schema (no block containers); decode branches on it. */
+/** True for the one-line schemas, which declare no `hard_break`; decode branches on it. */
 export function isInlineSchema(schema: Schema): boolean {
-	return !schema.nodes.blockquote;
+	return !schema.nodes.hard_break;
+}
+
+/** True for {@link blockSchema}, the one holding blocks past the paragraph: what a
+ *  leaf's island, gap-cursor and slash machinery mounts on. */
+export function isBlockSchema(schema: Schema): boolean {
+	return !!schema.nodes.blockquote;
 }
 
 /** Whether `type` can hold a within-block line break, which a heading cannot (§`heading`).
