@@ -232,9 +232,8 @@ export function declaredGhost(v: unknown, markdown: boolean): string | undefined
 
 /**
  * A scalar `default:` as the text an unset control holds, where it prints: as
- * declared, `undefined` for none, a blank or a non-scalar. One test of printing for
- * every control, the one {@link exampleGhost} gives way to: a default of spaces
- * prints nothing a reader sees.
+ * declared, `undefined` for none, a blank or a non-scalar. A default of spaces prints
+ * nothing a reader sees, so a control holds none and draws its example instead.
  */
 export function printedText(v: unknown): string | undefined {
 	const text = stringifyGhost(v);

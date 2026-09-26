@@ -801,8 +801,8 @@
 	}
 	/* The default's rows are what prints and nothing written: every value they draw takes
 	   the default rung (theme.css), and the first gesture, writing them, takes it off. */
-	.qm-array-rows[data-default]
-		:global(:is(.qm-input, .ProseMirror, .qm-select:not([data-ghosted]), .qm-date)),
+	.qm-array-rows[data-default] :global(:is(.qm-input, .ProseMirror, .qm-date)),
+	.qm-array-rows[data-default] :global(.qm-select:not([data-ghosted])),
 	.qm-array-rows[data-default] .qm-element-title:not(.untitled) {
 		color: var(--_qm-ink-default);
 	}

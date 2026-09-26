@@ -27,8 +27,9 @@
  rung (theme.css), instead of the primitive's `mm`/`dd`/`yyyy` hints, which say
  "empty" where the rung says "will render 2026-01-01". At rest the ghost is painted
  in the segment snippet, over an unset primitive: a default held as its value reads
- as filled to every path that reads the primitive, which re-reports a filled value as
- each segment loses focus, so a Tab through the field would write it. `placeholder`
+ as filled to every path that reads the primitive (`areAllSegmentsFilled`,
+ Backspace, the hidden input), and whether it stands as the value is the field's to
+ say only once the user enters it. `placeholder`
  (the `DateValue` the segments count from, never one they display) carries the
  default too, so arrowing an empty segment starts at the render's date rather than
  today's.
