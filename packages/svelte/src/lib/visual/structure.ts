@@ -410,10 +410,11 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
 // ── Row summaries and layouts ────────────────────────────────────────────────
 
 /** Whether a cell is one line tall by declaration: the shape a table column and a row
- *  summary can hold. A `plaintext` leaf is inline at the codec whatever it declares. */
+ *  summary can hold. A prose cell is one where it declares `inline`, `richtext` or
+ *  `plaintext` alike. */
 export function shortCell(sub: QuillFieldSchema): boolean {
 	const kind = controlKind(sub);
-	if (kind === 'prose') return sub.type === 'plaintext' || !!sub.inline;
+	if (kind === 'prose') return !!sub.inline;
 	return (
 		kind === 'text' || kind === 'enum' || kind === 'number' || kind === 'boolean' || kind === 'date'
 	);

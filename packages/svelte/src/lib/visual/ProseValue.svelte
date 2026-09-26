@@ -17,16 +17,18 @@
  being the row's or the cell's business. Read once, at mount, since that is when this
  leaf takes its state.
 
- The schema is the declared type's where the parent has room for it: a subform's
- block `richtext` cell takes the block schema and the full row ({@link ObjectField}).
+ The schema is the declared type's where the parent has room for it: a subform cell
+ declaring no `inline` takes the full row ({@link ObjectField}), a `richtext` one on the
+ block schema and a `plaintext` one on the plain schema, paragraphs and hard breaks.
  An array element is one textblock whatever it declares, since Enter there is the
  repeater's. There is no slash menu at either width, and an island draws as its
  placeholder: an atom a keystroke can delete and no view edits.
 
- A narrowed leaf over anything but one plain paragraph is held: the inline decode
- joins lines and drops containers and islands, so the first keystroke would write
- that loss back. A held leaf draws its content on the block schema, read-only, with a
- note inside its box, and commits nothing.
+ A leaf over content its schema cannot hold is held: a narrowed one over anything but
+ one plain paragraph (`fitsInline`), a plain one over anything but plain lines
+ (`fitsPlain`). Its decode would join or drop what is left over, and the first
+ keystroke would write that loss back, so a held leaf draws its content on the block
+ schema, read-only, with a note inside its box, and commits nothing.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
@@ -36,6 +38,7 @@
 		blockSchema,
 		decode,
 		fitsInline,
+		fitsPlain,
 		leafSchema,
 		pmToContent,
 		proseAttributes,
@@ -56,8 +59,8 @@
 		/** The mark-free schema (a `plaintext` leaf): literal text, no formatting,
 		 * exactly as the scalar field of that type mounts. */
 		plaintext?: boolean;
-		/** The block schema, for a block `richtext` the parent draws at full width.
-		 * Absent, the leaf is one textblock. */
+		/** A multi-block schema, for a cell the parent draws at full width: the block
+		 * schema, or the plain one with `plaintext`. Absent, the leaf is one textblock. */
 		block?: boolean;
 		/** Accessible name for the editable region, where nothing else names it: an
 		 * array has no per-element label. A cell with a label element takes
@@ -127,9 +130,9 @@
 		// The same keymap and plugin stack a `createField` leaf mounts (shared
 		// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
 		// the parent's value write, per the header.
-		const inline = plaintext || !block;
+		const inline = !block;
 		const rt = content();
-		held = inline && !fitsInline(rt);
+		held = inline ? !fitsInline(rt) : plaintext && !fitsPlain(rt);
 		const schema = held ? blockSchema : leafSchema({ plaintext, inline });
 		const state = EditorState.create({
 			doc: decode(rt, schema),

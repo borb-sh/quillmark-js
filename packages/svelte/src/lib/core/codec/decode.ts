@@ -11,7 +11,8 @@ import { DOMSerializer, type Mark, type Node as PMNode, type Schema } from 'pros
 import type { Content, ContentContainer, ContentLine, ContentMark } from '@quillmark/wasm';
 import { ISLAND_SLOT, isBlockIsland, type IslandNodeAttrs } from './islands.js';
 import { descriptorOf, markKey, pmMarkFromContent } from './marks.js';
-import { hasMarks, isInlineSchema, takesLineBreak } from './schema.js';
+import { core } from '../lifecycle.js';
+import { hasMarks, isBlockSchema, isInlineSchema, takesLineBreak } from './schema.js';
 
 /** Code points of `s` (USV units): the iteration granularity the content speaks. */
 export function codePoints(s: string): string[] {
@@ -68,6 +69,9 @@ export function decode(rt: Content, schema: Schema): PMNode {
 	if (isInlineSchema(schema)) {
 		return decodeInline(rt, schema, lineTexts, starts, marks, cursor);
 	}
+	if (!isBlockSchema(schema)) {
+		return decodePlain(rt, schema, lineTexts, starts, marks, cursor);
+	}
 
 	// Build leaves (fold `continues` runs), then nest by container prefix.
 	const leaves: Leaf[] = [];
@@ -98,7 +102,14 @@ export function fitsInline(rt: Content): boolean {
 	return !second || (plain(second) && !second.continues && rt.text.endsWith('\n'));
 }
 
-/** Inline / plaintext decode: one paragraph, containers and islands stripped. */
+/** Whether `rt` decodes under `plainSchema` losing nothing but its marks, which the
+ *  next commit heals (CODEC §Inline mode): upstream's `isPlain`, asked of the content
+ *  with them set aside. */
+export function fitsPlain(rt: Content): boolean {
+	return core().isPlain({ ...rt, marks: [] });
+}
+
+/** Inline decode: one paragraph, containers and islands stripped. */
 function decodeInline(
 	rt: Content,
 	schema: Schema,
@@ -117,6 +128,28 @@ function decodeInline(
 	}
 	const para = schema.nodes.paragraph.create(null, inline);
 	return schema.nodes.doc.create(null, para);
+}
+
+/** Plain decode: a `continues` line is a `hard_break` in the paragraph above and every
+ *  other line opens one. A line's kind and containers and every island have no node
+ *  here and are dropped, so a content {@link fitsPlain} refuses opens flattened. */
+function decodePlain(
+	rt: Content,
+	schema: Schema,
+	lineTexts: string[],
+	starts: number[],
+	marks: ContentMark[],
+	cursor: IslandCursor
+): PMNode {
+	const paras: PMNode[][] = [];
+	for (let i = 0; i < rt.lines.length; i++) {
+		const inline = buildInline(schema, lineTexts[i] ?? '', starts[i], marks, cursor, true);
+		const open = paras[paras.length - 1];
+		if (rt.lines[i].continues && open) open.push(schema.nodes.hard_break.create(), ...inline);
+		else paras.push(inline);
+	}
+	const blocks = paras.map((inline) => schema.nodes.paragraph.create(null, inline));
+	return schema.nodes.doc.create(null, blocks.length ? blocks : schema.nodes.paragraph.create());
 }
 
 /** Nest a run of leaves that share a `depth`-length container prefix into blocks. */

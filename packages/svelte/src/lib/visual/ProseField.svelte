@@ -82,10 +82,9 @@
 	 * trigger mounting on the block schema alone. */
 	let slash: SlashState | undefined = $state();
 
-	// The codec's own schema predicate (`createField`: `plaintext` implies `inline`), so
-	// the box a leaf draws and the schema it holds cannot disagree. On `inline` alone a
-	// `plaintext` field would take the block floor while holding one paragraph.
-	const block = $derived(!(inline || plaintext));
+	// The codec's own schema predicate (`leafSchema`: `inline` is one textblock at either
+	// type), so the box a leaf draws and the schema it holds cannot disagree.
+	const block = $derived(!inline);
 
 	let controller: FieldController | undefined;
 

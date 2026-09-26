@@ -5,11 +5,13 @@ import { describe, it, expect } from 'vitest';
 import {
 	decode,
 	fitsInline,
+	fitsPlain,
 	pmToContent,
 	rendersHref,
 	blockSchema,
 	inlineSchema,
-	plaintextSchema
+	plaintextSchema,
+	plainSchema
 } from '$lib/core/codec';
 import type { Content } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
@@ -144,6 +146,29 @@ describe('inline / plaintext constraints', () => {
 		const anyMark = doc.child(0).children.some((n) => n.marks.length > 0);
 		expect(anyMark).toBe(false);
 		expect(doc.child(0).textContent).toBe('plain bold em');
+	});
+
+	// The lines upstream's literal codec reads out of `a\nb\n\nc`: a lone `\n` between
+	// two written lines continues the paragraph, and a blank line opens one.
+	it('the plain schema holds paragraphs and breaks, and projects back to the same lines', () => {
+		const para: Content['lines'][number] = { containers: [], kind: 'para' };
+		const rt: Content = {
+			text: 'a\nb\n\nc',
+			lines: [para, { ...para, continues: true }, para, para],
+			marks: [],
+			islands: []
+		};
+		const doc = decode(rt, plainSchema);
+		expect(doc.toString()).toBe('doc(paragraph("a", hard_break, "b"), paragraph, paragraph("c"))');
+		expect(contentEqual(normalize(pmToContent(doc)), normalize(rt))).toBe(true);
+	});
+
+	it('fitsPlain asks upstream whether the lines are plain, marks set aside', () => {
+		expect(fitsPlain(md('one  \ntwo\n\nthree'))).toBe(true);
+		expect(fitsPlain(md('plain **bold** end'))).toBe(true);
+		for (const src of ['- one', '# Title', '> quoted', '```\ncode\n```', '![i](a.png)']) {
+			expect(fitsPlain(md(src)), src).toBe(false);
+		}
 	});
 });
 

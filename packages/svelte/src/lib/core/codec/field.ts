@@ -39,7 +39,7 @@ import { createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
-import { leafSchema } from './schema.js';
+import { isBlockSchema, leafSchema } from './schema.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
 import { focusSlashItem, runSlashItem, slashPlugin, type SlashState } from './slash.js';
 
@@ -52,10 +52,10 @@ export interface CreateFieldOpts {
 	quill: Quill;
 	addr: Addr;
 	container: HTMLElement;
-	/** Constrained single-textblock schema (a `richtext(inline)` field). */
+	/** Constrained single-textblock schema (a field declaring `inline`). */
 	inline?: boolean;
-	/** The mark-free inline schema (a `plaintext` field): literal text, no formatting
-	 *  and no anchors. Implies `inline`. */
+	/** A mark-free schema (a `plaintext` field): literal text, no formatting and no
+	 *  anchors, in paragraphs and hard breaks or, with `inline`, one textblock. */
 	plaintext?: boolean;
 	/** Suppress the markdown-shorthand input rules. */
 	noInputRules?: boolean;
@@ -264,12 +264,13 @@ export function proseAttributes(opts: {
 
 export function createField(opts: CreateFieldOpts): FieldController {
 	const { doc, addr, container } = opts;
-	const inline = !!opts.inline || !!opts.plaintext;
+	const inline = !!opts.inline;
 	const plaintext = !!opts.plaintext;
 	// The declared type picks the schema, and the schema is the whole of what
 	// `plaintext` suppresses: no mark types to toggle, to paste in, or to mint a
 	// shorthand with (`schema.ts`).
 	const schema: Schema = leafSchema({ plaintext, inline });
+	const block = isBlockSchema(schema);
 	// Bound once and held: the reader is a `{quill, doc}` pair that reads live, so
 	// every read below sees the commit before it.
 	const reader: DocumentReader = opts.quill.reader(doc);
@@ -292,7 +293,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 
 	// The menu's report channel, and the whole of what a leaf holds of it: the
 	// vocabulary is the codec's own constant (`slash.ts`), not a wording to derive.
-	const slash = inline ? undefined : opts.onSlash;
+	const slash = block ? opts.onSlash : undefined;
 
 	const seeded = buildState(reconciler.last);
 	const state = seeded.state;
@@ -315,10 +316,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		// (`scrollThreshold`) and what it leaves at the edge (`scrollMargin`).
 		scrollThreshold: clearance,
 		scrollMargin: clearance,
-		// Islands are block-schema only, so an inline leaf mounts no node view at all.
-		nodeViews: inline
-			? undefined
-			: {
+		// Islands are block-schema only, so any other leaf mounts no node view at all.
+		nodeViews: block
+			? {
 					island_block: tableNodeView({
 						strings: opts.tableStrings ?? (() => DEFAULT_TABLE_STRINGS),
 						register: (cellView) => {
@@ -331,7 +331,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 						onCellFocus: () => opts.onFocus?.(addr),
 						clearance
 					})
-				},
+				}
+			: undefined,
 		dispatchTransaction: (tr) => {
 			const oldRt = reconciler.last;
 			const next = view.state.apply(tr);
@@ -554,7 +555,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 
 /**
  * The prose-leaf plugin stack (VISUAL_EDITOR §Surface): shared by
- * {@link createField} and the by-value inline editor (`ProseValue`), so the two
+ * {@link createField} and the by-value editor (`ProseValue`), so the two
  * never fork the keymap/plugin ordering. History first, then any leaf-specific
  * plugins (`afterHistory`: the addressed leaf passes its anchor-position plugin;
  * a by-value leaf passes none), then {@link linebreakPlugin}, which normalizes what
@@ -563,10 +564,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * shapes: the gap cursor, {@link pastAtomPlugin}, and the island paste pass
  * (`islands.ts`).
  *
- * Every mark-shaped plugin reads the schema rather than a flag: over
- * `plaintextSchema` the shorthand rules build nothing (each is guarded on its mark
- * type) and the toggles bind no key, so a `**bold**` keeps the delimiters its author
- * typed without a second rule saying so.
+ * Every mark-shaped plugin reads the schema rather than a flag: over either plaintext
+ * schema the shorthand rules build nothing (each is guarded on its mark type) and the
+ * toggles bind no key, so a `**bold**` keeps the delimiters its author typed without
+ * a second rule saying so.
  */
 export function proseLeafPlugins(
 	schema: Schema,
@@ -588,9 +589,9 @@ export function proseLeafPlugins(
 	if (!opts.noInputRules) list.push(inputRulesPlugin(schema));
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));
-	// All three answer to something only a block leaf holds: an inline leaf is one
-	// textblock with no island and no gap to put a cursor in.
-	if (!opts.inline) list.push(gapCursor(), pastAtomPlugin(), islandPastePlugin());
+	// All three answer to something only the block schema holds: any other leaf is
+	// textblocks alone, with no island and no gap to put a cursor in.
+	if (isBlockSchema(schema)) list.push(gapCursor(), pastAtomPlugin(), islandPastePlugin());
 	if (opts.placeholder) list.push(placeholderPlugin(opts.placeholder));
 	return list;
 }
