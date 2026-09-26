@@ -92,8 +92,8 @@ export function decode(rt: Content, schema: Schema): PMNode {
 /** Whether `rt` decodes under an inline schema with nothing but whitespace dropped:
  *  upstream's `inline` rule, or one plain line and the empty one a trailing `\n`
  *  opens. That newline is the one a YAML `|` scalar keeps in a `plaintext` value,
- *  which upstream refuses (`trailingNewline`) and the inline decode joins at the cost
- *  of a space. Marks are the schema's own business (`plaintextSchema` declares none). */
+ *  which upstream refuses (`trailingNewline`) and the inline decode drops. Marks are
+ *  the schema's own business (`plaintextSchema` declares none). */
 export function fitsInline(rt: Content): boolean {
 	if (core().isInline(rt)) return true;
 	const plain = (line: ContentLine): boolean =>
@@ -132,10 +132,13 @@ function decodeInline(
 	cursor: IslandCursor
 ): PMNode {
 	// An inline field is single-line; join any stray lines with a space (no
-	// hard_break node exists in this schema). Islands are not representable inline:
-	// the slot char is dropped and its entry skipped.
+	// hard_break node exists in this schema). The empty line a trailing `\n` opens is
+	// dropped rather than joined, so a first edit stores no space nobody typed. Islands
+	// are not representable inline: the slot char is dropped and its entry skipped.
 	const inline: PMNode[] = [];
+	const last = lineTexts.length - 1;
 	for (let i = 0; i < lineTexts.length; i++) {
+		if (i > 0 && i === last && lineTexts[i] === '') break;
 		if (i > 0) inline.push(schema.text(' '));
 		inline.push(...buildInline(schema, lineTexts[i], starts[i], marks, cursor, true));
 	}

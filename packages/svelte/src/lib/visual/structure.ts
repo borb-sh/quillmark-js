@@ -279,6 +279,13 @@ export function exampleGhost(f: QuillFieldSchema): string | undefined {
 	return declaredGhost(f.example, markdown);
 }
 
+/** A field's `{#each}` key: its name and what a mounted leaf reads once, its type and
+ *  `inline` and its elements'. A retype or a quill swap that changes any of them under a
+ *  name remounts the field, where a kept leaf would commit on the old schema. */
+export function mountKey(name: string, f: QuillFieldSchema): string {
+	return `${name}\u0000${f.type}\u0000${f.inline === true}\u0000${f.items?.type ?? ''}\u0000${f.items?.inline === true}`;
+}
+
 /** Map a field schema to its control (precedence: prose › enum › text › …).
  * An array's element control is this over `items`: a missing `items` is a text
  * element. */

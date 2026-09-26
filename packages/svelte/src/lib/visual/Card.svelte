@@ -15,7 +15,7 @@
 	import type { EditorErrorHandler } from '../core/errors.js';
 	import type { LeafRegistry } from './leaves.js';
 	import type { CardModel, FieldModel } from './structure.js';
-	import { placeFields, humanize, initialExpandedGroup, kindTitle } from './structure.js';
+	import { placeFields, humanize, initialExpandedGroup, kindTitle, mountKey } from './structure.js';
 	import { holdInView } from './hold.js';
 	import type { FieldDomIds } from './domid.js';
 	import Field from './Field.svelte';
@@ -333,7 +333,7 @@
 
 {#snippet sectionFields(fields: FieldModel[])}
 	<div class="qm-fields qm-tracks">
-		{#each placeFields(fields) as { field: f, span } (f.name)}
+		{#each placeFields(fields) as { field: f, span } (mountKey(f.name, f.schema))}
 			<Field
 				field={f}
 				{span}
