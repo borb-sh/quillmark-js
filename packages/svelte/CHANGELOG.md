@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A body edited back to empty ghosts nothing**, as a field's prose leaf does: its `body.example`, `strings.bodyPlaceholder` or `Write…` goes at the leaf's first edit and does not return when the text is deleted.
+
 ## v0.13.0 - 2026-09-26
 
 **The `@quillmark/wasm` peer floor is `>=0.116.0-0`.** **A label is the quill's top-level `title`**: a field's label, a subform property's, a table column's and a card header's read `title` where they read `ui.title`, which the artifact refuses at load. A `{field}` token in a title is a load error too, so a card header is the kind's literal title and no longer follows an edit to the field it named, and a collapsed `object` row summarizes by its first short text cell, the `items.ui.title` template gone. **A card of an undeclared kind renders**: the preview opens over it and leaves it out, where the engine refused the document, and the editor still draws it in its recovery shell. **A seeded card is empty**: an added card carries the document's `$seed` overlay for its kind and nothing else, where it carried every field's `example:` and the kind's `body.example`.

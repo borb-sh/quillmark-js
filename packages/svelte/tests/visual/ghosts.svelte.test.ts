@@ -616,4 +616,20 @@ describe('the empty body', () => {
 			DEFAULT_VISUAL_STRINGS.bodyGhost
 		]);
 	});
+
+	it('ghosts nothing once edited back to empty', async () => {
+		q = ghosts();
+		doc = q.seedDocument();
+		const { target, editor } = openInner(doc);
+
+		await editor.focusField('main.body');
+		const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+		view.dispatch(view.state.tr.insertText('x', 1));
+		view.dispatch(view.state.tr.delete(1, 2));
+		flushSync();
+
+		expect(doc.main.body.text).toBe('');
+		expect(bodies(target)).toEqual([DEFAULT_VISUAL_STRINGS.bodyGhost]);
+		doc.free();
+	});
 });

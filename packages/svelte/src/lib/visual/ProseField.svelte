@@ -43,7 +43,7 @@
 		/** Ghost shown on the empty leaf: the `none` an optional field prints unset, or
 		 * nothing, and a body's always text (`resolveBodyGhost`). */
 		placeholder?: string;
-		/** A field's leaf, whose placeholder goes at its first edit (`createField`). */
+		/** The placeholder goes at the leaf's first edit (`createField`). */
 		placeholderUntilEdit?: boolean;
 		/** Ghost shown on the empty leaf until its first edit, and in the placeholder's
 		 * stead while the leaf holds the focus: an unset field's `example:`
