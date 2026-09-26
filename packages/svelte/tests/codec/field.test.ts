@@ -477,6 +477,81 @@ describe('the empty-leaf ghost', () => {
 	});
 });
 
+// The focused leaf's ghost rides the same decoration, and `prose.css` swaps it in while
+// the view holds the focus. What the codec owns is when it is stamped at all: on an
+// unanswered leaf, up to the first edit.
+describe('the example ghost', () => {
+	const attrOf = (f: FieldController, name: string): string | null =>
+		viewOf(f).dom.querySelector('.qm-prose-placeholder')?.getAttribute(name) ?? null;
+	const ghostOf = (f: FieldController) => attrOf(f, 'data-placeholder');
+	const exampleOf = (f: FieldController) => attrOf(f, 'data-example');
+
+	/** The showcase `title`, unset on a seed: inline richtext declaring an `example:` and
+	 *  no `default:`. */
+	function unsetTitle(opts: {
+		placeholder?: string;
+		placeholderUntilEdit?: boolean;
+		example?: string;
+	}): FieldController {
+		return createField({
+			doc: quill().seedDocument(),
+			quill: quill(),
+			addr: { field: 'title' },
+			container: mount(),
+			inline: true,
+			...opts
+		});
+	}
+
+	it('stamps the example beside the resting ghost, and alone where there is none', () => {
+		const both = unsetTitle({ placeholder: 'None', example: 'The Showcase Quill' });
+		expect(ghostOf(both)).toBe('None');
+		expect(exampleOf(both)).toBe('The Showcase Quill');
+		const alone = unsetTitle({ example: 'The Showcase Quill' });
+		expect(ghostOf(alone)).toBeNull();
+		expect(exampleOf(alone)).toBe('The Showcase Quill');
+		// An inline leaf's ghost keeps to its one line.
+		expect(
+			viewOf(alone)
+				.dom.querySelector('.qm-prose-placeholder')
+				?.classList.contains('qm-prose-placeholder-line')
+		).toBe(true);
+	});
+
+	it('drops the example at the first edit, and an emptied leaf keeps only the resting ghost', () => {
+		const field = unsetTitle({ placeholder: 'None', example: 'The Showcase Quill' });
+		const view = viewOf(field);
+		view.dispatch(view.state.tr.insertText('X', 1));
+		expect(exampleOf(field)).toBeNull();
+		view.dispatch(view.state.tr.delete(1, 2));
+		expect(ghostOf(field)).toBe('None');
+		expect(exampleOf(field)).toBeNull();
+		field.destroy();
+	});
+
+	it('drops a placeholder that says what the unset field prints at the first edit too', () => {
+		// The edit answers the field: emptied, the leaf holds an empty answer, which is
+		// what prints, where a body's invitation returns whenever the leaf is empty.
+		const field = unsetTitle({ placeholder: 'None', placeholderUntilEdit: true });
+		const view = viewOf(field);
+		expect(ghostOf(field)).toBe('None');
+		view.dispatch(view.state.tr.insertText('X', 1));
+		view.dispatch(view.state.tr.delete(1, 2));
+		expect(view.dom.querySelector('.qm-prose-placeholder')).toBeNull();
+		field.destroy();
+	});
+
+	it('moves after mount without an edit', () => {
+		const field = unsetTitle({});
+		expect(exampleOf(field)).toBeNull();
+		field.setExample('The Showcase Quill');
+		expect(exampleOf(field)).toBe('The Showcase Quill');
+		field.setExample(undefined);
+		expect(viewOf(field).dom.querySelector('.qm-prose-placeholder')).toBeNull();
+		field.destroy();
+	});
+});
+
 describe('an island edit on the op path', () => {
 	const TABLE_MD = 'para\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ntail';
 

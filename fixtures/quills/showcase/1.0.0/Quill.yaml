@@ -59,7 +59,7 @@ main:
       ui:
         group: identity
         compact: true
-      description: "Strings. Asks for `ui.compact` and is declined: an array grows with the document, and a row is as tall as its tallest cell. The one array declaring a literal `default:`, and a list ghosts nothing — the line prints only while the field is unset, and the `example:` beside it is what a seed writes instead."
+      description: "Strings. Asks for `ui.compact` and is declined: an array grows with the document, and a row is as tall as its tallest cell. The one array declaring a literal `default:`, and a list ghosts nothing — the line prints only while the field is unset. Nor does it ghost the `example:` beside it, which an array's control takes none of."
 
     contact:
       type: object
@@ -267,7 +267,7 @@ main:
       ui:
         group: meta
         compact: true
-      description: "Where the document is in its life. Which stage this is remains a human's call, so the field declares no `default:` and asks: the one enum carrying a required `*`, and the one whose seeded `draft` is an authored answer rather than a ghost."
+      description: "Where the document is in its life. Which stage this is remains a human's call, so the field declares no `default:` and asks: the one enum carrying a required `*`. Its `example:` reaches the blueprint and ghosts nowhere, an enum taking no example ghost."
 
     distribution:
       type: enum
@@ -325,7 +325,7 @@ main:
             type: plaintext
             inline: true
             example: SPEC/AA
-            description: Who set the marking. Declares no `default:`, so it is required in this world and asked in no other; its `example:` is a cell's, which no seed reaches.
+            description: Who set the marking. Declares no `default:`, so it is required in this world and asked in no other; its `example:` ghosts while the cell holds the focus.
           caveat:
             type: plaintext
             inline: true
@@ -356,6 +356,14 @@ main:
         group: meta
         compact: true
       description: A free-text handle. A bare string with no closed domain, so a text input.
+
+    reference:
+      type: string?
+      example: RFC 9110
+      ui:
+        group: meta
+        compact: true
+      description: "What the document answers to. An optional cell: unanswered, a `string?` prints `none` rather than the blank, so it declares no `default:`, draws no `*`, and ghosts `None` at rest and its `example:` while it holds the focus."
 
     revisions:
       type: array
@@ -414,8 +422,7 @@ main:
 
 card_kinds:
   section:
-    title: Section
-    description: A titled division of the document.
+    description: A titled division of the document. The kind declares no `title`, so each card is named by its own first short text cell, the `heading`.
     ui:
       groups:
         structure: {}
@@ -468,7 +475,7 @@ card_kinds:
 
   note:
     title: Marginal note
-    description: A short aside. Its fields are ungrouped, so the card renders no accordion. Its body declares no example, so a fresh one seeds empty — the leaf the ghost exists for.
+    description: A short aside. Its fields are ungrouped, so the card renders no accordion. Its body declares no `example:`, so an empty one ghosts the host's `bodyPlaceholder`, else `Write…`.
     fields:
       label:
         type: string
@@ -525,7 +532,7 @@ card_kinds:
                 - end
               default: end
               description: Which margin the figure floats to.
-        description: How the figure sits in the flow. The one variant-bearing enum on a card kind, and the field the kind's title reads.
+        description: How the figure sits in the flow. The one variant-bearing enum on a card kind.
       caption:
         type: richtext
         inline: true

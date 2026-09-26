@@ -27,6 +27,9 @@
 		fallback?: string;
 		/** The schema's `ui.blank_title`: what the blank draws as, in place of the em dash. */
 		blankTitle?: string;
+		/** An `enum?` cell, which prints `none` unset rather than its blank, and so ghosts
+		 *  `strings.optionalGhost` there. */
+		optional?: boolean;
 		/** Accessible name for a trigger nothing else names: an object property, whose
 		 * name is the field label plus the property's. A field's own trigger takes `id`
 		 * instead and is named by the `<label for>` beside it (the trigger is a
@@ -50,6 +53,7 @@
 		values,
 		fallback,
 		blankTitle,
+		optional = false,
 		label,
 		id,
 		describedBy,
@@ -74,7 +78,7 @@
 	const dash = (v: string | undefined) => v || blankTitle || '—';
 
 	const unset = $derived(local.value === UNSET);
-	const ghostText = $derived(dash(fallback));
+	const ghostText = $derived(optional ? t.strings.optionalGhost : dash(fallback));
 	/** What the closed trigger shows: the pick, or the ghosted default while unset. */
 	const shown = $derived(unset ? ghostText : dash(local.value));
 
@@ -129,13 +133,17 @@
 						     and while the field is unset this is the selected row, so the weight
 						     step pulls the other way. It rides the accessible name for the same
 						     reason. -->
+						<!-- An optional cell's row is untagged: it ghosts no default, and `None`
+						     names no member to tell it from. -->
 						<Select.Item
 							class="qm-menu-item qm-select-item qm-select-unset"
 							value={UNSET}
-							label={`${ghostText} ${t.strings.enumUnsetTag}`}
+							label={optional ? ghostText : `${ghostText} ${t.strings.enumUnsetTag}`}
 						>
 							<span class="qm-select-ghost">{ghostText}</span>
-							<span class="qm-select-tag">{t.strings.enumUnsetTag}</span>
+							{#if !optional}
+								<span class="qm-select-tag">{t.strings.enumUnsetTag}</span>
+							{/if}
 						</Select.Item>
 						<!-- A refused option still draws under `'disable'`, and under either
 						     policy when it is the one selected: a listbox whose selected value

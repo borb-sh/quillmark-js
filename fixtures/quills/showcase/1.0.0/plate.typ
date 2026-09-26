@@ -94,6 +94,7 @@
   #let revised = display("revised_at", "[year]-[month]-[day] [hour]:[minute]")
   #if revised != none [ · Revised #revised]
   #if data.at("tracking_id", default: "") != "" [ · #raw(data.tracking_id)]
+  #if data.at("reference", default: none) != none [ · re #data.reference]
   // A property's date is a `datetime` like a card-level one, so the property is
   // addressed the same way rather than placed as the string it used to be.
   #let reply = display("contact.reply_by", "[year]-[month]-[day]")

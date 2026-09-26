@@ -64,10 +64,14 @@ describe('the recovery shell', () => {
 		expect(card.querySelector('.qm-recovery-note')?.textContent).toContain('legacy_kind');
 		// The two exits, both drawn: retype offers every kind the quill declares, and delete
 		// sits on the header a declared card carries.
-		const offered = [...card.querySelectorAll<HTMLOptionElement>('.qm-recovery-retype option')]
-			.map((o) => o.value)
-			.filter(Boolean);
-		expect(offered).toEqual(Object.keys(q.schema.card_kinds!));
+		const options = [
+			...card.querySelectorAll<HTMLOptionElement>('.qm-recovery-retype option')
+		].filter((o) => o.value);
+		expect(options.map((o) => o.value)).toEqual(Object.keys(q.schema.card_kinds!));
+		// Each named as the add menu names it: the kind's `title`, else its humanized key.
+		expect(options.map((o) => o.textContent)).toEqual(
+			Object.entries(q.schema.card_kinds!).map(([kind, s]) => s.title ?? humanize(kind))
+		);
 		expect(card.querySelector('.qm-card-delete')).not.toBeNull();
 	});
 

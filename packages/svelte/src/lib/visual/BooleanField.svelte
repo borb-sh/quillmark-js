@@ -4,6 +4,12 @@
  Styled rather than a native checkbox: the native box's face is UA-owned shadow
  DOM, so no dial reaches it. The a11y comes with the primitive:
  Switch.Root renders `role="switch"` with its checked state and keyboard handling.
+
+ An unset `boolean?` prints `none`, which neither face of a switch says, so it draws a
+ third: the thumb at the track's centre. `role="switch"` admits no third state (a
+ `mixed` there reads as false), so an optional boolean's control is a `checkbox`, the
+ toggle role that does, announcing `mixed` while unset. A press from unset writes
+ `true`; nothing here returns the cell to unset.
 -->
 <script lang="ts">
 	import { Switch } from 'bits-ui';
@@ -13,6 +19,8 @@
 	interface Props {
 		value: boolean | undefined;
 		fallback?: boolean;
+		/** A `boolean?` cell, which has a third state: unset, printing `none`. */
+		optional?: boolean;
 		/** Accessible name for a switch nothing else names: an object property, whose
 		 * name is the field label plus the property's. A field's own switch takes `id`
 		 * instead and is named by the `<label for>` beside it. */
@@ -26,32 +34,42 @@
 		describedBy?: string;
 		onCommit: (v: boolean) => void;
 	}
-	let { value, fallback, label, id, describedBy, onCommit }: Props = $props();
+	let { value, fallback, optional = false, label, id, describedBy, onCommit }: Props = $props();
 
 	// Local toggle state synced to `value`; own-toggles stay local, only an external
 	// change reconciles back in (see `syncedLocal`). The primitive is driven
 	// controlled (`checked` + `onCheckedChange`, never `bind:`) so reconciliation
 	// stays the package's: a two-way bind hands the primitive a lane around it,
-	// which repeats the reconciliation hazard in miniature.
-	const local = syncedLocal(() => value ?? fallback ?? false);
+	// which repeats the reconciliation hazard in miniature. `undefined` is the unset
+	// optional cell, the one state with no default to stand in for it.
+	const local = syncedLocal<boolean | undefined>(
+		() => value ?? fallback ?? (optional ? undefined : false)
+	);
+	const unset = $derived(local.value === undefined);
+	const tristate = $derived(
+		optional ? { role: 'checkbox', 'aria-checked': unset ? ('mixed' as const) : !!local.value } : {}
+	);
 </script>
 
 <!-- Not `.qm-switch`: that name is the preset's pane band, whose narrow-viewport rule
  stands every child of it at `--qmh-tap`, so a track wearing it grows a thumb three times
  its own height over the labels around it (`preset/recipes.css`, held by `check:style`). -->
-<span class="qm-toggle-wrap">
+<span class="qm-toggle-wrap" data-unset={unset ? '' : undefined}>
 	<Switch.Root
 		class="qm-toggle qm-focus-ring qm-tap-floor"
-		checked={local.value}
+		checked={!!local.value}
 		{id}
 		aria-label={id ? undefined : label}
 		aria-describedby={describedBy}
 		onCheckedChange={(v) => {
+			// From unset the primitive reads the unchecked face, so its toggle is `true`.
 			local.value = v;
 			onCommit(v);
 		}}
 	>
-		<Switch.Thumb class="qm-toggle-thumb" />
+		{#snippet child({ props })}
+			<button {...props} {...tristate}><Switch.Thumb class="qm-toggle-thumb" /></button>
+		{/snippet}
 	</Switch.Root>
 </span>
 
@@ -94,5 +112,9 @@
 	}
 	.qm-toggle-wrap :global(.qm-toggle-thumb[data-state='checked']) {
 		translate: 0.75rem;
+	}
+	/* Unset, the thumb stands at neither end: halfway along its travel. */
+	.qm-toggle-wrap[data-unset] :global(.qm-toggle-thumb) {
+		translate: 0.375rem;
 	}
 </style>

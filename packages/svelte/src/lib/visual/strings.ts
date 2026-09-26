@@ -86,6 +86,9 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	// ── Field chrome ──────────────────────────────────────────────────────────
 	/** The required marker's accessible name; the glyph itself is a `*`. */
 	fieldRequired: string;
+	/** What an unset optional cell (`t?`) ghosts at rest: the `none` it prints
+	 *  unanswered, in the product's words. */
+	optionalGhost: string;
 	/** Under a prose leaf holding more structure than it can edit (paragraphs, a list,
 	 *  an island in a one-line cell), which it draws read-only rather than flatten. */
 	proseHeld: string;
@@ -132,7 +135,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	bodyGhost: string;
 	/**
 	 * Per-CARD wording, in place of {@link VisualStrings.bodyGhost}; `undefined`
-	 * takes it. Pure and uncached ({@link BodyPlaceholder}).
+	 * takes it. A body `default:` and the kind's `body.example` both outrank it
+	 * (`resolveBodyGhost`). Pure and uncached ({@link BodyPlaceholder}).
 	 */
 	bodyPlaceholder: BodyPlaceholder;
 }
@@ -187,6 +191,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	enumUnsetTag: 'default',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
 	fieldRequired: 'required',
+	optionalGhost: 'None',
 	proseHeld: 'Holds more than this field can edit here.',
 	formatGroup: 'Formatting',
 	formatBold: 'Bold (Mod-B)',

@@ -15,7 +15,7 @@
 	import type { EditorErrorHandler } from '../core/errors.js';
 	import type { LeafRegistry } from './leaves.js';
 	import type { CardModel, FieldModel } from './structure.js';
-	import { placeFields, humanize, initialExpandedGroup } from './structure.js';
+	import { placeFields, humanize, initialExpandedGroup, kindTitle } from './structure.js';
 	import { holdInView } from './hold.js';
 	import type { FieldDomIds } from './domid.js';
 	import Field from './Field.svelte';
@@ -402,7 +402,7 @@
 
 {#snippet kindOptions()}
 	{#each kinds as k (k)}
-		<option value={k}>{humanize(k)}</option>
+		<option value={k}>{kindTitle(quill.schema.card_kinds?.[k], k)}</option>
 	{/each}
 {/snippet}
 

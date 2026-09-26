@@ -16,6 +16,7 @@ import {
 	titleText,
 	fieldValues,
 	cardTitle,
+	kindTitle,
 	bodyEnabled,
 	variantMember,
 	variantCells,
@@ -31,6 +32,10 @@ import {
 	memberWrite,
 	commitMember,
 	obliged,
+	optionalCell,
+	baseType,
+	exampleGhost,
+	declaredGhost,
 	MATRIX_HELD
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
@@ -142,11 +147,33 @@ describe('titleText + cardTitle', () => {
 			])
 		).toEqual({ rank: 'TSgt', name: content });
 	});
-	it('override wins, then schema title, then humanized kind', () => {
-		const schema = { fields: {}, title: 'Routing indorsement' };
-		expect(cardTitle(schema, 'indorsement', 'Custom')).toBe('Custom');
-		expect(cardTitle(schema, 'indorsement', '')).toBe('Routing indorsement');
-		expect(cardTitle({ fields: {} }, 'indorsement', undefined)).toBe('Indorsement');
+	it('rename wins, then the kind’s title, then the first short text cell, then the kind', () => {
+		const fields = {
+			tone: f({ type: 'enum', values: ['a'] }),
+			heading: f({ type: 'string' }),
+			lead: f({ type: 'richtext', inline: true })
+		};
+		const titled = { fields, title: 'Routing indorsement' };
+		const untitled = { fields };
+		const values = { tone: 'a', heading: 'Findings' };
+		expect(cardTitle(titled, 'indorsement', values, 'Custom')).toBe('Custom');
+		// A kind declaring `title` names every instance with it, whatever each one holds.
+		expect(cardTitle(titled, 'indorsement', values, '')).toBe('Routing indorsement');
+		// One declaring none names each from its own values: the enum is not a text
+		// cell, and an empty cell passes to the next.
+		expect(cardTitle(untitled, 'section', values, undefined)).toBe('Findings');
+		expect(cardTitle(untitled, 'section', { heading: ' ', lead: 'A lead' }, undefined)).toBe(
+			'A lead'
+		);
+		expect(cardTitle(untitled, 'section_card', {}, undefined)).toBe('Section card');
+		expect(cardTitle(undefined, 'legacy_kind', values, undefined)).toBe('Legacy kind');
+	});
+	it('names a kind by its title, else its humanized key, with no instance to read', () => {
+		expect(kindTitle({ fields: {}, title: 'Routing indorsement' }, 'indorsement')).toBe(
+			'Routing indorsement'
+		);
+		expect(kindTitle({ fields: {}, title: ' ' }, 'indorsement')).toBe('Indorsement');
+		expect(kindTitle(undefined, 'sign_off')).toBe('Sign off');
 	});
 });
 
@@ -518,6 +545,96 @@ describe('obliged', () => {
 		expect(obliged(f({ type: 'string', default: '' }))).toBe(false);
 		expect(obliged(f({ type: 'object', properties: {} }))).toBe(false);
 		expect(obliged(f({ type: 'matrix', members: { a: 'A' } }))).toBe(false);
+	});
+
+	it('reads nothing at an optional cell, which can declare no `default:`', () => {
+		expect(obliged(f({ type: 'string?' }))).toBe(false);
+		expect(obliged(f({ type: 'enum?', values: ['a'] }))).toBe(false);
+		expect(obliged(f({ type: 'array?', items: f({}) }))).toBe(false);
+	});
+});
+
+// The `?` moves the render floor and nothing else, so an optional cell reads as its
+// base type everywhere a type is read.
+describe('optional cells', () => {
+	const bases = [
+		'string',
+		'number',
+		'integer',
+		'boolean',
+		'date',
+		'datetime',
+		'richtext',
+		'plaintext',
+		'enum',
+		'array'
+	] as const;
+
+	it('take their base type’s control', () => {
+		for (const base of bases) {
+			const plain = f({ type: base, values: ['a'], items: f({}) });
+			const optional = f({ type: `${base}?`, values: ['a'], items: f({}) });
+			expect(controlKind(optional), base).toBe(controlKind(plain));
+			expect(baseType(optional)).toBe(base);
+			expect(optionalCell(optional)).toBe(true);
+			expect(optionalCell(plain)).toBe(false);
+		}
+	});
+
+	it('keep the base type’s shape: an inline `plaintext?` cell is one line, a table column', () => {
+		expect(shortCell(f({ type: 'plaintext?', inline: true }))).toBe(true);
+		expect(shortCell(f({ type: 'plaintext?' }))).toBe(false);
+		expect(shortCell(f({ type: 'richtext?' }))).toBe(false);
+		const items = f({
+			type: 'object',
+			properties: { note: f({ type: 'plaintext?', inline: true }), on: f({ type: 'boolean?' }) }
+		});
+		expect(arrayLayout(f({ type: 'array', items, ui: { layout: 'table' } }))).toBe('table');
+		expect(rowSummary(items, { note: 'Primary' })).toBe('Primary');
+	});
+
+	it('project as the base type, unobliged', () => {
+		const [model] = fieldModels({ fields: { note: f({ type: 'plaintext?', inline: true }) } });
+		expect(model.control).toBe('prose');
+		expect(model.plaintext).toBe(true);
+		expect(model.required).toBe(false);
+	});
+});
+
+describe('declaredGhost', () => {
+	it('renders markdown to its text, a block to a line, and leaves the rest as spelled', () => {
+		expect(declaredGhost('One *two*\nthree.\n\n- four', true)).toBe('One two three.\nfour');
+		expect(declaredGhost('One *two*', false)).toBe('One *two*');
+		expect(declaredGhost(0, false)).toBe('0');
+		expect(declaredGhost('  ', true)).toBeUndefined();
+		expect(declaredGhost({ a: 1 }, false)).toBeUndefined();
+	});
+});
+
+describe('exampleGhost', () => {
+	it('reads the `example:` of a defaultless free-text cell, as text', () => {
+		expect(exampleGhost(f({ type: 'string', example: 'SPEC/AA' }))).toBe('SPEC/AA');
+		expect(exampleGhost(f({ type: 'plaintext', example: 'a note' }))).toBe('a note');
+		// Markdown ghosts as the text it renders, and a block literal's closing newline is
+		// the YAML's, not the example's.
+		expect(exampleGhost(f({ type: 'richtext', example: 'A *lead*.\n' }))).toBe('A lead.');
+		// A `plaintext` example is literal: its asterisks are text.
+		expect(exampleGhost(f({ type: 'plaintext?', example: '*x*' }))).toBe('*x*');
+		expect(exampleGhost(f({ type: 'string?', example: 'RFC 9110' }))).toBe('RFC 9110');
+		expect(exampleGhost(f({ type: 'string' }))).toBeUndefined();
+	});
+
+	it('takes none where a `default:` answers, however blank', () => {
+		expect(exampleGhost(f({ type: 'string', default: '', example: 'x' }))).toBeUndefined();
+		expect(exampleGhost(f({ type: 'richtext', default: 'D', example: 'x' }))).toBeUndefined();
+	});
+
+	it('takes none on any other type: a pick, a number or a date offered is a value', () => {
+		expect(exampleGhost(f({ type: 'enum', values: ['a'], example: 'a' }))).toBeUndefined();
+		expect(exampleGhost(f({ type: 'integer', example: 3 }))).toBeUndefined();
+		expect(exampleGhost(f({ type: 'date', example: '2026-01-01' }))).toBeUndefined();
+		expect(exampleGhost(f({ type: 'boolean', example: true }))).toBeUndefined();
+		expect(exampleGhost(f({ type: 'array', items: f({}), example: ['a'] }))).toBeUndefined();
 	});
 });
 

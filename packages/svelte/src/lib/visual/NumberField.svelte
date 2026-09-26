@@ -26,7 +26,8 @@
 	interface Props {
 		value: number | undefined;
 		integer?: boolean;
-		fallback?: number;
+		/** The ghost: what the field prints unset. */
+		placeholder?: string;
 		/** Accessible name for an input nothing else names: an object property, whose
 		 * name is the field label plus the property's. A field's own input takes `id`
 		 * instead and is named by the `<label for>` beside it. */
@@ -38,7 +39,7 @@
 		describedBy?: string;
 		onCommit: (v: number | string | undefined) => void;
 	}
-	let { value, integer, fallback, label, id, describedBy, onCommit }: Props = $props();
+	let { value, integer, placeholder, label, id, describedBy, onCommit }: Props = $props();
 
 	// Local input state synced to `value` (as a string projection); own-typing
 	// stays local, only an external change reconciles back in (see `syncedLocal`).
@@ -62,7 +63,7 @@
 	inputmode={integer ? 'numeric' : 'decimal'}
 	value={local.value}
 	{id}
-	placeholder={fallback != null ? String(fallback) : ''}
+	{placeholder}
 	aria-label={id ? undefined : label}
 	aria-describedby={describedBy}
 	oninput={(e) => {

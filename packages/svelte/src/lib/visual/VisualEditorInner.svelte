@@ -50,19 +50,21 @@
 		IdSeq,
 		controlKind,
 		isContainer,
+		shortCell,
 		schemaAt,
 		fieldModels,
 		groupOrder,
 		groupSections,
 		groupLabel,
 		cardTitle,
+		kindTitle,
 		fieldValues,
 		bodyEnabled,
-		humanize,
 		provenanceMap,
 		resolvedByCardIndex,
 		ghostDefault,
-		stringifyGhost,
+		declaredGhost,
+		titleText,
 		resolveBodyGhost,
 		NO_RESOLVED_ROWS,
 		type CardModel,
@@ -156,6 +158,7 @@
 	 */
 	function bump(source: ChangeSource, cardId?: CardId, at?: Addr | number): void {
 		revision++;
+		liveTitles = {};
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
 		onChange?.({ source, cardId, path });
@@ -280,7 +283,31 @@
 		const plain = normalize(addr);
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
+		refreshTitle(plain, cardId);
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
+	}
+
+	/** A header named by the card's own values, after a prose commit to one that can name
+	 *  it: the one piece of the model that lane moves, held beside the model and dropped
+	 *  on the next bump, which rebuilds it from the document. The card is read only for a
+	 *  one-line prose field of a kind declaring no `title` (`cardTitle`). */
+	let liveTitles = $state<Record<CardId, string>>({});
+	function refreshTitle(addr: Addr, cardId: CardId): void {
+		const { card: at, field } = addr;
+		if (at == null || field == null) return;
+		const shown = model.cards[at];
+		const cardSchema = shown && quill.schema.card_kinds?.[shown.kind];
+		if (!cardSchema || cardSchema.title?.trim()) return;
+		const sub = Object.hasOwn(cardSchema.fields, field) ? cardSchema.fields[field] : undefined;
+		if (!sub || !shortCell(sub)) return;
+		liveTitles = {
+			...liveTitles,
+			[cardId]: cardTitle(cardSchema, shown.kind, fieldValues(doc.card(at).payloadItems), undefined)
+		};
+	}
+	function titled(c: CardModel): CardModel {
+		const t = liveTitles[c.id];
+		return t == null ? c : { ...c, titlePlaceholder: t };
 	}
 
 	// ── Commit routing ──────────────────────────────────────────────────────────
@@ -572,7 +599,7 @@
 			// `main` always resolves `schema.main`, so it is never unschemable.
 			unschemable: !isMain && !cardSchema,
 			titleOverride: extEditor?.title ?? '',
-			titlePlaceholder: cardTitle(cardSchema, kind, undefined),
+			titlePlaceholder: cardTitle(cardSchema, kind, values, undefined),
 			values,
 			provenance: provenanceMap(rows.fields),
 			sections,
@@ -584,7 +611,8 @@
 			// still across a re-derive because the function does.
 			bodyGhost: hasBody
 				? resolveBodyGhost(
-						stringifyGhost(ghostDefault(rows.body ?? undefined)),
+						titleText(ghostDefault(rows.body ?? undefined)) || undefined,
+						declaredGhost(cardSchema?.body?.example, true),
 						merged.bodyPlaceholder?.({ cardId: id, kind, isMain }),
 						merged.bodyGhost
 					)
@@ -862,7 +890,7 @@
 		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed}>
 			<Card
 				bind:this={cardRefs[i]}
-				card={c}
+				card={titled(c)}
 				{doc}
 				{quill}
 				isFirst={i === 0}
@@ -929,7 +957,7 @@
 							<div class="qm-menu-surface" data-qm-root>
 								{#each kinds as k (k)}
 									<DropdownMenu.Item class="qm-menu-item" onSelect={() => addCard(atIndex, k)}
-										>{humanize(k)}</DropdownMenu.Item
+										>{kindTitle(quill.schema.card_kinds?.[k], k)}</DropdownMenu.Item
 									>
 								{/each}
 							</div>
