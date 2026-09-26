@@ -317,6 +317,7 @@
 						unframed
 						label={t.strings.bodyLabel}
 						placeholder={card.bodyGhost}
+						placeholderUntilEdit
 						leafKey={ops.leafKey(undefined)}
 						{onFocus}
 						{onCaretMove}

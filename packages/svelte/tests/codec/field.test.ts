@@ -569,7 +569,7 @@ describe('the example ghost', () => {
 
 	it('drops a placeholder that says what the unset field prints at the first edit too', () => {
 		// The edit answers the field: emptied, the leaf holds an empty answer, which is
-		// what prints, where a body's invitation returns whenever the leaf is empty.
+		// what prints, where a leaf without the flag ghosts whenever it is empty.
 		const field = unsetTitle({ placeholder: 'None', placeholderUntilEdit: true });
 		const view = viewOf(field);
 		expect(ghostOf(field)).toBe('None');

@@ -117,10 +117,9 @@ export interface CreateFieldOpts {
 	 * a body's invitation. The initial value; {@link FieldController.setPlaceholder}
 	 * moves it after mount. Empty/absent shows no ghost. */
 	placeholder?: string;
-	/** The placeholder is what the unset field prints, so it goes at the leaf's first
-	 * edit: the edit answers the field, and emptied the leaf holds an empty answer, which
-	 * prints empty. Absent, the placeholder is an invitation (a body's) and returns
-	 * whenever the leaf is empty. */
+	/** The placeholder goes at the leaf's first edit: the edit answers the leaf, and
+	 * emptied it holds an empty answer, which prints empty. Absent, the placeholder
+	 * returns whenever the leaf is empty. */
 	placeholderUntilEdit?: boolean;
 	/** Ghost text shown on the empty leaf until its first edit: an unset field's
 	 * `example:`, at rest where there is no placeholder and in the placeholder's stead
@@ -811,7 +810,7 @@ function pastAtomPlugin(): Plugin {
  * `data-placeholder` is drawn at rest, and `data-example` where there is none, and in
  * its stead while the view holds the focus. The example is stamped only until the
  * state's first edit, after which the leaf has been answered, and so is a placeholder
- * that says what the unset field prints (`placeholderUntilEdit`). An inline leaf's
+ * under `placeholderUntilEdit`. An inline leaf's
  * ghost keeps to the one line the leaf is (`qm-prose-placeholder-line`).
  *
  * The texts are read per decoration pass rather than closed over, so moving a ghost is
