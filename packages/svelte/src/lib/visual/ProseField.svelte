@@ -11,7 +11,7 @@
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
 	import './controls.css';
-	import type { Document, Quill, Addr, Diagnostic } from '@quillmark/wasm';
+	import type { Document, Quill, Addr, Content, Diagnostic } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
 
 	interface Props {
@@ -37,13 +37,17 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
-		/** Ghost shown on the empty leaf: what a field prints unset, or nothing, and a
-		 * body's always text (`resolveBodyGhost`). */
+		/** The resolved `default:` where it prints: what an unset field's leaf holds
+		 * until an edit takes it (`createField`). */
+		fallback?: Content;
+		/** Ghost shown on the empty leaf: the `none` an optional field prints unset, or
+		 * nothing, and a body's always text (`resolveBodyGhost`). */
 		placeholder?: string;
 		/** A field's leaf, whose placeholder goes at its first edit (`createField`). */
 		placeholderUntilEdit?: boolean;
-		/** Ghost shown in the placeholder's stead while the leaf holds the focus, until
-		 * its first edit: an unset field's `example:` (`exampleGhost`). */
+		/** Ghost shown on the empty leaf until its first edit, and in the placeholder's
+		 * stead while the leaf holds the focus: an unset field's `example:`
+		 * (`exampleGhost`). */
 		example?: string;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
@@ -70,6 +74,7 @@
 		label,
 		labelledBy,
 		describedBy,
+		fallback,
 		placeholder,
 		placeholderUntilEdit,
 		example,
@@ -120,6 +125,7 @@
 			label,
 			labelledBy,
 			describedBy,
+			fallback,
 			placeholder,
 			placeholderUntilEdit,
 			example,
@@ -145,12 +151,16 @@
 	});
 
 	// A retype does not remount the leaf (its key is the card's session id), so the new
-	// kind's ghost is pushed into the live view rather than paid for with the caret.
+	// kind's ghost and default are pushed into the live view rather than paid for with
+	// the caret.
 	$effect(() => {
 		controller?.setPlaceholder(placeholder);
 	});
 	$effect(() => {
 		controller?.setExample(example);
+	});
+	$effect(() => {
+		controller?.setFallback(fallback);
 	});
 
 	// Only a narrowed or a plain leaf can hold, so only one of them asks.

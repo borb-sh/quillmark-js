@@ -90,8 +90,8 @@ export function openGroup(target: HTMLElement, label: string): void {
 	flushSync();
 }
 
-/** Type into a text control: the input event a live commit rides and the change a
- *  clear settles at. */
+/** Type into a text control: the input event a text commit rides and the change a
+ *  number settles at. */
 export function type(input: HTMLInputElement, value: string): void {
 	input.value = value;
 	input.dispatchEvent(new Event('input', { bubbles: true }));

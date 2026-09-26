@@ -1,12 +1,17 @@
 <!--
- A `string` field → text input. Commits a non-empty edit live (on input) via the
- parent's typed `writer.set`, so the preview tracks typing. A cleared field is the
- unset rung of the commitment ladder (VISUAL_EDITOR §"Structure mirrors the schema"): it
- commits `undefined` (the parent removes the field, ghosted `default:` renders):
- but at `change` (blur), not per keystroke, so select-all-and-retype doesn't flash
- the field through its default between the delete and the first typed char.
- Trade-off (recorded in VISUAL_EDITOR): an explicit empty string over a non-empty
- default is inexpressible from the UI: clear and unset collapse to one gesture.
+ A `string` field → text input. Commits every edit live (on input) via the parent's
+ typed `writer.set`, so the preview tracks typing.
+
+ An unset field whose `default:` prints holds that default as its text, at the
+ default rung (theme.css): the value it prints, drawn as one and a step off a written
+ one. Nothing is written until an edit, which writes the whole text as authored: the
+ default taken, whatever the edit left of it. Tabbing through writes nothing; a
+ keystroke typed and removed pins the default.
+
+ An emptied input writes what empty means for this field (VISUAL_EDITOR §"The
+ commitment ladder"): `""` over a default that prints, the only answer that prints empty there;
+ the unset rung elsewhere, where unset already prints nothing and the field stays
+ unanswered, and an optional cell returns to `none`.
 -->
 <script lang="ts">
 	import { syncedLocal } from './synced.svelte.js';
@@ -14,10 +19,13 @@
 
 	interface Props {
 		value: string | undefined;
-		/** The ghost at rest: what the field prints unset. */
+		/** The resolved `default:` where it prints: the text an unset field holds. */
+		fallback?: string;
+		/** Words at rest about an unset field that holds no text: the `None` an optional
+		 * cell prints. */
 		placeholder?: string;
-		/** The ghost while the input holds the focus, until its first keystroke: an unset
-		 * field's `example:` (`exampleGhost`). */
+		/** An unset field's `example:` (`exampleGhost`): drawn wherever the field holds no
+		 * text, and in `placeholder`'s stead while the input holds the focus. */
 		example?: string;
 		/** Accessible name for an input nothing else names: an array element, whose
 		 * name is the field label plus its 1-based index. A field's own input takes
@@ -33,15 +41,17 @@
 		 * array repeater's Enter/Backspace (`ArrayField`). */
 		onKey?: (e: KeyboardEvent) => void;
 	}
-	let { value, placeholder, example, label, id, describedBy, onCommit, onKey }: Props = $props();
+	let { value, fallback, placeholder, example, label, id, describedBy, onCommit, onKey }: Props =
+		$props();
 
-	// Local input state synced to `value`: own-typing stays local, only an external
-	// change reconciles back in (see `syncedLocal`).
-	const local = syncedLocal(() => value ?? '');
+	// Local input state synced to `value`, or to the default an unset field holds:
+	// own-typing stays local, only an external change reconciles back in (see
+	// `syncedLocal`).
+	const local = syncedLocal(() => value ?? fallback ?? '');
+	const defaulted = $derived(value == null && !!fallback && local.value === fallback);
 
-	// Whether the example is up: from a focus to the first keystroke after it.
-	let asking = $state(false);
-	const ghost = $derived(asking && example ? example : placeholder);
+	let focused = $state(false);
+	const ghost = $derived(focused ? (example ?? placeholder) : (placeholder ?? example));
 
 	let inputEl: HTMLInputElement | undefined = $state();
 	/** Take the caret: what a parent placing focus on this control calls. */
@@ -57,18 +67,14 @@
 	value={local.value}
 	{id}
 	placeholder={ghost}
+	data-default={defaulted ? '' : undefined}
 	aria-label={id ? undefined : label}
 	aria-describedby={describedBy}
 	onkeydown={onKey}
-	onfocus={() => (asking = true)}
-	onblur={() => (asking = false)}
+	onfocus={() => (focused = true)}
+	onblur={() => (focused = false)}
 	oninput={(e) => {
-		asking = false;
 		local.value = (e.currentTarget as HTMLInputElement).value;
-		// Live-commit a non-empty edit; defer a cleared field to `change` (see header).
-		if (local.value !== '') onCommit(local.value);
-	}}
-	onchange={() => {
-		if (local.value === '') onCommit(undefined);
+		onCommit(local.value !== '' ? local.value : fallback ? '' : undefined);
 	}}
 />
