@@ -17,7 +17,13 @@ export { rangeAnchor } from './anchor.js';
 export type { RangeAnchor } from './anchor.js';
 
 // The prose leaf.
-export { createField, emptyContent, proseAttributes, proseLeafPlugins } from './field.js';
+export {
+	createField,
+	emptyContent,
+	heldAttributes,
+	proseAttributes,
+	proseLeafPlugins
+} from './field.js';
 export type { CreateFieldOpts, FieldController, LeafViews } from './field.js';
 
 // The table island's chrome vocabulary: the visual tier's `strings` set extends it,
@@ -51,7 +57,7 @@ export { rendersHref, storableUrl } from './urls.js';
 // The barrel carries what has an off-barrel caller, and nothing else. A symbol
 // reached only by relative import within `codec/` stays off it: an export nothing
 // imports is surface that still has to stay honest.
-export { decode, fitsInline, fitsPlain, renderContent, usvLength } from './decode.js';
+export { decode, fitsInline, fitsLeaf, fitsPlain, renderContent, usvLength } from './decode.js';
 export { pmToContent, contentEdit, lower } from './encode.js';
 export type { ContentEdit } from './encode.js';
 export { usvToPM, pmToUsv, buildLineIndex } from './positions.js';

@@ -37,8 +37,8 @@
 	import {
 		blockSchema,
 		decode,
-		fitsInline,
-		fitsPlain,
+		fitsLeaf,
+		heldAttributes,
 		leafSchema,
 		pmToContent,
 		proseAttributes,
@@ -139,7 +139,7 @@
 		// the parent's value write, per the header.
 		const inline = !block;
 		const rt = content();
-		held = inline ? !fitsInline(rt) : plaintext && !fitsPlain(rt);
+		held = !fitsLeaf(rt, { inline, plaintext });
 		const schema = held ? blockSchema : leafSchema({ plaintext, inline });
 		const state = EditorState.create({
 			doc: decode(rt, schema),
@@ -152,11 +152,6 @@
 						example: () => example
 					})
 		});
-		const attributes = proseAttributes({
-			label,
-			labelledBy,
-			describedBy: [describedBy, held ? heldId : undefined].filter(Boolean).join(' ') || undefined
-		});
 		const mounted = new EditorView(
 			{ mount: editorEl },
 			{
@@ -164,17 +159,10 @@
 				editable: () => !held,
 				// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
 				// (`proseAttributes`), so a cell carrying a label element and a row carrying
-				// none cannot name their regions by different rules. A non-editable view is
-				// no textbox to assistive tech or to Tab, so a held leaf states both itself.
+				// none cannot name their regions by different rules.
 				attributes: held
-					? {
-							...attributes,
-							role: 'textbox',
-							'aria-readonly': 'true',
-							'aria-multiline': 'true',
-							tabindex: '0'
-						}
-					: attributes,
+					? heldAttributes({ label, labelledBy, describedBy }, heldId)
+					: proseAttributes({ label, labelledBy, describedBy }),
 				dispatchTransaction(tr) {
 					const next = mounted.state.apply(tr);
 					mounted.updateState(next);
@@ -217,10 +205,5 @@
 	   controls.css), which is where the box is. */
 	.qm-prose-value :global(.ProseMirror) {
 		outline: none;
-	}
-	.qm-prose-held-note {
-		display: block;
-		font-size: var(--_qm-text-label);
-		color: var(--_qm-ink-label);
 	}
 </style>

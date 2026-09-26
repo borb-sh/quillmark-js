@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 // The standalone prose leaf: a `createField` over a real `showcase` `title` (inline)
 // and body edits via applyChange; the caret survives own-edits through the PM StepMap;
-// an external content change re-hydrates and the leaf's own edit does not.
+// an external content change re-hydrates and the leaf's own edit does not; a narrowed
+// field holds over a value upstream's `inline` rule refuses, and releases once it fits.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorView } from 'prosemirror-view';
+import { Selection } from 'prosemirror-state';
 import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Document, TableProps } from '@quillmark/wasm';
@@ -115,6 +117,97 @@ describe('field-level reconciliation', () => {
 		field.applyExternal();
 		expect(view.state.doc.textContent.startsWith('EXT ')).toBe(true);
 		expect((field.getContent() as { text: string }).text.startsWith('EXT ')).toBe(true);
+		field.destroy();
+	});
+});
+
+describe('the hold on a narrowed field', () => {
+	const STRUCTURED = '- one\n- two\n\npara ![i](a.png)';
+	/** The transaction a keystroke dispatches, at the first text position. */
+	const keystroke = (view: EditorView) =>
+		view.dispatch(view.state.tr.insertText('Z', Selection.atStart(view.state.doc).from));
+	const leaf = (doc: Document, field: string, holds: boolean[], plaintext = false) =>
+		createField({
+			doc,
+			quill: quill(),
+			addr: { field },
+			container: mount(),
+			inline: true,
+			plaintext,
+			onHold: (held) => holds.push(held)
+		});
+
+	it('releases when the value an external write leaves is inline, and then commits', () => {
+		const doc = template();
+		doc.storeField('title', STRUCTURED);
+		const holds: boolean[] = [];
+		const field = leaf(doc, 'title', holds);
+		const view = viewOf(field);
+		expect(holds).toEqual([true]);
+		expect(view.editable).toBe(false);
+		expect(view.state.doc.firstChild?.type.name).toBe('bullet_list');
+		keystroke(view);
+		expect(doc.getStored('title')).toBe(STRUCTURED);
+
+		quill().writer(doc).set('title', 'plain');
+		field.applyExternal();
+		expect(holds).toEqual([true, false]);
+		expect(view.editable).toBe(true);
+		keystroke(view);
+		expect(field.getContent().text).toBe('Zplain');
+		field.destroy();
+	});
+
+	it('holds before a commit when an external store write gains structure', () => {
+		const doc = template();
+		const holds: boolean[] = [];
+		const field = leaf(doc, 'title', holds);
+		const view = viewOf(field);
+		expect(view.editable).toBe(true);
+
+		doc.storeField('title', STRUCTURED);
+		field.applyExternal();
+		expect(holds).toEqual([true]);
+		expect(view.editable).toBe(false);
+		expect(view.state.doc.firstChild?.type.name).toBe('bullet_list');
+		keystroke(view);
+		expect(doc.getStored('title')).toBe(STRUCTURED);
+		field.destroy();
+	});
+
+	it('holds a plaintext(inline) field, whose refusal upstream names not_plain', () => {
+		const doc = template();
+		doc.overwrite({ field: 'subtitle' }, md(STRUCTURED));
+		expect(
+			quill()
+				.validate(doc)
+				.filter((d) => d.path === 'main.subtitle')
+				.map((d) => d.code)
+		).toEqual(['validation::not_plain']);
+		const before = JSON.stringify(doc.getStored('subtitle'));
+		const holds: boolean[] = [];
+		const field = leaf(doc, 'subtitle', holds, true);
+		expect(holds).toEqual([true]);
+		expect(viewOf(field).editable).toBe(false);
+		// A plaintext leaf commits through the typed writer, which would store it joined.
+		keystroke(viewOf(field));
+		expect(JSON.stringify(doc.getStored('subtitle'))).toBe(before);
+		field.destroy();
+	});
+
+	it('does not hold for the trailing newline a YAML block scalar keeps', () => {
+		const doc = template();
+		doc.storeField('subtitle', 'one line\n');
+		expect(
+			quill()
+				.validate(doc)
+				.filter((d) => d.path === 'main.subtitle')
+				.map((d) => [d.code, d.args?.trailingNewline])
+		).toEqual([['validation::not_inline', true]]);
+		const holds: boolean[] = [];
+		const field = leaf(doc, 'subtitle', holds, true);
+		expect(holds).toEqual([]);
+		expect(viewOf(field).editable).toBe(true);
 		field.destroy();
 	});
 });

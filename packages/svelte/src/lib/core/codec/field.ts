@@ -12,7 +12,7 @@
 // On an `applyChange` throw the optimistic PM state stays and the failure reports
 // through `onError`: never a crash. Caret continuity across own-edits is the PM
 // `StepMap`; an external content change re-hydrates through `applyExternal`, gated
-// by `reconcile`.
+// by `reconcile` except where the hold it re-evaluates flips.
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
@@ -38,7 +38,7 @@ import type {
 } from '@quillmark/wasm';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
-import { decode } from './decode.js';
+import { decode, fitsLeaf } from './decode.js';
 import { usvToPM, pmToUsv, buildLineIndex, lineIndexOf, type LineIndex } from './positions.js';
 import { lower, pmToContent, scanContent, scanDoc, contentEdit } from './encode.js';
 import { islandPastePlugin } from './islands.js';
@@ -47,7 +47,7 @@ import { createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
-import { isBlockSchema, leafSchema, plainSchema } from './schema.js';
+import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
 import { focusSlashItem, runSlashItem, slashPlugin, type SlashState } from './slash.js';
 
@@ -65,6 +65,19 @@ export interface CreateFieldOpts {
 	/** A mark-free schema (a `plaintext` field): literal text, no formatting and no
 	 *  anchors, in paragraphs and hard breaks or, with `inline`, one textblock. */
 	plaintext?: boolean;
+	/** The id of the note the caller draws inside `container` for a held leaf →
+	 *  `aria-describedby` while it holds. */
+	heldNoteId?: string;
+	/**
+	 * Fired when the leaf holds or releases, and at mount when it mounts held. A leaf
+	 * declaring `inline`, or a `plaintext` one, is held over a value its schema cannot
+	 * hold (`fitsLeaf`, upstream's `isInline` and `isPlain`): the decode would join lines
+	 * and drop containers and islands for the first commit to store. A held leaf draws
+	 * its content on the block schema, read-only, and commits nothing. Judged of the value
+	 * each mount and re-hydrate reads, so {@link FieldController.applyExternal} is what
+	 * re-evaluates it.
+	 */
+	onHold?(held: boolean): void;
 	/** Suppress the markdown-shorthand input rules. */
 	noInputRules?: boolean;
 	/** The island chrome's wording, read live (per render) so a consumer swapping
@@ -131,7 +144,8 @@ export interface FieldController {
 	readonly el: HTMLElement;
 	/** Place the caret at USV `pos` (preview onPick → usvToPM → here). */
 	setCaret(pos: number): void;
-	/** External content change → re-hydrate this leaf (gated by reconcile). */
+	/** External content change → re-hydrate this leaf (gated by reconcile), and
+	 *  re-evaluate its hold against the value now stored. */
 	applyExternal(): void;
 	/**
 	 * Move the empty-leaf ghost after mount: a card retyped to another kind takes
@@ -279,6 +293,22 @@ export function proseAttributes(opts: {
 	return Object.keys(attrs).length ? attrs : undefined;
 }
 
+/** A held leaf's attributes, described by its note as well. A non-editable view is no
+ *  textbox to assistive tech or to Tab, so a held leaf states both itself. */
+export function heldAttributes(
+	opts: { label?: string; labelledBy?: string; describedBy?: string },
+	noteId: string | undefined
+): Record<string, string> {
+	const describedBy = [opts.describedBy, noteId].filter(Boolean).join(' ') || undefined;
+	return {
+		...proseAttributes({ ...opts, describedBy }),
+		role: 'textbox',
+		'aria-readonly': 'true',
+		'aria-multiline': 'true',
+		tabindex: '0'
+	};
+}
+
 export function createField(opts: CreateFieldOpts): FieldController {
 	const { doc, addr, container } = opts;
 	const inline = !!opts.inline;
@@ -314,6 +344,14 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// vocabulary is the codec's own constant (`slash.ts`), not a wording to derive.
 	const slash = block ? opts.onSlash : undefined;
 
+	// Judged of the value being mounted rather than read off a diagnostic: a routed set
+	// can predate the value it arrives with, and `validation::not_plain` stands in for
+	// `not_inline` on a `plaintext(inline)` field.
+	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext });
+	let held = holds(reconciler.last);
+	const named = proseAttributes(opts) ?? {};
+	const heldNamed = heldAttributes(opts, opts.heldNoteId);
+
 	const seeded = buildState(reconciler.last);
 	const state = seeded.state;
 	index = seeded.index;
@@ -328,9 +366,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const lineBox = Number.parseFloat(getComputedStyle(container).lineHeight);
 	const clearance = Number.isFinite(lineBox) ? lineBox : undefined;
 
-	view = new EditorView(container, {
+	// Prepended, so what the caller draws inside `container` (a held leaf's note)
+	// follows the text it is about.
+	view = new EditorView((dom) => container.prepend(dom), {
 		state,
-		attributes: proseAttributes(opts),
+		editable: () => !held,
+		attributes: () => (held ? heldNamed : named),
 		// Both terms, one line each: when a flagged dispatch moves the scrollport
 		// (`scrollThreshold`) and what it leaves at the edge (`scrollMargin`).
 		scrollThreshold: clearance,
@@ -365,7 +406,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			// Commit a content edit or an anchor mutation. An anchor insert/remove is
 			// zero-width, so `docChanged` is false: the `anchorKey` meta is what
 			// routes it through the same commit path (the diff emits the anchor op).
-			if (tr.docChanged || tr.getMeta(anchorKey)) {
+			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) {
 				// (d) the change signal, only for what actually landed.
 				const newRt = scan ? scanContent(scan) : pmToContent(next.doc);
 				if (commitEdit(oldRt, newRt)) opts.onChange?.(addr);
@@ -387,6 +428,13 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	/** The state, and the index over the document it was built from: the seed reads one
 	 *  and every caller wants the same one, and `buildLineIndex` is a whole walk. */
 	function buildState(rt: Content): { state: EditorState; index: LineIndex } {
+		if (held) {
+			const pmDoc = decode(rt, blockSchema);
+			return {
+				state: EditorState.create({ doc: pmDoc }),
+				index: buildLineIndex(pmDoc)
+			};
+		}
 		const pmDoc: PMNode = decode(rt, schema);
 		const anchors = plaintext ? [] : anchorsFromContent(rt);
 		// Seed anchor plugin positions in PM coords via a fresh index over pmDoc.
@@ -523,15 +571,18 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		},
 		applyExternal(): void {
 			const current = readLeaf(reader, addr);
-			if (!reconciler.shouldRehydrate(current)) return; // own edit / no change
+			const flipped = holds(current) !== held;
+			if (!flipped && !reconciler.shouldRehydrate(current)) return; // own edit / no change
+			if (flipped) held = !held;
 			const caretUsv = pmToUsv(index, view.state.selection.head);
 			const fresh = buildState(current);
-			view.updateState(fresh.state);
 			index = fresh.index;
-			// Best-effort caret continuity across an external change: keep the USV.
-			const pm = usvToPM(index, caretUsv);
-			view.dispatch(view.state.tr.setSelection(Selection.near(fresh.state.doc.resolve(pm))));
+			// Best-effort caret continuity across an external change: keep the USV. Set
+			// rather than dispatched, so a leaf the caret is not in reports no caret move.
+			const sel = Selection.near(fresh.state.doc.resolve(usvToPM(index, caretUsv)));
+			view.updateState(fresh.state.apply(fresh.state.tr.setSelection(sel)));
 			reconciler.commit(current);
+			if (flipped) opts.onHold?.(held);
 		},
 		setPlaceholder(text: string | undefined): void {
 			if (text === placeholderText) return;
@@ -556,7 +607,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			return readLeaf(reader, addr);
 		},
 		insertAnchor(id: string, pos: number): void {
-			if (plaintext) return; // a plaintext field carries no marks (§Inline mode)
+			// A plaintext field carries no marks (§Inline mode), and a held one commits nothing.
+			if (plaintext || held) return;
 			if (heldAnchors().some((a) => a.id === id)) return; // ids are unique + invariant (0.97 policy)
 			// An anchor commits through `applyChange`, so the field is brought to content
 			// rest first; else the commit's overwrite branch (value semantics) would drop
@@ -604,6 +656,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		for (const cellView of nested) if (cellView.hasFocus()) return cellView;
 		return view;
 	};
+	if (held) opts.onHold?.(true);
 	return controller;
 }
 
