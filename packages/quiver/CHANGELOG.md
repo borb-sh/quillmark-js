@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.30.0 - 2026-09-26
+
 **The `@quillmark/wasm` peer floor is `>=0.116.0-0`.**
 
 **A built quiver is `quiver.json`, one bundle per quill, and `fonts/`.** `quiver.json` carries the format and the catalog, and is the one name fetched `no-cache`; every bundle and font name carries the digest of its bytes and is fetched `force-cache`. The hashed manifest and `store/` are gone, and `latest.json` carries only `format`, so a reader of format 1 refuses a format-2 artifact by name; every artifact is rebuilt (MIGRATION.md). `getQuill` still reads one bundle and the fonts it names, and a font shared across quills or versions is still written once.
