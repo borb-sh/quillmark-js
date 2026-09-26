@@ -16,7 +16,7 @@ import {
 import type { Content } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { pmMarkFromContent } from '$lib/core/codec/marks.js';
-import { md, normalize, contentEqual, titleContent, bodyContent } from './_util.js';
+import { md, normalize, contentEqual, titleContent, bodyContent, quill } from './_util.js';
 
 /** decode → pmToContent, both sides normalized through the real content. */
 function reContent(rt: Content): Content {
@@ -148,19 +148,24 @@ describe('inline / plaintext constraints', () => {
 		expect(doc.child(0).textContent).toBe('plain bold em');
 	});
 
-	// The lines upstream's literal codec reads out of `a\nb\n\nc`: a lone `\n` between
-	// two written lines continues the paragraph, and a blank line opens one.
-	it('the plain schema holds paragraphs and breaks, and projects back to the same lines', () => {
-		const para: Content['lines'][number] = { containers: [], kind: 'para' };
-		const rt: Content = {
-			text: 'a\nb\n\nc',
-			lines: [para, { ...para, continues: true }, para, para],
-			marks: [],
-			islands: []
-		};
-		const doc = decode(rt, plainSchema);
-		expect(doc.toString()).toBe('doc(paragraph("a", hard_break, "b"), paragraph, paragraph("c"))');
-		expect(contentEqual(normalize(pmToContent(doc)), normalize(rt))).toBe(true);
+	// What upstream's literal codec reads out of a string: a lone `\n` between two
+	// written lines continues the paragraph, and every other `\n` opens one.
+	it.each([
+		['a lone newline', 'a\nb', 'doc(paragraph("a", hard_break, "b"))'],
+		['a blank line', 'a\n\nb', 'doc(paragraph("a"), paragraph, paragraph("b"))'],
+		['a trailing newline', 'a\n', 'doc(paragraph("a"), paragraph)'],
+		['a leading newline', '\na', 'doc(paragraph, paragraph("a"))'],
+		['trailing spaces', 'a  \nb  ', 'doc(paragraph("a  ", hard_break, "b  "))']
+	])('the plain schema holds %s, and projects back to the same lines', (_, value, shape) => {
+		const doc = quill().seedDocument();
+		doc.storeField('errata', [value]);
+		const rt = quill().reader(doc).getContentAt('errata', [0])!;
+		doc.free();
+
+		const pm = decode(rt, plainSchema);
+		expect(pm.toString()).toBe(shape);
+		expect(pmToContent(pm).text).toBe(value);
+		expect(contentEqual(normalize(pmToContent(pm)), normalize(rt))).toBe(true);
 	});
 
 	it('fitsPlain asks upstream whether the lines are plain, marks set aside', () => {

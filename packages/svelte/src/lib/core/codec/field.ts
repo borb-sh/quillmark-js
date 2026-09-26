@@ -5,7 +5,8 @@
 //   (a) apply optimistically to the view,
 //   (b) lower the tr to a `ChangeBundle` (or `overwrite` for a field not yet at
 //       content rest, which has nothing to splice),
-//   (c) commit via `doc.applyChange(addr, bundle)`,
+//   (c) commit via `doc.applyChange(addr, bundle)`, or a `plaintext` leaf's whole
+//       text through the typed writer,
 //   (d) fire `onChange` when the transaction committed, then `onCaretMove` with
 //       the new USV caret, which a bare selection move fires on its own.
 // On an `applyChange` throw the optimistic PM state stays and the failure reports
@@ -16,7 +17,7 @@ import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
-import type { Node as PMNode, Schema } from 'prosemirror-model';
+import { Fragment, Slice, type Node as PMNode, type Schema } from 'prosemirror-model';
 import {
 	EditorState,
 	NodeSelection,
@@ -27,7 +28,14 @@ import {
 	type Command
 } from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
-import type { Document, DocumentReader, Content, Addr, Quill } from '@quillmark/wasm';
+import type {
+	Document,
+	DocumentReader,
+	DocumentWriter,
+	Content,
+	Addr,
+	Quill
+} from '@quillmark/wasm';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
 import { decode } from './decode.js';
@@ -39,7 +47,7 @@ import { createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
-import { isBlockSchema, leafSchema } from './schema.js';
+import { isBlockSchema, leafSchema, plainSchema } from './schema.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
 import { focusSlashItem, runSlashItem, slashPlugin, type SlashState } from './slash.js';
 
@@ -98,7 +106,8 @@ export interface CreateFieldOpts {
 	 * move, so a host driving a recompile off it recompiles on every arrow key.
 	 *
 	 * Fires for every commit regardless of which branch it took (`applyChange`, the
-	 * first-edit `overwrite`, the fallback `overwrite`) and for an anchor mutation,
+	 * first-edit `overwrite`, the fallback `overwrite`, a `plaintext` leaf's typed
+	 * write) and for an anchor mutation,
 	 * which changes no text. A commit that failed outright (`commit-lost`) does not
 	 * fire it: nothing landed.
 	 */
@@ -232,13 +241,10 @@ export function emptyContent(): Content {
  * `applyChange` splices exactly the content the leaf read and PM is showing.
  *
  * The two other rest forms both take `overwrite` instead. An unset field (`undefined`;
- * a default-only richtext field before its first edit) has nothing to splice.
- * An authored string is the trap: `applyChange` reads it as markdown whatever the
- * declared type is, so on a `plaintext` field its pre-image is not the content the
- * leaf read and a delta computed against that content lands at the wrong offsets.
- * Installing over it costs nothing either way, since content-only marks do not
- * survive markdown and a string therefore carries no anchors to pay. A body always
- * rests as `Content`. */
+ * a default-only richtext field before its first edit) has nothing to splice, and an
+ * authored string nothing to lose: content-only marks do not survive markdown, so a
+ * string carries no anchors to pay. A body always rests as `Content`. A `plaintext`
+ * leaf never asks: it commits through the writer ({@link createField}). */
 function opsCommittable(doc: Document, addr: Addr): boolean {
 	const stored = doc.getStored(addr);
 	return stored !== null && typeof stored === 'object';
@@ -274,6 +280,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// Bound once and held: the reader is a `{quill, doc}` pair that reads live, so
 	// every read below sees the commit before it.
 	const reader: DocumentReader = opts.quill.reader(doc);
+	const writer: DocumentWriter = opts.quill.writer(doc);
 
 	// `known` is the codec's view of the stored content: kept in sync after every
 	// own-edit so `reconcile` can tell an external change from the field's own.
@@ -396,14 +403,15 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// Returns whether anything landed: the caller's change signal, which must not
 	// be a property of which branch the commit took.
 	function commitEdit(oldRt: Content, newRt: Content): boolean {
+		if (plaintext) return commitPlain(newRt.text);
 		// The text splice, computed once per keystroke: the gate below, both overwrite
 		// fallbacks, and `lower` all read this one `edit`. The projection is the
 		// caller's, off the same walk that rebuilt the index.
 		const edit = contentEdit(oldRt, newRt);
 		try {
 			// A field not yet at content rest is the only edit that overwrites by choice:
-			// `applyChange` throws on an absent declared field (verified) and mis-reads
-			// an authored string (`opsCommittable`), and neither has anchors to lose.
+			// `applyChange` throws on an absent declared field (verified), and neither an
+			// absent field nor an authored string has anchors to lose (`opsCommittable`).
 			// Every structural edit lowers, island creation included: the island channel
 			// places a slot the `delta` may not carry.
 			if (!opsCommittable(doc, addr)) {
@@ -411,8 +419,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			} else {
 				// Post-edit anchors are the plugin's positions (mapped through the tr) as
 				// USV; the pre-edit set is `oldRt`'s own, which `lower` reads for itself.
-				const newAnchors = plaintext ? [] : readAnchorsUsv();
-				doc.applyChange(addr, lower(edit, { newAnchors }));
+				doc.applyChange(addr, lower(edit, { newAnchors: readAnchorsUsv() }));
 			}
 			reconciler.commit(readLeaf(reader, addr));
 			return true;
@@ -442,6 +449,34 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				});
 				return false;
 			}
+		}
+	}
+
+	/**
+	 * A `plaintext` leaf's commit: its whole text through the typed writer, which rests
+	 * the field as that literal string (CODEC §Inline mode). A content object is the
+	 * other rest form, and `toMarkdown` emits one as markdown: a break spelled as a
+	 * backslash, a `*` and a trailing space escaped, a blank line doubled, so the value
+	 * reads back changed. The leaf carries no anchors, so the op path has none to keep.
+	 *
+	 * A refusal lands nothing and has no fallback, the other rest form being the
+	 * corruption; the next edit writes the whole text again.
+	 */
+	function commitPlain(text: string): boolean {
+		try {
+			const name = addr.field;
+			if (name === undefined) throw new Error('a plaintext leaf names a field');
+			(addr.card === undefined ? writer : writer.card(addr.card)).set(name, text);
+			reconciler.commit(readLeaf(reader, addr));
+			return true;
+		} catch (e) {
+			reportError(opts.onError, {
+				code: 'commit-lost',
+				severity: 'error',
+				message: `the typed writer refused the text; the stored value is stale while the editor keeps the edit: ${errorMessage(e)}`,
+				cause: e
+			});
+			return false;
 		}
 	}
 
@@ -592,8 +627,35 @@ export function proseLeafPlugins(
 	// All three answer to something only the block schema holds: any other leaf is
 	// textblocks alone, with no island and no gap to put a cursor in.
 	if (isBlockSchema(schema)) list.push(gapCursor(), pastAtomPlugin(), islandPastePlugin());
+	if (schema === plainSchema) list.push(plainClipboardPlugin());
 	if (opts.placeholder) list.push(placeholderPlugin(opts.placeholder));
 	return list;
+}
+
+/**
+ * A plain leaf's clipboard text is literal, one line per `\n` both ways. Upstream's
+ * defaults read pasted text as blocks split on any run of newlines, which drops a
+ * blank line the value holds as content, and write a copy's blocks joined by a blank
+ * line and its breaks as nothing.
+ */
+function plainClipboardPlugin(): Plugin {
+	const { paragraph } = plainSchema.nodes;
+	return new Plugin({
+		props: {
+			clipboardTextParser: (text) =>
+				new Slice(
+					Fragment.from(
+						text
+							.split(/\r\n?|\n/)
+							.map((line) => paragraph.create(null, line ? plainSchema.text(line) : null))
+					),
+					1,
+					1
+				),
+			clipboardTextSerializer: (slice) =>
+				slice.content.textBetween(0, slice.content.size, '\n', '\n')
+		}
+	});
 }
 
 /**
