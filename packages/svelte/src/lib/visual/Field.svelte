@@ -31,10 +31,15 @@
 	import {
 		VARIANT_DISCRIMINANT,
 		arrayLayout,
+		baseType,
+		exampleGhost,
 		ghostDefault,
 		isContainer,
-		stringifyGhost
+		optionalCell,
+		stringifyGhost,
+		titleText
 	} from './structure.js';
+	import { wording } from './strings.js';
 	import { deepen } from './diagnostics.js';
 	import type { FieldDomIds } from './domid.js';
 	import ProseField from './ProseField.svelte';
@@ -104,12 +109,24 @@
 		diagnostics
 	}: Props = $props();
 
+	const t = wording();
+
 	// The ghost the control shows when unset: the resolved `default:` (provenance,
 	// `source === 'default'`). `ghost` is the raw typed value (enum/number/boolean
-	// fallbacks); `defaultStr` its string form: the text placeholder and the date
-	// control's `YYYY-MM-DD`. An object-valued default does not ghost.
+	// fallbacks), `defaultStr` its string form (the date control's `YYYY-MM-DD`). An
+	// object-valued default does not ghost, but a content one resolves as `Content` and
+	// ghosts as its text. A control ghosting text shows `restGhost`, which is what
+	// prints: the default, or the `none` an optional cell prints; while it holds the
+	// focus, an unset free-text field shows its `example:` instead.
 	const ghost = $derived(ghostDefault(provenance));
-	const defaultStr = $derived(stringifyGhost(ghost));
+	const defaultStr = $derived(
+		field.control === 'prose' ? titleText(ghost) || undefined : stringifyGhost(ghost)
+	);
+	const optional = $derived(optionalCell(field.schema));
+	const restGhost = $derived(
+		defaultStr ?? (optional && value == null ? t.strings.optionalGhost : undefined)
+	);
+	const example = $derived(value == null ? exampleGhost(field.schema) : undefined);
 	// A variant resolves as one rung whose value is the whole container, so the
 	// discriminant's ghost is that container's own discriminant cell.
 	const ghostMember = $derived(
@@ -260,7 +277,9 @@
 					{addr}
 					inline={field.inline}
 					plaintext={field.plaintext}
-					placeholder={defaultStr}
+					placeholder={restGhost}
+					placeholderUntilEdit
+					{example}
 					labelledBy={domIds.label}
 					{describedBy}
 					{leafKey}
@@ -276,6 +295,7 @@
 					values={field.schema.values ?? []}
 					fallback={ghost as string | undefined}
 					blankTitle={field.schema.ui?.blank_title}
+					{optional}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}
@@ -301,8 +321,8 @@
 			{:else if field.control === 'number'}
 				<NumberField
 					value={value as number | undefined}
-					integer={field.schema.type === 'integer'}
-					fallback={ghost as number | undefined}
+					integer={baseType(field.schema) === 'integer'}
+					placeholder={restGhost}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}
@@ -311,6 +331,7 @@
 				<BooleanField
 					value={value as boolean | undefined}
 					fallback={ghost as boolean | undefined}
+					{optional}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}
@@ -371,7 +392,8 @@
 			{:else}
 				<TextField
 					value={value as string | undefined}
-					placeholder={defaultStr}
+					placeholder={restGhost}
+					{example}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}

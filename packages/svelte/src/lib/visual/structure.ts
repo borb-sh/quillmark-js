@@ -1,6 +1,6 @@
 // The schema × payload join, done by the editor (VISUAL_EDITOR §Structure). Pure
 // functions only (no runes, no Document reads) so the ordering, control
-// dispatch, group layout, title interpolation, and session-identity bookkeeping
+// dispatch, group layout, titles, ghosts, and session-identity bookkeeping
 // are unit-testable in isolation (tests/visual/structure.test.ts). The reactive
 // orchestration (revision counter, live doc reads) lives in VisualEditor.svelte;
 // this module is the projection math it feeds.
@@ -11,9 +11,11 @@ import {
 	type PayloadItem,
 	type QuillCardSchema,
 	type QuillFieldSchema,
+	type QuillFieldType,
 	type ResolvedField,
 	type Resolved
 } from '@quillmark/wasm';
+import { core } from '../core/lifecycle.js';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
 export type ControlKind =
@@ -88,7 +90,8 @@ export interface CardModel {
 	unschemable: boolean;
 	/** Raw `$ext.editor.title` override (composable cards). */
 	titleOverride: string;
-	/** Schema-resolved title used as the rename placeholder (composable cards). */
+	/** The header an unrenamed card shows ({@link cardTitle} below its rename rung),
+	 *  which the rename input ghosts (composable cards). */
 	titlePlaceholder: string;
 	/** Field name → current stored value (absent fields missing). */
 	values: Record<string, unknown>;
@@ -102,12 +105,10 @@ export interface CardModel {
 	sections: GroupSection[];
 	hasBody: boolean;
 	/**
-	 * The empty-body ghost, or undefined when the card renders no body. Never
-	 * empty for a card that does: the resolved body `default:` when there is one,
-	 * else the consumer's wording, else the built-in invitation
-	 * ({@link resolveBodyGhost}). A body leaf therefore always has something in it
-	 * to write into, which the inline fields deliberately do not: their ghost is
-	 * the resolved default, and an invented one would read as a value.
+	 * The empty-body ghost, or undefined when the card renders no body. Never empty
+	 * for a card that does ({@link resolveBodyGhost}), so a body leaf always has
+	 * something in it to write into, which a field at rest deliberately does not: its
+	 * ghost is what prints, and an invented one would read as a value.
 	 */
 	bodyGhost?: string;
 }
@@ -153,10 +154,9 @@ export function ghostDefault(row: ResolvedField | undefined): unknown {
 }
 
 /** A ghost value's string form, or undefined for null/object (only text ghosts
- * render a placeholder). The one text-ghost projection: a scalar field's
- * placeholder and a body leaf's both read `stringifyGhost ∘
- * ghostDefault`, since a richtext body resolves to a text render: the correct
- * thing to display as a placeholder (FIELD_PROVENANCE). */
+ * render a placeholder). A scalar's resolved default reads through it; a content
+ * field's resolves as `Content`, which a prose leaf reads by its text instead
+ * ({@link titleText}). */
 export function stringifyGhost(ghost: unknown): string | undefined {
 	return ghost != null && typeof ghost !== 'object' ? String(ghost) : undefined;
 }
@@ -188,26 +188,64 @@ export interface BodyPlaceholderContext {
 export type BodyPlaceholder = (ctx: BodyPlaceholderContext) => string | undefined;
 
 /**
- * The empty body's ghost: the resolved body `default:`, else the consumer's
- * wording, else the flat built-in. The `default:` wins because it is the only one
- * of the three that describes the render: it promises what prints if nothing is
- * written, and wording placed over it would make that promise unreadable. The
- * other two are invitations, and an invitation belongs only where there is no
- * promise.
+ * The empty body's ghost: the resolved body `default:`, else the kind's
+ * `body.example`, else the consumer's wording, else the flat built-in. The
+ * `default:` wins because it is the only one that describes the render: it promises
+ * what prints if nothing is written, and wording placed over it would make that
+ * promise unreadable. The rest are invitations, and an invitation belongs only where
+ * there is no promise; the quill's own comes first, being the one an agent working
+ * from the blueprint sees too.
  */
 export function resolveBodyGhost(
 	resolvedDefault: string | undefined,
+	example: string | undefined,
 	custom: string | undefined,
 	builtIn: string
 ): string {
-	return resolvedDefault || custom || builtIn;
+	return resolvedDefault || example || custom || builtIn;
+}
+
+/** Whether a cell is optional: a `t?` type, which renders `none` unanswered and so
+ *  never declares a `default:` (canon `SCHEMAS.md` §"Optional cells"). */
+export function optionalCell(f: QuillFieldSchema): boolean {
+	return f.type.endsWith('?');
+}
+
+/** The type a cell's control reads: the declared one, an optional cell's `?` stripped.
+ *  The `?` moves the render floor and nothing else, so every read of a type is this. */
+export function baseType(f: QuillFieldSchema): QuillFieldType {
+	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as QuillFieldType;
+}
+
+/**
+ * A value the schema declares, as ghost text: a `default:`, an `example:` or a
+ * `body.example`. Markdown — a `richtext` value — ghosts as the text it renders, one
+ * block to a line, as a resolved default does ({@link titleText}); anything else as
+ * itself. `undefined` for a blank or a non-scalar.
+ */
+export function declaredGhost(v: unknown, markdown: boolean): string | undefined {
+	const text = stringifyGhost(v)?.trim();
+	if (!text) return undefined;
+	return (markdown ? core().importMarkdown(text).text.trim() : text) || undefined;
+}
+
+/**
+ * The `example:` a free-text cell ghosts while it holds the focus: a `string`,
+ * `plaintext` or `richtext` declaring no `default:`. Every other type takes none, and
+ * so does a cell with a `default:`, whose ghost is the promise of what prints. The
+ * caller asks only for an unset cell.
+ */
+export function exampleGhost(f: QuillFieldSchema): string | undefined {
+	const kind = controlKind(f);
+	if ((kind !== 'text' && kind !== 'prose') || f.default !== undefined) return undefined;
+	return declaredGhost(f.example, baseType(f) === 'richtext');
 }
 
 /** Map a field schema to its control (precedence: prose › enum › text › …).
  * An array's element control is this over `items`: a missing `items` is a text
  * element. */
 export function controlKind(f: QuillFieldSchema): ControlKind {
-	switch (f.type) {
+	switch (baseType(f)) {
 		case 'richtext':
 		case 'plaintext':
 			return 'prose';
@@ -413,26 +451,35 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
  *  summary can hold. A `plaintext` leaf is inline at the codec whatever it declares. */
 export function shortCell(sub: QuillFieldSchema): boolean {
 	const kind = controlKind(sub);
-	if (kind === 'prose') return sub.type === 'plaintext' || !!sub.inline;
+	if (kind === 'prose') return baseType(sub) === 'plaintext' || !!sub.inline;
 	return (
 		kind === 'text' || kind === 'enum' || kind === 'number' || kind === 'boolean' || kind === 'date'
 	);
 }
 
 /**
- * A collapsed row's own words: the first short text cell in declaration order — a
- * `string`, or an inline `richtext` / `plaintext` — read through {@link titleText};
- * `undefined` while the row has nothing to say for itself.
+ * The first short text cell's words, in declaration order — a `string`, or an inline
+ * `richtext` / `plaintext` — read through {@link titleText}; `undefined` while none of
+ * them has any. What names an instance from its own values: a collapsed row, and a
+ * card whose kind declares no `title`.
  */
-export function rowSummary(items: QuillFieldSchema | undefined, row: unknown): string | undefined {
-	const values = (row ?? {}) as Record<string, unknown>;
-	for (const [k, sub] of Object.entries(items?.properties ?? {})) {
+function firstShortText(
+	cells: Record<string, QuillFieldSchema> | undefined,
+	values: Record<string, unknown>
+): string | undefined {
+	for (const [k, sub] of Object.entries(cells ?? {})) {
 		const kind = controlKind(sub);
 		if (kind !== 'text' && !(kind === 'prose' && shortCell(sub))) continue;
 		const text = titleText(ownValue(values, k)).trim();
 		if (text) return text;
 	}
 	return undefined;
+}
+
+/** A collapsed row's own words ({@link firstShortText}); `undefined` while the row has
+ *  nothing to say for itself. */
+export function rowSummary(items: QuillFieldSchema | undefined, row: unknown): string | undefined {
+	return firstShortText(items?.properties, (row ?? {}) as Record<string, unknown>);
 }
 
 /** How an `array` draws its elements. */
@@ -497,12 +544,18 @@ export function commitDiscriminant(
 
 /**
  * Whether the schema obliges a cell: `default:`'s absence, which is the whole of the
- * obligation (DOCUMENT_MODEL). A typed dictionary and a matrix are exempt — a namespace
- * declares no `default:` at all, and `validate` anchors obligation on the leaves under
- * it, so reading one off the container would mark every subform required.
+ * obligation (DOCUMENT_MODEL). Exempt are the cells whose absence of one says nothing:
+ * a typed dictionary and a matrix, since a namespace declares no `default:` at all and
+ * `validate` anchors obligation on the leaves under it; and an optional cell, which can
+ * declare none, its unanswered render being `none`.
  */
 export function obliged(schema: QuillFieldSchema): boolean {
-	return schema.type !== 'object' && schema.type !== 'matrix' && schema.default === undefined;
+	return (
+		schema.type !== 'object' &&
+		schema.type !== 'matrix' &&
+		!optionalCell(schema) &&
+		schema.default === undefined
+	);
 }
 
 /** `foo_bar` → `Foo bar`: the label fallback when a field declares no `title`. */
@@ -523,7 +576,7 @@ export function fieldModels(cardSchema: QuillCardSchema): FieldModel[] {
 		description: schema.description,
 		required: obliged(schema),
 		inline: !!schema.inline,
-		plaintext: schema.type === 'plaintext'
+		plaintext: baseType(schema) === 'plaintext'
 	}));
 }
 
@@ -699,20 +752,29 @@ export function titleText(v: unknown): string {
 	return typeof member === 'string' ? member : '';
 }
 
+/** A card kind's name: its schema `title`, else the humanized kind. What names a kind
+ *  before there is an instance of it: the add menu, the retype select. */
+export function kindTitle(cardSchema: QuillCardSchema | undefined, kind: string): string {
+	const t = cardSchema?.title;
+	return t && t.trim() ? t : humanize(kind);
+}
+
 /**
- * Resolve a card instance's header title: the per-instance `$ext.editor.title`
- * override wins; else the kind's schema `title`; else the humanized kind. Empty
- * overrides fall through so a cleared rename reverts to the schema title.
+ * A card instance's header: the per-instance `$ext.editor.title` rename; else the
+ * kind's schema `title`, which names every instance alike; else the instance's own
+ * first short text cell ({@link firstShortText}); else the humanized kind. Empty
+ * renames fall through, so a cleared rename reverts to what the schema says.
  */
 export function cardTitle(
 	cardSchema: QuillCardSchema | undefined,
 	kind: string,
+	values: Record<string, unknown>,
 	extTitle: string | undefined
 ): string {
 	if (extTitle && extTitle.trim()) return extTitle;
 	const t = cardSchema?.title;
 	if (t && t.trim()) return t;
-	return humanize(kind);
+	return firstShortText(cardSchema?.fields, values) ?? humanize(kind);
 }
 
 /** Whether a card kind renders a body leaf: gated by `body.enabled !== false`. */
