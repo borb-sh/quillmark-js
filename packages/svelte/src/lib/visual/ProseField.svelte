@@ -40,6 +40,8 @@
 		/** Ghost shown on the empty leaf: what a field prints unset, or nothing, and a
 		 * body's always text (`resolveBodyGhost`). */
 		placeholder?: string;
+		/** A field's leaf, whose placeholder goes at its first edit (`createField`). */
+		placeholderUntilEdit?: boolean;
 		/** Ghost shown in the placeholder's stead while the leaf holds the focus, until
 		 * its first edit: an unset field's `example:` (`exampleGhost`). */
 		example?: string;
@@ -66,6 +68,7 @@
 		labelledBy,
 		describedBy,
 		placeholder,
+		placeholderUntilEdit,
 		example,
 		leafKey,
 		onFocus,
@@ -112,6 +115,7 @@
 			labelledBy,
 			describedBy,
 			placeholder,
+			placeholderUntilEdit,
 			example,
 			tableStrings: () => t.strings,
 			onSlash: (next) => {

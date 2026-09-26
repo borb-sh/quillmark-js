@@ -35,6 +35,7 @@ import {
 	optionalCell,
 	baseType,
 	exampleGhost,
+	declaredGhost,
 	MATRIX_HELD
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
@@ -596,12 +597,25 @@ describe('optional cells', () => {
 	});
 });
 
+describe('declaredGhost', () => {
+	it('renders markdown to its text, a block to a line, and leaves the rest as spelled', () => {
+		expect(declaredGhost('One *two*\nthree.\n\n- four', true)).toBe('One two three.\nfour');
+		expect(declaredGhost('One *two*', false)).toBe('One *two*');
+		expect(declaredGhost(0, false)).toBe('0');
+		expect(declaredGhost('  ', true)).toBeUndefined();
+		expect(declaredGhost({ a: 1 }, false)).toBeUndefined();
+	});
+});
+
 describe('exampleGhost', () => {
 	it('reads the `example:` of a defaultless free-text cell, as text', () => {
 		expect(exampleGhost(f({ type: 'string', example: 'SPEC/AA' }))).toBe('SPEC/AA');
 		expect(exampleGhost(f({ type: 'plaintext', example: 'a note' }))).toBe('a note');
-		// A block literal's closing newline is the YAML's, not the example's.
-		expect(exampleGhost(f({ type: 'richtext', example: 'A *lead*.\n' }))).toBe('A *lead*.');
+		// Markdown ghosts as the text it renders, and a block literal's closing newline is
+		// the YAML's, not the example's.
+		expect(exampleGhost(f({ type: 'richtext', example: 'A *lead*.\n' }))).toBe('A lead.');
+		// A `plaintext` example is literal: its asterisks are text.
+		expect(exampleGhost(f({ type: 'plaintext?', example: '*x*' }))).toBe('*x*');
 		expect(exampleGhost(f({ type: 'string?', example: 'RFC 9110' }))).toBe('RFC 9110');
 		expect(exampleGhost(f({ type: 'string' }))).toBeUndefined();
 	});

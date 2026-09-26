@@ -5,17 +5,25 @@
 // The reference quill carries both shapes: `section` declares no `title` and is named
 // by its `heading`, `figure` declares one.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync } from 'svelte';
+import { flushSync, mount, unmount } from 'svelte';
+import { init, type Quill } from '@quillmark/wasm';
+import type { FieldController, LeafViews } from '$lib/core/codec';
+import type { EditorChange } from '$lib/visual';
 import { fieldValues, humanize } from '$lib/visual/structure';
+import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
 import { field, mountEditor, stubLayout, type, type Mounted } from '../helpers/surface.js';
 import { quill, template } from '../helpers/fixtures.js';
 
+const core = await init();
 stubLayout();
 
 let mounted: Mounted | undefined;
+let cleanup: (() => void) | undefined;
 afterEach(() => {
 	mounted?.unmount();
 	mounted = undefined;
+	cleanup?.();
+	cleanup = undefined;
 });
 
 const cards = (target: HTMLElement) => [
@@ -96,5 +104,72 @@ describe('the add menu', () => {
 		flushSync();
 		await new Promise((settled) => setTimeout(settled, 50));
 		expect(document.querySelector('.qm-menu-item')).toBeNull();
+	});
+});
+
+// A kind named by a one-line prose field: that lane commits without a re-derive, so the
+// header follows the leaf's own commit. On its own quill, the reference quill naming its
+// untitled kind by a `string`.
+const PERSON = `quill:
+  name: person_probe
+  version: 1.0.0
+  backend: typst
+  description: A kind with no title, named by an inline prose field.
+typst:
+  plate_file: plate.typ
+main:
+  fields: {}
+card_kinds:
+  person:
+    fields:
+      name:
+        type: plaintext
+        inline: true
+`;
+
+function personQuill(): Quill {
+	// This realm's `Uint8Array`: the boundary refuses another realm's by identity.
+	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
+	return core.Quill.fromTree(
+		new Map([
+			['Quill.yaml', bytes(PERSON)],
+			['plate.typ', bytes('#set page(width: 200pt)\n')]
+		])
+	);
+}
+
+describe('a header named by an inline prose field', () => {
+	it('follows the leaf’s commit, which re-derives nothing', async () => {
+		const q = personQuill();
+		// A seed carries one card of each declared kind.
+		const doc = q.seedDocument();
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+		const changes: EditorChange[] = [];
+		const app = mount(VisualEditorInner, {
+			target,
+			props: { doc, quill: q, onChange: (c: EditorChange) => changes.push(c) }
+		});
+		flushSync();
+		cleanup = () => {
+			void unmount(app);
+			target.remove();
+			doc.free();
+		};
+		const editor = app as unknown as {
+			focusField(field: string): Promise<void>;
+			getActiveLeaf(): FieldController | undefined;
+		};
+		const titles = () =>
+			[...target.querySelectorAll<HTMLInputElement>('.qm-card-title')].map((i) => i.placeholder);
+		expect(titles()).toEqual([humanize('person')]);
+
+		await editor.focusField('cards.person[0].name');
+		const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+		view.dispatch(view.state.tr.insertText('Jane Q. Roe', 1));
+		flushSync();
+
+		expect(changes.map((c) => c.source)).toEqual(['prose']);
+		expect(titles()).toEqual(['Jane Q. Roe']);
 	});
 });

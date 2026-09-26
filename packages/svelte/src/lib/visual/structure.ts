@@ -15,6 +15,7 @@ import {
 	type ResolvedField,
 	type Resolved
 } from '@quillmark/wasm';
+import { core } from '../core/lifecycle.js';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
 export type ControlKind =
@@ -217,15 +218,27 @@ export function baseType(f: QuillFieldSchema): QuillFieldType {
 }
 
 /**
+ * A value the schema declares, as ghost text: a `default:`, an `example:` or a
+ * `body.example`. Markdown — a `richtext` value — ghosts as the text it renders, one
+ * block to a line, as a resolved default does ({@link titleText}); anything else as
+ * itself. `undefined` for a blank or a non-scalar.
+ */
+export function declaredGhost(v: unknown, markdown: boolean): string | undefined {
+	const text = stringifyGhost(v)?.trim();
+	if (!text) return undefined;
+	return (markdown ? core().importMarkdown(text).text.trim() : text) || undefined;
+}
+
+/**
  * The `example:` a free-text cell ghosts while it holds the focus: a `string`,
- * `plaintext` or `richtext` declaring no `default:`, its example read as text. Every
- * other type takes none, and so does a cell with a `default:`, whose ghost is the
- * promise of what prints. The caller asks only for an unset cell.
+ * `plaintext` or `richtext` declaring no `default:`. Every other type takes none, and
+ * so does a cell with a `default:`, whose ghost is the promise of what prints. The
+ * caller asks only for an unset cell.
  */
 export function exampleGhost(f: QuillFieldSchema): string | undefined {
 	const kind = controlKind(f);
 	if ((kind !== 'text' && kind !== 'prose') || f.default !== undefined) return undefined;
-	return stringifyGhost(f.example)?.trim();
+	return declaredGhost(f.example, baseType(f) === 'richtext');
 }
 
 /** Map a field schema to its control (precedence: prose › enum › text › …).

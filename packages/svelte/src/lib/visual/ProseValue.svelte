@@ -69,9 +69,9 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
-		/** The empty leaf's ghosts, a subform cell's: what it prints unset, and the
-		 *  `example:` drawn in its stead while the leaf holds the focus (`createField`'s
-		 *  pair). Read per decoration pass. */
+		/** The empty leaf's ghosts, a subform cell's: what it prints unset, until the
+		 *  leaf's first edit, and the `example:` drawn in its stead while the leaf holds
+		 *  the focus (`createField`'s pair). Read per decoration pass. */
 		placeholder?: string;
 		example?: string;
 		onChange: (rt: Content) => void;
@@ -145,6 +145,7 @@
 				: proseLeafPlugins(schema, {
 						inline,
 						placeholder: () => placeholder,
+						placeholderUntilEdit: true,
 						example: () => example
 					})
 		});

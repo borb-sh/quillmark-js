@@ -10,9 +10,12 @@
 // `prose.css` keys the example on), so a leaf is read by the attributes that rule
 // draws from; an input's is its own `placeholder`.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync } from 'svelte';
-import { init, type Quill } from '@quillmark/wasm';
+import { flushSync, mount, unmount } from 'svelte';
+import { init, type Document, type Quill, type ResolvedField } from '@quillmark/wasm';
+import type { FieldController, LeafViews } from '$lib/core/codec';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
+import TextField from '$lib/visual/TextField.svelte';
+import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
 import { field, mountEditor, stubLayout, type, type Mounted } from '../helpers/surface.js';
 
 const core = await init();
@@ -48,13 +51,6 @@ main:
       inline: true
       default: "*Always* be testing."
       example: Never drawn
-    count:
-      type: integer
-      example: 3
-    tier:
-      type: enum
-      values: [low, high]
-      example: low
     ref:
       type: string?
       example: RFC 9110
@@ -63,6 +59,8 @@ main:
     level:
       type: enum?
       values: [low, high]
+    flag:
+      type: boolean?
     aside:
       type: plaintext?
       inline: true
@@ -76,6 +74,10 @@ main:
           type: plaintext
           inline: true
           example: In person
+        motto:
+          type: richtext
+          inline: true
+          default: "*Always* be testing."
         phone:
           type: string?
     rows:
@@ -110,16 +112,43 @@ const ghosts = (): Quill =>
 	);
 
 let mounted: Mounted | undefined;
+let cleanup: (() => void) | undefined;
 afterEach(() => {
 	mounted?.unmount();
 	mounted = undefined;
+	cleanup?.();
+	cleanup = undefined;
 });
 
-/** A seed: every field unset and every body empty, one card of the one kind. */
-function open(extra: Record<string, unknown> = {}): HTMLElement {
+/** A seed, every field unset and every body empty, or the document `md` spells. */
+function open(extra: Record<string, unknown> = {}, md?: string): HTMLElement {
 	const q = ghosts();
-	mounted = mountEditor(q, q.seedDocument(), extra);
+	const doc = md == null ? q.seedDocument() : q.parse(md);
+	mounted = mountEditor(q, doc, extra);
 	return mounted.target;
+}
+
+/** A document answering the given main-card lines. */
+const answering = (...lines: string[]) =>
+	['~~~', '$quill: ghosts@1.0.0', '$kind: main', ...lines, '~~~', ''].join('\n');
+
+interface InnerRef {
+	focusField(field: string): Promise<void>;
+	getActiveLeaf(): FieldController | undefined;
+}
+
+/** Mounted at `VisualEditorInner`, which holds `getActiveLeaf`: jsdom drives no
+ *  contenteditable, so an edit is a transaction dispatched into the leaf's own view. */
+function openInner(doc: Document): { target: HTMLElement; editor: InnerRef } {
+	const target = document.createElement('div');
+	document.body.appendChild(target);
+	const app = mount(VisualEditorInner, { target, props: { doc, quill: ghosts() } });
+	flushSync();
+	cleanup = () => {
+		void unmount(app);
+		target.remove();
+	};
+	return { target, editor: app as unknown as InnerRef };
 }
 
 const input = (scope: HTMLElement): HTMLInputElement => scope.querySelector('input')!;
@@ -131,7 +160,7 @@ const cell = (scope: HTMLElement, key: string): HTMLElement =>
 	scope.querySelector<HTMLElement>(`[data-qm-prop="${key}"]`)!;
 
 describe('the example ghost', () => {
-	it('shows on a focused, unset text field, and goes at the first keystroke', () => {
+	it('shows on a focused, unset text field, and goes at blur', () => {
 		const target = open();
 		const heading = input(field(target, 'Heading'));
 		expect(heading.placeholder).toBe('');
@@ -143,11 +172,34 @@ describe('the example ghost', () => {
 		heading.blur();
 		flushSync();
 		expect(heading.placeholder).toBe('');
+	});
 
-		heading.focus();
+	it('goes at the first keystroke, and an input emptied after it ghosts what prints', () => {
+		// The control alone, its value held unset, so what clears the example is the
+		// keystroke and not the commit that re-derives the field.
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+		const app = mount(TextField, {
+			target,
+			props: { value: undefined, placeholder: 'At rest', example: 'Findings', onCommit: () => {} }
+		});
+		cleanup = () => {
+			void unmount(app);
+			target.remove();
+		};
 		flushSync();
-		type(heading, 'F');
-		expect(heading.placeholder).toBe('');
+		const el = input(target);
+		el.focus();
+		flushSync();
+		expect(el.placeholder).toBe('Findings');
+
+		el.value = 'F';
+		el.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		el.value = '';
+		el.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		expect(el.placeholder).toBe('At rest');
 	});
 
 	it('gives way to a `default:`, which is what prints', () => {
@@ -165,19 +217,10 @@ describe('the example ghost', () => {
 	it('rides a prose leaf as the attribute its focus rule draws', () => {
 		const target = open();
 		const lead = leafGhost(field(target, 'Lead'));
-		expect(lead?.dataset.example).toBe('What the section *found*.');
+		// Markdown, so it ghosts as the text it renders.
+		expect(lead?.dataset.example).toBe('What the section found.');
 		// Nothing at rest: the field declares no `default:`, so nothing prints.
 		expect(lead?.hasAttribute('data-placeholder')).toBe(false);
-	});
-
-	it('takes none on a number or an enum, whatever they declare', () => {
-		const target = open();
-		const count = input(field(target, 'Count'));
-		count.focus();
-		flushSync();
-		expect(count.placeholder).toBe('');
-		const tier = field(target, 'Tier').querySelector<HTMLElement>('.qm-select')!;
-		expect(tier.textContent?.trim()).not.toContain('low');
 	});
 
 	it('reaches an object’s cells and a table’s, by `sub.example`', () => {
@@ -189,6 +232,8 @@ describe('the example ghost', () => {
 		flushSync();
 		expect(name.placeholder).toBe('Ada Lovelace');
 		expect(leafGhost(cell(contact, 'note'))?.dataset.example).toBe('In person');
+		// A cell's markdown `default:` ghosts as the text it prints, as a field's does.
+		expect(leafGhost(cell(contact, 'motto'))?.dataset.placeholder).toBe('Always be testing.');
 
 		const rows = field(target, 'Rows');
 		rows.querySelector<HTMLButtonElement>('.qm-add-el')!.click();
@@ -230,6 +275,47 @@ describe('an optional cell', () => {
 		ref.blur();
 		flushSync();
 		expect(ref.placeholder).toBe(NONE);
+	});
+
+	it('ghosts nothing once answered, an empty answer printing empty', () => {
+		const target = open({}, answering('ref: ""', 'aside: ""', 'contact:', '  phone: ""'));
+		expect(input(field(target, 'Ref')).placeholder).toBe('');
+		expect(leafGhost(field(target, 'Aside'))).toBeNull();
+		expect(input(cell(field(target, 'Contact'), 'phone')).placeholder).toBe('');
+	});
+
+	it('drops `None` from a prose leaf at its first edit, which answers it', async () => {
+		const q = ghosts();
+		const doc = q.seedDocument();
+		const { target, editor } = openInner(doc);
+		expect(leafGhost(field(target, 'Aside'))?.dataset.placeholder).toBe(NONE);
+
+		await editor.focusField('main.aside');
+		const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+		view.dispatch(view.state.tr.insertText('x', 1));
+		view.dispatch(view.state.tr.delete(1, 2));
+		flushSync();
+
+		// Emptied, the leaf holds an empty answer, and the boundary says so.
+		const rows: ResolvedField[] = q.reader(doc).resolve().main.fields;
+		const aside = rows.find((row) => row.name === 'aside');
+		expect(aside?.source).toBe('authored');
+		expect(leafGhost(field(target, 'Aside'))).toBeNull();
+		doc.free();
+	});
+
+	it('draws an unset `boolean?` as a third state, and a press answers it', () => {
+		const target = open();
+		const flag = field(target, 'Flag');
+		const toggle = flag.querySelector<HTMLElement>('.qm-toggle')!;
+		expect(toggle.getAttribute('role')).toBe('checkbox');
+		expect(toggle.getAttribute('aria-checked')).toBe('mixed');
+		expect(flag.querySelector('.qm-toggle-wrap')!.hasAttribute('data-unset')).toBe(true);
+
+		toggle.click();
+		flushSync();
+		expect(toggle.getAttribute('aria-checked')).toBe('true');
+		expect(flag.querySelector('.qm-toggle-wrap')!.hasAttribute('data-unset')).toBe(false);
 	});
 
 	it('words its ghost as the consumer does', () => {

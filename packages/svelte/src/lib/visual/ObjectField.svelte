@@ -45,7 +45,7 @@
 		obliged,
 		optionalCell,
 		shortCell,
-		stringifyGhost
+		declaredGhost
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
@@ -129,10 +129,14 @@
 	const required = obliged;
 
 	const title = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
-	/** What a cell ghosts at rest, which is what it prints unset: its `default:`, or the
-	 *  `none` an optional cell prints. */
-	const restGhost = (sub: QuillFieldSchema): string | undefined =>
-		stringifyGhost(sub.default) ?? (optionalCell(sub) ? t.strings.optionalGhost : undefined);
+	/** What an unset cell ghosts at rest, which is what it prints: its `default:`, or the
+	 *  `none` an optional cell prints. An answered cell ghosts nothing, an empty answer
+	 *  printing empty. */
+	const restGhost = (key: string, sub: QuillFieldSchema): string | undefined =>
+		obj[key] != null
+			? undefined
+			: (declaredGhost(sub.default, baseType(sub) === 'richtext') ??
+				(optionalCell(sub) ? t.strings.optionalGhost : undefined));
 	/** What an unset free-text cell ghosts while it holds the focus ({@link exampleGhost}). */
 	const exampleOf = (key: string, sub: QuillFieldSchema): string | undefined =>
 		obj[key] == null ? exampleGhost(sub) : undefined;
@@ -311,7 +315,7 @@
 						describedBy={describes}
 						value={obj[key] as number | undefined}
 						integer={baseType(sub) === 'integer'}
-						placeholder={restGhost(sub)}
+						placeholder={restGhost(key, sub)}
 						onCommit={(v) => commitProp(key, v)}
 					/>
 				{:else if kind === 'boolean'}
@@ -321,6 +325,7 @@
 						describedBy={describes}
 						value={obj[key] as boolean | undefined}
 						fallback={sub.default as boolean | undefined}
+						optional={optionalCell(sub)}
 						onCommit={(v) => commitProp(key, v)}
 					/>
 				{:else if kind === 'date'}
@@ -338,7 +343,7 @@
 						id={ids?.control}
 						describedBy={describes}
 						value={obj[key] as string | undefined}
-						placeholder={restGhost(sub)}
+						placeholder={restGhost(key, sub)}
 						example={exampleOf(key, sub)}
 						onCommit={(v) => commitProp(key, v)}
 						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
@@ -350,7 +355,7 @@
 						bind:this={proseEls[key]}
 						content={() => contentAt([key]) ?? emptyContent()}
 						plaintext={baseType(sub) === 'plaintext'}
-						placeholder={restGhost(sub)}
+						placeholder={restGhost(key, sub)}
 						example={exampleOf(key, sub)}
 						{block}
 						label={named}

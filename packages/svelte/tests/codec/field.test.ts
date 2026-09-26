@@ -394,7 +394,11 @@ describe('the example ghost', () => {
 
 	/** The showcase `title`, unset on a seed: inline richtext declaring an `example:` and
 	 *  no `default:`. */
-	function unsetTitle(opts: { placeholder?: string; example?: string }): FieldController {
+	function unsetTitle(opts: {
+		placeholder?: string;
+		placeholderUntilEdit?: boolean;
+		example?: string;
+	}): FieldController {
 		return createField({
 			doc: quill().seedDocument(),
 			quill: quill(),
@@ -428,6 +432,18 @@ describe('the example ghost', () => {
 		view.dispatch(view.state.tr.delete(1, 2));
 		expect(ghostOf(field)).toBe('None');
 		expect(exampleOf(field)).toBeNull();
+		field.destroy();
+	});
+
+	it('drops a placeholder that says what the unset field prints at the first edit too', () => {
+		// The edit answers the field: emptied, the leaf holds an empty answer, which is
+		// what prints, where a body's invitation returns whenever the leaf is empty.
+		const field = unsetTitle({ placeholder: 'None', placeholderUntilEdit: true });
+		const view = viewOf(field);
+		expect(ghostOf(field)).toBe('None');
+		view.dispatch(view.state.tr.insertText('X', 1));
+		view.dispatch(view.state.tr.delete(1, 2));
+		expect(view.dom.querySelector('.qm-prose-placeholder')).toBeNull();
 		field.destroy();
 	});
 

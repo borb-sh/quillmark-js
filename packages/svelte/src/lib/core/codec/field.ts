@@ -88,6 +88,11 @@ export interface CreateFieldOpts {
 	 * invitation. The initial value; {@link FieldController.setPlaceholder} moves it
 	 * after mount. Empty/absent shows no ghost. */
 	placeholder?: string;
+	/** The placeholder is what the unset field prints, so it goes at the leaf's first
+	 * edit: the edit answers the field, and emptied the leaf holds an empty answer, which
+	 * prints empty. Absent, the placeholder is an invitation (a body's) and returns
+	 * whenever the leaf is empty. */
+	placeholderUntilEdit?: boolean;
 	/** Ghost text shown on the empty leaf in the placeholder's stead while the leaf
 	 * holds the focus, until its first edit: a defaultless field's `example:`. The
 	 * initial value; {@link FieldController.setExample} moves it after mount. */
@@ -391,6 +396,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				// Always installed, so a leaf that mounts without a ghost can still be
 				// given one later; the plugin draws nothing while the text is empty.
 				placeholder: () => placeholderText,
+				placeholderUntilEdit: opts.placeholderUntilEdit,
 				example: () => exampleText,
 				afterHistory: [anchorPlugin(seededAnchors)]
 			})
@@ -593,6 +599,8 @@ export function proseLeafPlugins(
 		 *  ({@link FieldController.setPlaceholder}), and a re-hydration rebuilds this
 		 *  stack, so the plugin must ask rather than hold. */
 		placeholder?: () => string | undefined;
+		/** {@link CreateFieldOpts.placeholderUntilEdit}. */
+		placeholderUntilEdit?: boolean;
 		/** The focused leaf's ghost, read live for the same reason. */
 		example?: () => string | undefined;
 		afterHistory?: Plugin[];
@@ -651,9 +659,10 @@ function pastAtomPlugin(): Plugin {
  * vanishes the instant the leaf holds any content (the emptiness test fails).
  *
  * `data-placeholder` is drawn at rest, and `data-example` in its stead while the view
- * holds the focus. The example is stamped only until the state's first edit: after
- * one the leaf has been answered, and emptied again it holds the empty answer. An
- * inline leaf's ghost keeps to the one line the leaf is (`qm-prose-placeholder-line`).
+ * holds the focus. The example is stamped only until the state's first edit, after
+ * which the leaf has been answered, and so is a placeholder that says what the unset
+ * field prints (`placeholderUntilEdit`). An inline leaf's ghost keeps to the one line
+ * the leaf is (`qm-prose-placeholder-line`).
  *
  * The texts are read per decoration pass rather than closed over, so moving a ghost is
  * a re-render and never a document edit.
@@ -661,6 +670,7 @@ function pastAtomPlugin(): Plugin {
 function ghostPlugin(opts: {
 	inline: boolean;
 	placeholder?: () => string | undefined;
+	placeholderUntilEdit?: boolean;
 	example?: () => string | undefined;
 }): Plugin<boolean> {
 	const key = new PluginKey<boolean>('qm-ghost');
@@ -672,8 +682,9 @@ function ghostPlugin(opts: {
 		},
 		props: {
 			decorations(state) {
-				const text = opts.placeholder?.();
-				const example = key.getState(state) ? undefined : opts.example?.();
+				const edited = key.getState(state);
+				const text = edited && opts.placeholderUntilEdit ? undefined : opts.placeholder?.();
+				const example = edited ? undefined : opts.example?.();
 				if (!text && !example) return null;
 				const { doc } = state;
 				const first = doc.firstChild;

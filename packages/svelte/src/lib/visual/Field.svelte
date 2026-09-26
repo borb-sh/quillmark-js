@@ -123,7 +123,9 @@
 		field.control === 'prose' ? titleText(ghost) || undefined : stringifyGhost(ghost)
 	);
 	const optional = $derived(optionalCell(field.schema));
-	const restGhost = $derived(defaultStr ?? (optional ? t.strings.optionalGhost : undefined));
+	const restGhost = $derived(
+		defaultStr ?? (optional && value == null ? t.strings.optionalGhost : undefined)
+	);
 	const example = $derived(value == null ? exampleGhost(field.schema) : undefined);
 	// A variant resolves as one rung whose value is the whole container, so the
 	// discriminant's ghost is that container's own discriminant cell.
@@ -276,6 +278,7 @@
 					inline={field.inline}
 					plaintext={field.plaintext}
 					placeholder={restGhost}
+					placeholderUntilEdit
 					{example}
 					labelledBy={domIds.label}
 					{describedBy}
@@ -328,6 +331,7 @@
 				<BooleanField
 					value={value as boolean | undefined}
 					fallback={ghost as boolean | undefined}
+					{optional}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}

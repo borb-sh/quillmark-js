@@ -133,13 +133,17 @@
 						     and while the field is unset this is the selected row, so the weight
 						     step pulls the other way. It rides the accessible name for the same
 						     reason. -->
+						<!-- An optional cell's row is untagged: it ghosts no default, and `None`
+						     names no member to tell it from. -->
 						<Select.Item
 							class="qm-menu-item qm-select-item qm-select-unset"
 							value={UNSET}
-							label={`${ghostText} ${t.strings.enumUnsetTag}`}
+							label={optional ? ghostText : `${ghostText} ${t.strings.enumUnsetTag}`}
 						>
 							<span class="qm-select-ghost">{ghostText}</span>
-							<span class="qm-select-tag">{t.strings.enumUnsetTag}</span>
+							{#if !optional}
+								<span class="qm-select-tag">{t.strings.enumUnsetTag}</span>
+							{/if}
 						</Select.Item>
 						<!-- A refused option still draws under `'disable'`, and under either
 						     policy when it is the one selected: a listbox whose selected value

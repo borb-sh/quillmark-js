@@ -197,8 +197,13 @@ li.ProseMirror-selectednode::after {
    leaf rather than hang over what follows it. A block leaf's ghost wraps and keeps the
    breaks it was written with, a `body.example` being a document's worth; an inline
    leaf's keeps to the one line the leaf is. The example stands in for the resting
-   ghost while the leaf holds the focus. */
-.ProseMirror .qm-prose-placeholder::after {
+   ghost while the leaf holds the focus.
+
+   Drawn only where there is text to draw: an empty box pulled up a line would take
+   the empty line with it, and a leaf ghosting an example alone would rest a line
+   short. */
+.ProseMirror .qm-prose-placeholder[data-placeholder]::after,
+.ProseMirror-focused .qm-prose-placeholder[data-example]::after {
 	content: attr(data-placeholder);
 	display: block;
 	margin-top: -1lh;
@@ -207,13 +212,13 @@ li.ProseMirror-selectednode::after {
 	font-style: italic;
 	pointer-events: none;
 }
-.ProseMirror .qm-prose-placeholder-line::after {
+.ProseMirror-focused .qm-prose-placeholder[data-example]::after {
+	content: attr(data-example);
+}
+.ProseMirror .qm-prose-placeholder.qm-prose-placeholder-line::after {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-.ProseMirror-focused .qm-prose-placeholder[data-example]::after {
-	content: attr(data-example);
 }
 
 /* ── The table island ────────────────────────────────────────────────────────

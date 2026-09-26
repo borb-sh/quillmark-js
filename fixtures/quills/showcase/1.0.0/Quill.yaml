@@ -532,7 +532,7 @@ card_kinds:
                 - end
               default: end
               description: Which margin the figure floats to.
-        description: How the figure sits in the flow. The one variant-bearing enum on a card kind, and the field the kind's title reads.
+        description: How the figure sits in the flow. The one variant-bearing enum on a card kind.
       caption:
         type: richtext
         inline: true
