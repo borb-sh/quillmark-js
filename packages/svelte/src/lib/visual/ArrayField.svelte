@@ -58,6 +58,7 @@
 	import { createLifespan } from '../core/teardown.js';
 	import {
 		IdSeq,
+		baseType,
 		controlKind,
 		humanize,
 		obliged,
@@ -656,7 +657,7 @@
 						<ProseValue
 							bind:this={els[id]}
 							content={() => contentAt([k]) ?? emptyContent()}
-							plaintext={items?.type === 'plaintext'}
+							plaintext={items != null && baseType(items) === 'plaintext'}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
 							onKey={(e) => onElementKey(e, k)}

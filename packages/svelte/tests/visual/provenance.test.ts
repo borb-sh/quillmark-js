@@ -111,10 +111,9 @@ describe('resolve over the real showcase schema', () => {
 	});
 
 	it('leaves a variant cell to its own world: no seed reaches its `example:`', () => {
-		// `handling.CONTROLLED.controlled_by` declares an `example:` and the seed writes
-		// none — the cascade reaches a card's fields, and a cell is not one. So a fresh
-		// document has no handling container at all, which is what the blank `default:`
-		// then resolves for.
+		// `handling.CONTROLLED.controlled_by` declares an `example:`, and a seed commits
+		// none anywhere. So a fresh document has no handling container at all, which is
+		// what the blank `default:` then resolves for.
 		const doc = quill().seedDocument();
 		expect(doc.toMarkdown()).not.toContain('handling');
 		expect(doc.getStored('handling')).toBeUndefined();
