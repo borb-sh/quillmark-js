@@ -327,11 +327,11 @@
 		const keyStr = fieldKeyToString(key);
 		try {
 			if (value === undefined) {
-				// The unset rung of the commitment ladder (VISUAL_EDITOR §"Structure mirrors
-				// the schema"): removing the field leaves the engine's authored › `default:`
-				// › blank-fill resolve to render the default, where writing one bakes a
-				// snapshot the schema cannot track (canon SCHEMAS.md: the engine never
-				// persists a default; nor do we). Removal writes no value, so there is
+				// The unset rung (VISUAL_EDITOR §"The commitment ladder"): removing the field
+				// leaves the engine's authored › `default:` › blank-fill resolve to render the
+				// default, where writing one bakes a snapshot the schema cannot track (canon
+				// SCHEMAS.md: the engine never writes a default; the editor writes one only
+				// as the edit that takes it). Removal writes no value, so there is
 				// nothing for a schema to conform and the lane is the quill-free one.
 				if (isMain) {
 					doc.removeField(name);

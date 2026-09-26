@@ -17,8 +17,9 @@
  Commit is whole: the sparse map, one `writer.set`. A tick writes the member object
  with an explicit `held`, an untick keeps the columns under `held: false`, and a member
  unheld with no columns leaves the map (`memberWrite`). What is blank per column is the
- engine's rule and not restated: a column control that clears drops its key, so the
- editor drops a member it has emptied rather than deciding skippability for itself.
+ engine's rule and not restated: a column control that clears to unset drops its key,
+ so the editor drops a member it has emptied rather than deciding skippability for
+ itself; one whose default prints clears to the empty answer, which the member holds.
  The read takes both rest forms — a bare tick and `{held?, …columns}`, whose `held` rests
  at `false` where the mapping names none — and the write lands one, on the member edited
  alone; every other member rides through as the document spelled it.

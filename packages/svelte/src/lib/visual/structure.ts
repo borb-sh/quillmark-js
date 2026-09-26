@@ -231,18 +231,36 @@ export function declaredGhost(v: unknown, markdown: boolean): string | undefined
 }
 
 /**
+ * A scalar `default:` as the text an unset control holds, where it prints: as
+ * declared, `undefined` for none, a blank or a non-scalar. One test of printing for
+ * every control, the one {@link exampleGhost} gives way to: a default of spaces
+ * prints nothing a reader sees.
+ */
+export function printedText(v: unknown): string | undefined {
+	const text = stringifyGhost(v);
+	return text?.trim() ? text : undefined;
+}
+
+/**
  * A declared content literal as the `Content` it holds: a `richtext` one's markdown
- * imported, a `plaintext` one's text taken literally, a line to each `\n`. What a
- * cell's static `default:` stands in its leaf as, where no resolved row reaches it.
- * `undefined` for a blank or a non-scalar.
+ * imported, a `plaintext` one's text taken literally, one paragraph whose later lines
+ * continue it, as the literal codec reads a stored one. What a cell's static
+ * `default:` stands in its leaf as, where no resolved row reaches it. `undefined` for
+ * a blank or a non-scalar.
  */
 export function declaredContent(v: unknown, markdown: boolean): Content | undefined {
-	const text = stringifyGhost(v);
-	if (!text?.trim()) return undefined;
+	const text = printedText(v);
+	if (text === undefined) return undefined;
 	if (markdown) return core().importMarkdown(text);
 	return {
 		text,
-		lines: text.split('\n').map(() => ({ containers: [], kind: 'para' as const })),
+		lines: text
+			.split('\n')
+			.map((_, i) =>
+				i === 0
+					? { containers: [], kind: 'para' as const }
+					: { containers: [], kind: 'para' as const, continues: true }
+			),
 		marks: [],
 		islands: []
 	};

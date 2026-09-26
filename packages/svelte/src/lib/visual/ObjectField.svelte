@@ -44,8 +44,8 @@
 		isContainer,
 		obliged,
 		optionalCell,
-		shortCell,
-		stringifyGhost
+		printedText,
+		shortCell
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
@@ -136,10 +136,8 @@
 	/** What an unset free-text cell ghosts where nothing prints ({@link exampleGhost}). */
 	const exampleOf = (key: string, sub: QuillFieldSchema): string | undefined =>
 		obj[key] == null ? exampleGhost(sub) : undefined;
-	/** A scalar cell's `default:` as the text an unset cell holds; a string's only where
-	 *  it prints ({@link TextField}). */
-	const textDefault = (sub: QuillFieldSchema): string | undefined =>
-		stringifyGhost(sub.default) || undefined;
+	/** A scalar cell's `default:` as the text an unset cell holds, where it prints. */
+	const textDefault = (sub: QuillFieldSchema): string | undefined => printedText(sub.default);
 	/** A content cell's `default:` as the content an unset leaf holds, where it prints. */
 	const contentDefault = (sub: QuillFieldSchema): Content | undefined =>
 		declaredContent(sub.default, baseType(sub) === 'richtext');

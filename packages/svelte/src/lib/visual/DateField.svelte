@@ -26,17 +26,17 @@
  carrying a `default:` prints the default's digits in the segments at the default
  rung (theme.css), instead of the primitive's `mm`/`dd`/`yyyy` hints, which say
  "empty" where the rung says "will render 2026-01-01". At rest the ghost is painted
- in the segment snippet, over an unset primitive: the primitive shadows a
- written-back `value` prop it was not `bind:`-ed to, so a default held as its value
- would be re-seated over a date whose segment was just cleared, taking the year and
- month the user kept. `placeholder` (the `DateValue` the segments count from, never
- one they display) carries the default too, so arrowing an empty segment starts at
- the render's date rather than today's.
+ in the segment snippet, over an unset primitive: a default held as its value reads
+ as filled to every path that reads the primitive, which re-reports a filled value as
+ each segment loses focus, so a Tab through the field would write it. `placeholder`
+ (the `DateValue` the segments count from, never one they display) carries the
+ default too, so arrowing an empty segment starts at the render's date rather than
+ today's.
 
- Focus takes the default as `TextField` does: entering an unset field seats the
- default as the primitive's value, still at the default rung, so an edit to one
- segment commits a whole date with the others the default's. Leaving without an edit
- unseats it, and nothing is written.
+ Entering an unset field seats the default as the primitive's value, still at the
+ default rung, so an edit to one segment commits a whole date with the others the
+ default's. Leaving without an edit unseats it, and nothing is written; so does
+ clearing a segment.
 -->
 <script lang="ts">
 	import { DateField as BitsDateField } from 'bits-ui';
@@ -89,32 +89,34 @@
 		}
 	}
 
+	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
+	/** The default is the primitive's value: from entering an unset field until an
+	 *  edit, a cleared segment or leaving. Part of the projection, so a reconcile
+	 *  neither drops a seat nor restores one over the segments a clear left. */
+	let seat = $state(false);
 	// Local value synced to `value` as a string (see the identity note above);
 	// own-edits stay local, only an external change reconciles back in. Driven
 	// controlled (`value` + `onValueChange`, never `bind:`) so reconciliation stays
 	// the package's.
-	const local = syncedLocal(() => value?.slice(0, 10) ?? '');
+	const local = syncedLocal(
+		() => value?.slice(0, 10) ?? (seat && fallbackDate ? fallbackDate.toString() : '')
+	);
 	const parsed = $derived(toDateValue(local.value));
 	// The date the empty segments ghost, or undefined when there is nothing to ghost:
 	// the field is unset and the default has a date form. A non-blank local that
 	// fails to parse is AUTHORED-but-malformed, which the empty field states
 	// honestly: the ghost would claim it unset. Held as the parsed value rather than
 	// a boolean so the substitution below narrows on the one fact it needs.
-	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
 	const ghost = $derived(local.value === '' ? fallbackDate : undefined);
-	/** The default seated as the value on entry, and nothing written since. */
-	const seated = $derived(
-		value == null && !!fallbackDate && local.value === fallbackDate.toString()
-	);
+	const seated = $derived(value == null && seat && local.value !== '');
 
-	/** Entering an unset field takes its default as the value, which a segment edit
-	 *  then commits whole; leaving without one puts the ghost back. */
-	function enter(): void {
-		if (value == null && fallbackDate && local.value === '') local.value = fallbackDate.toString();
+	/** Focus moving between segments is neither an entry nor a leaving. */
+	const within = (e: FocusEvent): boolean => !!wrapEl?.contains(e.relatedTarget as Node | null);
+	function enter(e: FocusEvent): void {
+		if (!within(e) && value == null && fallbackDate) seat = true;
 	}
 	function leave(e: FocusEvent): void {
-		if (wrapEl?.contains(e.relatedTarget as Node | null)) return;
-		if (seated) local.value = '';
+		if (!within(e)) seat = false;
 	}
 
 	// What one segment prints, and which rung it takes.
@@ -155,8 +157,13 @@
 		placeholder={fallbackDate}
 		onValueChange={(d) => {
 			// `CalendarDate.toString()` is exactly `YYYY-MM-DD`. A cleared or
-			// half-typed field yields undefined: the unset rung.
-			local.value = d?.toString() ?? '';
+			// half-typed field yields undefined: the unset rung. The primitive reports
+			// its own value again as a segment loses focus, which is no edit, and over a
+			// seated default would write it.
+			const next = d?.toString() ?? '';
+			if (next === local.value) return;
+			local.value = next;
+			if (!d) seat = false;
 			onCommit(d?.toString());
 		}}
 	>

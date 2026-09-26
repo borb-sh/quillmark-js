@@ -133,6 +133,21 @@ main:
             default: false
       ui:
         layout: table
+    crew:
+      type: array
+      items:
+        type: object
+        properties:
+          who:
+            type: string
+          tag:
+            type: string
+            default: T
+      default:
+        - who: Ada
+          tag: X
+      ui:
+        layout: table
 card_kinds:
   entry:
     fields:
@@ -327,6 +342,16 @@ describe('a default that prints', () => {
 		expect(kept.placeholder).toBe('');
 	});
 
+	it('emptied once written, still writes the empty answer rather than coming back', () => {
+		const target = open();
+		const kept = input(field(target, 'Kept'));
+		type(kept, 'Kept!');
+		type(kept, '');
+		expect(row('kept')).toMatchObject({ source: 'authored', value: '' });
+		expect(kept.value).toBe('');
+		expect(kept.hasAttribute('data-default')).toBe(false);
+	});
+
 	it('leaves a field emptied where nothing prints unanswered', () => {
 		const target = open();
 		const heading = input(field(target, 'Heading'));
@@ -399,19 +424,44 @@ describe('a default that prints', () => {
 		expect(marking.dataset.ghosted).toBe('');
 	});
 
+	/** The date field's segments, by part. */
+	const segment = (target: HTMLElement, part: string): HTMLElement =>
+		field(target, 'Dated').querySelector<HTMLElement>(`[data-segment="${part}"]`)!;
+
 	it('paints a date’s digits at the default rung, and a segment edit takes the rest', () => {
 		const target = open();
-		const dated = field(target, 'Dated');
-		const segments = () =>
-			[...dated.querySelectorAll<HTMLElement>('[data-date-field-segment]')].filter(
-				(s) => s.getAttribute('data-segment') !== 'literal'
-			);
-		expect(segments().map((s) => s.dataset.ghosted)).toEqual(['default', 'default', 'default']);
+		const segments = [...field(target, 'Dated').querySelectorAll<HTMLElement>('[data-segment]')]
+			.filter((s) => s.getAttribute('data-segment') !== 'literal')
+			.map((s) => s.dataset.ghosted);
+		expect(segments).toEqual(['default', 'default', 'default']);
 
-		const day = segments().find((s) => s.getAttribute('data-segment') === 'day')!;
+		const day = segment(target, 'day');
 		day.focus();
 		flushSync();
 		expect(row('dated').source).toBe('default');
+		press(day, 'ArrowUp');
+		expect(row('dated')).toMatchObject({ source: 'authored', value: '2026-01-16' });
+	});
+
+	it('writes no date as the focus crosses its segments and leaves', () => {
+		const target = open();
+		segment(target, 'month').focus();
+		flushSync();
+		segment(target, 'day').focus();
+		flushSync();
+		segment(target, 'day').blur();
+		flushSync();
+		expect(row('dated').source).toBe('default');
+	});
+
+	it('keeps a seated date across another field’s commit', () => {
+		const target = open();
+		const day = segment(target, 'day');
+		day.focus();
+		flushSync();
+		type(input(field(target, 'Kept')), 'Kept!');
+		day.focus();
+		flushSync();
 		press(day, 'ArrowUp');
 		expect(row('dated')).toMatchObject({ source: 'authored', value: '2026-01-16' });
 	});
@@ -451,6 +501,22 @@ describe('an array’s default', () => {
 			flushSync();
 		}
 		expect(row('tags')).toMatchObject({ source: 'authored', value: [] });
+	});
+
+	it('is taken whole by Enter in a table row', () => {
+		const target = open();
+		const crew = field(target, 'Crew');
+		press(input(cell(crew, 'who')), 'Enter');
+		expect(q.reader(doc).get('crew')).toEqual([{ who: 'Ada', tag: 'X' }, {}]);
+	});
+
+	it('keeps a table row whose default declares a cell beside the caret', () => {
+		const target = open();
+		const crew = field(target, 'Crew');
+		const who = input(cell(crew, 'who'));
+		type(who, '');
+		press(who, 'Backspace');
+		expect(q.reader(doc).get('crew')).toEqual([{ tag: 'X' }]);
 	});
 });
 

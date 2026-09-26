@@ -37,6 +37,7 @@
 		ghostDefault,
 		isContainer,
 		optionalCell,
+		printedText,
 		stringifyGhost,
 		titleText
 	} from './structure.js';
@@ -125,7 +126,11 @@
 	const defaultStr = $derived(
 		field.control === 'prose' ? titleText(ghost) || undefined : stringifyGhost(ghost)
 	);
-	const printed = $derived(defaultStr || undefined);
+	const printed = $derived(printedText(defaultStr));
+	// A text or number control reads its default off the schema, not the resolved row:
+	// the row stops naming a default once the field is written, and emptying a written
+	// field still has to know that the default prints.
+	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
 	const none = $derived(optional && value == null ? t.strings.optionalGhost : undefined);
 	const example = $derived(value == null ? exampleGhost(field.schema) : undefined);
@@ -326,7 +331,7 @@
 				<NumberField
 					value={value as number | undefined}
 					integer={baseType(field.schema) === 'integer'}
-					fallback={defaultStr}
+					fallback={declared}
 					placeholder={none}
 					id={domIds.control}
 					{describedBy}
@@ -398,7 +403,7 @@
 			{:else}
 				<TextField
 					value={value as string | undefined}
-					fallback={printed}
+					fallback={declared}
 					placeholder={none}
 					{example}
 					id={domIds.control}

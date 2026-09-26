@@ -470,8 +470,10 @@
 	 * being the control the keystroke lands in. A prose element commits every edit, so
 	 * the committed `Content` is; an authored string, the transport-door rest, is empty
 	 * when it has no characters. A table's row is empty when the cell under the caret is
-	 * and so is every cell beside it: the caret's cell is read off its control, which a
-	 * default the cell holds unwritten leaves full while the committed row has no key. */
+	 * and so is every cell beside it, read off the row: a cell showing only its schema
+	 * default holds nothing written, as in a row just added. The caret's cell is read off
+	 * its control, which a default the cell holds unwritten leaves full while the
+	 * committed row has no key. */
 	function elementEmpty(k: number, target: EventTarget | null, column?: string): boolean {
 		if (control === 'prose') {
 			const el = arr[k];
@@ -799,7 +801,8 @@
 	}
 	/* The default's rows are what prints and nothing written: every value they draw takes
 	   the default rung (theme.css), and the first gesture, writing them, takes it off. */
-	.qm-array-rows[data-default] :global(:is(.qm-input, .ProseMirror, .qm-select, .qm-date)),
+	.qm-array-rows[data-default]
+		:global(:is(.qm-input, .ProseMirror, .qm-select:not([data-ghosted]), .qm-date)),
 	.qm-array-rows[data-default] .qm-element-title:not(.untitled) {
 		color: var(--_qm-ink-default);
 	}

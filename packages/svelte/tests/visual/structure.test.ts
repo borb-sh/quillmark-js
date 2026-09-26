@@ -37,6 +37,7 @@ import {
 	exampleGhost,
 	declaredGhost,
 	declaredContent,
+	printedText,
 	MATRIX_HELD
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
@@ -619,11 +620,23 @@ describe('declaredContent', () => {
 		expect(md?.marks).toHaveLength(1);
 		const plain = declaredContent('*a*\nb', false);
 		expect(plain?.text).toBe('*a*\nb');
-		expect(plain?.lines).toHaveLength(2);
+		// One paragraph whose second line continues it, as the literal codec reads one.
+		expect(plain?.lines.map((l) => !!l.continues)).toEqual([false, true]);
 		expect(plain?.marks).toEqual([]);
 		expect(declaredContent('', false)).toBeUndefined();
 		expect(declaredContent('  ', true)).toBeUndefined();
 		expect(declaredContent({ a: 1 }, false)).toBeUndefined();
+	});
+});
+
+describe('printedText', () => {
+	it('holds a default as declared where it prints, and none where a reader sees nothing', () => {
+		expect(printedText(' B-12 ')).toBe(' B-12 ');
+		expect(printedText(0)).toBe('0');
+		expect(printedText('')).toBeUndefined();
+		expect(printedText('  ')).toBeUndefined();
+		expect(printedText(undefined)).toBeUndefined();
+		expect(printedText(['a'])).toBeUndefined();
 	});
 });
 
