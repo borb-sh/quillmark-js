@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, sep } from 'node:path';
-import { init, type Quill } from '@quillmark/wasm';
+import { init, type Document, type Quill } from '@quillmark/wasm';
 
 const core = await init();
 
@@ -52,7 +52,7 @@ export function loadFixtureTree(name: FixtureName = 'showcase'): Map<string, Uin
 
 /**
  * A fixture quill, parsed once per worker. `Quill.fromTree` re-parses the whole
- * fixture tree, and a suite only ever reads its schema or seeds fresh documents off
+ * fixture tree, and a suite only ever reads its schema or opens fresh documents off
  * it; so the handle is shared and never freed, rather than each suite keeping its own
  * copy of this cache.
  */
@@ -61,4 +61,14 @@ export function quill(name: FixtureName = 'showcase'): Quill {
 	let held = cached.get(name);
 	if (!held) cached.set(name, (held = core.Quill.fromTree(loadFixtureTree(name))));
 	return held;
+}
+
+/**
+ * A fixture quill's template document, `fixtures/templates/<name>.md`, parsed and
+ * conformed against it: every field and body filled, which a seed leaves empty. A
+ * fresh `Document` per call, the caller's to free.
+ */
+export function template(name: FixtureName = 'showcase'): Document {
+	const md = readFileSync(join(REPO_ROOT, 'fixtures', 'templates', `${name}.md`), 'utf8');
+	return quill(name).parse(md);
 }

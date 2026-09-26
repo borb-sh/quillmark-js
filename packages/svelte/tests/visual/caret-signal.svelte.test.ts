@@ -16,7 +16,7 @@ import { init, type ContentHit, type Document, type Quill } from '@quillmark/was
 import type { Place } from '$lib/core';
 import type { ActiveLeaf } from '$lib/visual';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 
 const core = await init();
 
@@ -65,7 +65,7 @@ const at = (field: string, pos: number): ContentHit => ({ field, pos }) as Conte
 describe('the caret signal reports places, not transactions', () => {
 	it('landing the caret where it already sits reports once', async () => {
 		const q = quill();
-		const { editor, places } = mountEditor(q, q.seedDocument());
+		const { editor, places } = mountEditor(q, template());
 
 		await editor.setCaret(at('main.body', 3));
 		const first = places.length;
@@ -78,7 +78,7 @@ describe('the caret signal reports places, not transactions', () => {
 
 	it('a place left and returned to is two moves, across leaves', async () => {
 		const q = quill();
-		const { editor, places } = mountEditor(q, q.seedDocument());
+		const { editor, places } = mountEditor(q, template());
 
 		await editor.setCaret(at('main.body', 3));
 		places.length = 0;
@@ -93,7 +93,7 @@ describe('the caret signal reports places, not transactions', () => {
 
 	it('a focus into a leaf with no caret is what makes the return a move', async () => {
 		const q = quill();
-		const { editor, places, active } = mountEditor(q, q.seedDocument());
+		const { editor, places, active } = mountEditor(q, template());
 
 		await editor.setCaret(at('main.body', 3));
 		places.length = 0;

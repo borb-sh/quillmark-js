@@ -82,10 +82,10 @@ main:
           inline: true
           default: ""
           description: How to reach them, in their own words. The content property, which reads at its codec one key in and mounts the prose leaf a scalar `plaintext` field mounts.
+      title: Point of contact
       ui:
-        title: Point of contact
         group: identity
-      description: "A nested subform, one property per control it draws. A namespace carries no literal of its own — an absent container descends into its cells, so what a blank `contact` renders is what its properties declare. The one field labelled by a `ui.title` override rather than by its humanized key."
+      description: "A nested subform, one property per control it draws. A namespace carries no literal of its own — an absent container descends into its cells, so what a blank `contact` renders is what its properties declare. The one field labelled by a `title` rather than by its humanized key."
 
     signature_block:
       type: array
@@ -180,8 +180,6 @@ main:
       type: array
       items:
         type: object
-        ui:
-          title: "{title}"
         properties:
           title:
             type: string
@@ -219,7 +217,7 @@ main:
               page: 20
       ui:
         group: content
-      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `items.ui.title` template and a collapsed entry by its inline `plaintext` label, the fallback a row with no `string` cell takes. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
+      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `title` cell and a collapsed entry by its inline `plaintext` label, the cell a row with no `string` cell reads. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
 
     columns:
       type: integer
@@ -416,9 +414,9 @@ main:
 
 card_kinds:
   section:
-    description: A titled division of the document. Its `ui.title` is a `{field}` template, so editing `heading` retitles the card.
+    title: Section
+    description: A titled division of the document.
     ui:
-      title: "{heading}"
       groups:
         structure: {}
         style:
@@ -469,9 +467,8 @@ card_kinds:
         Section bodies are leaves of their own, addressed per card.
 
   note:
-    description: A short aside. Its title is a literal and its fields are ungrouped, so the card renders no accordion. Its body declares no example, so a fresh one seeds empty — the leaf the ghost exists for.
-    ui:
-      title: Marginal note
+    title: Marginal note
+    description: A short aside. Its fields are ungrouped, so the card renders no accordion. Its body declares no example, so a fresh one seeds empty — the leaf the ghost exists for.
     fields:
       label:
         type: string
@@ -488,9 +485,8 @@ card_kinds:
         description: How loudly the aside is set.
 
   signoff:
+    title: Sign-off
     description: Who signed, and when. The kind that renders no body leaf at all.
-    ui:
-      title: Sign-off
     body:
       enabled: false
     fields:
@@ -510,9 +506,8 @@ card_kinds:
         description: YYYY-MM-DD. Blank renders a fill-in line.
 
   figure:
-    description: A placed figure. Its `ui.title` names a variant-bearing enum, so the header reads the placement's member rather than the container the field rests as.
-    ui:
-      title: "{placement}"
+    title: Figure
+    description: A placed figure.
     fields:
       placement:
         type: enum

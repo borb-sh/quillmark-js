@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-// The recovery shell, drawn. `Engine.open` refuses a document holding a card whose kind
-// the schema does not declare, so the shell is the only surface that card is reachable
-// from, and the retype it offers is what lets a session open over the document.
+// The recovery shell, drawn. A card whose kind the schema does not declare renders
+// nothing and warns `validation::unknown_card`, so the shell is the only surface that
+// card is reachable from, and the retype it offers is what puts it on the page.
 //
 // A `CardInput` literal is the door in: `insertCard` is schema-agnostic where the
 // Quill-bound writer refuses an undeclared kind, which is what the playground's
@@ -76,8 +76,8 @@ describe('the recovery shell', () => {
 		const doc = withForeignCard(q);
 		const engine = new Engine();
 
-		// The refusal that puts the card out of every other surface's reach.
-		await expect(engine.open(q, doc)).rejects.toThrow(/unknown card kind `legacy_kind`/);
+		// The engine renders past the card and warns: its payload reaches no page.
+		expect(q.validate(doc).map((d) => d.code)).toContain('validation::unknown_card');
 
 		const target = mountEditor(q, doc);
 		const select = target.querySelector<HTMLSelectElement>('.qm-recovery-retype select')!;

@@ -12,9 +12,9 @@
  neither a screen reader nor a touch user, and the count is the carrier.
 
  An `object` element collapses: the row is its own summary — a box, titled by the
- row's `items.ui.title` template or its first short text cell ({@link rowSummary}) —
- and opens onto {@link ObjectField}, one at a time. Stacking the subforms instead would
- nest a field one level past the depth the subform's own vertical draws, once per row.
+ row's first short text cell ({@link rowSummary}) — and opens onto {@link ObjectField},
+ one at a time. Stacking the subforms instead would nest a field one level past the
+ depth the subform's own vertical draws, once per row.
  Opening is therefore part of a landing rather than something the user does first:
  `focusPath` opens the row it is aimed at before it focuses, and hands the rest of the
  walk to the subform it opened, which is how a row two closed boxes down is reached.
@@ -239,8 +239,7 @@
 	// one, else this instance's own.
 	const uid = $props.id();
 	const countId = $derived(`${idBase ?? `qm-${uid}`}-count`);
-	const columnTitle = (key: string, sub: QuillFieldSchema): string =>
-		sub.ui?.title ?? humanize(key);
+	const columnTitle = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
 
 	// The awaited flush below is the only work that outlives a gesture here, so the
 	// span carries the reorder's frame and nothing else: it is the liveness

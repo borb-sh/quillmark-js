@@ -141,9 +141,9 @@ describe('formatDiagnostic', () => {
 			diagnostics: [
 				{
 					severity: 'warning',
-					code: 'validation::must_fill',
-					path: 'main.title',
-					message: 'Field `main.title` is marked `!must_fill`: a placeholder awaiting a value.'
+					code: 'validation::unknown_field',
+					path: 'main.titel',
+					message: 'Field `main.titel` is not declared by the schema.'
 				},
 				{
 					severity: 'error',
@@ -154,7 +154,7 @@ describe('formatDiagnostic', () => {
 			]
 		});
 		const lines = [...target.querySelectorAll('.qm-diag-line')].map((n) => n.textContent);
-		expect(lines.some((t) => t?.includes('must_fill') || t?.includes('placeholder'))).toBe(false);
+		expect(lines.some((t) => t?.includes('titel'))).toBe(false);
 		expect(lines).toContain('field `main.title` is `richtext` but the value is an array.');
 	});
 });

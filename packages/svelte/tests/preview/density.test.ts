@@ -39,9 +39,10 @@ function densityAt(ratio: number): number {
 	const session = {
 		pageCount: 1,
 		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
-		paint: (_ctx: unknown, _page: number, opts: { densityScale: number }) => {
-			density = opts.densityScale;
-			return { layoutWidth: 612, layoutHeight: 792, pixelWidth: 612, pixelHeight: 792 };
+		// jsdom lays no box out, so the slot paints at a layout scale of 1 and the scale
+		// is the density alone.
+		paint: (_ctx: unknown, _page: number, scale: number) => {
+			density = scale;
 		},
 		regions: () => [],
 		fieldBoxes: () => []

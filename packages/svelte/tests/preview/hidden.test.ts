@@ -76,7 +76,7 @@ function mockSession(pageCount: number): LiveSession {
 	return {
 		pageCount,
 		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
-		paint: () => ({ layoutWidth: 612, layoutHeight: 792, pixelWidth: 612, pixelHeight: 792 }),
+		paint: () => {},
 		regions: () => [],
 		fieldBoxes: () => [],
 		positionAt: () => undefined,
@@ -136,7 +136,6 @@ describe('a preview hidden by the narrow shell', () => {
 			...mockSession(2),
 			paint: (_ctx: unknown, page: number) => {
 				painted.push(page);
-				return { layoutWidth: 612, layoutHeight: 792, pixelWidth: 612, pixelHeight: 792 };
 			}
 		} as unknown as LiveSession;
 		setBox(container, 600, 800);

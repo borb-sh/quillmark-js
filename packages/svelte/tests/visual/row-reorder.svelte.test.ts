@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 function threeRows(q: Quill): Document {
-	const doc = q.seedDocument();
+	const doc = template();
 	doc.storeField('revisions', [
 		{ note: 'A', pages: 1 },
 		{ note: 'B', pages: 2 },
@@ -165,7 +165,7 @@ describe('reorder on an object row', () => {
 
 	it('answers from the nearest row alone: a press in a nested row leaves the record around it', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		openGroup(mounted.target, 'Content');
 		const outer = field(mounted.target, 'Appendices');
@@ -186,7 +186,7 @@ describe('reorder on an object row', () => {
 
 	it('offers no reorder on a scalar or prose row', () => {
 		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
+		mounted = mountEditor(q, template());
 		// `authors` is `string[]` and `keywords` `richtext[]`: edit-in-place rows.
 		for (const name of ['Authors', 'Keywords']) {
 			openGroup(mounted.target, name === 'Authors' ? 'Who and what' : 'Content');

@@ -102,9 +102,8 @@ describe('an object field', () => {
 		const obj = field(target, 'Point of contact');
 		const props = [...obj.querySelectorAll<HTMLElement>('.qm-object-prop')];
 		// Declaration order, which is what the subform renders by. The marker is per
-		// property, not per container: the three that declare no `default:` carry one and
-		// `validate` anchors a `validation::must_fill` at each, and `listed`'s default
-		// retires its own while the container above holds none either way.
+		// property, not per container: the three that declare no `default:` carry one, and
+		// `listed`'s default retires its own while the container above holds none either way.
 		expect(
 			props.map((p) => p.querySelector('.qm-field-label')?.textContent?.replace(/\s+/g, ' ').trim())
 		).toEqual(['Name *', 'Email *', 'Reply by *', 'Listed', 'Note']);

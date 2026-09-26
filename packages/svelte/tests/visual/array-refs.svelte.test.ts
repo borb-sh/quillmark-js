@@ -16,14 +16,14 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, unmount, flushSync, tick } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 
 const core = await init();
 
 // The reference quill's `main.authors` is `string[]`, so its elements are `TextField`s:
 // the array control with a component instance behind each row. Located by the
 // accessible name each element carries (`${label} ${index + 1}`, ArrayField), the field
-// declaring no `ui.title` so the label is `humanize('authors')`.
+// declaring no `title` so the label is `humanize('authors')`.
 const ELEMENT_LABEL = 'Authors ';
 
 let cleanup: (() => void) | undefined;
@@ -73,7 +73,7 @@ describe('array element refs', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			const q = quill();
-			mountEditor(q, q.seedDocument());
+			mountEditor(q, template());
 			// The messages, not just the count: a failure here should name what it saw.
 			expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([]);
 			expect(error.mock.calls.map((c) => String(c[0]))).toEqual([]);
@@ -85,7 +85,7 @@ describe('array element refs', () => {
 
 	it('Enter inserts a sibling and takes focus there, through the proxied handle', async () => {
 		const q = quill();
-		const target = mountEditor(q, q.seedDocument());
+		const target = mountEditor(q, template());
 		const before = inputs(target).length;
 
 		press(inputs(target)[0], 'Enter');
@@ -100,7 +100,7 @@ describe('array element refs', () => {
 
 	it('Backspace on an empty element removes it and hands focus back up the list', async () => {
 		const q = quill();
-		const target = mountEditor(q, q.seedDocument());
+		const target = mountEditor(q, template());
 		press(inputs(target)[0], 'Enter');
 		await settle();
 		const grown = inputs(target).length;

@@ -70,7 +70,7 @@
 	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
 	import { Preview } from '@quillmark/svelte/preview';
-	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
+	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree, loadTemplate } from '../fixture';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -329,14 +329,15 @@
 			const params = new URLSearchParams(window.location.search);
 			// Chrome rather than a seed, so it rides no document and outlives a pick.
 			stats = params.has('stats');
-			const quill = Quill.fromTree(await loadFixtureTree(name));
+			const [tree, md] = await Promise.all([loadFixtureTree(name), loadTemplate(name)]);
+			const quill = Quill.fromTree(tree);
 			created.unshift(quill);
-			const doc = quill.seedDocument();
+			const doc = md == null ? quill.seedDocument() : quill.parse(md);
 			created.unshift(doc);
 			// The seed variants. `?foreign` holds a card whose kind the schema cannot
 			// project: `Document.insertCard` is schema-agnostic where the Quill-bound
-			// writer would reject it, and the engine refuses the document holding it, so the
-			// seed reaches both the recovery shell and the sessionless shell it draws in.
+			// writer would reject it, and the engine renders past it with a warning, so the
+			// seed reaches the recovery shell over a preview that leaves the card out.
 			// `?tips` seeds the guidance channel a quill or consumer supplies
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
 			// does not replace the map.

@@ -248,9 +248,9 @@ main:
 
 card_kinds:
   indorsement:
+    title: Routing indorsement
     description: "An endorsing official's response to the memo, or their forwarding of it onward. Indorsements are numbered in card order: 1st Ind, 2d Ind, 3d Ind."
     ui:
-      title: Routing indorsement
       groups: [addressing, additional]
     fields:
       from:

@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { init, type Document, type Quill } from '@quillmark/wasm';
-import { quill } from '../helpers/fixtures.js';
+import { quill, template } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -43,11 +43,11 @@ function appendices(target: HTMLElement): HTMLElement {
 describe('a nested array property', () => {
 	it('draws as a record list inside the open row', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 
-		// The outer rows, summarized by the `items.ui.title` template.
+		// The outer rows, summarized by their `title` cell.
 		expect(summaryTexts(outer)).toEqual(['Sources', 'Glossary']);
 
 		summaries(outer)[0].click();
@@ -65,7 +65,7 @@ describe('a nested array property', () => {
 
 	it('opens one entry at a time, two rungs in, and commits the whole tree by value', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 		summaries(outer)[0].click();
@@ -93,7 +93,7 @@ describe('a nested array property', () => {
 
 	it('keeps the open rows mounted across a commit inside them', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 		summaries(outer)[0].click();
@@ -118,7 +118,7 @@ describe('a nested array property', () => {
 
 	it('adds a nested row open and removes it, the list committing whole each time', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 		summaries(outer)[1].click();
@@ -152,7 +152,7 @@ describe('a nested array property', () => {
 		// by inheriting it. What `container-type` then does is the browser's (PLAYGROUND
 		// §"Reaching it from source").
 		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
+		mounted = mountEditor(q, template());
 		const outer = appendices(mounted.target);
 		summaries(outer)[0].click();
 		flushSync();
@@ -165,7 +165,7 @@ describe('a nested array property', () => {
 describe('a container inside a variant cell', () => {
 	it('draws the record list under the discriminant and commits it into the container', () => {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		mounted = mountEditor(q, doc);
 		openGroup(mounted.target, 'Metadata');
 		const dist = field(mounted.target, 'Distribution');
@@ -187,22 +187,5 @@ describe('a container inside a variant cell', () => {
 		});
 		// The row summarizes by its `string` cell once it has one.
 		expect(summaryTexts(notices)).toEqual(['Legal']);
-	});
-});
-
-describe('a card title over a variant-bearing enum', () => {
-	it('reads the discriminant member, not the container it rests as', () => {
-		const q = quill();
-		const doc = q.seedDocument();
-		mounted = mountEditor(q, doc);
-		// The seeded `figure` card carries `placement: {value: 'float'}`; its `ui.title`
-		// is `{placement}`.
-		const slots = [...mounted.target.querySelectorAll<HTMLElement>('.qm-card-slot')];
-		const figure = slots.find((s) =>
-			[...s.querySelectorAll('[data-leaf-key]')].some((e) =>
-				e.getAttribute('data-leaf-key')?.endsWith(':caption')
-			)
-		)!;
-		expect(figure.querySelector<HTMLInputElement>('.qm-card-title')?.placeholder).toBe('float');
 	});
 });

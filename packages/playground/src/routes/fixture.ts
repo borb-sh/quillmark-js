@@ -47,3 +47,12 @@ export async function loadFixtureTree(
 ): Promise<Map<string, Uint8Array>> {
 	return (await (await quiver()).getQuill(name)).toTree();
 }
+
+/**
+ * A fixture quill's template document, the markdown a route opens instead of a seed:
+ * a seed leaves every field and body empty. `undefined` for a quill that ships none.
+ */
+export async function loadTemplate(name: string = DEFAULT_FIXTURE): Promise<string | undefined> {
+	const res = await fetch(`${base}/templates/${name}.md`);
+	return res.ok ? res.text() : undefined;
+}

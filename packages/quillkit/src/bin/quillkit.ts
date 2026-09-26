@@ -42,8 +42,7 @@ function message(err: unknown): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The gate. Seeded rather than read from a file: the blueprint carries `<must-fill>`
- * sentinels and is not directly renderable, and `seedDocument()` is the one document
+ * The gate. Seeded rather than read from a file: `seedDocument()` is the one document
  * this and the client can both name.
  *
  * The only door onto the verdict, so an author on vitest, jest or another runner spawns

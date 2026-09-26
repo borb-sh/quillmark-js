@@ -13,9 +13,7 @@ import {
 	groupSections,
 	initialExpandedGroup,
 	placeFields,
-	interpolateTitle,
 	titleText,
-	titleFields,
 	fieldValues,
 	cardTitle,
 	bodyEnabled,
@@ -121,16 +119,9 @@ describe('humanize', () => {
 	});
 });
 
-describe('interpolateTitle + cardTitle', () => {
-	it('interpolates {field} against live values', () => {
-		expect(interpolateTitle('To {for} from {from}', { for: 'A', from: 'B' })).toBe('To A from B');
-		expect(interpolateTitle('x {missing} y', {})).toBe('x  y');
-	});
+describe('titleText + cardTitle', () => {
 	it('reads a committed Content value by its text', () => {
 		const content = { text: 'John A. Doe', lines: [], marks: [], islands: [] };
-		expect(interpolateTitle('{rank} {name}', { rank: 'TSgt', name: content })).toBe(
-			'TSgt John A. Doe'
-		);
 		expect(titleText(content)).toBe('John A. Doe');
 		expect(titleText({ lines: [] })).toBe('');
 		expect(titleText(['a', 'b'])).toBe('');
@@ -138,16 +129,8 @@ describe('interpolateTitle + cardTitle', () => {
 		expect(titleText(undefined)).toBe('');
 	});
 	it('reads a variant container by its discriminant member', () => {
-		// A `{field}` title over a variant-bearing enum names the world, which is the one
-		// cell of the container that does.
 		expect(titleText({ value: 'float', side: 'end' })).toBe('float');
-		expect(interpolateTitle('{placement}', { placement: { value: 'float' } })).toBe('float');
 		expect(titleText({ side: 'end' })).toBe('');
-	});
-	it('names the fields a title reads', () => {
-		expect(titleFields('{rank} {name}')).toEqual(['rank', 'name']);
-		expect(titleFields('Routing indorsement')).toEqual([]);
-		expect(titleFields(undefined)).toEqual([]);
 	});
 	it('joins a payload into values by key, comments aside', () => {
 		const content = { text: 'John A. Doe', lines: [], marks: [], islands: [] };
@@ -160,10 +143,10 @@ describe('interpolateTitle + cardTitle', () => {
 		).toEqual({ rank: 'TSgt', name: content });
 	});
 	it('override wins, then schema title, then humanized kind', () => {
-		const schema = { fields: {}, ui: { title: 'Routing indorsement' } };
-		expect(cardTitle(schema, 'indorsement', {}, 'Custom')).toBe('Custom');
-		expect(cardTitle(schema, 'indorsement', {}, '')).toBe('Routing indorsement');
-		expect(cardTitle({ fields: {} }, 'indorsement', {}, undefined)).toBe('Indorsement');
+		const schema = { fields: {}, title: 'Routing indorsement' };
+		expect(cardTitle(schema, 'indorsement', 'Custom')).toBe('Custom');
+		expect(cardTitle(schema, 'indorsement', '')).toBe('Routing indorsement');
+		expect(cardTitle({ fields: {} }, 'indorsement', undefined)).toBe('Indorsement');
 	});
 });
 
@@ -484,23 +467,18 @@ describe('against the real showcase schema', () => {
 });
 
 describe('rowSummary', () => {
-	const row = (properties: Record<string, QuillFieldSchema>, ui?: { title?: string }) =>
-		({ type: 'object', properties, ui }) as QuillFieldSchema;
+	const row = (properties: Record<string, QuillFieldSchema>) =>
+		({ type: 'object', properties }) as QuillFieldSchema;
 	const content = (text: string) => ({ text, lines: [], marks: [], islands: [] });
 
-	it('interpolates items.ui.title with the row, and falls through where it comes out blank', () => {
-		const items = row(
-			{ title: f({ type: 'string' }), note: f({ type: 'string' }) },
-			{ title: '{title}' }
-		);
+	it('reads the first short text cell that has words', () => {
+		const items = row({ title: f({ type: 'string' }), note: f({ type: 'string' }) });
 		expect(rowSummary(items, { title: 'Sources', note: 'n' })).toBe('Sources');
-		// The template names an empty cell: the cell rule takes over rather than the row
-		// reading as untitled beside a note it has.
 		expect(rowSummary(items, { note: 'n' })).toBe('n');
 		expect(rowSummary(items, {})).toBeUndefined();
 	});
 
-	it('falls back to the first short text cell: a string, or inline prose', () => {
+	it('takes inline prose as a text cell, in either rest form', () => {
 		const items = row({
 			page: f({ type: 'integer' }),
 			label: f({ type: 'plaintext', inline: true }),
@@ -525,10 +503,9 @@ describe('rowSummary', () => {
 	});
 
 	it('reads a cell by own key: a declared name can be one every object inherits', () => {
-		const items = row({ constructor: f({ type: 'string' }) }, { title: '{toString}' });
+		const items = row({ constructor: f({ type: 'string' }) });
 		expect(rowSummary(items, {})).toBeUndefined();
 		expect(rowSummary(items, { constructor: 'Ada' })).toBe('Ada');
-		expect(interpolateTitle('{constructor}', {})).toBe('');
 	});
 });
 

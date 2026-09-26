@@ -8,7 +8,7 @@ import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
-import { mount, quill, normalize, contentEqual, md } from './_util.js';
+import { mount, quill, template, normalize, contentEqual, md } from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
 // rect to reveal it. Stubbed rather than guarded in the source: a landing is right to
@@ -24,7 +24,7 @@ function viewOf(f: FieldController): EditorView {
 describe('createField over a real showcase leaf', () => {
 	let doc: Document;
 	beforeEach(() => {
-		doc = quill().seedDocument();
+		doc = template();
 	});
 
 	it('edits the inline `title` field via applyChange', () => {
@@ -85,7 +85,7 @@ describe('createField over a real showcase leaf', () => {
 
 describe('field-level reconciliation', () => {
 	it('applyExternal re-hydrates on a foreign edit; own edit does not', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -133,7 +133,7 @@ describe('plaintext fields fire no markdown input rules', () => {
 	}
 
 	it('a plaintext field does NOT fire the strong rule — delimiters and no-marks survive', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -152,7 +152,7 @@ describe('plaintext fields fire no markdown input rules', () => {
 	});
 
 	it('a non-plaintext inline field DOES fire it (proving the schema is what suppresses it)', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -172,7 +172,7 @@ describe('plaintext fields fire no markdown input rules', () => {
 
 describe('createField over an ABSENT declared richtext field', () => {
 	it('installs on the first edit (applyChange throws on absent), then applyChanges', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		// `colophon` is `default:`-only, so it is absent from the seed.
 		expect(doc.getStored('colophon')).toBeUndefined();
 		const field = createField({
@@ -196,7 +196,7 @@ describe('createField over an ABSENT declared richtext field', () => {
 
 describe('a within-block hard break', () => {
 	it('lands in the store as a `continues` line, matching the optimistic PM', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const view = viewOf(field);
 		// Insert a hard_break into the first paragraph: the `continues` line that
@@ -221,7 +221,7 @@ describe('anchor insertion', () => {
 	}
 
 	it('inserts a caller-supplied identity anchor that persists in the content', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 3);
 		const anchors = bodyAnchors(doc);
@@ -231,7 +231,7 @@ describe('anchor insertion', () => {
 	});
 
 	it('a duplicate id is a no-op; removeAnchor drops the anchor', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 3);
 		field.insertAnchor('a1', 5); // same id → ignored (unique + invariant, 0.97 policy)
@@ -242,7 +242,7 @@ describe('anchor insertion', () => {
 	});
 
 	it('the anchor rebases through a later text edit — it survives like a mark', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 5);
 		const view = viewOf(field);
@@ -253,7 +253,7 @@ describe('anchor insertion', () => {
 	});
 
 	it('anchorsInRange reports coverage for the popover active state', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 4);
 		expect(field.anchorsInRange(0, 10)).toEqual(['a1']);
@@ -264,7 +264,7 @@ describe('anchor insertion', () => {
 
 describe('createField accessible name (a11y follow-up)', () => {
 	it('sets aria-label on the editable element when a label is given', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -278,7 +278,7 @@ describe('createField accessible name (a11y follow-up)', () => {
 	});
 
 	it('leaves the editable element unnamed when no label is given', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -304,7 +304,7 @@ describe('the empty-leaf ghost', () => {
 	 *  body `example`, so its seed carries nothing for the ghost to hide behind. */
 	function emptyBodyDoc(): Document {
 		const q = quill();
-		const doc = q.seedDocument();
+		const doc = template();
 		const card = q.seedCard('note', doc.seedOverlay('note'));
 		doc.insertCard(card!, doc.cardCount);
 		return doc;
@@ -404,7 +404,7 @@ describe('an island edit on the op path', () => {
 	}
 
 	it('a props edit reaches the store, and the leaf keeps committing after it', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = tableBody(doc);
 		const view = viewOf(field);
 		const pos = islandPos(view);
@@ -422,7 +422,7 @@ describe('an island edit on the op path', () => {
 	});
 
 	it('deleting a block island and undoing it re-places the slot, keeping the anchors', () => {
-		const doc = quill().seedDocument();
+		const doc = template();
 		const field = tableBody(doc);
 		const view = viewOf(field);
 		field.insertAnchor('a1', 2);

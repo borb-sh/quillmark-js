@@ -124,7 +124,7 @@
 	 *  (VISUAL_EDITOR §"Enum variants"). */
 	const required = obliged;
 
-	const title = (key: string, sub: QuillFieldSchema): string => sub.ui?.title ?? humanize(key);
+	const title = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
 	/** The `aria-label` fallback, for a subform mounted without a field's id space:
 	 *  the field's name and the property's, since nothing else names the control. */
 	const fallbackName = (key: string, sub: QuillFieldSchema): string =>
