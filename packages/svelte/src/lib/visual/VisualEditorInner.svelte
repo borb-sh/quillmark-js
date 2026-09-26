@@ -56,9 +56,9 @@
 		groupSections,
 		groupLabel,
 		cardTitle,
+		kindTitle,
 		fieldValues,
 		bodyEnabled,
-		humanize,
 		provenanceMap,
 		resolvedByCardIndex,
 		ghostDefault,
@@ -572,7 +572,7 @@
 			// `main` always resolves `schema.main`, so it is never unschemable.
 			unschemable: !isMain && !cardSchema,
 			titleOverride: extEditor?.title ?? '',
-			titlePlaceholder: cardTitle(cardSchema, kind, undefined),
+			titlePlaceholder: cardTitle(cardSchema, kind, values, undefined),
 			values,
 			provenance: provenanceMap(rows.fields),
 			sections,
@@ -585,6 +585,7 @@
 			bodyGhost: hasBody
 				? resolveBodyGhost(
 						stringifyGhost(ghostDefault(rows.body ?? undefined)),
+						cardSchema?.body?.example?.trim(),
 						merged.bodyPlaceholder?.({ cardId: id, kind, isMain }),
 						merged.bodyGhost
 					)
@@ -929,7 +930,7 @@
 							<div class="qm-menu-surface" data-qm-root>
 								{#each kinds as k (k)}
 									<DropdownMenu.Item class="qm-menu-item" onSelect={() => addCard(atIndex, k)}
-										>{humanize(k)}</DropdownMenu.Item
+										>{kindTitle(quill.schema.card_kinds?.[k], k)}</DropdownMenu.Item
 									>
 								{/each}
 							</div>

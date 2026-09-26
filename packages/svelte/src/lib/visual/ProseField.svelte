@@ -37,9 +37,12 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
-		/** Ghost shown on the empty leaf: an inline leaf's resolved `default:` or
-		 * nothing, a body's always text (`resolveBodyGhost`). */
+		/** Ghost shown on the empty leaf: what a field prints unset, or nothing, and a
+		 * body's always text (`resolveBodyGhost`). */
 		placeholder?: string;
+		/** Ghost shown in the placeholder's stead while the leaf holds the focus, until
+		 * its first edit: an unset field's `example:` (`exampleGhost`). */
+		example?: string;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
 		onFocus?: (addr: Addr) => void;
@@ -63,6 +66,7 @@
 		labelledBy,
 		describedBy,
 		placeholder,
+		example,
 		leafKey,
 		onFocus,
 		onCaretMove,
@@ -108,6 +112,7 @@
 			labelledBy,
 			describedBy,
 			placeholder,
+			example,
 			tableStrings: () => t.strings,
 			onSlash: (next) => {
 				slash = next;
@@ -129,6 +134,9 @@
 	// kind's ghost is pushed into the live view rather than paid for with the caret.
 	$effect(() => {
 		controller?.setPlaceholder(placeholder);
+	});
+	$effect(() => {
+		controller?.setExample(example);
 	});
 </script>
 
@@ -178,17 +186,5 @@
 	 (`qm-focus-ring-within`, controls.css). */
 	.qm-prose :global(.ProseMirror) {
 		outline: none;
-	}
-	/* Empty-leaf ghost, at the rung every scalar's placeholder takes: a node decoration's
-	 data attr, so it stays out of the document; `float`/`height: 0` keep it from
-	 displacing the caret. The italic is what a leaf with no written neighbour has
-	 instead of the step to `ink`. */
-	.qm-prose :global(.ProseMirror .qm-prose-placeholder::before) {
-		content: attr(data-placeholder);
-		color: var(--_qm-ink-label);
-		font-style: italic;
-		float: left;
-		height: 0;
-		pointer-events: none;
 	}
 </style>

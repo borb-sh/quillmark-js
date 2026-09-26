@@ -187,6 +187,35 @@ li.ProseMirror-selectednode::after {
 	font-weight: var(--_qm-weight-strong);
 }
 
+/* The empty leaf's ghost (`field.ts`, `ghostPlugin`): a node decoration's data
+   attributes, so the text stays out of the document. At the rung every control's
+   placeholder takes; the italic is what a leaf with no written neighbour has instead
+   of the step to `ink`.
+
+   After the empty line rather than before it, and pulled up one line box onto it: the
+   caret keeps the start of that line, and a ghost's lines past the first grow the
+   leaf rather than hang over what follows it. A block leaf's ghost wraps and keeps the
+   breaks it was written with, a `body.example` being a document's worth; an inline
+   leaf's keeps to the one line the leaf is. The example stands in for the resting
+   ghost while the leaf holds the focus. */
+.ProseMirror .qm-prose-placeholder::after {
+	content: attr(data-placeholder);
+	display: block;
+	margin-top: -1lh;
+	white-space: pre-line;
+	color: var(--_qm-ink-label);
+	font-style: italic;
+	pointer-events: none;
+}
+.ProseMirror .qm-prose-placeholder-line::after {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.ProseMirror-focused .qm-prose-placeholder[data-example]::after {
+	content: attr(data-example);
+}
+
 /* ── The table island ────────────────────────────────────────────────────────
 
    The one construct in this file with chrome in it. The rest of the stylesheet

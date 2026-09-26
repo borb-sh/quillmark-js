@@ -84,11 +84,14 @@ export interface CreateFieldOpts {
 	labelledBy?: string;
 	/** The parked `description` → `aria-describedby`; announced after the name. */
 	describedBy?: string;
-	/** Ghost text shown on the empty leaf: the resolved `default:` a field ghosts,
-	 * or a body's invitation. The initial value; {@link
-	 * FieldController.setPlaceholder} moves it after mount. Empty/absent
-	 * shows no ghost. */
+	/** Ghost text shown on the empty leaf: what an unset field prints, or a body's
+	 * invitation. The initial value; {@link FieldController.setPlaceholder} moves it
+	 * after mount. Empty/absent shows no ghost. */
 	placeholder?: string;
+	/** Ghost text shown on the empty leaf in the placeholder's stead while the leaf
+	 * holds the focus, until its first edit: a defaultless field's `example:`. The
+	 * initial value; {@link FieldController.setExample} moves it after mount. */
+	example?: string;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new USV caret after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -125,6 +128,9 @@ export interface FieldController {
 	 * a transaction would fire `onCaretMove` at a moment the caret did not move.
 	 */
 	setPlaceholder(text: string | undefined): void;
+	/** Move the focused leaf's ghost after mount, the way {@link setPlaceholder}
+	 *  moves the resting one. */
+	setExample(text: string | undefined): void;
 	focus(): void;
 	/** The current stored content for this addr (for tests / reconcile). */
 	getContent(): Content;
@@ -280,9 +286,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 
 	let index: LineIndex; // rebuilt on every structural change
 	let view: EditorView;
-	// The ghost's live cell: the placeholder plugin reads it per pass, so moving it
-	// is an assignment plus a re-render rather than a rebuilt plugin stack.
+	// The ghosts' live cells: the ghost plugin reads them per pass, so moving one is
+	// an assignment plus a re-render rather than a rebuilt plugin stack.
 	let placeholderText = opts.placeholder;
+	let exampleText = opts.example;
 
 	// The views nested inside this leaf: one per table cell (`table-view.ts`). The
 	// leaf holds the set because chrome asks the leaf, not the island, which view
@@ -384,6 +391,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				// Always installed, so a leaf that mounts without a ghost can still be
 				// given one later; the plugin draws nothing while the text is empty.
 				placeholder: () => placeholderText,
+				example: () => exampleText,
 				afterHistory: [anchorPlugin(seededAnchors)]
 			})
 		});
@@ -490,6 +498,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			// transaction, so nothing commits and no caret is reported.
 			view.setProps({});
 		},
+		setExample(text: string | undefined): void {
+			if (text === exampleText) return;
+			exampleText = text;
+			view.setProps({});
+		},
 		focus(): void {
 			view.focus();
 			// The placement rung's reveal: no caret to flag a transaction with, so the
@@ -580,6 +593,8 @@ export function proseLeafPlugins(
 		 *  ({@link FieldController.setPlaceholder}), and a re-hydration rebuilds this
 		 *  stack, so the plugin must ask rather than hold. */
 		placeholder?: () => string | undefined;
+		/** The focused leaf's ghost, read live for the same reason. */
+		example?: () => string | undefined;
 		afterHistory?: Plugin[];
 	}
 ): Plugin[] {
@@ -591,7 +606,7 @@ export function proseLeafPlugins(
 	// All three answer to something only a block leaf holds: an inline leaf is one
 	// textblock with no island and no gap to put a cursor in.
 	if (!opts.inline) list.push(gapCursor(), pastAtomPlugin(), islandPastePlugin());
-	if (opts.placeholder) list.push(placeholderPlugin(opts.placeholder));
+	if (opts.placeholder || opts.example) list.push(ghostPlugin(opts));
 	return list;
 }
 
@@ -630,32 +645,49 @@ function pastAtomPlugin(): Plugin {
 }
 
 /**
- * The empty-leaf ghost placeholder. A node decoration stamps the sole empty
- * textblock with a class + the ghost text,
- * which CSS renders via `::before { content: attr(data-placeholder) }`: so the
- * text never enters the document, the caret path, or a `pmToContent` export. It
+ * The empty leaf's ghosts. A node decoration stamps the sole empty textblock with a
+ * class and the ghost text, which `prose.css` draws from the attributes: so the text
+ * never enters the document, the caret path, or a `pmToContent` export, and it
  * vanishes the instant the leaf holds any content (the emptiness test fails).
  *
- * `read` is called per decoration pass rather than closed over, so moving the
- * ghost is a re-render and never a document edit.
+ * `data-placeholder` is drawn at rest, and `data-example` in its stead while the view
+ * holds the focus. The example is stamped only until the state's first edit: after
+ * one the leaf has been answered, and emptied again it holds the empty answer. An
+ * inline leaf's ghost keeps to the one line the leaf is (`qm-prose-placeholder-line`).
+ *
+ * The texts are read per decoration pass rather than closed over, so moving a ghost is
+ * a re-render and never a document edit.
  */
-function placeholderPlugin(read: () => string | undefined): Plugin {
-	return new Plugin({
+function ghostPlugin(opts: {
+	inline: boolean;
+	placeholder?: () => string | undefined;
+	example?: () => string | undefined;
+}): Plugin<boolean> {
+	const key = new PluginKey<boolean>('qm-ghost');
+	return new Plugin<boolean>({
+		key,
+		state: {
+			init: () => false,
+			apply: (tr, edited) => edited || tr.docChanged
+		},
 		props: {
 			decorations(state) {
-				const text = read();
-				if (!text) return null;
+				const text = opts.placeholder?.();
+				const example = key.getState(state) ? undefined : opts.example?.();
+				if (!text && !example) return null;
 				const { doc } = state;
 				const first = doc.firstChild;
 				const empty =
 					doc.childCount === 1 && !!first && first.isTextblock && first.content.size === 0;
 				if (!empty) return null;
-				return DecorationSet.create(doc, [
-					Decoration.node(0, first.nodeSize, {
-						class: 'qm-prose-placeholder',
-						'data-placeholder': text
-					})
-				]);
+				const attrs: Record<string, string> = {
+					class: opts.inline
+						? 'qm-prose-placeholder qm-prose-placeholder-line'
+						: 'qm-prose-placeholder'
+				};
+				if (text) attrs['data-placeholder'] = text;
+				if (example) attrs['data-example'] = example;
+				return DecorationSet.create(doc, [Decoration.node(0, first.nodeSize, attrs)]);
 			}
 		}
 	});

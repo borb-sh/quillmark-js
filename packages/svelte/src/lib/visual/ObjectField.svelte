@@ -37,11 +37,15 @@
 	import { emptyContent } from '../core/codec/index.js';
 	import {
 		arrayLayout,
+		baseType,
 		controlKind,
+		exampleGhost,
 		humanize,
 		isContainer,
 		obliged,
-		shortCell
+		optionalCell,
+		shortCell,
+		stringifyGhost
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
@@ -125,6 +129,13 @@
 	const required = obliged;
 
 	const title = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
+	/** What a cell ghosts at rest, which is what it prints unset: its `default:`, or the
+	 *  `none` an optional cell prints. */
+	const restGhost = (sub: QuillFieldSchema): string | undefined =>
+		stringifyGhost(sub.default) ?? (optionalCell(sub) ? t.strings.optionalGhost : undefined);
+	/** What an unset free-text cell ghosts while it holds the focus ({@link exampleGhost}). */
+	const exampleOf = (key: string, sub: QuillFieldSchema): string | undefined =>
+		obj[key] == null ? exampleGhost(sub) : undefined;
 	/** The `aria-label` fallback, for a subform mounted without a field's id space:
 	 *  the field's name and the property's, since nothing else names the control. */
 	const fallbackName = (key: string, sub: QuillFieldSchema): string =>
@@ -290,6 +301,7 @@
 						values={sub.values ?? []}
 						fallback={sub.default as string | undefined}
 						blankTitle={sub.ui?.blank_title}
+						optional={optionalCell(sub)}
 						onCommit={(v) => commitProp(key, v)}
 					/>
 				{:else if kind === 'number'}
@@ -298,8 +310,8 @@
 						id={ids?.control}
 						describedBy={describes}
 						value={obj[key] as number | undefined}
-						integer={sub.type === 'integer'}
-						fallback={sub.default as number | undefined}
+						integer={baseType(sub) === 'integer'}
+						placeholder={restGhost(sub)}
 						onCommit={(v) => commitProp(key, v)}
 					/>
 				{:else if kind === 'boolean'}
@@ -326,7 +338,8 @@
 						id={ids?.control}
 						describedBy={describes}
 						value={obj[key] as string | undefined}
-						placeholder={sub.default != null ? String(sub.default) : undefined}
+						placeholder={restGhost(sub)}
+						example={exampleOf(key, sub)}
 						onCommit={(v) => commitProp(key, v)}
 						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
 					/>
@@ -336,7 +349,9 @@
 					<ProseValue
 						bind:this={proseEls[key]}
 						content={() => contentAt([key]) ?? emptyContent()}
-						plaintext={sub.type === 'plaintext'}
+						plaintext={baseType(sub) === 'plaintext'}
+						placeholder={restGhost(sub)}
+						example={exampleOf(key, sub)}
 						{block}
 						label={named}
 						labelledBy={ids?.label}

@@ -27,6 +27,9 @@
 		fallback?: string;
 		/** The schema's `ui.blank_title`: what the blank draws as, in place of the em dash. */
 		blankTitle?: string;
+		/** An `enum?` cell, which prints `none` unset rather than its blank, and so ghosts
+		 *  `strings.optionalGhost` there. */
+		optional?: boolean;
 		/** Accessible name for a trigger nothing else names: an object property, whose
 		 * name is the field label plus the property's. A field's own trigger takes `id`
 		 * instead and is named by the `<label for>` beside it (the trigger is a
@@ -50,6 +53,7 @@
 		values,
 		fallback,
 		blankTitle,
+		optional = false,
 		label,
 		id,
 		describedBy,
@@ -74,7 +78,7 @@
 	const dash = (v: string | undefined) => v || blankTitle || '—';
 
 	const unset = $derived(local.value === UNSET);
-	const ghostText = $derived(dash(fallback));
+	const ghostText = $derived(optional ? t.strings.optionalGhost : dash(fallback));
 	/** What the closed trigger shows: the pick, or the ghosted default while unset. */
 	const shown = $derived(unset ? ghostText : dash(local.value));
 
