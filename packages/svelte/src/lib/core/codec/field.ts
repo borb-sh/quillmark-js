@@ -11,7 +11,7 @@
 // On an `applyChange` throw the optimistic PM state stays and the failure reports
 // through `onError`: never a crash. Caret continuity across own-edits is the PM
 // `StepMap`; an external content change re-hydrates through `applyExternal`, gated
-// by `reconcile`, which re-evaluates the hold as well.
+// by `reconcile` except where the hold it re-evaluates flips.
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
@@ -27,10 +27,10 @@ import {
 	type Command
 } from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
-import type { Document, DocumentReader, Content, Addr, Diagnostic, Quill } from '@quillmark/wasm';
+import type { Document, DocumentReader, Content, Addr, Quill } from '@quillmark/wasm';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
-import { decode, fitsPlain } from './decode.js';
+import { decode, fitsLeaf } from './decode.js';
 import { usvToPM, pmToUsv, buildLineIndex, lineIndexOf, type LineIndex } from './positions.js';
 import { lower, pmToContent, scanContent, scanDoc, contentEdit } from './encode.js';
 import { islandPastePlugin } from './islands.js';
@@ -57,23 +57,17 @@ export interface CreateFieldOpts {
 	/** A mark-free schema (a `plaintext` field): literal text, no formatting and no
 	 *  anchors, in paragraphs and hard breaks or, with `inline`, one textblock. */
 	plaintext?: boolean;
-	/**
-	 * The diagnostics routed to this field, against the value it mounts over: a leaf
-	 * declaring `inline` holds while they carry `validation::not_inline`, and not for one
-	 * carrying `trailingNewline`, the decode joining that newline at the cost of a space.
-	 * {@link FieldController.applyExternal} takes the next set.
-	 */
-	diagnostics?: readonly Diagnostic[];
 	/** The id of the note the caller draws inside `container` for a held leaf →
 	 *  `aria-describedby` while it holds. */
 	heldNoteId?: string;
 	/**
-	 * Fired when the leaf holds or releases, and at mount when it mounts held. A leaf is
-	 * held over content its schema cannot hold, whose decode would join lines and drop
-	 * containers and islands for the first commit to store: one declaring `inline` by
-	 * its {@link CreateFieldOpts.diagnostics}, a plain one where upstream's `isPlain`
-	 * refuses the content once its marks are set aside. A held leaf draws its content on
-	 * the block schema, read-only, and commits nothing.
+	 * Fired when the leaf holds or releases, and at mount when it mounts held. A leaf
+	 * declaring `inline`, or a `plaintext` one, is held over a value its schema cannot
+	 * hold (`fitsLeaf`, upstream's `isInline` and `isPlain`): the decode would join lines
+	 * and drop containers and islands for the first commit to store. A held leaf draws
+	 * its content on the block schema, read-only, and commits nothing. Judged of the value
+	 * each mount and re-hydrate reads, so {@link FieldController.applyExternal} is what
+	 * re-evaluates it.
 	 */
 	onHold?(held: boolean): void;
 	/** Suppress the markdown-shorthand input rules. */
@@ -133,10 +127,9 @@ export interface FieldController {
 	readonly el: HTMLElement;
 	/** Place the caret at USV `pos` (preview onPick → usvToPM → here). */
 	setCaret(pos: number): void;
-	/** The stored value or the diagnostics routed to this field changed: re-hydrate
-	 *  where the content moved (gated by reconcile), and re-evaluate the hold against the
-	 *  value now stored and the `diagnostics` routed against it, absent keeping the last. */
-	applyExternal(diagnostics?: readonly Diagnostic[]): void;
+	/** External content change → re-hydrate this leaf (gated by reconcile), and
+	 *  re-evaluate its hold against the value now stored. */
+	applyExternal(): void;
 	/**
 	 * Move the empty-leaf ghost after mount: a card retyped to another kind takes
 	 * its new kind's wording without remounting, which it must not do (the leaf key
@@ -192,8 +185,6 @@ export interface LeafViews {
 }
 
 const anchorKey = new PluginKey<AnchorPos[]>('quill-anchors');
-
-const NOT_INLINE = 'validation::not_inline';
 
 /** An anchor mutation carried on a transaction's `anchorKey` meta: the seam that
  * folds a new identity anchor (or a removal) into the plugin's position set, so
@@ -334,15 +325,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// vocabulary is the codec's own constant (`slash.ts`), not a wording to derive.
 	const slash = block ? opts.onSlash : undefined;
 
-	// The `inline` rule is upstream's and arrives as its diagnostic, so that hold reads the
-	// verdict rather than the content. A plain leaf asks upstream's `isPlain` of the
-	// content instead (`fitsPlain`): `validation::not_plain` names marks too, which the
-	// decode drops and the next commit heals.
-	let routed = opts.diagnostics;
-	const holds = (rt: Content): boolean =>
-		inline
-			? !!routed?.some((d) => d.code === NOT_INLINE && !d.args?.trailingNewline)
-			: plaintext && !fitsPlain(rt);
+	// Judged of the value being mounted rather than read off a diagnostic: a routed set
+	// can predate the value it arrives with, and `validation::not_plain` stands in for
+	// `not_inline` on a `plaintext(inline)` field.
+	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext });
 	let held = holds(reconciler.last);
 	const named = proseAttributes(opts) ?? {};
 	const heldNamed = heldAttributes(opts, opts.heldNoteId);
@@ -534,8 +520,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			view.focus();
 			view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 		},
-		applyExternal(diagnostics?: readonly Diagnostic[]): void {
-			if (diagnostics) routed = diagnostics;
+		applyExternal(): void {
 			const current = readLeaf(reader, addr);
 			const flipped = holds(current) !== held;
 			if (!flipped && !reconciler.shouldRehydrate(current)) return; // own edit / no change

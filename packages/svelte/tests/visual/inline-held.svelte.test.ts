@@ -1,13 +1,21 @@
 // @vitest-environment jsdom
-// A top-level field declaring `inline` over stored content upstream reports as
-// `validation::not_inline` is held: the inline decode would join the lines and drop the
-// list and the image, and the first commit would store that. The hold follows the
-// diagnostics the editor routes to the field, so a re-validation releases it or takes
-// it. The probe is its own quill: the field, and a string beside it whose commit
-// re-validates.
+// A top-level field declaring `inline`, or a `plaintext` one, over a stored value its
+// schema cannot hold is held: the decode would join the lines and drop the list and the
+// image, and the first commit would store that. The hold is judged of the value each
+// mount and re-hydrate reads, and every set of diagnostics routed to the field
+// re-hydrates it, so a re-validation after an external write releases it or takes it.
+// The probe is its own quill: one field of each shape, a card kind holding one, and a
+// string whose commit re-validates.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync } from 'svelte';
-import { init, isQuillmarkError, type Document, type Quill } from '@quillmark/wasm';
+import { flushSync, mount, unmount } from 'svelte';
+import {
+	init,
+	isQuillmarkError,
+	type Diagnostic,
+	type Document,
+	type Quill
+} from '@quillmark/wasm';
+import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import { field, mountEditor, stubLayout, type, type Mounted } from '../helpers/surface.js';
 
 const core = await init();
@@ -17,7 +25,7 @@ const YAML = `quill:
   name: inline_held
   version: 1.0.0
   backend: typst
-  description: A top-level inline richtext field.
+  description: Narrowed and plain fields, at the top level and on a card.
 typst:
   plate_file: plate.typ
 main:
@@ -25,8 +33,21 @@ main:
     title:
       type: richtext
       inline: true
+    line:
+      type: plaintext
+      inline: true
+      default: ""
+    address:
+      type: plaintext
+      default: ""
     author:
       type: string
+card_kinds:
+  note:
+    fields:
+      heading:
+        type: richtext
+        inline: true
 `;
 // Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes from
 // another realm and the boundary refuses it by identity.
@@ -39,9 +60,22 @@ const probe = (): Quill =>
 		])
 	);
 const STRUCTURED = '- one\n- two\n\npara ![i](a.png)';
-const load = (title: string): Document =>
+const load = (title: string, ...cards: string[]): Document =>
 	core.Document.fromMarkdown(
-		['~~~', '$quill: inline_held@1.0.0', `title: ${JSON.stringify(title)}`, '~~~', ''].join('\n')
+		[
+			'~~~',
+			'$quill: inline_held@1.0.0',
+			`title: ${JSON.stringify(title)}`,
+			'~~~',
+			'',
+			...cards.flatMap((heading) => [
+				'~~~',
+				'$kind: note',
+				`heading: ${JSON.stringify(heading)}`,
+				'~~~',
+				''
+			])
+		].join('\n')
 	);
 
 let mounted: Mounted | undefined;
@@ -67,10 +101,10 @@ function heldNote(leaf: HTMLElement): HTMLElement | null {
 	return note && leaf.closest('.qm-control-box')?.contains(note) ? note : null;
 }
 
-const titleLeaf = (m: Mounted): HTMLElement =>
-	field(m.target, 'Title').querySelector<HTMLElement>('.ProseMirror')!;
+const leafOf = (target: HTMLElement, label: string): HTMLElement =>
+	field(target, label).querySelector<HTMLElement>('.ProseMirror')!;
 
-/** Commit the string beside the title: a revision, and so a re-validation. */
+/** Commit the string beside the fields: a revision, and so a re-validation. */
 function revalidate(m: Mounted): void {
 	type(field(m.target, 'Author').querySelector<HTMLInputElement>('input')!, 'Ann');
 }
@@ -84,34 +118,37 @@ function expectHeld(leaf: HTMLElement): void {
 	expect(heldNote(leaf)?.previousElementSibling).toBe(leaf);
 }
 
+function expectStructure(leaf: HTMLElement): void {
+	expect([...leaf.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['one', 'two']);
+	expect(leaf.querySelector('[data-qm-island="image"]')).not.toBeNull();
+}
+
 describe('a top-level inline richtext field over stored block content', () => {
-	it('draws the list and the image read-only, and a paste commits nothing', () => {
+	it('draws the list and the image read-only, where a paste lands nothing', () => {
 		const doc = load(STRUCTURED);
 		mounted = mountEditor(probe(), doc);
-		const leaf = titleLeaf(mounted);
+		const leaf = leafOf(mounted.target, 'Title');
 
 		expectHeld(leaf);
-		expect([...leaf.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['one', 'two']);
-		expect(leaf.querySelector('[data-qm-island="image"]')).not.toBeNull();
-
+		expectStructure(leaf);
 		paste(leaf, 'Z');
 		expect(doc.getStored('title')).toBe(STRUCTURED);
 		expect(mounted.changes).toEqual([]);
 		doc.free();
 	});
 
-	it('releases once a re-validation finds the value an external write left inline', () => {
+	it('releases once a re-validation follows an external write that leaves it inline', () => {
 		const q = probe();
 		const doc = load(STRUCTURED);
 		mounted = mountEditor(q, doc);
-		expectHeld(titleLeaf(mounted));
+		expectHeld(leafOf(mounted.target, 'Title'));
 
 		q.writer(doc).set('title', 'plain');
 		revalidate(mounted);
-		const leaf = titleLeaf(mounted);
+		const leaf = leafOf(mounted.target, 'Title');
 		expect(leaf.getAttribute('contenteditable')).toBe('true');
 		expect(leaf.hasAttribute('aria-describedby')).toBe(false);
-		expect(mounted.target.querySelector('.qm-prose-held-note')).toBeNull();
+		expect(field(mounted.target, 'Title').querySelector('.qm-prose-held-note')).toBeNull();
 		expect(leaf.textContent).toBe('plain');
 
 		paste(leaf, 'Z');
@@ -120,11 +157,11 @@ describe('a top-level inline richtext field over stored block content', () => {
 		doc.free();
 	});
 
-	it('holds once a re-validation finds structure an external store write left', () => {
+	it('holds once a re-validation follows an external store write that gains structure', () => {
 		const q = probe();
 		const doc = load('plain');
 		mounted = mountEditor(q, doc);
-		expect(titleLeaf(mounted).getAttribute('contenteditable')).toBe('true');
+		expect(leafOf(mounted.target, 'Title').getAttribute('contenteditable')).toBe('true');
 
 		// The typed writer refuses the value outright; the store takes it verbatim, as the
 		// source view and an import do.
@@ -138,12 +175,68 @@ describe('a top-level inline richtext field over stored block content', () => {
 		doc.storeField('title', STRUCTURED);
 		revalidate(mounted);
 
-		const leaf = titleLeaf(mounted);
+		const leaf = leafOf(mounted.target, 'Title');
 		expectHeld(leaf);
-		expect([...leaf.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['one', 'two']);
-		paste(leaf, 'Z');
-		expect(doc.getStored('title')).toBe(STRUCTURED);
-		expect(mounted.changes.map((c) => c.path)).toEqual(['main.author']);
+		expectStructure(leaf);
+		doc.free();
+	});
+
+	it('holds when the diagnostics that re-hydrate it predate the value', () => {
+		const q = probe();
+		const doc = load('plain');
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+		const props = $state({ doc, quill: q, diagnostics: [] as Diagnostic[] });
+		const app = mount(VisualEditor, { target, props });
+		flushSync();
+
+		doc.storeField('title', STRUCTURED);
+		// A host's own feed changing, with no revision to re-validate the document: the
+		// set routed to the title names nothing about its shape.
+		props.diagnostics = [{ severity: 'error', message: 'Checked elsewhere.', path: 'main.title' }];
+		flushSync();
+
+		const leaf = leafOf(target, 'Title');
+		expectHeld(leaf);
+		expectStructure(leaf);
+		void unmount(app);
+		target.remove();
+		doc.free();
+	});
+
+	it('holds the same field on a card', () => {
+		const doc = load('plain', STRUCTURED);
+		mounted = mountEditor(probe(), doc);
+		const leaf = leafOf(mounted.target, 'Heading');
+		expectHeld(leaf);
+		expectStructure(leaf);
+		doc.free();
+	});
+});
+
+describe('a top-level plaintext field over content upstream does not call plain', () => {
+	it('holds one declaring inline, whose refusal upstream names not_plain', () => {
+		const doc = load('plain');
+		doc.overwrite({ field: 'line' }, core.importMarkdown(STRUCTURED));
+		mounted = mountEditor(probe(), doc);
+		const leaf = leafOf(mounted.target, 'Line');
+		expectHeld(leaf);
+		expectStructure(leaf);
+		doc.free();
+	});
+
+	it('releases one without inline once a re-validation follows an external write', () => {
+		const q = probe();
+		const doc = load('plain');
+		doc.overwrite({ field: 'address' }, core.importMarkdown(STRUCTURED));
+		mounted = mountEditor(q, doc);
+		expectHeld(leafOf(mounted.target, 'Address'));
+
+		q.writer(doc).set('address', '12 Main St\nSpringfield');
+		revalidate(mounted);
+		const leaf = leafOf(mounted.target, 'Address');
+		expect(leaf.getAttribute('contenteditable')).toBe('true');
+		expect(leaf.innerHTML).toBe('<p>12 Main St<br>Springfield</p>');
 		doc.free();
 	});
 });

@@ -50,8 +50,8 @@
 		/** The editor's leaf registry (`leaves.ts`). Registering the controller is what
 		 *  makes this leaf a caret target and not merely a focus one. */
 		leaves?: LeafRegistry;
-		/** The diagnostics routed to this field, which a leaf declaring `inline` holds by
-		 *  (`createField`). */
+		/** The diagnostics routed to this field: each set re-evaluates a hold
+		 *  (`createField`), a re-validation being what follows an external write. */
 		diagnostics?: Diagnostic[];
 	}
 
@@ -122,7 +122,6 @@
 			onCaretMove,
 			onChange,
 			onError,
-			diagnostics,
 			heldNoteId: heldId,
 			onHold: (next) => {
 				held = next;
@@ -142,14 +141,13 @@
 		controller?.setPlaceholder(placeholder);
 	});
 
-	// Each set the editor routes to an `inline` leaf re-evaluates its hold, against the
-	// value stored now.
+	// Only a narrowed or a plain leaf can hold, so only one of them asks.
 	$effect(() => {
-		if (inline) controller?.applyExternal(diagnostics ?? []);
+		void diagnostics;
+		if (inline || plaintext) controller?.applyExternal();
 	});
 </script>
 
-<!-- The note sits inside the box, after the view `createField` prepends. -->
 <div
 	bind:this={containerEl}
 	class="qm-prose"

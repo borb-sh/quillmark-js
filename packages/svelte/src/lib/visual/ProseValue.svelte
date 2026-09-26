@@ -37,8 +37,7 @@
 	import {
 		blockSchema,
 		decode,
-		fitsInline,
-		fitsPlain,
+		fitsLeaf,
 		heldAttributes,
 		leafSchema,
 		pmToContent,
@@ -133,7 +132,7 @@
 		// the parent's value write, per the header.
 		const inline = !block;
 		const rt = content();
-		held = inline ? !fitsInline(rt) : plaintext && !fitsPlain(rt);
+		held = !fitsLeaf(rt, { inline, plaintext });
 		const schema = held ? blockSchema : leafSchema({ plaintext, inline });
 		const state = EditorState.create({
 			doc: decode(rt, schema),

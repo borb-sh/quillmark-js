@@ -13,8 +13,8 @@
  `diagnostics` is the routed `Diagnostic[]` for this field (VisualEditor's
  `diagByKey`, merging `quill.validate`, local commit errors, and the external
  `diagnostics` prop (VISUAL_EDITOR §Diagnostics)) rendered via the shared
- `DiagnosticList`, non-gating; a prose leaf declaring `inline` also holds by them
- (`createField`).
+ `DiagnosticList`, non-gating; each set also re-evaluates a prose leaf's hold
+ (`ProseField`).
 -->
 <script lang="ts">
 	import type {

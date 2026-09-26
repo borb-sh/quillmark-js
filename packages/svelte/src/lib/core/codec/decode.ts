@@ -91,9 +91,9 @@ export function decode(rt: Content, schema: Schema): PMNode {
 
 /** Whether `rt` decodes under an inline schema with nothing but whitespace dropped:
  *  upstream's `inline` rule, or one plain line and the empty one a trailing `\n`
- *  opens. That newline is the one a YAML `|` scalar keeps, which upstream refuses
- *  (`trailingNewline`) and the inline decode joins at the cost of a space. Marks are
- *  the schema's own business (`plaintextSchema` declares none). */
+ *  opens. That newline is the one a YAML `|` scalar keeps in a `plaintext` value,
+ *  which upstream refuses (`trailingNewline`) and the inline decode joins at the cost
+ *  of a space. Marks are the schema's own business (`plaintextSchema` declares none). */
 export function fitsInline(rt: Content): boolean {
 	if (core().isInline(rt)) return true;
 	const plain = (line: ContentLine): boolean =>
@@ -112,6 +112,14 @@ export function fitsInline(rt: Content): boolean {
  *  with them set aside. */
 export function fitsPlain(rt: Content): boolean {
 	return core().isPlain({ ...rt, marks: [] });
+}
+
+/** Whether `rt` decodes under the schema a leaf so declared mounts, losing nothing its
+ *  first commit would store: {@link fitsInline} narrowed, {@link fitsPlain} plain, and
+ *  anything on the block schema. What a leaf held over the rest reads. */
+export function fitsLeaf(rt: Content, leaf: { inline: boolean; plaintext: boolean }): boolean {
+	if (leaf.inline) return fitsInline(rt);
+	return !leaf.plaintext || fitsPlain(rt);
 }
 
 /** Inline decode: one paragraph, containers and islands stripped. */

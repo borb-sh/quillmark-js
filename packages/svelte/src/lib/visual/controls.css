@@ -113,8 +113,7 @@
 :where(.qm-input)::placeholder {
 	color: var(--_qm-ink-label);
 }
-/* The note a held prose leaf draws inside its box, under the text it is about
-   (`ProseField`, `ProseValue`). */
+/* The note a held prose leaf draws inside its box, under the text it is about. */
 :where(.qm-prose-held-note) {
 	display: block;
 	font-size: var(--_qm-text-label);
