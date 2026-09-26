@@ -111,7 +111,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 		expect(rows(q, doc)[1].name).toBe('Grace Hopper');
 	});
 
-	it('removes a row cleared under the caret, the committed cell still lagging', async () => {
+	it('removes a row cleared under the caret', async () => {
 		const q = quill();
 		const doc = template();
 		mounted = mountEditor(q, doc);
@@ -122,13 +122,13 @@ describe('an array<object> declaring ui.layout: table', () => {
 		type(nameCell(t, 1), 'Adele');
 		expect(rows(q, doc)[1]).toEqual({ name: 'Adele' });
 
-		// Cleared but not blurred: a text cell commits at `change`, so the row still reads
-		// `Adele` while the input reads empty. The caret's cell is the input's to answer.
+		// Cleared but not blurred: the cell declares no `default:`, so the clear drops its
+		// key as it lands, and the row is empty before the Backspace reads it.
 		const cell = nameCell(t, 1);
 		cell.value = '';
 		cell.dispatchEvent(new Event('input', { bubbles: true }));
 		flushSync();
-		expect(rows(q, doc)[1]).toEqual({ name: 'Adele' });
+		expect(rows(q, doc)[1]).toEqual({});
 
 		press(cell, 'Backspace');
 		await settle();

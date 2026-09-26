@@ -36,6 +36,8 @@ import {
 	baseType,
 	exampleGhost,
 	declaredGhost,
+	declaredContent,
+	printedText,
 	MATRIX_HELD
 } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
@@ -611,6 +613,33 @@ describe('declaredGhost', () => {
 	});
 });
 
+describe('declaredContent', () => {
+	it('imports markdown, takes a literal a line to each break, and has none for a blank', () => {
+		const md = declaredContent('One *two*', true);
+		expect(md?.text).toBe('One two');
+		expect(md?.marks).toHaveLength(1);
+		const plain = declaredContent('*a*\nb', false);
+		expect(plain?.text).toBe('*a*\nb');
+		// One paragraph whose second line continues it, as the literal codec reads one.
+		expect(plain?.lines.map((l) => !!l.continues)).toEqual([false, true]);
+		expect(plain?.marks).toEqual([]);
+		expect(declaredContent('', false)).toBeUndefined();
+		expect(declaredContent('  ', true)).toBeUndefined();
+		expect(declaredContent({ a: 1 }, false)).toBeUndefined();
+	});
+});
+
+describe('printedText', () => {
+	it('holds a default as declared where it prints, and none where a reader sees nothing', () => {
+		expect(printedText(' B-12 ')).toBe(' B-12 ');
+		expect(printedText(0)).toBe('0');
+		expect(printedText('')).toBeUndefined();
+		expect(printedText('  ')).toBeUndefined();
+		expect(printedText(undefined)).toBeUndefined();
+		expect(printedText(['a'])).toBeUndefined();
+	});
+});
+
 describe('exampleGhost', () => {
 	it('reads the `example:` of a defaultless free-text cell, as text', () => {
 		expect(exampleGhost(f({ type: 'string', example: 'SPEC/AA' }))).toBe('SPEC/AA');
@@ -624,9 +653,13 @@ describe('exampleGhost', () => {
 		expect(exampleGhost(f({ type: 'string' }))).toBeUndefined();
 	});
 
-	it('takes none where a `default:` answers, however blank', () => {
-		expect(exampleGhost(f({ type: 'string', default: '', example: 'x' }))).toBeUndefined();
+	it('takes none where the `default:` prints, and gives way to none that does not', () => {
 		expect(exampleGhost(f({ type: 'richtext', default: 'D', example: 'x' }))).toBeUndefined();
+		expect(exampleGhost(f({ type: 'string', default: 'D', example: 'x' }))).toBeUndefined();
+		// A type-empty default is the skippable marker: it prints nothing, so the example
+		// is the only thing to draw.
+		expect(exampleGhost(f({ type: 'string', default: '', example: 'x' }))).toBe('x');
+		expect(exampleGhost(f({ type: 'plaintext', default: '  ', example: 'x' }))).toBe('x');
 	});
 
 	it('takes none on any other type: a pick, a number or a date offered is a value', () => {

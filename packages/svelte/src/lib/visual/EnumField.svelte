@@ -78,6 +78,9 @@
 	const dash = (v: string | undefined) => v || blankTitle || '—';
 
 	const unset = $derived(local.value === UNSET);
+	/** The ghost is a member the render prints, rather than a word for the blank or for
+	 *  `none`: it draws at the default rung (theme.css). */
+	const ghostsMember = $derived(!optional && !!fallback);
 	const ghostText = $derived(optional ? t.strings.optionalGhost : dash(fallback));
 	/** What the closed trigger shows: the pick, or the ghosted default while unset. */
 	const shown = $derived(unset ? ghostText : dash(local.value));
@@ -110,7 +113,7 @@
 			{id}
 			aria-label={id ? undefined : label}
 			aria-describedby={describedBy}
-			data-ghosted={unset ? '' : undefined}
+			data-ghosted={unset ? (ghostsMember ? 'default' : '') : undefined}
 		>
 			<span class="qm-select-shown">{shown}</span>
 			<Icon name="chevron-down" class="qm-select-chevron" size={14} />
@@ -204,10 +207,13 @@
 		flex-shrink: 0;
 	}
 	/* The focus ring rides `.qm-focus-ring` on the trigger (controls.css). */
-	/* Shown-never-written: the closed control reads muted while unset, matching the
-	   ghosted placeholder the text/number controls show. */
+	/* Shown-never-written: the closed control reads muted while unset, at the rung of
+	   what it shows — the default member the render prints, or a word for the blank. */
 	.qm-select-wrap :global(.qm-select[data-ghosted]) {
 		color: var(--_qm-ink-label);
+	}
+	.qm-select-wrap :global(.qm-select[data-ghosted='default']) {
+		color: var(--_qm-ink-default);
 	}
 	/* The open list is `.qm-menu-surface` and its rows `.qm-menu-item` (controls.css):
 	 the lift, the inset and the highlight are the shared menu recipe. What a listbox
@@ -241,7 +247,7 @@
 	/* A step down the size ramp, which is what says this is chrome and the word beside
 	   it is the value. The ink is the ghost's own: a second tone here would rank the
 	   tag against the thing it annotates, and there is no rung under `label` to take
-	   (theme.css, "Two rungs, and there is no third"). */
+	   (theme.css, "nothing under the last"). */
 	.qm-select-tag {
 		flex-shrink: 0;
 		font-size: var(--_qm-text-label);

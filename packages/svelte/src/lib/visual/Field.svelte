@@ -37,6 +37,7 @@
 		ghostDefault,
 		isContainer,
 		optionalCell,
+		printedText,
 		stringifyGhost,
 		titleText
 	} from './structure.js';
@@ -112,21 +113,26 @@
 
 	const t = wording();
 
-	// The ghost the control shows when unset: the resolved `default:` (provenance,
+	// What an unset field shows of its `default:`: the resolved value (provenance,
 	// `source === 'default'`). `ghost` is the raw typed value (enum/number/boolean
-	// fallbacks), `defaultStr` its string form (the date control's `YYYY-MM-DD`). An
-	// object-valued default does not ghost, but a content one resolves as `Content` and
-	// ghosts as its text. A control ghosting text shows `restGhost`, which is what
-	// prints: the default, or the `none` an optional cell prints; while it holds the
-	// focus, an unset free-text field shows its `example:` instead.
+	// fallbacks, a content leaf's `Content`), `defaultStr` its string form (the date
+	// control's `YYYY-MM-DD`); an object-valued default has none. An array draws its
+	// declared literal instead, which is what a take writes (`ArrayField`).
+	// A default that prints stands in the control as the value it is, at the default
+	// rung, and the first edit takes it (VISUAL_EDITOR §"The commitment ladder"). Where
+	// nothing prints, a control draws words: the `none` an optional cell prints, and
+	// a free-text field's `example:`.
 	const ghost = $derived(ghostDefault(provenance));
 	const defaultStr = $derived(
 		field.control === 'prose' ? titleText(ghost) || undefined : stringifyGhost(ghost)
 	);
+	const printed = $derived(printedText(defaultStr));
+	// A text or number control reads its default off the schema, not the resolved row:
+	// the row stops naming a default once the field is written, and emptying a written
+	// field still has to know that the default prints.
+	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
-	const restGhost = $derived(
-		defaultStr ?? (optional && value == null ? t.strings.optionalGhost : undefined)
-	);
+	const none = $derived(optional && value == null ? t.strings.optionalGhost : undefined);
 	const example = $derived(value == null ? exampleGhost(field.schema) : undefined);
 	// A variant resolves as one rung whose value is the whole container, so the
 	// discriminant's ghost is that container's own discriminant cell.
@@ -278,7 +284,8 @@
 					{addr}
 					inline={field.inline}
 					plaintext={field.plaintext}
-					placeholder={restGhost}
+					fallback={printed ? (ghost as Content) : undefined}
+					placeholder={none}
 					placeholderUntilEdit
 					{example}
 					labelledBy={domIds.label}
@@ -324,7 +331,8 @@
 				<NumberField
 					value={value as number | undefined}
 					integer={baseType(field.schema) === 'integer'}
-					placeholder={restGhost}
+					fallback={declared}
+					placeholder={none}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}
@@ -351,6 +359,7 @@
 				<ArrayField
 					bind:this={arrayEl}
 					value={value as unknown[] | undefined}
+					fallback={Array.isArray(field.schema.default) ? field.schema.default : undefined}
 					items={field.schema.items}
 					layout={arrayLayout(field.schema)}
 					max={field.schema.max}
@@ -394,7 +403,8 @@
 			{:else}
 				<TextField
 					value={value as string | undefined}
-					placeholder={restGhost}
+					fallback={declared}
+					placeholder={none}
 					{example}
 					id={domIds.control}
 					{describedBy}

@@ -23,16 +23,21 @@
  make every reconcile fire and re-render all seven segments on each commit.
 
  The ghost is the default's digits, not a format hint. An unset field
- carrying a `default:` prints the default's digits in the segments, ghost-toned,
- instead of the primitive's `mm`/`dd`/`yyyy` hints, which say "empty" where the
- rung says "will render 2026-01-01". The ghost is painted in the segment snippet,
- over an unset primitive: substituting the default for `value` instead would make
- the field indistinguishable from an authored one to every path that reads it
- (`areAllSegmentsFilled`, Backspace, the hidden input), and the primitive shadows
- a written-back `value` prop it was not `bind:`-ed to, so re-seating the ghost
- after a clear never lands. `placeholder` (the `DateValue` the segments count
- from, never one they display) carries the default too, so arrowing an empty
- segment starts at the render's date rather than today's.
+ carrying a `default:` prints the default's digits in the segments at the default
+ rung (theme.css), instead of the primitive's `mm`/`dd`/`yyyy` hints, which say
+ "empty" where the rung says "will render 2026-01-01". At rest the ghost is painted
+ in the segment snippet, over an unset primitive: a default held as its value reads
+ as filled to every path that reads the primitive (`areAllSegmentsFilled`,
+ Backspace, the hidden input), and whether it stands as the value is the field's to
+ say only once the user enters it. `placeholder`
+ (the `DateValue` the segments count from, never one they display) carries the
+ default too, so arrowing an empty segment starts at the render's date rather than
+ today's.
+
+ Entering an unset field seats the default as the primitive's value, still at the
+ default rung, so an edit to one segment commits a whole date with the others the
+ default's. Leaving without an edit unseats it, and nothing is written; so does
+ clearing a segment.
 -->
 <script lang="ts">
 	import { DateField as BitsDateField } from 'bits-ui';
@@ -85,25 +90,42 @@
 		}
 	}
 
+	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
+	/** The default is the primitive's value: from entering an unset field until an
+	 *  edit, a cleared segment or leaving. Part of the projection, so a reconcile
+	 *  neither drops a seat nor restores one over the segments a clear left. */
+	let seat = $state(false);
 	// Local value synced to `value` as a string (see the identity note above);
 	// own-edits stay local, only an external change reconciles back in. Driven
 	// controlled (`value` + `onValueChange`, never `bind:`) so reconciliation stays
 	// the package's.
-	const local = syncedLocal(() => value?.slice(0, 10) ?? '');
+	const local = syncedLocal(
+		() => value?.slice(0, 10) ?? (seat && fallbackDate ? fallbackDate.toString() : '')
+	);
 	const parsed = $derived(toDateValue(local.value));
 	// The date the empty segments ghost, or undefined when there is nothing to ghost:
 	// the field is unset and the default has a date form. A non-blank local that
 	// fails to parse is AUTHORED-but-malformed, which the empty field states
 	// honestly: the ghost would claim it unset. Held as the parsed value rather than
 	// a boolean so the substitution below narrows on the one fact it needs.
-	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
 	const ghost = $derived(local.value === '' ? fallbackDate : undefined);
+	const seated = $derived(value == null && seat && local.value !== '');
 
-	// What one segment prints, and whether that text is shown-never-written.
+	/** Focus moving between segments is neither an entry nor a leaving. */
+	const within = (e: FocusEvent): boolean => !!wrapEl?.contains(e.relatedTarget as Node | null);
+	function enter(e: FocusEvent): void {
+		if (!within(e) && value == null && fallbackDate) seat = true;
+	}
+	function leave(e: FocusEvent): void {
+		if (!within(e)) seat = false;
+	}
+
+	// What one segment prints, and which rung it takes.
 	//
 	// An unfilled segment is always shown-never-written, whether it prints the
-	// default's digits or the primitive's own `mm`/`dd`/`yyyy` hint: both state
-	// "nothing authored here". Only an unfilled segment ghosts: a half-entered date
+	// default's digits (`default`, the rung of what prints) or the primitive's own
+	// `mm`/`dd`/`yyyy` hint (`hint`, a word about the value): both state "nothing
+	// authored here". Only an unfilled segment ghosts: a half-entered date
 	// holds digits while the value is still undefined (one unfilled segment unsets
 	// the whole field), so ghosting unconditionally would paint over, and dim, the
 	// digits just typed. The segment's own text is the tell: its unfilled hint is
@@ -113,30 +135,36 @@
 	// The separators are `literal` parts, never unfilled; substitution covers the
 	// date parts only, so any time part keeps the primitive's text. Digits are
 	// zero-padded to the segment widths the field displays.
-	function segmentText(part: string, text: string): { text: string; ghosted: boolean } {
-		if (part === 'literal' || /\d/.test(text)) return { text, ghosted: false };
-		if (!ghost) return { text, ghosted: true };
+	type Rung = 'default' | 'hint' | undefined;
+	function segmentText(part: string, text: string): { text: string; ghosted: Rung } {
+		if (part === 'literal' || /\d/.test(text)) return { text, ghosted: undefined };
+		if (!ghost) return { text, ghosted: 'hint' };
 		switch (part) {
 			case 'year':
-				return { text: String(ghost.year).padStart(4, '0'), ghosted: true };
+				return { text: String(ghost.year).padStart(4, '0'), ghosted: 'default' };
 			case 'month':
-				return { text: String(ghost.month).padStart(2, '0'), ghosted: true };
+				return { text: String(ghost.month).padStart(2, '0'), ghosted: 'default' };
 			case 'day':
-				return { text: String(ghost.day).padStart(2, '0'), ghosted: true };
+				return { text: String(ghost.day).padStart(2, '0'), ghosted: 'default' };
 			default:
-				return { text, ghosted: true };
+				return { text, ghosted: 'hint' };
 		}
 	}
 </script>
 
-<span class="qm-date-wrap" bind:this={wrapEl}>
+<span class="qm-date-wrap" bind:this={wrapEl} onfocusin={enter} onfocusout={leave}>
 	<BitsDateField.Root
 		value={parsed}
 		placeholder={fallbackDate}
 		onValueChange={(d) => {
 			// `CalendarDate.toString()` is exactly `YYYY-MM-DD`. A cleared or
-			// half-typed field yields undefined: the unset rung.
-			local.value = d?.toString() ?? '';
+			// half-typed field yields undefined: the unset rung. The primitive reports
+			// its own value again as a segment loses focus, which is no edit, and over a
+			// seated default would write it.
+			const next = d?.toString() ?? '';
+			if (next === local.value) return;
+			local.value = next;
+			if (!d) seat = false;
 			onCommit(d?.toString());
 		}}
 	>
@@ -151,6 +179,7 @@
 			aria-labelledby={labelledBy}
 			aria-describedby={describedBy}
 			data-ghosted={ghost ? '' : undefined}
+			data-default={seated ? '' : undefined}
 		>
 			{#snippet children({ segments })}
 				<!-- Keyed by index: `part` repeats (the `literal` separators between
@@ -160,7 +189,7 @@
 					<BitsDateField.Segment
 						class="qm-date-segment"
 						part={seg.part}
-						data-ghosted={shown.ghosted ? '' : undefined}
+						data-ghosted={shown.ghosted}
 					>
 						{shown.text}
 					</BitsDateField.Segment>
@@ -193,11 +222,17 @@
 	.qm-date-wrap :global(.qm-date-segment:focus) {
 		background: var(--_qm-surface-hover);
 	}
-	/* An unfilled segment is ghost-toned whatever it prints: the resolved `default:`
-	 when there is one to ghost, the `dd`/`mm`/`yyyy` hint when there is not. Shown,
-	 never written, either way. The marker is the component's own (see the snippet):
-	 the date primitive emits no placeholder attribute of its own. */
-	.qm-date-wrap :global(.qm-date-segment[data-ghosted]) {
+	/* An unfilled segment is ghost-toned whatever it prints, at the rung of what it
+	 prints: the resolved `default:`'s digits at the default rung, the `dd`/`mm`/`yyyy`
+	 hint at the label rung. Shown, never written, either way. The marker is the
+	 component's own (see the snippet): the date primitive emits no placeholder
+	 attribute of its own. A seated default is the value and still unwritten, so its
+	 filled segments take the default rung too. */
+	.qm-date-wrap :global(.qm-date-segment[data-ghosted='hint']) {
 		color: var(--_qm-ink-label);
+	}
+	.qm-date-wrap :global(.qm-date-segment[data-ghosted='default']),
+	.qm-date-wrap :global(.qm-date[data-default] .qm-date-segment) {
+		color: var(--_qm-ink-default);
 	}
 </style>

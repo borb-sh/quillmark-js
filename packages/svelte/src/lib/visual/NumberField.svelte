@@ -4,10 +4,13 @@
  (`-`, `1.`, `1e`) is never a document state worth a boundary round-trip, and
  committing it live flashes a coercion diagnostic + `console.error` on every
  intermediate prefix, announced by `DiagnosticList`'s `role="status"` live
- region. A blank entry commits `undefined`: the unset rung of the
- commitment ladder: the parent removes the field and the engine renders the
- ghosted `default:`. Settling at `change` also keeps
- select-all-and-retype from flashing the preview through the default mid-keystroke.
+ region.
+
+ An unset field holds its resolved `default:` as its text, at the default rung
+ (theme.css), and an edit that settles writes it as authored, as `TextField` takes
+ its default. A number has no empty answer (canon `SCHEMAS.md` §"Native validation"),
+ so a blank entry commits `undefined`, the unset rung: the parent removes the field,
+ the engine renders the default, and the input holds it again.
 
  `type="text"`, not `type="number"`: a native number input sanitizes an
  invalid string to `""` before the DOM `value` setter even runs (verified:
@@ -26,7 +29,10 @@
 	interface Props {
 		value: number | undefined;
 		integer?: boolean;
-		/** The ghost: what the field prints unset. */
+		/** The resolved `default:` as text: what an unset field holds. */
+		fallback?: string;
+		/** Words at rest about an unset field that holds no text: the `None` an optional
+		 * cell prints. */
 		placeholder?: string;
 		/** Accessible name for an input nothing else names: an object property, whose
 		 * name is the field label plus the property's. A field's own input takes `id`
@@ -39,16 +45,25 @@
 		describedBy?: string;
 		onCommit: (v: number | string | undefined) => void;
 	}
-	let { value, integer, placeholder, label, id, describedBy, onCommit }: Props = $props();
+	let { value, integer, fallback, placeholder, label, id, describedBy, onCommit }: Props = $props();
 
-	// Local input state synced to `value` (as a string projection); own-typing
-	// stays local, only an external change reconciles back in (see `syncedLocal`).
-	const local = syncedLocal(() => (value != null ? String(value) : ''));
+	// Local input state synced to `value` (as a string projection), or to the default
+	// an unset field holds; own-typing stays local, only an external change reconciles
+	// back in (see `syncedLocal`).
+	const local = syncedLocal(() => (value != null ? String(value) : (fallback ?? '')));
+	const defaulted = $derived(value == null && !!fallback && local.value === fallback);
 
 	// Parse a settled entry and emit it; `local` is owned by `oninput`. Blank →
-	// `undefined` (the unset rung: parent removes the field, default renders).
-	function commit(raw: string): void {
-		if (raw.trim() === '') return void onCommit(undefined);
+	// `undefined`, and the input takes the default back: nothing else reconciles it, the
+	// projection having read the default throughout. Onto the element as well, since the
+	// attribute Svelte last wrote may already be the default, and it writes no repeat.
+	function commit(el: HTMLInputElement): void {
+		const raw = el.value;
+		if (raw.trim() === '') {
+			onCommit(undefined);
+			local.value = el.value = fallback ?? '';
+			return;
+		}
 		// Number(), not parseFloat/parseInt: a prefix parse would silently commit
 		// `14.5` for `14.5x` (and truncate `11.9` → 11 on integer fields) instead
 		// of letting the boundary judge the full entry.
@@ -64,10 +79,11 @@
 	value={local.value}
 	{id}
 	{placeholder}
+	data-default={defaulted ? '' : undefined}
 	aria-label={id ? undefined : label}
 	aria-describedby={describedBy}
 	oninput={(e) => {
 		local.value = (e.currentTarget as HTMLInputElement).value;
 	}}
-	onchange={(e) => commit((e.currentTarget as HTMLInputElement).value)}
+	onchange={(e) => commit(e.currentTarget as HTMLInputElement)}
 />

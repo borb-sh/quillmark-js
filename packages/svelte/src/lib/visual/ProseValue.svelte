@@ -37,6 +37,7 @@
 	import {
 		blockSchema,
 		decode,
+		emptyContent,
 		fitsLeaf,
 		heldAttributes,
 		leafSchema,
@@ -51,11 +52,14 @@
 	import type { Content } from '@quillmark/wasm';
 
 	interface Props {
-		/** This leaf's content, read at mount (the parent's boundary read). A thunk
-		 * rather than a value: the parent re-derives per revision and this leaf takes
-		 * its state once, so a value prop would be a boundary read per leaf per render,
-		 * all but one of them discarded. */
-		content: () => Content;
+		/** This leaf's content, read at mount (the parent's boundary read), `undefined`
+		 * where nothing is stored. A thunk rather than a value: the parent re-derives
+		 * per revision and this leaf takes its state once, so a value prop would be a
+		 * boundary read per leaf per render, all but one of them discarded. */
+		content: () => Content | undefined;
+		/** The default an unset leaf holds, where it prints: drawn at the default rung,
+		 * and handed up whole with the first edit in it, as `createField` takes one. */
+		fallback?: Content;
 		/** The mark-free schema (a `plaintext` leaf): literal text, no formatting,
 		 * exactly as the scalar field of that type mounts. */
 		plaintext?: boolean;
@@ -72,9 +76,10 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
-		/** The empty leaf's ghosts, a subform cell's: what it prints unset, until the
-		 *  leaf's first edit, and the `example:` drawn in its stead while the leaf holds
-		 *  the focus (`createField`'s pair). Read per decoration pass. */
+		/** The empty leaf's ghosts, a subform cell's, until the leaf's first edit: the
+		 *  `none` an optional cell prints unset, and the `example:` drawn where there is no
+		 *  placeholder and in its stead while the leaf holds the focus (`createField`'s
+		 *  pair). Read per decoration pass. */
 		placeholder?: string;
 		example?: string;
 		onChange: (rt: Content) => void;
@@ -85,6 +90,7 @@
 	}
 	let {
 		content,
+		fallback,
 		plaintext = false,
 		block = false,
 		label,
@@ -138,8 +144,14 @@
 		// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
 		// the parent's value write, per the header.
 		const inline = !block;
-		const rt = content();
+		const stored = content();
+		const rt = stored ?? fallback ?? emptyContent();
+		let defaulted = stored === undefined && !!fallback;
 		held = !fitsLeaf(rt, { inline, plaintext });
+		const named = held
+			? heldAttributes({ label, labelledBy, describedBy }, heldId)
+			: (proseAttributes({ label, labelledBy, describedBy }) ?? {});
+		const defaultNamed = { ...named, 'data-default': '' };
 		const schema = held ? blockSchema : leafSchema({ plaintext, inline });
 		const state = EditorState.create({
 			doc: decode(rt, schema),
@@ -160,13 +172,13 @@
 				// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
 				// (`proseAttributes`), so a cell carrying a label element and a row carrying
 				// none cannot name their regions by different rules.
-				attributes: held
-					? heldAttributes({ label, labelledBy, describedBy }, heldId)
-					: proseAttributes({ label, labelledBy, describedBy }),
+				attributes: () => (defaulted ? defaultNamed : named),
 				dispatchTransaction(tr) {
 					const next = mounted.state.apply(tr);
+					const edit = tr.docChanged && !held;
+					if (edit) defaulted = false;
 					mounted.updateState(next);
-					if (tr.docChanged && !held) onChange(pmToContent(next.doc));
+					if (edit) onChange(pmToContent(next.doc));
 				},
 				handleDOMEvents: {
 					keydown: (_v, e) => {

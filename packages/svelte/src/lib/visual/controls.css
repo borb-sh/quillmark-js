@@ -105,11 +105,16 @@
 	width: 100%;
 	box-sizing: border-box;
 }
-/* The native placeholder is the label rung, not the UA's own grey: a text or
-   number control's placeholder is the resolved `default:` (Field's `defaultStr`),
-   which is content and reads at a content's contrast. What says shown-never-written
-   is the step from the `ink` a written value takes, the same step the prose leaf's
-   empty state reads (`ProseField`). */
+/* An unset field's text where its `default:` prints (`TextField`, `NumberField`, a
+   prose leaf): the value, at the default rung, so it reads as an answer and never as a
+   written one. The first edit writes it and the rung goes with the attribute. */
+:where(.qm-input[data-default], .ProseMirror[data-default]) {
+	color: var(--_qm-ink-default);
+}
+/* The native placeholder is the label rung, not the UA's own grey: what an input
+   ghosts is words about a value it does not hold — an `example:`, `None` — which is
+   content and reads at a content's contrast, the same step the prose leaf's ghost
+   reads (`prose.css`). */
 :where(.qm-input)::placeholder {
 	color: var(--_qm-ink-label);
 }

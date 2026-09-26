@@ -43,7 +43,7 @@ import { usvToPM, pmToUsv, buildLineIndex, lineIndexOf, type LineIndex } from '.
 import { lower, pmToContent, scanContent, scanDoc, contentEdit } from './encode.js';
 import { islandPastePlugin } from './islands.js';
 import { anchorsFromContent, type AnchorPos } from './marks.js';
-import { createReconciler, type Reconciler } from './reconcile.js';
+import { contentEqual, createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
@@ -105,18 +105,27 @@ export interface CreateFieldOpts {
 	labelledBy?: string;
 	/** The parked `description` → `aria-describedby`; announced after the name. */
 	describedBy?: string;
-	/** Ghost text shown on the empty leaf: what an unset field prints, or a body's
-	 * invitation. The initial value; {@link FieldController.setPlaceholder} moves it
-	 * after mount. Empty/absent shows no ghost. */
+	/**
+	 * The resolved `default:` where it prints: the content an unset field's leaf holds,
+	 * marked `data-default` on the editable for the default rung. Nothing is written
+	 * until an edit, which commits the whole leaf as authored: the default taken, with
+	 * the edit in it. The initial value; {@link FieldController.setFallback} moves it
+	 * after mount.
+	 */
+	fallback?: Content;
+	/** Ghost text shown on the empty leaf: the `none` an unset optional field prints, or
+	 * a body's invitation. The initial value; {@link FieldController.setPlaceholder}
+	 * moves it after mount. Empty/absent shows no ghost. */
 	placeholder?: string;
 	/** The placeholder is what the unset field prints, so it goes at the leaf's first
 	 * edit: the edit answers the field, and emptied the leaf holds an empty answer, which
 	 * prints empty. Absent, the placeholder is an invitation (a body's) and returns
 	 * whenever the leaf is empty. */
 	placeholderUntilEdit?: boolean;
-	/** Ghost text shown on the empty leaf in the placeholder's stead while the leaf
-	 * holds the focus, until its first edit: a defaultless field's `example:`. The
-	 * initial value; {@link FieldController.setExample} moves it after mount. */
+	/** Ghost text shown on the empty leaf until its first edit: an unset field's
+	 * `example:`, at rest where there is no placeholder and in the placeholder's stead
+	 * while the leaf holds the focus. The initial value; {@link FieldController.setExample}
+	 * moves it after mount. */
 	example?: string;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new USV caret after an edit or a selection move. */
@@ -156,9 +165,12 @@ export interface FieldController {
 	 * a transaction would fire `onCaretMove` at a moment the caret did not move.
 	 */
 	setPlaceholder(text: string | undefined): void;
-	/** Move the focused leaf's ghost after mount, the way {@link setPlaceholder}
-	 *  moves the resting one. */
+	/** Move the example ghost after mount, the way {@link setPlaceholder} moves the
+	 *  other one. */
 	setExample(text: string | undefined): void;
+	/** Move the default an unset leaf holds after mount: a retype or a quill swap
+	 *  re-seats an unset leaf on the new kind's default, and leaves a written one be. */
+	setFallback(content: Content | undefined): void;
 	focus(): void;
 	/** The current stored content for this addr (for tests / reconcile). */
 	getContent(): Content;
@@ -323,9 +335,16 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const reader: DocumentReader = opts.quill.reader(doc);
 	const writer: DocumentWriter = opts.quill.writer(doc);
 
-	// `known` is the codec's view of the stored content: kept in sync after every
+	let fallback = opts.fallback;
+	/** What the leaf holds: the stored content, else the default an unset field shows. */
+	const shown = (): Content => reader.getContent(addr) ?? fallback ?? emptyContent();
+	/** Whether the leaf holds a default nobody has written: the `data-default` mark. */
+	const unwritten = (): boolean => !!fallback && doc.getStored(addr) == null;
+	let defaulted = unwritten();
+
+	// `known` is the codec's view of what the leaf holds: kept in sync after every
 	// own-edit so `reconcile` can tell an external change from the field's own.
-	const reconciler: Reconciler = createReconciler(readLeaf(reader, addr));
+	const reconciler: Reconciler = createReconciler(shown());
 
 	let index: LineIndex; // rebuilt on every structural change
 	let view: EditorView;
@@ -350,6 +369,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext });
 	let held = holds(reconciler.last);
 	const named = proseAttributes(opts) ?? {};
+	const defaultNamed = { ...named, 'data-default': '' };
 	const heldNamed = heldAttributes(opts, opts.heldNoteId);
 
 	const seeded = buildState(reconciler.last);
@@ -371,7 +391,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	view = new EditorView((dom) => container.prepend(dom), {
 		state,
 		editable: () => !held,
-		attributes: () => (held ? heldNamed : named),
+		attributes: () => (held ? heldNamed : defaulted ? defaultNamed : named),
 		// Both terms, one line each: when a flagged dispatch moves the scrollport
 		// (`scrollThreshold`) and what it leaves at the edge (`scrollMargin`).
 		scrollThreshold: clearance,
@@ -396,6 +416,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		dispatchTransaction: (tr) => {
 			const oldRt = reconciler.last;
 			const next = view.state.apply(tr);
+			// An edit takes a held default: the commit below writes the whole leaf, so the
+			// mark goes in the same update that draws the edit.
+			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) defaulted = false;
 			view.updateState(next); // (a) optimistic
 			// One walk per structural change: the index and the projection the commit
 			// diffs both come off it. A selection-only transaction leaves the document
@@ -570,9 +593,15 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 		},
 		applyExternal(): void {
-			const current = readLeaf(reader, addr);
+			const current = shown();
 			const flipped = holds(current) !== held;
-			if (!flipped && !reconciler.shouldRehydrate(current)) return; // own edit / no change
+			const wasDefaulted = defaulted;
+			defaulted = unwritten();
+			if (!flipped && !reconciler.shouldRehydrate(current)) {
+				// Own edit / no change; a default written as itself changes the mark alone.
+				if (defaulted !== wasDefaulted) view.setProps({});
+				return;
+			}
 			if (flipped) held = !held;
 			const caretUsv = pmToUsv(index, view.state.selection.head);
 			const fresh = buildState(current);
@@ -595,6 +624,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			if (text === exampleText) return;
 			exampleText = text;
 			view.setProps({});
+		},
+		setFallback(content: Content | undefined): void {
+			if (content === fallback || (content && fallback && contentEqual(content, fallback))) return;
+			fallback = content;
+			controller.applyExternal();
 		},
 		focus(): void {
 			view.focus();
@@ -774,11 +808,11 @@ function pastAtomPlugin(): Plugin {
  * never enters the document, the caret path, or a `pmToContent` export, and it
  * vanishes the instant the leaf holds any content (the emptiness test fails).
  *
- * `data-placeholder` is drawn at rest, and `data-example` in its stead while the view
- * holds the focus. The example is stamped only until the state's first edit, after
- * which the leaf has been answered, and so is a placeholder that says what the unset
- * field prints (`placeholderUntilEdit`). An inline leaf's ghost keeps to the one line
- * the leaf is (`qm-prose-placeholder-line`).
+ * `data-placeholder` is drawn at rest, and `data-example` where there is none, and in
+ * its stead while the view holds the focus. The example is stamped only until the
+ * state's first edit, after which the leaf has been answered, and so is a placeholder
+ * that says what the unset field prints (`placeholderUntilEdit`). An inline leaf's
+ * ghost keeps to the one line the leaf is (`qm-prose-placeholder-line`).
  *
  * The texts are read per decoration pass rather than closed over, so moving a ghost is
  * a re-render and never a document edit.

@@ -163,13 +163,16 @@
 	   relationship at any mix: a stroke against the surface behind it, not a fill
 	   stacked on one. */
 	--_qm-border-faint: color-mix(in oklab, var(--_qm-bg), var(--_qm-border) 50%);
-	/* Two rungs, and there is no third: a step below `label` lands under 3:1 on the
-	   well a field draws it against, and what would take it — a placeholder, an
-	   unset value, the resolved `default:` — is content a reader has to read
-	   (WCAG 1.4.3), not decoration. So tone carries hierarchy alone, and a leaf
-	   saying shown-never-written says it against the `ink` a written value takes,
-	   in italic where it has no written neighbour to be read against. */
+	/* Three rungs, and nothing under the last: a step below `label` lands under 3:1 on
+	   the well a field draws it against, and what would take it — an example, an unset
+	   value's word — is content a reader has to read (WCAG 1.4.3), not decoration.
+	   `ink` is written. `default` is the resolved `default:` drawn as the value it
+	   prints: near enough to `ink` to read as an answer, a step off it so it never
+	   reads as a written one. `label` is words about a value rather than the value — an
+	   `example:`, `None`, a format hint — and the chrome that names fields; in italic
+	   where it is a leaf's ghost, which has no written neighbour to be read against. */
 	--_qm-ink: var(--_qm-fg);
+	--_qm-ink-default: color-mix(in oklab, var(--_qm-fg), var(--_qm-bg) 20%);
 	--_qm-ink-label: color-mix(in oklab, var(--_qm-fg), var(--_qm-bg) 35%);
 	/* The arrival wash (`core/bloom.ts`). Its alpha is a peak, not a tint: the
 	   wash animates from and back to zero, never held, so it reads over the leaf it

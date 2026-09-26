@@ -107,8 +107,9 @@ export interface CardModel {
 	/**
 	 * The empty-body ghost, or undefined when the card renders no body. Never empty
 	 * for a card that does ({@link resolveBodyGhost}), so a body leaf always has
-	 * something in it to write into, which a field at rest deliberately does not: its
-	 * ghost is what prints, and an invented one would read as a value.
+	 * something in it to write into, which a field at rest deliberately does not: it
+	 * draws what prints or what its quill declares, and an invented ghost would read as
+	 * a value.
 	 */
 	bodyGhost?: string;
 }
@@ -146,9 +147,9 @@ export function resolvedByCardIndex(resolved: Resolved | undefined): Map<number,
 	return new Map((resolved?.cards ?? []).map((c) => [c.index, { fields: c.fields, body: c.body }]));
 }
 
-/** The ghost a field shows when unset: the resolved `default:` value the render
- * would use (`source === 'default'`), else undefined: an `authored` field shows
- * its value, a `zero` field has no default to ghost. */
+/** What an unset field shows of its `default:`: the resolved value the render would
+ * use (`source === 'default'`), else undefined: an `authored` field shows its value,
+ * a `blank` field has no default to show. */
 export function ghostDefault(row: ResolvedField | undefined): unknown {
 	return row?.source === 'default' ? row.value : undefined;
 }
@@ -230,15 +231,52 @@ export function declaredGhost(v: unknown, markdown: boolean): string | undefined
 }
 
 /**
- * The `example:` a free-text cell ghosts while it holds the focus: a `string`,
- * `plaintext` or `richtext` declaring no `default:`. Every other type takes none, and
- * so does a cell with a `default:`, whose ghost is the promise of what prints. The
- * caller asks only for an unset cell.
+ * A scalar `default:` as the text an unset control holds, where it prints: as
+ * declared, `undefined` for none, a blank or a non-scalar. A default of spaces prints
+ * nothing a reader sees, so a control holds none and draws its example instead.
+ */
+export function printedText(v: unknown): string | undefined {
+	const text = stringifyGhost(v);
+	return text?.trim() ? text : undefined;
+}
+
+/**
+ * A declared content literal as the `Content` it holds: a `richtext` one's markdown
+ * imported, a `plaintext` one's text taken literally, one paragraph whose later lines
+ * continue it, as the literal codec reads a stored one. What a cell's static
+ * `default:` stands in its leaf as, where no resolved row reaches it. `undefined` for
+ * a blank or a non-scalar.
+ */
+export function declaredContent(v: unknown, markdown: boolean): Content | undefined {
+	const text = printedText(v);
+	if (text === undefined) return undefined;
+	if (markdown) return core().importMarkdown(text);
+	return {
+		text,
+		lines: text
+			.split('\n')
+			.map((_, i) =>
+				i === 0
+					? { containers: [], kind: 'para' as const }
+					: { containers: [], kind: 'para' as const, continues: true }
+			),
+		marks: [],
+		islands: []
+	};
+}
+
+/**
+ * The `example:` an unset free-text cell ghosts: a `string`, `plaintext` or `richtext`
+ * whose `default:` prints nothing. Every other type takes none. A default that prints
+ * dominates, standing in the control as the value it is; a type-empty one, the
+ * skippable marker, prints nothing and leaves the example the only thing to draw.
  */
 export function exampleGhost(f: QuillFieldSchema): string | undefined {
 	const kind = controlKind(f);
-	if ((kind !== 'text' && kind !== 'prose') || f.default !== undefined) return undefined;
-	return declaredGhost(f.example, baseType(f) === 'richtext');
+	if (kind !== 'text' && kind !== 'prose') return undefined;
+	const markdown = baseType(f) === 'richtext';
+	if (declaredGhost(f.default, markdown) !== undefined) return undefined;
+	return declaredGhost(f.example, markdown);
 }
 
 /** Map a field schema to its control (precedence: prose › enum › text › …).

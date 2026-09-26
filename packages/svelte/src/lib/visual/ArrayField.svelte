@@ -45,6 +45,13 @@
  and of the values together, the mechanism insert and remove use, so an element keeps
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
+
+ An unset array whose `default:` holds elements draws them as its rows, at the default
+ rung (`data-default` on the rows' box), since they are what prints. The rows are the
+ declared literal rather than resolve's form, which completes a record against `items`:
+ every gesture — an edit in a row, Enter, a remove, a move, the add chip — commits the
+ whole array with the change in it, and a take writes only what the author declared.
+ Removing the last row commits `[]`, the empty answer.
 -->
 <script lang="ts">
 	import { wording } from './strings.js';
@@ -60,9 +67,11 @@
 		IdSeq,
 		baseType,
 		controlKind,
+		declaredContent,
 		humanize,
 		obliged,
 		rowSummary,
+		schemaAt,
 		type ArrayLayout
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
@@ -83,6 +92,8 @@
 
 	interface Props {
 		value: unknown[] | undefined;
+		/** The declared `default:`: the rows an unset array draws, which a gesture takes. */
+		fallback?: unknown[];
 		items: QuillFieldSchema | undefined;
 		/** How the elements draw: the record list, or the table an `array<object>` of
 		 * short cells asks for (`arrayLayout`). */
@@ -122,6 +133,7 @@
 	}
 	let {
 		value,
+		fallback,
 		items,
 		layout = 'list',
 		max,
@@ -143,7 +155,17 @@
 	const control = $derived(items ? controlKind(items) : 'text');
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
-	const arr = $derived((value ?? []) as unknown[]);
+	const defaulted = $derived(value == null && (fallback?.length ?? 0) > 0);
+	const arr = $derived((value ?? fallback ?? []) as unknown[]);
+	/** The rows' content read: the boundary's, or, while the rows are the default, the
+	 *  literal's own leaf at the codec its declared type names. */
+	function readAt(path: PathStep[]): Content | undefined {
+		if (!defaulted) return contentAt(path);
+		const leaf = schemaAt({ type: 'array', items }, path);
+		let v: unknown = arr;
+		for (const step of path) v = (v as Record<string | number, unknown> | undefined)?.[step];
+		return leaf ? declaredContent(v, baseType(leaf) === 'richtext') : undefined;
+	}
 	const atCap = $derived(max != null && arr.length >= max);
 	const routed = $derived(splitDeep(diagnostics));
 	const foot = $derived(
@@ -155,7 +177,7 @@
 	// an effect-only seed mounts every element editor in a second render.
 	const seq = new IdSeq();
 	// svelte-ignore state_referenced_locally
-	let ids = $state<string[]>(seq.take((value ?? []).length));
+	let ids = $state<string[]>(seq.take((value ?? fallback ?? []).length));
 	// Length reconcile (defend against an out-of-band length change);
 	// order is maintained by the mutators, not here.
 	$effect(() => {
@@ -444,14 +466,14 @@
 		if (v === undefined || v === '') return true;
 		return typeof v === 'object' && v !== null && 'text' in v && (v as Content).text === '';
 	}
-	/** Whether element `k` reads empty to the user. A text element's committed value
-	 * lags the input: a cleared field commits at `change`, not per keystroke
-	 * ({@link TextField}); so the input's own value is the truth. A prose element
-	 * commits every edit, so the committed `Content` is; an authored string, the
-	 * transport-door rest, is empty when it has no characters. A table's row is empty
-	 * when the cell under the caret is and so is every cell beside it — beside, because
-	 * the caret's own committed value is the one that lags, and counting it twice would
-	 * hold the row full until a blur. */
+	/** Whether element `k` reads empty to the user. A text element's input is the truth,
+	 * being the control the keystroke lands in. A prose element commits every edit, so
+	 * the committed `Content` is; an authored string, the transport-door rest, is empty
+	 * when it has no characters. A table's row is empty when the cell under the caret is
+	 * and so is every cell beside it, read off the row: a cell showing only its schema
+	 * default holds nothing written, as in a row just added. The caret's cell is read off
+	 * its control, which a default the cell holds unwritten leaves full while the
+	 * committed row has no key. */
 	function elementEmpty(k: number, target: EventTarget | null, column?: string): boolean {
 		if (control === 'prose') {
 			const el = arr[k];
@@ -556,7 +578,12 @@
 	<!-- Three lists, one per row shape, because `animate:` is granted only to a keyed
 	     each block's one child: a branch inside the block would stand between them. -->
 	{#if table}
-		<div class="qm-array-rows qm-array-table" class:empty={ids.length === 0} bind:this={rowsEl}>
+		<div
+			class="qm-array-rows qm-array-table"
+			class:empty={ids.length === 0}
+			data-default={defaulted ? '' : undefined}
+			bind:this={rowsEl}
+		>
 			<div class="qm-array-table-scroller" style:--table-cols={columns.length}>
 				<!-- The header names the columns, so a cell carries no label of its own: its
 				     accessible name is the row's and the column's composed (`ObjectField`). The
@@ -582,7 +609,7 @@
 							value={(arr[k] ?? {}) as Record<string, unknown>}
 							properties={items?.properties}
 							label={rowName(k)}
-							contentAt={(path) => contentAt([k, ...path])}
+							contentAt={(path) => readAt([k, ...path])}
 							onCommit={(obj) => commitElement(k, obj)}
 							onCellKey={(e, column) => onElementKey(e, k, column)}
 							diagnostics={routed.below.get(k)}
@@ -593,7 +620,12 @@
 			</div>
 		</div>
 	{:else if control === 'object'}
-		<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
+		<div
+			class="qm-array-rows"
+			class:empty={ids.length === 0}
+			data-default={defaulted ? '' : undefined}
+			bind:this={rowsEl}
+		>
 			{#each ids as id, k (id)}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<!-- The handler catches a key from the controls inside the row and adds no
@@ -637,7 +669,7 @@
 							properties={items?.properties}
 							label={rowName(k)}
 							idBase={idBase != null ? `${idBase}-e-${id}` : undefined}
-							contentAt={(path) => contentAt([k, ...path])}
+							contentAt={(path) => readAt([k, ...path])}
 							onCommit={(obj) => commitElement(k, obj)}
 							diagnostics={routed.below.get(k)}
 						/>
@@ -650,13 +682,18 @@
 			{/each}
 		</div>
 	{:else}
-		<div class="qm-array-rows" class:empty={ids.length === 0} bind:this={rowsEl}>
+		<div
+			class="qm-array-rows"
+			class:empty={ids.length === 0}
+			data-default={defaulted ? '' : undefined}
+			bind:this={rowsEl}
+		>
 			{#each ids as id, k (id)}
 				<div class="qm-array-row" bind:this={rowEls[id]}>
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
-							content={() => contentAt([k]) ?? emptyContent()}
+							content={() => readAt([k])}
 							plaintext={items != null && baseType(items) === 'plaintext'}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
@@ -761,6 +798,13 @@
 	}
 	.qm-array-rows.empty {
 		display: none;
+	}
+	/* The default's rows are what prints and nothing written: every value they draw takes
+	   the default rung (theme.css), and the first gesture, writing them, takes it off. */
+	.qm-array-rows[data-default] :global(:is(.qm-input, .ProseMirror, .qm-date)),
+	.qm-array-rows[data-default] :global(.qm-select:not([data-ghosted])),
+	.qm-array-rows[data-default] .qm-element-title:not(.untitled) {
+		color: var(--_qm-ink-default);
 	}
 	/* A grid rather than a block: an `<input>` is inline-level and would sit on a
 	 baseline, standing the row a descender taller than the box the slab measures itself

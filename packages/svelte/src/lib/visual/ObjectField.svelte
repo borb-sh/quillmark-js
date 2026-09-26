@@ -19,10 +19,10 @@
  An array element's properties hang a rung further in ({@link ArrayField}), the summary
  above them standing for the whole row.
 
- A property's ghosted `default:` is the static schema `sub.default`, not the
- resolved provenance the top-level ghosts read (FIELD_PROVENANCE): `resolve`
- carries no per-property row (an object field resolves as one row whose value is
- the whole object).
+ A property's `default:`, which an unset cell holds until an edit takes it, is the
+ static schema `sub.default`, not the resolved provenance a field reads
+ (FIELD_PROVENANCE): `resolve` carries no per-property row (an object field resolves
+ as one row whose value is the whole object).
 
  Every caller hands down `contentAt`, which is `reader.getContentAt` with the field
  already bound: a field-level subform passes the property key through untouched, a
@@ -34,18 +34,18 @@
 -->
 <script lang="ts">
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
-	import { emptyContent } from '../core/codec/index.js';
 	import {
 		arrayLayout,
 		baseType,
 		controlKind,
+		declaredContent,
 		exampleGhost,
 		humanize,
 		isContainer,
 		obliged,
 		optionalCell,
-		shortCell,
-		declaredGhost
+		printedText,
+		shortCell
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
@@ -129,17 +129,18 @@
 	const required = obliged;
 
 	const title = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
-	/** What an unset cell ghosts at rest, which is what it prints: its `default:`, or the
-	 *  `none` an optional cell prints. An answered cell ghosts nothing, an empty answer
-	 *  printing empty. */
-	const restGhost = (key: string, sub: QuillFieldSchema): string | undefined =>
-		obj[key] != null
-			? undefined
-			: (declaredGhost(sub.default, baseType(sub) === 'richtext') ??
-				(optionalCell(sub) ? t.strings.optionalGhost : undefined));
-	/** What an unset free-text cell ghosts while it holds the focus ({@link exampleGhost}). */
+	/** What an unset optional cell ghosts, which is what it prints: `none`. An answered
+	 *  cell ghosts nothing, an empty answer printing empty. */
+	const noneOf = (key: string, sub: QuillFieldSchema): string | undefined =>
+		obj[key] == null && optionalCell(sub) ? t.strings.optionalGhost : undefined;
+	/** What an unset free-text cell ghosts where nothing prints ({@link exampleGhost}). */
 	const exampleOf = (key: string, sub: QuillFieldSchema): string | undefined =>
 		obj[key] == null ? exampleGhost(sub) : undefined;
+	/** A scalar cell's `default:` as the text an unset cell holds, where it prints. */
+	const textDefault = (sub: QuillFieldSchema): string | undefined => printedText(sub.default);
+	/** A content cell's `default:` as the content an unset leaf holds, where it prints. */
+	const contentDefault = (sub: QuillFieldSchema): Content | undefined =>
+		declaredContent(sub.default, baseType(sub) === 'richtext');
 	/** The `aria-label` fallback, for a subform mounted without a field's id space:
 	 *  the field's name and the property's, since nothing else names the control. */
 	const fallbackName = (key: string, sub: QuillFieldSchema): string =>
@@ -315,7 +316,8 @@
 						describedBy={describes}
 						value={obj[key] as number | undefined}
 						integer={baseType(sub) === 'integer'}
-						placeholder={restGhost(key, sub)}
+						fallback={textDefault(sub)}
+						placeholder={noneOf(key, sub)}
 						onCommit={(v) => commitProp(key, v)}
 					/>
 				{:else if kind === 'boolean'}
@@ -343,7 +345,8 @@
 						id={ids?.control}
 						describedBy={describes}
 						value={obj[key] as string | undefined}
-						placeholder={restGhost(key, sub)}
+						fallback={textDefault(sub)}
+						placeholder={noneOf(key, sub)}
 						example={exampleOf(key, sub)}
 						onCommit={(v) => commitProp(key, v)}
 						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
@@ -353,9 +356,10 @@
 					     leaves the leaf mounted and the caret in it. -->
 					<ProseValue
 						bind:this={proseEls[key]}
-						content={() => contentAt([key]) ?? emptyContent()}
+						content={() => contentAt([key])}
+						fallback={contentDefault(sub)}
 						plaintext={baseType(sub) === 'plaintext'}
-						placeholder={restGhost(key, sub)}
+						placeholder={noneOf(key, sub)}
 						example={exampleOf(key, sub)}
 						{block}
 						label={named}
@@ -373,6 +377,7 @@
 					<ArrayField
 						bind:this={nestedEls[key]}
 						value={obj[key] as unknown[] | undefined}
+						fallback={Array.isArray(sub.default) ? sub.default : undefined}
 						items={sub.items}
 						layout={arrayLayout(sub)}
 						max={sub.max}

@@ -288,6 +288,44 @@ describe('createField over an ABSENT declared richtext field', () => {
 	});
 });
 
+describe('a default the leaf holds', () => {
+	const said = (text: string) => ({
+		text,
+		lines: [{ containers: [], kind: 'para' as const }],
+		marks: [],
+		islands: []
+	});
+
+	it('is held unwritten, re-seated by a new one, and taken whole by the first edit', () => {
+		const doc = template();
+		const field = createField({
+			doc,
+			quill: quill(),
+			addr: { field: 'colophon' },
+			container: mount(),
+			inline: true,
+			fallback: said('Old')
+		});
+		const view = viewOf(field);
+		expect(view.state.doc.textContent).toBe('Old');
+		expect(view.dom.hasAttribute('data-default')).toBe(true);
+
+		// A retype's new default re-seats the unset leaf, and writes nothing.
+		field.setFallback(said('New'));
+		expect(view.state.doc.textContent).toBe('New');
+		expect(doc.getStored('colophon')).toBeUndefined();
+
+		view.dispatch(view.state.tr.insertText('!', view.state.doc.content.size - 1));
+		expect((doc.getStored('colophon') as { text: string }).text).toBe('New!');
+		expect(view.dom.hasAttribute('data-default')).toBe(false);
+
+		// A written leaf keeps what it holds whatever default arrives.
+		field.setFallback(said('Other'));
+		expect(view.state.doc.textContent).toBe('New!');
+		field.destroy();
+	});
+});
+
 describe('a within-block hard break', () => {
 	it('lands in the store as a `continues` line, matching the optimistic PM', () => {
 		const doc = template();
