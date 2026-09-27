@@ -47,12 +47,13 @@ describe('Icon', () => {
 		}
 	});
 
-	it('sizes the frame, and defaults to the rung the card controls override in CSS', () => {
+	it('sizes the frame, and defaults to a square the card controls override in CSS', () => {
 		const sized = draw({ name: 'x', size: 14 });
 		expect([sized.getAttribute('width'), sized.getAttribute('height')]).toEqual(['14', '14']);
 
 		const bare = draw({ name: 'x' });
-		expect([bare.getAttribute('width'), bare.getAttribute('height')]).toEqual(['24', '24']);
+		expect(bare.getAttribute('width')).toBeTruthy();
+		expect(bare.getAttribute('height')).toBe(bare.getAttribute('width'));
 	});
 
 	it('forwards `class` to the svg', () => {

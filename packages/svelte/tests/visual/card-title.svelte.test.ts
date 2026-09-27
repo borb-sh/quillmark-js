@@ -5,26 +5,20 @@
 // The reference quill carries both shapes: `section` declares no `title` and is named
 // by its `heading`, `figure` declares one.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync, mount, unmount } from 'svelte';
-import { init, type Quill } from '@quillmark/wasm';
-import type { FieldController, LeafViews } from '$lib/core/codec';
-import type { EditorChange } from '$lib/visual';
+import { flushSync } from 'svelte';
 import { fieldValues, humanize } from '$lib/visual/structure';
-import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
-import { field, mountEditor, stubLayout, type, type Mounted } from '../helpers/surface.js';
-import { quill, template } from '../helpers/fixtures.js';
+import {
+	activeView,
+	field,
+	mountEditor,
+	mountInner,
+	press,
+	type,
+	unmountAll
+} from '../helpers/surface.svelte.js';
+import { quill, quillFromYaml, template } from '../helpers/fixtures.js';
 
-const core = await init();
-stubLayout();
-
-let mounted: Mounted | undefined;
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	mounted?.unmount();
-	mounted = undefined;
-	cleanup?.();
-	cleanup = undefined;
-});
+afterEach(unmountAll);
 
 const cards = (target: HTMLElement) => [
 	...target.querySelectorAll<HTMLElement>('.qm-card:not(.qm-main)')
@@ -40,7 +34,7 @@ describe('the card header', () => {
 		const q = quill();
 		const doc = template();
 		const kinds = doc.cards.map((c) => c.kind);
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const { target } = mounted;
 
 		expect(q.schema.card_kinds!.section.title).toBeUndefined();
@@ -55,9 +49,9 @@ describe('the card header', () => {
 
 	it('names a fresh card by its kind until its heading is typed, then follows it', () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, template());
 		const { target, editor } = mounted;
-		(editor as unknown as { insertCard(kind: string): string }).insertCard('section');
+		editor.insertCard('section');
 		flushSync();
 
 		const fresh = cards(target).at(-1)!;
@@ -68,7 +62,7 @@ describe('the card header', () => {
 
 	it('keeps a rename over whatever the heading says', () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, template());
 		const section = cards(mounted.target)[0];
 		const title = header(section);
 		title.value = 'Renamed';
@@ -82,10 +76,8 @@ describe('the card header', () => {
 describe('the add menu', () => {
 	it('names each kind by its title, else its humanized key', async () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
-		const trigger = [...mounted.target.querySelectorAll<HTMLElement>('.qm-add-btn')].at(-1)!;
-		trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-		flushSync();
+		const mounted = mountEditor(q, template());
+		press([...mounted.target.querySelectorAll<HTMLElement>('.qm-add-btn')].at(-1)!, 'ArrowDown');
 
 		const offered = [...document.querySelectorAll<HTMLElement>('.qm-menu-item')].map((el) =>
 			el.textContent?.trim()
@@ -98,10 +90,7 @@ describe('the add menu', () => {
 
 		// Closed and let settle inside the test: the open menu locks the body's scroll, and
 		// the primitive restores it on a timer that must not outlive the environment.
-		document
-			.querySelector('.qm-menu-item')!
-			.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-		flushSync();
+		press(document.querySelector<HTMLElement>('.qm-menu-item')!, 'Escape');
 		await new Promise((settled) => setTimeout(settled, 50));
 		expect(document.querySelector('.qm-menu-item')).toBeNull();
 	});
@@ -127,45 +116,17 @@ card_kinds:
         inline: true
 `;
 
-function personQuill(): Quill {
-	// This realm's `Uint8Array`: the boundary refuses another realm's by identity.
-	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
-	return core.Quill.fromTree(
-		new Map([
-			['Quill.yaml', bytes(PERSON)],
-			['plate.typ', bytes('#set page(width: 200pt)\n')]
-		])
-	);
-}
-
 describe('a header named by an inline prose field', () => {
 	it('follows the leaf’s commit, which re-derives nothing', async () => {
-		const q = personQuill();
+		const q = quillFromYaml(PERSON);
 		// A seed carries one card of each declared kind.
-		const doc = q.seedDocument();
-		const target = document.createElement('div');
-		document.body.appendChild(target);
-		const changes: EditorChange[] = [];
-		const app = mount(VisualEditorInner, {
-			target,
-			props: { doc, quill: q, onChange: (c: EditorChange) => changes.push(c) }
-		});
-		flushSync();
-		cleanup = () => {
-			void unmount(app);
-			target.remove();
-			doc.free();
-		};
-		const editor = app as unknown as {
-			focusField(field: string): Promise<void>;
-			getActiveLeaf(): FieldController | undefined;
-		};
+		const { target, editor, changes } = mountInner(q, q.seedDocument());
 		const titles = () =>
 			[...target.querySelectorAll<HTMLInputElement>('.qm-card-title')].map((i) => i.placeholder);
 		expect(titles()).toEqual([humanize('person')]);
 
 		await editor.focusField('cards.person[0].name');
-		const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+		const view = activeView(editor);
 		view.dispatch(view.state.tr.insertText('Jane Q. Roe', 1));
 		flushSync();
 

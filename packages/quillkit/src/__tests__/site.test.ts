@@ -80,6 +80,9 @@ describe('laying a site out', () => {
 		await expect(laySite({ collection: await temp.collection(), out, client })).rejects.toThrow(
 			/No client/
 		);
+		await expect(laySite({ collection: out, out, client: await stubClient() })).rejects.toThrow(
+			/Refusing to lay a site out/
+		);
 		expect(existsSync(join(out, 'keep.txt'))).toBe(true);
 	});
 });

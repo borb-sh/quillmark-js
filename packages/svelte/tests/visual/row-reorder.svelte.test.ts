@@ -7,7 +7,7 @@
 // for a row inside a row.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
-import { init, type Document, type Quill } from '@quillmark/wasm';
+import type { Document, Quill } from '@quillmark/wasm';
 import { quill, template } from '../helpers/fixtures.js';
 import {
 	field,
@@ -15,21 +15,12 @@ import {
 	openGroup,
 	press,
 	settle,
-	stubLayout,
 	summaries,
 	summaryTexts,
-	type Mounted
-} from '../helpers/surface.js';
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
-// The gate every mounted suite stands behind; the classes are reached off the fixture.
-await init();
-stubLayout();
-
-let mounted: Mounted | undefined;
-afterEach(() => {
-	mounted?.unmount();
-	mounted = undefined;
-});
+afterEach(unmountAll);
 
 function threeRows(q: Quill): Document {
 	const doc = template();
@@ -57,7 +48,7 @@ describe('reorder on an object row', () => {
 	it('moves the row by button, commits the order, and disables at the edges', async () => {
 		const q = quill();
 		const doc = threeRows(q);
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		expect(summaryTexts(arr)).toEqual(['A', 'B', 'C']);
 		expect(rowButton(arr, 0, 'Move up').disabled).toBe(true);
@@ -82,7 +73,7 @@ describe('reorder on an object row', () => {
 	it('hands the focus to the twin arrow when a move carries the pressed one to its edge', async () => {
 		const q = quill();
 		const doc = threeRows(q);
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 
 		const down = rowButton(arr, 1, 'Move down');
@@ -98,7 +89,7 @@ describe('reorder on an object row', () => {
 	it('leaves a key a cell already took to that cell', () => {
 		const q = quill();
 		const doc = threeRows(q);
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		summaries(arr)[1].click();
 		flushSync();
@@ -118,7 +109,7 @@ describe('reorder on an object row', () => {
 	it('moves the row by Alt+arrow from its summary, and keeps the open row open', async () => {
 		const q = quill();
 		const doc = threeRows(q);
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 
 		// Open the middle row, then move it up from its own summary.
@@ -149,7 +140,7 @@ describe('reorder on an object row', () => {
 	it("keeps the open row's subform mounted across its own move", () => {
 		const q = quill();
 		const doc = threeRows(q);
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		summaries(arr)[0].click();
 		flushSync();
@@ -166,7 +157,7 @@ describe('reorder on an object row', () => {
 	it('answers from the nearest row alone: a press in a nested row leaves the record around it', () => {
 		const q = quill();
 		const doc = template();
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		openGroup(mounted.target, 'Content');
 		const outer = field(mounted.target, 'Appendices');
 		summaries(outer)[0].click();
@@ -186,7 +177,7 @@ describe('reorder on an object row', () => {
 
 	it('offers no reorder on a scalar or prose row', () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, template());
 		// `authors` is `string[]` and `keywords` `richtext[]`: edit-in-place rows.
 		for (const name of ['Authors', 'Keywords']) {
 			openGroup(mounted.target, name === 'Authors' ? 'Who and what' : 'Content');

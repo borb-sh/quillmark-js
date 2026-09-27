@@ -5,22 +5,11 @@
 // reason a host can drive a recompile off `onChange` without recompiling on every
 // arrow key.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EditorView } from 'prosemirror-view';
 import { TextSelection } from 'prosemirror-state';
 import { createField } from '$lib/core/codec';
-import type { FieldController } from '$lib/core/codec';
 import type { Addr, Document } from '@quillmark/wasm';
 import type { EditorError } from '$lib/core';
-import { quill } from '../helpers/fixtures.js';
-
-function viewOf(f: FieldController): EditorView {
-	return (f as FieldController & { view: EditorView }).view;
-}
-function mount(): HTMLElement {
-	const el = document.createElement('div');
-	document.body.appendChild(el);
-	return el;
-}
+import { mount, quill, viewOf } from './_util.js';
 
 describe('the prose leaf change signal', () => {
 	let doc: Document;

@@ -4,11 +4,9 @@
 // assumed: the doc on that hook tells a consumer which fields to word a sentence
 // from, and it is only sound advice while these hold.
 import { describe, it, expect } from 'vitest';
-import { init, type Diagnostic } from '@quillmark/wasm';
-import { quill } from '../helpers/fixtures.js';
+import type { Diagnostic } from '@quillmark/wasm';
+import { core, quill } from '../helpers/fixtures.js';
 import { routeAndResolve } from '$lib/visual/diagnostics';
-
-const core = await init();
 
 describe('what a Diagnostic carries', () => {
 	it('hands the validation lane the offending value under `args`', () => {

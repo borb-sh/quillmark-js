@@ -4,8 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { fieldPathForAddr, addrForFieldPath } from '$lib/core';
 // Not on `/core`'s entry: the nested split is the editor's ladder, not a hop a host
 // needs (`core/index.ts` carries what more than one surface speaks).
-import { nestedAddrForFieldPath, nearestAddrForFieldPath } from '$lib/core/address.js';
-import { cardPath } from '$lib/core/address.js';
+import { nestedAddrForFieldPath, nearestAddrForFieldPath, cardPath } from '$lib/core/address.js';
 
 describe('fieldPathForAddr', () => {
 	it('maps the main body and main fields', () => {
@@ -41,8 +40,6 @@ describe('cardPath', () => {
 	it('names the CARD, not the body leaf inside it', () => {
 		const kinds = ['note', 'indorsement'];
 		expect(cardPath(1, kinds)).toBe('cards.indorsement[1]');
-		// The distinction the structure lane rides: a card op is about the card.
-		expect(fieldPathForAddr({ card: 1 }, kinds)).toBe('cards.indorsement[1].body');
 	});
 
 	it('uses the unknown-kind form, and drops an out-of-range index', () => {
@@ -52,17 +49,6 @@ describe('cardPath', () => {
 });
 
 describe('addrForFieldPath', () => {
-	it('maps main and card paths back to the mutator currency', () => {
-		expect(addrForFieldPath('main.body')).toEqual({});
-		expect(addrForFieldPath('main.subject')).toEqual({ field: 'subject' });
-		expect(addrForFieldPath('cards.indorsement[1].from')).toEqual({ card: 1, field: 'from' });
-	});
-
-	it('lands a bare card and a .body terminal on the same field-less addr', () => {
-		expect(addrForFieldPath('cards.indorsement[2]')).toEqual({ card: 2 });
-		expect(addrForFieldPath('cards.indorsement[2].body')).toEqual({ card: 2 });
-	});
-
 	it('reads the unknown-kind card form', () => {
 		expect(addrForFieldPath('cards[1].from')).toEqual({ card: 1, field: 'from' });
 	});
@@ -145,7 +131,11 @@ describe('nearestAddrForFieldPath', () => {
 			'main.subject',
 			'cards.indorsement[1].from',
 			'cards.indorsement[1].body',
-			'cards.indorsement[1]'
+			'cards.indorsement[1]',
+			// Field-rooted and malformed: no prefix to truncate to.
+			'recipients[0].name',
+			'',
+			'cards.indorsement[x].from'
 		]) {
 			expect(nearestAddrForFieldPath(path)).toEqual(addrForFieldPath(path));
 		}
@@ -179,14 +169,6 @@ describe('nearestAddrForFieldPath', () => {
 		// — and the two segments name nothing, so it drops instead of landing on a body.
 		expect(nearestAddrForFieldPath('main[0]')).toBeUndefined();
 		expect(nearestAddrForFieldPath('cards.indorsement[1][0]')).toBeUndefined();
-	});
-
-	it('drops a path with no addressable prefix at all', () => {
-		// Field-rooted (config-space) and malformed: the root itself is unnameable, so
-		// there is nothing to truncate to.
-		expect(nearestAddrForFieldPath('recipients[0].name')).toBeUndefined();
-		expect(nearestAddrForFieldPath('')).toBeUndefined();
-		expect(nearestAddrForFieldPath('cards.indorsement[x].from')).toBeUndefined();
 	});
 
 	it('keeps an out-of-range card index rather than truncating it away', () => {

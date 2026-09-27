@@ -1,48 +1,19 @@
 // @vitest-environment jsdom
-// The array element refs, from both ends of the one decision.
-//
-// `ArrayField` keeps its elements' focus handles in a record keyed by element id and
-// binds into it with `bind:this={els[id]}`. A plain object makes that a write Svelte
-// cannot track, and it says so once per element per render — thirteen lines on the
-// reference quill's first paint, in the console a consumer is reading to find its own
-// defects. The record is `$state`, so: nothing is logged.
-//
-// The other end is what `$state` costs. It proxies a plain object deeply, and what
-// goes in here is a component instance rather than a DOM node (the shape {@link Card}
-// keeps its refs in), so the handle a focus hop calls through is the proxy's. The
-// keyboard paths are driven here to prove `focus()` still lands: silence bought by
-// breaking the refs is the same defect one console line quieter.
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mount, unmount, flushSync, tick } from 'svelte';
-import { init, type Document, type Quill } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
+// The array element refs. `ArrayField` binds its elements' focus handles into a `$state`
+// record, which is what keeps a mount from logging an untracked write per element
+// (the mount `plaintext-array` asserts silent). `$state` proxies deeply, and what goes
+// in is a component instance, so the handle a focus hop calls through is the proxy's:
+// the keyboard paths prove `focus()` still lands through it.
+import { describe, it, expect, afterEach } from 'vitest';
 import { quill, template } from '../helpers/fixtures.js';
+import { mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
-const core = await init();
+afterEach(unmountAll);
 
 // The reference quill's `main.authors` is `string[]`, so its elements are `TextField`s:
 // the array control with a component instance behind each row. Located by the
-// accessible name each element carries (`${label} ${index + 1}`, ArrayField), the field
-// declaring no `title` so the label is `humanize('authors')`.
+// accessible name each element carries (`${label} ${index + 1}`, ArrayField).
 const ELEMENT_LABEL = 'Authors ';
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return target;
-}
 
 /** The array control's element inputs, in DOM order. */
 function inputs(target: HTMLElement): HTMLInputElement[] {
@@ -54,38 +25,10 @@ function inputs(target: HTMLElement): HTMLInputElement[] {
 	return found;
 }
 
-function press(el: HTMLElement, key: string): void {
-	el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-	flushSync();
-}
-
-/** Two ticks, not one: the focus hop awaits `span.resumes(tick())`, so it resumes one
- *  microtask deeper than the `tick()` a caller awaits, and a single await reads the
- *  list rebuilt with the caret not yet moved. */
-async function settle(): Promise<void> {
-	await tick();
-	await tick();
-}
-
 describe('array element refs', () => {
-	it('mounting over a document with array fields logs nothing', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-		try {
-			const q = quill();
-			mountEditor(q, template());
-			// The messages, not just the count: a failure here should name what it saw.
-			expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([]);
-			expect(error.mock.calls.map((c) => String(c[0]))).toEqual([]);
-		} finally {
-			warn.mockRestore();
-			error.mockRestore();
-		}
-	});
-
 	it('Enter inserts a sibling and takes focus there, through the proxied handle', async () => {
 		const q = quill();
-		const target = mountEditor(q, template());
+		const { target } = mountEditor(q, template());
 		const before = inputs(target).length;
 
 		press(inputs(target)[0], 'Enter');
@@ -100,7 +43,7 @@ describe('array element refs', () => {
 
 	it('Backspace on an empty element removes it and hands focus back up the list', async () => {
 		const q = quill();
-		const target = mountEditor(q, template());
+		const { target } = mountEditor(q, template());
 		press(inputs(target)[0], 'Enter');
 		await settle();
 		const grown = inputs(target).length;

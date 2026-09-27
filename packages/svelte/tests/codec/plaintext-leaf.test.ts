@@ -10,13 +10,11 @@
 // in nothing else. So the schema is built here and stays minimal: two content fields
 // differing only in declared type, which is the entire variable.
 import { describe, it, expect } from 'vitest';
-import { init, type Content, type Document, type Quill } from '@quillmark/wasm';
+import type { Content, Document } from '@quillmark/wasm';
 import { createField, hasMarks } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import { TextSelection } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
-
-const core = await init();
+import { core, mount, probeQuill, viewOf } from './_util.js';
 
 const QUILL_YAML = `
 quill:
@@ -40,25 +38,7 @@ main:
       example: markdown
 `;
 
-function probeQuill(): Quill {
-	// Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes
-	// from another realm and the boundary refuses it by identity.
-	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
-	return core.Quill.fromTree(
-		new Map([
-			['Quill.yaml', bytes(QUILL_YAML)],
-			['plate.typ', bytes('#set page(width: 200pt)\n')]
-		])
-	);
-}
-
-function mount(): HTMLElement {
-	const el = document.createElement('div');
-	document.body.appendChild(el);
-	return el;
-}
-const viewOf = (f: FieldController): EditorView =>
-	(f as FieldController & { view: EditorView }).view;
+const q = probeQuill(QUILL_YAML);
 
 const AUTHORED = 'Wing *Motto* Here';
 /** Both content fields authored with the same bytes, through the transport door so
@@ -81,7 +61,6 @@ const authored = (): Document =>
 
 describe('a plaintext leaf over an authored string', () => {
 	it('reads the bytes literally, while richtext reads the same bytes as markdown', () => {
-		const q = probeQuill();
 		const doc = authored();
 		expect(typeof doc.getStored('note')).toBe('string');
 
@@ -99,27 +78,11 @@ describe('a plaintext leaf over an authored string', () => {
 		doc.free();
 	});
 
-	it('mounts the literal text, asterisks intact', () => {
-		const q = probeQuill();
-		const doc = authored();
-		const field = createField({
-			doc,
-			quill: q,
-			addr: { field: 'note' },
-			container: mount(),
-			plaintext: true
-		});
-		expect(field.getContent().text).toBe(AUTHORED);
-		field.destroy();
-		doc.free();
-	});
-
 	it('commits the first edit CLEANLY, taking no recovery path', () => {
 		// The commit half. `applyChange` reads an authored string as markdown whatever the
 		// declared type, so a delta over the literal content would meet a shorter
 		// pre-image and be refused. The leaf takes no op path at all: it hands its text to
 		// the typed writer, which rests the field as the literal string.
-		const q = probeQuill();
 		const doc = authored();
 		const errors: string[] = [];
 		const field = createField({
@@ -158,7 +121,7 @@ describe('a plaintext leaf carries no marks', () => {
 	function plaintextField(doc: Document, onError?: (code: string) => void): FieldController {
 		return createField({
 			doc,
-			quill: probeQuill(),
+			quill: q,
 			addr: { field: 'note' },
 			container: mount(),
 			plaintext: true,

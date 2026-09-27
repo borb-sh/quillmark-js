@@ -8,66 +8,12 @@
 // `DocumentReader`, so the commit is judged by the writer's own conformance rather
 // than by a captured callback argument.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
+import { flushSync } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import { quill } from '../helpers/fixtures.js';
+import { field, mountEditor, summaries, type, unmountAll } from '../helpers/surface.svelte.js';
 
-// jsdom implements neither, and mounting the editor reaches both: the card
-// scroll hop and the flip the survivors run through.
-Element.prototype.scrollIntoView ??= () => {};
-Element.prototype.getAnimations ??= () => [];
-// The rects the subform's prose cell measures; jsdom implements neither.
-Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
-Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return target;
-}
-
-/** The field whose label reads `label`: the one locator that does not spend an id
- *  minted per editor instance (`fieldDomIds` keys off `$props.id()`). */
-function field(target: HTMLElement, label: string): HTMLElement {
-	const match = [...target.querySelectorAll<HTMLElement>('.qm-field')].find(
-		(f) => f.querySelector('.qm-field-label span')?.textContent === label
-	);
-	if (!match) throw new Error(`no field labelled ${label}`);
-	return match;
-}
-
-/** An array field carries no `.qm-field-label`; its label sits in the header row
- *  {@link ArrayField} builds beside the add affordance. */
-function arrayField(target: HTMLElement, label: string): HTMLElement {
-	const match = [...target.querySelectorAll<HTMLElement>('.qm-field')].find((f) =>
-		[...f.querySelectorAll('span')].some((s) => s.textContent === label)
-	);
-	if (!match) throw new Error(`no array field labelled ${label}`);
-	return match;
-}
-
-/** Type into a text/number input the way a pointer entry settles: `input` carries
- *  the keystroke, `change` the settle, and the two controls commit on different
- *  ones. */
-function type(input: HTMLInputElement, value: string): void {
-	input.value = value;
-	input.dispatchEvent(new Event('input', { bubbles: true }));
-	input.dispatchEvent(new Event('change', { bubbles: true }));
-	flushSync();
-}
+afterEach(unmountAll);
 
 const read = (q: Quill, doc: Document, name: string) => new DocumentReader(q, doc).get(name);
 
@@ -75,7 +21,7 @@ describe('a boolean field', () => {
 	it('commits the switch toggle, and toggles back off', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		const sw = field(target, 'Draft watermark').querySelector<HTMLElement>('[role="switch"]')!;
 		expect(sw.getAttribute('aria-checked')).toBe('false');
@@ -97,7 +43,7 @@ describe('an object field', () => {
 	it('commits the whole object on each property, keeping the properties beside it', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		const obj = field(target, 'Point of contact');
 		const props = [...obj.querySelectorAll<HTMLElement>('.qm-object-prop')];
@@ -131,7 +77,7 @@ describe('an object field', () => {
 	it('drops a cleared property rather than committing a hole', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		const props = [
 			...field(target, 'Point of contact').querySelectorAll<HTMLElement>('.qm-object-prop')
@@ -156,7 +102,7 @@ describe('an object field', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		q.writer(doc).set('contact', { name: 'Ada Lovelace', note: 'ask for *Ada*, not Augusta' });
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		const props = [
 			...field(target, 'Point of contact').querySelectorAll<HTMLElement>('.qm-object-prop')
@@ -181,11 +127,6 @@ describe('an object field', () => {
 });
 
 describe('an array of objects', () => {
-	/** A row's summary button, which is the element in collapsed form. */
-	const summaries = (arr: HTMLElement) => [
-		...arr.querySelectorAll<HTMLButtonElement>('.qm-element-summary')
-	];
-
 	/** A seeded document with `revisions` emptied. The fixture seeds one row so its plate
 	 *  has a nested row to region (PREVIEW.md §"Click bridge"); these three are about the
 	 *  array a hand fills from empty, so they clear it and drive the adds themselves. */
@@ -198,9 +139,9 @@ describe('an array of objects', () => {
 	it('adds an element open, and commits its cells through the subform', () => {
 		const q = quill();
 		const doc = emptied(q);
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
-		const arr = arrayField(target, 'Revisions');
+		const arr = field(target, 'Revisions');
 		arr.querySelector<HTMLButtonElement>('.qm-add-el')!.click();
 		flushSync();
 
@@ -226,9 +167,9 @@ describe('an array of objects', () => {
 	it('titles a collapsed row by its first string cell, and opens one at a time', () => {
 		const q = quill();
 		const doc = emptied(q);
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
-		const arr = arrayField(target, 'Revisions');
+		const arr = field(target, 'Revisions');
 		const add = arr.querySelector<HTMLButtonElement>('.qm-add-el')!;
 		add.click();
 		flushSync();
@@ -258,9 +199,9 @@ describe('an array of objects', () => {
 	it('drops the open row with its element, leaving no row opened in its place', () => {
 		const q = quill();
 		const doc = emptied(q);
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
-		const arr = arrayField(target, 'Revisions');
+		const arr = field(target, 'Revisions');
 		const add = arr.querySelector<HTMLButtonElement>('.qm-add-el')!;
 		add.click();
 		flushSync();

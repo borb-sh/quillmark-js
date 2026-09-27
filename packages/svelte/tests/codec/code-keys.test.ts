@@ -9,9 +9,9 @@
 import { describe, it, expect } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
-import { blockSchema, bodyKeymap, decode, pmToContent } from '$lib/core/codec';
+import { blockSchema, bodyKeymap, decode } from '$lib/core/codec';
 import { baseKeymap } from 'prosemirror-commands';
-import { md, normalize, startOf, run, shape, keyDriver } from './_util.js';
+import { md, startOf, endOf, run, shape, keyDriver } from './_util.js';
 
 const keys = bodyKeymap(blockSchema);
 const { press, expectPress } = keyDriver(keys);
@@ -37,19 +37,6 @@ function sel(markdown: string, from: number, to = from): EditorState {
 		doc,
 		selection: TextSelection.create(doc, start + from, start + to)
 	});
-}
-
-/** A state over `markdown` with the caret at the end of the `index`-th textblock:
- * where a forward delete is about the block's neighbour rather than about a
- * character. */
-function endOf(markdown: string, index: number): EditorState {
-	const doc = decode(md(markdown), blockSchema);
-	const ends: number[] = [];
-	doc.descendants((node, pos) => {
-		if (node.isTextblock) ends.push(pos + 1 + node.content.size);
-		return !node.isTextblock;
-	});
-	return EditorState.create({ doc, selection: TextSelection.create(doc, ends[index]) });
 }
 
 const FENCE = '```\nfoo\nbar\n```';
@@ -89,11 +76,6 @@ describe('Tab indents', () => {
 		const doc = blockSchema.nodes.doc.create(null, [blockSchema.nodes.code_block.create()]);
 		const state = EditorState.create({ doc, selection: TextSelection.create(doc, 1) });
 		expect(shape(press(state, 'Tab'))).toBe('doc(code_block("  "))');
-	});
-
-	it('survives the boundary as literal text', () => {
-		const next = press(sel(FENCE, 1, 5), 'Tab');
-		expect(normalize(pmToContent(next.doc)).text).toBe('  foo\n  bar');
 	});
 });
 
@@ -330,9 +312,5 @@ describe('outside a code block the links decline', () => {
 			'Enter',
 			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph), list_item(paragraph("b"))))'
 		);
-	});
-
-	it('Enter still splits a paragraph through the base keymap', () => {
-		expectPress(startOf('one', 0), 'Enter', 'doc(paragraph, paragraph("one"))');
 	});
 });

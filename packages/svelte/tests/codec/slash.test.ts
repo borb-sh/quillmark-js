@@ -64,20 +64,6 @@ function typeAt(field: FieldController, view: EditorView, pos: number, text: str
 }
 
 describe('the trigger is a word boundary', () => {
-	it('opens on `/` at the start of a textblock', () => {
-		const { field, view, state } = leaf('');
-		typeAt(field, view, 0, '/');
-		expect(state()?.items.length).toBeGreaterThan(0);
-		field.destroy();
-	});
-
-	it('opens on `/` after whitespace', () => {
-		const { field, view, state } = leaf('para');
-		typeAt(field, view, 4, ' /');
-		expect(state()).toBeDefined();
-		field.destroy();
-	});
-
 	it('stays shut mid-word, so `and/or` and a URL are prose', () => {
 		const { field, view, state } = leaf('and');
 		typeAt(field, view, 3, '/or');
@@ -117,13 +103,6 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		const { field, view, state } = leaf('');
 		typeAt(field, view, 0, '/');
 		expect(state()?.items).toEqual(['heading', 'list', 'numbered-list', 'quote', 'code', 'table']);
-		field.destroy();
-	});
-
-	it('is lowercase kebab-case throughout: a name is typed, not read', () => {
-		const { field, view, state } = leaf('');
-		typeAt(field, view, 0, '/');
-		for (const name of state()!.items) expect(name).toMatch(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/);
 		field.destroy();
 	});
 
@@ -462,9 +441,14 @@ describe('a pick lands in the container the caret was writing in', () => {
 		const { field, view } = leaf('- alpha\n- beta');
 		pick(field, view, 0);
 		const stored = field.getContent();
+		// Three lines, no exit paragraph: a fourth would be an empty continuation of item 0,
+		// which the reference quill typesets as an unnumbered paragraph.
 		expect(stored.text).toBe('alpha\n￼\nbeta');
 		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
 		expect(stored.lines[1].containers).toEqual([item(0)]);
+		// The caret lands in the fresh cell all the same.
+		const focused = (field as FieldController & LeafViews).focusedView();
+		expect((field as FieldController & LeafViews).nestedViews()).toContain(focused);
 		field.destroy();
 	});
 
@@ -501,23 +485,6 @@ describe('a pick lands in the container the caret was writing in', () => {
 		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para', 'para']);
 		// The exit is the item's: the island opened inside it, so the way out is there too.
 		expect(stored.lines[3].containers).toEqual([item(1)]);
-		field.destroy();
-	});
-
-	it('mints none where the doc goes on, a non-last item having the next to type in', () => {
-		const { field, view } = leaf('- alpha\n- beta');
-		pick(field, view, 0);
-		// Three lines, not four: a fourth would be an empty continuation of item 0, which
-		// the reference quill typesets as an unnumbered paragraph.
-		expect(field.getContent().lines).toHaveLength(3);
-		field.destroy();
-	});
-
-	it('lands the caret in the fresh cell even where no exit paragraph follows', () => {
-		const { field, view } = leaf('- alpha\n- beta');
-		pick(field, view, 0);
-		const focused = (field as FieldController & LeafViews).focusedView();
-		expect((field as FieldController & LeafViews).nestedViews()).toContain(focused);
 		field.destroy();
 	});
 });

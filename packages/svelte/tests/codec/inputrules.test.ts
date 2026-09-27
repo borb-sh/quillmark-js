@@ -27,104 +27,22 @@ function type(view: EditorView, text: string): void {
 	}
 }
 
-/** The first paragraph's text plus, per child, its text and mark names. */
-function inlineShape(view: EditorView): { text: string; runs: [string, string[]][] } {
-	const para = view.state.doc.child(0);
-	const runs: [string, string[]][] = [];
-	para.forEach((child) => {
-		runs.push([child.text ?? '', child.marks.map((m) => m.type.name)]);
-	});
-	return { text: para.textContent, runs };
-}
-
+// Mid-sentence, after a non-space char, after a char equal to the captured text, at
+// line start, and with a char typed after the closing delimiter.
 describe('mark input rules fire with exact positions', () => {
-	it('*em* mid-sentence keeps the char before the delimiter', () => {
+	it.each([
+		['word *em*', 'doc(paragraph("word ", em("em")))'],
+		['5*6*', 'doc(paragraph("5", em("6")))'],
+		['e*e*', 'doc(paragraph("e", em("e")))'],
+		['*em*', 'doc(paragraph(em("em")))'],
+		['a **b**', 'doc(paragraph("a ", strong("b")))'],
+		['x ~~y~~', 'doc(paragraph("x ", strike("y")))'],
+		['x `y`', 'doc(paragraph("x ", code("y")))'],
+		['a *b* c', 'doc(paragraph("a ", em("b"), " c"))']
+	])('%s', (typed, shape) => {
 		const view = mountView();
-		type(view, 'word *em*');
-		expect(inlineShape(view)).toEqual({
-			text: 'word em',
-			runs: [
-				['word ', []],
-				['em', ['em']]
-			]
-		});
-		view.destroy();
-	});
-
-	it('*em* directly after a non-space char (5*6*)', () => {
-		const view = mountView();
-		type(view, '5*6*');
-		expect(inlineShape(view)).toEqual({
-			text: '56',
-			runs: [
-				['5', []],
-				['6', ['em']]
-			]
-		});
-		view.destroy();
-	});
-
-	it('*em* whose prefix char equals the captured text (e*e*)', () => {
-		const view = mountView();
-		type(view, 'e*e*');
-		expect(inlineShape(view)).toEqual({
-			text: 'ee',
-			runs: [
-				['e', []],
-				['e', ['em']]
-			]
-		});
-		view.destroy();
-	});
-
-	it('*em* at line start', () => {
-		const view = mountView();
-		type(view, '*em*');
-		expect(inlineShape(view)).toEqual({ text: 'em', runs: [['em', ['em']]] });
-		view.destroy();
-	});
-
-	it('**strong** mid-sentence', () => {
-		const view = mountView();
-		type(view, 'a **b**');
-		expect(inlineShape(view)).toEqual({
-			text: 'a b',
-			runs: [
-				['a ', []],
-				['b', ['strong']]
-			]
-		});
-		view.destroy();
-	});
-
-	it('~~strike~~ and `code`', () => {
-		const view = mountView();
-		type(view, 'x ~~y~~');
-		expect(inlineShape(view).runs).toEqual([
-			['x ', []],
-			['y', ['strike']]
-		]);
-		view.destroy();
-		const view2 = mountView();
-		type(view2, 'x `y`');
-		expect(inlineShape(view2).runs).toEqual([
-			['x ', []],
-			['y', ['code']]
-		]);
-		view2.destroy();
-	});
-
-	it('the mark does not bleed into the next typed char', () => {
-		const view = mountView();
-		type(view, 'a *b* c');
-		expect(inlineShape(view)).toEqual({
-			text: 'a b c',
-			runs: [
-				['a ', []],
-				['b', ['em']],
-				[' c', []]
-			]
-		});
+		type(view, typed);
+		expect(view.state.doc.toString()).toBe(shape);
 		view.destroy();
 	});
 });

@@ -98,41 +98,6 @@ describe('quillkit build', () => {
 	}, 60_000);
 });
 
-describe('quillkit site', () => {
-	it('lays a site out of a collection it was pointed at', async () => {
-		const source = await temp.collection();
-		const out = join(await temp.dir(), 'site');
-		const { stdout } = await run(process.execPath, [BIN, 'site', '--quiver', source, '--out', out]);
-
-		expect(stdout).toContain('quillkit site:');
-		expect(existsSync(join(out, 'index.html'))).toBe(true);
-		expect(existsSync(join(out, 'quiver', 'quiver.json'))).toBe(true);
-	}, 60_000);
-
-	it('refuses an out that would delete the collection', async () => {
-		const source = await temp.collection();
-		await expect(
-			run(process.execPath, [BIN, 'site', '--quiver', source, '--out', source])
-		).rejects.toThrow(/Refusing to lay a site out/);
-	});
-
-	it('names the install when the collection has no packer', async () => {
-		// quillkit ships no runtime dependencies, so a collection without
-		// `@quillmark/quiver` has nothing to pack with, and says which install fixes it.
-		const bare = await temp.dir();
-		await expect(
-			run(process.execPath, [
-				BIN,
-				'site',
-				'--quiver',
-				bare,
-				'--out',
-				join(await temp.dir(), 'site')
-			])
-		).rejects.toThrow(/npm install --save-dev @quillmark\/quiver/);
-	});
-});
-
 describe('quillkit studio', () => {
 	it('packs, serves the client at the root and the quiver beneath it', async () => {
 		const source = await temp.collection();

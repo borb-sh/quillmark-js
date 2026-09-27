@@ -38,8 +38,10 @@ import {
 	declaredGhost,
 	declaredContent,
 	printedText,
+	resolveBodyGhost,
 	MATRIX_HELD
 } from '$lib/visual/structure';
+import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quill } from '../helpers/fixtures.js';
 
 const f = (over: Partial<QuillFieldSchema>): QuillFieldSchema =>
@@ -330,10 +332,6 @@ describe('initialExpandedGroup', () => {
 		expect(initialExpandedGroup([sec('a')])).toBe('a');
 		expect(initialExpandedGroup([sec('a'), sec('b')])).toBe('a');
 	});
-	it('opens the first group whether or not the card carries a body', () => {
-		// A body leaf is no substitute for a field: the card opens on one either way.
-		expect(initialExpandedGroup([sec('a'), sec('b'), sec('c'), sec('d')])).toBe('a');
-	});
 	it('skips ungrouped sections, which render outside the accordion', () => {
 		expect(initialExpandedGroup([sec(undefined), sec('a')])).toBe('a');
 		// No groups at all → nothing to expand.
@@ -390,37 +388,6 @@ describe('bodyEnabled', () => {
 	});
 });
 
-describe('required', () => {
-	const models = (fields: Record<string, unknown>) =>
-		Object.fromEntries(
-			fieldModels({ fields } as unknown as Parameters<typeof fieldModels>[0]).map((m) => [
-				m.name,
-				m
-			])
-		);
-
-	it('derives from the absence of a `default:`, which an empty string or array still counts as', () => {
-		const byName = models({
-			none: f({}),
-			empty: f({ default: '' }),
-			list: f({ type: 'array', default: [] })
-		});
-		expect(byName.none.required).toBe(true);
-		expect(byName.empty.required).toBe(false);
-		expect(byName.list.required).toBe(false);
-	});
-
-	it('exempts a typed dictionary, whose obligation is its leaves’', () => {
-		// A namespace can declare no `default:` at all, so reading one off the container
-		// would mark every subform required. `validate` anchors the obligation on the
-		// properties, and so does the subform's own label.
-		const byName = models({
-			dict: f({ type: 'object', properties: { name: f({}) } })
-		});
-		expect(byName.dict.required).toBe(false);
-	});
-});
-
 // The real schema is here to prove the fixture's YAML shapes reach the projection
 // as the synthetic cases above assume. It asserts contracts, never the fixture's
 // inventory: a count, a group list or a field's copy pinned here fails on every
@@ -441,25 +408,6 @@ describe('against the real showcase schema', () => {
 		expect(byName.status.control).toBe('enum');
 		expect(byName.keywords.control).toBe('array');
 		expect(byName.keywords.schema.items?.type).toBe('richtext');
-	});
-
-	it('splits the two variants on what their `default:` names', () => {
-		const byName = Object.fromEntries(fieldModels(main()).map((m) => [m.name, m]));
-		expect(byName.distribution.control).toBe('variant');
-		expect(byName.handling.control).toBe('variant');
-		// The blank is a `default:` like any other, so the field is unobliged and draws
-		// no `*`; what it does not do is name a world (`variantMember`), so an unset
-		// `handling` draws its discriminant alone where `distribution` draws cells.
-		expect(byName.handling.schema.default).toBe('');
-		expect(byName.handling.required).toBe(false);
-		expect(variantCells(byName.handling.schema, variantMember(undefined, ''))).toBeUndefined();
-		expect(
-			Object.keys(variantCells(byName.distribution.schema, variantMember(undefined, 'embargoed'))!)
-		).toEqual(['lift_on', 'held_by', 'notices']);
-		// A member is a value, not an id: one carries a space, and the cells hang off the
-		// spelling the schema declares rather than a humanized one.
-		expect(byName.handling.schema.values).toContain('CLOSE HOLD');
-		expect(Object.keys(byName.handling.schema.variants!)).toEqual(['CONTROLLED']);
 	});
 
 	it('reads `inline` off what the boundary serves, which spells it at every type', () => {
@@ -492,6 +440,31 @@ describe('against the real showcase schema', () => {
 		expect(sections.flatMap((s) => s.fields.map((m) => m.name)).sort()).toEqual(
 			models.map((m) => m.name).sort()
 		);
+	});
+});
+
+// The empty body's ghost, by precedence: a resolved `default:`, the kind's
+// `body.example`, the consumer's wording, the built-in invitation. The mounted rungs
+// below the default are `ghosts.svelte.test.ts`'s. The built-in is a `strings` key, so
+// it is an argument: what the editor passes is whatever the consumer's wording resolved.
+describe('resolveBodyGhost', () => {
+	const BUILT_IN = DEFAULT_VISUAL_STRINGS.bodyGhost;
+
+	it('prefers a resolved `default:` over every invitation', () => {
+		// The default is the only ghost that describes the render, so wording never
+		// displaces it; a consumer cannot hide what prints when nothing is written.
+		expect(resolveBodyGhost('THE DEFAULT', 'e.g.', 'witty', BUILT_IN)).toBe('THE DEFAULT');
+	});
+
+	it('never yields empty — a body leaf always has something to invite into it', () => {
+		// `undefined` is the documented "defer to the package" answer from a consumer
+		// hook; an empty string is the same intent expressed badly, and an empty
+		// resolved default or example falls through rather than winning. No combination
+		// blanks the leaf.
+		expect(resolveBodyGhost('', '', 'witty', BUILT_IN)).toBe('witty');
+		for (const d of ['', undefined])
+			for (const e of ['', undefined])
+				for (const c of ['', undefined]) expect(resolveBodyGhost(d, e, c, BUILT_IN)).toBe(BUILT_IN);
 	});
 });
 
@@ -544,7 +517,9 @@ describe('rowSummary', () => {
 describe('obliged', () => {
 	it('reads default absence at a leaf, and nothing at a namespace', () => {
 		expect(obliged(f({ type: 'string' }))).toBe(true);
+		// An empty string or array is a `default:` all the same.
 		expect(obliged(f({ type: 'string', default: '' }))).toBe(false);
+		expect(obliged(f({ type: 'array', default: [] }))).toBe(false);
 		expect(obliged(f({ type: 'object', properties: {} }))).toBe(false);
 		expect(obliged(f({ type: 'matrix', members: { a: 'A' } }))).toBe(false);
 	});

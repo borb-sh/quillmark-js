@@ -5,71 +5,13 @@
 // the public vocabulary — a `CardId` for a card, a `DocPath` for a place — so a host
 // drives them with what the hooks handed it.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync, tick } from 'svelte';
-import { init, type Document, type Quill } from '@quillmark/wasm';
-import type { EditorError } from '$lib/core';
-import type { ActiveLeaf, CardId, EditorChange } from '$lib/visual';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
+import { flushSync, tick } from 'svelte';
+import type { Document, Quill } from '@quillmark/wasm';
+import { addrForFieldPath } from '$lib/core';
 import { quill, template } from '../helpers/fixtures.js';
+import { caret, mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
-const core = await init();
-
-// jsdom implements none of these. The first two are a card operation's: the
-// insert/reorder scroll hop and the flip the removal runs the survivors through. The
-// rects are the caret's — a landing that carries an offset dispatches a scrolled
-// selection, and PM measures the caret to scroll to it.
-Element.prototype.scrollIntoView ??= () => {};
-Element.prototype.getAnimations ??= () => [];
-Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
-Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-
-/** The instance surface a host binds to. */
-interface EditorRef {
-	focusField(field: string): Promise<void>;
-	setCaret(at: { field: string; pos?: number; granularity?: string }): Promise<void>;
-	insertCard(kind: string, at?: number): CardId | undefined;
-	removeCard(cardId: CardId): void;
-	moveCard(cardId: CardId, dir: -1 | 1): void;
-	setKind(cardId: CardId, kind: string): void;
-}
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const changes: EditorChange[] = [];
-	const errors: EditorError[] = [];
-	const active: ActiveLeaf[] = [];
-	const app = mount(VisualEditor, {
-		target,
-		props: {
-			doc,
-			quill: q,
-			onChange: (c: EditorChange) => changes.push(c),
-			onError: (e: EditorError) => errors.push(e),
-			onActiveLeafChange: (a: ActiveLeaf) => active.push(a)
-		}
-	}) as unknown as EditorRef;
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return { target, editor: app, changes, errors, active };
-}
-
-/** Where the caret sits, as the DOM reports it: the text node it is in and its
- *  UTF-16 offset within that node. An array element registers no prose lane, so
- *  `onCaretMove` says nothing about one and the selection is the only witness. */
-const caret = () => {
-	const sel = window.getSelection();
-	return { text: sel?.anchorNode?.textContent, offset: sel?.anchorOffset };
-};
+afterEach(unmountAll);
 
 const slots = (target: HTMLElement) => [...target.querySelectorAll<HTMLElement>('.qm-card-slot')];
 const leafKeys = (slot: HTMLElement) =>
@@ -143,6 +85,99 @@ describe('the card verbs', () => {
 		const focused = document.activeElement;
 		expect(slots(target)[0].contains(focused)).toBe(true);
 		expect(focused?.closest('[data-leaf-key]')?.getAttribute('data-leaf-key')).toBe('c0:$body');
+	});
+});
+
+// A card's address does not survive a `moveCard` (`Addr` and `DocPath` are both
+// positional), so every card-naming payload carries the session `cardId` beside it
+// (VISUAL_EDITOR §"The address is the spine"): after a move the address a host captured
+// names the other card, and the key still names the one that moved. The id-keyed
+// commit-error map rides the same fact, so a refused write travels with its card.
+describe('a reorder through the card control', () => {
+	/**
+	 * Exactly two `section` cards, the smallest stack a reorder is visible in. `section`
+	 * carries the fixture's card-side `datetime` (`reviewed_at`), the one commit a mounted
+	 * control cannot satisfy: the date control emits `YYYY-MM-DD` whatever the declared
+	 * type, and a `datetime` coerces none (`edit::field_coercion_failed`).
+	 */
+	function twoSections(q: Quill): Document {
+		const doc = q.seedDocument();
+		for (let i = doc.cardCount - 1; i >= 0; i--) {
+			if (doc.card(i).kind !== 'section') doc.removeCard(i);
+		}
+		const card = q.seedCard('section', doc.seedOverlay('section'));
+		if (!card) throw new Error('fixture drift: the quill seeds no section card');
+		doc.insertCard(card, 1);
+		return doc;
+	}
+	/** Focus a card's body leaf where PM listens: on the view's own element, and focus
+	 *  does not bubble. */
+	function focusBody(slot: HTMLElement): void {
+		slot
+			.querySelector('[data-leaf-key$="$body"] .ProseMirror')!
+			.dispatchEvent(new FocusEvent('focus'));
+		flushSync();
+	}
+	function moveDown(slot: HTMLElement): void {
+		slot.querySelectorAll<HTMLButtonElement>('.qm-card-reorder button')[1].click();
+		flushSync();
+	}
+	const refusal = (slot: HTMLElement) => slot.querySelector<HTMLElement>('.qm-diag-line');
+
+	it('moves the key with the card and leaves the address behind', () => {
+		const q = quill();
+		const { target, changes, active } = mountEditor(q, twoSections(q));
+		expect(slots(target)).toHaveLength(2);
+
+		focusBody(slots(target)[0]);
+		const captured = active.at(-1)!;
+		expect(captured).toEqual({ field: 'cards.section[0].body', cardId: 'c0' });
+
+		moveDown(slots(target)[0]);
+		// The path names the card, not the body leaf inside it: a card op is about the card.
+		expect(changes.at(-1)).toEqual({ source: 'structure', cardId: 'c0', path: 'cards.section[1]' });
+
+		const after = slots(target);
+		const staleIndex = addrForFieldPath(captured.field)!.card!;
+		expect(leafKeys(after[staleIndex])).toContain('c1:$body');
+		expect(leafKeys(after[1])).toContain(`${captured.cardId}:$body`);
+	});
+
+	it('carries a refused commit with the card, not with the index', () => {
+		const q = quill();
+		const { target } = mountEditor(q, twoSections(q));
+
+		// One ArrowUp per segment completes the date, which the writer refuses.
+		for (const seg of slots(target)[0].querySelectorAll<HTMLElement>('[data-date-field-segment]'))
+			if (seg.getAttribute('data-segment') !== 'literal') press(seg, 'ArrowUp');
+		expect(refusal(slots(target)[0])?.textContent).toContain('could not be coerced');
+		expect(refusal(slots(target)[1])).toBeNull();
+
+		moveDown(slots(target)[0]);
+		const after = slots(target);
+		expect(refusal(after[0])).toBeNull();
+		expect(refusal(after[1])?.textContent).toContain('could not be coerced');
+		expect(leafKeys(after[1])).toContain('c0:$body');
+	});
+
+	// The post-mutation scroll is one per tick, on the terms of that tick's last mutation.
+	// An insert and a move of the same card are the pair a per-id handle cannot tell
+	// apart: two calls naming one id, one asking for `center` and one for `nearest`.
+	it('scrolls once for two mutations inside one tick, on the terms of the last', async () => {
+		const q = quill();
+		const { editor } = mountEditor(q, twoSections(q));
+		const trips: (ScrollIntoViewOptions | undefined)[] = [];
+		const scroll = Element.prototype.scrollIntoView;
+		Element.prototype.scrollIntoView = function (arg?: boolean | ScrollIntoViewOptions) {
+			trips.push(arg as ScrollIntoViewOptions);
+		};
+
+		const id = editor.insertCard('section', 1);
+		editor.moveCard(id!, -1);
+		await settle();
+
+		expect(trips.map((t) => t?.block)).toEqual(['nearest']);
+		Element.prototype.scrollIntoView = scroll;
 	});
 });
 

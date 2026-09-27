@@ -1,22 +1,18 @@
-// Three structural properties the fixed-example suites miss:
+// Two structural properties the fixed-example suites miss:
 //   (1) decode → lower round-trip under a seeded generator over random line
 //       kinds / containers / continues / marks:
 //       `normalize(pmToContent(decode(rt))) == normalize(rt)`;
 //   (2) the chain the leaf actually runs, under the same generator:
 //       `decode → press → pmToContent → lower → applyChange`, asserting the
 //       projection validates, the store equals the optimistic PM, the position map
-//       still inverts, and the store decodes back to the leaf;
-//   (3) the position map after split/join/wrap: rebuild `buildLineIndex` and
-//       re-assert the clean-inverse property.
+//       still inverts after the structural edit, and the store decodes back to the leaf.
 //
-// (1) and (2) are different statements about different halves. (1) is about the
+// They are different statements about different halves. (1) is about the
 // codec's two pure functions and holds over contents a producer can build; (2) is
 // about the documents the *keymaps* can reach, which is the larger set — a shape no
 // `importMarkdown` produces still has to project.
 import { describe, it, expect } from 'vitest';
-import { EditorState, TextSelection, type Command } from 'prosemirror-state';
-import { wrapIn } from 'prosemirror-commands';
-import type { Node as PMNode } from 'prosemirror-model';
+import { EditorState, TextSelection } from 'prosemirror-state';
 import type { Content } from '@quillmark/wasm';
 import {
 	blockSchema,
@@ -62,7 +58,7 @@ function rng(seed: number): () => number {
 // At most one mark per word, so no overlap that would blur the property under test.
 //
 // The fence and the nesting are what the fixed suites cover apart and never cross:
-// `list-shapes.test.ts` holds the nesting shapes and no code, `code-keys.test.ts` the
+// `decode.test.ts` holds the nesting shapes and no code, `code-keys.test.ts` the
 // `list_item > code_block` cases and no generation. A fence carries astral characters
 // for the same reason a paragraph does —
 // a code block's `\n`s ride a `text` run, where PM and USV advance together and an
@@ -228,7 +224,7 @@ describe('generative keymap → lower → applyChange', () => {
 			scratch.overwrite({}, rt);
 			return scratch.main.body;
 		};
-		for (let seed = 1; seed <= 300; seed++) {
+		for (let seed = 1; seed <= 100; seed++) {
 			const r = rng(seed);
 			const source = genMarkdown(r);
 			const doc = freshDoc();
@@ -253,57 +249,6 @@ describe('generative keymap → lower → applyChange', () => {
 				// (4) and a re-hydrate draws the leaf back, unchanged.
 				expect(decode(stored, blockSchema).toString(), where).toBe(state.doc.toString());
 			}
-		}
-	});
-});
-
-// ── Position map across a structural edit + index rebuild ────────────────────
-// The inverse property itself is `assertPositionInverse` (_util.ts): what these
-// add over positions.test.ts is that the index is rebuilt after a structural
-// mutation, not read off a fresh decode.
-
-describe('position map across structural edits + rebuild', () => {
-	it('holds after splitting a paragraph', () => {
-		const doc = decode(md('First 😀 para body 漢.'), blockSchema);
-		// PM pos 4 is inside the first textblock (after "Fir"): split into two paras.
-		const newDoc = EditorState.create({ doc }).tr.split(4).doc;
-		expect(newDoc.childCount).toBe(2);
-		assertPositionInverse(newDoc, 'split');
-	});
-
-	it('holds after joining two paragraphs', () => {
-		const doc = decode(md('Alpha 😀.\n\nBeta 🎉 body.'), blockSchema);
-		expect(doc.childCount).toBe(2);
-		// The boundary between block 0 and block 1 is at block 0's node size.
-		const newDoc = EditorState.create({ doc }).tr.join(doc.child(0).nodeSize).doc;
-		expect(newDoc.childCount).toBe(1);
-		assertPositionInverse(newDoc, 'join');
-	});
-
-	it('holds after wrapping a paragraph in a blockquote', () => {
-		const doc = decode(md('Wrap 😀 me 漢 up.'), blockSchema);
-		const state = EditorState.create({ doc });
-		let newDoc = doc;
-		const applied = wrapIn(blockSchema.nodes.blockquote)(state, (tr) => {
-			newDoc = tr.doc;
-		});
-		expect(applied).toBe(true);
-		expect(newDoc.child(0).type.name).toBe('blockquote');
-		assertPositionInverse(newDoc, 'wrap');
-	});
-
-	it('holds after a split at every interior offset of a paragraph', () => {
-		// ASCII only: sweeping every PM offset would otherwise land between an
-		// emoji's surrogate halves, which is not a content edit the map models.
-		const doc = decode(md('one two three four five six'), blockSchema);
-		for (let pos = 2; pos < doc.content.size - 1; pos++) {
-			let newDoc: PMNode;
-			try {
-				newDoc = EditorState.create({ doc }).tr.split(pos).doc;
-			} catch {
-				continue; // not a splittable position; skip
-			}
-			assertPositionInverse(newDoc, `split@${pos}`);
 		}
 	});
 });

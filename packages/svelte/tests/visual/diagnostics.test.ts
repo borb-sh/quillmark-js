@@ -54,10 +54,6 @@ describe('routeAndResolve', () => {
 		]);
 	});
 
-	it('drops warnings rather than routing them', () => {
-		expect(routeAndResolve([warn('w1', 'main.subject')], cardIds)).toEqual([]);
-	});
-
 	it('lands an error deeper than a commit address on the field that holds it', () => {
 		const out = routeAndResolve(
 			[
@@ -74,8 +70,10 @@ describe('routeAndResolve', () => {
 		]);
 	});
 
-	it('drops a nested WARNING, which the severity gate takes before any truncation', () => {
-		expect(routeAndResolve([warn('unfilled', 'main.contact.email')], cardIds)).toEqual([]);
+	it('drops warnings, nested ones included: the severity gate precedes any truncation', () => {
+		expect(
+			routeAndResolve([warn('w1', 'main.subject'), warn('unfilled', 'main.contact.email')], cardIds)
+		).toEqual([]);
 	});
 
 	it('drops rather than mis-routes: no path, an unplaceable path, an out-of-range card', () => {

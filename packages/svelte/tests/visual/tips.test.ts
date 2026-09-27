@@ -8,13 +8,11 @@
 // would keep passing while the shipped write regressed.
 import { describe, it, expect } from 'vitest';
 import { MAIN_CARD_ADDR, type Document } from '@quillmark/wasm';
-import { init } from '$lib/core';
 import { tipsChannel, renderTip } from '$lib/visual/tips.js';
 import { patchEditorExt } from '$lib/visual/ext.js';
-import { loadFixtureTree } from '../helpers/fixtures.js';
+import { core, quill as fixture } from '../helpers/fixtures.js';
 
-const core = await init();
-const quill = core.Quill.fromTree(loadFixtureTree());
+const quill = fixture();
 
 /** The `editor` namespace as the Document holds it. */
 function editorExt(doc: Document, addr = MAIN_CARD_ADDR): Record<string, unknown> {

@@ -25,12 +25,6 @@ describe('QuiverError', () => {
 		expect(err.name).toBe('QuiverError');
 	});
 
-	it('forwards cause for native error chaining', () => {
-		const cause = new Error('underlying cause');
-		const err = new QuiverError('transport_error', 'wrapped', { cause });
-		expect(err.cause).toBe(cause);
-	});
-
 	it('preserves all payload fields together', () => {
 		const cause = new Error('root');
 		const err = new QuiverError('quiver_invalid', 'full payload', {

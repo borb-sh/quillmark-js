@@ -9,69 +9,23 @@
 // which the typed writer rests as the literal string again — the claim that lets a
 // `plaintext` element mount the same prose leaf its scalar field does.
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mount, unmount, flushSync, tick } from 'svelte';
-import { init, DocumentReader, type Quill, type Document } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
-import { quill, template } from '../helpers/fixtures.js';
+import { flushSync, tick } from 'svelte';
+import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
+import { core, quill, template } from '../helpers/fixtures.js';
+import { field, mountEditor, press, unmountAll } from '../helpers/surface.svelte.js';
 
-const core = await init();
+afterEach(unmountAll);
 
-// jsdom implements none of these: the first two are the mount's, the rects are the
-// caret rect PM measures to scroll a landing into view.
-Element.prototype.scrollIntoView ??= () => {};
-Element.prototype.getAnimations ??= () => [];
-Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
-Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-/** The landing verb this suite drives; the rest of the instance surface is
- *  `verbs.svelte.test.ts`'s. */
-interface EditorRef {
-	setCaret(at: { field: string; pos?: number; granularity?: string }): Promise<void>;
-}
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q } });
+/** The element leaves labelled `label`, in DOM order, located by the accessible name
+ *  each carries (`${label} ${index + 1}`, ArrayField). */
+const leaves = (target: HTMLElement, label: string): HTMLElement[] => [
+	...target.querySelectorAll<HTMLElement>(`.ProseMirror[aria-label^="${label} "]`)
+];
+const rows = (target: HTMLElement) => leaves(target, 'Errata');
+const add = (target: HTMLElement) => {
+	field(target, 'Errata').querySelector<HTMLButtonElement>('.qm-add-el')!.click();
 	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return { target, editor: app as unknown as EditorRef };
-}
-
-const ELEMENT_LABEL = 'Errata ';
-
-/** The array control itself: the quill declares several, and the add affordance
- *  sits inside each one's own header row. */
-function arrayControl(target: HTMLElement): HTMLElement {
-	const match = [...target.querySelectorAll<HTMLElement>('.qm-array')].find((a) =>
-		[...a.querySelectorAll('span')].some((s) => s.textContent === 'Errata')
-	);
-	if (!match) throw new Error('no array field labelled Errata');
-	return match;
-}
-
-/** The array's element leaves, in DOM order, located by the accessible name each
- *  carries (`${label} ${index + 1}`, ArrayField). */
-function rows(target: HTMLElement): HTMLElement[] {
-	return [...target.querySelectorAll<HTMLElement>(`.ProseMirror[aria-label^="${ELEMENT_LABEL}"]`)];
-}
-
-/** A key at a row, the way the browser delivers one: the leaf registers a real
- *  `keydown` listener (`handleDOMEvents`), which is where the repeater's own
- *  Enter/Backspace contract hangs. */
-function press(el: HTMLElement, key: string): void {
-	el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-	flushSync();
-}
+};
 
 const read = (q: Quill, doc: Document, name: string) => new DocumentReader(q, doc).get(name);
 
@@ -88,7 +42,7 @@ describe('an array of plaintext', () => {
 			expect(seeded.every((e) => typeof e === 'string')).toBe(true);
 			expect(seeded.length).toBeGreaterThan(1);
 
-			const { target } = mountEditor(q, doc);
+			const { target, errors } = mountEditor(q, doc);
 			expect(rows(target).map((r) => r.textContent)).toEqual(seeded);
 			// The type distinction, on screen: the seed's `**asterisks**` are characters
 			// in the row, and no emphasis was lowered from them.
@@ -97,6 +51,7 @@ describe('an array of plaintext', () => {
 			// The messages, not just the count: a failure here should name what it saw.
 			expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([]);
 			expect(error.mock.calls.map((c) => String(c[0]))).toEqual([]);
+			expect(errors).toEqual([]);
 		} finally {
 			warn.mockRestore();
 			error.mockRestore();
@@ -109,8 +64,7 @@ describe('an array of plaintext', () => {
 		const { target } = mountEditor(q, doc);
 
 		const seeded = doc.getStored('errata') as string[];
-		arrayControl(target).querySelector<HTMLButtonElement>('.qm-add-el')!.click();
-		flushSync();
+		add(target);
 		expect(rows(target)).toHaveLength(seeded.length + 1);
 		expect(rows(target).at(-1)!.textContent).toBe('');
 
@@ -124,8 +78,8 @@ describe('an array of plaintext', () => {
 	// The other half of that write, without the row: what a prose leaf hands up for
 	// an edited element is a `Content`, and the typed writer is what turns it back
 	// into the element's rest form. jsdom implements no contenteditable, so the
-	// keystroke that produces one cannot be driven here (`loaded-richtext-array`
-	// stops at the same wall); the writer's half is where the claim lives anyway.
+	// keystroke that produces one cannot be driven here; the writer's half is where the
+	// claim lives anyway.
 	it('rests an edited element as its literal string', () => {
 		const q = quill();
 		const doc = template();
@@ -145,8 +99,7 @@ describe('an array of plaintext', () => {
 		expect(rows(target)).toHaveLength(seeded.length);
 
 		// An added row is the empty one, and it goes.
-		arrayControl(target).querySelector<HTMLButtonElement>('.qm-add-el')!.click();
-		flushSync();
+		add(target);
 		press(rows(target).at(-1)!, 'Backspace');
 		expect(rows(target).map((r) => r.textContent)).toEqual(seeded);
 		expect(read(q, doc, 'errata')).toEqual(seeded);
@@ -184,5 +137,33 @@ describe('an array of plaintext', () => {
 		expect(sel?.anchorNode?.textContent).toBe('astral \u{1D518} tail here');
 		expect(sel?.anchorOffset).toBe(10);
 		expect(rows(target)).toHaveLength(1);
+	});
+});
+
+// The `richtext` twin, on a document through the transport door (`Document.fromMarkdown`):
+// its elements rest as authored strings, the scalar field's rest form, and the row reads
+// one at the codec the declared type names, so the emphasis is lowered by the boundary
+// rather than by the row.
+describe('an array of richtext loaded from markdown', () => {
+	it('mounts authored-string elements as prose rows, with emphasis lowered', () => {
+		const doc = core.Document.fromMarkdown(`~~~
+$quill: showcase@1.0.0
+$kind: main
+title: Probe
+keywords:
+  - Dominion Fleet Intelligence, 2504, *Char Orbital Reconnaissance Summary*
+  - Raynor's Raiders Field Report, 2504, *Zerg Hive Cluster Activity on Char*
+~~~
+
+Body.
+`);
+		expect((doc.getStored('keywords') as unknown[]).every((e) => typeof e === 'string')).toBe(true);
+
+		const text = leaves(mountEditor(quill(), doc).target, 'Keywords').map((el) => el.textContent);
+		expect(text).toEqual([
+			'Dominion Fleet Intelligence, 2504, Char Orbital Reconnaissance Summary',
+			"Raynor's Raiders Field Report, 2504, Zerg Hive Cluster Activity on Char"
+		]);
+		expect(text.some((t) => t?.includes('*'))).toBe(false);
 	});
 });

@@ -23,30 +23,20 @@ function reContent(rt: Content): Content {
 	return normalize(pmToContent(decode(rt, blockSchema)));
 }
 
+// The shapes the generated corpus (`roundtrip.test.ts`) does not reach: lists nested
+// three deep, the marks it never writes, an overlap, and the fixture's own content.
 describe('decode idempotence (up to normalization)', () => {
-	const cases: Record<string, Content> = {
-		twoParas: md('First para.\n\nSecond para.'),
-		heading: md('# Title\n\nBody text with a tail.'),
-		bulletList: md('- one\n- two\n- three'),
-		nestedList: md('- outer\n    - inner1\n    - inner2'),
-		orderedList: md('1. first\n2. second\n3. third'),
-		blockquote: md('> quoted line\n\nafter the quote'),
-		nestedQuoteList: md('> - quoted bullet'),
-		codeFence: md('```js\nconst x = 1;\nconst y = 2;\n```'),
-		hardBreak: md('line one\\\nline two'),
-		marks: md('normal **bold** *italic* `code` [link](http://x)'),
-		overlap: md('**bold _both_ italic**'),
-		strike: md('~~struck~~ and plain'),
-		underline: md('<u>underlined</u> text'),
-		astral: md('emoji 😀 and 漢字 **bold 🎉**'),
-		realTitle: titleContent(),
-		realBody: bodyContent()
-	};
-	for (const [name, rt] of Object.entries(cases)) {
-		it(name, () => {
-			expect(contentEqual(reContent(rt), normalize(rt)), name).toBe(true);
-		});
-	}
+	it.each([
+		['threeLevelBullet', md('- a\n    - b\n        - c')],
+		['deepMixed', md('1. one\n    - bullet\n        1. deep\n2. two')],
+		['overlap', md('**bold _both_ italic**')],
+		['strike', md('~~struck~~ and plain')],
+		['underline', md('<u>underlined</u> text')],
+		['realTitle', titleContent()],
+		['realBody', bodyContent()]
+	])('%s', (_, rt) => {
+		expect(contentEqual(reContent(rt), normalize(rt))).toBe(true);
+	});
 });
 
 describe('overlapping formatting → correct inline node splits', () => {
@@ -203,21 +193,6 @@ describe('adjacent sibling containers (the `instance` boundary)', () => {
 		marks: [],
 		islands: []
 	};
-
-	it('decodes a second list `instance` as a NEW list, not a merged one', () => {
-		const doc = decode(twoLists, blockSchema);
-		expect(doc.childCount).toBe(2);
-		expect(doc.child(0).type.name).toBe('bullet_list');
-		expect(doc.child(0).childCount).toBe(2);
-		expect(doc.child(1).type.name).toBe('bullet_list');
-		expect(doc.child(1).childCount).toBe(1);
-	});
-
-	it('decodes a second quote `instance` as a NEW blockquote', () => {
-		const doc = decode(twoQuotes, blockSchema);
-		expect(doc.childCount).toBe(2);
-		expect(doc.children.map((n) => n.type.name)).toEqual(['blockquote', 'blockquote']);
-	});
 
 	it('round-trips through the content (the exit-criterion shape)', () => {
 		// The normalizer keeps the discriminator, so a merged decode would re-encode

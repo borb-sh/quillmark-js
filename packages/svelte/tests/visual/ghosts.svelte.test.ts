@@ -2,9 +2,10 @@
 // What an empty field shows, drawn (VISUAL_EDITOR §"The commitment ladder"). A default
 // that prints is the value an unset control holds, at the default rung, and an edit
 // takes it. Where nothing prints, a control draws words: the `none` an optional cell
-// prints, worded `strings.optionalGhost`, and a free-text field's `example:`, at rest
-// and in `None`'s stead on focus. An empty body ghosts its kind's `body.example` ahead
-// of the consumer's wording.
+// prints, worded `strings.optionalGhost`, an enum's blank, worded `ui.blank_title`, and
+// a free-text field's `example:`, at rest and in `None`'s stead on focus. An empty body
+// ghosts its kind's `body.example` ahead of the consumer's wording, the `bodyPlaceholder`
+// hook asked once per card with nothing kept between asks.
 //
 // On its own quill, one cell per case, so no case leans on what the reference quill
 // happens to declare. A prose leaf's focus is its view's (`ProseMirror-focused`, which
@@ -12,16 +13,24 @@
 // draws from; an input's is its own `placeholder`. A commit is read back through
 // `resolve`, whose rung says whether anything was written.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync, mount, unmount } from 'svelte';
-import { init, type Document, type Quill, type ResolvedField } from '@quillmark/wasm';
-import type { FieldController, LeafViews } from '$lib/core/codec';
+import { flushSync } from 'svelte';
+import type { Document, Quill, ResolvedField } from '@quillmark/wasm';
+import type { BodyPlaceholderContext } from '$lib/visual/structure';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
-import TextField from '$lib/visual/TextField.svelte';
-import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
-import { field, mountEditor, press, stubLayout, type, type Mounted } from '../helpers/surface.js';
+import { quillFromYaml } from '../helpers/fixtures.js';
+import {
+	activeView,
+	field,
+	mountEditor,
+	mountInner,
+	openList,
+	press,
+	trigger,
+	type,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
-const core = await init();
-stubLayout();
+afterEach(unmountAll);
 
 const NONE = DEFAULT_VISUAL_STRINGS.optionalGhost;
 
@@ -75,6 +84,8 @@ main:
       type: enum
       values: [low, high]
       default: ""
+      ui:
+        blank_title: (no marking)
     dated:
       type: date
       default: 2026-01-15
@@ -155,34 +166,19 @@ card_kinds:
         type: string
 `;
 
-// This realm's `Uint8Array`: under jsdom the encoder's output comes from another realm
-// and the boundary refuses it by identity.
-const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
-const ghosts = (): Quill =>
-	core.Quill.fromTree(
-		new Map([
-			['Quill.yaml', bytes(QUILL_YAML)],
-			['plate.typ', bytes('#set page(width: 200pt)\n')]
-		])
-	);
-
-let mounted: Mounted | undefined;
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	mounted?.unmount();
-	mounted = undefined;
-	cleanup?.();
-	cleanup = undefined;
-});
-
 let q: Quill;
 let doc: Document;
 /** A seed, every field unset and every body empty, or the document `md` spells. */
 function open(extra: Record<string, unknown> = {}, md?: string): HTMLElement {
-	q = ghosts();
+	q = quillFromYaml(QUILL_YAML);
 	doc = md == null ? q.seedDocument() : q.parse(md);
-	mounted = mountEditor(q, doc, extra);
-	return mounted.target;
+	return mountEditor(q, doc, extra).target;
+}
+/** A seed mounted at `VisualEditorInner`, whose leaves an edit is dispatched into. */
+function openInner() {
+	q = quillFromYaml(QUILL_YAML);
+	doc = q.seedDocument();
+	return mountInner(q, doc);
 }
 
 /** A main-card field's resolved row: its value and the rung that supplied it. */
@@ -195,25 +191,6 @@ const row = (name: string): ResolvedField =>
 /** A document answering the given main-card lines. */
 const answering = (...lines: string[]) =>
 	['~~~', '$quill: ghosts@1.0.0', '$kind: main', ...lines, '~~~', ''].join('\n');
-
-interface InnerRef {
-	focusField(field: string): Promise<void>;
-	getActiveLeaf(): FieldController | undefined;
-}
-
-/** Mounted at `VisualEditorInner`, which holds `getActiveLeaf`: jsdom drives no
- *  contenteditable, so an edit is a transaction dispatched into the leaf's own view. */
-function openInner(d: Document): { target: HTMLElement; editor: InnerRef } {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditorInner, { target, props: { doc: d, quill: q } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return { target, editor: app as unknown as InnerRef };
-}
 
 const input = (scope: HTMLElement): HTMLInputElement => scope.querySelector('input')!;
 const inputs = (scope: HTMLElement): HTMLInputElement[] => [...scope.querySelectorAll('input')];
@@ -235,30 +212,6 @@ describe('the example ghost', () => {
 		heading.focus();
 		flushSync();
 		expect(heading.placeholder).toBe('Findings');
-	});
-
-	it('stands in for the placeholder while the input holds the focus', () => {
-		// The control alone, its value held unset, so what moves the ghost is the focus
-		// and not a commit that re-derives the field.
-		const target = document.createElement('div');
-		document.body.appendChild(target);
-		const app = mount(TextField, {
-			target,
-			props: { value: undefined, placeholder: 'At rest', example: 'Findings', onCommit: () => {} }
-		});
-		cleanup = () => {
-			void unmount(app);
-			target.remove();
-		};
-		flushSync();
-		const el = input(target);
-		expect(el.placeholder).toBe('At rest');
-		el.focus();
-		flushSync();
-		expect(el.placeholder).toBe('Findings');
-		el.blur();
-		flushSync();
-		expect(el.placeholder).toBe('At rest');
 	});
 
 	it('gives way to a `default:` that prints, which the control holds as its text', () => {
@@ -390,20 +343,17 @@ describe('a default that prints', () => {
 	});
 
 	it('holds a prose leaf’s content, which its first edit writes whole', async () => {
-		q = ghosts();
-		doc = q.seedDocument();
-		const { target, editor } = openInner(doc);
+		const { target, editor } = openInner();
 		const motto = field(target, 'Motto');
 		expect(editable(motto).hasAttribute('data-default')).toBe(true);
 
 		await editor.focusField('main.motto');
-		const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+		const view = activeView(editor);
 		view.dispatch(view.state.tr.insertText('!', view.state.doc.content.size - 1));
 		flushSync();
 
 		expect(q.reader(doc).get('motto')).toBe('*Always* be testing.!');
 		expect(editable(motto).hasAttribute('data-default')).toBe(false);
-		doc.free();
 	});
 
 	it('takes a subform cell’s own `default:`, and writes that cell alone', () => {
@@ -417,11 +367,26 @@ describe('a default that prints', () => {
 
 	it('draws an enum’s default member at the default rung, and a blank as a word', () => {
 		const target = open();
-		const tone = field(target, 'Tone').querySelector<HTMLElement>('.qm-select')!;
+		const tone = trigger(field(target, 'Tone'));
 		expect(tone.textContent?.trim()).toBe('high');
 		expect(tone.dataset.ghosted).toBe('default');
-		const marking = field(target, 'Marking').querySelector<HTMLElement>('.qm-select')!;
+		// The word is the quill's `ui.blank_title`, and the list offers no member row for
+		// it: the one row it heads is the unset sentinel's.
+		const marking = trigger(field(target, 'Marking'));
 		expect(marking.dataset.ghosted).toBe('');
+		expect(marking.textContent?.trim()).toBe('(no marking)');
+		openList(marking);
+		expect(
+			[...document.querySelectorAll<HTMLElement>('.qm-select-item')].map(
+				(r) => r.querySelector('.qm-select-ghost')?.textContent ?? r.textContent?.trim()
+			)
+		).toEqual(['(no marking)', 'low', 'high']);
+	});
+
+	it('words a stored blank by its `ui.blank_title` too, unghosted', () => {
+		const marking = trigger(field(open({}, answering('marking: ""')), 'Marking'));
+		expect(marking.textContent?.trim()).toBe('(no marking)');
+		expect(marking.hasAttribute('data-ghosted')).toBe(false);
 	});
 
 	/** The date field's segments, by part. */
@@ -531,7 +496,7 @@ describe('an optional cell', () => {
 		expect(input(size).getAttribute('inputmode')).toBe('numeric');
 		expect(input(size).placeholder).toBe(NONE);
 
-		const level = field(target, 'Level').querySelector<HTMLElement>('.qm-select')!;
+		const level = trigger(field(target, 'Level'));
 		expect(level.textContent?.trim()).toBe(NONE);
 		expect(level.hasAttribute('data-ghosted')).toBe(true);
 
@@ -560,13 +525,11 @@ describe('an optional cell', () => {
 	});
 
 	it('drops `None` from a prose leaf at its first edit, which answers it', async () => {
-		q = ghosts();
-		doc = q.seedDocument();
-		const { target, editor } = openInner(doc);
+		const { target, editor } = openInner();
 		expect(leafGhost(field(target, 'Aside'))?.dataset.placeholder).toBe(NONE);
 
 		await editor.focusField('main.aside');
-		const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+		const view = activeView(editor);
 		view.dispatch(view.state.tr.insertText('x', 1));
 		view.dispatch(view.state.tr.delete(1, 2));
 		flushSync();
@@ -574,7 +537,6 @@ describe('an optional cell', () => {
 		// Emptied, the leaf holds an empty answer, and the boundary says so.
 		expect(row('aside').source).toBe('authored');
 		expect(leafGhost(field(target, 'Aside'))).toBeNull();
-		doc.free();
 	});
 
 	it('draws an unset `boolean?` as a third state, and a press answers it', () => {
@@ -603,10 +565,19 @@ describe('the empty body', () => {
 			(el) => el.dataset.placeholder ?? ''
 		);
 
-	it('ghosts its kind’s `body.example` ahead of the consumer’s wording', () => {
-		const target = open({ strings: { bodyPlaceholder: () => 'Consumer…' } });
-		// Main declares an example and the card's kind declares none.
-		expect(bodies(target)).toEqual(["The main body's own example.", 'Consumer…']);
+	it('ghosts its kind’s `body.example` ahead of the consumer’s wording, asked per card', () => {
+		const seen: BodyPlaceholderContext[] = [];
+		const bodyPlaceholder = (ctx: BodyPlaceholderContext) => {
+			seen.push(ctx);
+			return `Write ${ctx.cardId}…`;
+		};
+		const entry = ['~~~', '$kind: entry', '~~~', ''].join('\n');
+		const target = open({ strings: { bodyPlaceholder } }, `${answering()}\n${entry}\n${entry}`);
+		// Main declares an example and `entry` declares none. The hook carries each card
+		// and keeps nothing between asks, so two cards of one kind can read two ways.
+		expect(bodies(target)).toEqual(["The main body's own example.", 'Write c0…', 'Write c1…']);
+		// Main is asked all the same, naming itself.
+		expect(seen.some((s) => s.cardId === 'main' && s.kind === 'main' && s.isMain)).toBe(true);
 	});
 
 	it('falls to the built-in where neither answers', () => {
@@ -618,18 +589,15 @@ describe('the empty body', () => {
 	});
 
 	it('ghosts nothing once edited back to empty', async () => {
-		q = ghosts();
-		doc = q.seedDocument();
-		const { target, editor } = openInner(doc);
+		const { target, editor } = openInner();
 
 		await editor.focusField('main.body');
-		const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+		const view = activeView(editor);
 		view.dispatch(view.state.tr.insertText('x', 1));
 		view.dispatch(view.state.tr.delete(1, 2));
 		flushSync();
 
 		expect(doc.main.body.text).toBe('');
 		expect(bodies(target)).toEqual([DEFAULT_VISUAL_STRINGS.bodyGhost]);
-		doc.free();
 	});
 });
