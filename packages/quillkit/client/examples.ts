@@ -3,6 +3,28 @@
 import type { Diagnostic, Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import { diagnosticsOf } from './notes';
 
+/** A preference and not a document, so it outlives the tab where nothing the document
+ *  holds does. Absent is on. */
+const KEY = 'quillkit.studio.examples';
+
+/** Whether a seed is filled. Storage a private window refuses reads as on. */
+export function examplesOn(): boolean {
+	try {
+		return localStorage.getItem(KEY) !== 'off';
+	} catch {
+		return true;
+	}
+}
+
+export function sayExamples(on: boolean): void {
+	try {
+		if (on) localStorage.removeItem(KEY);
+		else localStorage.setItem(KEY, 'off');
+	} catch {
+		// Held for this tab alone.
+	}
+}
+
 /** A read throws on a stored value its codec cannot decode, which is still an answer. */
 function answered(read: () => unknown): boolean {
 	try {

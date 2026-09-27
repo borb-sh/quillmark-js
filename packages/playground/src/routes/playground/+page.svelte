@@ -52,11 +52,11 @@
   the document out as a file, and the strip says what it cost or what refused it.
 
   Which quill is a control, since the answer changes what both surfaces are: picking
-  tears the shell down and stands it back up. `fill-examples` writes the schema's
-  `example:`s onto every unanswered field and stands the shell back up over the
-  result. The seed variants are query flags with no chrome, read once per open, for
-  the branches a quill on disk reaches none of (PLAYGROUND §"Which quill, and what is
-  seeded into it").
+  tears the shell down and stands it back up. `examples` is whether an open writes the
+  schema's `example:`s onto every unanswered field, said in the URL as `?examples=off`
+  where it does not. The seed variants are query flags with no chrome, read once per
+  open, for the branches a quill on disk reaches none of (PLAYGROUND §"Which quill, and
+  what is seeded into it").
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -132,6 +132,10 @@
 	let lastError = $state('none');
 	let lastEmit = $state('none');
 	let lastFill = $state('none');
+
+	// Whether an open fills. Read off the URL once and written back to it, so a link
+	// reproduces the page it was copied from.
+	let examples = $state(true);
 
 	// Every readout above names something in the document that is going, and the
 	// injected stand-in names a field the next quill need not have.
@@ -286,15 +290,26 @@
 		syncDiagnostics();
 	}
 
-	// The examples land on the document the editor holds, which it does not re-read, so the
-	// shell stands back up over the result as a pick does, carrying it.
-	async function fill(): Promise<void> {
-		if (!quillHandle || !docHandle) return;
-		const { filled, refused } = fillExamples(quillHandle, docHandle);
-		if (filled) await open(fixture, docHandle.toMarkdown());
-		lastFill = refused.length
+	function sayFill({ filled, refused }: ReturnType<typeof fillExamples>): string {
+		return refused.length
 			? `${filled} filled, refused: ${refused.map((d) => d.message).join('; ')}`
 			: `${filled} filled`;
+	}
+
+	// On, the examples land on the document the editor holds, which it does not re-read, so
+	// the shell stands back up over the result as a pick does, carrying it. Off, the open
+	// starts over, since a written example is an answer like any other.
+	async function toggleExamples(): Promise<void> {
+		examples = !examples;
+		const url = new URL(window.location.href);
+		if (examples) url.searchParams.delete('examples');
+		else url.searchParams.set('examples', 'off');
+		window.history.replaceState(window.history.state, '', url);
+		if (!examples) return open(fixture);
+		if (!quillHandle || !docHandle) return;
+		const fill = fillExamples(quillHandle, docHandle);
+		if (fill.filled) await open(fixture, docHandle.toMarkdown());
+		lastFill = sayFill(fill);
 	}
 
 	/**
@@ -370,6 +385,7 @@
 					]
 				});
 			}
+			const filled = carry === undefined && examples ? sayFill(fillExamples(quill, doc)) : 'none';
 			const engine = new Engine();
 			// Always free: it answers off the backend descriptor without loading the binary
 			// or cloning the quill.
@@ -396,6 +412,7 @@
 			quillHandle = quill;
 			docHandle = doc;
 			syncDiagnostics();
+			lastFill = filled;
 			toFree = created;
 			status = { phase: 'ready' };
 		} catch (e) {
@@ -413,6 +430,7 @@
 	}
 
 	onMount(() => {
+		examples = new URLSearchParams(window.location.search).get('examples') !== 'off';
 		void open(fixture);
 		return () => {
 			// Bumped rather than flagged: it is the same guard an open in flight already
@@ -541,9 +559,10 @@
 				<button
 					class="qm-control"
 					type="button"
-					data-testid="fill-examples"
-					disabled={opening || !docHandle}
-					onclick={fill}>Fill examples</button
+					data-testid="examples"
+					disabled={opening}
+					aria-pressed={examples}
+					onclick={toggleExamples}>Examples</button
 				>
 				<button
 					class="qm-control"

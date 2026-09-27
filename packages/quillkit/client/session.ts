@@ -10,6 +10,7 @@ import type {
 	Quill
 } from '@quillmark/wasm';
 import type { Quiver } from '@quillmark/quiver';
+import { fillExamples } from './examples';
 import { diagnosticsOf, messageOf } from './notes';
 
 /** How the document got here, and what the landing cost. */
@@ -19,8 +20,8 @@ export interface Carry {
 	 *  `reseeded`: the previous document was refused, so the seed stands in. */
 	how: 'seeded' | 'carried' | 'reseeded';
 	/** The `conform::*` diagnostics for the values the schema in hand will not take,
-	 *  or the one refusal that dropped the document. Empty for a seed, and the point
-	 *  of the surface rather than an error to swallow. */
+	 *  or the one refusal that dropped the document, and on a filled seed the examples
+	 *  the writer refused. The point of the surface rather than an error to swallow. */
 	stranded: Diagnostic[];
 }
 
@@ -43,7 +44,8 @@ export interface Opened {
 
 /**
  * Open `ref` from `quiver`, over `carry`: the canonical markdown of the document the
- * surfaces were holding, or `undefined` to seed a fresh document.
+ * surfaces were holding, or `undefined` to seed a fresh document, its unanswered fields
+ * written from their `example:`s where `examples` holds.
  *
  * Carrying is what makes a repack an edit to the quill rather than a reset of the
  * work: a plate-only change lands the same document verbatim, an additive schema
@@ -59,7 +61,8 @@ export async function openRef(
 	engine: Engine,
 	quiver: Quiver,
 	ref: string,
-	carry?: string
+	carry: string | undefined,
+	examples: boolean
 ): Promise<Opened> {
 	// Borrowed: `getQuill` caches one quill per canonical ref and hands it to every
 	// caller for the quiver's lifetime, so studio holds it and frees nothing (QUIVER
@@ -83,7 +86,10 @@ export async function openRef(
 			landed = { how: 'reseeded', stranded: [{ severity: 'warning', message: messageOf(err) }] };
 		}
 	}
-	doc ??= quill.seedDocument();
+	if (!doc) {
+		doc = quill.seedDocument();
+		if (examples) landed.stranded.push(...fillExamples(quill, doc).refused);
+	}
 
 	return { ref, quill, formats, doc, ...(await openSession(engine, quill, doc)), carry: landed };
 }

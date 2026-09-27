@@ -66,13 +66,15 @@ Studio draws with `@quillmark/svelte/preset`, the same import a third-party cons
 
 ## The document is the blueprint's
 
-Studio holds one document and it starts as the schema's own: `seedDocument()`, one card per kind with every field absent and every body empty, each rendering its `default:` or its blank. Nothing of studio's outlives the tab — no file it is read from at boot, none it writes, no store it reseeds from.
+Studio holds one document and it starts as the schema's own: `seedDocument()`, one card per kind with every field absent and every body empty, each rendering its `default:` or its blank, and then, while **Examples** is on, each unanswered top-level field answered with its `example:`. No document of studio's outlives the tab — no file it is read from at boot, none it writes, no store it reseeds from.
 
-**Reload is the reseed.** A boot seeds, and the carry keeps a running session on the document in hand, so a `default:` edited mid-session does not appear on a field the document holds until the page reloads. F5 is the whole of that verb, and it costs a keystroke rather than a control.
+**Reload is the reseed.** A boot seeds, and the carry keeps a running session on the document in hand, so a `default:` or `example:` edited mid-session does not appear on a field the document holds until the page reloads. F5 is the whole of that verb, and it costs a keystroke rather than a control.
 
-**What that costs, and the press that pays it.** The failures that only a long list or a wrapping value reveal are invisible to `quillkit test`, which renders the seed and so a document with no answer in it. **Fill examples** in the head writes each unanswered top-level field's `example:` as its answer, on the main card and every composable card, and lands the document through the carry an import takes. A field already answered keeps its answer, so a press after an edit fills around it.
+**What the blank hides, and the toggle that shows it.** The failures that only a long list or a wrapping value reveal are invisible to `quillkit test`, which renders the seed and so a document with no answer in it. **Examples** in the head is on until the author turns it off: a seed takes each unanswered top-level field's `example:` as its answer, on the main card and every composable card, over a `default:` too, since the page worth judging is the fullest one. Turned on mid-session it fills around what the document holds and lands it through the carry an import takes. Turned off it reseeds: a written example is an answer like any other, and nothing tells it from one the author typed. A carry is never filled, so a repack or an import lands as it stands.
 
-An example nested under `items` or `properties` is not written: it illustrates one cell, and writing it would mint the row or the container it sits in, a value no declaration holds. The press is the author's and the boot stays the seed, since what a new document is like to use is the first thing a reader sees.
+An example nested under `items` or `properties` is not written: it illustrates one cell, and writing it would mint the row or the container it sits in, a value no declaration holds. Off is the other half of the page — the ghosts and the defaults an unanswered field shows — which is why it is a toggle rather than the boot.
+
+**The toggle outlives the tab, and the document does not.** It stands in the browser's storage, one key, absent being on. Which way an author judges a quill is their habit across every quill and every launch: a URL param would go with each `quillkit studio`, and a link to a studio on the author's own machine has no reader to carry it to. It holds no document, so what the tab rule protects holds: nothing stale lands on a field. Storage a private window refuses reads as on.
 
 ## The document has doors
 

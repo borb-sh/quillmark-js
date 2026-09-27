@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio opens with a quill's examples filled.** **Examples** in the head is a toggle, on until turned off, and the browser remembers which. On, a seed takes each unanswered top-level field's `example:` as its answer, a field with a `default:` included; turned on mid-session it fills around the document in hand. Off reseeds, discarding what the document holds. A repack or an import lands as it stands, unfilled.
+
 ## v0.10.0 - 2026-09-27
 
 **Studio fills a quill's examples on a press.** **Fill examples** in the head writes each unanswered top-level field's `example:` as its answer, on the main card and every composable card, so a page is judged with answers in it without typing them. A field already answered keeps its value, and an example nested under an array's `items` or an object's `properties` is not written. A document still opens as the seed.
