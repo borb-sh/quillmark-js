@@ -70,7 +70,9 @@ Studio holds one document and it starts as the schema's own: `seedDocument()`, o
 
 **Reload is the reseed.** A boot seeds, and the carry keeps a running session on the document in hand, so a `default:` edited mid-session does not appear on a field the document holds until the page reloads. F5 is the whole of that verb, and it costs a keystroke rather than a control.
 
-**What that costs.** The failures that only a long list, a wrapping value or an empty optional reveal are invisible here, and to `quillkit test` with it: neither renders a document with an answer in it. The seed is the blank, so a filled field's page is judged by typing the value into the form.
+**What that costs, and the press that pays it.** The failures that only a long list or a wrapping value reveal are invisible to `quillkit test`, which renders the seed and so a document with no answer in it. **Fill examples** in the head writes each unanswered top-level field's `example:` as its answer, on the main card and every composable card, and lands the document through the carry an import takes. A field already answered keeps its answer, so a press after an edit fills around it.
+
+An example nested under `items` or `properties` is not written: it illustrates one cell, and writing it would mint the row or the container it sits in, a value no declaration holds. The press is the author's and the boot stays the seed, since what a new document is like to use is the first thing a reader sees.
 
 ## The document has doors
 

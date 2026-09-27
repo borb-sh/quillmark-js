@@ -1,0 +1,52 @@
+// The schema's `example:`s written as answers, for a quill author judging a page the
+// blank seed cannot show them (STUDIO §"The document is the blueprint's").
+import type { Diagnostic, Document, Quill, QuillCardSchema } from '@quillmark/wasm';
+import { diagnosticsOf } from './notes';
+
+/**
+ * Write each unanswered top-level field's `example:` onto `doc`, on the main card and
+ * every composable card, through the typed writer. Returns how many landed and what
+ * refused, so an example the writer will not take is said rather than dropped.
+ */
+export function fillExamples(
+	quill: Quill,
+	doc: Document
+): { filled: number; refused: Diagnostic[] } {
+	const { main, card_kinds } = quill.schema;
+	const reader = quill.reader(doc);
+	const writer = quill.writer(doc);
+	let filled = 0;
+	const refused: Diagnostic[] = [];
+
+	const fill = (
+		schema: QuillCardSchema | undefined,
+		get: (name: string) => unknown,
+		set: (name: string, value: unknown) => void
+	): void => {
+		for (const [name, field] of Object.entries(schema?.fields ?? {})) {
+			if (field.example === undefined || get(name) != null) continue;
+			try {
+				set(name, field.example);
+				filled++;
+			} catch (err) {
+				refused.push(...diagnosticsOf(err));
+			}
+		}
+	};
+
+	fill(
+		main,
+		(n) => reader.get(n),
+		(n, v) => writer.set(n, v)
+	);
+	for (let i = 0; i < doc.cardCount; i++) {
+		const card = reader.card(i);
+		const at = writer.card(i);
+		fill(
+			card_kinds?.[card.kind],
+			(n) => card.get(n),
+			(n, v) => at.set(n, v)
+		);
+	}
+	return { filled, refused };
+}
