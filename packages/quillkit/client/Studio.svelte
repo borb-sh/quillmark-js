@@ -28,8 +28,8 @@
   makes an edit to a schema an edit to the thing the author is holding.
 
   Studio stores nothing, so a boot is a seed and a reload is the reseed: the carry is
-  what keeps an edited `example:` out of a running session, and F5 is what puts it back
-  (STUDIO §"The document is the blueprint's"). What outlives a boot is which quill, and
+  what keeps an edited `default:` off a field the document holds, and F5 is what puts it
+  back (STUDIO §"The document is the blueprint's"). What outlives a boot is which quill, and
   it stands in the URL rather than in a store: a link names a quill, and a reload keeps
   it while still reseeding the document (`link.ts`).
 -->
@@ -46,6 +46,7 @@
 	import Picker from './Picker.svelte';
 	import Markdown from './Markdown.svelte';
 	import { save } from './save';
+	import { fillExamples } from './examples';
 	import { askedRef, sayRef } from './link';
 	import { catalogOf, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
@@ -240,6 +241,27 @@
 		return undefined;
 	}
 
+	// ── The examples ────────────────────────────────────────────────────────────
+	/**
+	 * Write the schema's `example:`s onto every unanswered field, then land the document
+	 * through the carry as an import is, so the editor remounts on what was written. A
+	 * press with nothing left to fill moves nothing. An example the writer refused is
+	 * stranded beside what the carry stranded, and goes with it at the next edit.
+	 */
+	async function fill(): Promise<void> {
+		const at = open;
+		if (!at) return;
+		const { filled, refused } = fillExamples(at.quill, at.doc);
+		if (filled) {
+			repacked = false;
+			await mount(at.ref, at.doc.toMarkdown());
+		}
+		if (refused.length) {
+			carried = [...carried, ...refused];
+			syncNotes();
+		}
+	}
+
 	// ── The file ────────────────────────────────────────────────────────────────
 	/** Whether the quill on screen writes a document as one file, which is what `pdf` is
 	 *  and the raster formats are not (one artifact per page). Latched from the open rather
@@ -274,7 +296,7 @@
 	}
 
 	/** A pick is a different document, so nothing crosses: the picked quill seeds its
-	 *  own example, which is what "what is this quill like to use" starts from. */
+	 *  own blank, which is what "what is this quill like to use" starts from. */
 	async function pick(name: string, version: string): Promise<void> {
 		picked = { name, version };
 		held = undefined;
@@ -482,6 +504,13 @@
 		{#if catalog}
 			<Picker {catalog} {picked} disabled={busy} onPick={pick} />
 		{/if}
+		<button
+			class="qm-control"
+			type="button"
+			data-testid="fill-examples"
+			disabled={!open}
+			onclick={fill}>Fill examples</button
+		>
 		<!-- The document's two doors (STUDIO §"Opened, not stood on"). The source goes both
 		     ways through the panel; the file goes one way and needs none, so the press is
 		     the whole of it. -->

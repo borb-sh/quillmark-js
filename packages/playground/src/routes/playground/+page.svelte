@@ -52,9 +52,11 @@
   the document out as a file, and the strip says what it cost or what refused it.
 
   Which quill is a control, since the answer changes what both surfaces are: picking
-  tears the shell down and stands it back up. The seed variants are query flags with
-  no chrome, read once per open, for the branches a quill on disk reaches none of
-  (PLAYGROUND §"Which quill, and what is seeded into it").
+  tears the shell down and stands it back up. `fill-examples` writes the schema's
+  `example:`s onto every unanswered field and stands the shell back up over the
+  result. The seed variants are query flags with no chrome, read once per open, for
+  the branches a quill on disk reaches none of (PLAYGROUND §"Which quill, and what is
+  seeded into it").
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -71,6 +73,7 @@
 	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
 	import { Preview } from '@quillmark/svelte/preview';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree, loadTemplate } from '../fixture';
+	import { fillExamples } from '../examples';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -128,6 +131,7 @@
 	let lastChangeSource = $state('none');
 	let lastError = $state('none');
 	let lastEmit = $state('none');
+	let lastFill = $state('none');
 
 	// Every readout above names something in the document that is going, and the
 	// injected stand-in names a field the next quill need not have.
@@ -139,6 +143,7 @@
 		lastChangeSource = 'none';
 		lastError = 'none';
 		lastEmit = 'none';
+		lastFill = 'none';
 		injected = [];
 		syncDiagnostics();
 	}
@@ -281,15 +286,27 @@
 		syncDiagnostics();
 	}
 
+	// The examples land on the document the editor holds, which it does not re-read, so the
+	// shell stands back up over the result as a pick does, carrying it.
+	async function fill(): Promise<void> {
+		if (!quillHandle || !docHandle) return;
+		const { filled, refused } = fillExamples(quillHandle, docHandle);
+		if (filled) await open(fixture, docHandle.toMarkdown());
+		lastFill = refused.length
+			? `${filled} filled, refused: ${refused.map((d) => d.message).join('; ')}`
+			: `${filled} filled`;
+	}
+
 	/**
 	 * Tear the shell down and stand it back up over `name`, so one session is live at a
-	 * time.
+	 * time. `carry` is the document to stand it over in place of the template, and takes
+	 * no seed variant: it already holds whatever the open it came from applied.
 	 *
 	 * The surfaces come down before their handles do: the ready phase is what mounts
 	 * them, so a loading phase and a flush is the teardown. The handles go before the
 	 * next open allocates.
 	 */
-	async function open(name: string): Promise<void> {
+	async function open(name: string, carry?: string): Promise<void> {
 		const mine = ++generation;
 		opening = true;
 		status = { phase: 'loading' };
@@ -329,7 +346,7 @@
 			const params = new URLSearchParams(window.location.search);
 			// Chrome rather than a seed, so it rides no document and outlives a pick.
 			stats = params.has('stats');
-			const [tree, md] = await Promise.all([loadFixtureTree(name), loadTemplate(name)]);
+			const [tree, md] = await Promise.all([loadFixtureTree(name), carry ?? loadTemplate(name)]);
 			const quill = Quill.fromTree(tree);
 			created.unshift(quill);
 			const doc = md == null ? quill.seedDocument() : quill.parse(md);
@@ -341,10 +358,10 @@
 			// `?tips` seeds the guidance channel a quill or consumer supplies
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
 			// does not replace the map.
-			if (params.has('foreign')) {
+			if (carry === undefined && params.has('foreign')) {
 				doc.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
 			}
-			if (params.has('tips')) {
+			if (carry === undefined && params.has('tips')) {
 				visual.patchEditorExt(doc, MAIN_CARD_ADDR, {
 					tips: [
 						'Press **Tab** to move on.',
@@ -470,6 +487,12 @@
 				></span
 			>
 			<span class="stat"
+				><span class="qm-label">fill</span>
+				<span class="qm-readout" class:alert={lastFill.includes('refused')} data-testid="last-fill"
+					>{lastFill}</span
+				></span
+			>
+			<span class="stat"
 				><span class="qm-label">error</span>
 				<!-- The one reading on the strip that is a failure rather than a fact, so it
 				     is the one that takes colour when it holds one. -->
@@ -515,6 +538,13 @@
 						onclick={download}>Download PDF</button
 					>
 				{/if}
+				<button
+					class="qm-control"
+					type="button"
+					data-testid="fill-examples"
+					disabled={opening || !docHandle}
+					onclick={fill}>Fill examples</button
+				>
 				<button
 					class="qm-control"
 					type="button"

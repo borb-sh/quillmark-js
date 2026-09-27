@@ -41,7 +41,7 @@ Two guardrails hold across both: the playground consumes only the public subpath
 
 The reference quill declares a field for every control and three card kinds, so the schema reaches the branches a harness is for. What a shipped quill asks of the surfaces is the other half, and `usaf_memo` is what asks it (`fixtures/Quiver.yaml`). So **which quill is a control**, at the end of `/playground`'s strip, where the seed variants below it are flags: the answer changes what both surfaces are, rather than reaching a branch a hand went looking for.
 
-A quill opens on its template document, `fixtures/templates/<name>.md`, which the pack serves beside the quiver, and on its seed where it ships none: a seed leaves every field and body empty, and a harness over empty controls reaches no value branch.
+A quill opens on its template document, `fixtures/templates/<name>.md`, which the pack serves beside the quiver, and on its seed where it ships none: a seed leaves every field and body empty, and a harness over empty controls reaches no value branch. **Fill examples** reaches them without a template: it writes each unanswered top-level field's `example:` as its answer, on every card, and stands the shell back up over the result as a pick does, carrying the document and applying no seed variant to it. The strip's `fill` readout says how many landed and what the writer refused.
 
 Picking tears the shell down and stands it back up, so one session is live at a time. The surfaces come down before their handles do. The readouts reset with them, each having named something in the document that went.
 

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio fills a quill's examples on a press.** **Fill examples** in the head writes each unanswered top-level field's `example:` as its answer, on the main card and every composable card, so a page is judged with answers in it without typing them. A field already answered keeps its value, and an example nested under an array's `items` or an object's `properties` is not written. A document still opens as the seed.
+
 ## v0.9.0 - 2026-09-26
 
 **The carried `@quillmark/wasm` is 0.116.0, and a quill that loaded may not.** `ui.title` on a field, on `main` or on a card kind fails the load: the label is a top-level `title` beside `description`. A `{field}` token in a `title` fails as `quill::title_template`, and a `title` on an array's `items` as `quill::title_on_items`. `body.unsupported` fails as `quill::invalid_body`. An unquoted `version: 1.10` loads as `1.10` where it loaded as `1.1`. **A seed answers nothing**: `quillkit test` renders, and studio opens on, a document with every field absent and every body empty, where both filled each field from its `example:` and each body from `body.example`. A plate that rendered the examples and fails on the blank fails the gate. A `typst:` key other than `plate_file`, `typst.packages` among them, warns `typst::unknown_key`, and a plate at a subdirectory `plate_file` resolves a bare path from its own directory.

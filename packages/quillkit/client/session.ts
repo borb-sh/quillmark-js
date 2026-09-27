@@ -14,9 +14,9 @@ import { diagnosticsOf, messageOf } from './notes';
 
 /** How the document got here, and what the landing cost. */
 export interface Carry {
-	/** `seeded`: the schema's example, for a first open or a different quill picked.
+	/** `seeded`: the schema's seed, for a first open or a different quill picked.
 	 *  `carried`: the previous document, landed under the schema in hand.
-	 *  `reseeded`: the previous document was refused, so the example stands in. */
+	 *  `reseeded`: the previous document was refused, so the seed stands in. */
 	how: 'seeded' | 'carried' | 'reseeded';
 	/** The `conform::*` diagnostics for the values the schema in hand will not take,
 	 *  or the one refusal that dropped the document. Empty for a seed, and the point
@@ -43,7 +43,7 @@ export interface Opened {
 
 /**
  * Open `ref` from `quiver`, over `carry`: the canonical markdown of the document the
- * surfaces were holding, or `undefined` to seed a fresh example.
+ * surfaces were holding, or `undefined` to seed a fresh document.
  *
  * Carrying is what makes a repack an edit to the quill rather than a reset of the
  * work: a plate-only change lands the same document verbatim, an additive schema
