@@ -1,7 +1,7 @@
 <!--
  A `number` / `integer` field → numeric input (fixture `font_size` = 11.5).
  Commits at `change` (blur/Enter), not per keystroke: a partial numeric entry
- (`-`, `1.`, `1e`) is never a document state worth a boundary round-trip, and
+ (`-`, `1.`) is never a document state worth a boundary round-trip, and
  committing it live flashes a coercion diagnostic + `console.error` on every
  intermediate prefix, announced by `DiagnosticList`'s `role="status"` live
  region.
@@ -12,15 +12,21 @@
  so a blank entry commits `undefined`, the unset rung: the parent removes the field,
  the engine renders the default, and the input holds it again.
 
- `type="text"`, not `type="number"`: a native number input sanitizes an
- invalid string to `""` before the DOM `value` setter even runs (verified:
- `.value = "abc"` on `type="number"` never lands), which would make a
- genuinely bad entry untypeable. The commit-time coercion diagnostic
- (VISUAL_EDITOR §Diagnostics) needs exactly that path reachable through the
- UI, so a non-blank entry that fails to parse forwards the raw string to
- `onCommit` unchanged: the boundary's own `writer.set` coercion is the judge
- (throws a `QuillmarkError` the parent turns into a field diagnostic), not a
- client-side guess. `inputmode` keeps the numeric mobile keyboard.
+ The entry grammar is plain decimal: an optional sign and digits, and for a `number`
+ a `.` and an exponent, the form `String()` gives a value too small or large for
+ digits. A keystroke that leaves the text outside a prefix of it does not land, and in
+ a `number` a `,` lands as `.`, the decimal key of a comma locale's keypad. A deletion
+ always lands, so a stored value outside the grammar (`abc`) can be cleared, and a
+ paste, a drop or an IME composition lands as it comes, judged when it settles.
+ `type="text"`, not `type="number"`: a native number input sanitizes an invalid
+ string to `""` rather than showing it, and steps on a scroll-wheel. `inputmode`
+ keeps the numeric mobile keyboard.
+
+ A settled entry in the grammar commits as a number. Anything else forwards the raw
+ string to `onCommit`: the boundary's `writer.set` coercion is the judge (throws a
+ `QuillmarkError` the parent turns into a field diagnostic, VISUAL_EDITOR
+ §Diagnostics). `Number()` alone is no gate: it reads `0x1F` and `Infinity` as
+ numbers, and `1.000` as a whole one.
 -->
 <script lang="ts">
 	import { syncedLocal } from './synced.svelte.js';
@@ -53,22 +59,42 @@
 	const local = syncedLocal(() => (value != null ? String(value) : (fallback ?? '')));
 	const defaulted = $derived(value == null && !!fallback && local.value === fallback);
 
+	const partial = $derived(
+		integer ? /^\s*[+-]?\d*\s*$/ : /^\s*[+-]?\d*\.?\d*(?:[eE][+-]?\d*)?\s*$/
+	);
+	const whole = $derived(integer ? /^[+-]?\d+$/ : /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/);
+
+	function filter(e: InputEvent): void {
+		if (e.inputType !== 'insertText' || e.data == null) return;
+		const el = e.currentTarget as HTMLInputElement;
+		const from = el.selectionStart ?? el.value.length;
+		const to = el.selectionEnd ?? el.value.length;
+		const data = !integer && e.data === ',' ? '.' : e.data;
+		const next = el.value.slice(0, from) + data + el.value.slice(to);
+		if (!partial.test(next)) return e.preventDefault();
+		if (data === e.data) return;
+		e.preventDefault();
+		// `insertText` lands on the undo stack and fires `input`; `setRangeText` does neither.
+		if (document.execCommand?.('insertText', false, data)) return;
+		el.setRangeText(data, from, to, 'end');
+		local.value = el.value;
+	}
+
 	// Parse a settled entry and emit it; `local` is owned by `oninput`. Blank →
 	// `undefined`, and the input takes the default back: nothing else reconciles it, the
 	// projection having read the default throughout. Onto the element as well, since the
 	// attribute Svelte last wrote may already be the default, and it writes no repeat.
 	function commit(el: HTMLInputElement): void {
 		const raw = el.value;
-		if (raw.trim() === '') {
+		const entry = raw.trim();
+		if (entry === '') {
 			onCommit(undefined);
 			local.value = el.value = fallback ?? '';
 			return;
 		}
-		// Number(), not parseFloat/parseInt: a prefix parse would silently commit
-		// `14.5` for `14.5x` (and truncate `11.9` → 11 on integer fields) instead
-		// of letting the boundary judge the full entry.
-		const n = Number(raw);
-		onCommit(Number.isNaN(n) ? raw : n);
+		// Finite as well: a digit run past `Number.MAX_VALUE` reads as `Infinity`.
+		const n = whole.test(entry) ? Number(entry) : NaN;
+		onCommit(Number.isFinite(n) ? n : raw);
 	}
 </script>
 
@@ -82,6 +108,7 @@
 	data-default={defaulted ? '' : undefined}
 	aria-label={id ? undefined : label}
 	aria-describedby={describedBy}
+	onbeforeinput={filter}
 	oninput={(e) => {
 		local.value = (e.currentTarget as HTMLInputElement).value;
 	}}
