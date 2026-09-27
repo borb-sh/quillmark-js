@@ -6,9 +6,9 @@
 // `static/` is Kit's verbatim-copy tree, so one output serves both `vite dev` and the
 // static build. Generated, and gitignored.
 //
-// `--drafts` packs what is under the quiver's floor as well, which is `usaf_memo@0.0.0`
-// and the fixture picker's second entry. `predev` asks for it and `prebuild` does not:
-// a deploy serves the reference quill alone (fixtures/Quiver.yaml).
+// The pack lifts the quiver's floor for dev and deploy alike: the playground is a
+// harness, a viewer rather than a quill deployment, and `usaf_memo@0.0.0` under the
+// floor is the fixture picker's second entry (fixtures/Quiver.yaml).
 
 import { cp } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -18,8 +18,7 @@ const SOURCE = fileURLToPath(new URL('../../../fixtures', import.meta.url));
 const OUT = fileURLToPath(new URL('../static/quiver', import.meta.url));
 const TEMPLATES = fileURLToPath(new URL('../../../fixtures/templates', import.meta.url));
 const TEMPLATES_OUT = fileURLToPath(new URL('../static/templates', import.meta.url));
-const drafts = process.argv.includes('--drafts');
 
-await build(SOURCE, OUT, { drafts });
+await build(SOURCE, OUT, { drafts: true });
 await cp(TEMPLATES, TEMPLATES_OUT, { recursive: true });
-console.log(`quiver packed: fixtures/ → static/quiver${drafts ? ' (drafts included)' : ''}`);
+console.log('quiver packed: fixtures/ → static/quiver (drafts included)');
