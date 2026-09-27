@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.14.0 - 2026-09-27
+
 **A date field holds `today`.** A field storing `today` draws the render date's digits at the default rung, where it drew an empty field. A **Today** toggle at the end of a `date` field (a `datetime` holds no `today`) writes `today`, and pressed again writes the digits it showed; `T` in a segment writes `today` too, and a segment edit writes a whole date. While off, the toggle is hidden until the pointer is over the field or the focus is in it. A `default: today` presses it at the default rung while the field is unset. `VisualStrings.dateToday` is its label.
 
 **A number field types plain decimal only.** A keystroke that would leave anything but an optional sign and digits, and for a `number` a `.` and an exponent, does not land, where the field took any text; a `number`'s `,` lands as `.`. A paste, a drop and a deletion land as they come. A settled entry outside that grammar is refused onto the field where it committed what `Number()` read: `0x1F` as 31, `1.000` in an `integer` as 1, and `Infinity` as a bare `null` key with no diagnostic.
