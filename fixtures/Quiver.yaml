@@ -11,7 +11,7 @@ description: |
   asked the way its author wrote it. Re-copy it whole to move it, and let the
   assertions keyed to its shapes fail where they will.
 
-  `0.0.0` is under the quiver's draft floor, so a build leaves it out and only a
-  source read reaches it: the suite and `quillkit test` gate it, an artifact serves
-  `showcase` alone. A copy is not the release, and the version is what holds it to
-  that.
+  `0.0.0` is under the quiver's draft floor, so a floored build leaves it out: the
+  suite and `quillkit test` gate it from source, and a published artifact serves
+  `showcase` alone. The playground's pack lifts the floor, being a harness and not a
+  deployment. A copy is not the release, and the version is what holds it to that.

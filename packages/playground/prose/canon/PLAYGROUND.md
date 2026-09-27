@@ -47,7 +47,7 @@ Picking tears the shell down and stands it back up, so one session is live at a 
 
 The strip is drawn from the moment the catalog is known rather than with the panes: the picker at its end is what opens them, and a control that goes while what it asked for loads is one a hand cannot get back to.
 
-What is in the list is the **pack's call**, not the route's. `usaf_memo` is held at `0.0.0`, under the quiver's floor, so `--drafts` is what puts it in the served tree: `predev` asks for it, `prebuild` does not, and a deploy serves the reference quill alone. An axis holding one value is printed rather than offered, so a deploy's strip states the quill where a dev server's offers two.
+What is in the list is the **pack's call**, not the route's. `usaf_memo` is held at `0.0.0`, under the quiver's floor, and the pack lifts the floor for dev and deploy alike: the playground is a harness, a viewer rather than a quill deployment, so the Pages build offers the same two quills a dev server does. An axis holding one value is printed rather than offered.
 
 Two branches are not a schema's to declare — a guidance channel a consumer supplies, and a card whose kind the schema cannot project — and those are **query flags on `/playground`**, read once per open and applied to the opened document: `?tips`, `?foreign`. They carry no chrome, because the only reader is a hand driving the harness, and a switch for one would be a control on the landing page for everyone else.
 
