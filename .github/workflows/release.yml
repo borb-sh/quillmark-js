@@ -76,9 +76,8 @@ jobs:
 
       - run: npm ci
 
-      # ci.yml's verbs through the suite, in one script and in its order; there they
-      # are separate steps to buy failure attribution, here they only need to pass.
-      # `build` is among them because the suite reads what it writes, and it stays
+      # ci.yml's two jobs in one script, up to its tarball checks, which follow. `build`
+      # is among them because the suite reads what it writes, and it stays
       # workspace-wide: the suite is the whole workspace's whichever package is being
       # released, so a scoped build leaves quillkit's bin or its client missing.
       - name: Gate
@@ -95,7 +94,7 @@ jobs:
             --pack-destination "$RUNNER_TEMP/pack" >/dev/null
           echo "tgz=$(echo "$RUNNER_TEMP"/pack/*.tgz)" >> "$GITHUB_OUTPUT"
 
-      # ci.yml's last verb, aimed at the tarball rather than at the worktree: publint
+      # ci.yml's `check:pack`, aimed at the tarball rather than at the worktree: publint
       # takes a file path as the package, so the manifest it reads and the files it
       # resolves against are the published ones.
       - name: Package (publint)

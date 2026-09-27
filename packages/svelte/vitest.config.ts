@@ -31,6 +31,9 @@ export default defineConfig({
 		environment: 'node',
 		include: ['tests/**/*.{test,spec}.ts'],
 		setupFiles: ['./tests/setup.ts'],
+		// Files share a worker's module graph, so the Typst backend compiles once per
+		// worker rather than once per file; a file leaves no global state behind.
+		isolate: false,
 		// The 26 MB Typst backend compiles lazily on the first `Engine.open`; the
 		// first test that opens a session pays it, so the budget is generous.
 		testTimeout: 30000,
