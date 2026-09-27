@@ -5,7 +5,7 @@
 // two columns — and read back through the document.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
-import { init, type Document, type Quill } from '@quillmark/wasm';
+import type { Document } from '@quillmark/wasm';
 import { quill } from '../helpers/fixtures.js';
 import {
 	field,
@@ -14,20 +14,11 @@ import {
 	pick,
 	press,
 	settle,
-	stubLayout,
 	washHost,
-	type Mounted
-} from '../helpers/surface.js';
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
-// The gate every mounted suite stands behind; the classes are reached off the fixture.
-await init();
-stubLayout();
-
-let mounted: Mounted | undefined;
-afterEach(() => {
-	mounted?.unmount();
-	mounted = undefined;
-});
+afterEach(unmountAll);
 
 const stored = (doc: Document) => doc.getStored('checks');
 function matrix(target: HTMLElement): HTMLElement {
@@ -49,7 +40,7 @@ const count = (m: HTMLElement) => m.querySelector('.qm-matrix-count')?.textConte
 describe('a matrix field', () => {
 	it('draws the roster as real checkboxes in declaration order, each titled by a label for it', () => {
 		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
+		const mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
 
 		expect([...m.querySelectorAll('.qm-member-title')].map((l) => l.textContent)).toEqual([
@@ -77,7 +68,7 @@ describe('a matrix field', () => {
 	it('ticks, annotates, unticks and reticks without losing the columns', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 
 		tick(m, 'Spelling').click();
@@ -96,7 +87,7 @@ describe('a matrix field', () => {
 			'Spelling'
 		);
 
-		pick(spelling.querySelector<HTMLElement>('.qm-select')!, 'major');
+		pick(spelling, 'major');
 		expect(stored(doc)).toEqual({ spelling: { held: true, severity: 'major' } });
 
 		// An untick keeps the columns under `held: false`, and stops drawing them.
@@ -116,7 +107,7 @@ describe('a matrix field', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		doc.storeField('checks', { fonts: true });
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 		expect(tick(m, 'Fonts').checked).toBe(true);
 		expect(count(m)).toBe('1 of 6 held');
@@ -140,7 +131,7 @@ describe('a matrix field', () => {
 
 	it('keys as a checkbox group: every tick a tab stop, and no arrow walk', () => {
 		const q = quill();
-		mounted = mountEditor(q, q.seedDocument());
+		const mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
 		const ticks = [...m.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
 		for (const t of ticks) expect(t.tabIndex).toBe(0);
@@ -156,7 +147,7 @@ describe('a matrix field', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		doc.storeField('checks', { fonts: { held: true, note: 'kerning off' } });
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 
 		await mounted.editor.setCaret({
@@ -191,7 +182,7 @@ describe('a matrix field', () => {
 			{ severity: 'error' as const, message: 'not a severity', path: 'main.checks.fonts.severity' },
 			{ severity: 'error' as const, message: 'no such column', path: 'main.checks.margins.note' }
 		];
-		mounted = mountEditor(q, doc, { diagnostics });
+		const mounted = mountEditor(q, doc, { diagnostics });
 		const m = matrix(mounted.target);
 
 		// Held: the column is drawn, so the message sits under it.

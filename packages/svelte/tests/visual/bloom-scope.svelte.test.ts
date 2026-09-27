@@ -9,52 +9,11 @@
 // inset child per host, and which host holds it is the whole of what the granularity
 // decides.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync, tick } from 'svelte';
-import type { Quill, Document } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
+import { tick } from 'svelte';
 import { quill, template } from '../helpers/fixtures.js';
+import { mountEditor, unmountAll, washHost } from '../helpers/surface.svelte.js';
 
-// jsdom implements neither, and the wash is `Element.animate`: a run that never
-// finishes leaves the node in place, which is what the host assertions read. The
-// stub's `duration` read is `getComputedStyle`'s, which jsdom answers as empty and
-// the wash falls back for.
-Element.prototype.getAnimations ??= () => [];
-Element.prototype.animate ??= () => ({}) as Animation;
-Element.prototype.scrollIntoView ??= () => {};
-Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
-Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-/** The two landing verbs; the rest of the instance surface is `verbs.svelte.test.ts`'s. */
-interface EditorRef {
-	focusField(field: string): Promise<void>;
-	setCaret(at: { field: string; pos?: number; granularity?: string }): Promise<void>;
-}
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return { target, editor: app as unknown as EditorRef };
-}
-
-/** The one wash on the surface: a landing is a discrete act, so there is never a
- *  second host holding one at rest. */
-function washHost(target: HTMLElement): HTMLElement | undefined {
-	const washes = [...target.querySelectorAll<HTMLElement>('.qm-bloom')];
-	expect(washes).toHaveLength(1);
-	return washes[0].parentElement ?? undefined;
-}
+afterEach(unmountAll);
 
 describe('the arrival wash', () => {
 	it('washes the row an element landing named, not the list around it', async () => {

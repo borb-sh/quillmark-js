@@ -9,85 +9,16 @@
 // nowhere else), an answer the discriminant strands is kept rather than dropped, and a
 // content cell (`handling`'s two) is a leaf at the depth it sits.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
-import { init, type Quill, type Document } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
-import { quill } from '../helpers/fixtures.js';
-import { mountEditor as mountWithEditor, stubLayout } from '../helpers/surface.js';
+import type { Document } from '@quillmark/wasm';
+import { core, quill, quillFromYaml } from '../helpers/fixtures.js';
+import { field, mountEditor, pick, trigger, type, unmountAll } from '../helpers/surface.svelte.js';
 
-const core = await init();
+afterEach(unmountAll);
 
-Element.prototype.scrollIntoView ??= () => {};
-Element.prototype.getAnimations ??= () => [];
-// The rects a prose cell's view measures; jsdom implements neither.
-Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
-Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-// jsdom implements no pointer-capture API, and the trigger probes for one before it
-// opens (see enum-policy).
-Element.prototype.hasPointerCapture ??= () => false;
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return target;
-}
-
-function field(target: HTMLElement, label: string): HTMLElement {
-	const match = [...target.querySelectorAll<HTMLElement>('.qm-field')].find(
-		(f) => f.querySelector('.qm-field-label span')?.textContent === label
-	);
-	if (!match) throw new Error(`no field labelled ${label}`);
-	return match;
-}
-
-/** Open the variant's discriminant list as a pointer opens it (see enum-policy). */
-function openList(target: HTMLElement, name = 'Distribution'): void {
-	const trigger = field(target, name).querySelector<HTMLElement>('.qm-select')!;
-	trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
-	trigger.click();
-	flushSync();
-}
-
-function press(row: HTMLElement | undefined, what: string): void {
-	if (!row) throw new Error(`no ${what} in the open list`);
-	row.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-	flushSync();
-}
-
-/** Pick a world by its option text. The sentinel is excluded by class rather than by
- *  text: it ghosts the resolved default, so its row reads `internal` too. */
-function pickWorld(target: HTMLElement, text: string, name = 'Distribution'): void {
-	openList(target, name);
-	press(
-		[...target.querySelectorAll<HTMLElement>('.qm-select-item')].find(
-			(el) => !el.querySelector('.qm-select-ghost') && el.textContent?.trim() === text
-		),
-		`option ${text}`
-	);
-}
-
-/** Pick the unset sentinel: the clear-back-to-default affordance. */
-function clearWorld(target: HTMLElement, name = 'Distribution'): void {
-	openList(target, name);
-	press(
-		[...target.querySelectorAll<HTMLElement>('.qm-select-item')].find((el) =>
-			el.querySelector('.qm-select-ghost')
-		),
-		'unset sentinel'
-	);
-}
+/** Pick a world by its option text; `null` picks the unset sentinel, the clear back to
+ *  the default. */
+const pickWorld = (target: HTMLElement, text: string | null, name = 'Distribution') =>
+	pick(field(target, name), text);
 
 /** The drawn cells of the live world, label text in declaration order. The marker is
  *  a sibling node inside the label, so the text is normalized rather than compared
@@ -109,20 +40,13 @@ function cellInput(target: HTMLElement, label: string): HTMLInputElement {
 	return input;
 }
 
-function type(input: HTMLInputElement, value: string): void {
-	input.value = value;
-	input.dispatchEvent(new Event('input', { bubbles: true }));
-	input.dispatchEvent(new Event('change', { bubbles: true }));
-	flushSync();
-}
-
 const stored = (doc: Document) => doc.getStored('distribution');
 
 describe('a variant enum field', () => {
 	it('draws the cells of the world the document renders as, and retires them on a flip', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		// Unset: the ghosted `default:` is `internal`, which declares no cells. The drawn
 		// world follows the ghost rather than nothing, so the form shows the cells the
@@ -149,7 +73,7 @@ describe('a variant enum field', () => {
 	it('names an obliged cell through a real label, and says "required" on the marker', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'embargoed');
 		// A cell is named the way every other control on the surface is: a `<label for>`
@@ -174,7 +98,7 @@ describe('a variant enum field', () => {
 	it('commits a cell into the container, keeping the discriminant beside it', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'embargoed');
 		expect(stored(doc)).toEqual({ value: 'embargoed' });
@@ -194,7 +118,7 @@ describe('a variant enum field', () => {
 	it('keeps an answer the discriminant strands, through the flip and back', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'embargoed');
 		type(cellInput(target, 'Lift on'), '2027-01-01');
@@ -215,21 +139,21 @@ describe('a variant enum field', () => {
 	it('clears the discriminant alone, and the whole field when it held nothing else', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		// Nothing beside the discriminant: clearing leaves an empty container, which is
 		// an unset field — removed, so the `default:` resolves at render rather than a
 		// `{}` being written.
 		pickWorld(target, 'public');
 		expect(stored(doc)).toEqual({ value: 'public' });
-		clearWorld(target);
+		pickWorld(target, null);
 		expect(stored(doc)).toBeUndefined();
 
 		// With an answer beside it, clearing is the discriminant's own gesture: it takes
 		// that cell and leaves the answer, for the same reason a flip does.
 		pickWorld(target, 'embargoed');
 		type(cellInput(target, 'Lift on'), '2027-01-01');
-		clearWorld(target);
+		pickWorld(target, null);
 		expect(stored(doc)).toEqual({ lift_on: '2027-01-01' });
 	});
 });
@@ -240,42 +164,41 @@ describe('a variant enum field', () => {
 // `distribution`.
 describe('a variant whose default is the blank', () => {
 	const held = (doc: Document) => doc.getStored('handling');
-	const trigger = (target: HTMLElement) =>
-		field(target, 'Handling').querySelector<HTMLElement>('.qm-select')!;
+	const handling = (target: HTMLElement) => trigger(field(target, 'Handling'));
 
 	it('draws the discriminant alone, ghosting the em dash the blank has no glyph for', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		// The blank owns no world, so there is nothing under the select to draw — and
 		// the ghost is the blank's own em dash rather than a member's name.
 		expect(cellLabels(target, 'Handling')).toEqual([]);
-		expect(trigger(target).textContent?.trim()).toBe('—');
-		expect(trigger(target).hasAttribute('data-ghosted')).toBe(true);
+		expect(handling(target).textContent?.trim()).toBe('—');
+		expect(handling(target).hasAttribute('data-ghosted')).toBe(true);
 		expect(held(doc)).toBeUndefined();
 	});
 
 	it('picks a member spelled as it is marked, spaces and all', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'CLOSE HOLD', 'Handling');
 		expect(held(doc)).toEqual({ value: 'CLOSE HOLD' });
-		expect(trigger(target).textContent?.trim()).toBe('CLOSE HOLD');
-		expect(trigger(target).hasAttribute('data-ghosted')).toBe(false);
+		expect(handling(target).textContent?.trim()).toBe('CLOSE HOLD');
+		expect(handling(target).hasAttribute('data-ghosted')).toBe(false);
 		// A member declaring no cells draws none, blank default or not.
 		expect(cellLabels(target, 'Handling')).toEqual([]);
 
-		clearWorld(target, 'Handling');
+		pickWorld(target, null, 'Handling');
 		expect(held(doc)).toBeUndefined();
 	});
 
 	it('names its prose cells, marks the obliged one, and mounts a leaf in each', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'CONTROLLED', 'Handling');
 		// Obligation is per world and per cell: `controlled_by` declares no `default:`
@@ -308,7 +231,7 @@ describe('a variant whose default is the blank', () => {
 			controlled_by: 'SPEC/AA',
 			caveat: 'no *markup*, just text'
 		});
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		const leaves = [
 			...field(target, 'Handling').querySelectorAll<HTMLElement>('.qm-object-prop .ProseMirror')
@@ -356,16 +279,7 @@ main:
                 type: string
                 default: ""
 `;
-	// Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes
-	// from another realm and the boundary refuses it by identity.
-	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
-	const nested = (): Quill =>
-		core.Quill.fromTree(
-			new Map([
-				['Quill.yaml', bytes(NESTED)],
-				['plate.typ', bytes('#set page(width: 200pt)\n')]
-			])
-		);
+	const nested = () => quillFromYaml(NESTED);
 	const header = (doc: Document) => doc.getStored('header');
 	const cell = (target: HTMLElement): HTMLInputElement | null =>
 		field(target, 'Header').querySelector<HTMLInputElement>('[data-qm-prop="controlled_by"] input');
@@ -384,10 +298,9 @@ main:
 				''
 			].join('\n')
 		);
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
-		const trigger = field(target, 'Header').querySelector<HTMLElement>('.qm-select')!;
-		expect(trigger.textContent?.trim()).toBe('CUI');
+		expect(trigger(field(target, 'Header')).textContent?.trim()).toBe('CUI');
 		expect(cellLabels(target, 'Header')).toEqual(['Classification', 'Controlled by']);
 		expect(cell(target)?.value).toBe('SPEC');
 
@@ -398,7 +311,7 @@ main:
 	it('draws the ghosted world while unset, and keeps a stranded answer through a flip', () => {
 		const q = nested();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		// `U` declares no cells, so the unset field draws the discriminant alone.
 		expect(cellLabels(target, 'Header')).toEqual(['Classification']);
@@ -414,20 +327,16 @@ main:
 	});
 
 	it('lands a cell address on the live cell, and a dormant one on the discriminant', async () => {
-		stubLayout();
 		const q = nested();
 		const doc = q.seedDocument();
 		q.writer(doc).set('header', { classification: { value: 'CUI' } });
-		const mounted = mountWithEditor(q, doc);
-		cleanup = () => mounted.unmount();
+		const mounted = mountEditor(q, doc);
 
 		await mounted.editor.focusField('main.header.classification.controlled_by');
 		expect(document.activeElement).toBe(cell(mounted.target));
 
 		pickWorld(mounted.target, 'U', 'Header');
 		await mounted.editor.focusField('main.header.classification.controlled_by');
-		expect(document.activeElement).toBe(
-			field(mounted.target, 'Header').querySelector('.qm-select')
-		);
+		expect(document.activeElement).toBe(trigger(field(mounted.target, 'Header')));
 	});
 });

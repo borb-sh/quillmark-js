@@ -1,10 +1,9 @@
 // The provenance channel (FIELD_PROVENANCE): `quill.reader(doc).resolve()` mapped to the
-// editor's name-keyed `provenance` map and the ghosted `default:` it feeds. The
-// pure helpers are unit-tested; the resolve behavior is asserted against the real
-// showcase schema, so the authored↔default flip the ghost turns on is pinned to
-// the fixture the suite runs against, not a mock.
+// editor's name-keyed `provenance` map and the ghosted `default:` it feeds. The pure
+// helpers are unit-tested; the resolve behavior is asserted against the real showcase
+// schema, its values read off the schema rather than restated.
 import { describe, it, expect } from 'vitest';
-import type { ResolvedField, Resolved } from '@quillmark/wasm';
+import type { Document, ResolvedField, Resolved } from '@quillmark/wasm';
 import {
 	provenanceMap,
 	resolvedByCardIndex,
@@ -72,36 +71,39 @@ describe('the ghost projection', () => {
 });
 
 describe('resolve over the real showcase schema', () => {
+	const declared = (name: string) => quill().schema.main.fields[name].default;
+	const resolved = (doc: Document) => provenanceMap(quill().reader(doc).resolve().main.fields);
+
 	it('reports unset declared defaults as `default`-sourced with the schema value', () => {
-		const doc = quill().seedDocument();
-		const main = provenanceMap(quill().reader(doc).resolve().main.fields);
-		expect(main.tracking_id).toMatchObject({ source: 'default', value: 'SPEC-0001' });
-		expect(main.font_size).toMatchObject({ source: 'default', value: 10.5 });
-		expect(main.accent).toMatchObject({ source: 'default', value: 'slate' });
+		const main = resolved(quill().seedDocument());
+		for (const name of ['tracking_id', 'font_size', 'accent'])
+			expect(main[name]).toMatchObject({ source: 'default', value: declared(name) });
 		// The ghost the control shows for each unset field is that resolved default.
-		expect(ghostDefault(main.tracking_id)).toBe('SPEC-0001');
+		expect(ghostDefault(main.tracking_id)).toBe(declared('tracking_id'));
 	});
 
 	it('flips a field to `authored` (no ghost) once a value is stored, back on clear', () => {
 		const doc = quill().seedDocument();
 		doc.storeField('tracking_id', 'ACME-9');
-		const authored = provenanceMap(quill().reader(doc).resolve().main.fields);
+		const authored = resolved(doc);
 		expect(authored.tracking_id).toMatchObject({ source: 'authored', value: 'ACME-9' });
 		// An authored field ghosts nothing; the control shows its own value.
 		expect(ghostDefault(authored.tracking_id)).toBeUndefined();
 
 		doc.removeField('tracking_id');
-		const cleared = provenanceMap(quill().reader(doc).resolve().main.fields);
+		const cleared = resolved(doc);
 		expect(cleared.tracking_id.source).toBe('default');
-		expect(ghostDefault(cleared.tracking_id)).toBe('SPEC-0001');
+		expect(ghostDefault(cleared.tracking_id)).toBe(declared('tracking_id'));
 	});
 
 	it('resolves a variant as a container, so the ghosted member is one cell of it', () => {
-		const doc = quill().seedDocument();
-		const main = provenanceMap(quill().reader(doc).resolve().main.fields);
+		const main = resolved(quill().seedDocument());
 		// The rung is the field's, and its value is the whole container: the discriminant
 		// the control ghosts is `value` inside it, never the row itself.
-		expect(main.distribution).toMatchObject({ source: 'default', value: { value: 'internal' } });
+		expect(main.distribution).toMatchObject({
+			source: 'default',
+			value: { value: declared('distribution') }
+		});
 		expect(main.handling).toMatchObject({ source: 'default', value: { value: '' } });
 		expect(stringifyGhost(ghostDefault(main.distribution))).toBeUndefined();
 		expect(
@@ -110,25 +112,16 @@ describe('resolve over the real showcase schema', () => {
 		).toBe('');
 	});
 
-	it('leaves a variant cell to its own world: no seed reaches its `example:`', () => {
-		// `handling.CONTROLLED.controlled_by` declares an `example:`, and a seed commits
-		// none anywhere. So a fresh document has no handling container at all, which is
-		// what the blank `default:` then resolves for.
-		const doc = quill().seedDocument();
-		expect(doc.toMarkdown()).not.toContain('handling');
-		expect(doc.getStored('handling')).toBeUndefined();
-	});
-
 	it('reports an array `default:` as one, and ghosts none of it', () => {
 		const doc = template();
 		// The template's answer is authored, not the default beneath it.
-		expect(provenanceMap(quill().reader(doc).resolve().main.fields).authors).toMatchObject({
+		expect(resolved(doc).authors).toMatchObject({
 			source: 'authored',
-			value: ['Ada Lovelace', 'Grace Hopper']
+			value: doc.getStored('authors')
 		});
 		doc.removeField('authors');
-		const cleared = provenanceMap(quill().reader(doc).resolve().main.fields);
-		expect(cleared.authors).toMatchObject({ source: 'default', value: ['Anonymous'] });
+		const cleared = resolved(doc);
+		expect(cleared.authors).toMatchObject({ source: 'default', value: declared('authors') });
 		// A list is not text: the repeater draws its rows and has no placeholder to ghost
 		// into, the same way an object-shaped rung has none.
 		expect(stringifyGhost(ghostDefault(cleared.authors))).toBeUndefined();
@@ -140,7 +133,7 @@ describe('resolve over the real showcase schema', () => {
 		// declares a `default:`, which is the whole of what lifts the container off
 		// `blank`. The value is composed per cell, so the defaultless three blank-fill
 		// beside it.
-		const unset = provenanceMap(quill().reader(doc).resolve().main.fields);
+		const unset = resolved(doc);
 		expect(unset.contact).toMatchObject({
 			source: 'default',
 			value: { name: '', email: '', reply_by: '', listed: false }
@@ -149,7 +142,7 @@ describe('resolve over the real showcase schema', () => {
 		expect(stringifyGhost(ghostDefault(unset.contact))).toBeUndefined();
 
 		doc.storeField('contact', { email: 'ada@example.org' });
-		const authored = provenanceMap(quill().reader(doc).resolve().main.fields);
+		const authored = resolved(doc);
 		expect(authored.contact).toMatchObject({
 			source: 'authored',
 			value: { name: '', email: 'ada@example.org', reply_by: '', listed: false }

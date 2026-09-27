@@ -7,34 +7,13 @@
 // Quill-bound writer refuses an undeclared kind, which is what the playground's
 // `?foreign` seeds.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
+import { flushSync } from 'svelte';
 import { Engine, type Document, type Quill } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import { humanize } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
+import { mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
-// jsdom implements neither; the first is the card operations' scroll hop and the flip a
-// removal runs the survivors through.
-Element.prototype.scrollIntoView ??= () => {};
-Element.prototype.getAnimations ??= () => [];
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return target;
-}
+afterEach(unmountAll);
 
 /** A seeded document with one card the schema cannot project, last in the stack. */
 function withForeignCard(q: Quill): Document {
@@ -54,7 +33,7 @@ const shells = (target: HTMLElement) => [
 describe('the recovery shell', () => {
 	it('draws for the card whose kind has no schema, and for no other', () => {
 		const q = quill();
-		const target = mountEditor(q, withForeignCard(q));
+		const { target } = mountEditor(q, withForeignCard(q));
 
 		expect(shells(target)).toHaveLength(1);
 		const card = target.querySelector<HTMLElement>('.qm-card.qm-unschemable')!;
@@ -83,7 +62,7 @@ describe('the recovery shell', () => {
 		// The engine renders past the card and warns: its payload reaches no page.
 		expect(q.validate(doc).map((d) => d.code)).toContain('validation::unknown_card');
 
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 		const select = target.querySelector<HTMLSelectElement>('.qm-recovery-retype select')!;
 		select.value = 'note';
 		select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -99,14 +78,13 @@ describe('the recovery shell', () => {
 		const session = await engine.open(q, doc);
 		expect(session.pageCount).toBeGreaterThan(0);
 		session.free();
-		doc.free();
 	});
 
 	it('deletes the card the schema cannot take, the exit that needs no other kind', async () => {
 		const q = quill();
 		const doc = withForeignCard(q);
 		const engine = new Engine();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		target.querySelector<HTMLButtonElement>('.qm-card.qm-unschemable .qm-card-delete')!.click();
 		flushSync();
@@ -116,6 +94,5 @@ describe('the recovery shell', () => {
 		const session = await engine.open(q, doc);
 		expect(session.pageCount).toBeGreaterThan(0);
 		session.free();
-		doc.free();
 	});
 });

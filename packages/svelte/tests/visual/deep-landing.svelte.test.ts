@@ -5,7 +5,6 @@
 // diagnostic anchored at a nested leaf draws at the nearest cell the tree holds.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
-import { init } from '@quillmark/wasm';
 import { quill, template } from '../helpers/fixtures.js';
 import {
 	caret,
@@ -15,26 +14,17 @@ import {
 	pick,
 	repeater,
 	settle,
-	stubLayout,
 	summaries,
 	washHost,
-	type Mounted
-} from '../helpers/surface.js';
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
-// The gate every mounted suite stands behind; the classes are reached off the fixture.
-await init();
-stubLayout();
-
-let mounted: Mounted | undefined;
-afterEach(() => {
-	mounted?.unmount();
-	mounted = undefined;
-});
+afterEach(unmountAll);
 
 describe('a landing at depth', () => {
 	it('opens each row on the way and places the caret in the leaf the address names', async () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, template());
 		openGroup(mounted.target, 'Content');
 		const outer = field(mounted.target, 'Appendices');
 		expect(outer.querySelector('.qm-element.open')).toBeNull();
@@ -62,7 +52,7 @@ describe('a landing at depth', () => {
 
 	it('lands on a row it has to open, revealing the group first', async () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, template());
 		const header = [...mounted.target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>
 			h.textContent?.includes('Content')
 		)!;
@@ -80,7 +70,7 @@ describe('a landing at depth', () => {
 
 	it('lands a property path on its cell, washing the field', async () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, template());
 		await mounted.editor.focusField('main.contact.email');
 		await settle();
 		const contact = field(mounted.target, 'Point of contact');
@@ -95,10 +85,10 @@ describe('a landing at depth', () => {
 	it('lands a live variant cell on its control, and a dormant one on the discriminant', async () => {
 		const q = quill();
 		const doc = template();
-		mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, doc);
 		openGroup(mounted.target, 'Metadata');
 		const dist = field(mounted.target, 'Distribution');
-		pick(dist.querySelector<HTMLElement>('.qm-select')!, 'public');
+		pick(dist, 'public');
 
 		await mounted.editor.focusField('main.distribution.license');
 		await settle();
@@ -116,7 +106,7 @@ describe('a landing at depth', () => {
 
 	it('refuses a step the schema does not declare, through either verb', async () => {
 		const q = quill();
-		mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, template());
 		await mounted.editor.focusField('main.appendices[0].nothing');
 		await mounted.editor.setCaret({ field: 'main.contact.email.deeper', pos: 0 });
 		await mounted.editor.focusField('main.contact[0]');
@@ -135,7 +125,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 
 	it('draws under the nearest cell the tree holds, following the rows as they open', () => {
 		const q = quill();
-		mounted = mountEditor(q, template(), { diagnostics });
+		const mounted = mountEditor(q, template(), { diagnostics });
 		openGroup(mounted.target, 'Content');
 		const outer = field(mounted.target, 'Appendices');
 
@@ -165,7 +155,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 
 	it('draws a property diagnostic under that property, not under the whole subform', () => {
 		const q = quill();
-		mounted = mountEditor(q, template(), { diagnostics });
+		const mounted = mountEditor(q, template(), { diagnostics });
 		const contact = field(mounted.target, 'Point of contact');
 		expect(contact.querySelector('[data-qm-prop="email"] .qm-diag-line')?.textContent).toBe(
 			'bad email'
@@ -175,7 +165,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 
 	it("keeps a variant's discriminant off the box its world's cells sit in", () => {
 		const q = quill();
-		mounted = mountEditor(q, template(), {
+		const mounted = mountEditor(q, template(), {
 			diagnostics: [
 				{ severity: 'error' as const, message: 'bad world', path: 'main.distribution.value' },
 				{ severity: 'error' as const, message: 'bad date', path: 'main.distribution.lift_on' }
@@ -183,7 +173,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 		});
 		openGroup(mounted.target, 'Metadata');
 		const dist = field(mounted.target, 'Distribution');
-		pick(dist.querySelector<HTMLElement>('.qm-select')!, 'embargoed');
+		pick(dist, 'embargoed');
 
 		// The live cell's draws under that cell.
 		expect(dist.querySelector('[data-qm-prop="lift_on"] .qm-diag-line')?.textContent).toBe(
