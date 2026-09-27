@@ -53,9 +53,10 @@
 
   Which quill is a control, since the answer changes what both surfaces are: picking
   tears the shell down and stands it back up. `fill-examples` writes the schema's
-  `example:`s onto every unanswered field and stands the shell back up over the result. The seed variants are query flags with
-  no chrome, read once per open, for the branches a quill on disk reaches none of
-  (PLAYGROUND §"Which quill, and what is seeded into it").
+  `example:`s onto every unanswered field and stands the shell back up over the
+  result. The seed variants are query flags with no chrome, read once per open, for
+  the branches a quill on disk reaches none of (PLAYGROUND §"Which quill, and what is
+  seeded into it").
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
