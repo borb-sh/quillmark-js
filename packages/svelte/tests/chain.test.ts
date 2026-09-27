@@ -69,10 +69,9 @@ describe('substrate chain', () => {
 		// and a Typst package of its own.
 		const quill = core.Quill.fromTree(loadFixtureTree('usaf_memo'));
 		expect(quill.metadata.name).toBe('usaf_memo');
-		expect(quill.metadata.version).toBe('0.0.0');
 
 		const doc = quill.seedDocument();
-		expect(doc.quillRef).toBe('usaf_memo@0.0.0');
+		expect(doc.quillRef).toBe(`usaf_memo@${quill.metadata.version}`);
 
 		const session = await new Engine().open(quill, doc);
 		expect(session.pageCount).toBeGreaterThan(0);

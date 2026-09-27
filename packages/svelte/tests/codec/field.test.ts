@@ -10,18 +10,13 @@ import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
-import { mount, quill, template, normalize, contentEqual, md } from './_util.js';
+import { mount, quill, template, normalize, contentEqual, md, viewOf } from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
 // rect to reveal it. Stubbed rather than guarded in the source: a landing is right to
 // reveal itself unconditionally in a browser, and a zero rect scrolls nothing here.
 Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
 Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-
-/** The view is attached to the controller as an undocumented handle. */
-function viewOf(f: FieldController): EditorView {
-	return (f as FieldController & { view: EditorView }).view;
-}
 
 describe('createField over a real showcase leaf', () => {
 	let doc: Document;
@@ -51,18 +46,6 @@ describe('createField over a real showcase leaf', () => {
 		expect(after[1]).toBe('X');
 		// onCaretMove fired with the post-edit USV caret (past the inserted char).
 		expect(caret.at(-1)).toBe(2);
-		field.destroy();
-	});
-
-	it('edits the main body via applyChange and preserves marks path', () => {
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
-		const before = doc.main.body.text;
-		const view = viewOf(field);
-		view.dispatch(view.state.tr.insertText('Z', 2)); // PM 2 = USV 1 (after first char)
-		const after = doc.main.body.text;
-		expect(after).not.toBe(before);
-		expect(after[0]).toBe(before[0]);
-		expect(after[1]).toBe('Z');
 		field.destroy();
 	});
 

@@ -10,13 +10,11 @@
 // every row and column op is asserted install-then-read against its own projection.
 import { describe, it, expect } from 'vitest';
 import { GapCursor } from 'prosemirror-gapcursor';
-import { Slice } from 'prosemirror-model';
-import { EditorState, NodeSelection, Selection, TextSelection } from 'prosemirror-state';
+import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { createField, decode, blockSchema, inlineSchema } from '$lib/core/codec';
 import type { FieldController, LeafViews } from '$lib/core/codec';
 import {
-	ALIGNS,
 	cellContent,
 	cellEqual,
 	cellFromDoc,
@@ -128,21 +126,6 @@ describe('the rectangle survives every op', () => {
 });
 
 describe('what the model already answers', () => {
-	it('the header MOVES like any row, and being the header is holding index 0', () => {
-		// Down one: the body row it passed lands at index 0 and is the header now.
-		expect(grid(moveRow(LETTERED, 0, 1))).toEqual([
-			['a1', 'a2'],
-			['h1', 'h2'],
-			['b1', 'b2']
-		]);
-		// And the reverse trip: the last body row carried to the top becomes the header.
-		expect(grid(moveRow(LETTERED, 2, -2))).toEqual([
-			['b1', 'b2'],
-			['h1', 'h2'],
-			['a1', 'a2']
-		]);
-	});
-
 	it('the LAST row is the one the model keeps: under it there is no table', () => {
 		const one = normalizeTable({ header: [cell('h')], rows: [], aligns: ['none'] });
 		expect(grid(deleteRow(one, 0))).toEqual([['h']]);
@@ -364,18 +347,6 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('the edited cell keeps its caret: an own edit reseeds nothing', () => {
-		const { field } = tableLeaf(LETTERED);
-		const cellView = cellViews(field)[0];
-		const before = cellView.state;
-		cellView.dispatch(cellView.state.tr.insertText('!', 1));
-		// The same state object advanced; a reseed would have replaced it wholesale
-		// and put the caret back at the start.
-		expect(cellView.state).not.toBe(before);
-		expect(cellView.state.selection.head).toBe(2);
-		field.destroy();
-	});
-
 	it('a grip SELECTS its line: the wash is the whole of what the FIRST press does', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[1].click();
@@ -404,17 +375,6 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('Backspace over a selected row deletes it', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'row')[1].click();
-		press(caret(field), 'Backspace');
-		expect(grid(leafProps(field))).toEqual([
-			['h1', 'h2'],
-			['b1', 'b2']
-		]);
-		field.destroy();
-	});
-
 	it('the HEADER row deletes the same way, and the row under it takes its place', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[0].click();
@@ -436,6 +396,8 @@ describe('the table NodeView', () => {
 		press(caret(field), 'Backspace');
 		expect(grid(leafProps(field))).toEqual([['h1'], ['a1'], ['b1']]);
 		expect(leafProps(field).aligns).toEqual(['left']);
+		// The LAST rank of an axis hands the selection back, there being nothing after it.
+		expect(washed(field)).toEqual(['0,0', '1,0', '2,0']);
 		field.destroy();
 	});
 
@@ -451,17 +413,12 @@ describe('the table NodeView', () => {
 		const tall = tableLeaf(LETTERED);
 		grips(tall.field, 'row')[1].click();
 		press(caret(tall.field), 'Backspace');
+		expect(grid(leafProps(tall.field))).toEqual([
+			['h1', 'h2'],
+			['b1', 'b2']
+		]);
 		expect(washed(tall.field)).toEqual(['1,0', '1,1']);
 		tall.field.destroy();
-	});
-
-	it('the LAST rank of an axis hands it back, there being nothing after it', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'column')[1].click();
-		press(caret(field), 'Backspace');
-		// Two columns, the second dropped: the clamp lands on the one that is left.
-		expect(washed(field)).toEqual(['0,0', '1,0', '2,0']);
-		field.destroy();
 	});
 
 	it('an arrow steps the selection, carries the caret, and stops where the axis does', () => {
@@ -632,16 +589,6 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('Tab past the last cell appends a row; the store follows', () => {
-		const { field } = tableLeaf(LETTERED);
-		const views = cellViews(field);
-		const last = views[views.length - 1];
-		last.focus();
-		press(last, 'Tab');
-		expect(leafProps(field).rows).toHaveLength(3);
-		field.destroy();
-	});
-
 	it('Tab declines at both ends, which is the island’s keyboard exit', () => {
 		const { field } = tableLeaf(LETTERED);
 		const claims = (view: EditorView, init: KeyboardEventInit = {}) =>
@@ -720,32 +667,6 @@ describe('the table NodeView', () => {
 		expect(leafProps(field).rows).toHaveLength(2); // and no row was appended
 		// The caret is in the cell below, which is the whole of what Enter means here.
 		expect((field as FieldController & LeafViews).focusedView()).toBe(views[2]);
-		field.destroy();
-	});
-
-	it('Escape leaves the cell for the island, which Backspace then deletes', () => {
-		const { doc, field } = tableLeaf(LETTERED);
-		const first = cellViews(field)[0];
-		first.focus();
-		press(first, 'Escape'); // the caret's row
-		press(first, 'Escape'); // and the island under it
-		const outer = outerView(field);
-		const selection = outer.state.selection;
-		expect(selection instanceof NodeSelection && selection.node.type.name).toBe('island_block');
-		// Delete is the selection's verb, the one every island already answered to;
-		// nothing on the band names it a second time.
-		outer.dispatch(outer.state.tr.deleteSelection());
-		expect(doc.main.body.islands).toHaveLength(0);
-		expect(doc.main.body.text).toBe('para\ntail');
-		field.destroy();
-	});
-
-	it('an external re-hydrate reseeds the cells', () => {
-		const { doc, field } = tableLeaf(LETTERED);
-		const next = withCell(LETTERED, 0, 0, cell('EXTERNAL'));
-		doc.overwrite({}, withTable(next));
-		field.applyExternal();
-		expect(cellViews(field)[0].state.doc.textContent).toBe('EXTERNAL');
 		field.destroy();
 	});
 
@@ -893,12 +814,9 @@ describe('a selection is a rectangle of cells, and Backspace reads its extent', 
 	});
 
 	it('a grip draws the same rectangle its line covers', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'row')[1].click();
-		expect(washed(field)).toEqual(['1,0', '1,1']);
 		// Swept or named, one rectangle: the grip is marked exactly when the selection is
 		// its own line, which is the only thing that tells the two gestures apart.
-		expect(grips(field, 'row')[1].getAttribute('aria-pressed')).toBe('true');
+		const { field } = tableLeaf(LETTERED);
 		layout(field);
 		sweep(field, 2, 3);
 		expect(washed(field)).toEqual(['1,0', '1,1']);

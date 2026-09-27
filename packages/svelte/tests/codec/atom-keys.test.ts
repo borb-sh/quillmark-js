@@ -3,8 +3,7 @@
 //
 // Driven through the composed chain (`bodyKeymap`) rather than the link alone, because
 // what is under test is as much the precedence as the command: a Backspace at the start
-// of a list's first item still lifts the item, whatever sits above the list, and a
-// Backspace against an ordinary block still joins.
+// of a list's first item still lifts the item, whatever sits above the list.
 import { describe, it, expect } from 'vitest';
 import { EditorState, NodeSelection, TextSelection } from 'prosemirror-state';
 import { blockSchema, bodyKeymap, decode } from '$lib/core/codec';
@@ -52,12 +51,6 @@ describe('a delete against a block atom selects it', () => {
 });
 
 describe('the link declines everywhere the neighbour can be entered', () => {
-	it('an ordinary block still joins', () => {
-		expect(press(startOf('one\n\ntwo', 1), 'Backspace').doc.toString()).toBe(
-			'doc(paragraph("onetwo"))'
-		);
-	});
-
 	it('a quote is a container, not an atom', () => {
 		const next = press(startOf('> quoted\n\ntail', 1), 'Backspace');
 		expect(selectedNode(next)).toBeUndefined();

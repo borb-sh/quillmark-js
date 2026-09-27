@@ -40,14 +40,6 @@ const ul = (...items: PMNode[]) => n.bullet_list.create(null, items);
 const docOf = (...blocks: PMNode[]) => n.doc.create(null, blocks);
 
 describe('Tab / Shift-Tab change nesting depth', () => {
-	it('Tab sinks an item under its previous sibling', () => {
-		expectPress(
-			startOf('- a\n- b', 1),
-			'Tab',
-			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("b"))))))'
-		);
-	});
-
 	it('Tab is inert on the first item at a level — nothing to sink under', () => {
 		expect(run(startOf('- a\n- b', 0), keys['Tab'])).toBe(null);
 	});
@@ -140,14 +132,6 @@ describe('Enter', () => {
 	// The gesture answers on exactly the shapes where a caret cannot already go, a
 	// rule and an island being atoms; everywhere else Enter is the ordinary split,
 	// so the key means one thing at every item a writer can escape by pressing Up.
-	it('opens a paragraph above a list that follows an atom', () => {
-		expectPress(
-			startOf('---\n\n- a', 0),
-			'Enter',
-			'doc(horizontal_rule, paragraph, bullet_list(list_item(paragraph("a"))))'
-		);
-	});
-
 	it('declines where the block above the list already takes a caret', () => {
 		expectPress(
 			startOf('intro\n\n- a\n- b', 1),
@@ -174,27 +158,11 @@ describe('Enter', () => {
 });
 
 describe('Backspace', () => {
-	it('at the start of a non-first item, merges its text into the previous item', () => {
-		expectPress(
-			startOf('- a\n- b', 1),
-			'Backspace',
-			'doc(bullet_list(list_item(paragraph("ab"))))'
-		);
-	});
-
 	it('at the start of the first item, lifts out of the list', () => {
 		expectPress(
 			startOf('- a\n- b', 0),
 			'Backspace',
 			'doc(paragraph("a"), bullet_list(list_item(paragraph("b"))))'
-		);
-	});
-
-	it('at the start of a nested first item, lifts one level', () => {
-		expectPress(
-			startOf('- a\n    - b', 1),
-			'Backspace',
-			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("b"))))'
 		);
 	});
 

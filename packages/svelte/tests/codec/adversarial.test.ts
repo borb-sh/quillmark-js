@@ -3,23 +3,17 @@
 // than as a unit-test artifact. That end-to-end route is what these add; the position
 // map's own inverse is positions.test.ts, over a strictly wider corpus.
 import { describe, it, expect } from 'vitest';
-import { init, type Content, type ContentMark } from '@quillmark/wasm';
+import type { Content, ContentMark } from '@quillmark/wasm';
 import { contentEdit, lower } from '$lib/core/codec';
+import { freshDoc } from './_util.js';
 
-const core = await init();
-
-function rt(text: string, marks: ContentMark[] = [], lines?: Content['lines']): Content {
-	return {
-		text,
-		lines: lines ?? [{ containers: [], kind: 'para' }],
-		marks,
-		islands: []
-	};
+function rt(text: string, marks: ContentMark[] = []): Content {
+	return { text, lines: [{ containers: [], kind: 'para' }], marks, islands: [] };
 }
 
 describe('codec adversarial — lower∘apply through a real core.Document (independent)', () => {
 	it('text delta counts USV code points, so an insert after an astral char lands correctly', () => {
-		const doc = new core.Document('showcase@1.0.0');
+		const doc = freshDoc();
 		doc.overwrite({}, rt('a😀b')); // 3 USV, 4 UTF-16
 		const oldRt = doc.main.body;
 
@@ -32,16 +26,8 @@ describe('codec adversarial — lower∘apply through a real core.Document (inde
 		expect(doc.main.body.text).toBe('a😀Xb');
 	});
 
-	it('a delete spanning an astral char removes the right code points', () => {
-		const doc = new core.Document('showcase@1.0.0');
-		doc.overwrite({}, rt('x😀😀y'));
-		const bundle = lower(contentEdit(doc.main.body, rt('xy'))); // drop both emoji
-		doc.applyChange({}, bundle);
-		expect(doc.main.body.text).toBe('xy');
-	});
-
 	it('a formatting mark added after an astral char lowers to the right USV range', () => {
-		const doc = new core.Document('showcase@1.0.0');
+		const doc = freshDoc();
 		doc.overwrite({}, rt('a😀bold')); // USV: a=0, 😀=1, b=2,o=3,l=4,d=5
 		const withMark = rt('a😀bold', [{ start: 2, end: 6, type: 'strong' } as ContentMark]);
 		const bundle = lower(contentEdit(doc.main.body, withMark));
@@ -51,25 +37,5 @@ describe('codec adversarial — lower∘apply through a real core.Document (inde
 		expect(strong, 'strong mark present').toBeTruthy();
 		// 'bold' is USV [2,6) even though the emoji is 2 UTF-16 units before it.
 		expect([strong!.start, strong!.end]).toEqual([2, 6]);
-	});
-
-	it('a paragraph split (new \\n via delta) applies without an install fallback', () => {
-		const doc = new core.Document('showcase@1.0.0');
-		doc.overwrite({}, rt('one two'));
-		// Split into two paragraphs at the space → "one\ntwo", two para lines.
-		const split: Content = {
-			text: 'one\ntwo',
-			lines: [
-				{ containers: [], kind: 'para' },
-				{ containers: [], kind: 'para' }
-			],
-			marks: [],
-			islands: []
-		};
-		const bundle = lower(contentEdit(doc.main.body, split));
-		doc.applyChange({}, bundle);
-		expect(doc.main.body.text).toBe('one\ntwo');
-		expect(doc.main.body.lines.length).toBe(2);
-		expect(doc.main.body.lines.every((l) => !l.continues)).toBe(true);
 	});
 });

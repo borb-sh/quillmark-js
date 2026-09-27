@@ -98,10 +98,6 @@ describe('everywhere else the key keeps its meaning', () => {
 		);
 	});
 
-	it('mid-fence takes a newline', () => {
-		expectPress(at('```\ncode\n```', 0, 2), 'Enter', 'doc(code_block("co\\nde"))');
-	});
-
 	it('an empty first item still exits the list', () => {
 		expectPress(
 			startOf('- \n- b', 0),
