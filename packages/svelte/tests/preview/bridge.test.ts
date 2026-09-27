@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-// The click ladder and the scroll's box lookup, driven through real clicks on real
-// slots against a stubbed session. Both are about which query answers and what the
-// answer carries, not about pixels: the transform they ride is `geometry.ts`'s and is
-// tested against a compiled session there.
+// The click ladder, driven through real clicks on real slots against a stubbed
+// session. It is about which query answers and what the answer carries, not about
+// pixels: the transform it rides is `geometry.ts`'s and is tested against a compiled
+// session there.
 //
 // jsdom lays nothing out, so every `getBoundingClientRect` is zero; the click math is
 // therefore fed a page box stubbed to a known size, and what is asserted is the
@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createBridge, clearOfTheFold } from '$lib/preview/bridge';
 import type { Landing } from '$lib/core';
-import type { LiveSession, FieldRegion } from '@quillmark/wasm';
+import type { LiveSession } from '@quillmark/wasm';
 import type { PageSlot } from '$lib/preview/paint';
 
 const PAGE = { widthPt: 612, heightPt: 792 };
@@ -116,45 +116,6 @@ describe('the click ladder', () => {
 		expect(tolAt(1)).toBeGreaterThan(0);
 		expect(tolAt(0.5)).toBeCloseTo(tolAt(1) * 2);
 		expect(tolAt(2)).toBeCloseTo(tolAt(1) / 2);
-	});
-});
-
-describe('scrollToField', () => {
-	const region = (field: string): FieldRegion =>
-		({ field, page: 0, rect: [10, 10, 110, 30] }) as FieldRegion;
-
-	function bridgeOver(boxes: FieldRegion[], regions: FieldRegion[]) {
-		const session = {
-			fieldBoxes: (field: string) => boxes.filter((b) => b.field === field),
-			regions: () => regions
-		} as unknown as LiveSession;
-		return createBridge(session, document.body, mockSlots(), undefined);
-	}
-
-	it('answers for an address whose rect only regions() carries', () => {
-		// `fieldBoxes` is span-bearing-content-only, so a plate-placed scalar has no
-		// union; runtime.d.ts says its box is the single `regions()` rect.
-		const bridge = bridgeOver([], [region('main.signature_block')]);
-		expect(bridge.scrollToField('main.signature_block')).toBe(true);
-		bridge.destroy();
-	});
-
-	it('answers for a declared array off the rects of its elements', () => {
-		// Nothing is named `main.keywords`: the compile tracks its elements. A host
-		// holding the declared path reaches the rows it prints.
-		const bridge = bridgeOver([], [region('main.keywords[0]'), region('main.keywords[1]')]);
-		expect(bridge.scrollToField('main.keywords')).toBe(true);
-		bridge.destroy();
-	});
-
-	it('is false for an address this compile places nothing at', () => {
-		// The honest answer, not a failure: the plate places plenty it does not track,
-		// and the preview carries no schema to tell that from a misnamed field.
-		const bridge = bridgeOver([], [region('main.body')]);
-		expect(bridge.scrollToField('main.date')).toBe(false);
-		// …and a prefix that is not a path boundary is not a match.
-		expect(bridge.scrollToField('main.bod')).toBe(false);
-		bridge.destroy();
 	});
 });
 

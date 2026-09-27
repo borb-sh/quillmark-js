@@ -10,30 +10,9 @@ import type { LiveSession } from '@quillmark/wasm';
 import type { EditorError } from '$lib/core';
 import Preview from '$lib/preview/Preview.svelte';
 import RebindHost from './RebindHost.svelte';
+import { mockSession, stubPaintGlobals } from '../helpers/session.js';
 
-// jsdom has no IntersectionObserver; the paint loop only observes visibility, and
-// no page is ever scrolled into view here.
-class NoopIO {
-	observe(): void {}
-	unobserve(): void {}
-	disconnect(): void {}
-}
-beforeAll(() => {
-	(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = NoopIO;
-});
-
-/** A report-only session stub: the geometry verbs the loop calls at build. */
-function mockSession(): LiveSession {
-	return {
-		pageCount: 1,
-		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
-		paint: () => {},
-		regions: () => [],
-		fieldBoxes: () => [],
-		positionAt: () => undefined,
-		locate: () => undefined
-	} as unknown as LiveSession;
-}
+beforeAll(stubPaintGlobals);
 
 let cleanup: (() => void) | undefined;
 afterEach(() => {
