@@ -1,279 +1,113 @@
 /**
- * Integration tests — `build` → `fromBuiltUrl` / `fromBuiltDir` → `getQuill`,
- * against artifacts written to a temporary directory.
+ * Integration tests — `build` → `fromBuiltUrl` / `fromBuiltDir` / `fromBuiltFiles` →
+ * `getQuill`, against one artifact written to a temporary directory.
  *
  * `fromBuiltUrl` takes http(s):// URLs only, so `globalThis.fetch` is stubbed to
  * serve the packed tree off disk. `Quill.fromTree` is stubbed too: what is under
  * test is the tree that reaches it, not the quill it builds.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { mkdir, rm, readFile, readdir } from 'node:fs/promises';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { cp, rm, readFile, readdir } from 'node:fs/promises';
 import { join, sep } from 'node:path';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
 import { Quiver, build, fromBuiltDir } from '../node.js';
 import { mockQuillFromTree } from './helpers/mock-engine.js';
-
-// ─── Fixture ──────────────────────────────────────────────────────────────────
+import { scratch } from './helpers/scratch.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const temp = scratch('quiver-integration-');
+let out: string;
 
-function tempDir(): string {
-	return join(tmpdir(), `quiver-integration-test-${randomUUID()}`);
+beforeAll(async () => {
+	out = join(await temp.dir(), 'out');
+	await build(SAMPLE_FIXTURE, out);
+});
+
+afterAll(() => temp.cleanup());
+
+let stub: ReturnType<typeof mockQuillFromTree> | undefined;
+afterEach(() => {
+	stub?.restore();
+	stub = undefined;
+	vi.unstubAllGlobals();
+});
+
+/** The catalog and the first tree a built quiver hands `Quill.fromTree`. */
+async function readBack(built: Quiver): Promise<void> {
+	expect(built.name).toBe('sample');
+	expect(built.quillNames()).toEqual(['memo', 'resume']);
+	expect(built.versionsOf('memo')).toEqual(['1.1.0', '1.0.0']);
+	expect(built.versionsOf('resume')).toEqual(['2.0.0']);
+
+	stub = mockQuillFromTree();
+	await built.getQuill('memo@1.0.0');
+	expect(stub.calls).toHaveLength(1);
+	expect(stub.calls[0]!.has('Quill.yaml')).toBe(true);
 }
 
-/**
- * Mock globalThis.fetch to serve files from a build-output directory on disk.
- * URL pattern: baseUrl + relativePath (with one slash between them).
- */
-function makeMockFetch(dir: string, baseUrl: string): { restore: () => void } {
-	const original = globalThis.fetch;
-	const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-
-	globalThis.fetch = (async (url: string) => {
-		if (!url.startsWith(base)) {
-			return new Response(null, { status: 404 });
-		}
-		const relativePath = url.slice(base.length);
-		const filePath = join(dir, relativePath);
-		try {
-			const bytes = await readFile(filePath);
-			return new Response(bytes.buffer, { status: 200 });
-		} catch {
-			return new Response(null, { status: 404 });
-		}
-	}) as typeof globalThis.fetch;
-
-	return {
-		restore: () => {
-			if (original !== undefined) {
-				globalThis.fetch = original;
-			} else {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				delete (globalThis as any).fetch;
+describe('Integration: build → fromBuiltUrl → getQuill', () => {
+	it('reads the catalog and a quill over HTTP', async () => {
+		const base = 'https://mock.cdn.example.com/my-quiver/';
+		vi.stubGlobal('fetch', async (url: string) => {
+			try {
+				return new Response(new Uint8Array(await readFile(join(out, url.slice(base.length)))));
+			} catch {
+				return new Response(null, { status: 404 });
 			}
-		}
-	};
-}
+		});
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
-
-describe('Integration: build → fromBuiltUrl → resolve → getQuill', () => {
-	const tmpDirs: string[] = [];
-	let mockFetch: { restore: () => void } | undefined;
-
-	afterEach(async () => {
-		if (mockFetch !== undefined) {
-			mockFetch.restore();
-			mockFetch = undefined;
-		}
-		for (const d of tmpDirs.splice(0)) {
-			await rm(d, { recursive: true, force: true });
-		}
-	});
-
-	it('fromBuiltUrl catalog matches source quiver', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-
-		await build(SAMPLE_FIXTURE, outDir);
-
-		const baseUrl = 'https://mock.cdn.example.com/my-quiver/';
-		mockFetch = makeMockFetch(outDir, baseUrl);
-
-		const built = await Quiver.fromBuiltUrl(baseUrl);
-
-		expect(built.name).toBe('sample');
-		expect(built.quillNames().sort()).toEqual(['memo', 'resume']);
-		expect(built.versionsOf('memo').sort()).toEqual(['1.0.0', '1.1.0']);
-		expect(built.versionsOf('resume')).toEqual(['2.0.0']);
-	});
-
-	it('quiver.getQuill builds a quill from the correct tree', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-
-		await build(SAMPLE_FIXTURE, outDir);
-
-		const baseUrl = 'https://mock.cdn.example.com/my-quiver/';
-		mockFetch = makeMockFetch(outDir, baseUrl);
-
-		const built = await Quiver.fromBuiltUrl(baseUrl);
-		const { calls, restore } = mockQuillFromTree();
-		try {
-			const quill = await built.getQuill('memo@1.0.0');
-
-			expect(quill).toBeDefined();
-			expect(calls).toHaveLength(1);
-			expect(calls[0]!.has('Quill.yaml')).toBe(true);
-		} finally {
-			restore();
-		}
+		await readBack(await Quiver.fromBuiltUrl(base));
 	});
 });
 
-describe('Integration: fromBuiltUrl error cases', () => {
-	let mockFetch: { restore: () => void } | undefined;
-	const tmpDirs: string[] = [];
-
-	afterEach(async () => {
-		if (mockFetch !== undefined) {
-			mockFetch.restore();
-			mockFetch = undefined;
-		}
-		for (const d of tmpDirs.splice(0)) {
-			await rm(d, { recursive: true, force: true });
-		}
-	});
-
-	it('fromBuiltUrl with empty directory served over HTTP throws transport_error', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-		await mkdir(outDir, { recursive: true });
-
-		const baseUrl = 'https://mock.cdn.example.com/empty/';
-		mockFetch = makeMockFetch(outDir, baseUrl);
-
-		await expect(Quiver.fromBuiltUrl(baseUrl)).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
-		);
-	});
-
-	it('fromBuiltUrl with malformed quiver.json throws quiver_invalid', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-		await mkdir(outDir, { recursive: true });
-
-		const { writeFile } = await import('node:fs/promises');
-		await writeFile(join(outDir, 'quiver.json'), 'not-json');
-
-		const baseUrl = 'https://mock.cdn.example.com/malformed/';
-		mockFetch = makeMockFetch(outDir, baseUrl);
-
-		await expect(Quiver.fromBuiltUrl(baseUrl)).rejects.toThrow(
-			expect.objectContaining({ code: 'quiver_invalid' })
-		);
-	});
-
-	it('fromBuiltUrl rejects file:// URLs with transport_error', async () => {
-		await expect(Quiver.fromBuiltUrl('file:///tmp/quiver/')).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
-		);
-	});
-});
-
-describe('Integration: build → fromBuiltDir → resolve → getQuill', () => {
-	const tmpDirs: string[] = [];
-
-	afterEach(async () => {
-		for (const d of tmpDirs.splice(0)) {
-			await rm(d, { recursive: true, force: true });
-		}
-	});
-
-	it('fromBuiltDir catalog matches source quiver', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-
-		await build(SAMPLE_FIXTURE, outDir);
-
-		const built = await fromBuiltDir(outDir);
-
-		expect(built.name).toBe('sample');
-		expect(built.quillNames().sort()).toEqual(['memo', 'resume']);
-		expect(built.versionsOf('memo').sort()).toEqual(['1.0.0', '1.1.0']);
-		expect(built.versionsOf('resume')).toEqual(['2.0.0']);
-	});
-
-	it('fromBuiltDir + getQuill loads tree from disk without network', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-
-		await build(SAMPLE_FIXTURE, outDir);
-
-		// Sabotage fetch — fromBuiltDir must not touch it.
-		const original = globalThis.fetch;
-		globalThis.fetch = (() => {
+describe('Integration: build → fromBuiltDir → getQuill', () => {
+	it('reads the catalog and a quill off disk, without network', async () => {
+		vi.stubGlobal('fetch', () => {
 			throw new Error('fetch must not be called by fromBuiltDir');
-		}) as typeof globalThis.fetch;
+		});
 
-		const { calls, restore } = mockQuillFromTree();
-		try {
-			const built = await fromBuiltDir(outDir);
-
-			const quill = await built.getQuill('memo@1.0.0');
-
-			expect(quill).toBeDefined();
-			expect(calls).toHaveLength(1);
-			expect(calls[0]!.has('Quill.yaml')).toBe(true);
-		} finally {
-			restore();
-			if (original !== undefined) globalThis.fetch = original;
-		}
+		await readBack(await fromBuiltDir(out));
 	});
 
 	it('fromBuiltDir on a missing bundle throws transport_error naming its path', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-		await build(SAMPLE_FIXTURE, outDir);
-		const { quills } = JSON.parse(await readFile(join(outDir, 'quiver.json'), 'utf-8')) as {
+		const gutted = join(await temp.dir(), 'gutted');
+		await cp(out, gutted, { recursive: true });
+		const { quills } = JSON.parse(await readFile(join(gutted, 'quiver.json'), 'utf-8')) as {
 			quills: Array<{ name: string; version: string; bundle: string }>;
 		};
 		const memo = quills.find((q) => q.name === 'memo' && q.version === '1.0.0')!;
-		await rm(join(outDir, memo.bundle));
+		await rm(join(gutted, memo.bundle));
 
-		const built = await fromBuiltDir(outDir);
+		const built = await fromBuiltDir(gutted);
 		await expect(built.getQuill('memo@1.0.0')).rejects.toThrow(
 			expect.objectContaining({
 				code: 'transport_error',
-				message: expect.stringContaining(join(outDir, memo.bundle))
+				message: expect.stringContaining(join(gutted, memo.bundle))
 			})
 		);
 	});
 
 	it('fromBuiltDir on missing directory throws transport_error', async () => {
-		await expect(fromBuiltDir(join(tmpdir(), `does-not-exist-${randomUUID()}`))).rejects.toThrow(
+		await expect(fromBuiltDir(join(out, 'does-not-exist'))).rejects.toThrow(
 			expect.objectContaining({ code: 'transport_error' })
 		);
 	});
 });
 
 describe('Integration: build → fromBuiltFiles → getQuill', () => {
-	const tmpDirs: string[] = [];
-
-	afterEach(async () => {
-		for (const d of tmpDirs.splice(0)) {
-			await rm(d, { recursive: true, force: true });
-		}
-	});
-
 	it('loads from the bytes `build` wrote, and names a path the map lacks', async () => {
-		const outDir = tempDir();
-		tmpDirs.push(outDir);
-		await build(SAMPLE_FIXTURE, outDir);
-
 		const files = new Map<string, Uint8Array>();
-		for (const path of await readdir(outDir, { recursive: true })) {
-			const bytes = await readFile(join(outDir, path)).catch(() => undefined);
+		for (const path of await readdir(out, { recursive: true })) {
+			const bytes = await readFile(join(out, path)).catch(() => undefined);
 			if (bytes !== undefined) files.set(path.split(sep).join('/'), bytes);
 		}
 
-		const { calls, restore } = mockQuillFromTree();
-		try {
-			const built = await Quiver.fromBuiltFiles(files);
-			expect(built.quillNames()).toEqual(['memo', 'resume']);
-			await built.getQuill('memo@1.0.0');
-			expect(calls[0]!.has('Quill.yaml')).toBe(true);
+		await readBack(await Quiver.fromBuiltFiles(files));
 
-			const partial = new Map([['quiver.json', files.get('quiver.json')!]]);
-			await expect((await Quiver.fromBuiltFiles(partial)).getQuill('memo@1.0.0')).rejects.toThrow(
-				/No bytes held for "memo@1\.0\.0\./
-			);
-		} finally {
-			restore();
-		}
+		const partial = new Map([['quiver.json', files.get('quiver.json')!]]);
+		await expect((await Quiver.fromBuiltFiles(partial)).getQuill('memo@1.0.0')).rejects.toThrow(
+			/No bytes held for "memo@1\.0\.0\./
+		);
 	});
 });

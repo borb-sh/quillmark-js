@@ -4,12 +4,12 @@
  * filter that keeps a pack from feeding itself, and a queue that survives a failure.
  */
 
-import { describe, it, expect } from 'vitest';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { describe, it, expect, afterEach } from 'vitest';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { within } from '../paths.js';
 import { serialize, settle, watchCollection } from '../watch.js';
+import { scratch } from './helpers/collection.js';
 
 describe('the watch filter', () => {
 	it('the output a pack writes is not a source change', () => {
@@ -58,40 +58,34 @@ describe('settle', () => {
 });
 
 describe('watchCollection', () => {
+	const temp = scratch('quillkit-watch-');
+	afterEach(() => temp.cleanup());
+
 	it('close() ends the scheduled repack, not just the registration', async () => {
-		const at = await mkdtemp(join(tmpdir(), 'quillkit-watch-'));
-		try {
-			let packs = 0;
-			const watcher = watchCollection(at, [], () => packs++);
-			await writeFile(join(at, 'Quiver.yaml'), 'name: w\n');
-			// Inside the settle window, which is the whole of what `close` has to answer
-			// for: the event has landed and the repack has not.
-			await new Promise((ok) => setTimeout(ok, 10));
-			watcher.close();
-			await new Promise((ok) => setTimeout(ok, 200));
-			expect(packs).toBe(0);
-		} finally {
-			await rm(at, { recursive: true, force: true });
-		}
+		const at = await temp.dir();
+		let packs = 0;
+		const watcher = watchCollection(at, [], () => packs++);
+		await writeFile(join(at, 'Quiver.yaml'), 'name: w\n');
+		// Inside the settle window, which is the whole of what `close` has to answer
+		// for: the event has landed and the repack has not.
+		await new Promise((ok) => setTimeout(ok, 10));
+		watcher.close();
+		await new Promise((ok) => setTimeout(ok, 200));
+		expect(packs).toBe(0);
 	});
 
 	it('repacks a collection that itself lives under node_modules', async () => {
 		// A quiver is consumed as a dependency, so `studio` is run against a root whose
 		// own path holds the segment the filter refuses. Reading it there answers every
 		// edit in the collection with silence.
-		const base = await mkdtemp(join(tmpdir(), 'quillkit-watch-'));
-		try {
-			const at = join(base, 'node_modules', '@acme', 'quills');
-			await mkdir(at, { recursive: true });
-			let packs = 0;
-			const watcher = watchCollection(at, [], () => packs++);
-			await writeFile(join(at, 'Quiver.yaml'), 'name: w\n');
-			await new Promise((ok) => setTimeout(ok, 300));
-			watcher.close();
-			expect(packs).toBe(1);
-		} finally {
-			await rm(base, { recursive: true, force: true });
-		}
+		const at = join(await temp.dir(), 'node_modules', '@acme', 'quills');
+		await mkdir(at, { recursive: true });
+		let packs = 0;
+		const watcher = watchCollection(at, [], () => packs++);
+		await writeFile(join(at, 'Quiver.yaml'), 'name: w\n');
+		await new Promise((ok) => setTimeout(ok, 300));
+		watcher.close();
+		expect(packs).toBe(1);
 	});
 });
 

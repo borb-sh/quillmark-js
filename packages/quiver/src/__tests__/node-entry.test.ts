@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Quiver as MainQuiver } from '../index.js';
-import { Quiver as NodeQuiver, fromDir, fromBuiltDir, build } from '../node.js';
+import { Quiver as NodeQuiver, fromDir } from '../node.js';
 
 describe('node entry — the class is untouched', () => {
 	it('re-exports the same constructor as the main entry', () => {
@@ -30,14 +30,6 @@ describe('node entry — the class is untouched', () => {
 });
 
 describe('node entry — the factories', () => {
-	it('exports each filesystem factory as a free function', () => {
-		expect([fromDir, fromBuiltDir, build].map((f) => typeof f)).toEqual([
-			'function',
-			'function',
-			'function'
-		]);
-	});
-
 	it('returns an instance of the constructor the main entry exports', async () => {
 		const fixture = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 		expect(await fromDir(fixture)).toBeInstanceOf(MainQuiver);
@@ -63,6 +55,11 @@ describe('the file:// refusal names a real export', () => {
 	});
 
 	it('names the module the free function is reachable from', async () => {
-		await expect(refuse()).rejects.toThrow(/@quillmark\/quiver\/node/);
+		await expect(refuse()).rejects.toThrow(
+			expect.objectContaining({
+				code: 'transport_error',
+				message: expect.stringContaining('@quillmark/quiver/node')
+			})
+		);
 	});
 });

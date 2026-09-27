@@ -24,12 +24,11 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init, Engine } from '@quillmark/wasm';
 import { build, fromBuiltDir, fromDir } from '../node.js';
+import { scratch } from './helpers/scratch.js';
 
 const core = await init();
 
@@ -44,7 +43,7 @@ const RENDER_FIXTURE = fileURLToPath(new URL('./fixtures/render-quiver', import.
 const REFERENCE_QUIVER = fileURLToPath(new URL('../../../../fixtures', import.meta.url));
 
 describe('Engine.render against a quiver quill', () => {
-	it('renders a fixture quill end-to-end with a real Engine', async () => {
+	it('renders a fixture quill, and clones it on render — the same handle renders twice', async () => {
 		const quiver = await fromDir(RENDER_FIXTURE);
 		const engine = new Engine();
 
@@ -52,31 +51,11 @@ describe('Engine.render against a quiver quill', () => {
 		// The fixture declares `backend: typst`; the Engine routes on this.
 		expect(quill.backendId).toBe('typst');
 
-		const doc = quill.seedDocument();
-		try {
-			const result = await engine.render(quill, doc);
-
-			expect(result.artifacts.length).toBeGreaterThan(0);
-			const [artifact] = result.artifacts;
-			expect(artifact.bytes).toBeInstanceOf(Uint8Array);
-			expect(artifact.bytes.length).toBeGreaterThan(0);
-		} finally {
-			doc.free();
-		}
-	}, 60000);
-
-	it('clones the quill on render — the same handle renders twice', async () => {
-		const quiver = await fromDir(RENDER_FIXTURE);
-		const engine = new Engine();
-
-		const quill = await quiver.getQuill('memo@1.0.0');
-		expect(quill.backendId).toBe('typst');
-
-		// First render.
 		const first = quill.seedDocument();
 		try {
 			const result = await engine.render(quill, first);
 			expect(result.artifacts.length).toBeGreaterThan(0);
+			expect(result.artifacts[0].bytes).toBeInstanceOf(Uint8Array);
 		} finally {
 			first.free();
 		}
@@ -127,19 +106,18 @@ describe('Engine.render against a quiver quill', () => {
 describe('the reference quill, source → build → fetch → render', () => {
 	// One test, the whole pipeline. Every reader shares the index validation and the
 	// unzip path, so `fromBuiltDir` covers them without a server.
-	let outDir: string;
+	const temp = scratch('quiver-reference-');
+	let packed: string;
 
 	beforeAll(async () => {
-		outDir = await mkdtemp(join(tmpdir(), 'quiver-reference-'));
-		await build(REFERENCE_QUIVER, join(outDir, 'packed'));
+		packed = join(await temp.dir(), 'packed');
+		await build(REFERENCE_QUIVER, packed);
 	}, 60000);
 
-	afterAll(async () => {
-		await rm(outDir, { recursive: true, force: true });
-	});
+	afterAll(() => temp.cleanup());
 
 	it('packs the reference quiver and renders it back out of the artifact', async () => {
-		const built = await fromBuiltDir(join(outDir, 'packed'));
+		const built = await fromBuiltDir(packed);
 		// The source quiver carries two quills and the artifact carries one: `usaf_memo`
 		// sits at `0.0.0`, under the draft floor, so a build leaves it out. It is a copy
 		// of a shipped quill rather than that release, and the version is what says so —
@@ -174,11 +152,12 @@ describe('the reference quill, source → build → fetch → render', () => {
 		// quill that went in. A build that drops, truncates, or reorders a file
 		// shows up here rather than as a typesetting error downstream.
 		const source = await (await fromDir(REFERENCE_QUIVER)).getQuill('showcase@1.0.0');
-		const built = await (await fromBuiltDir(join(outDir, 'packed'))).getQuill('showcase@1.0.0');
+		const built = await (await fromBuiltDir(packed)).getQuill('showcase@1.0.0');
 
 		const before = source.toTree();
 		const after = built.toTree();
 		expect([...after.keys()].sort()).toEqual([...before.keys()].sort());
-		for (const [path, bytes] of before) expect(after.get(path)).toEqual(bytes);
+		for (const [path, bytes] of before)
+			expect(Buffer.from(after.get(path)!).equals(bytes), path).toBe(true);
 	}, 120000);
 });

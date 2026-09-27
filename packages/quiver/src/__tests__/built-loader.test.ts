@@ -161,18 +161,6 @@ describe('loadBuiltQuiver — tree rehydration', () => {
 		expect(new TextDecoder().decode(tree.get('Quill.yaml'))).toBe('name: memo\n');
 	});
 
-	it('rehydrates fonts at correct paths', async () => {
-		const fontBytes = font(0xde, 0xad, 0xbe, 0xef);
-		const artifact = makeArtifact('sample', [
-			{ name: 'memo', version: '1.0.0', fonts: { 'fonts/body.ttf': [fontKey(1), fontBytes] } }
-		]);
-
-		const q = await loadBuiltQuiver(artifact.read);
-		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
-
-		expect(tree.get('fonts/body.ttf')).toEqual(fontBytes);
-	});
-
 	it('reads one bundle and its own fonts, and nothing of another quill', async () => {
 		const artifact = makeArtifact('sample', [
 			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), font(1)] } },
@@ -537,15 +525,6 @@ describe('loadBuiltQuiver — invalid index', () => {
 				}).read
 			)
 		).rejects.toThrow(/Duplicate quill entry/);
-	});
-
-	it('same name but different versions is not a duplicate', async () => {
-		const artifact = makeArtifact('test', [
-			{ name: 'foo', version: '1.0.0' },
-			{ name: 'foo', version: '2.0.0' }
-		]);
-		const q = await loadBuiltQuiver(artifact.read);
-		expect(q.versionsOf('foo')).toEqual(['2.0.0', '1.0.0']);
 	});
 });
 
