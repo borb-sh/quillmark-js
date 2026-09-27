@@ -18,8 +18,8 @@ main:
 
       Lines that take no number, letter, or bullet — a roster of names, an address — go in a block quote, typeset as written. End a line with a backslash to break it.
 
-      > FIRST M. LAST, Maj, USAF\
-      > SECOND N. LAST, Capt, USAF
+      > MARY E. BROWN, Maj, USAF\
+      > ROBERT L. JONES, Capt, USAF
   fields:
     memo_for:
       type: array
@@ -27,8 +27,8 @@ main:
         type: plaintext
         inline: true
       example:
-        - ORG1/SYMBOL
-        - ORG2/SYMBOL
+        - 123 OG/CC
+        - 123 MXG/CC
       ui:
         group: addressing
         compact: true
@@ -41,10 +41,9 @@ main:
         inline: true
       default: []
       example:
-        - ORG/SYMBOL
-        - Organization Name
-        - 123 Street Ave
-        - City ST 12345-6789
+        - 123 CS/SCX
+        - 1 Example Way
+        - Example AFB ST 12345-6789
       ui:
         group: addressing
         compact: true
@@ -53,7 +52,7 @@ main:
     subject:
       type: richtext
       inline: true
-      example: Subject of the Memorandum
+      example: "Annual Records Management Review (Suspense: 30 October 2026)"
       ui:
         group: addressing
       description: "Keep it brief. Capitalize the first letter of each word except articles, prepositions, and conjunctions. Put any suspense date in parentheses. Italicize publication titles with *asterisks*."
@@ -64,7 +63,7 @@ main:
       ui:
         group: addressing
         compact: true
-      description: "YYYY-MM-DD, printed in the format the Memo Style field selects. Leave blank to use today's date."
+      description: "YYYY-MM-DD, printed in the format the Memo Style field selects. Leave blank to print a fillable PDF text field for the signer to type the date into when signing."
       
     authority_line:
       type: plaintext
@@ -82,8 +81,8 @@ main:
         type: plaintext
         inline: true
       example:
-        - "FIRST M. LAST, Rank, USAF"
-        - Duty Title
+        - "JOHN B. SMITH, Maj, USAF"
+        - Director of Operations
       ui:
         group: addressing
         compact: true
@@ -98,7 +97,7 @@ main:
         - DEPARTMENT OF THE AIR FORCE
       example:
         - DEPARTMENT OF THE AIR FORCE
-        - HEADQUARTERS [UNIT NAME]
+        - 123D COMMUNICATIONS SQUADRON
       ui:
         group: letterhead
       description: "Letterhead lines, top to bottom, all rendered in uppercase. The first is the department title, set larger than the rest. Change that line only for a Joint Command or a DoW agency. The lines below it are your unit's full organization name."
@@ -197,7 +196,7 @@ main:
         inline: true
       default: []
       example:
-        - Rank and Name, ORG/SYMBOL
+        - 123 WG/CCE
       ui:
         group: additional
       description: Offices or people receiving a courtesy copy, one per line.
@@ -209,8 +208,10 @@ main:
         inline: true
       default: []
       example:
-        - ORG1/SYMBOL
-        - ORG2/SYMBOL
+        - 123 OG/CC
+        - 123 MXG/CC
+        - 123 MSG/CC
+        - 123 MDG/CC
       ui:
         group: additional
       description: "Every recipient, listed here when 'SEE DISTRIBUTION' stands in the Memo For field."
@@ -222,7 +223,7 @@ main:
         inline: true
       default: []
       example:
-        - Attachment description, YYYY MMM DD
+        - Records Management Self-Inspection Checklist, 1 September 2026
       ui:
         group: additional
       description: "Attachments in the order the memo mentions them. Describe each briefly; do not write 'as stated' or abbreviate. A lone attachment prints unnumbered, two or more are numbered. Italicize publication titles with *asterisks*."
@@ -256,7 +257,7 @@ card_kinds:
       from:
         type: plaintext
         inline: true
-        example: ORG/SYMBOL
+        example: 123 OG/CC
         ui:
           group: addressing
           compact: true
@@ -264,7 +265,7 @@ card_kinds:
       for:
         type: plaintext
         inline: true
-        example: ORG/SYMBOL
+        example: 123 CS/CC
         ui:
           group: addressing
           compact: true
@@ -290,8 +291,8 @@ card_kinds:
           type: plaintext
           inline: true
         example:
-          - "FIRST M. LAST, Rank, USAF"
-          - Duty Title
+          - "RICHARD C. ROE, Col, USAF"
+          - Commander
         ui:
           group: addressing
           compact: true
