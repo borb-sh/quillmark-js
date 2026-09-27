@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.10.0 - 2026-09-27
+
 **Studio fills a quill's examples on a press.** **Fill examples** in the head writes each unanswered top-level field's `example:` as its answer, on the main card and every composable card, so a page is judged with answers in it without typing them. A field already answered keeps its value, and an example nested under an array's `items` or an object's `properties` is not written. A document still opens as the seed.
 
 ## v0.9.0 - 2026-09-26
