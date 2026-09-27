@@ -115,9 +115,9 @@
 
 	// What an unset field shows of its `default:`: the resolved value (provenance,
 	// `source === 'default'`). `ghost` is the raw typed value (enum/number/boolean
-	// fallbacks, a content leaf's `Content`), `defaultStr` its string form (the date
-	// control's `YYYY-MM-DD`); an object-valued default has none. An array draws its
-	// declared literal instead, which is what a take writes (`ArrayField`).
+	// fallbacks, a content leaf's `Content`), `defaultStr` its string form; an
+	// object-valued default has none. An array draws its declared literal instead,
+	// which is what a take writes (`ArrayField`).
 	// A default that prints stands in the control as the value it is, at the default
 	// rung, and the first edit takes it (VISUAL_EDITOR §"The commitment ladder"). Where
 	// nothing prints, a control draws words: the `none` an optional cell prints, and
@@ -127,9 +127,10 @@
 		field.control === 'prose' ? titleText(ghost) || undefined : stringifyGhost(ghost)
 	);
 	const printed = $derived(printedText(defaultStr));
-	// A text or number control reads its default off the schema, not the resolved row:
-	// the row stops naming a default once the field is written, and emptying a written
-	// field still has to know that the default prints.
+	// A text, number or date control reads its default off the schema, not the resolved
+	// row: the row stops naming a default once the field is written, and emptying a
+	// written field still has to know that the default prints. A date's `default: today`
+	// resolves to digits, and the control has to know it follows the render date.
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
 	const none = $derived(optional && value == null ? t.strings.optionalGhost : undefined);
@@ -350,7 +351,8 @@
 				<DateField
 					bind:this={dateEl}
 					value={value as string | undefined}
-					fallback={defaultStr}
+					fallback={stringifyGhost(field.schema.default)}
+					datetime={baseType(field.schema) === 'datetime'}
 					labelledBy={domIds.label}
 					{describedBy}
 					onCommit={onCommitScalar}

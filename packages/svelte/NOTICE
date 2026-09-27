@@ -6,9 +6,10 @@ Copyright 2026 Nibs
 This package contains SVG glyph geometry derived from Lucide, carried in source
 rather than installed.
 
-`visual/icons/nodes.ts` holds sixteen verbatim from @lucide/svelte 1.28.0:
+`visual/icons/nodes.ts` holds nineteen verbatim from @lucide/svelte 1.28.0:
 chevron-right, arrow-right, chevron-down, chevron-up, bold, italic, underline,
-strikethrough, code, link, hash, info, plus, x, trash-2 and minus.
+strikethrough, code, link, hash, info, plus, x, trash-2, minus, check, calendar
+and calendar-check.
 
 `core/codec/table-view.ts` holds a plus and four text-alignment glyphs derived
 from an earlier release of the same project.

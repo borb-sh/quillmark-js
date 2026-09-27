@@ -1,10 +1,17 @@
 <!--
  A `date` (or `datetime`) field → a styled segmented date field on bits-ui. The
- stored value is a string (fixture uses `YYYY-MM-DD`, blank to mean "today at
- render"); a cleared control commits `undefined` (the unset rung): the parent
- removes the field, so the memo quill's blank-date → `datetime.today`
- substitution applies. The value-object a date field lowers to is a
- render-time concern: the editor only sees the stored string.
+ stored value is a string, `YYYY-MM-DD` or `today`; a cleared control commits
+ `undefined` (the unset rung): the parent removes the field, and the quill's
+ `default:` applies. The value-object a date field lowers to is a render-time
+ concern: the editor only sees the stored string.
+
+ `today` is the render date rather than a written one (canon `SCHEMAS.md`), so its
+ digits take the default rung: they print, and nothing wrote them. The digits are
+ the local date, which is what `resolve` and a session opened without a date both
+ render. The Today toggle writes `today`, and pressed, writes those digits; `T` in a
+ segment writes `today` too. An edit to a segment writes a whole date, the other
+ segments the render date's. A `default: today` presses the toggle at the default
+ rung while the field is unset.
 
  Styled rather than a native `<input type="date">`: that control's calendar popup
  is UA-owned and reaches no dial. `DateField` (segments, no
@@ -41,14 +48,20 @@
 -->
 <script lang="ts">
 	import { DateField as BitsDateField } from 'bits-ui';
-	import { parseDate, type DateValue } from '@internationalized/date';
+	import { getLocalTimeZone, parseDate, today, type DateValue } from '@internationalized/date';
+	import Icon from './icons/Icon.svelte';
+	import { wording } from './strings.js';
 	import { syncedLocal } from './synced.svelte.js';
 	import './controls.css';
 
+	const t = wording();
+	const TODAY = 'today';
+	const renderDate = today(getLocalTimeZone());
+
 	interface Props {
 		value: string | undefined;
-		/** The resolved `default:` in the boundary's currency (`YYYY-MM-DD`): parsed
-		 * for display only, shown while unset, never written. */
+		/** The declared `default:` (`YYYY-MM-DD` or `today`): parsed for display only,
+		 * shown while unset, never written. */
 		fallback?: string;
 		/** Accessible name for a field nothing else names: an object property, whose
 		 * name is the field label plus the property's. A field's own date takes
@@ -65,9 +78,12 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel): announced after the name. */
 		describedBy?: string;
+		/** A `datetime`: `today` is no value of its type, so it draws no toggle and
+		 * takes no `T`. */
+		datetime?: boolean;
 		onCommit: (v: string | undefined) => void;
 	}
-	let { value, fallback, label, labelledBy, describedBy, onCommit }: Props = $props();
+	let { value, fallback, label, labelledBy, describedBy, datetime, onCommit }: Props = $props();
 
 	let wrapEl: HTMLElement | undefined = $state();
 	/** Take the caret: what the label click, and a parent placing focus here, calls.
@@ -83,6 +99,7 @@
 	// throws on a malformed authored value: an empty field is the honest render.
 	function toDateValue(s: string): DateValue | undefined {
 		if (!s) return undefined;
+		if (s === TODAY) return renderDate;
 		try {
 			return parseDate(s);
 		} catch {
@@ -110,6 +127,27 @@
 	// a boolean so the substitution below narrows on the one fact it needs.
 	const ghost = $derived(local.value === '' ? fallbackDate : undefined);
 	const seated = $derived(value == null && seat && local.value !== '');
+	/** Who put `today` here, while the field follows the render date. */
+	const follows = $derived(
+		local.value === TODAY ? 'authored' : value == null && fallback === TODAY ? 'default' : undefined
+	);
+
+	function write(next: string): void {
+		local.value = next;
+		seat = false;
+		onCommit(next);
+	}
+	function toggle(): void {
+		write(follows ? renderDate.toString() : TODAY);
+	}
+	function shortcut(e: KeyboardEvent): void {
+		if (datetime || e.key.toLowerCase() !== 't' || e.ctrlKey || e.metaKey || e.altKey) return;
+		const seg = (e.target as HTMLElement).dataset.segment;
+		if (!seg || seg === 'literal') return;
+		e.preventDefault();
+		e.stopPropagation();
+		write(TODAY);
+	}
 
 	/** Focus moving between segments is neither an entry nor a leaving. */
 	const within = (e: FocusEvent): boolean => !!wrapEl?.contains(e.relatedTarget as Node | null);
@@ -152,7 +190,13 @@
 	}
 </script>
 
-<span class="qm-date-wrap" bind:this={wrapEl} onfocusin={enter} onfocusout={leave}>
+<span
+	class="qm-date-wrap"
+	bind:this={wrapEl}
+	onfocusin={enter}
+	onfocusout={leave}
+	onkeydowncapture={shortcut}
+>
 	<BitsDateField.Root
 		value={parsed}
 		placeholder={fallbackDate}
@@ -160,9 +204,9 @@
 			// `CalendarDate.toString()` is exactly `YYYY-MM-DD`. A cleared or
 			// half-typed field yields undefined: the unset rung. The primitive reports
 			// its own value again as a segment loses focus, which is no edit, and over a
-			// seated default would write it.
+			// seated default or `today` would write it.
 			const next = d?.toString() ?? '';
-			if (next === local.value) return;
+			if (next === (parsed?.toString() ?? '')) return;
 			local.value = next;
 			if (!d) seat = false;
 			onCommit(d?.toString());
@@ -179,7 +223,7 @@
 			aria-labelledby={labelledBy}
 			aria-describedby={describedBy}
 			data-ghosted={ghost ? '' : undefined}
-			data-default={seated ? '' : undefined}
+			data-default={seated || follows ? '' : undefined}
 		>
 			{#snippet children({ segments })}
 				<!-- Keyed by index: `part` repeats (the `literal` separators between
@@ -194,6 +238,17 @@
 						{shown.text}
 					</BitsDateField.Segment>
 				{/each}
+				{#if !datetime}
+					<button
+						type="button"
+						class="qm-chip qm-tap-floor qm-focus-ring qm-date-today"
+						aria-pressed={!!follows}
+						data-default={follows === 'default' ? '' : undefined}
+						onclick={toggle}
+					>
+						<Icon name={follows ? 'calendar-check' : 'calendar'} />{t.strings.dateToday}
+					</button>
+				{/if}
 			{/snippet}
 		</BitsDateField.Input>
 	</BitsDateField.Root>
@@ -234,5 +289,33 @@
 	.qm-date-wrap :global(.qm-date-segment[data-ghosted='default']),
 	.qm-date-wrap :global(.qm-date[data-default] .qm-date-segment) {
 		color: var(--_qm-ink-default);
+	}
+	/* The toggle's state is its fill and its glyph, never the pointer: a hover fill
+	 would read as pressed. Off, it rests hidden where a pointer can reveal it, still
+	 holding its width so the digits never shift. It sits inside the box's line, so
+	 the box stands as tall as the inputs beside it. */
+	.qm-date-today {
+		margin-inline-start: auto;
+		padding-block: var(--_qm-space-half);
+		line-height: 1;
+		border-radius: var(--_qm-radius-inner);
+	}
+	.qm-date-today:hover {
+		background: transparent;
+		color: var(--_qm-ink-label);
+	}
+	.qm-date-today[aria-pressed='true'] {
+		background: var(--_qm-accent-tint);
+		color: var(--_qm-ink);
+	}
+	.qm-date-today[data-default] {
+		background: transparent;
+		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-border);
+		color: var(--_qm-ink-default);
+	}
+	@media (hover: hover) {
+		.qm-date-wrap:not(:hover, :focus-within) .qm-date-today[aria-pressed='false'] {
+			opacity: 0;
+		}
 	}
 </style>

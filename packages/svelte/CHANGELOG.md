@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A date field holds `today`.** A field storing `today` draws the render date's digits at the default rung, where it drew an empty field. A **Today** toggle at the end of a `date` field (a `datetime` holds no `today`) writes `today`, and pressed again writes the digits it showed; `T` in a segment writes `today` too, and a segment edit writes a whole date. While off, the toggle is hidden until the pointer is over the field or the focus is in it. A `default: today` presses it at the default rung while the field is unset. `VisualStrings.dateToday` is its label.
+
 **A body edited back to empty ghosts nothing**, as a field's prose leaf does: its `body.example`, `strings.bodyPlaceholder` or `Write…` goes at the leaf's first edit and does not return when the text is deleted.
 
 **A collapsed `object` row and an untitled kind's card are named by their first short text cell alone.** While that cell is empty, a row reads its indexed name and a card its humanized kind, where both read the next short text cell that held words, so which cell names an instance is the schema's to say and does not move as values are typed.
