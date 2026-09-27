@@ -83,6 +83,11 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	/** The count in the matrix's label row: how many of the roster are held. */
 	matrixHeld: (held: number, total: number) => string;
 
+	// ── Date control ──────────────────────────────────────────────────────────
+	/** The date field's toggle, pressed while the field holds `today`: the render
+	 *  date rather than a written one. */
+	dateToday: string;
+
 	// ── Field chrome ──────────────────────────────────────────────────────────
 	/** The required marker's accessible name; the glyph itself is a `*`. */
 	fieldRequired: string;
@@ -190,6 +195,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	elementUntitled: (label, index) => `${label} ${index}`,
 	enumUnsetTag: 'default',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
+	dateToday: 'Today',
 	fieldRequired: 'required',
 	optionalGhost: 'None',
 	proseHeld: 'Holds more than this field can edit here.',

@@ -338,6 +338,7 @@
 						describedBy={describes}
 						value={obj[key] as string | undefined}
 						fallback={sub.default != null ? String(sub.default) : undefined}
+						datetime={baseType(sub) === 'datetime'}
 						onCommit={(v) => commitProp(key, v)}
 					/>
 				{:else if kind === 'text'}
