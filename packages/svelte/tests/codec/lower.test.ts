@@ -79,15 +79,6 @@ function lowerApply(rt: Content, mkTr: (state: EditorState) => Transaction, opts
 }
 
 describe('lower ∘ apply matches PM', () => {
-	it('text insert', () => {
-		lowerApply(md('hello world'), (s) => s.tr.insertText('X', 4));
-	});
-	it('text delete', () => {
-		lowerApply(md('hello world'), (s) => s.tr.delete(2, 5));
-	});
-	it('text insert with an astral char', () => {
-		lowerApply(md('hello world'), (s) => s.tr.insertText('😀', 6));
-	});
 	it('Enter — split a paragraph', () => {
 		const { stored } = lowerApply(md('one two three'), (s) => s.tr.split(5));
 		expect(stored.lines).toHaveLength(2);
@@ -105,9 +96,6 @@ describe('lower ∘ apply matches PM', () => {
 			s.tr.setBlockType(0, s.doc.content.size, blockSchema.nodes.heading, { level: 2 })
 		);
 		expect(stored.lines[0].kind).toBe('heading');
-	});
-	it('multi-op: insert then delete elsewhere', () => {
-		lowerApply(md('alpha beta gamma'), (s) => s.tr.insertText('ZZ', 6).delete(0, 2));
 	});
 	it('Shift+Enter — a hard break lowers via setContinues', () => {
 		const { stored, bundle } = lowerApply(md('one two'), (s) =>

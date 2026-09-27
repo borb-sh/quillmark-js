@@ -7,14 +7,13 @@
 // `plaintext` one the literal string a saved document reads back unchanged. The probe
 // is its own quill: two kinds holding one `note` field each, one codec apiece.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync, mount, unmount } from 'svelte';
-import { init, type Content, type Document, type Quill } from '@quillmark/wasm';
-import { hasMarks, type FieldController, type LeafViews } from '$lib/core/codec';
-import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
-import { stubLayout } from '../helpers/surface.js';
+import { flushSync } from 'svelte';
+import type { Content, Document, Quill } from '@quillmark/wasm';
+import { hasMarks } from '$lib/core/codec';
+import { quillFromYaml } from '../helpers/fixtures.js';
+import { activeView, mountInner, unmountAll } from '../helpers/surface.svelte.js';
 
-const core = await init();
-stubLayout();
+afterEach(unmountAll);
 
 const YAML = `quill:
   name: retype_codec
@@ -37,57 +36,17 @@ card_kinds:
       note:
         type: richtext
 `;
-// Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes from
-// another realm and the boundary refuses it by identity.
-const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
-const probe = (): Quill =>
-	core.Quill.fromTree(
-		new Map([
-			['Quill.yaml', bytes(YAML)],
-			['plate.typ', bytes('#set page(width: 200pt)\n')]
-		])
-	);
-
-interface InnerRef {
-	insertCard(kind: string): string | undefined;
-	setKind(cardId: string, kind: string): void;
-	focusField(field: string): Promise<void>;
-	getActiveLeaf(): FieldController | undefined;
-}
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-/** Mounted at `VisualEditorInner`, which holds `getActiveLeaf`: jsdom drives no
- *  contenteditable, so an edit is a transaction dispatched into the leaf's own view. */
-function openInner(q: Quill, doc: Document, errors: string[]): InnerRef {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditorInner, {
-		target,
-		props: { doc, quill: q, onError: (e: { code: string }) => errors.push(e.code) }
-	});
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return app as unknown as InnerRef;
-}
+const probe = () => quillFromYaml(YAML);
 
 /** A card of kind `from` retyped to `to`, and `text` typed into its `note` leaf. */
 async function retypeAndType(q: Quill, doc: Document, from: string, to: string, text: string) {
-	const errors: string[] = [];
-	const editor = openInner(q, doc, errors);
+	const { editor, errors } = mountInner(q, doc);
 	const id = editor.insertCard(from)!;
 	flushSync();
 	editor.setKind(id, to);
 	flushSync();
 	await editor.focusField(`cards.${to}[0].note`);
-	const { view } = editor.getActiveLeaf() as FieldController & LeafViews;
+	const view = activeView(editor);
 	view.dispatch(view.state.tr.insertText(text, 1));
 	flushSync();
 	return { view, errors };
@@ -114,7 +73,6 @@ describe('a retype that changes the codec under a field name', () => {
 		expect(stored.text).toBe('a *b* c');
 		expect(stored.marks).toEqual([]);
 		expect(savedText(q, doc)).toBe('a *b* c');
-		doc.free();
 	});
 
 	it('remounts a richtext leaf as plaintext, which stores its literal string', async () => {
@@ -126,6 +84,5 @@ describe('a retype that changes the codec under a field name', () => {
 		expect(errors).toEqual([]);
 		expect(doc.getStored({ card: 0, field: 'note' })).toBe('x  y *z*');
 		expect(savedText(q, doc)).toBe('x  y *z*');
-		doc.free();
 	});
 });

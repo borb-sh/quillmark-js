@@ -1,6 +1,7 @@
-// The position map, the UTF-16/USV seam. For every USV offset (across astral chars and
-// structural shapes alike) the map is a clean inverse, and offsets land on the right
-// code point.
+// The position map, the UTF-16/USV seam. For every USV offset the map is a clean
+// inverse, and offsets land on the right code point. The shapes the keymaps reach are
+// asserted by the generated chain (`roundtrip.test.ts`); these are the text and the leaf
+// blocks it does not generate.
 import { describe, it, expect } from 'vitest';
 import { decode, blockSchema, buildLineIndex, usvToPM, pmToUsv } from '$lib/core/codec';
 import type { Content } from '@quillmark/wasm';
@@ -23,15 +24,6 @@ describe('positions: UTF-16 / USV inverse', () => {
 		assertInverse(para('日本語テキスト'));
 		assertInverse(para('mix 😀 と 漢字 x'));
 		assertInverse(para('👨‍👩‍👧‍👦 family zwj'));
-	});
-
-	it('holds across multiple lines and structural shapes', () => {
-		assertInverse(md('First para.\n\nSecond 😀 para.'));
-		assertInverse(md('# Heading 漢\n\nBody 🎉 text'));
-		assertInverse(md('- one 😀\n- two 🎉\n- three'));
-		assertInverse(md('> quoted 😀 line\n\nafter'));
-		assertInverse(md('```js\nconst x = "😀";\nconst y = 2;\n```'));
-		assertInverse(md('line one😀\\\nline two🎉'));
 	});
 
 	it('holds across leaf blocks (image island, table island, rule)', () => {

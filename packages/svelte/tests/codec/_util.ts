@@ -7,12 +7,13 @@ import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { baseKeymap } from 'prosemirror-commands';
-import { init, type Content, type Document } from '@quillmark/wasm';
+import { init, type Content, type Document, type Quill } from '@quillmark/wasm';
 import { contentEqual } from '$lib/core/codec/reconcile.js';
 import {
 	blockSchema,
 	buildLineIndex,
 	decode,
+	type FieldController,
 	pmToContent,
 	pmToUsv,
 	usvLength,
@@ -20,7 +21,7 @@ import {
 } from '$lib/core/codec';
 import { quill, template } from '../helpers/fixtures.js';
 
-const core = await init();
+export const core = await init();
 
 export { quill, template };
 export function freshDoc(): Document {
@@ -109,9 +110,27 @@ export function mount(): HTMLElement {
 	return el;
 }
 
+/** The view a controller holds as an undocumented handle. */
+export const viewOf = (f: FieldController): EditorView =>
+	(f as FieldController & { view: EditorView }).view;
+
+/** A quill over `yaml` and a one-line plate: for a suite whose variable no fixture
+ *  quill isolates. */
+export function probeQuill(yaml: string): Quill {
+	// Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes
+	// from another realm and the boundary refuses it by identity.
+	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
+	return core.Quill.fromTree(
+		new Map([
+			['Quill.yaml', bytes(yaml)],
+			['plate.typ', bytes('#set page(width: 200pt)\n')]
+		])
+	);
+}
+
 /** Drive one key at a mounted view the way the browser does, through the props the
  *  plugin stack registered. `init` carries the modifiers, which prosemirror-keymap
- *  reads off the event rather than off the key name. The `keyDriver` above is the other
+ *  reads off the event rather than off the key name. `keyDriver` below is the other
  *  half of this: it runs a keymap directly, without a view, where what is under test is
  *  the binding. */
 export function press(view: EditorView, key: string, init: KeyboardEventInit = {}): void {
@@ -172,10 +191,11 @@ export function keyDriver(keys: Record<string, Command>) {
 export function assertPositionInverse(doc: PMNode, label = 'position map'): void {
 	const index = buildLineIndex(doc);
 	const total = usvLength(pmToContent(doc).text);
+	const broken: string[] = [];
 	for (let p = 0; p <= total; p++) {
 		const pm = usvToPM(index, p);
-		expect(pm, `${label}: usvToPM(${p}) below range`).toBeGreaterThanOrEqual(0);
-		expect(pm, `${label}: usvToPM(${p}) above range`).toBeLessThanOrEqual(doc.content.size);
-		expect(pmToUsv(index, pm), `${label}: roundtrip at USV ${p}`).toBe(p);
+		const back = pm >= 0 && pm <= doc.content.size ? pmToUsv(index, pm) : NaN;
+		if (back !== p) broken.push(`USV ${p} → PM ${pm} → USV ${back}`);
 	}
+	expect(broken, label).toEqual([]);
 }

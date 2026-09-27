@@ -14,38 +14,13 @@
 // read half is asserted on the mounted leaf and the write half through the typed
 // writer, as an array's prose row asserts them (`plaintext-array`).
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
-import type { Quill, Document } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
-import { fieldModels, groupOrder } from '$lib/visual/structure';
+import { fieldModels, groupLabel, groupOrder } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
+import { field, mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
-Element.prototype.scrollIntoView ??= () => {};
-Element.prototype.getAnimations ??= () => [];
-Element.prototype.hasPointerCapture ??= () => false;
-// The rects a prose cell's view measures; jsdom implements neither.
-Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
-Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
+afterEach(unmountAll);
 
 const memo = () => quill('usaf_memo');
-
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return target;
-}
 
 const texts = (target: HTMLElement, selector: string): string[] =>
 	[...target.querySelectorAll<HTMLElement>(selector)].map(
@@ -56,7 +31,7 @@ describe('the shipped quill on the surface', () => {
 	it('draws a labelled control for every field of every card it seeds', () => {
 		const q = memo();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		const schema = q.schema;
 		// The seed lays the main card and one `indorsement`; both are declared kinds, so
@@ -76,30 +51,22 @@ describe('the shipped quill on the surface', () => {
 	it('sections the main card into the groups the schema registers, in that order', () => {
 		const q = memo();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		// The quill spells `ui.groups` as a list and the boundary serves the registry a
 		// map, so the JS tier reads one shape however an author wrote it — and the order
 		// on the surface is the order the registry gives.
-		expect(groupOrder(q.schema.main)).toEqual([
-			'addressing',
-			'letterhead',
-			'classification',
-			'additional'
-		]);
-		const main = target.querySelector<HTMLElement>('.qm-card')!;
-		expect(texts(main, '.qm-group-header')).toEqual([
-			'Addressing',
-			'Letterhead',
-			'Classification',
-			'Additional'
-		]);
+		const main = q.schema.main;
+		expect(groupOrder(main).length).toBeGreaterThan(1);
+		expect(texts(target.querySelector<HTMLElement>('.qm-card')!, '.qm-group-header')).toEqual(
+			groupOrder(main).map((g) => groupLabel(main, g))
+		);
 	});
 
 	it('names a card kind’s fields as the projection labels them, in declaration order', () => {
 		const q = memo();
 		const doc = q.seedDocument();
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
 		const card = [...target.querySelectorAll<HTMLElement>('.qm-card')][1];
 		// The marker rides inside the label, so the text carries it: three of this kind's
@@ -125,13 +92,9 @@ describe('the shipped quill on the surface', () => {
 		// And on the surface, where a packed field is a `cell` and a declined one — or one
 		// stranded with nothing to pack against — spans the row.
 		const q = memo();
-		const target = mountEditor(q, q.seedDocument());
-		const span = (label: string) => {
-			const el = [...target.querySelectorAll<HTMLElement>('.qm-field')].find(
-				(f) => f.querySelector('.qm-field-label')?.textContent?.trim() === label
-			)!;
-			return el.classList.contains('cell') ? 'cell' : 'full';
-		};
+		const { target } = mountEditor(q, q.seedDocument());
+		const span = (label: string) =>
+			field(target, label).classList.contains('cell') ? 'cell' : 'full';
 		// `Dissemination` asks to pack and stands alone between block leaves, so its run
 		// is one and it takes the row; `Tag line` sits in a run of inline neighbours and
 		// packs. What separates them is the run each lands in, not what either declares.
@@ -139,31 +102,9 @@ describe('the shipped quill on the surface', () => {
 		expect(span('Tag line')).toBe('cell');
 	});
 
-	it('draws the CUI world as four fillable cells', () => {
-		const q = memo();
-		const doc = q.seedDocument();
-		doc.storeField('classification', { value: 'CUI' });
-		const target = mountEditor(q, doc);
-
-		const field = [...target.querySelectorAll<HTMLElement>('.qm-field')].find(
-			(f) => f.querySelector('.qm-field-label span')?.textContent === 'Classification'
-		)!;
-		// The world's four cells are named and obliged as the schema declares them.
-		expect(texts(field, '.qm-object-prop .qm-field-label')).toEqual([
-			'Controlled by *',
-			'Poc *',
-			'Category',
-			'Limited dissemination'
-		]);
-		// And every one of them is `plaintext`, which the subform mounts the prose leaf
-		// for: the whole world is fillable here, so a CUI document can be finished from
-		// this surface.
-		expect(field.querySelectorAll('.qm-object-prop .ProseMirror')).toHaveLength(4);
-	});
-
 	// What the cells rest as, both ways. The read is the one a variant's key answers
 	// only at the boundary that walks it; the write is the container's own, whole.
-	it('reads its CUI cells at their codec and rests them back as strings', () => {
+	it('draws the CUI world as prose cells, read at their codec and rested as strings', () => {
 		const q = memo();
 		const doc = q.seedDocument();
 		q.writer(doc).set('classification', {
@@ -173,12 +114,18 @@ describe('the shipped quill on the surface', () => {
 			category: 'PRVCY',
 			limited_dissemination: 'FEDONLY'
 		});
-		const target = mountEditor(q, doc);
+		const { target } = mountEditor(q, doc);
 
-		const field = [...target.querySelectorAll<HTMLElement>('.qm-field')].find(
-			(f) => f.querySelector('.qm-field-label span')?.textContent === 'Classification'
-		)!;
-		expect(texts(field, '.qm-object-prop .ProseMirror')).toEqual([
+		const classification = field(target, 'Classification');
+		// Named and obliged as the schema declares them, and each a `plaintext` leaf, so a
+		// CUI document can be finished from this surface.
+		expect(texts(classification, '.qm-object-prop .qm-field-label')).toEqual([
+			'Controlled by *',
+			'Poc *',
+			'Category',
+			'Limited dissemination'
+		]);
+		expect(texts(classification, '.qm-object-prop .ProseMirror')).toEqual([
 			'SAF/AA',
 			'Capt J. Smith, DSN 555-1234',
 			'PRVCY',

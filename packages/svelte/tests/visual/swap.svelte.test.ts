@@ -10,13 +10,12 @@
 // content is the new document's. That is the whole mechanism, because a leaf whose
 // `createField` ran against the new handle commits there by construction.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
-import { init, type Quill, type Document } from '@quillmark/wasm';
-import type { EditorError } from '$lib/core';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
+import { flushSync } from 'svelte';
+import type { Quill, Document } from '@quillmark/wasm';
 import { quill } from '../helpers/fixtures.js';
+import { mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
-const core = await init();
+afterEach(unmountAll);
 
 /** A document whose `title` is `text`, seeded off the reference quill. */
 function docWith(q: Quill, text: string): Document {
@@ -26,37 +25,14 @@ function docWith(q: Quill, text: string): Document {
 }
 
 /** The main card's `title` leaf, by the key the registry stamps on it. */
-function titleLeaf(target: HTMLElement): HTMLElement | null {
-	return target.querySelector('[data-leaf-key$="title"]');
-}
-
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-/** Mount the editor over a reactive prop bag the test can swap under it. */
-function mountEditor(q: Quill, doc: Document) {
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const errors: EditorError[] = [];
-	const props = $state({ doc, quill: q, onError: (e: EditorError) => errors.push(e) });
-	const app = mount(VisualEditor, { target, props });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-	};
-	return { target, props, errors };
-}
+const titleLeaf = (target: HTMLElement) => target.querySelector('[data-leaf-key$="title"]');
 
 describe('swapping the doc prop', () => {
 	it('remounts the main card leaf onto the new handle', () => {
 		const q = quill();
 		const a = docWith(q, 'FIRST SUBJECT');
 		const b = docWith(q, 'SECOND SUBJECT');
-		const { target, props } = mountEditor(q, a);
+		const { target, props, errors } = mountEditor(q, a);
 
 		const before = titleLeaf(target);
 		expect(before).not.toBeNull();
@@ -73,23 +49,8 @@ describe('swapping the doc prop', () => {
 		expect(after?.textContent).toContain('SECOND SUBJECT');
 		// And the leaf carries none of the previous document's text.
 		expect(after?.textContent).not.toContain('FIRST SUBJECT');
-
-		a.free();
-		b.free();
-	});
-
-	it('reports nothing when the doc swaps: the re-key covers it', () => {
-		const q = quill();
-		const a = docWith(q, 'A');
-		const b = docWith(q, 'B');
-		const { props, errors } = mountEditor(q, a);
-
-		props.doc = b;
-		flushSync();
-
-		expect(errors.filter((e) => e.code === 'rebind-ignored')).toHaveLength(0);
-		a.free();
-		b.free();
+		// And reports nothing: the re-key covers the swap.
+		expect(errors).toEqual([]);
 	});
 });
 
@@ -120,6 +81,5 @@ describe('swapping the quill prop alone', () => {
 		expect(reported).toHaveLength(1);
 		expect(reported[0].severity).toBe('dev');
 		expect(thrown?.message).toContain('rebind-ignored');
-		a.free();
 	});
 });

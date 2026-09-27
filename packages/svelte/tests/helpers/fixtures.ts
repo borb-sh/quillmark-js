@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, sep } from 'node:path';
 import { init, type Document, type Quill } from '@quillmark/wasm';
 
-const core = await init();
+/** The core surface, for the classes and free functions `init` is the only door to. */
+export const core = await init();
 
 // `fixtures/` is the workspace's, not this package's: the playground reads the same
 // tree, so it sits above both.
@@ -71,4 +72,20 @@ export function quill(name: FixtureName = 'showcase'): Quill {
 export function template(name: FixtureName = 'showcase'): Document {
 	const md = readFileSync(join(REPO_ROOT, 'fixtures', 'templates', `${name}.md`), 'utf8');
 	return quill(name).parse(md);
+}
+
+/**
+ * A quill of its `Quill.yaml` alone, over a one-line plate: the probe a suite declares
+ * when the reference quill has no field of the shape under test. Fresh per call. The
+ * bytes are re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output
+ * comes from another realm, and the boundary refuses it by identity.
+ */
+export function quillFromYaml(yaml: string): Quill {
+	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
+	return core.Quill.fromTree(
+		new Map([
+			['Quill.yaml', bytes(yaml)],
+			['plate.typ', bytes('#set page(width: 200pt)\n')]
+		])
+	);
 }

@@ -5,21 +5,9 @@
 // `reader.getContent`, which decodes by declared type, so it takes both rest forms
 // and an edit lands back in the same document.
 import { describe, it, expect } from 'vitest';
-import { init, type Quill, type Document } from '@quillmark/wasm';
+import type { Quill, Document } from '@quillmark/wasm';
 import { createField } from '$lib/core/codec';
-import type { FieldController } from '$lib/core/codec';
-import type { EditorView } from 'prosemirror-view';
-import { quill, template } from '../helpers/fixtures.js';
-
-const core = await init();
-
-function mount(): HTMLElement {
-	const el = document.createElement('div');
-	document.body.appendChild(el);
-	return el;
-}
-const viewOf = (f: FieldController): EditorView =>
-	(f as FieldController & { view: EditorView }).view;
+import { core, mount, quill, template, viewOf } from './_util.js';
 
 /** A saved document: templated, written, serialized, and parsed back. */
 function loaded(): { q: Quill; doc: Document } {

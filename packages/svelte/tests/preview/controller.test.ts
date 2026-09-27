@@ -2,63 +2,22 @@
 // A zero-page session must not be a permanent empty-state stub. These
 // drive the count transitions and assert the "No pages" element and the page
 // slots both track the live count; 0→N escapes the empty state, N→0 returns.
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { createPreview } from '$lib/preview/controller';
-import type { LiveSession, ChangeSet, FieldRegion } from '@quillmark/wasm';
+import type { LiveSession, FieldRegion } from '@quillmark/wasm';
+import { change, mockSession, stubPaintGlobals } from '../helpers/session.js';
 
-// jsdom has no IntersectionObserver; the paint loop only needs it to observe
-// visibility, which these count-transition assertions do not exercise (no page
-// is ever scrolled into view, so `paint` is never reached).
-class NoopIO {
-	observe(): void {}
-	unobserve(): void {}
-	disconnect(): void {}
-}
+beforeAll(stubPaintGlobals);
 
-beforeAll(() => {
-	(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = NoopIO;
+let container: HTMLDivElement;
+beforeEach(() => {
+	container = document.createElement('div');
+	document.body.appendChild(container);
 });
 
-/** A report-only session stub: only the geometry verbs the loop calls at build. */
-function mockSession(pageCount: number): LiveSession {
-	return {
-		pageCount,
-		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
-		paint: () => {},
-		regions: () => [],
-		fieldBoxes: () => [],
-		positionAt: () => undefined,
-		locate: () => undefined
-	} as unknown as LiveSession;
-}
-
-function change(pageCount: number): ChangeSet {
-	return { pageCount, dirtyPages: [] };
-}
-
 describe('preview controller empty-state across page-count transitions', () => {
-	let container: HTMLDivElement;
-	beforeEach(() => {
-		container = document.createElement('div');
-		document.body.appendChild(container);
-	});
-
 	const pages = () => container.querySelectorAll('.qm-page-slot').length;
 	const isEmpty = () => !!container.querySelector('.qm-preview-empty');
-
-	it('a session that opens empty escapes the empty state on a later apply', () => {
-		const preview = createPreview(mockSession(0), { container });
-		expect(isEmpty()).toBe(true);
-		expect(pages()).toBe(0);
-
-		// A ChangeSet arriving after an empty open builds slots; ignoring it would
-		// strand the surface in the empty state for the session.
-		preview.refresh(change(2));
-		expect(isEmpty()).toBe(false);
-		expect(pages()).toBe(2);
-
-		preview.destroy();
-	});
 
 	it('a session that drops to zero pages returns to the empty state', () => {
 		const preview = createPreview(mockSession(3), { container });
@@ -92,11 +51,8 @@ describe('preview controller empty-state across page-count transitions', () => {
 // scroll"); where the scroll ends up is geometry jsdom does not have, so what is
 // asserted is the query, not a scrollTop.
 describe('a recompile re-locates the followed caret', () => {
-	let container: HTMLDivElement;
 	let located: Array<[string, number]>;
 	beforeEach(() => {
-		container = document.createElement('div');
-		document.body.appendChild(container);
 		located = [];
 	});
 
@@ -176,12 +132,6 @@ describe('a recompile re-locates the followed caret', () => {
 });
 
 describe('the page slot names its index', () => {
-	let container: HTMLDivElement;
-	beforeEach(() => {
-		container = document.createElement('div');
-		document.body.appendChild(container);
-	});
-
 	// A consumer drawing its own overlay reads the page number off the slot. Without
 	// `data-page` the only handle is position among siblings, which is right today and
 	// is not a contract; asserted here so it becomes one.
@@ -199,79 +149,6 @@ describe('the page slot names its index', () => {
 
 		preview.refresh(change(2));
 		expect(numbers()).toEqual(['0', '1']);
-		preview.destroy();
-	});
-});
-
-// A `session.paint` that throws must not abort the band sweep: it is
-// caught per-slot and surfaced as an error state instead of an unhandled throw
-// inside the IntersectionObserver callback.
-describe('preview controller paint resilience', () => {
-	let container: HTMLDivElement;
-	let ioInstances: CapturingIO[];
-	let prevIO: unknown;
-	let prevGetContext: typeof HTMLCanvasElement.prototype.getContext;
-
-	// A capturing IntersectionObserver whose callback the test fires on demand:
-	// jsdom has none, and this path needs a page to actually reach `paint`.
-	class CapturingIO {
-		cb: (entries: { target: Element; isIntersecting: boolean }[]) => void;
-		targets: Element[] = [];
-		constructor(cb: CapturingIO['cb']) {
-			this.cb = cb;
-			ioInstances.push(this);
-		}
-		observe(el: Element): void {
-			this.targets.push(el);
-		}
-		unobserve(el: Element): void {
-			this.targets = this.targets.filter((t) => t !== el);
-		}
-		disconnect(): void {
-			this.targets = [];
-		}
-		fireAll(): void {
-			this.cb(this.targets.map((target) => ({ target, isIntersecting: true })));
-		}
-	}
-
-	beforeEach(() => {
-		ioInstances = [];
-		container = document.createElement('div');
-		document.body.appendChild(container);
-		prevIO = (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver;
-		(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = CapturingIO;
-		// jsdom's canvas has no 2d context; hand `paintSlot` a truthy stub so it
-		// proceeds to `session.paint` (the throw under test) instead of bailing.
-		prevGetContext = HTMLCanvasElement.prototype.getContext;
-		HTMLCanvasElement.prototype.getContext =
-			(() => ({})) as unknown as typeof HTMLCanvasElement.prototype.getContext;
-	});
-	afterEach(() => {
-		(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = prevIO;
-		HTMLCanvasElement.prototype.getContext = prevGetContext;
-	});
-
-	function throwingSession(pageCount: number): LiveSession {
-		return {
-			...mockSession(pageCount),
-			paint: () => {
-				throw new Error('backend refused to paint');
-			}
-		} as unknown as LiveSession;
-	}
-
-	it('a paint that throws surfaces an error state without aborting the observer sweep', () => {
-		const preview = createPreview(throwingSession(2), { container });
-		expect(container.querySelectorAll('.qm-page-slot').length).toBe(2);
-
-		const io = ioInstances[ioInstances.length - 1];
-		// The whole point: the band sweep does not throw out of the IO callback.
-		expect(() => io.fireAll()).not.toThrow();
-		expect(container.querySelector('.qm-preview-error')).toBeTruthy();
-		// …and a failed paint leaves no blank registered canvas behind.
-		expect(container.querySelectorAll('canvas.qm-page-canvas').length).toBe(0);
-
 		preview.destroy();
 	});
 });

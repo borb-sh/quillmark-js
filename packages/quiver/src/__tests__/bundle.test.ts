@@ -12,43 +12,33 @@ function zipOf(files: Record<string, Uint8Array>): Uint8Array {
 	return zipSync(files, { level: 1 });
 }
 
-describe('packFiles / unpackFiles', () => {
-	it('roundtrips a single file', () => {
-		const input = { 'a.txt': enc.encode('hello') };
-		const zipped = packFiles(input);
-		const output = unpackFiles(zipped);
-		expect(output['a.txt']).toEqual(enc.encode('hello'));
-	});
+/**
+ * `names` zipped one byte each, every central-directory record then declaring `size`:
+ * the header a bomb carries, without the seconds a real one takes to deflate.
+ */
+function declaring(size: number, ...names: string[]): Uint8Array {
+	const zip = zipOf(Object.fromEntries(names.map((name) => [name, enc.encode('x')])));
+	const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+	for (let at = 0; at + 4 <= zip.length; at++)
+		if (view.getUint32(at, true) === 0x02014b50) view.setUint32(at + 24, size, true);
+	return zip;
+}
 
-	it('roundtrips multiple files', () => {
+describe('packFiles / unpackFiles', () => {
+	it('roundtrips every file, byte for byte', () => {
 		const input = {
 			'a.txt': enc.encode('hello'),
-			'b.txt': enc.encode('world')
+			'binary.bin': new Uint8Array([0, 1, 2, 255, 128, 64])
 		};
-		const zipped = packFiles(input);
-		const output = unpackFiles(zipped);
-		expect(output['a.txt']).toEqual(enc.encode('hello'));
-		expect(output['b.txt']).toEqual(enc.encode('world'));
-		expect(Object.keys(output).sort()).toEqual(['a.txt', 'b.txt']);
-	});
-
-	it('roundtrips binary / Uint8Array content faithfully', () => {
-		const bytes = new Uint8Array([0, 1, 2, 255, 128, 64]);
-		const input = { 'binary.bin': bytes };
-		const output = unpackFiles(packFiles(input));
-		expect(output['binary.bin']).toEqual(bytes);
+		expect(unpackFiles(packFiles(input))).toEqual(input);
 	});
 });
 
 describe('the bundle budget', () => {
-	it('refuses a zip that inflates past the total, without inflating it', () => {
-		const zeros = new Uint8Array(15 * MIB);
-		const zipped = zipOf({ a: zeros, b: zeros, c: zeros, d: zeros, e: zeros });
-
-		// The whole finding in two assertions: what arrives is small, and what it
-		// declares is refused off the central directory rather than allocated.
-		expect(zipped.length).toBeLessThan(MIB);
-		expect(() => unpackFiles(zipped)).toThrow(
+	it('refuses a zip that declares past the total, without inflating it', () => {
+		// Refused off the central directory: inflated, each entry would come back one byte
+		// and the total would never be reached.
+		expect(() => unpackFiles(declaring(15 * MIB, 'a', 'b', 'c', 'd', 'e'))).toThrow(
 			expect.objectContaining({
 				code: 'quiver_invalid',
 				message: expect.stringContaining('unpacks to over')
@@ -57,8 +47,7 @@ describe('the bundle budget', () => {
 	});
 
 	it('refuses one entry over the per-file ceiling, naming it', () => {
-		const zipped = zipOf({ 'fat.bin': new Uint8Array(17 * MIB) });
-		expect(() => unpackFiles(zipped)).toThrow(/"fat\.bin" is \d+ bytes/);
+		expect(() => unpackFiles(declaring(17 * MIB, 'fat.bin'))).toThrow(/"fat\.bin" is \d+ bytes/);
 	});
 
 	it('refuses more entries than the count allows', () => {
@@ -76,16 +65,6 @@ describe('the bundle budget', () => {
 });
 
 describe('packFiles determinism', () => {
-	it('packing the same record twice yields byte-identical output', () => {
-		const input = {
-			'a.txt': enc.encode('hello'),
-			'b.txt': enc.encode('world')
-		};
-		const zip1 = packFiles(input);
-		const zip2 = packFiles(input);
-		expect(zip1).toEqual(zip2);
-	});
-
 	it('packing with swapped insertion order yields the same output (keys are sorted)', () => {
 		const inputAB = {
 			'a.txt': enc.encode('hello'),

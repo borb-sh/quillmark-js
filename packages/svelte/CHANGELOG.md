@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A body edited back to empty ghosts nothing**, as a field's prose leaf does: its `body.example`, `strings.bodyPlaceholder` or `Write…` goes at the leaf's first edit and does not return when the text is deleted.
+
 **A collapsed `object` row and an untitled kind's card are named by their first short text cell alone.** While that cell is empty, a row reads its indexed name and a card its humanized kind, where both read the next short text cell that held words, so which cell names an instance is the schema's to say and does not move as values are typed.
 
 ## v0.13.0 - 2026-09-26

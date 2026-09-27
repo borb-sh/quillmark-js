@@ -4,35 +4,10 @@
 // to a tab switch would repaint the whole document on every one. Hiding is what the loop
 // sees as an empty visible set, so these drive that transition directly — the observer is
 // the only thing that reports it, and jsdom has none.
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, onTestFinished } from 'vitest';
 import { createPreview } from '$lib/preview/controller';
-import type { LiveSession, ChangeSet, FieldRegion } from '@quillmark/wasm';
-
-// A driveable IntersectionObserver: the paint loop learns visibility from it alone, so a
-// stub that remembers its targets can play "scrolled into view" and "hidden" in turn.
-let io: FakeIO | undefined;
-class FakeIO {
-	targets: Element[] = [];
-	constructor(private cb: IntersectionObserverCallback) {
-		io = this;
-	}
-	observe(el: Element): void {
-		this.targets.push(el);
-	}
-	unobserve(el: Element): void {
-		this.targets = this.targets.filter((t) => t !== el);
-	}
-	disconnect(): void {
-		this.targets = [];
-	}
-	/** Report every observed page at once, which is what a short document does. */
-	report(isIntersecting: boolean): void {
-		this.cb(
-			this.targets.map((target) => ({ target, isIntersecting })) as IntersectionObserverEntry[],
-			this as unknown as IntersectionObserver
-		);
-	}
-}
+import type { LiveSession, FieldRegion } from '@quillmark/wasm';
+import { FakeIO, change, mockSession, stubPaintGlobals } from '../helpers/session.js';
 
 // The other half of the transition, and the only thing that reports it: the switch is
 // `display: none`, which is a box going to 0×0 and back. Both the paint loop and the
@@ -63,33 +38,13 @@ function setBox(el: HTMLElement, width: number, height: number): void {
 const frame = (): Promise<unknown> => new Promise((r) => requestAnimationFrame(r));
 
 beforeAll(() => {
-	(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = FakeIO;
+	stubPaintGlobals();
 	(globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = FakeRO;
-	// jsdom ships no canvas backend, so `getContext` returns null and the loop reads every
-	// page as one it must not register. What is under test is which pages are mounted, and
-	// the pixels are the session's — which is mocked — so a stub context is the whole need.
-	HTMLCanvasElement.prototype.getContext =
-		(() => ({})) as unknown as HTMLCanvasElement['getContext'];
 });
-
-function mockSession(pageCount: number): LiveSession {
-	return {
-		pageCount,
-		pageSize: () => ({ widthPt: 612, heightPt: 792 }),
-		paint: () => {},
-		regions: () => [],
-		fieldBoxes: () => [],
-		positionAt: () => undefined,
-		locate: () => undefined
-	} as unknown as LiveSession;
-}
-
-const change = (pageCount: number): ChangeSet => ({ pageCount, dirtyPages: [] });
 
 describe('a preview hidden by the narrow shell', () => {
 	let container: HTMLDivElement;
 	beforeEach(() => {
-		io = undefined;
 		ros = [];
 		container = document.createElement('div');
 		document.body.appendChild(container);
@@ -97,13 +52,28 @@ describe('a preview hidden by the narrow shell', () => {
 
 	const canvases = () => container.querySelectorAll('canvas').length;
 
+	/** What the bridge's marker measures, the container's own box being its own property:
+	 *  a caret a page down while the pane is showing — off the fold of any port here — and
+	 *  nothing at all while it is not, since a box inside a hidden container measures 0×0
+	 *  exactly as the container does. */
+	function stubMarker(): void {
+		const rect = Element.prototype.getBoundingClientRect;
+		onTestFinished(() => {
+			Element.prototype.getBoundingClientRect = rect;
+		});
+		Element.prototype.getBoundingClientRect = () =>
+			(container.getBoundingClientRect().height > 0
+				? { left: 0, top: 1000, right: 110, bottom: 1020, width: 100, height: 20 }
+				: { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }) as DOMRect;
+	}
+
 	it('keeps its painted pages while the other track is showing', () => {
 		const preview = createPreview(mockSession(2), { container });
-		io?.report(true);
+		FakeIO.last!.report(true);
 		expect(canvases()).toBe(2);
 
 		// The switch flips: `display: none` on the track leaves nothing intersecting.
-		io?.report(false);
+		FakeIO.last!.report(false);
 		expect(canvases()).toBe(2);
 
 		preview.destroy();
@@ -111,8 +81,8 @@ describe('a preview hidden by the narrow shell', () => {
 
 	it('paints what a recompile dirtied while it was hidden once it is back', () => {
 		const preview = createPreview(mockSession(2), { container });
-		io?.report(true);
-		io?.report(false);
+		FakeIO.last!.report(true);
+		FakeIO.last!.report(false);
 
 		// An edit lands in the other track; the page count moves under a preview no one
 		// is looking at. Nothing is visible, so nothing paints yet.
@@ -120,7 +90,7 @@ describe('a preview hidden by the narrow shell', () => {
 		expect(container.querySelectorAll('.qm-page-slot').length).toBe(3);
 
 		// Back on this track, the observer reports again and the band is swept.
-		io?.report(true);
+		FakeIO.last!.report(true);
 		expect(canvases()).toBe(3);
 
 		preview.destroy();
@@ -140,7 +110,7 @@ describe('a preview hidden by the narrow shell', () => {
 		} as unknown as LiveSession;
 		setBox(container, 600, 800);
 		const preview = createPreview(session, { container });
-		io?.report(true);
+		FakeIO.last!.report(true);
 		expect(painted).toEqual([0, 1]);
 
 		painted.length = 0;
@@ -174,18 +144,10 @@ describe('a preview hidden by the narrow shell', () => {
 				return { field, page: 0, rect: [10, 10, 110, 30] } as FieldRegion;
 			}
 		} as unknown as LiveSession;
-		// What the bridge's marker measures, the container's own box being its own
-		// property: a caret a page down while the pane is showing — off the fold of any
-		// port here — and nothing at all while it is not, since a box inside a hidden
-		// container measures 0×0 exactly as the container does.
-		const rect = Element.prototype.getBoundingClientRect;
-		Element.prototype.getBoundingClientRect = () =>
-			(container.getBoundingClientRect().height > 0
-				? { left: 0, top: 1000, right: 110, bottom: 1020, width: 100, height: 20 }
-				: { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }) as DOMRect;
+		stubMarker();
 		setBox(container, 600, 800);
 		const preview = createPreview(session, { container });
-		io?.report(true);
+		FakeIO.last!.report(true);
 
 		setBox(container, 0, 0);
 		preview.focusPosition({ field: 'main.body', pos: 12 });
@@ -199,7 +161,6 @@ describe('a preview hidden by the narrow shell', () => {
 		]);
 		expect(container.scrollTop).toBeGreaterThan(0);
 
-		Element.prototype.getBoundingClientRect = rect;
 		preview.destroy();
 	});
 
@@ -213,14 +174,10 @@ describe('a preview hidden by the narrow shell', () => {
 				{ field: 'main.date', page: 0, rect: [10, 10, 110, 30] } as FieldRegion
 			]
 		} as unknown as LiveSession;
-		const rect = Element.prototype.getBoundingClientRect;
-		Element.prototype.getBoundingClientRect = () =>
-			(container.getBoundingClientRect().height > 0
-				? { left: 0, top: 1000, right: 110, bottom: 1020, width: 100, height: 20 }
-				: { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }) as DOMRect;
+		stubMarker();
 		setBox(container, 600, 800);
 		const preview = createPreview(session, { container });
-		io?.report(true);
+		FakeIO.last!.report(true);
 
 		// The address is placed, which is the whole of what the boolean says; a pane with
 		// no box yet is not a second no.
@@ -234,7 +191,22 @@ describe('a preview hidden by the narrow shell', () => {
 		setBox(container, 600, 800);
 		expect(container.scrollTop).toBeGreaterThan(0);
 
-		Element.prototype.getBoundingClientRect = rect;
+		preview.destroy();
+	});
+
+	// Caught per slot and surfaced as the error state, rather than thrown out of the
+	// observer callback mid-sweep; and a failed paint leaves no blank canvas registered.
+	it('surfaces a paint that throws without aborting the observer sweep', () => {
+		const session = {
+			...mockSession(2),
+			paint: () => {
+				throw new Error('backend refused to paint');
+			}
+		} as unknown as LiveSession;
+		const preview = createPreview(session, { container });
+		expect(() => FakeIO.last!.report(true)).not.toThrow();
+		expect(container.querySelector('.qm-preview-error')).toBeTruthy();
+		expect(canvases()).toBe(0);
 		preview.destroy();
 	});
 });

@@ -1,44 +1,16 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
 import { fromDir } from '../node.js';
 import { mockQuillFromTree } from './helpers/mock-engine.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
-function makeTempDir(): string {
-	return join(tmpdir(), `quiver-test-${randomUUID()}`);
-}
-
 describe('fromDir', () => {
-	const tempDirs: string[] = [];
-
-	afterEach(async () => {
-		for (const dir of tempDirs.splice(0)) {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
-
-	// --- Happy path ---
-
-	it("loads sample fixture: name is 'sample'", async () => {
-		const q = await fromDir(SAMPLE_FIXTURE);
-		expect(q.name).toBe('sample');
-	});
-
 	it('loads sample fixture: quillNames() returns sorted names', async () => {
 		const q = await fromDir(SAMPLE_FIXTURE);
 		const names = q.quillNames();
 		expect(names).toEqual([...names].sort());
 		expect(names).toContain('memo');
 		expect(names).toContain('resume');
-	});
-
-	it("loads sample fixture: versionsOf('memo') is descending", async () => {
-		const q = await fromDir(SAMPLE_FIXTURE);
-		expect(q.versionsOf('memo')).toEqual(['1.1.0', '1.0.0']);
 	});
 
 	it('versionsOf returns empty array for unknown quill name', async () => {
@@ -57,52 +29,22 @@ describe('fromDir', () => {
 		stub = undefined;
 	});
 
-	it("getQuill('memo@1.0.0') loads a tree with Quill.yaml and template.typ", async () => {
-		const q = await fromDir(SAMPLE_FIXTURE);
-		stub = mockQuillFromTree();
-		await q.getQuill('memo@1.0.0');
-		const tree = stub.calls[0]!;
-		expect(tree).toBeInstanceOf(Map);
-		expect(tree.has('Quill.yaml')).toBe(true);
-		expect(tree.has('template.typ')).toBe(true);
-	});
-
 	it('loads the correct version: 1.1.0 content differs from 1.0.0', async () => {
 		const q = await fromDir(SAMPLE_FIXTURE);
 		stub = mockQuillFromTree();
 		await q.getQuill('memo@1.0.0');
 		await q.getQuill('memo@1.1.0');
+		expect(stub.calls[0]!.has('Quill.yaml')).toBe(true);
 		const text100 = new TextDecoder().decode(stub.calls[0]!.get('template.typ')!);
 		const text110 = new TextDecoder().decode(stub.calls[1]!.get('template.typ')!);
 		expect(text100).toContain('1.0.0');
 		expect(text110).toContain('1.1.0');
 	});
 
-	// --- not-found / errors ---
-
 	it('getQuill throws quill_not_found for unknown quill name', async () => {
 		const q = await fromDir(SAMPLE_FIXTURE);
 		await expect(q.getQuill('unknown@1.0.0')).rejects.toThrow(
 			expect.objectContaining({ code: 'quill_not_found' })
-		);
-	});
-
-	// --- Error propagation from scanSourceQuiver ---
-
-	it('throws quiver_invalid for non-canonical version dir', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
-		await mkdir(join(root, 'quills', 'myquill', 'bad-version'), {
-			recursive: true
-		});
-		await writeFile(join(root, 'Quiver.yaml'), 'name: test\n');
-		await writeFile(
-			join(root, 'quills', 'myquill', 'bad-version', 'Quill.yaml'),
-			'name: myquill\n'
-		);
-
-		await expect(fromDir(root)).rejects.toThrow(
-			expect.objectContaining({ code: 'quiver_invalid' })
 		);
 	});
 

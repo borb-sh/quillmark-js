@@ -7,14 +7,12 @@
 // saved document reads back unchanged. The reference quill declares no `plaintext`
 // field without `inline`, so the schema is built here.
 import { describe, it, expect } from 'vitest';
-import { init, type Document, type Quill } from '@quillmark/wasm';
+import type { Document } from '@quillmark/wasm';
 import { Slice } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import { Selection, TextSelection } from 'prosemirror-state';
-import { createField, type FieldController } from '$lib/core/codec';
-import { mount, press } from './_util.js';
-
-const core = await init();
+import { createField } from '$lib/core/codec';
+import { core, md, mount, press, probeQuill, viewOf } from './_util.js';
 
 const QUILL_YAML = `
 quill:
@@ -35,16 +33,7 @@ main:
       default: ""
 `;
 
-// Re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output comes from
-// another realm and the boundary refuses it by identity.
-const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
-const probe = (): Quill =>
-	core.Quill.fromTree(
-		new Map([
-			['Quill.yaml', bytes(QUILL_YAML)],
-			['plate.typ', bytes('#set page(width: 200pt)\n')]
-		])
-	);
+const q = probeQuill(QUILL_YAML);
 const load = (): Document =>
 	core.Document.fromMarkdown(
 		[
@@ -59,10 +48,7 @@ const load = (): Document =>
 		].join('\n')
 	);
 
-const viewOf = (f: FieldController): EditorView =>
-	(f as FieldController & { view: EditorView }).view;
-
-function leaf(q: Quill, doc: Document, field: string, inline = false, errors: string[] = []) {
+function leaf(doc: Document, field: string, inline = false, errors: string[] = []) {
 	const f = createField({
 		doc,
 		quill: q,
@@ -80,7 +66,7 @@ const caretAtEnd = (view: EditorView): void =>
 
 /** The field as a saved document reads it back: `toMarkdown`, a fresh parse, and the
  *  schema-bound read. */
-function saved(q: Quill, doc: Document, field: string): unknown {
+function saved(doc: Document, field: string): unknown {
 	const back = core.Document.fromMarkdown(doc.toMarkdown());
 	const value = q.reader(back).get(field);
 	back.free();
@@ -99,10 +85,9 @@ function paste(view: EditorView, text: string): void {
 
 describe('a plaintext field without `inline`', () => {
 	it('keeps both lines of an address through an edit', () => {
-		const q = probe();
 		const doc = load();
 		const errors: string[] = [];
-		const { f, view } = leaf(q, doc, 'address', false, errors);
+		const { f, view } = leaf(doc, 'address', false, errors);
 
 		expect(view.state.doc.toString()).toBe(
 			'doc(paragraph("12 Main St", hard_break, "Springfield"))'
@@ -111,7 +96,7 @@ describe('a plaintext field without `inline`', () => {
 
 		expect(errors).toEqual([]);
 		expect(doc.getStored('address')).toBe('Apt 4, 12 Main St\nSpringfield');
-		expect(saved(q, doc, 'address')).toBe('Apt 4, 12 Main St\nSpringfield');
+		expect(saved(doc, 'address')).toBe('Apt 4, 12 Main St\nSpringfield');
 		f.destroy();
 		doc.free();
 	});
@@ -126,22 +111,20 @@ describe('a plaintext field without `inline`', () => {
 		['trailing spaces', 'a  \nb  '],
 		['markdown delimiters', 'x *y* z\n- not a list']
 	])('an edit rests %s as the string a saved document reads back', (_, value) => {
-		const q = probe();
 		const doc = load();
 		q.writer(doc).set('address', value);
-		const { f, view } = leaf(q, doc, 'address');
+		const { f, view } = leaf(doc, 'address');
 		view.dispatch(view.state.tr.insertText('!', 1));
 
 		expect(doc.getStored('address')).toBe(`!${value}`);
-		expect(saved(q, doc, 'address')).toBe(`!${value}`);
+		expect(saved(doc, 'address')).toBe(`!${value}`);
 		f.destroy();
 		doc.free();
 	});
 
 	it('opens a line on Enter and on Shift-Enter, each one stored `\\n`', () => {
-		const q = probe();
 		const doc = load();
-		const { f, view } = leaf(q, doc, 'address');
+		const { f, view } = leaf(doc, 'address');
 		caretAtEnd(view);
 		press(view, 'Enter');
 		view.dispatch(view.state.tr.insertText('IL'));
@@ -151,7 +134,7 @@ describe('a plaintext field without `inline`', () => {
 		expect(view.state.doc.toString()).toBe(
 			'doc(paragraph("12 Main St", hard_break, "Springfield"), paragraph("IL", hard_break, "USA"))'
 		);
-		expect(saved(q, doc, 'address')).toBe('12 Main St\nSpringfield\nIL\nUSA');
+		expect(saved(doc, 'address')).toBe('12 Main St\nSpringfield\nIL\nUSA');
 		// A paragraph is a line: the stylesheet's rhythm between blocks answers to
 		// `data-qm-line`, so a boundary draws the one line down a break does.
 		expect([...view.dom.children].map((p) => p.hasAttribute('data-qm-line'))).toEqual([true, true]);
@@ -160,13 +143,12 @@ describe('a plaintext field without `inline`', () => {
 	});
 
 	it('pastes text literally, a blank line kept, and copies it back the same way', () => {
-		const q = probe();
 		const doc = load();
-		const { f, view } = leaf(q, doc, 'address');
+		const { f, view } = leaf(doc, 'address');
 		caretAtEnd(view);
 		paste(view, '\none\n\ntwo');
 
-		expect(saved(q, doc, 'address')).toBe('12 Main St\nSpringfield\none\n\ntwo');
+		expect(saved(doc, 'address')).toBe('12 Main St\nSpringfield\none\n\ntwo');
 		let text = '';
 		view.someProp('clipboardTextSerializer', (s) => {
 			text = s(new Slice(view.state.doc.content, 0, 0), view);
@@ -177,9 +159,8 @@ describe('a plaintext field without `inline`', () => {
 	});
 
 	it('builds no mark from a shorthand, delimiters kept', () => {
-		const q = probe();
 		const doc = load();
-		const { f, view } = leaf(q, doc, 'address');
+		const { f, view } = leaf(doc, 'address');
 		caretAtEnd(view);
 		view.dispatch(view.state.tr.insertText(' **x*'));
 		const pos = view.state.selection.head;
@@ -196,9 +177,8 @@ describe('a plaintext field without `inline`', () => {
 
 describe('a plaintext field declaring `inline`', () => {
 	it('stays one textblock: Enter and Shift-Enter open nothing', () => {
-		const q = probe();
 		const doc = load();
-		const { f, view } = leaf(q, doc, 'line', true);
+		const { f, view } = leaf(doc, 'line', true);
 		caretAtEnd(view);
 		press(view, 'Enter');
 		press(view, 'Enter', { shiftKey: true });
@@ -212,13 +192,12 @@ describe('a plaintext field declaring `inline`', () => {
 	// The newline a YAML `|` scalar keeps opens an empty second line, which the leaf
 	// drops rather than joins: a space there is one a click at the end types after.
 	it('holds a `|` scalar’s trailing newline as nothing, and an edit stores no space', () => {
-		const q = probe();
 		const doc = core.Document.fromMarkdown(
 			['~~~', '$quill: plain_probe@0.1.0', 'line: |', '  solo', '~~~', ''].join('\n')
 		);
 		expect(doc.getStored('line')).toBe('solo\n');
 		const errors: string[] = [];
-		const { f, view } = leaf(q, doc, 'line', true, errors);
+		const { f, view } = leaf(doc, 'line', true, errors);
 
 		expect(view.editable).toBe(true);
 		expect(view.state.doc.toString()).toBe('doc(paragraph("solo"))');
@@ -236,14 +215,13 @@ describe('a plaintext field declaring `inline`', () => {
 		['leading spaces', '  one line'],
 		['markdown delimiters', 'x *y* z']
 	])('an edit rests %s as the string a saved document reads back', (_, value) => {
-		const q = probe();
 		const doc = load();
 		q.writer(doc).set('line', value);
-		const { f, view } = leaf(q, doc, 'line', true);
+		const { f, view } = leaf(doc, 'line', true);
 		view.dispatch(view.state.tr.insertText('!', 1));
 
 		expect(doc.getStored('line')).toBe(`!${value}`);
-		expect(saved(q, doc, 'line')).toBe(`!${value}`);
+		expect(saved(doc, 'line')).toBe(`!${value}`);
 		f.destroy();
 		doc.free();
 	});
@@ -251,9 +229,8 @@ describe('a plaintext field declaring `inline`', () => {
 
 describe('a plaintext field without `inline` over content `isPlain` refuses', () => {
 	it('holds, committing nothing, and releases on the re-hydrate that leaves it plain', () => {
-		const q = probe();
 		const doc = load();
-		doc.overwrite({ field: 'address' }, core.importMarkdown('- one\n- two'));
+		doc.overwrite({ field: 'address' }, md('- one\n- two'));
 		const before = JSON.stringify(doc.getStored('address'));
 		const holds: boolean[] = [];
 		const f = createField({
@@ -286,10 +263,9 @@ describe('a plaintext field without `inline` over content `isPlain` refuses', ()
 	});
 
 	it('does not hold for a mark alone, which the decode drops', () => {
-		const q = probe();
 		const doc = load();
-		doc.overwrite({ field: 'address' }, core.importMarkdown('**12** Main St'));
-		const { f, view } = leaf(q, doc, 'address');
+		doc.overwrite({ field: 'address' }, md('**12** Main St'));
+		const { f, view } = leaf(doc, 'address');
 		expect(view.editable).toBe(true);
 		expect(view.state.doc.toString()).toBe('doc(paragraph("12 Main St"))');
 		f.destroy();

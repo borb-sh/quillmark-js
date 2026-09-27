@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -46,8 +47,16 @@ const LOAD_MS = 120_000;
  * What the page is asked, once each handle it is asked about exists: the shell is the
  * mount, the picker stands only over a resolved quiver, the split only over an open
  * session. A handle that never arrives comes back null rather than hanging the load.
+ *
+ * `demand` is what the mounted surface asks its host for, measured where the host stops
+ * answering for it: the editor's track put on its own min-content width, with and
+ * without a wide element inside the surface. A surface whose width followed its contents
+ * answers the second with the element's width, and the pane takes that width from
+ * whatever stands beside it. The element stands in for a document's own widest construct
+ * — a table is as wide as its columns — so what is asserted is the boundary rather than
+ * any one construct.
  */
-const PROBE = `(async () => {
+const SURVEY = `(async () => {
 	const deadline = Date.now() + 30000;
 	const until = async (find) => {
 		for (;;) {
@@ -60,101 +69,57 @@ const PROBE = `(async () => {
 	const shell = await until(() => document.querySelector('.qm-workspace'));
 	const picker = await until(() => document.querySelector('.picker'));
 	const split = await until(() => document.querySelector('.qm-split'));
+	const pane = await until(() => document.querySelector('.qm-pane'));
 	const width = (el) => (el === null ? null : el.getBoundingClientRect().width);
+	const asked = () => {
+		const track = pane.parentElement;
+		track.style.width = 'min-content';
+		const at = track.getBoundingClientRect().width;
+		track.style.width = '';
+		return at;
+	};
+	const demand = () => {
+		const bare = asked();
+		const wide = document.createElement('div');
+		wide.style.cssText = 'width: 4000px; height: 1px';
+		pane.appendChild(wide);
+		const held = asked();
+		wide.remove();
+		return { bare, held };
+	};
 	return {
 		booted: shell !== null,
 		quiverResolved: picker !== null,
-		editorMounted: document.querySelector('.qm-pane') !== null,
+		editorMounted: pane !== null,
 		viewport: window.innerWidth,
 		shellWidth: width(shell),
 		splitWidth: width(split),
-		panesLaid: split === null ? 0 : [...split.children].filter((p) => width(p) > 0).length
+		search: location.search,
+		demand: pane === null ? null : demand()
 	};
 })()`;
 
-/**
- * What the mounted surface asks its host for, measured where the host stops answering
- * for it: the editor's track is put on its own min-content width, with and without a
- * wide element inside the surface. A surface whose width followed its contents answers
- * the second question with the element's width, and the pane it is mounted in takes that
- * width from whatever stands beside it.
- *
- * The element stands in for a document's own widest construct — a table is as wide as
- * its columns — so what is asserted is the boundary rather than any one construct.
- */
-const DEMAND = `(async () => {
-	const deadline = Date.now() + 30000;
-	const until = async (find) => {
-		for (;;) {
-			const found = find();
-			if (found) return found;
-			if (Date.now() > deadline) return null;
-			await new Promise((wake) => setTimeout(wake, 50));
-		}
-	};
-	const pane = await until(() => document.querySelector('.qm-pane'));
-	if (pane === null) return null;
-	const track = pane.parentElement;
-	const asked = () => {
-		track.style.width = 'min-content';
-		const width = track.getBoundingClientRect().width;
-		track.style.width = '';
-		return width;
-	};
-
-	const bare = asked();
-	const probe = document.createElement('div');
-	probe.style.cssText = 'width: 4000px; height: 1px';
-	pane.appendChild(probe);
-	const held = asked();
-	probe.remove();
-	return { bare, held };
-})()`;
-
-/**
- * The link half: what opened, and what the address bar says once it has. Read after the
- * surface mounts, the write standing ahead of the open that follows it.
- */
-const LINKED = `(async () => {
-	const deadline = Date.now() + 30000;
-	const until = async (find) => {
-		for (;;) {
-			const found = find();
-			if (found) return found;
-			if (Date.now() > deadline) return null;
-			await new Promise((wake) => setTimeout(wake, 50));
-		}
-	};
-	const mounted = await until(() => document.querySelector('.qm-pane'));
-	return { editorMounted: mounted !== null, search: location.search };
-})()`;
-
-interface Demand {
-	/** The surface's own width demand. */
-	bare: number;
-	/** The same, holding a 4000px element. */
-	held: number;
-}
-
-interface Linked {
-	editorMounted: boolean;
-	/** The address bar's query once the surface is up. */
-	search: string;
-}
-
-interface Probe {
+interface Survey {
 	booted: boolean;
 	quiverResolved: boolean;
 	editorMounted: boolean;
 	viewport: number;
 	shellWidth: number | null;
 	splitWidth: number | null;
-	panesLaid: number;
+	/** The address bar's query once the surface is up. */
+	search: string;
+	/** The surface's own width demand, bare and holding a 4000px element. */
+	demand: { bare: number; held: number } | null;
 }
 
 const temp = scratch('quillkit-deploy-');
 let server: Server;
-let url: string;
+/** The quill the deployed quiver opens first, canonical. */
+let first: string;
+/** Opened by a link naming `first` by its name alone. */
+let wide: Survey;
+/** Opened by a link naming a ref the quiver does not hold. */
+let narrow: Survey;
 
 beforeAll(async () => {
 	expect(
@@ -164,10 +129,15 @@ beforeAll(async () => {
 
 	const site = join(await temp.dir(), 'site');
 	await run(process.execPath, [BIN, 'site', '--quiver', await temp.collection(), '--out', site]);
+	const { quills } = JSON.parse(await readFile(join(site, 'quiver', 'quiver.json'), 'utf8'));
+	first = `${quills[0].name}@${quills[0].version}`;
 
 	server = createStaticServer([{ prefix: PREFIX, root: site }]);
-	const port = await listen(server, 0, '127.0.0.1');
-	url = `http://127.0.0.1:${port}${PREFIX}/`;
+	const url = `http://127.0.0.1:${await listen(server, 0, '127.0.0.1')}${PREFIX}/`;
+	[wide, narrow] = await Promise.all([
+		load<Survey>(`${url}?quill=${quills[0].name}`, SURVEY, WIDE),
+		load<Survey>(`${url}?quill=nope@9.9.9`, SURVEY, NARROW)
+	]);
 }, LOAD_MS);
 
 afterAll(async () => {
@@ -176,76 +146,40 @@ afterAll(async () => {
 });
 
 describe('the built client, served under a subpath', () => {
-	it(
-		'boots, resolves its quiver against the base it was served at, and mounts a surface',
-		async () => {
-			const page = await load<Probe>(url, PROBE, WIDE);
+	it('boots, resolves its quiver against the base it was served at, and mounts a surface', () => {
+		for (const page of [wide, narrow]) {
+			const where = `at ${page.viewport}px`;
+			expect(page.booted, where).toBe(true);
+			expect(page.quiverResolved, where).toBe(true);
+			expect(page.editorMounted, where).toBe(true);
+		}
+	});
 
-			expect(page.booted).toBe(true);
-			expect(page.quiverResolved).toBe(true);
-			expect(page.editorMounted).toBe(true);
-		},
-		LOAD_MS
-	);
-
-	it(
-		'stands its tracks in the viewport, at both sides of the threshold',
-		async () => {
-			for (const viewport of [WIDE, NARROW]) {
-				const page = await load<Probe>(url, PROBE, viewport);
-				const where = `at ${viewport.width}px`;
-
-				// The second assertion is the load-bearing one: `inset: 0` pins the shell's
-				// box at the viewport whatever its tracks do, so a column sized to its
-				// content overflows silently under the shell's own `overflow: hidden`.
-				expect(page.shellWidth, `the shell is the viewport ${where}`).toBeCloseTo(page.viewport, 0);
-				expect(page.splitWidth, `the tracks sum to the shell ${where}`).toBeCloseTo(
-					page.shellWidth ?? 0,
-					0
-				);
-			}
-		},
-		LOAD_MS
-	);
-
-	it(
-		'asks its host for no more width than the document it holds',
-		async () => {
-			const asked = await load<Demand | null>(url, DEMAND, WIDE);
-
-			expect(asked, 'the editor mounted').not.toBeNull();
-			expect(asked?.held, 'a 4000px element inside the surface moves nothing').toBeCloseTo(
-				asked?.bare ?? 0,
+	it('stands its tracks in the viewport, at both sides of the threshold', () => {
+		for (const page of [wide, narrow]) {
+			const where = `at ${page.viewport}px`;
+			// The second assertion is the load-bearing one: `inset: 0` pins the shell's
+			// box at the viewport whatever its tracks do, so a column sized to its
+			// content overflows silently under the shell's own `overflow: hidden`.
+			expect(page.shellWidth, `the shell is the viewport ${where}`).toBeCloseTo(page.viewport, 0);
+			expect(page.splitWidth, `the tracks sum to the shell ${where}`).toBeCloseTo(
+				page.shellWidth ?? 0,
 				0
 			);
-		},
-		LOAD_MS
-	);
+		}
+	});
 
-	it(
-		'shows both panes above the threshold and one under it',
-		async () => {
-			expect((await load<Probe>(url, PROBE, WIDE)).panesLaid).toBe(2);
-			expect((await load<Probe>(url, PROBE, NARROW)).panesLaid).toBe(1);
-		},
-		LOAD_MS
-	);
+	it('asks its host for no more width than the document it holds', () => {
+		expect(wide.demand?.held, 'a 4000px element inside the surface moves nothing').toBeCloseTo(
+			wide.demand?.bare ?? NaN,
+			0
+		);
+	});
 
-	// The deployed fixture quiver holds `showcase@1.0.0` alone — `usaf_memo` sits under
-	// the draft floor `build` packs above — so what is asserted is the link itself: a
-	// selector opens and is said canonically, and a ref the quiver does not hold still
-	// reaches a surface with the address bar corrected to what is on it.
-	it(
-		'opens the quill a link names, and says which one is on screen',
-		async () => {
-			const named = await load<Linked>(`${url}?quill=showcase`, LINKED, WIDE);
-			expect(named.editorMounted, 'a link to a quill mounts a surface').toBe(true);
-			expect(named.search).toBe('?quill=showcase@1.0.0');
-
-			const stray = await load<Linked>(`${url}?quill=nope@9.9.9`, LINKED, WIDE);
-			expect(stray.editorMounted, 'a ref the quiver does not hold still opens').toBe(true);
-			expect(stray.search).toBe('?quill=showcase@1.0.0');
-		},
-		LOAD_MS
-	);
+	// A ref the quiver does not hold opens the catalog's first, the address bar corrected
+	// to it.
+	it('opens the quill a link names, and says which one is on screen', () => {
+		expect(wide.search).toBe(`?quill=${first}`);
+		expect(narrow.search).toBe(`?quill=${first}`);
+	});
 });

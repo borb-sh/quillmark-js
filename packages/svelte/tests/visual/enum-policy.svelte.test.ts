@@ -5,75 +5,22 @@
 // reference quill declares leave a deployment carrying two with both kinds of row
 // in one list.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount, unmount, flushSync } from 'svelte';
 import type { Addr, Document, Quill } from '@quillmark/wasm';
-import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import type { VisualEditorProps } from '$lib/visual/props';
 import { quill } from '../helpers/fixtures.js';
+import { field, mountEditor, openList, pick, unmountAll } from '../helpers/surface.svelte.js';
 
-// jsdom implements no pointer-capture API, and the trigger probes for one before it
-// opens. `false` is the whole of what it needs: with nothing captured, the release
-// beside it is never reached.
-Element.prototype.hasPointerCapture ??= () => false;
+afterEach(unmountAll);
 
 /** The stages this deployment does not carry, in the reference quill's own set. */
 const WITHHELD = ['approved', 'final', 'withdrawn'];
 const allowedStages = (_addr: Addr, value: string) => !WITHHELD.includes(value);
 
-let cleanup: (() => void) | undefined;
-afterEach(() => {
-	cleanup?.();
-	cleanup = undefined;
-});
-
-function mountEditor(
-	props: Partial<VisualEditorProps> = {},
-	seed?: (q: Quill, doc: Document) => void
-) {
+function open(props: Partial<VisualEditorProps> = {}, seed?: (q: Quill, doc: Document) => void) {
 	const q = quill();
 	const doc = q.seedDocument();
 	seed?.(q, doc);
-	const target = document.createElement('div');
-	document.body.appendChild(target);
-	const app = mount(VisualEditor, { target, props: { doc, quill: q, ...props } });
-	flushSync();
-	cleanup = () => {
-		void unmount(app);
-		target.remove();
-		doc.free();
-	};
-	return target;
-}
-
-/** The field whose label reads `label`: the one locator that does not spend an id
- *  minted per editor instance (`fieldDomIds` keys off `$props.id()`). */
-function field(target: HTMLElement, label: string): HTMLElement {
-	const match = [...target.querySelectorAll<HTMLElement>('.qm-field')].find(
-		(f) => f.querySelector('.qm-field-label span')?.textContent === label
-	);
-	if (!match) throw new Error(`no field labelled ${label}`);
-	return match;
-}
-
-/** Open a field's listbox as a pointer opens it: the primitive acts on `pointerdown`
- *  and releases the implicit capture, and the click settles it. */
-function openList(target: HTMLElement, label: string): HTMLElement {
-	const trigger = field(target, label).querySelector<HTMLElement>('.qm-select')!;
-	trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
-	trigger.click();
-	flushSync();
-	return trigger;
-}
-
-/** Pick a row as a pointer picks it: the primitive commits on `pointerup`, which is
- *  what lets a press on the trigger release onto a row. */
-function pick(target: HTMLElement, text: string): void {
-	const row = [...target.querySelectorAll<HTMLElement>('.qm-select-item')].find(
-		(el) => el.textContent?.trim() === text
-	);
-	if (!row) throw new Error(`no option ${text} in the open list`);
-	row.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-	flushSync();
+	return mountEditor(q, doc, props).target;
 }
 
 /** The schema options the open list draws, in order, each with whether it is offered.
@@ -92,8 +39,8 @@ const texts = (target: HTMLElement) => options(target).map((o) => o.text);
 
 describe("enumDisallowed: 'disable'", () => {
 	it('is the default, and draws a refused option greyed in place', () => {
-		const target = mountEditor({ enumOptionAllowed: allowedStages });
-		openList(target, 'Status');
+		const target = open({ enumOptionAllowed: allowedStages });
+		openList(field(target, 'Status'));
 
 		// The whole schema set, order intact: nothing is stripped.
 		expect(texts(target)).toEqual(['draft', 'in_review', ...WITHHELD]);
@@ -105,8 +52,8 @@ describe("enumDisallowed: 'disable'", () => {
 	});
 
 	it('offers every option when no hook is set', () => {
-		const target = mountEditor();
-		openList(target, 'Status');
+		const target = open();
+		openList(field(target, 'Status'));
 
 		expect(options(target).some((o) => o.disabled)).toBe(false);
 	});
@@ -114,8 +61,8 @@ describe("enumDisallowed: 'disable'", () => {
 
 describe("enumDisallowed: 'hide'", () => {
 	it('leaves a refused option out of the list', () => {
-		const target = mountEditor({ enumOptionAllowed: allowedStages, enumDisallowed: 'hide' });
-		openList(target, 'Status');
+		const target = open({ enumOptionAllowed: allowedStages, enumDisallowed: 'hide' });
+		openList(field(target, 'Status'));
 
 		expect(texts(target)).toEqual(['draft', 'in_review']);
 	});
@@ -123,11 +70,10 @@ describe("enumDisallowed: 'hide'", () => {
 	it('draws the authored value anyway, disabled, and no other out-of-policy row', () => {
 		// Authored before the mount, the way a stored document arrives: the deployment
 		// stopped carrying the stage after this document was written.
-		const target = mountEditor(
-			{ enumOptionAllowed: allowedStages, enumDisallowed: 'hide' },
-			(q, doc) => q.writer(doc).set('status', 'final')
+		const target = open({ enumOptionAllowed: allowedStages, enumDisallowed: 'hide' }, (q, doc) =>
+			q.writer(doc).set('status', 'final')
 		);
-		const trigger = openList(target, 'Status');
+		const trigger = openList(field(target, 'Status'));
 
 		expect(texts(target)).toEqual(['draft', 'in_review', 'final']);
 		expect(
@@ -140,25 +86,23 @@ describe("enumDisallowed: 'hide'", () => {
 	});
 
 	it('drops the row once the document no longer holds it', () => {
-		const target = mountEditor(
-			{ enumOptionAllowed: allowedStages, enumDisallowed: 'hide' },
-			(q, doc) => q.writer(doc).set('status', 'final')
+		const target = open({ enumOptionAllowed: allowedStages, enumDisallowed: 'hide' }, (q, doc) =>
+			q.writer(doc).set('status', 'final')
 		);
-		openList(target, 'Status');
-		pick(target, 'in_review');
+		pick(field(target, 'Status'), 'in_review');
 
-		openList(target, 'Status');
+		openList(field(target, 'Status'));
 		expect(texts(target)).toEqual(['draft', 'in_review']);
 	});
 });
 
 describe('the policy reaches a card field', () => {
 	it('applies to a section enum, not only the main card', () => {
-		const target = mountEditor({
+		const target = open({
 			enumOptionAllowed: (_addr, value) => value !== 'aside',
 			enumDisallowed: 'hide'
 		});
-		openList(target, 'Layout');
+		openList(field(target, 'Layout'));
 
 		expect(texts(target)).toEqual(['prose', 'callout']);
 	});
@@ -167,13 +111,13 @@ describe('the policy reaches a card field', () => {
 describe('the hook is asked per option, at the field it draws', () => {
 	it('carries the field addr', () => {
 		const seen: { addr: Addr; value: string }[] = [];
-		const target = mountEditor({
+		const target = open({
 			enumOptionAllowed: (addr, value) => {
 				seen.push({ addr, value });
 				return true;
 			}
 		});
-		openList(target, 'Status');
+		openList(field(target, 'Status'));
 
 		const asked = seen.filter((s) => s.addr.field === 'status');
 		expect(asked.map((s) => s.value)).toEqual(

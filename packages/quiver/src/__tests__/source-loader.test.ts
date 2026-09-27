@@ -1,15 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
 import { scanSourceQuiver, readQuillTree } from '../source-loader.js';
+import { scratch } from './helpers/scratch.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
-function makeTempDir(): string {
-	return join(tmpdir(), `quiver-test-${randomUUID()}`);
-}
+const temp = scratch('quiver-source-');
+afterEach(() => temp.cleanup());
 
 async function buildMinimalQuiver(
 	root: string,
@@ -40,14 +38,6 @@ async function buildMinimalQuiver(
 }
 
 describe('scanSourceQuiver', () => {
-	const tempDirs: string[] = [];
-
-	afterEach(async () => {
-		for (const dir of tempDirs.splice(0)) {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
-
 	// --- Fixture happy path ---
 
 	it("scans sample fixture: meta name is 'sample'", async () => {
@@ -63,8 +53,7 @@ describe('scanSourceQuiver', () => {
 	// --- Non-canonical version dir ---
 
 	it("throws quiver_invalid for non-canonical version dir '1.0' (missing patch)", async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, {
 			quills: [{ name: 'myquill', version: '1.0' }]
 		});
@@ -77,8 +66,7 @@ describe('scanSourceQuiver', () => {
 	// --- Missing Quill.yaml ---
 
 	it('throws quiver_invalid when Quill.yaml is missing in a version dir', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, {
 			quills: [{ name: 'myquill', version: '1.0.0', hasQuillYaml: false }]
 		});
@@ -91,8 +79,7 @@ describe('scanSourceQuiver', () => {
 	// --- Missing quills/ directory ---
 
 	it('returns empty catalog when quills/ dir is absent', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, { noQuillsDir: true });
 
 		const { catalog } = await scanSourceQuiver(root);
@@ -105,12 +92,7 @@ describe('scanSourceQuiver', () => {
 		// ENOENT on Quiver.yaml is transport_error (missing-path condition) — the
 		// path doesn't point to a quiver at all, not a structural violation within
 		// one. Contrast: missing Quill.yaml inside a version dir is quiver_invalid.
-		const root = makeTempDir();
-		tempDirs.push(root);
-		await mkdir(root, { recursive: true });
-		// No Quiver.yaml written
-
-		await expect(scanSourceQuiver(root)).rejects.toThrow(
+		await expect(scanSourceQuiver(await temp.dir())).rejects.toThrow(
 			expect.objectContaining({ code: 'transport_error' })
 		);
 	});
@@ -118,8 +100,7 @@ describe('scanSourceQuiver', () => {
 	// --- Invalid Quiver.yaml content ---
 
 	it('throws quiver_invalid when Quiver.yaml has unknown fields', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, { quiverYaml: 'name: test\nextra: bad\n' });
 
 		await expect(scanSourceQuiver(root)).rejects.toThrow(
@@ -129,17 +110,8 @@ describe('scanSourceQuiver', () => {
 });
 
 describe('the quill-name charset', () => {
-	const tempDirs: string[] = [];
-
-	afterEach(async () => {
-		for (const dir of tempDirs.splice(0)) {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
-
 	it('admits the charset a ref spells', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, { quills: [{ name: 'My_quill-2', version: '1.0.0' }] });
 
 		const { catalog } = await scanSourceQuiver(root);
@@ -147,8 +119,7 @@ describe('the quill-name charset', () => {
 	});
 
 	it('refuses a seated row a ref cannot spell', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, { quills: [{ name: 'my.quill', version: '1.0.0' }] });
 
 		await expect(scanSourceQuiver(root)).rejects.toThrow(
@@ -157,8 +128,7 @@ describe('the quill-name charset', () => {
 	});
 
 	it('names the directory rather than the ref that would have failed', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, { quills: [{ name: 'my quill', version: '1.0.0' }] });
 
 		await expect(scanSourceQuiver(root)).rejects.toThrow(/directory "my quill"/);
@@ -166,8 +136,7 @@ describe('the quill-name charset', () => {
 
 	it('ignores a stray directory holding no quill, whatever its name', async () => {
 		// The row is what has to be addressable; a `.cache` beside the quills is not one.
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await buildMinimalQuiver(root, { quills: [{ name: 'memo', version: '1.0.0' }] });
 		await mkdir(join(root, 'quills', '.cache'), { recursive: true });
 
@@ -177,24 +146,8 @@ describe('the quill-name charset', () => {
 });
 
 describe('readQuillTree', () => {
-	const tempDirs: string[] = [];
-
-	afterEach(async () => {
-		for (const dir of tempDirs.splice(0)) {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
-
-	it('reads memo/1.0.0 from fixture with POSIX-style keys', async () => {
-		const quillDir = join(SAMPLE_FIXTURE, 'quills', 'memo', '1.0.0');
-		const tree = await readQuillTree(quillDir);
-		expect(tree.has('Quill.yaml')).toBe(true);
-		expect(tree.has('template.typ')).toBe(true);
-	});
-
 	it('reads nested files with forward-slash POSIX paths', async () => {
-		const root = makeTempDir();
-		tempDirs.push(root);
+		const root = await temp.dir();
 		await mkdir(join(root, 'subdir'), { recursive: true });
 		await writeFile(join(root, 'Quill.yaml'), 'name: x\n');
 		await writeFile(join(root, 'subdir', 'asset.svg'), '<svg/>');
@@ -212,18 +165,9 @@ describe('readQuillTree', () => {
 });
 
 describe('the symlink refusal', () => {
-	const tempDirs: string[] = [];
-
-	afterEach(async () => {
-		for (const dir of tempDirs.splice(0)) {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
-
 	/** A quiver holding one quill, plus `secret.txt` beside the root for a link to reach. */
 	async function quiverWithOutsideFile(): Promise<{ root: string; secret: string }> {
-		const base = makeTempDir();
-		tempDirs.push(base);
+		const base = await temp.dir();
 		const root = join(base, 'quiver');
 		await buildMinimalQuiver(root, { quills: [{ name: 'memo', version: '1.0.0' }] });
 		const secret = join(base, 'secret.txt');
