@@ -13,19 +13,20 @@
  the engine renders the default, and the input holds it again.
 
  The entry grammar is plain decimal: an optional sign and digits, and for a `number`
- one `.`. `beforeinput` refuses an insertion that leaves the text outside a prefix of
- it, so a letter, a separator or a second sign never lands; a deletion always does, so
- a stored value outside the grammar (`abc`, `1e+21`) can be cleared. `type="text"`,
- not `type="number"`: a native number input sanitizes an invalid string to `""`
- rather than showing it, and steps on a scroll-wheel. `inputmode` keeps the numeric
- mobile keyboard.
+ a `.` and an exponent, the form `String()` gives a value too small or large for
+ digits. A keystroke that leaves the text outside a prefix of it does not land, and in
+ a `number` a `,` lands as `.`, the decimal key of a comma locale's keypad. A deletion
+ always lands, so a stored value outside the grammar (`abc`) can be cleared, and a
+ paste, a drop or an IME composition lands as it comes, judged when it settles.
+ `type="text"`, not `type="number"`: a native number input sanitizes an invalid
+ string to `""` rather than showing it, and steps on a scroll-wheel. `inputmode`
+ keeps the numeric mobile keyboard.
 
- A settled entry in the grammar commits as a number. Anything else — a bare sign or
- point, an IME composition, which `beforeinput` cannot cancel — forwards the raw
+ A settled entry in the grammar commits as a number. Anything else forwards the raw
  string to `onCommit`: the boundary's `writer.set` coercion is the judge (throws a
  `QuillmarkError` the parent turns into a field diagnostic, VISUAL_EDITOR
- §Diagnostics). `Number()` alone is no gate: it reads `0x1F`, `Infinity` and a
- `de-DE` `1.000` as numbers.
+ §Diagnostics). `Number()` alone is no gate: it reads `0x1F` and `Infinity` as
+ numbers, and `1.000` as a whole one.
 -->
 <script lang="ts">
 	import { syncedLocal } from './synced.svelte.js';
@@ -58,19 +59,23 @@
 	const local = syncedLocal(() => (value != null ? String(value) : (fallback ?? '')));
 	const defaulted = $derived(value == null && !!fallback && local.value === fallback);
 
-	const partial = $derived(integer ? /^\s*[+-]?\d*\s*$/ : /^\s*[+-]?\d*\.?\d*\s*$/);
-	const whole = $derived(integer ? /^[+-]?\d+$/ : /^[+-]?(?:\d+\.?\d*|\.\d+)$/);
+	const partial = $derived(
+		integer ? /^\s*[+-]?\d*\s*$/ : /^\s*[+-]?\d*\.?\d*(?:[eE][+-]?\d*)?\s*$/
+	);
+	const whole = $derived(integer ? /^[+-]?\d+$/ : /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/);
 
 	function filter(e: InputEvent): void {
-		if (!e.inputType.startsWith('insert')) return;
-		const data = e.data ?? e.dataTransfer?.getData('text/plain');
-		if (data == null) return;
+		if (e.inputType !== 'insertText' || e.data == null) return;
 		const el = e.currentTarget as HTMLInputElement;
-		const next =
-			el.value.slice(0, el.selectionStart ?? el.value.length) +
-			data +
-			el.value.slice(el.selectionEnd ?? el.value.length);
-		if (!partial.test(next)) e.preventDefault();
+		const from = el.selectionStart ?? el.value.length;
+		const to = el.selectionEnd ?? el.value.length;
+		const data = !integer && e.data === ',' ? '.' : e.data;
+		const next = el.value.slice(0, from) + data + el.value.slice(to);
+		if (!partial.test(next)) return e.preventDefault();
+		if (data === e.data) return;
+		e.preventDefault();
+		el.setRangeText(data, from, to, 'end');
+		local.value = el.value;
 	}
 
 	// Parse a settled entry and emit it; `local` is owned by `oninput`. Blank →

@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A number field takes plain decimal only.** A keystroke or paste that would leave anything but an optional sign and digits, and for a `number` one `.`, does not land, where the field took any text; a deletion always does. An entry outside that grammar is refused onto the field where it committed what `Number()` read: `0x1F` as 31, `1.000` as 1, and `Infinity` as a bare `null` key with no diagnostic.
+**A number field types plain decimal only.** A keystroke that would leave anything but an optional sign and digits, and for a `number` a `.` and an exponent, does not land, where the field took any text; a `number`'s `,` lands as `.`. A paste, a drop and a deletion land as they come. A settled entry outside that grammar is refused onto the field where it committed what `Number()` read: `0x1F` as 31, `1.000` in an `integer` as 1, and `Infinity` as a bare `null` key with no diagnostic.
 
 **A body edited back to empty ghosts nothing**, as a field's prose leaf does: its `body.example`, `strings.bodyPlaceholder` or `Write…` goes at the leaf's first edit and does not return when the text is deleted.
 
