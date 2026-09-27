@@ -68,7 +68,20 @@ export const ICONS = {
 		['path', { d: 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }]
 	],
 	minus: [['path', { d: 'M5 12h14' }]],
-	check: [['path', { d: 'M20 6 9 17l-5-5' }]]
+	check: [['path', { d: 'M20 6 9 17l-5-5' }]],
+	calendar: [
+		['path', { d: 'M8 2v3' }],
+		['path', { d: 'M16 2v3' }],
+		['rect', { x: '3', y: '3', width: '18', height: '18', rx: '2' }],
+		['path', { d: 'M3 9h18' }]
+	],
+	'calendar-check': [
+		['path', { d: 'M8 2v3' }],
+		['path', { d: 'M16 2v3' }],
+		['rect', { x: '3', y: '3', width: '18', height: '18', rx: '2' }],
+		['path', { d: 'M3 9h18' }],
+		['path', { d: 'm9 15 2 2 4-4' }]
+	]
 } as const satisfies Record<string, IconNode>;
 
 /** The closed set. A name that is not here is a compile error at the call site,
