@@ -27,11 +27,12 @@
   The document crosses (STUDIO §"The document survives the quill"), which is what
   makes an edit to a schema an edit to the thing the author is holding.
 
-  Studio stores nothing, so a boot is a seed and a reload is the reseed: the carry is
-  what keeps an edited `default:` off a field the document holds, and F5 is what puts it
-  back (STUDIO §"The document is the blueprint's"). What outlives a boot is which quill, and
-  it stands in the URL rather than in a store: a link names a quill, and a reload keeps
-  it while still reseeding the document (`link.ts`).
+  Studio stores no document, so a boot is a seed and a reload is the reseed: the carry is
+  what keeps an edited `default:` or `example:` off a field the document holds, and F5 is
+  what puts it back (STUDIO §"The document is the blueprint's"). What outlives a boot is
+  which quill, in the URL, since a link names a quill (`link.ts`), and whether a seed is
+  filled, in the browser, since it is the author's habit rather than the link's
+  (`examples.ts`).
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -46,7 +47,7 @@
 	import Picker from './Picker.svelte';
 	import Markdown from './Markdown.svelte';
 	import { save } from './save';
-	import { fillExamples } from './examples';
+	import { examplesOn, fillExamples, sayExamples } from './examples';
 	import { askedRef, sayRef } from './link';
 	import { catalogOf, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
@@ -170,7 +171,7 @@
 		recovered = [];
 		unemitted = [];
 		try {
-			const next = await openRef(engine, quiver, ref, carry);
+			const next = await openRef(engine, quiver, ref, carry, examples);
 			if (mine !== turn) return close(next);
 			open = next;
 			held = undefined;
@@ -242,15 +243,25 @@
 	}
 
 	// ── The examples ────────────────────────────────────────────────────────────
+	/** Whether a seed is filled with the schema's `example:`s. */
+	let examples = $state.raw(examplesOn());
+
 	/**
-	 * Write the schema's `example:`s onto every unanswered field, then land the document
-	 * through the carry as an import is, so the editor remounts on what was written. A
-	 * press with nothing left to fill moves nothing. An example the writer refused is
-	 * stranded beside what the carry stranded, and goes with it at the next edit.
+	 * On, the `example:`s land on every unanswered field of the document in hand, which
+	 * then lands through the carry as an import is, so the editor remounts on what was
+	 * written. An example the writer refused is stranded beside what the carry stranded,
+	 * and goes with it at the next edit. Off, the quill reseeds: a written example is an
+	 * answer like any other, and nothing tells it from one the author typed.
 	 */
-	async function fill(): Promise<void> {
+	async function toggleExamples(): Promise<void> {
+		examples = !examples;
+		sayExamples(examples);
 		const at = open;
 		if (!at) return;
+		if (!examples) {
+			repacked = false;
+			return mount(at.ref);
+		}
 		const { filled, refused } = fillExamples(at.quill, at.doc);
 		if (filled) {
 			repacked = false;
@@ -296,7 +307,7 @@
 	}
 
 	/** A pick is a different document, so nothing crosses: the picked quill seeds its
-	 *  own blank, which is what "what is this quill like to use" starts from. */
+	 *  own, which is what "what is this quill like to use" starts from. */
 	async function pick(name: string, version: string): Promise<void> {
 		picked = { name, version };
 		held = undefined;
@@ -507,9 +518,10 @@
 		<button
 			class="qm-control"
 			type="button"
-			data-testid="fill-examples"
-			disabled={!open}
-			onclick={fill}>Fill examples</button
+			data-testid="examples"
+			aria-pressed={examples}
+			disabled={busy}
+			onclick={toggleExamples}>Examples</button
 		>
 		<!-- The document's two doors (STUDIO §"Opened, not stood on"). The source goes both
 		     ways through the panel; the file goes one way and needs none, so the press is
