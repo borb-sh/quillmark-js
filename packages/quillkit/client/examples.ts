@@ -3,6 +3,15 @@
 import type { Diagnostic, Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import { diagnosticsOf } from './notes';
 
+/** A read throws on a stored value its codec cannot decode, which is still an answer. */
+function answered(read: () => unknown): boolean {
+	try {
+		return read() != null;
+	} catch {
+		return true;
+	}
+}
+
 /**
  * Write each unanswered top-level field's `example:` onto `doc`, on the main card and
  * every composable card, through the typed writer. Returns how many landed and what
@@ -24,7 +33,7 @@ export function fillExamples(
 		set: (name: string, value: unknown) => void
 	): void => {
 		for (const [name, field] of Object.entries(schema?.fields ?? {})) {
-			if (field.example === undefined || get(name) != null) continue;
+			if (field.example === undefined || answered(() => get(name))) continue;
 			try {
 				set(name, field.example);
 				filled++;
