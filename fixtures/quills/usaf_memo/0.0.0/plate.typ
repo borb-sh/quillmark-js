@@ -1,5 +1,5 @@
 #import "@local/quillmark-helper:0.1.0": (
-  data, display, field-region, form-field, signature-field,
+  data, display, form-field, signature-field,
 )
 #import "@local/tonguetoquill-usaf-memo:5.0.0": (
   backmatter, date-pattern, frontmatter, indorsement, mainmatter,
@@ -16,10 +16,35 @@
 // leaves no glyphs and takes no space from the flow, and the seal stands alone.
 #let letterhead_lines = data.letterhead_title
 
-// Body text size, in points. Also the height of one line of the indorsement
-// header, which is what an omitted indorsement date reserves for its fill-in
-// widget (`date-placeholder-slot`, whose slot is `1em` tall and 1in wide).
+// Body text size, in points. Also the height of a blank date's fill-in widget.
 #let body_font_size = data.font_size * 1pt
+
+// A blank date's fill-in slot: an empty AcroForm text box the signer types the
+// date into, set in the body face, the value flush right in the date line's
+// slot as the printed date would sit. Wide enough for the longest date either
+// style prints, "September 30, 2026", which runs 8em in the body face.
+//
+// The slot is built here rather than through the package's
+// `date-placeholder-slot`: that slot stands `1em` above the baseline, and a
+// text line only a cap-height, so a blank date grew its line and pushed
+// everything below it down. This one claims exactly a cap-height, the extent of
+// a printed date, and the widget overhangs it about the line's middle, taking
+// no room from the flow.
+#let date_slot_width = body_font_size * 8.5
+#let date_slot(name, field) = context box(
+  width: date_slot_width,
+  height: measure[0].height,
+  place(horizon + left, form-field(
+    name,
+    type: "text",
+    width: date_slot_width,
+    height: body_font_size,
+    field: field,
+    font: "times",
+    size: body_font_size,
+    align: "right",
+  )),
+)
 
 #show: frontmatter.with(
   letterhead-title: letterhead_lines.at(0, default: ""),
@@ -40,22 +65,11 @@
   // born in the generated helper, so the memo date stays click-to-edit however
   // deep the package formats it.
   //
-  // A blank date means today's, and the plate stamps it rather than falling
-  // through to `frontmatter`'s own `datetime.today()`: package-born ink carries
-  // no address, so the one date a memo never types would be the one date a
-  // preview cannot click. `field-region` claims that ink for the field instead.
-  //
-  // The stamp is markup, not the bare `str` `.display()` returns: a `str` off a
-  // function call carries no source position, and ink with none is unclaimable.
-  date: {
-    let pattern = date-pattern(memo-style: memo_style)
-    let authored = display("date", pattern)
-    if authored != none {
-      authored
-    } else {
-      field-region("date", [#datetime.today().display(pattern)])
-    }
-  },
+  // A blank date is left for the signer: a memo is dated when it is signed,
+  // which is generally not when it is rendered, so the slot is fillable rather
+  // than stamped with the compile date.
+  date: display("date", date-pattern(memo-style: memo_style)),
+  date-field: date_slot("Date", "date"),
 
   memo-for: data.memo_for,
 
@@ -66,13 +80,10 @@
 
   ..if data.references.len() > 0 { (references: data.references) },
 
-  // The tag line is set in Cinzel, which ships one regular face: `emph` resolves
-  // to it and reads as nothing. The slant is synthesized here rather than in the
-  // package, whose `src/` is upstream's verbatim. `box` keeps the run inline.
-  footer-tag-line: {
-    show emph: it => box(skew(ax: -12deg, reflow: false, it.body))
-    data.tag_line
-  },
+  // The package sets the tag line in Cinzel, which has no italic or bold face.
+  // The body font set here, nearer the text, wins and carries real italics and
+  // bold.
+  footer-tag-line: text(font: "NimbusRomNo9L", data.tag_line),
 
   // The blank reads as no banner, which is what the package's own
   // `classification-level: none` default means.
@@ -185,19 +196,13 @@
         height: body_font_size * 2.5,
       ),
       ..if card.format != "" { (format: card.format) },
-      date: resolved_date,
-      // An omitted date becomes an empty AcroForm text box the endorser types
-      // the signing date into, sized to the slot the package reserves for it.
-      // Built only when there is no date to print: a widget over a printed date
-      // would offer an edit that the rendered document does not carry back.
-      ..if resolved_date == none {
-        (date-field: form-field(
-          "Ind_" + str(i) + "_Date",
-          type: "text",
-          width: 1in,
-          height: body_font_size,
-          field: card.at("$path") + "date",
-        ))
+      // An omitted date becomes a fill-in slot for the signing date. Built only
+      // when there is no date to print: a widget over a printed date would offer
+      // an edit that the rendered document does not carry back.
+      date: if resolved_date != none {
+        resolved_date
+      } else {
+        date_slot("Ind_" + str(i) + "_Date", card.at("$path") + "date")
       },
       ..if card.action != "" { (action: card.action) },
       approval-authority: i == last_indorsement_index,
