@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A collapsed `object` row and an untitled kind's card are named by their first short text cell alone.** While that cell is empty, a row reads its indexed name and a card its humanized kind, where both read the next short text cell that held words, so which cell names an instance is the schema's to say and does not move as values are typed.
+
 ## v0.13.0 - 2026-09-26
 
 **The `@quillmark/wasm` peer floor is `>=0.116.0-0`.** **A label is the quill's top-level `title`**: a field's label, a subform property's, a table column's and a card header's read `title` where they read `ui.title`, which the artifact refuses at load. A `{field}` token in a title is a load error too, so a card header is the kind's literal title and no longer follows an edit to the field it named, and a collapsed `object` row summarizes by its first short text cell, the `items.ui.title` template gone. **A card of an undeclared kind renders**: the preview opens over it and leaves it out, where the engine refused the document, and the editor still draws it in its recovery shell. **A seeded card is empty**: an added card carries the document's `$seed` overlay for its kind and nothing else, where it carried every field's `example:` and the kind's `body.example`.
