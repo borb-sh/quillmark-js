@@ -504,22 +504,22 @@ export function shortCell(sub: QuillFieldSchema): boolean {
 }
 
 /**
- * The first short text cell's words, in declaration order — a `string`, or an inline
- * `richtext` / `plaintext` — read through {@link titleText}; `undefined` while none of
- * them has any. What names an instance from its own values: a collapsed row, and a
- * card whose kind declares no `title`.
+ * The first short text cell's words — the first `string`, or inline `richtext` /
+ * `plaintext`, in declaration order — read through {@link titleText}; `undefined` where
+ * there is no such cell or it is empty. The cell is picked by the schema alone, so an
+ * instance is named by one cell whatever the others hold. What names an instance from
+ * its own values: a collapsed row, and a card whose kind declares no `title`.
  */
 function firstShortText(
 	cells: Record<string, QuillFieldSchema> | undefined,
 	values: Record<string, unknown>
 ): string | undefined {
-	for (const [k, sub] of Object.entries(cells ?? {})) {
+	const named = Object.entries(cells ?? {}).find(([, sub]) => {
 		const kind = controlKind(sub);
-		if (kind !== 'text' && !(kind === 'prose' && shortCell(sub))) continue;
-		const text = titleText(ownValue(values, k)).trim();
-		if (text) return text;
-	}
-	return undefined;
+		return kind === 'text' || (kind === 'prose' && shortCell(sub));
+	});
+	if (!named) return undefined;
+	return titleText(ownValue(values, named[0])).trim() || undefined;
 }
 
 /** A collapsed row's own words ({@link firstShortText}); `undefined` while the row has

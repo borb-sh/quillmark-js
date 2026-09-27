@@ -164,10 +164,10 @@ describe('titleText + cardTitle', () => {
 		// A kind declaring `title` names every instance with it, whatever each one holds.
 		expect(cardTitle(titled, 'indorsement', values, '')).toBe('Routing indorsement');
 		// One declaring none names each from its own values: the enum is not a text
-		// cell, and an empty cell passes to the next.
+		// cell, and an empty heading names the card by its kind, not by the next cell.
 		expect(cardTitle(untitled, 'section', values, undefined)).toBe('Findings');
 		expect(cardTitle(untitled, 'section', { heading: ' ', lead: 'A lead' }, undefined)).toBe(
-			'A lead'
+			'Section'
 		);
 		expect(cardTitle(untitled, 'section_card', {}, undefined)).toBe('Section card');
 		expect(cardTitle(undefined, 'legacy_kind', values, undefined)).toBe('Legacy kind');
@@ -473,10 +473,11 @@ describe('rowSummary', () => {
 		({ type: 'object', properties }) as QuillFieldSchema;
 	const content = (text: string) => ({ text, lines: [], marks: [], islands: [] });
 
-	it('reads the first short text cell that has words', () => {
+	it('reads the first short text cell, and no other while it is empty', () => {
 		const items = row({ title: f({ type: 'string' }), note: f({ type: 'string' }) });
 		expect(rowSummary(items, { title: 'Sources', note: 'n' })).toBe('Sources');
-		expect(rowSummary(items, { note: 'n' })).toBe('n');
+		expect(rowSummary(items, { title: ' ', note: 'n' })).toBeUndefined();
+		expect(rowSummary(items, { note: 'n' })).toBeUndefined();
 		expect(rowSummary(items, {})).toBeUndefined();
 	});
 
@@ -490,7 +491,7 @@ describe('rowSummary', () => {
 		// through `titleText` whichever rest form it has.
 		expect(rowSummary(items, { page: 3, label: 'Primary' })).toBe('Primary');
 		expect(rowSummary(items, { page: 3, label: content('Primary') })).toBe('Primary');
-		expect(rowSummary(items, { page: 3, note: content('only a note') })).toBe('only a note');
+		expect(rowSummary(items, { page: 3, note: content('only a note') })).toBeUndefined();
 		expect(rowSummary(items, { page: 3 })).toBeUndefined();
 	});
 
