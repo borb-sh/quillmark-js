@@ -74,6 +74,8 @@
 		if (!partial.test(next)) return e.preventDefault();
 		if (data === e.data) return;
 		e.preventDefault();
+		// `insertText` lands on the undo stack and fires `input`; `setRangeText` does neither.
+		if (document.execCommand?.('insertText', false, data)) return;
 		el.setRangeText(data, from, to, 'end');
 		local.value = el.value;
 	}
