@@ -45,7 +45,7 @@ The tarball holds two, and they never meet: the client bundles the copy it was b
 
 ## The local loop
 
-`studio` packs the source into a served tree, serves the client at the root with the pack mounted at `/quiver`, and repacks when the source changes. Three parts, and only the first is subtle:
+`studio` packs the source into a served tree, serves the client at the root with the pack mounted at `/quiver` and any `--templates` directory at `/templates`, and repacks when the source changes. Templates are served from where they are written, so an edit to one reaches the next pick with no repack. Three parts, and only the first is subtle:
 
 **The pack lands whole, and that is quiver's** (QUIVER §"The generation lands whole"). Nothing here stages or swaps: the directory belongs to `build`, and a caller cannot close a window inside it. What is left here is the trigger: a burst of watcher events collapsed to one repack, the pack's own output filtered out of the watch (the default output is under the collection's `node_modules`, so a watcher seeing its own writes would repack forever), and a queue that serializes packs without ending on the first failure, a quiver mid-edit being invalid as often as not. A close ends both halves in the teardown's order — the watch first, then the burst still settling — so nothing packs into a tree the caller is done with. It always asks for drafts (QUIVER §"The draft floor"): this is the author looking at their own collection, where a quill under `0.1.0` is the likeliest thing on the screen. `build` writes a deployment and takes quiver's floor; `site` takes it unless `--drafts` asks otherwise.
 
@@ -55,9 +55,9 @@ The tarball holds two, and they never meet: the client bundles the copy it was b
 
 ## The deploy layout
 
-`site` writes the arrangement a deploy serves and nothing else: the client at a root, a built quiver at `quiver/` beneath it, which is where the client looks (`document.baseURI`). The verb is the whole encapsulation, which is why there is no workflow beside it: a consumer's `scripts`, this repository's CI and a Pages job all reach the layout by running it, and a consumer running it locally gates the shape their deploy will have. What a reusable workflow would add over `npx quillkit site` is a checkout and an upload, at the price of an input contract this repository would then have to version.
+`site` writes the arrangement a deploy serves and nothing else: the client at a root, a built quiver at `quiver/` beneath it, which is where the client looks (`document.baseURI`), and with `--templates` the collection's starter documents at `templates/` beside it (STUDIO §"The document has doors"). The verb is the whole encapsulation, which is why there is no workflow beside it: a consumer's `scripts`, this repository's CI and a Pages job all reach the layout by running it, and a consumer running it locally gates the shape their deploy will have. What a reusable workflow would add over `npx quillkit site` is a checkout and an upload, at the price of an input contract this repository would then have to version.
 
-Both halves are asserted rather than assumed: a client carrying a `quiver/` of its own would occupy the URL the built one is served from, and the winner would be whichever copy landed last.
+Both halves are asserted rather than assumed: a client carrying a `quiver/` or `templates/` of its own would occupy the URL the laid one is served from, and the winner would be whichever copy landed last. A templates manifest is checked before anything is cleared, since an entry naming a file its directory does not hold is a picker offering a 404.
 
 **The floor is the default, and `--drafts` lifts it.** A site is a deployment, so it takes quiver's floor like `build`; a collection whose site is where reviewers preview its prototypes asks for the draft space with `--drafts`, and the site then serves what `studio` serves locally.
 

@@ -105,6 +105,7 @@ packages/*/build/
 packages/playground/static/quiver/
 packages/playground/static/templates/
 packages/quillkit/client/public/quiver/
+packages/quillkit/client/public/templates/
 
 # The client laid out beside a built quiver, the way a deploy serves it (`npm run site`).
 /site/

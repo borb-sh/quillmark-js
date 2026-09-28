@@ -46,11 +46,13 @@
 	import type { EditorChange } from '@quillmark/svelte/visual';
 	import Picker from './Picker.svelte';
 	import Markdown from './Markdown.svelte';
+	import Templates from './Templates.svelte';
 	import { save } from './save';
 	import { examplesOn, fillExamples, sayExamples } from './examples';
 	import { askedRef, sayRef } from './link';
 	import { catalogOf, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
+	import { listTemplates, readTemplate, type Template } from './templates';
 	import { collect, diagnosticsOf, messageOf, placeOf } from './notes';
 
 	/** The dev server's signal that a repack landed. */
@@ -206,7 +208,11 @@
 	 *  open left held. */
 	const carrying = $derived(open !== undefined || held !== undefined);
 
+	/** What refused the text the panel opens on, where it opened because of a refusal. */
+	let sourceSaid = $state.raw<string | undefined>();
+
 	function openSource(): void {
+		sourceSaid = undefined;
 		sourceText = open ? open.doc.toMarkdown() : held;
 	}
 
@@ -214,24 +220,30 @@
 	 * Land `text` as the document, which is the repack's carry with a different source.
 	 * Resolves to what refused it, or to `undefined` once it is mounted.
 	 *
-	 * The file names its own quill and is believed: a ref this quiver holds is the one it
-	 * lands in, the picker following. A ref the quiver does not hold has nothing to
+	 * The file names its own quill and is believed: a ref this quiver resolves is the one
+	 * it lands in, the picker following. A ref the quiver does not hold has nothing to
 	 * honour, so the quill on screen takes it and the conform names what would not fit
 	 * (STUDIO §"The document has doors").
 	 */
 	async function applyMarkdown(text: string): Promise<string | undefined> {
 		let at = picked;
+		let asked: string;
 		let probe: Document | undefined;
 		try {
 			// Quill-free, so the ref is read before anything is opened against it.
 			probe = core!.Document.fromMarkdown(text);
-			const [name, version] = probe.quillRef.split('@');
-			if (catalog?.quills.some((q) => q.name === name && q.versions.includes(version!)))
-				at = { name: name!, version: version! };
+			asked = probe.quillRef;
 		} catch (err) {
 			return messageOf(err);
 		} finally {
 			probe?.free();
+		}
+		// A selector is honoured, `usaf_memo@0.3` being how a document pins a line.
+		try {
+			const [name, version] = quiver!.resolve(asked).split('@');
+			at = { name: name!, version: version! };
+		} catch {
+			// Not in this quiver's catalog.
 		}
 		if (!at) return `quiver "${catalog?.name}" holds no quills`;
 		sourceText = undefined;
@@ -240,6 +252,29 @@
 		held = undefined;
 		await mount(`${at.name}@${at.version}`, text);
 		return undefined;
+	}
+
+	// ── The templates ───────────────────────────────────────────────────────────
+	/** The collection's starter documents, where the verb was handed any. */
+	let templates = $state.raw<Template[]>([]);
+
+	/**
+	 * A template is a file the reader did not have to find: it lands through the import
+	 * door and follows its own `$quill`. What it will not land as is said in the source
+	 * panel, beside its text, as a pasted file's refusal is.
+	 */
+	async function openTemplate(template: Template): Promise<void> {
+		let text = '';
+		let said: string | undefined;
+		try {
+			text = await readTemplate(template);
+			said = await applyMarkdown(text);
+		} catch (err) {
+			said = messageOf(err);
+		}
+		if (said === undefined) return;
+		sourceSaid = said;
+		sourceText = text;
 	}
 
 	// ── The examples ────────────────────────────────────────────────────────────
@@ -354,6 +389,7 @@
 	async function reload(): Promise<void> {
 		repacked = true;
 		const carry = open ? open.doc.toMarkdown() : held;
+		void listTemplates().then((next) => (templates = next));
 		let next: Catalog;
 		try {
 			quiver = await openQuiver();
@@ -471,6 +507,9 @@
 				// reads synchronously. The quiver awaits the same memoized gate to
 				// materialize a quill.
 				core = await init();
+				void listTemplates().then((next) => {
+					if (!cancelled) templates = next;
+				});
 				quiver = await openQuiver();
 				const next = catalogOf(quiver);
 				catalog = next;
@@ -514,6 +553,9 @@
 		<span class="qm-readout engine" data-testid="engine">wasm {WASM}</span>
 		{#if catalog}
 			<Picker {catalog} {picked} disabled={busy} onPick={pick} />
+		{/if}
+		{#if catalog && templates.length}
+			<Templates {templates} disabled={busy} onOpen={openTemplate} />
 		{/if}
 		<button
 			class="qm-control"
@@ -655,6 +697,7 @@
 	<Markdown
 		text={sourceText}
 		ref={`${picked.name}@${picked.version}`}
+		said={sourceSaid}
 		onApply={applyMarkdown}
 		onClose={() => (sourceText = undefined)}
 	/>

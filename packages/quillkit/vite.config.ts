@@ -1,3 +1,4 @@
+import { cp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from '@quillmark/quiver/node';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
@@ -28,6 +29,10 @@ const SOURCE = fileURLToPath(new URL('../../fixtures', import.meta.url));
  *  carries no quiver, and `quillkit site` lays one beside it. Generated, and
  *  gitignored. */
 const OUT = fileURLToPath(new URL('client/public/quiver', import.meta.url));
+/** The fixture's templates and their manifest, laid beside the pack where `--templates`
+ *  lays a collection's. Generated, and gitignored. */
+const TEMPLATES = fileURLToPath(new URL('../../fixtures/templates', import.meta.url));
+const TEMPLATES_OUT = fileURLToPath(new URL('client/public/templates', import.meta.url));
 /** One repack per settled burst: an editor's save arrives as several watcher events. */
 const SETTLE_MS = 80;
 /** The dev-only signal that a repack landed. The client answers it by minting a
@@ -52,7 +57,11 @@ function quiverSource(): Plugin {
 	// overlapping packs would race over one tree. Both arms chain, so a pack queues onto
 	// a settled promise whichever way the last one went; a rejected link would answer
 	// every later pack with the first failure instead of running it.
-	const run = (): Promise<void> => build(SOURCE, OUT);
+	const run = async (): Promise<void> => {
+		await build(SOURCE, OUT);
+		await rm(TEMPLATES_OUT, { recursive: true, force: true });
+		await cp(TEMPLATES, TEMPLATES_OUT, { recursive: true });
+	};
 	let queue: Promise<void> = Promise.resolve();
 	const pack = (): Promise<void> => (queue = queue.then(run, run));
 

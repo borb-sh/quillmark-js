@@ -60,6 +60,12 @@ The address bar names what is on screen — `?quill=showcase@1.0.0` — so a lin
 
 The document has two doors, both in the head. **Edit source** is its canonical markdown, out and back in: what comes out opens in the CLI or a quiver repo unchanged, and what goes in is parsed and conformed against the quill in hand, so a file that names a quill this quiver holds lands in it and anything the schema will not take is named on the control it is about. **Download PDF** is the page itself — `name@x.y.z.pdf`, rendered from the compile the preview is painting, so the file and the screen agree. It is drawn where the quill's backend writes a PDF.
 
+**`--templates <dir>` offers a collection's starter documents.** The directory holds a `templates.json` listing each as `{ "name", "file", "description"? }`, with `file` relative to it; other keys are ignored. The head then draws a **Templates…** select, and a pick opens that document in the quill its `$quill` names — `usaf_memo@0.3` resolves like a link does. `studio` serves the directory where it stands, so an edited template is picked up on its next pick, and refuses a manifest naming a file the directory does not hold.
+
+```sh
+npx quillkit studio --templates templates
+```
+
 It shows a quill rather than editing one: no plate editing, no schema editing, no auth, and nothing it holds outlives the tab.
 
 The client renders through the `@quillmark/wasm` it was built against, and the head names it; your `quillkit test` runs whatever your own tree holds, and nothing at runtime reconciles the two. The gate is authoritative, studio is advisory.
@@ -73,6 +79,8 @@ npx quillkit test && npx quillkit site --out ./site
 ```
 
 **The gate runs first, here and in every recipe below.** `site` packs files and opens none of them — it stats each `Quill.yaml` as a sentinel and never parses it — so a quill that does not compile packs cleanly and reports itself in the client. That is what the local loop wants and what a deploy does not, and nothing in `site` supplies it.
+
+**`--templates <dir>` lays the starter documents at `templates/`** beside the quiver, so a deployed studio offers them as the local one does.
 
 **`--drafts` packs the versions below `0.1.0` too.** Without it `site` takes quiver's draft floor, as a deployment should; with it the site is a preview of the collection as it stands, prototypes included, which is what `studio` serves locally.
 

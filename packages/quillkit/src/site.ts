@@ -15,6 +15,7 @@ import { cp, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { loadQuiverNode } from './collection.js';
 import { CLIENT, within } from './paths.js';
+import { assertTemplates } from './templates.js';
 
 export interface SiteOptions {
 	/** The source quiver: `Quiver.yaml` at its root. */
@@ -29,6 +30,9 @@ export interface SiteOptions {
 	/** Pack the draft space too (QUIVER §"The draft floor"): a deploy that previews a
 	 *  collection's prototypes rather than publishing its releases. */
 	drafts?: boolean;
+	/** A directory of starter documents and the `templates.json` listing them, laid at
+	 *  `templates/` beside the quiver. */
+	templates?: string;
 }
 
 /**
@@ -68,10 +72,11 @@ export function assertSafeOut(collection: string, out: string): void {
 export function assertClient(dist: string): void {
 	if (!existsSync(join(dist, 'index.html')))
 		throw new Error(`No client at ${dist}: quillkit carries one at dist/client`);
-	if (existsSync(join(dist, 'quiver')))
-		throw new Error(
-			`${dist}/quiver exists: a client carries no quiver, and it would shadow the site's`
-		);
+	for (const beside of ['quiver', 'templates'])
+		if (existsSync(join(dist, beside)))
+			throw new Error(
+				`${dist}/${beside} exists: a client carries no ${beside}, and it would shadow the site's`
+			);
 }
 
 /** Returns the site root, resolved. */
@@ -79,18 +84,25 @@ export async function laySite({
 	collection,
 	out,
 	client,
-	drafts = false
+	drafts = false,
+	templates
 }: SiteOptions): Promise<string> {
 	const dist = client ?? CLIENT;
 	assertClient(dist);
 	assertSafeOut(collection, out);
-
 	const at = resolve(out);
+	const starters = templates === undefined ? undefined : assertTemplates(templates);
+	if (starters !== undefined && within(at, starters))
+		throw new Error(
+			`Refusing to lay a site out in "${out}": the layout clears its output, and this one holds the templates ("${starters}").`
+		);
+
 	const { build } = await loadQuiverNode(collection);
 
 	await rm(at, { recursive: true, force: true });
 	await cp(dist, at, { recursive: true });
 	await build(collection, join(at, 'quiver'), { drafts });
+	if (starters !== undefined) await cp(starters, join(at, 'templates'), { recursive: true });
 
 	assertPacked(join(at, 'quiver'), collection);
 

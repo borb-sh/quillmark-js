@@ -1,6 +1,6 @@
 /**
- * The static server `studio` serves the loop over. It composes two roots rather than
- * copying one into the other: the client out of this package, the packed quiver out of
+ * The static server `studio` serves the loop over. It composes its roots rather than
+ * copying one into another: the client out of this package, the packed quiver out of
  * the tree the packer swaps. A repack replaces a directory the server reads per
  * request, so nothing here is told a pack happened.
  *
@@ -15,8 +15,8 @@ import { extname, resolve } from 'node:path';
 import { within } from './paths.js';
 
 /**
- * What the two roots hold: the client `vite build` emits, and a packed quiver's
- * `quiver.json` and bundles. Fonts carry no type because they carry no extension either,
+ * What the roots hold: the client `vite build` emits, a packed quiver's `quiver.json`
+ * and bundles, and a collection's templates. Fonts carry no type because they carry no extension either,
  * being dehydrated into `fonts/<sha256>`; anything unlisted falls back to
  * `application/octet-stream`, which is right for opaque bytes.
  *
@@ -30,6 +30,7 @@ const TYPES: Record<string, string> = {
 	'.ico': 'image/x-icon',
 	'.js': 'text/javascript; charset=utf-8',
 	'.json': 'application/json; charset=utf-8',
+	'.md': 'text/markdown; charset=utf-8',
 	'.png': 'image/png',
 	'.svg': 'image/svg+xml',
 	'.wasm': 'application/wasm',

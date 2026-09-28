@@ -1,0 +1,12 @@
+[
+	{
+		"name": "Showcase",
+		"description": "Every shape the reference quill declares, answered",
+		"file": "showcase.md"
+	},
+	{
+		"name": "USAF memo",
+		"description": "An official memorandum as a shipped quill takes one",
+		"file": "usaf_memo.md"
+	}
+]

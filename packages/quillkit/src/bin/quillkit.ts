@@ -12,6 +12,7 @@ import { loadEngine, loadQuiverNode } from '../collection.js';
 import { CLIENT } from '../paths.js';
 import { createStaticServer, listen, type Mount } from '../serve.js';
 import { assertClient, assertPacked, laySite } from '../site.js';
+import { assertTemplates } from '../templates.js';
 import { serialize, watchCollection } from '../watch.js';
 
 const argv = process.argv.slice(2);
@@ -118,6 +119,8 @@ async function studio(): Promise<void> {
 	// that answers 404 to every request, which reads as a broken tool rather than as a
 	// tree with the bin compiled and the client not.
 	assertClient(CLIENT);
+	const templates = flag('--templates');
+	const starters = templates === undefined ? undefined : assertTemplates(templates);
 	const port = Number(flag('--port') ?? 5174);
 	const host = flag('--host') ?? 'localhost';
 
@@ -133,8 +136,11 @@ async function studio(): Promise<void> {
 	await pack();
 	assertPacked(out, source);
 
+	// Templates are served from where they are written, so an edit to one reaches the
+	// next pick without a repack.
 	const mounts: Mount[] = [
 		{ prefix: '/quiver', root: out },
+		...(starters === undefined ? [] : [{ prefix: '/templates', root: starters }]),
 		{ prefix: '', root: CLIENT }
 	];
 	const bound = await listen(createStaticServer(mounts), port, host);
@@ -156,6 +162,7 @@ async function studio(): Promise<void> {
 
 	console.log(`quillkit studio: http://${host}:${bound}/`);
 	console.log(`  quiver:   ${source}`);
+	if (starters !== undefined) console.log(`  templates: ${starters}`);
 	console.log('  reload the page to pick up a repack.');
 }
 
@@ -172,7 +179,8 @@ async function site(): Promise<void> {
 	const at = await laySite({
 		collection: source,
 		out: flag('--out') ?? join(source, 'site'),
-		drafts: argv.includes('--drafts')
+		drafts: argv.includes('--drafts'),
+		templates: flag('--templates')
 	});
 	console.log(`quillkit site: ${at}`);
 }
@@ -187,8 +195,8 @@ function usage(): void {
 			'Usage:',
 			'  quillkit test   [--quiver <dir>]',
 			'  quillkit build  [--quiver <dir>] [--out <dir>]',
-			'  quillkit studio [--quiver <dir>] [--out <dir>] [--port <n>] [--host <addr>]',
-			'  quillkit site   [--quiver <dir>] [--out <dir>] [--drafts]'
+			'  quillkit studio [--quiver <dir>] [--out <dir>] [--port <n>] [--host <addr>] [--templates <dir>]',
+			'  quillkit site   [--quiver <dir>] [--out <dir>] [--drafts] [--templates <dir>]'
 		].join('\n')
 	);
 }
