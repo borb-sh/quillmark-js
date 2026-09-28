@@ -23,11 +23,14 @@
 		 *  what it stranded are the caller's to report; what never became a document is
 		 *  said here, beside the text that caused it. */
 		onApply: (text: string) => Promise<string | undefined>;
+		/** What refused `text` before the panel opened: a template that would not parse
+		 *  opens here, beside what it said. */
+		said?: string;
 		/** Called for every way it closes, the escape key and the scrim included. */
 		onClose: () => void;
 	}
 
-	let { text, ref, onApply, onClose }: Props = $props();
+	let { text, ref, onApply, said, onClose }: Props = $props();
 
 	let el = $state.raw<HTMLDialogElement | undefined>();
 	$effect(() => el?.showModal());
@@ -39,7 +42,8 @@
 
 	/** What refused the draft, at either door: a file that would not decode, or markdown
 	 *  that would not parse. Both leave the document on screen standing. */
-	let refused = $state.raw<string | undefined>();
+	// svelte-ignore state_referenced_locally
+	let refused = $state.raw<string | undefined>(said);
 
 	/** Where the gesture a click reports began. A click fires at the nearest common
 	 *  ancestor of press and release, so a selection dragged out of the textarea and

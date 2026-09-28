@@ -70,6 +70,7 @@ const SURVEY = `(async () => {
 	const picker = await until(() => document.querySelector('.picker'));
 	const split = await until(() => document.querySelector('.qm-split'));
 	const pane = await until(() => document.querySelector('.qm-pane'));
+	const templates = await until(() => document.querySelector('[data-testid="pick-template"]'));
 	const width = (el) => (el === null ? null : el.getBoundingClientRect().width);
 	const asked = () => {
 		const track = pane.parentElement;
@@ -91,6 +92,7 @@ const SURVEY = `(async () => {
 		booted: shell !== null,
 		quiverResolved: picker !== null,
 		editorMounted: pane !== null,
+		templatesResolved: templates !== null,
 		viewport: window.innerWidth,
 		shellWidth: width(shell),
 		splitWidth: width(split),
@@ -103,6 +105,7 @@ interface Survey {
 	booted: boolean;
 	quiverResolved: boolean;
 	editorMounted: boolean;
+	templatesResolved: boolean;
 	viewport: number;
 	shellWidth: number | null;
 	splitWidth: number | null;
@@ -128,7 +131,17 @@ beforeAll(async () => {
 	).toBe(true);
 
 	const site = join(await temp.dir(), 'site');
-	await run(process.execPath, [BIN, 'site', '--quiver', await temp.collection(), '--out', site]);
+	const collection = await temp.collection();
+	await run(process.execPath, [
+		BIN,
+		'site',
+		'--quiver',
+		collection,
+		'--out',
+		site,
+		'--templates',
+		join(collection, 'templates')
+	]);
 	const { quills } = JSON.parse(await readFile(join(site, 'quiver', 'quiver.json'), 'utf8'));
 	first = `${quills[0].name}@${quills[0].version}`;
 
@@ -146,12 +159,13 @@ afterAll(async () => {
 });
 
 describe('the built client, served under a subpath', () => {
-	it('boots, resolves its quiver against the base it was served at, and mounts a surface', () => {
+	it('boots, resolves its quiver and templates against the base it was served at, and mounts a surface', () => {
 		for (const page of [wide, narrow]) {
 			const where = `at ${page.viewport}px`;
 			expect(page.booted, where).toBe(true);
 			expect(page.quiverResolved, where).toBe(true);
 			expect(page.editorMounted, where).toBe(true);
+			expect(page.templatesResolved, where).toBe(true);
 		}
 	});
 

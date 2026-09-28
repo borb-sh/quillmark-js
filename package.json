@@ -16,7 +16,7 @@
 		"probe": "node scripts/playground.mjs --probe",
 		"dev:studio": "npm run dev -w packages/quillkit",
 		"build": "npm run build -w packages/quiver -w packages/svelte && npm run build -w packages/quillkit -w packages/playground",
-		"site": "node packages/quillkit/dist/bin/quillkit.js site --quiver fixtures --out site",
+		"site": "node packages/quillkit/dist/bin/quillkit.js site --quiver fixtures --out site --templates fixtures/templates",
 		"check": "npm run check --workspaces --if-present",
 		"test": "npm run test --workspaces --if-present",
 		"lint": "prettier --check .",

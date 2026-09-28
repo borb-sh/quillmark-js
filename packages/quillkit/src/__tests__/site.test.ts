@@ -60,6 +60,43 @@ describe('laying a site out', () => {
 		expect(await refs(true)).toContain('usaf_memo@0.0.0');
 	});
 
+	it('lays the templates beside the quiver when handed them', async () => {
+		const out = join(await temp.dir(), 'site');
+		const collection = await temp.collection();
+		await laySite({
+			collection,
+			out,
+			client: await stubClient(),
+			templates: join(collection, 'templates')
+		});
+
+		// Where the client looks: `new URL('templates/', document.baseURI)`.
+		const listed = JSON.parse(
+			await readFile(join(out, 'templates', 'templates.json'), 'utf8')
+		) as Array<{ file: string }>;
+		expect(listed.length).toBeGreaterThan(0);
+		for (const { file } of listed) expect(existsSync(join(out, 'templates', file))).toBe(true);
+	});
+
+	it('lays no templates unless handed them', async () => {
+		const out = join(await temp.dir(), 'site');
+		await laySite({ collection: await temp.collection(), out, client: await stubClient() });
+		expect(existsSync(join(out, 'templates'))).toBe(false);
+	});
+
+	it('refuses templates it would clear before copying', async () => {
+		const collection = await temp.collection();
+		const out = join(await temp.dir(), 'site');
+		const templates = join(out, 'templates');
+		await mkdir(templates, { recursive: true });
+		await writeFile(join(templates, 'templates.json'), '[]');
+
+		await expect(
+			laySite({ collection, out, client: await stubClient(), templates })
+		).rejects.toThrow(/holds the templates/);
+		expect(existsSync(join(templates, 'templates.json'))).toBe(true);
+	});
+
 	it('owns its output: a previous generation does not bleed through', async () => {
 		const out = join(await temp.dir(), 'site');
 		await mkdir(out, { recursive: true });
@@ -115,6 +152,13 @@ describe('the client assertion', () => {
 		// whichever copy landed last.
 		const dist = await stubClient();
 		await mkdir(join(dist, 'quiver'), { recursive: true });
+
+		expect(() => assertClient(dist)).toThrow(/shadow/);
+	});
+
+	it('refuses a client carrying templates of its own', async () => {
+		const dist = await stubClient();
+		await mkdir(join(dist, 'templates'), { recursive: true });
 
 		expect(() => assertClient(dist)).toThrow(/shadow/);
 	});

@@ -99,11 +99,13 @@ describe('quillkit build', () => {
 });
 
 describe('quillkit studio', () => {
-	it('packs, serves the client at the root and the quiver beneath it', async () => {
+	it('packs, serves the client at the root and the quiver and templates beneath it', async () => {
 		const source = await temp.collection();
-		const child = spawn(process.execPath, [BIN, 'studio', '--quiver', source, '--port', '0'], {
-			stdio: ['ignore', 'pipe', 'pipe']
-		});
+		const child = spawn(
+			process.execPath,
+			[BIN, 'studio', '--quiver', source, '--port', '0', '--templates', join(source, 'templates')],
+			{ stdio: ['ignore', 'pipe', 'pipe'] }
+		);
 
 		try {
 			const url = await new Promise<string>((ok, no) => {
@@ -127,6 +129,13 @@ describe('quillkit studio', () => {
 			const catalog = await fetch(new URL('quiver/quiver.json', url));
 			expect(catalog.status).toBe(200);
 			expect(await catalog.json()).toHaveProperty('quills');
+
+			const listed = await fetch(new URL('templates/templates.json', url));
+			expect(listed.status).toBe(200);
+			const [{ file }] = (await listed.json()) as Array<{ file: string }>;
+			const template = await fetch(new URL(`templates/${file}`, url));
+			expect(template.status).toBe(200);
+			expect(template.headers.get('content-type')).toContain('text/markdown');
 		} finally {
 			child.kill('SIGTERM');
 		}
