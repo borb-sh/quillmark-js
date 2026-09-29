@@ -18,13 +18,13 @@ import {
 	type PageSize
 } from '@quillmark/wasm';
 import { boxesForField, rectToPercent, clickToPdfPt, pxToPt } from '$lib/preview/geometry.js';
-import { quill, template, type FixtureName } from '../helpers/fixtures.js';
+import { quill, example, type FixtureName } from '../helpers/fixtures.js';
 
 const engine = new Engine();
 
-/** A session over a fixture's template, `edit`ed first, freed when the test ends. */
+/** A session over a fixture's example, `edit`ed first, freed when the test ends. */
 async function open(edit?: (doc: Document) => void, name?: FixtureName): Promise<LiveSession> {
-	const doc = template(name);
+	const doc = example(name);
 	edit?.(doc);
 	const session = await engine.open(quill(name), doc);
 	onTestFinished(() => {
@@ -34,11 +34,11 @@ async function open(edit?: (doc: Document) => void, name?: FixtureName): Promise
 	return session;
 }
 
-// The unedited showcase template, which the tests that only read it share.
+// The unedited showcase example, which the tests that only read it share.
 let showcaseDoc: Document;
 let showcase: LiveSession;
 beforeAll(async () => {
-	showcaseDoc = template();
+	showcaseDoc = example();
 	showcase = await engine.open(quill(), showcaseDoc);
 });
 afterAll(() => {

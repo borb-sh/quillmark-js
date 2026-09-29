@@ -63,7 +63,6 @@
 		provenanceMap,
 		resolvedByCardIndex,
 		ghostDefault,
-		declaredGhost,
 		titleText,
 		resolveBodyGhost,
 		NO_RESOLVED_ROWS,
@@ -612,7 +611,6 @@
 			bodyGhost: hasBody
 				? resolveBodyGhost(
 						titleText(ghostDefault(rows.body ?? undefined)) || undefined,
-						declaredGhost(cardSchema?.body?.example, true),
 						merged.bodyPlaceholder?.({ cardId: id, kind, isMain }),
 						merged.bodyGhost
 					)

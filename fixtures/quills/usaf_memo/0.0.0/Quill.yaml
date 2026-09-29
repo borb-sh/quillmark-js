@@ -8,27 +8,15 @@ typst:
   plate_file: plate.typ
 
 main:
+  description: U.S. Air Force and Space Force Official Memorandum. Top-level body paragraphs are auto-numbered and nested bullets auto-lettered, so add no manual numbering. A line that takes no number, letter or bullet, such as a roster of names or an address, goes in a block quote, typeset as written.
   ui:
     groups: [addressing, letterhead, classification, additional]
-  body:
-    example: |
-      The first paragraph. Top-level paragraphs are auto-numbered; do not add manual numbering.
-
-      - Nested bullets are automatically lettered.
-
-      Lines that take no number, letter, or bullet — a roster of names, an address — go in a block quote, typeset as written. End a line with a backslash to break it.
-
-      > MARY E. BROWN, Maj, USAF\
-      > ROBERT L. JONES, Capt, USAF
   fields:
     memo_for:
       type: array
       items:
         type: plaintext
         inline: true
-      example:
-        - 123 OG/CC
-        - 123 MXG/CC
       ui:
         group: addressing
         compact: true
@@ -40,10 +28,6 @@ main:
         type: plaintext
         inline: true
       default: []
-      example:
-        - 123 CS/SCX
-        - 1 Example Way
-        - Example AFB ST 12345-6789
       ui:
         group: addressing
         compact: true
@@ -52,7 +36,6 @@ main:
     subject:
       type: richtext
       inline: true
-      example: "Annual Records Management Review (Suspense: 30 October 2026)"
       ui:
         group: addressing
       description: "Keep it brief. Capitalize the first letter of each word except articles, prepositions, and conjunctions. Put any suspense date in parentheses. Italicize publication titles with *asterisks*."
@@ -69,7 +52,6 @@ main:
       type: plaintext
       inline: true
       default: ""
-      example: FOR THE COMMANDER
       ui:
         group: addressing
         compact: true
@@ -80,9 +62,6 @@ main:
       items:
         type: plaintext
         inline: true
-      example:
-        - "JOHN B. SMITH, Maj, USAF"
-        - Director of Operations
       ui:
         group: addressing
         compact: true
@@ -95,9 +74,6 @@ main:
         inline: true
       default:
         - DEPARTMENT OF THE AIR FORCE
-      example:
-        - DEPARTMENT OF THE AIR FORCE
-        - 123D COMMUNICATIONS SQUADRON
       ui:
         group: letterhead
       description: "Letterhead lines, top to bottom, all rendered in uppercase. The first is the department title, set larger than the rest. Change that line only for a Joint Command or a DoW agency. The lines below it are your unit's full organization name."
@@ -149,12 +125,10 @@ main:
           controlled_by:
             type: plaintext
             inline: true
-            example: SAF/AA
             description: "Office or organization that designated this information as CUI. Required by DoDM 5200.48."
           poc:
             type: plaintext
             inline: true
-            example: "Capt J. Smith, DSN 555-1234, john.smith@us.af.mil"
             description: "Point of contact for CUI questions. Required by DoDM 5200.48."
           category:
             type: plaintext
@@ -182,9 +156,6 @@ main:
         type: richtext
         inline: true
       default: []
-      example:
-        - "AFMAN 33-326, 25 November 2011, *Preparing Official Communications*"
-        - "AFI 33-360, *Publications and Forms Management*"
       ui:
         group: additional
       description: "Cite each reference by organization, type, date, and title. Two or more print as a References block lettered (a), (b), (c); a single one prints in parentheses after the subject, per AFH 33-337. Italicize publication titles with *asterisks*."
@@ -195,8 +166,6 @@ main:
         type: plaintext
         inline: true
       default: []
-      example:
-        - 123 WG/CCE
       ui:
         group: additional
       description: Offices or people receiving a courtesy copy, one per line.
@@ -207,11 +176,6 @@ main:
         type: plaintext
         inline: true
       default: []
-      example:
-        - 123 OG/CC
-        - 123 MXG/CC
-        - 123 MSG/CC
-        - 123 MDG/CC
       ui:
         group: additional
       description: "Every recipient, listed here when 'SEE DISTRIBUTION' stands in the Memo For field."
@@ -222,8 +186,6 @@ main:
         type: richtext
         inline: true
       default: []
-      example:
-        - Records Management Self-Inspection Checklist, 1 September 2026
       ui:
         group: additional
       description: "Attachments in the order the memo mentions them. Describe each briefly; do not write 'as stated' or abbreviate. A lone attachment prints unnumbered, two or more are numbered. Italicize publication titles with *asterisks*."
@@ -257,7 +219,6 @@ card_kinds:
       from:
         type: plaintext
         inline: true
-        example: 123 OG/CC
         ui:
           group: addressing
           compact: true
@@ -265,7 +226,6 @@ card_kinds:
       for:
         type: plaintext
         inline: true
-        example: 123 CS/CC
         ui:
           group: addressing
           compact: true
@@ -290,9 +250,6 @@ card_kinds:
         items:
           type: plaintext
           inline: true
-        example:
-          - "RICHARD C. ROE, Col, USAF"
-          - Commander
         ui:
           group: addressing
           compact: true

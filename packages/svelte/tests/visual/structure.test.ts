@@ -34,8 +34,6 @@ import {
 	obliged,
 	optionalCell,
 	baseType,
-	exampleGhost,
-	declaredGhost,
 	declaredContent,
 	printedText,
 	resolveBodyGhost,
@@ -443,8 +441,8 @@ describe('against the real showcase schema', () => {
 	});
 });
 
-// The empty body's ghost, by precedence: a resolved `default:`, the kind's
-// `body.example`, the consumer's wording, the built-in invitation. The mounted rungs
+// The empty body's ghost, by precedence: a resolved `default:`, the consumer's
+// wording, the built-in invitation. The mounted rungs
 // below the default are `ghosts.svelte.test.ts`'s. The built-in is a `strings` key, so
 // it is an argument: what the editor passes is whatever the consumer's wording resolved.
 describe('resolveBodyGhost', () => {
@@ -453,18 +451,17 @@ describe('resolveBodyGhost', () => {
 	it('prefers a resolved `default:` over every invitation', () => {
 		// The default is the only ghost that describes the render, so wording never
 		// displaces it; a consumer cannot hide what prints when nothing is written.
-		expect(resolveBodyGhost('THE DEFAULT', 'e.g.', 'witty', BUILT_IN)).toBe('THE DEFAULT');
+		expect(resolveBodyGhost('THE DEFAULT', 'witty', BUILT_IN)).toBe('THE DEFAULT');
 	});
 
 	it('never yields empty — a body leaf always has something to invite into it', () => {
 		// `undefined` is the documented "defer to the package" answer from a consumer
 		// hook; an empty string is the same intent expressed badly, and an empty
-		// resolved default or example falls through rather than winning. No combination
-		// blanks the leaf.
-		expect(resolveBodyGhost('', '', 'witty', BUILT_IN)).toBe('witty');
+		// resolved default falls through rather than winning. No combination blanks the
+		// leaf.
+		expect(resolveBodyGhost('', 'witty', BUILT_IN)).toBe('witty');
 		for (const d of ['', undefined])
-			for (const e of ['', undefined])
-				for (const c of ['', undefined]) expect(resolveBodyGhost(d, e, c, BUILT_IN)).toBe(BUILT_IN);
+			for (const c of ['', undefined]) expect(resolveBodyGhost(d, c, BUILT_IN)).toBe(BUILT_IN);
 	});
 });
 
@@ -579,16 +576,6 @@ describe('optional cells', () => {
 	});
 });
 
-describe('declaredGhost', () => {
-	it('renders markdown to its text, a block to a line, and leaves the rest as spelled', () => {
-		expect(declaredGhost('One *two*\nthree.\n\n- four', true)).toBe('One two three.\nfour');
-		expect(declaredGhost('One *two*', false)).toBe('One *two*');
-		expect(declaredGhost(0, false)).toBe('0');
-		expect(declaredGhost('  ', true)).toBeUndefined();
-		expect(declaredGhost({ a: 1 }, false)).toBeUndefined();
-	});
-});
-
 describe('declaredContent', () => {
 	it('imports markdown, takes a literal a line to each break, and has none for a blank', () => {
 		const md = declaredContent('One *two*', true);
@@ -613,37 +600,6 @@ describe('printedText', () => {
 		expect(printedText('  ')).toBeUndefined();
 		expect(printedText(undefined)).toBeUndefined();
 		expect(printedText(['a'])).toBeUndefined();
-	});
-});
-
-describe('exampleGhost', () => {
-	it('reads the `example:` of a defaultless free-text cell, as text', () => {
-		expect(exampleGhost(f({ type: 'string', example: 'SPEC/AA' }))).toBe('SPEC/AA');
-		expect(exampleGhost(f({ type: 'plaintext', example: 'a note' }))).toBe('a note');
-		// Markdown ghosts as the text it renders, and a block literal's closing newline is
-		// the YAML's, not the example's.
-		expect(exampleGhost(f({ type: 'richtext', example: 'A *lead*.\n' }))).toBe('A lead.');
-		// A `plaintext` example is literal: its asterisks are text.
-		expect(exampleGhost(f({ type: 'plaintext?', example: '*x*' }))).toBe('*x*');
-		expect(exampleGhost(f({ type: 'string?', example: 'RFC 9110' }))).toBe('RFC 9110');
-		expect(exampleGhost(f({ type: 'string' }))).toBeUndefined();
-	});
-
-	it('takes none where the `default:` prints, and gives way to none that does not', () => {
-		expect(exampleGhost(f({ type: 'richtext', default: 'D', example: 'x' }))).toBeUndefined();
-		expect(exampleGhost(f({ type: 'string', default: 'D', example: 'x' }))).toBeUndefined();
-		// A type-empty default is the skippable marker: it prints nothing, so the example
-		// is the only thing to draw.
-		expect(exampleGhost(f({ type: 'string', default: '', example: 'x' }))).toBe('x');
-		expect(exampleGhost(f({ type: 'plaintext', default: '  ', example: 'x' }))).toBe('x');
-	});
-
-	it('takes none on any other type: a pick, a number or a date offered is a value', () => {
-		expect(exampleGhost(f({ type: 'enum', values: ['a'], example: 'a' }))).toBeUndefined();
-		expect(exampleGhost(f({ type: 'integer', example: 3 }))).toBeUndefined();
-		expect(exampleGhost(f({ type: 'date', example: '2026-01-01' }))).toBeUndefined();
-		expect(exampleGhost(f({ type: 'boolean', example: true }))).toBeUndefined();
-		expect(exampleGhost(f({ type: 'array', items: f({}), example: ['a'] }))).toBeUndefined();
 	});
 });
 

@@ -39,7 +39,6 @@
 		baseType,
 		controlKind,
 		declaredContent,
-		exampleGhost,
 		humanize,
 		isContainer,
 		mountKey,
@@ -134,9 +133,6 @@
 	 *  cell ghosts nothing, an empty answer printing empty. */
 	const noneOf = (key: string, sub: QuillFieldSchema): string | undefined =>
 		obj[key] == null && optionalCell(sub) ? t.strings.optionalGhost : undefined;
-	/** What an unset free-text cell ghosts where nothing prints ({@link exampleGhost}). */
-	const exampleOf = (key: string, sub: QuillFieldSchema): string | undefined =>
-		obj[key] == null ? exampleGhost(sub) : undefined;
 	/** A scalar cell's `default:` as the text an unset cell holds, where it prints. */
 	const textDefault = (sub: QuillFieldSchema): string | undefined => printedText(sub.default);
 	/** A content cell's `default:` as the content an unset leaf holds, where it prints. */
@@ -349,7 +345,6 @@
 						value={obj[key] as string | undefined}
 						fallback={textDefault(sub)}
 						placeholder={noneOf(key, sub)}
-						example={exampleOf(key, sub)}
 						onCommit={(v) => commitProp(key, v)}
 						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
 					/>
@@ -362,7 +357,6 @@
 						fallback={contentDefault(sub)}
 						plaintext={baseType(sub) === 'plaintext'}
 						placeholder={noneOf(key, sub)}
-						example={exampleOf(key, sub)}
 						{block}
 						label={named}
 						labelledBy={ids?.label}

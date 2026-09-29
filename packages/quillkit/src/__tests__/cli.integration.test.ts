@@ -5,7 +5,7 @@
  * its seconds: what an author reaches is a linked bin, and nothing that imports a module
  * proves one works. It pins the two resolutions the tool is built on (the packer and the
  * engine, each out of the collection's own tree), the client it carries instead, and a
- * real render of every quill's seeded example, that last being what a gate for quills is.
+ * real render of every quill's seed and example, that last being what a gate for quills is.
  *
  * It runs against `dist/`, so it needs the package built: both halves, since the verbs
  * that serve reach for the client. The root `npm run build` does that in an order `tsc`
@@ -52,8 +52,8 @@ describe('quillkit test', () => {
 				cwd: await temp.collection()
 			});
 
-			expect(stdout).toContain('pass  showcase@1.0.0');
-			expect(stdout).toContain('pass  usaf_memo@0.0.0');
+			expect(stdout).toContain('pass  showcase@1.0.0 (seed, example)');
+			expect(stdout).toContain('pass  usaf_memo@0.0.0 (seed, example)');
 			expect(stdout).toContain('2/2 passed');
 		},
 		RENDER_MS
@@ -81,6 +81,28 @@ describe('quillkit test', () => {
 			expect(failure.message).toContain('Cannot load quillkit.config.js');
 			expect(failure.message).toContain('config is broken');
 			expect(failure.message).not.toContain('pass  ');
+		},
+		RENDER_MS
+	);
+
+	it(
+		'fails a quill whose example will not open, and passes the rest',
+		async () => {
+			const source = await temp.collection();
+			const example = join(source, 'quills', 'showcase', '1.0.0', 'example.md');
+			const md = await readFile(example, 'utf8');
+			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1\n'));
+
+			const failure: Error & { stdout?: string } = await run(process.execPath, [BIN, 'test'], {
+				cwd: source
+			}).then(
+				() => new Error('the gate passed a quill whose example names a selector'),
+				(err: Error) => err
+			);
+
+			// A `FAIL` line is the gate's stderr, which the rejection's message carries.
+			expect(failure.message).toContain('FAIL  showcase@1.0.0');
+			expect(failure.stdout).toContain('pass  usaf_memo@0.0.0');
 		},
 		RENDER_MS
 	);

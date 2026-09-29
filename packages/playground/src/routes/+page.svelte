@@ -15,7 +15,7 @@
 	import { Preview } from '@quillmark/svelte/preview';
 	import type { Document, LiveSession, Quill } from '@quillmark/wasm';
 	import type { Landing } from '@quillmark/svelte/core';
-	import { loadFixtureTree, loadTemplate } from './fixture';
+	import { loadFixtureTree } from './fixture';
 	import { INSTALL, OPEN_SESSION, PREVIEW, VISUAL } from './samples';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
@@ -48,10 +48,10 @@
 					import('@quillmark/svelte/visual')
 				]);
 				const { Quill } = await init();
-				const [tree, md] = await Promise.all([loadFixtureTree(), loadTemplate()]);
-				const quill = Quill.fromTree(tree);
+				const quill = Quill.fromTree(await loadFixtureTree());
 				created.unshift(quill);
-				const open = (): Document => (md == null ? quill.seedDocument() : quill.parse(md));
+				// The quill's example, filled where a seed is blank; the seed where it ships none.
+				const open = (): Document => quill.exampleDocument() ?? quill.seedDocument();
 				const previewDoc = open();
 				created.unshift(previewDoc);
 				const engine = new Engine();

@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
-import { quill, template } from '../helpers/fixtures.js';
+import { quill, example } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -34,7 +34,7 @@ function appendices(target: HTMLElement): HTMLElement {
 describe('a nested array property', () => {
 	it('draws as a record list inside the open row', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 
@@ -56,7 +56,7 @@ describe('a nested array property', () => {
 
 	it('opens one entry at a time, two rungs in, and commits the whole tree by value', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 		summaries(outer)[0].click();
@@ -84,7 +84,7 @@ describe('a nested array property', () => {
 
 	it('keeps the open rows mounted across a commit inside them', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 		summaries(outer)[0].click();
@@ -109,7 +109,7 @@ describe('a nested array property', () => {
 
 	it('adds a nested row open and removes it, the list committing whole each time', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
 		summaries(outer)[1].click();
@@ -143,7 +143,7 @@ describe('a nested array property', () => {
 		// by inheriting it. What `container-type` then does is the browser's (PLAYGROUND
 		// §"Reaching it from source").
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		const outer = appendices(mounted.target);
 		summaries(outer)[0].click();
 		flushSync();
@@ -156,7 +156,7 @@ describe('a nested array property', () => {
 describe('a container inside a variant cell', () => {
 	it('draws the record list under the discriminant and commits it into the container', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const mounted = mountEditor(q, doc);
 		openGroup(mounted.target, 'Metadata');
 		const dist = field(mounted.target, 'Distribution');

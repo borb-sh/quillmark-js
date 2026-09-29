@@ -10,7 +10,7 @@
 // decides.
 import { describe, it, expect, afterEach } from 'vitest';
 import { tick } from 'svelte';
-import { quill, template } from '../helpers/fixtures.js';
+import { quill, example } from '../helpers/fixtures.js';
 import { mountEditor, unmountAll, washHost } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -18,7 +18,7 @@ afterEach(unmountAll);
 describe('the arrival wash', () => {
 	it('washes the row an element landing named, not the list around it', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, template());
+		const { target, editor } = mountEditor(q, example());
 
 		await editor.setCaret({ field: 'main.keywords[1]', pos: 4, granularity: 'cluster' });
 		await tick();
@@ -31,7 +31,7 @@ describe('the arrival wash', () => {
 
 	it('washes the whole list where the address named the field', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, template());
+		const { target, editor } = mountEditor(q, example());
 
 		await editor.focusField('main.keywords');
 		await tick();
@@ -41,7 +41,7 @@ describe('the arrival wash', () => {
 
 	it('washes the list again where the row is one this document no longer has', async () => {
 		const q = quill();
-		const { target, editor } = mountEditor(q, template());
+		const { target, editor } = mountEditor(q, example());
 
 		// A landing off a compile the document has moved past: the field is right and
 		// the row is gone, so the landing falls back to the field and the wash with it.

@@ -52,8 +52,8 @@
   the document out as a file, and the strip says what it cost or what refused it.
 
   Which quill is a control, since the answer changes what both surfaces are: picking
-  tears the shell down and stands it back up. `examples` is whether an open writes the
-  schema's `example:`s onto every unanswered field, said in the URL as `?examples=off`
+  tears the shell down and stands it back up. `examples` is whether an open stands on the
+  quill's example document rather than its seed, said in the URL as `?examples=off`
   where it does not. The seed variants are query flags with no chrome, read once per
   open, for the branches a quill on disk reaches none of (PLAYGROUND §"Which quill, and
   what is seeded into it").
@@ -72,8 +72,7 @@
 	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
 	import { Preview } from '@quillmark/svelte/preview';
-	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree, loadTemplate } from '../fixture';
-	import { fillExamples } from '../examples';
+	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -131,9 +130,9 @@
 	let lastChangeSource = $state('none');
 	let lastError = $state('none');
 	let lastEmit = $state('none');
-	let lastFill = $state('none');
+	let lastOpened = $state('none');
 
-	// Whether an open fills. Read off the URL once and written back to it, so a link
+	// Whether an open stands on the quill's example. Read off the URL once and written back to it, so a link
 	// reproduces the page it was copied from.
 	let examples = $state(true);
 
@@ -147,7 +146,7 @@
 		lastChangeSource = 'none';
 		lastError = 'none';
 		lastEmit = 'none';
-		lastFill = 'none';
+		lastOpened = 'none';
 		injected = [];
 		syncDiagnostics();
 	}
@@ -290,38 +289,26 @@
 		syncDiagnostics();
 	}
 
-	function sayFill({ filled, refused }: ReturnType<typeof fillExamples>): string {
-		return refused.length
-			? `${filled} filled, refused: ${refused.map((d) => d.message).join('; ')}`
-			: `${filled} filled`;
-	}
-
-	// On, the examples land on the document the editor holds, which it does not re-read, so
-	// the shell stands back up over the result as a pick does, carrying it. Off, the open
-	// starts over, since a written example is an answer like any other.
+	// Either way the open starts over: an example is a whole document, and a written one
+	// is an answer like any other.
 	async function toggleExamples(): Promise<void> {
 		examples = !examples;
 		const url = new URL(window.location.href);
 		if (examples) url.searchParams.delete('examples');
 		else url.searchParams.set('examples', 'off');
 		window.history.replaceState(window.history.state, '', url);
-		if (!examples) return open(fixture);
-		if (!quillHandle || !docHandle) return;
-		const fill = fillExamples(quillHandle, docHandle);
-		if (fill.filled) await open(fixture, docHandle.toMarkdown());
-		lastFill = sayFill(fill);
+		return open(fixture);
 	}
 
 	/**
 	 * Tear the shell down and stand it back up over `name`, so one session is live at a
-	 * time. `carry` is the document to stand it over in place of the template, and takes
-	 * no seed variant: it already holds whatever the open it came from applied.
+	 * time, on the quill's example where `examples` holds and it ships one, else its seed.
 	 *
 	 * The surfaces come down before their handles do: the ready phase is what mounts
 	 * them, so a loading phase and a flush is the teardown. The handles go before the
 	 * next open allocates.
 	 */
-	async function open(name: string, carry?: string): Promise<void> {
+	async function open(name: string): Promise<void> {
 		const mine = ++generation;
 		opening = true;
 		status = { phase: 'loading' };
@@ -361,10 +348,10 @@
 			const params = new URLSearchParams(window.location.search);
 			// Chrome rather than a seed, so it rides no document and outlives a pick.
 			stats = params.has('stats');
-			const [tree, md] = await Promise.all([loadFixtureTree(name), carry ?? loadTemplate(name)]);
-			const quill = Quill.fromTree(tree);
+			const quill = Quill.fromTree(await loadFixtureTree(name));
 			created.unshift(quill);
-			const doc = md == null ? quill.seedDocument() : quill.parse(md);
+			const example = examples ? quill.exampleDocument() : undefined;
+			const doc = example ?? quill.seedDocument();
 			created.unshift(doc);
 			// The seed variants. `?foreign` holds a card whose kind the schema cannot
 			// project: `Document.insertCard` is schema-agnostic where the Quill-bound
@@ -373,10 +360,10 @@
 			// `?tips` seeds the guidance channel a quill or consumer supplies
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
 			// does not replace the map.
-			if (carry === undefined && params.has('foreign')) {
+			if (params.has('foreign')) {
 				doc.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
 			}
-			if (carry === undefined && params.has('tips')) {
+			if (params.has('tips')) {
 				visual.patchEditorExt(doc, MAIN_CARD_ADDR, {
 					tips: [
 						'Press **Tab** to move on.',
@@ -385,7 +372,6 @@
 					]
 				});
 			}
-			const filled = carry === undefined && examples ? sayFill(fillExamples(quill, doc)) : 'none';
 			const engine = new Engine();
 			// Always free: it answers off the backend descriptor without loading the binary
 			// or cloning the quill.
@@ -412,7 +398,7 @@
 			quillHandle = quill;
 			docHandle = doc;
 			syncDiagnostics();
-			lastFill = filled;
+			lastOpened = example ? 'example' : 'seed';
 			toFree = created;
 			status = { phase: 'ready' };
 		} catch (e) {
@@ -505,10 +491,8 @@
 				></span
 			>
 			<span class="stat"
-				><span class="qm-label">fill</span>
-				<span class="qm-readout" class:alert={lastFill.includes('refused')} data-testid="last-fill"
-					>{lastFill}</span
-				></span
+				><span class="qm-label">doc</span>
+				<span class="qm-readout" data-testid="last-opened">{lastOpened}</span></span
 			>
 			<span class="stat"
 				><span class="qm-label">error</span>

@@ -10,7 +10,7 @@ import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
-import { mount, quill, template, normalize, contentEqual, md, viewOf } from './_util.js';
+import { mount, quill, example, normalize, contentEqual, md, viewOf } from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
 // rect to reveal it. Stubbed rather than guarded in the source: a landing is right to
@@ -21,7 +21,7 @@ Range.prototype.getBoundingClientRect ??= () => new DOMRect();
 describe('createField over a real showcase leaf', () => {
 	let doc: Document;
 	beforeEach(() => {
-		doc = template();
+		doc = example();
 	});
 
 	it('edits the inline `title` field via applyChange', () => {
@@ -70,7 +70,7 @@ describe('createField over a real showcase leaf', () => {
 
 describe('field-level reconciliation', () => {
 	it('applyExternal re-hydrates on a foreign edit; own edit does not', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -121,7 +121,7 @@ describe('the hold on a narrowed field', () => {
 		});
 
 	it('releases when the value an external write leaves is inline, and then commits', () => {
-		const doc = template();
+		const doc = example();
 		doc.storeField('title', STRUCTURED);
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'title', holds);
@@ -142,7 +142,7 @@ describe('the hold on a narrowed field', () => {
 	});
 
 	it('holds before a commit when an external store write gains structure', () => {
-		const doc = template();
+		const doc = example();
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'title', holds);
 		const view = viewOf(field);
@@ -159,7 +159,7 @@ describe('the hold on a narrowed field', () => {
 	});
 
 	it('holds a plaintext(inline) field, whose refusal upstream names not_plain', () => {
-		const doc = template();
+		const doc = example();
 		doc.overwrite({ field: 'subtitle' }, md(STRUCTURED));
 		expect(
 			quill()
@@ -179,7 +179,7 @@ describe('the hold on a narrowed field', () => {
 	});
 
 	it('does not hold for the trailing newline a YAML block scalar keeps', () => {
-		const doc = template();
+		const doc = example();
 		doc.storeField('subtitle', 'one line\n');
 		expect(
 			quill()
@@ -209,7 +209,7 @@ describe('plaintext fields fire no markdown input rules', () => {
 	}
 
 	it('a plaintext field does NOT fire the strong rule — delimiters and no-marks survive', () => {
-		const doc = template();
+		const doc = example();
 		const before = doc.getStored('subtitle') as string;
 		const field = createField({
 			doc,
@@ -229,7 +229,7 @@ describe('plaintext fields fire no markdown input rules', () => {
 	});
 
 	it('a non-plaintext inline field DOES fire it (proving the schema is what suppresses it)', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -249,7 +249,7 @@ describe('plaintext fields fire no markdown input rules', () => {
 
 describe('createField over an ABSENT declared richtext field', () => {
 	it('installs on the first edit (applyChange throws on absent), then applyChanges', () => {
-		const doc = template();
+		const doc = example();
 		// `colophon` is `default:`-only, so it is absent from the seed.
 		expect(doc.getStored('colophon')).toBeUndefined();
 		const field = createField({
@@ -280,7 +280,7 @@ describe('a default the leaf holds', () => {
 	});
 
 	it('is held unwritten, re-seated by a new one, and taken whole by the first edit', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -311,7 +311,7 @@ describe('a default the leaf holds', () => {
 
 describe('a within-block hard break', () => {
 	it('lands in the store as a `continues` line, matching the optimistic PM', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const view = viewOf(field);
 		// Insert a hard_break into the first paragraph: the `continues` line that
@@ -336,7 +336,7 @@ describe('anchor insertion', () => {
 	}
 
 	it('inserts a caller-supplied identity anchor that persists in the content', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 3);
 		const anchors = bodyAnchors(doc);
@@ -346,7 +346,7 @@ describe('anchor insertion', () => {
 	});
 
 	it('a duplicate id is a no-op; removeAnchor drops the anchor', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 3);
 		field.insertAnchor('a1', 5); // same id → ignored (unique + invariant, 0.97 policy)
@@ -357,7 +357,7 @@ describe('anchor insertion', () => {
 	});
 
 	it('the anchor rebases through a later text edit — it survives like a mark', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 5);
 		const view = viewOf(field);
@@ -368,7 +368,7 @@ describe('anchor insertion', () => {
 	});
 
 	it('anchorsInRange reports coverage for the popover active state', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		field.insertAnchor('a1', 4);
 		expect(field.anchorsInRange(0, 10)).toEqual(['a1']);
@@ -379,7 +379,7 @@ describe('anchor insertion', () => {
 
 describe('createField accessible name (a11y follow-up)', () => {
 	it('sets aria-label on the editable element when a label is given', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -393,7 +393,7 @@ describe('createField accessible name (a11y follow-up)', () => {
 	});
 
 	it('leaves the editable element unnamed when no label is given', () => {
-		const doc = template();
+		const doc = example();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -415,11 +415,10 @@ describe('the empty-leaf ghost', () => {
 		viewOf(f).dom.querySelector('.qm-prose-placeholder')?.getAttribute('data-placeholder') ?? null;
 
 	/** A freshly added card's body: empty, which the seeded main body is not.
-	 *  This is the very leaf the fallback exists for. `note` is the kind declaring no
-	 *  body `example`, so its seed carries nothing for the ghost to hide behind. */
+	 *  This is the very leaf the fallback exists for. */
 	function emptyBodyDoc(): Document {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const card = q.seedCard('note', doc.seedOverlay('note'));
 		doc.insertCard(card!, doc.cardCount);
 		return doc;
@@ -498,22 +497,14 @@ describe('the empty-leaf ghost', () => {
 	});
 });
 
-// The focused leaf's ghost rides the same decoration, and `prose.css` swaps it in while
-// the view holds the focus. What the codec owns is when it is stamped at all: on an
-// unanswered leaf, up to the first edit.
-describe('the example ghost', () => {
-	const attrOf = (f: FieldController, name: string): string | null =>
-		viewOf(f).dom.querySelector('.qm-prose-placeholder')?.getAttribute(name) ?? null;
-	const ghostOf = (f: FieldController) => attrOf(f, 'data-placeholder');
-	const exampleOf = (f: FieldController) => attrOf(f, 'data-example');
+// A placeholder saying what the unset field prints is stamped on an unanswered leaf
+// only, up to the first edit.
+describe('an unanswered leaf’s ghost', () => {
+	const ghostOf = (f: FieldController): string | null =>
+		viewOf(f).dom.querySelector('.qm-prose-placeholder')?.getAttribute('data-placeholder') ?? null;
 
-	/** The showcase `title`, unset on a seed: inline richtext declaring an `example:` and
-	 *  no `default:`. */
-	function unsetTitle(opts: {
-		placeholder?: string;
-		placeholderUntilEdit?: boolean;
-		example?: string;
-	}): FieldController {
+	/** The showcase `title`, unset on a seed: inline richtext with no `default:`. */
+	function unsetTitle(opts: { placeholder?: string; placeholderUntilEdit?: boolean }) {
 		return createField({
 			doc: quill().seedDocument(),
 			quill: quill(),
@@ -524,33 +515,18 @@ describe('the example ghost', () => {
 		});
 	}
 
-	it('stamps the example beside the resting ghost, and alone where there is none', () => {
-		const both = unsetTitle({ placeholder: 'None', example: 'The Showcase Quill' });
-		expect(ghostOf(both)).toBe('None');
-		expect(exampleOf(both)).toBe('The Showcase Quill');
-		const alone = unsetTitle({ example: 'The Showcase Quill' });
-		expect(ghostOf(alone)).toBeNull();
-		expect(exampleOf(alone)).toBe('The Showcase Quill');
-		// An inline leaf's ghost keeps to its one line.
+	it('keeps an inline leaf’s ghost to its one line', () => {
+		const field = unsetTitle({ placeholder: 'None' });
+		expect(ghostOf(field)).toBe('None');
 		expect(
-			viewOf(alone)
+			viewOf(field)
 				.dom.querySelector('.qm-prose-placeholder')
 				?.classList.contains('qm-prose-placeholder-line')
 		).toBe(true);
-	});
-
-	it('drops the example at the first edit, and an emptied leaf keeps only the resting ghost', () => {
-		const field = unsetTitle({ placeholder: 'None', example: 'The Showcase Quill' });
-		const view = viewOf(field);
-		view.dispatch(view.state.tr.insertText('X', 1));
-		expect(exampleOf(field)).toBeNull();
-		view.dispatch(view.state.tr.delete(1, 2));
-		expect(ghostOf(field)).toBe('None');
-		expect(exampleOf(field)).toBeNull();
 		field.destroy();
 	});
 
-	it('drops a placeholder that says what the unset field prints at the first edit too', () => {
+	it('drops a placeholder that says what the unset field prints at the first edit', () => {
 		// The edit answers the field: emptied, the leaf holds an empty answer, which is
 		// what prints, where a leaf without the flag ghosts whenever it is empty.
 		const field = unsetTitle({ placeholder: 'None', placeholderUntilEdit: true });
@@ -559,16 +535,6 @@ describe('the example ghost', () => {
 		view.dispatch(view.state.tr.insertText('X', 1));
 		view.dispatch(view.state.tr.delete(1, 2));
 		expect(view.dom.querySelector('.qm-prose-placeholder')).toBeNull();
-		field.destroy();
-	});
-
-	it('moves after mount without an edit', () => {
-		const field = unsetTitle({});
-		expect(exampleOf(field)).toBeNull();
-		field.setExample('The Showcase Quill');
-		expect(exampleOf(field)).toBe('The Showcase Quill');
-		field.setExample(undefined);
-		expect(viewOf(field).dom.querySelector('.qm-prose-placeholder')).toBeNull();
 		field.destroy();
 	});
 });
@@ -594,7 +560,7 @@ describe('an island edit on the op path', () => {
 	}
 
 	it('a props edit reaches the store, and the leaf keeps committing after it', () => {
-		const doc = template();
+		const doc = example();
 		const field = tableBody(doc);
 		const view = viewOf(field);
 		const pos = islandPos(view);
@@ -612,7 +578,7 @@ describe('an island edit on the op path', () => {
 	});
 
 	it('deleting a block island and undoing it re-places the slot, keeping the anchors', () => {
-		const doc = template();
+		const doc = example();
 		const field = tableBody(doc);
 		const view = viewOf(field);
 		field.insertAnchor('a1', 2);

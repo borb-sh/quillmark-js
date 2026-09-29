@@ -45,10 +45,6 @@
 		placeholder?: string;
 		/** The placeholder goes at the leaf's first edit (`createField`). */
 		placeholderUntilEdit?: boolean;
-		/** Ghost shown on the empty leaf until its first edit, and in the placeholder's
-		 * stead while the leaf holds the focus: an unset field's `example:`
-		 * (`exampleGhost`). */
-		example?: string;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
 		onFocus?: (addr: Addr) => void;
@@ -77,7 +73,6 @@
 		fallback,
 		placeholder,
 		placeholderUntilEdit,
-		example,
 		leafKey,
 		onFocus,
 		onCaretMove,
@@ -128,7 +123,6 @@
 			fallback,
 			placeholder,
 			placeholderUntilEdit,
-			example,
 			tableStrings: () => t.strings,
 			onSlash: (next) => {
 				slash = next;
@@ -155,9 +149,6 @@
 	// the caret.
 	$effect(() => {
 		controller?.setPlaceholder(placeholder);
-	});
-	$effect(() => {
-		controller?.setExample(example);
 	});
 	$effect(() => {
 		controller?.setFallback(fallback);

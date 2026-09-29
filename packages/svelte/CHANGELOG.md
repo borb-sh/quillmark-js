@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.117.0-0`, and nothing ghosts an example.** The schema carries no `example:` and no `body.example`, so an unset free-text field with no `default:` that prints draws nothing, where it ghosted its `example:` at rest and on focus, and an optional cell keeps `None` while it holds the focus. An empty body ghosts its resolved `default:`, else the `bodyPlaceholder` wording, else `bodyGhost`, on every kind. The codec's `example` option and `FieldController.setExample` are deleted, and a prose leaf's ghost is `data-placeholder` alone.
+
 ## v0.14.0 - 2026-09-27
 
 **A date field holds `today`.** A field storing `today` draws the render date's digits at the default rung, where it drew an empty field. A **Today** toggle at the end of a `date` field (a `datetime` holds no `today`) writes `today`, and pressed again writes the digits it showed; `T` in a segment writes `today` too, and a segment edit writes a whole date. While off, the toggle is hidden until the pointer is over the field or the focus is in it. A `default: today` presses it at the default rung while the field is unset. `VisualStrings.dateToday` is its label.

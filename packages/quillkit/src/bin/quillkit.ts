@@ -8,6 +8,7 @@
  */
 
 import { join, resolve } from 'node:path';
+import type { Document } from '@quillmark/wasm';
 import { loadEngine, loadQuiverNode } from '../collection.js';
 import { CLIENT } from '../paths.js';
 import { createStaticServer, listen, type Mount } from '../serve.js';
@@ -43,8 +44,9 @@ function message(err: unknown): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The gate. Seeded rather than read from a file: `seedDocument()` is the one document
- * this and the client can both name.
+ * The gate: every quill's seed renders, and so does its root `example.md` where it ships
+ * one. The seed is the one document every quill has; the example is the filled page
+ * whose values reach the branches the blank leaves dark.
  *
  * The only door onto the verdict, so an author on vitest, jest or another runner spawns
  * it (`execFileSync('quillkit', ['test'])`) rather than rebuilding the loop
@@ -70,17 +72,20 @@ async function test(): Promise<void> {
 			const ref = `${name}@${version}`;
 			try {
 				const quill = await quiver.getQuill(ref);
-				const doc = quill.seedDocument();
-				let result: { artifacts?: unknown[] };
+				const docs: [string, Document][] = [['seed', quill.seedDocument()]];
 				try {
-					result = await engine.render(quill, doc);
+					const example = quill.exampleDocument();
+					if (example) docs.push(['example', example]);
+					for (const [what, doc] of docs) {
+						const result: { artifacts?: unknown[] } = await engine.render(quill, doc);
+						if (!Array.isArray(result.artifacts) || result.artifacts.length === 0) {
+							throw new Error(`${what} render produced no artifacts`);
+						}
+					}
 				} finally {
-					doc.free();
+					for (const [, doc] of docs) doc.free();
 				}
-				if (!Array.isArray(result.artifacts) || result.artifacts.length === 0) {
-					throw new Error('example render produced no artifacts');
-				}
-				console.log(`pass  ${ref}`);
+				console.log(`pass  ${ref} (${docs.map(([what]) => what).join(', ')})`);
 				pass++;
 			} catch (err) {
 				console.error(`FAIL  ${ref} — ${message(err)}`);

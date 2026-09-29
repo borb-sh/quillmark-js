@@ -24,9 +24,6 @@
 		/** Words at rest about an unset field that holds no text: the `None` an optional
 		 * cell prints. */
 		placeholder?: string;
-		/** An unset field's `example:` (`exampleGhost`): drawn wherever the field holds no
-		 * text, and in `placeholder`'s stead while the input holds the focus. */
-		example?: string;
 		/** Accessible name for an input nothing else names: an array element, whose
 		 * name is the field label plus its 1-based index. A field's own input takes
 		 * `id` instead and is named by the `<label for>` beside it. */
@@ -41,17 +38,13 @@
 		 * array repeater's Enter/Backspace (`ArrayField`). */
 		onKey?: (e: KeyboardEvent) => void;
 	}
-	let { value, fallback, placeholder, example, label, id, describedBy, onCommit, onKey }: Props =
-		$props();
+	let { value, fallback, placeholder, label, id, describedBy, onCommit, onKey }: Props = $props();
 
 	// Local input state synced to `value`, or to the default an unset field holds:
 	// own-typing stays local, only an external change reconciles back in (see
 	// `syncedLocal`).
 	const local = syncedLocal(() => value ?? fallback ?? '');
 	const defaulted = $derived(value == null && !!fallback && local.value === fallback);
-
-	let focused = $state(false);
-	const ghost = $derived(focused ? (example ?? placeholder) : (placeholder ?? example));
 
 	let inputEl: HTMLInputElement | undefined = $state();
 	/** Take the caret: what a parent placing focus on this control calls. */
@@ -66,13 +59,11 @@
 	type="text"
 	value={local.value}
 	{id}
-	placeholder={ghost}
+	{placeholder}
 	data-default={defaulted ? '' : undefined}
 	aria-label={id ? undefined : label}
 	aria-describedby={describedBy}
 	onkeydown={onKey}
-	onfocus={() => (focused = true)}
-	onblur={() => (focused = false)}
 	oninput={(e) => {
 		local.value = (e.currentTarget as HTMLInputElement).value;
 		onCommit(local.value !== '' ? local.value : fallback ? '' : undefined);

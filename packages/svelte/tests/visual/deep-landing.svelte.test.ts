@@ -5,7 +5,7 @@
 // diagnostic anchored at a nested leaf draws at the nearest cell the tree holds.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
-import { quill, template } from '../helpers/fixtures.js';
+import { quill, example } from '../helpers/fixtures.js';
 import {
 	caret,
 	field,
@@ -24,7 +24,7 @@ afterEach(unmountAll);
 describe('a landing at depth', () => {
 	it('opens each row on the way and places the caret in the leaf the address names', async () => {
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		openGroup(mounted.target, 'Content');
 		const outer = field(mounted.target, 'Appendices');
 		expect(outer.querySelector('.qm-element.open')).toBeNull();
@@ -52,7 +52,7 @@ describe('a landing at depth', () => {
 
 	it('lands on a row it has to open, revealing the group first', async () => {
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		const header = [...mounted.target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>
 			h.textContent?.includes('Content')
 		)!;
@@ -70,7 +70,7 @@ describe('a landing at depth', () => {
 
 	it('lands a property path on its cell, washing the field', async () => {
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		await mounted.editor.focusField('main.contact.email');
 		await settle();
 		const contact = field(mounted.target, 'Point of contact');
@@ -84,7 +84,7 @@ describe('a landing at depth', () => {
 
 	it('lands a live variant cell on its control, and a dormant one on the discriminant', async () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const mounted = mountEditor(q, doc);
 		openGroup(mounted.target, 'Metadata');
 		const dist = field(mounted.target, 'Distribution');
@@ -106,7 +106,7 @@ describe('a landing at depth', () => {
 
 	it('refuses a step the schema does not declare, through either verb', async () => {
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		await mounted.editor.focusField('main.appendices[0].nothing');
 		await mounted.editor.setCaret({ field: 'main.contact.email.deeper', pos: 0 });
 		await mounted.editor.focusField('main.contact[0]');
@@ -125,7 +125,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 
 	it('draws under the nearest cell the tree holds, following the rows as they open', () => {
 		const q = quill();
-		const mounted = mountEditor(q, template(), { diagnostics });
+		const mounted = mountEditor(q, example(), { diagnostics });
 		openGroup(mounted.target, 'Content');
 		const outer = field(mounted.target, 'Appendices');
 
@@ -155,7 +155,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 
 	it('draws a property diagnostic under that property, not under the whole subform', () => {
 		const q = quill();
-		const mounted = mountEditor(q, template(), { diagnostics });
+		const mounted = mountEditor(q, example(), { diagnostics });
 		const contact = field(mounted.target, 'Point of contact');
 		expect(contact.querySelector('[data-qm-prop="email"] .qm-diag-line')?.textContent).toBe(
 			'bad email'
@@ -165,7 +165,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 
 	it("keeps a variant's discriminant off the box its world's cells sit in", () => {
 		const q = quill();
-		const mounted = mountEditor(q, template(), {
+		const mounted = mountEditor(q, example(), {
 			diagnostics: [
 				{ severity: 'error' as const, message: 'bad world', path: 'main.distribution.value' },
 				{ severity: 'error' as const, message: 'bad date', path: 'main.distribution.lift_on' }

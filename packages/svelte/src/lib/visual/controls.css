@@ -112,7 +112,7 @@
 	color: var(--_qm-ink-default);
 }
 /* The native placeholder is the label rung, not the UA's own grey: what an input
-   ghosts is words about a value it does not hold — an `example:`, `None` — which is
+   ghosts is words about a value it does not hold — `None` — which is
    content and reads at a content's contrast, the same step the prose leaf's ghost
    reads (`prose.css`). */
 :where(.qm-input)::placeholder {

@@ -13,7 +13,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import type { ContentHit, Document } from '@quillmark/wasm';
 import type { Place } from '$lib/core';
-import { quill, template } from '../helpers/fixtures.js';
+import { quill, example } from '../helpers/fixtures.js';
 import { mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -27,7 +27,7 @@ const at = (field: string, pos: number) => ({ field, pos }) as ContentHit;
 
 describe('the caret signal reports places, not transactions', () => {
 	it('landing the caret where it already sits reports once', async () => {
-		const { editor, places } = open(template());
+		const { editor, places } = open(example());
 
 		await editor.setCaret(at('main.body', 3));
 		const first = places.length;
@@ -39,7 +39,7 @@ describe('the caret signal reports places, not transactions', () => {
 	});
 
 	it('a place left and returned to is two moves, across leaves', async () => {
-		const { editor, places } = open(template());
+		const { editor, places } = open(example());
 
 		await editor.setCaret(at('main.body', 3));
 		places.length = 0;
@@ -53,7 +53,7 @@ describe('the caret signal reports places, not transactions', () => {
 	});
 
 	it('a focus into a leaf with no caret is what makes the return a move', async () => {
-		const { editor, places, active } = open(template());
+		const { editor, places, active } = open(example());
 
 		await editor.setCaret(at('main.body', 3));
 		places.length = 0;

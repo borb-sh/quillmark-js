@@ -10,7 +10,7 @@ import {
 	ghostDefault,
 	stringifyGhost
 } from '$lib/visual/structure';
-import { quill, template } from '../helpers/fixtures.js';
+import { quill, example } from '../helpers/fixtures.js';
 
 const row = (name: string, value: unknown, source: ResolvedField['source']): ResolvedField => ({
 	name,
@@ -113,8 +113,8 @@ describe('resolve over the real showcase schema', () => {
 	});
 
 	it('reports an array `default:` as one, and ghosts none of it', () => {
-		const doc = template();
-		// The template's answer is authored, not the default beneath it.
+		const doc = example();
+		// The example's answer is authored, not the default beneath it.
 		expect(resolved(doc).authors).toMatchObject({
 			source: 'authored',
 			value: doc.getStored('authors')
