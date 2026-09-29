@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.11.0 - 2026-09-29
+
 **Studio offers a collection's templates.** `quillkit studio --templates <dir>` and `quillkit site --templates <dir>` serve a directory of starter documents and the `templates.json` listing them (`{ name, file, description? }`, other keys ignored) beside the quiver, and the head draws a **Templates…** select over them. A pick opens the document in the quill it names. A manifest naming a file the directory does not hold is refused before anything is served or cleared.
 
 **A document naming its quill by selector opens in it.** An import whose `$quill` is `usaf_memo@0.3` lands in `usaf_memo@0.3.0`, resolved as a `?quill=` link is, where it landed in the quill on screen.
