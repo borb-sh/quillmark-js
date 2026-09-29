@@ -2,16 +2,15 @@
 // What an empty field shows, drawn (VISUAL_EDITOR §"The commitment ladder"). A default
 // that prints is the value an unset control holds, at the default rung, and an edit
 // takes it. Where nothing prints, a control draws words: the `none` an optional cell
-// prints, worded `strings.optionalGhost`, an enum's blank, worded `ui.blank_title`, and
-// a free-text field's `example:`, at rest and in `None`'s stead on focus. An empty body
-// ghosts its kind's `body.example` ahead of the consumer's wording, the `bodyPlaceholder`
-// hook asked once per card with nothing kept between asks.
+// prints, worded `strings.optionalGhost`, and an enum's blank, worded `ui.blank_title`.
+// A free-text field with nothing to print draws nothing. An empty body ghosts the
+// consumer's wording, the `bodyPlaceholder` hook asked once per card with nothing kept
+// between asks.
 //
 // On its own quill, one cell per case, so no case leans on what the reference quill
-// happens to declare. A prose leaf's focus is its view's (`ProseMirror-focused`, which
-// `prose.css` keys the example on), so a leaf is read by the attributes that rule
-// draws from; an input's is its own `placeholder`. A commit is read back through
-// `resolve`, whose rung says whether anything was written.
+// happens to declare. A leaf is read by the attributes `prose.css` draws from; an
+// input's ghost is its own `placeholder`. A commit is read back through `resolve`,
+// whose rung says whether anything was written.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill, ResolvedField } from '@quillmark/wasm';
@@ -42,35 +41,26 @@ const QUILL_YAML = `quill:
 typst:
   plate_file: plate.typ
 main:
-  body:
-    example: |
-      The main body's own example.
   fields:
     heading:
       type: string
-      example: Findings
     lead:
       type: richtext
       inline: true
-      example: What the section *found*.
     kept:
       type: string
       default: Kept
-      example: Never drawn
     motto:
       type: richtext
       inline: true
       default: "*Always* be testing."
-      example: Never drawn
     signed_for:
       type: plaintext
       inline: true
       default: ""
-      example: FOR THE COMMANDER
     skippable:
       type: string
       default: ""
-      example: Skip me
     size:
       type: integer?
     pages:
@@ -91,7 +81,6 @@ main:
       default: 2026-01-15
     ref:
       type: string?
-      example: RFC 9110
     level:
       type: enum?
       values: [low, high]
@@ -117,11 +106,9 @@ main:
       properties:
         name:
           type: string
-          example: Ada Lovelace
         note:
           type: plaintext
           inline: true
-          example: In person
         motto:
           type: richtext
           inline: true
@@ -131,19 +118,6 @@ main:
           default: B-12
         phone:
           type: string?
-    rows:
-      type: array
-      items:
-        type: object
-        properties:
-          who:
-            type: string
-            example: Grace Hopper
-          lead:
-            type: boolean
-            default: false
-      ui:
-        layout: table
     crew:
       type: array
       items:
@@ -203,18 +177,25 @@ const editable = (scope: HTMLElement): HTMLElement =>
 const cell = (scope: HTMLElement, key: string): HTMLElement =>
 	scope.querySelector<HTMLElement>(`[data-qm-prop="${key}"]`)!;
 
-describe('the example ghost', () => {
-	it('draws on an unset text field where nothing prints, at rest and on focus', () => {
+describe('a free-text field where nothing prints', () => {
+	it('draws nothing, at rest and on focus', () => {
 		const target = open();
 		const heading = input(field(target, 'Heading'));
-		expect(heading.placeholder).toBe('Findings');
-
+		expect(heading.placeholder).toBe('');
 		heading.focus();
 		flushSync();
-		expect(heading.placeholder).toBe('Findings');
+		expect(heading.placeholder).toBe('');
+		expect(leafGhost(field(target, 'Lead'))).toBeNull();
+		// A type-empty default is the skippable marker, and prints nothing either.
+		expect(leafGhost(field(target, 'Signed for'))).toBeNull();
+		expect(input(field(target, 'Skippable')).placeholder).toBe('');
+		expect(input(cell(field(target, 'Contact'), 'name')).placeholder).toBe('');
+		expect(leafGhost(cell(field(target, 'Contact'), 'note'))).toBeNull();
 	});
+});
 
-	it('gives way to a `default:` that prints, which the control holds as its text', () => {
+describe('a default that prints', () => {
+	it('is the text the control holds, where nothing else ghosts', () => {
 		const target = open();
 		const kept = input(field(target, 'Kept'));
 		expect(kept.value).toBe('Kept');
@@ -223,43 +204,11 @@ describe('the example ghost', () => {
 		const motto = field(target, 'Motto');
 		expect(editable(motto).textContent).toBe('Always be testing.');
 		expect(leafGhost(motto)).toBeNull();
+		expect(editable(cell(field(target, 'Contact'), 'motto')).textContent).toBe(
+			'Always be testing.'
+		);
 	});
 
-	it('draws where a type-empty default prints nothing, the skippable marker', () => {
-		const target = open();
-		expect(leafGhost(field(target, 'Signed for'))?.dataset.example).toBe('FOR THE COMMANDER');
-		const skippable = input(field(target, 'Skippable'));
-		expect(skippable.value).toBe('');
-		expect(skippable.placeholder).toBe('Skip me');
-	});
-
-	it('rides a prose leaf as the attribute its rule draws', () => {
-		const target = open();
-		const lead = leafGhost(field(target, 'Lead'));
-		// Markdown, so it ghosts as the text it renders.
-		expect(lead?.dataset.example).toBe('What the section found.');
-		// Nothing prints: the field declares no `default:`.
-		expect(lead?.hasAttribute('data-placeholder')).toBe(false);
-	});
-
-	it('reaches an object’s cells and a table’s, by `sub.example`', () => {
-		const target = open();
-		const contact = field(target, 'Contact');
-
-		expect(input(cell(contact, 'name')).placeholder).toBe('Ada Lovelace');
-		expect(leafGhost(cell(contact, 'note'))?.dataset.example).toBe('In person');
-		// A cell's markdown `default:` is the text its leaf holds, as a field's is.
-		expect(editable(cell(contact, 'motto')).textContent).toBe('Always be testing.');
-
-		const rows = field(target, 'Rows');
-		rows.querySelector<HTMLButtonElement>('.qm-add-el')!.click();
-		flushSync();
-		const who = input(cell(rows.querySelector<HTMLElement>('.qm-array-row')!, 'who'));
-		expect(who.placeholder).toBe('Grace Hopper');
-	});
-});
-
-describe('a default that prints', () => {
 	it('is held unwritten, at the default rung, until an edit', () => {
 		const target = open();
 		const kept = input(field(target, 'Kept'));
@@ -311,7 +260,7 @@ describe('a default that prints', () => {
 		type(heading, 'x');
 		type(heading, '');
 		expect(row('heading').source).toBe('blank');
-		expect(heading.placeholder).toBe('Findings');
+		expect(heading.placeholder).toBe('');
 
 		// A type-empty default prints nothing, so emptying returns the field to it.
 		const skippable = input(field(target, 'Skippable'));
@@ -506,13 +455,10 @@ describe('an optional cell', () => {
 		expect(input(cell(field(target, 'Contact'), 'phone')).placeholder).toBe(NONE);
 	});
 
-	it('ghosts its `example:` in `None`’s stead while it holds the focus', () => {
+	it('keeps `None` while it holds the focus', () => {
 		const target = open();
 		const ref = input(field(target, 'Ref'));
 		ref.focus();
-		flushSync();
-		expect(ref.placeholder).toBe('RFC 9110');
-		ref.blur();
 		flushSync();
 		expect(ref.placeholder).toBe(NONE);
 	});
@@ -565,7 +511,7 @@ describe('the empty body', () => {
 			(el) => el.dataset.placeholder ?? ''
 		);
 
-	it('ghosts its kind’s `body.example` ahead of the consumer’s wording, asked per card', () => {
+	it('ghosts the consumer’s wording, asked per card', () => {
 		const seen: BodyPlaceholderContext[] = [];
 		const bodyPlaceholder = (ctx: BodyPlaceholderContext) => {
 			seen.push(ctx);
@@ -573,17 +519,17 @@ describe('the empty body', () => {
 		};
 		const entry = ['~~~', '$kind: entry', '~~~', ''].join('\n');
 		const target = open({ strings: { bodyPlaceholder } }, `${answering()}\n${entry}\n${entry}`);
-		// Main declares an example and `entry` declares none. The hook carries each card
-		// and keeps nothing between asks, so two cards of one kind can read two ways.
-		expect(bodies(target)).toEqual(["The main body's own example.", 'Write c0…', 'Write c1…']);
-		// Main is asked all the same, naming itself.
+		// The hook carries each card and keeps nothing between asks, so two cards of one
+		// kind can read two ways.
+		expect(bodies(target)).toEqual(['Write main…', 'Write c0…', 'Write c1…']);
+		// Main is asked, naming itself.
 		expect(seen.some((s) => s.cardId === 'main' && s.kind === 'main' && s.isMain)).toBe(true);
 	});
 
 	it('falls to the built-in where neither answers', () => {
 		const target = open();
 		expect(bodies(target)).toEqual([
-			"The main body's own example.",
+			DEFAULT_VISUAL_STRINGS.bodyGhost,
 			DEFAULT_VISUAL_STRINGS.bodyGhost
 		]);
 	});

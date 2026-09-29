@@ -33,7 +33,6 @@
 		VARIANT_DISCRIMINANT,
 		arrayLayout,
 		baseType,
-		exampleGhost,
 		ghostDefault,
 		isContainer,
 		optionalCell,
@@ -120,8 +119,7 @@
 	// which is what a take writes (`ArrayField`).
 	// A default that prints stands in the control as the value it is, at the default
 	// rung, and the first edit takes it (VISUAL_EDITOR §"The commitment ladder"). Where
-	// nothing prints, a control draws words: the `none` an optional cell prints, and
-	// a free-text field's `example:`.
+	// nothing prints, a control draws words: the `none` an optional cell prints.
 	const ghost = $derived(ghostDefault(provenance));
 	const defaultStr = $derived(
 		field.control === 'prose' ? titleText(ghost) || undefined : stringifyGhost(ghost)
@@ -134,7 +132,6 @@
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
 	const none = $derived(optional && value == null ? t.strings.optionalGhost : undefined);
-	const example = $derived(value == null ? exampleGhost(field.schema) : undefined);
 	// A variant resolves as one rung whose value is the whole container, so the
 	// discriminant's ghost is that container's own discriminant cell.
 	const ghostMember = $derived(
@@ -288,7 +285,6 @@
 					fallback={printed ? (ghost as Content) : undefined}
 					placeholder={none}
 					placeholderUntilEdit
-					{example}
 					labelledBy={domIds.label}
 					{describedBy}
 					{leafKey}
@@ -407,7 +403,6 @@
 					value={value as string | undefined}
 					fallback={declared}
 					placeholder={none}
-					{example}
 					id={domIds.control}
 					{describedBy}
 					onCommit={onCommitScalar}

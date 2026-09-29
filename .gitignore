@@ -101,9 +101,8 @@ dist
 # SvelteKit adapter-static playground output
 packages/*/build/
 
-# The fixture quiver and its templates, packed into each app's served tree before dev/build.
+# The fixture quiver, and studio's templates, packed into each app's served tree before dev/build.
 packages/playground/static/quiver/
-packages/playground/static/templates/
 packages/quillkit/client/public/quiver/
 packages/quillkit/client/public/templates/
 

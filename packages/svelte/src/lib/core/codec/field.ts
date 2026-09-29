@@ -121,11 +121,6 @@ export interface CreateFieldOpts {
 	 * emptied it holds an empty answer, which prints empty. Absent, the placeholder
 	 * returns whenever the leaf is empty. */
 	placeholderUntilEdit?: boolean;
-	/** Ghost text shown on the empty leaf until its first edit: an unset field's
-	 * `example:`, at rest where there is no placeholder and in the placeholder's stead
-	 * while the leaf holds the focus. The initial value; {@link FieldController.setExample}
-	 * moves it after mount. */
-	example?: string;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new USV caret after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -164,9 +159,6 @@ export interface FieldController {
 	 * a transaction would fire `onCaretMove` at a moment the caret did not move.
 	 */
 	setPlaceholder(text: string | undefined): void;
-	/** Move the example ghost after mount, the way {@link setPlaceholder} moves the
-	 *  other one. */
-	setExample(text: string | undefined): void;
 	/** Move the default an unset leaf holds after mount: a retype or a quill swap
 	 *  re-seats an unset leaf on the new kind's default, and leaves a written one be. */
 	setFallback(content: Content | undefined): void;
@@ -347,10 +339,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 
 	let index: LineIndex; // rebuilt on every structural change
 	let view: EditorView;
-	// The ghosts' live cells: the ghost plugin reads them per pass, so moving one is
-	// an assignment plus a re-render rather than a rebuilt plugin stack.
+	// The ghost's live cell: the ghost plugin reads it per pass, so moving it is an
+	// assignment plus a re-render rather than a rebuilt plugin stack.
 	let placeholderText = opts.placeholder;
-	let exampleText = opts.example;
 
 	// The views nested inside this leaf: one per table cell (`table-view.ts`). The
 	// leaf holds the set because chrome asks the leaf, not the island, which view
@@ -475,7 +466,6 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				// given one later; the plugin draws nothing while the text is empty.
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
-				example: () => exampleText,
 				afterHistory: [anchorPlugin(seededAnchors)]
 			})
 		});
@@ -619,11 +609,6 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			// transaction, so nothing commits and no caret is reported.
 			view.setProps({});
 		},
-		setExample(text: string | undefined): void {
-			if (text === exampleText) return;
-			exampleText = text;
-			view.setProps({});
-		},
 		setFallback(content: Content | undefined): void {
 			if (content === fallback || (content && fallback && contentEqual(content, fallback))) return;
 			fallback = content;
@@ -723,8 +708,6 @@ export function proseLeafPlugins(
 		placeholder?: () => string | undefined;
 		/** {@link CreateFieldOpts.placeholderUntilEdit}. */
 		placeholderUntilEdit?: boolean;
-		/** The focused leaf's ghost, read live for the same reason. */
-		example?: () => string | undefined;
 		afterHistory?: Plugin[];
 	}
 ): Plugin[] {
@@ -737,7 +720,7 @@ export function proseLeafPlugins(
 	// textblocks alone, with no island and no gap to put a cursor in.
 	if (isBlockSchema(schema)) list.push(gapCursor(), pastAtomPlugin(), islandPastePlugin());
 	if (schema === plainSchema) list.push(plainClipboardPlugin());
-	if (opts.placeholder || opts.example) list.push(ghostPlugin(opts));
+	if (opts.placeholder) list.push(ghostPlugin(opts));
 	return list;
 }
 
@@ -802,25 +785,22 @@ function pastAtomPlugin(): Plugin {
 }
 
 /**
- * The empty leaf's ghosts. A node decoration stamps the sole empty textblock with a
- * class and the ghost text, which `prose.css` draws from the attributes: so the text
+ * The empty leaf's ghost. A node decoration stamps the sole empty textblock with a
+ * class and the ghost text, which `prose.css` draws from the attribute: so the text
  * never enters the document, the caret path, or a `pmToContent` export, and it
  * vanishes the instant the leaf holds any content (the emptiness test fails).
  *
- * `data-placeholder` is drawn at rest, and `data-example` where there is none, and in
- * its stead while the view holds the focus. The example is stamped only until the
- * state's first edit, after which the leaf has been answered, and so is a placeholder
- * under `placeholderUntilEdit`. An inline leaf's
- * ghost keeps to the one line the leaf is (`qm-prose-placeholder-line`).
+ * Under `placeholderUntilEdit` it is stamped only until the state's first edit, after
+ * which the leaf has been answered. An inline leaf's ghost keeps to the one line the
+ * leaf is (`qm-prose-placeholder-line`).
  *
- * The texts are read per decoration pass rather than closed over, so moving a ghost is
+ * The text is read per decoration pass rather than closed over, so moving the ghost is
  * a re-render and never a document edit.
  */
 function ghostPlugin(opts: {
 	inline: boolean;
 	placeholder?: () => string | undefined;
 	placeholderUntilEdit?: boolean;
-	example?: () => string | undefined;
 }): Plugin<boolean> {
 	const key = new PluginKey<boolean>('qm-ghost');
 	return new Plugin<boolean>({
@@ -833,8 +813,7 @@ function ghostPlugin(opts: {
 			decorations(state) {
 				const edited = key.getState(state);
 				const text = edited && opts.placeholderUntilEdit ? undefined : opts.placeholder?.();
-				const example = edited ? undefined : opts.example?.();
-				if (!text && !example) return null;
+				if (!text) return null;
 				const { doc } = state;
 				const first = doc.firstChild;
 				const empty =
@@ -845,8 +824,7 @@ function ghostPlugin(opts: {
 						? 'qm-prose-placeholder qm-prose-placeholder-line'
 						: 'qm-prose-placeholder'
 				};
-				if (text) attrs['data-placeholder'] = text;
-				if (example) attrs['data-example'] = example;
+				attrs['data-placeholder'] = text;
 				return DecorationSet.create(doc, [Decoration.node(0, first.nodeSize, attrs)]);
 			}
 		}

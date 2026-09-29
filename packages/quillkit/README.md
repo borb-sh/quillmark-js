@@ -16,7 +16,7 @@ That client compiles in its own copies of both libraries and the engine, which y
 
 | Verb              | What it does                                                       |
 | ----------------- | ------------------------------------------------------------------ |
-| `quillkit test`   | the gate: every quill's example document compiles and renders      |
+| `quillkit test`   | the gate: every quill's seed and example document render           |
 | `quillkit build`  | pack the source layout into a servable artifact                    |
 | `quillkit studio` | the local loop: pack, serve, repack on save                        |
 | `quillkit site`   | the deploy layout: the client at a root, a built quiver beneath it |
@@ -34,7 +34,7 @@ Every verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives
 }
 ```
 
-It loads the source layout with `fromDir`, then compiles and renders every quill's example document, seeded from the blueprint's `example:` values. It finds the engine itself: a named `engine` export from `quillkit.config.js` at the collection root, else `@quillmark/wasm` from your own `node_modules`. A config that is there and throws fails the gate, naming the file and what threw: only a config you have not written falls through to the artifact.
+It loads the source layout with `fromDir`, then renders every quill's seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill. It finds the engine itself: a named `engine` export from `quillkit.config.js` at the collection root, else `@quillmark/wasm` from your own `node_modules`. A config that is there and throws fails the gate, naming the file and what threw: only a config you have not written falls through to the artifact.
 
 On vitest, jest or `node:test`, spawn the bin rather than rebuilding the loop against the library. The gate stays one implementation, and the case gates what CI gates:
 
@@ -56,7 +56,7 @@ npx quillkit studio
 
 Pick a quill, edit, watch it paint, read the errors. `quillkit test` answers _does it work_; studio answers _what is it like to use_. The document it holds is the blueprint's own, so what the gate renders is what you judge. Reload the page to pick up a repack.
 
-The address bar names what is on screen — `?quill=showcase@1.0.0` — so a link goes to a quill rather than to the quiver's first. `?quill=showcase` and `?quill=showcase@1` are links too, resolved the way `getQuill` resolves them; a ref the quiver does not hold opens the first quill and the address bar says so. The document is not in the URL: a reload keeps the quill and reseeds the example.
+The address bar names what is on screen — `?quill=showcase@1.0.0` — so a link goes to a quill rather than to the quiver's first. `?quill=showcase` and `?quill=showcase@1` are links too, resolved the way `getQuill` resolves them; a ref the quiver does not hold opens the first quill and the address bar says so. The document is not in the URL: a reload keeps the quill and reopens its example, or its seed with **Examples** off.
 
 The document has two doors, both in the head. **Edit source** is its canonical markdown, out and back in: what comes out opens in the CLI or a quiver repo unchanged, and what goes in is parsed and conformed against the quill in hand, so a file that names a quill this quiver holds lands in it and anything the schema will not take is named on the control it is about. **Download PDF** is the page itself — `name@x.y.z.pdf`, rendered from the compile the preview is painting, so the file and the screen agree. It is drawn where the quill's backend writes a PDF.
 

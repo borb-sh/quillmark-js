@@ -27,12 +27,12 @@
   The document crosses (STUDIO §"The document survives the quill"), which is what
   makes an edit to a schema an edit to the thing the author is holding.
 
-  Studio stores no document, so a boot is a seed and a reload is the reseed: the carry is
-  what keeps an edited `default:` or `example:` off a field the document holds, and F5 is
-  what puts it back (STUDIO §"The document is the blueprint's"). What outlives a boot is
-  which quill, in the URL, since a link names a quill (`link.ts`), and whether a seed is
-  filled, in the browser, since it is the author's habit rather than the link's
-  (`examples.ts`).
+  Studio stores no document, so a boot is a seed or the quill's example and a reload is
+  the reseed: the carry is what keeps an edited `default:` off a field the document
+  holds, and F5 is what puts it back (STUDIO §"The document is the blueprint's"). What
+  outlives a boot is which quill, in the URL, since a link names a quill (`link.ts`), and
+  whether a quill opens on its example, in the browser, since it is the author's habit
+  rather than the link's (`examples.ts`).
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -48,7 +48,7 @@
 	import Markdown from './Markdown.svelte';
 	import Templates from './Templates.svelte';
 	import { save } from './save';
-	import { examplesOn, fillExamples, sayExamples } from './examples';
+	import { examplesOn, sayExamples } from './examples';
 	import { askedRef, sayRef } from './link';
 	import { catalogOf, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
@@ -278,34 +278,21 @@
 	}
 
 	// ── The examples ────────────────────────────────────────────────────────────
-	/** Whether a seed is filled with the schema's `example:`s. */
+	/** Whether a quill opens on its example document rather than the seed. */
 	let examples = $state.raw(examplesOn());
 
 	/**
-	 * On, the `example:`s land on every unanswered field of the document in hand, which
-	 * then lands through the carry as an import is, so the editor remounts on what was
-	 * written. An example the writer refused is stranded beside what the carry stranded,
-	 * and goes with it at the next edit. Off, the quill reseeds: a written example is an
-	 * answer like any other, and nothing tells it from one the author typed.
+	 * Either way the quill opens afresh, discarding the document in hand: an example is a
+	 * whole document, so there is nothing to fill around, and a written example is an
+	 * answer like any other.
 	 */
 	async function toggleExamples(): Promise<void> {
 		examples = !examples;
 		sayExamples(examples);
 		const at = open;
 		if (!at) return;
-		if (!examples) {
-			repacked = false;
-			return mount(at.ref);
-		}
-		const { filled, refused } = fillExamples(at.quill, at.doc);
-		if (filled) {
-			repacked = false;
-			await mount(at.ref, at.doc.toMarkdown());
-		}
-		if (refused.length) {
-			carried = [...carried, ...refused];
-			syncNotes();
-		}
+		repacked = false;
+		await mount(at.ref);
 	}
 
 	// ── The file ────────────────────────────────────────────────────────────────
@@ -598,7 +585,7 @@
 					     as text for the repack that fixes it. -->
 					<span class="qm-status" data-testid="held">Document held</span>
 				{/if}
-			{:else if repacked && open && open.carry.how !== 'seeded'}
+			{:else if repacked && open && (open.carry.how === 'carried' || open.carry.how === 'reseeded')}
 				<!-- An open session says so by painting the page, so the only word here is
 				     what a repack did to the document that was already in hand. -->
 				<span class="qm-status" data-testid="phase"

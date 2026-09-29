@@ -19,13 +19,13 @@ import {
 	usvLength,
 	usvToPM
 } from '$lib/core/codec';
-import { quill, template } from '../helpers/fixtures.js';
+import { quill, example } from '../helpers/fixtures.js';
 
 export const core = await init();
 
-export { quill, template };
+export { quill, example };
 export function freshDoc(): Document {
-	return template();
+	return example();
 }
 
 /** Install `rt` into a fresh main body and read it back; the canonical (normalized) form. */

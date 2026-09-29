@@ -189,21 +189,18 @@ export interface BodyPlaceholderContext {
 export type BodyPlaceholder = (ctx: BodyPlaceholderContext) => string | undefined;
 
 /**
- * The empty body's ghost: the resolved body `default:`, else the kind's
- * `body.example`, else the consumer's wording, else the flat built-in. The
- * `default:` wins because it is the only one that describes the render: it promises
- * what prints if nothing is written, and wording placed over it would make that
- * promise unreadable. The rest are invitations, and an invitation belongs only where
- * there is no promise; the quill's own comes first, being the one an agent working
- * from the blueprint sees too.
+ * The empty body's ghost: the resolved body `default:`, else the consumer's wording,
+ * else the flat built-in. The `default:` wins because it is the only one that
+ * describes the render: it promises what prints if nothing is written, and wording
+ * placed over it would make that promise unreadable. The rest are invitations, and an
+ * invitation belongs only where there is no promise.
  */
 export function resolveBodyGhost(
 	resolvedDefault: string | undefined,
-	example: string | undefined,
 	custom: string | undefined,
 	builtIn: string
 ): string {
-	return resolvedDefault || example || custom || builtIn;
+	return resolvedDefault || custom || builtIn;
 }
 
 /** Whether a cell is optional: a `t?` type, which renders `none` unanswered and so
@@ -219,21 +216,9 @@ export function baseType(f: QuillFieldSchema): QuillFieldType {
 }
 
 /**
- * A value the schema declares, as ghost text: a `default:`, an `example:` or a
- * `body.example`. Markdown — a `richtext` value — ghosts as the text it renders, one
- * block to a line, as a resolved default does ({@link titleText}); anything else as
- * itself. `undefined` for a blank or a non-scalar.
- */
-export function declaredGhost(v: unknown, markdown: boolean): string | undefined {
-	const text = stringifyGhost(v)?.trim();
-	if (!text) return undefined;
-	return (markdown ? core().importMarkdown(text).text.trim() : text) || undefined;
-}
-
-/**
  * A scalar `default:` as the text an unset control holds, where it prints: as
  * declared, `undefined` for none, a blank or a non-scalar. A default of spaces prints
- * nothing a reader sees, so a control holds none and draws its example instead.
+ * nothing a reader sees, so a control holds none.
  */
 export function printedText(v: unknown): string | undefined {
 	const text = stringifyGhost(v);
@@ -263,20 +248,6 @@ export function declaredContent(v: unknown, markdown: boolean): Content | undefi
 		marks: [],
 		islands: []
 	};
-}
-
-/**
- * The `example:` an unset free-text cell ghosts: a `string`, `plaintext` or `richtext`
- * whose `default:` prints nothing. Every other type takes none. A default that prints
- * dominates, standing in the control as the value it is; a type-empty one, the
- * skippable marker, prints nothing and leaves the example the only thing to draw.
- */
-export function exampleGhost(f: QuillFieldSchema): string | undefined {
-	const kind = controlKind(f);
-	if (kind !== 'text' && kind !== 'prose') return undefined;
-	const markdown = baseType(f) === 'richtext';
-	if (declaredGhost(f.default, markdown) !== undefined) return undefined;
-	return declaredGhost(f.example, markdown);
 }
 
 /** A field's `{#each}` key: its name and what a mounted leaf reads once, its type and

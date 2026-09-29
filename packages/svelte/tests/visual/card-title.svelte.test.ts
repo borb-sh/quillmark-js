@@ -16,7 +16,7 @@ import {
 	type,
 	unmountAll
 } from '../helpers/surface.svelte.js';
-import { quill, quillFromYaml, template } from '../helpers/fixtures.js';
+import { quill, quillFromYaml, example } from '../helpers/fixtures.js';
 
 afterEach(unmountAll);
 
@@ -32,7 +32,7 @@ const cardOf = (target: HTMLElement, kinds: string[], kind: string) =>
 describe('the card header', () => {
 	it('names an untitled kind’s card by its heading, and a titled kind’s by the title', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const kinds = doc.cards.map((c) => c.kind);
 		const mounted = mountEditor(q, doc);
 		const { target } = mounted;
@@ -49,7 +49,7 @@ describe('the card header', () => {
 
 	it('names a fresh card by its kind until its heading is typed, then follows it', () => {
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		const { target, editor } = mounted;
 		editor.insertCard('section');
 		flushSync();
@@ -62,7 +62,7 @@ describe('the card header', () => {
 
 	it('keeps a rename over whatever the heading says', () => {
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		const section = cards(mounted.target)[0];
 		const title = header(section);
 		title.value = 'Renamed';
@@ -76,7 +76,7 @@ describe('the card header', () => {
 describe('the add menu', () => {
 	it('names each kind by its title, else its humanized key', async () => {
 		const q = quill();
-		const mounted = mountEditor(q, template());
+		const mounted = mountEditor(q, example());
 		press([...mounted.target.querySelectorAll<HTMLElement>('.qm-add-btn')].at(-1)!, 'ArrowDown');
 
 		const offered = [...document.querySelectorAll<HTMLElement>('.qm-menu-item')].map((el) =>

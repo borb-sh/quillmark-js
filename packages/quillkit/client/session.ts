@@ -10,18 +10,19 @@ import type {
 	Quill
 } from '@quillmark/wasm';
 import type { Quiver } from '@quillmark/quiver';
-import { fillExamples } from './examples';
+import { openExample } from './examples';
 import { diagnosticsOf, messageOf } from './notes';
 
 /** How the document got here, and what the landing cost. */
 export interface Carry {
 	/** `seeded`: the schema's seed, for a first open or a different quill picked.
+	 *  `example`: the quill's example document, in the seed's stead.
 	 *  `carried`: the previous document, landed under the schema in hand.
 	 *  `reseeded`: the previous document was refused, so the seed stands in. */
-	how: 'seeded' | 'carried' | 'reseeded';
+	how: 'seeded' | 'example' | 'carried' | 'reseeded';
 	/** The `conform::*` diagnostics for the values the schema in hand will not take,
-	 *  or the one refusal that dropped the document, and on a filled seed the examples
-	 *  the writer refused. The point of the surface rather than an error to swallow. */
+	 *  or the one refusal that dropped the document or the example. The point of the
+	 *  surface rather than an error to swallow. */
 	stranded: Diagnostic[];
 }
 
@@ -44,8 +45,8 @@ export interface Opened {
 
 /**
  * Open `ref` from `quiver`, over `carry`: the canonical markdown of the document the
- * surfaces were holding, or `undefined` to seed a fresh document, its unanswered fields
- * written from their `example:`s where `examples` holds.
+ * surfaces were holding, or `undefined` for a fresh document: the quill's example
+ * where `examples` holds and the quill ships one, else the seed.
  *
  * Carrying is what makes a repack an edit to the quill rather than a reset of the
  * work: a plate-only change lands the same document verbatim, an additive schema
@@ -86,10 +87,13 @@ export async function openRef(
 			landed = { how: 'reseeded', stranded: [{ severity: 'warning', message: messageOf(err) }] };
 		}
 	}
-	if (!doc) {
-		doc = quill.seedDocument();
-		if (examples) landed.stranded.push(...fillExamples(quill, doc).refused);
+	if (!doc && examples) {
+		const example = openExample(quill);
+		doc = example.doc;
+		if (doc) landed = { how: 'example', stranded: example.stranded };
+		else landed.stranded.push(...example.stranded);
 	}
+	doc ??= quill.seedDocument();
 
 	return { ref, quill, formats, doc, ...(await openSession(engine, quill, doc)), carry: landed };
 }

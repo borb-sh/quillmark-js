@@ -11,7 +11,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
-import { core, quill, template } from '../helpers/fixtures.js';
+import { core, quill, example } from '../helpers/fixtures.js';
 import { field, mountEditor, press, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -35,7 +35,7 @@ describe('an array of plaintext', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			const q = quill();
-			const doc = template();
+			const doc = example();
 			// The element rests as its literal string; the row reads it through the codec
 			// the declared type names rather than off the stored value.
 			const seeded = doc.getStored('errata') as string[];
@@ -60,7 +60,7 @@ describe('an array of plaintext', () => {
 
 	it('adds an element and rests it as a string', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const { target } = mountEditor(q, doc);
 
 		const seeded = doc.getStored('errata') as string[];
@@ -82,14 +82,14 @@ describe('an array of plaintext', () => {
 	// claim lives anyway.
 	it('rests an edited element as its literal string', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		q.writer(doc).set('errata', [core.importMarkdown('Page 9 omits the colophon.')]);
 		expect(doc.getStored('errata')).toEqual(['Page 9 omits the colophon.']);
 	});
 
 	it('removes an element on Backspace only once it reads empty', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const { target } = mountEditor(q, doc);
 
 		const seeded = doc.getStored('errata') as string[];
@@ -107,7 +107,7 @@ describe('an array of plaintext', () => {
 
 	it('inserts a sibling on Enter', () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		const { target } = mountEditor(q, doc);
 
 		const seeded = doc.getStored('errata') as string[];
@@ -123,7 +123,7 @@ describe('an array of plaintext', () => {
 	// element lane carries the offset down (VISUAL_EDITOR.md §Surface).
 	it('lands a caret at the offset the compile resolved, counting by code point', async () => {
 		const q = quill();
-		const doc = template();
+		const doc = example();
 		// An astral character before the offset is the hazard: 𝔘 is one code point and
 		// two UTF-16 units, so USV 9 is UTF-16 10 and a naive offset lands short of it.
 		q.writer(doc).set('errata', [core.importMarkdown('astral \u{1D518} tail here')]);

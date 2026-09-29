@@ -25,17 +25,12 @@ quill:
 typst:
   plate_file: plate.typ
 main:
-  body:
-    example: |
-      Body.
   fields:
     note:
       type: plaintext
-      example: literal
     tag:
       type: richtext
       inline: true
-      example: markdown
 `;
 
 const q = probeQuill(QUILL_YAML);

@@ -5,7 +5,7 @@
 // in is a component instance, so the handle a focus hop calls through is the proxy's:
 // the keyboard paths prove `focus()` still lands through it.
 import { describe, it, expect, afterEach } from 'vitest';
-import { quill, template } from '../helpers/fixtures.js';
+import { quill, example } from '../helpers/fixtures.js';
 import { mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -28,7 +28,7 @@ function inputs(target: HTMLElement): HTMLInputElement[] {
 describe('array element refs', () => {
 	it('Enter inserts a sibling and takes focus there, through the proxied handle', async () => {
 		const q = quill();
-		const { target } = mountEditor(q, template());
+		const { target } = mountEditor(q, example());
 		const before = inputs(target).length;
 
 		press(inputs(target)[0], 'Enter');
@@ -43,7 +43,7 @@ describe('array element refs', () => {
 
 	it('Backspace on an empty element removes it and hands focus back up the list', async () => {
 		const q = quill();
-		const { target } = mountEditor(q, template());
+		const { target } = mountEditor(q, example());
 		press(inputs(target)[0], 'Enter');
 		await settle();
 		const grown = inputs(target).length;

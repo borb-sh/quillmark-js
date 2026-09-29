@@ -76,12 +76,9 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
-		/** The empty leaf's ghosts, a subform cell's, until the leaf's first edit: the
-		 *  `none` an optional cell prints unset, and the `example:` drawn where there is no
-		 *  placeholder and in its stead while the leaf holds the focus (`createField`'s
-		 *  pair). Read per decoration pass. */
+		/** The empty leaf's ghost, a subform cell's, until the leaf's first edit: the
+		 *  `none` an optional cell prints unset. Read per decoration pass. */
 		placeholder?: string;
-		example?: string;
 		onChange: (rt: Content) => void;
 		/** Raw keydown, for a container whose own keys run through this leaf: the
 		 * array repeater's Enter/Backspace (`ArrayField`). Fires before the view's own
@@ -97,7 +94,6 @@
 		labelledBy,
 		describedBy,
 		placeholder,
-		example,
 		onChange,
 		onKey
 	}: Props = $props();
@@ -160,8 +156,7 @@
 				: proseLeafPlugins(schema, {
 						inline,
 						placeholder: () => placeholder,
-						placeholderUntilEdit: true,
-						example: () => example
+						placeholderUntilEdit: true
 					})
 		});
 		const mounted = new EditorView(

@@ -18,21 +18,10 @@ main:
       layout: {}
       meta:
         title: Metadata
-  body:
-    example: |
-      The body is a full block leaf: paragraphs, emphasis, and the containers the
-      codec round-trips.
-
-      - A bullet, to place a list container.
-      - A second one, so the list has a sibling to nest against.
-
-      A closing paragraph, far enough down the page that the body's boxes are two
-      disjoint segments rather than one run.
   fields:
     title:
       type: richtext
       inline: true
-      example: The Showcase Quill
       ui:
         group: identity
       description: The document's title. Placed in the letterhead and again on the colophon page, so its regions span pages.
@@ -41,7 +30,6 @@ main:
       type: plaintext
       inline: true
       default: ""
-      example: A reference document
       ui:
         group: identity
         compact: true
@@ -53,13 +41,10 @@ main:
         type: string
       default:
         - Anonymous
-      example:
-        - Ada Lovelace
-        - Grace Hopper
       ui:
         group: identity
         compact: true
-      description: "Strings. Asks for `ui.compact` and is declined: an array grows with the document, and a row is as tall as its tallest cell. The one array declaring a literal `default:`, and a list ghosts nothing — the line prints only while the field is unset. Nor does it ghost the `example:` beside it, which an array's control takes none of."
+      description: "Strings. Asks for `ui.compact` and is declined: an array grows with the document, and a row is as tall as its tallest cell. The one array declaring a literal `default:`, and a list ghosts nothing — the line prints only while the field is unset."
 
     contact:
       type: object
@@ -91,9 +76,6 @@ main:
       type: array
       items:
         type: string
-      example:
-        - A. LOVELACE
-        - Author
       ui:
         group: identity
       description: Signed by. Placed through the helper's `signature-field`, so its region comes from a widget rather than from glyph spans.
@@ -122,13 +104,6 @@ main:
             type: boolean
             default: false
       default: []
-      example:
-        - name: Ada Lovelace
-          role: author
-          since: "2025-11-03"
-          lead: true
-        - name: Grace Hopper
-          role: reviewer
       ui:
         group: identity
         layout: table
@@ -136,9 +111,6 @@ main:
 
     abstract:
       type: richtext
-      example: |
-        A block richtext leaf: it holds paragraphs, so it never shares a row however
-        compact it asks to be.
       ui:
         group: content
       description: The standing summary. Block richtext — no `inline`, so the leaf takes the block floor.
@@ -149,9 +121,6 @@ main:
         type: richtext
         inline: true
       default: []
-      example:
-        - "*Schema* shapes"
-        - "**Regions** and geometry"
       ui:
         group: content
       description: An array whose items are themselves richtext. Each element is tracked as its own region (`main.keywords[0]`); the array itself is named by none.
@@ -161,9 +130,6 @@ main:
       items:
         type: plaintext
       default: []
-      example:
-        - "Fig. 2 is mislabelled — the **asterisks** here are the text, not emphasis."
-        - "Page 4 gives the wrong year."
       ui:
         group: content
       description: Corrections, verbatim. A `plaintext` item rests as its literal string, so a row is a text input and markdown inside one is text.
@@ -203,18 +169,6 @@ main:
             default: []
             description: The appendix's entries, a record list one rung further in.
       default: []
-      example:
-        - title: Sources
-          entries:
-            - label: Primary
-              page: 12
-              note: "Where the *claims* come from."
-            - label: Secondary
-              page: 14
-        - title: Glossary
-          entries:
-            - label: Terms
-              page: 20
       ui:
         group: content
       description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `title` cell and a collapsed entry by its inline `plaintext` label, the cell a row with no `string` cell reads. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
@@ -263,11 +217,10 @@ main:
         - approved
         - final
         - withdrawn
-      example: draft
       ui:
         group: meta
         compact: true
-      description: "Where the document is in its life. Which stage this is remains a human's call, so the field declares no `default:` and asks: the one enum carrying a required `*`. Its `example:` reaches the blueprint and ghosts nowhere, an enum taking no example ghost."
+      description: "Where the document is in its life. Which stage this is remains a human's call, so the field declares no `default:` and asks: the one enum carrying a required `*`."
 
     distribution:
       type: enum
@@ -324,8 +277,7 @@ main:
           controlled_by:
             type: plaintext
             inline: true
-            example: SPEC/AA
-            description: Who set the marking. Declares no `default:`, so it is required in this world and asked in no other; its `example:` ghosts while the cell holds the focus.
+            description: Who set the marking. Declares no `default:`, so it is required in this world and asked in no other.
           caveat:
             type: plaintext
             inline: true
@@ -359,11 +311,10 @@ main:
 
     reference:
       type: string?
-      example: RFC 9110
       ui:
         group: meta
         compact: true
-      description: "What the document answers to. An optional cell: unanswered, a `string?` prints `none` rather than the blank, so it declares no `default:`, draws no `*`, and ghosts `None` at rest and its `example:` while it holds the focus."
+      description: "What the document answers to. An optional cell: unanswered, a `string?` prints `none` rather than the blank, so it declares no `default:`, draws no `*`, and ghosts `None`."
 
     revisions:
       type: array
@@ -380,10 +331,6 @@ main:
             default: ""
             description: What changed, in the reviser's own words. The row's content cell, and so the one cell of a row the preview can land a click on.
       default: []
-      example:
-        - note: Fig. 2 relabelled
-          pages: 1
-          detail: The caption named the wrong figure.
       ui:
         group: meta
       description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform, one at a time. A row's cells are read through the plate's loop binding, which carries no address, so only the content cell regions — `main.revisions[0].detail` is the fixture's one-rung nested-row address, and the scalar cells beside it reach the preview through the array's own region."
@@ -412,7 +359,7 @@ main:
       ui:
         group: meta
         compact: true
-      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`; two columns, one of them prose, that unfold under a held member. It declares no `default:` or `example:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
+      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`; two columns, one of them prose, that unfold under a held member. It declares no `default:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
 
     colophon:
       type: richtext
@@ -431,7 +378,6 @@ card_kinds:
     fields:
       heading:
         type: string
-        example: Findings
         ui:
           group: structure
           compact: true
@@ -440,7 +386,6 @@ card_kinds:
         type: richtext
         inline: true
         default: ""
-        example: What the section *found*, in one line.
         ui:
           group: structure
         description: A standfirst under the heading.
@@ -469,13 +414,10 @@ card_kinds:
           group: style
           compact: true
         description: When the section was last reviewed, to the minute.
-    body:
-      example: |
-        Section bodies are leaves of their own, addressed per card.
 
   note:
     title: Marginal note
-    description: A short aside. Its fields are ungrouped, so the card renders no accordion. Its body declares no `example:`, so an empty one ghosts the host's `bodyPlaceholder`, else `Write…`.
+    description: A short aside. Its fields are ungrouped, so the card renders no accordion.
     fields:
       label:
         type: string
@@ -501,9 +443,6 @@ card_kinds:
         type: array
         items:
           type: string
-        example:
-          - G. HOPPER
-          - Reviewer
         description: "Line 1: name as signed. Line 2: role."
       signed_on:
         type: date
@@ -522,7 +461,6 @@ card_kinds:
           - inline
           - float
         default: inline
-        example: float
         variants:
           float:
             side:
@@ -537,8 +475,4 @@ card_kinds:
         type: richtext
         inline: true
         default: ""
-        example: "A figure's *caption*."
         description: Set under the figure.
-    body:
-      example: |
-        The figure's own note, which stands in for the figure.

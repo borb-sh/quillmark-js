@@ -65,13 +65,14 @@ export function quill(name: FixtureName = 'showcase'): Quill {
 }
 
 /**
- * A fixture quill's template document, `fixtures/templates/<name>.md`, parsed and
- * conformed against it: every field and body filled, which a seed leaves empty. A
- * fresh `Document` per call, the caller's to free.
+ * A fixture quill's example document, its root `example.md`, conformed against it:
+ * every field and body filled, which a seed leaves empty. A fresh `Document` per call,
+ * the caller's to free.
  */
-export function template(name: FixtureName = 'showcase'): Document {
-	const md = readFileSync(join(REPO_ROOT, 'fixtures', 'templates', `${name}.md`), 'utf8');
-	return quill(name).parse(md);
+export function example(name: FixtureName = 'showcase'): Document {
+	const doc = quill(name).exampleDocument();
+	if (!doc) throw new Error(`fixture quill ${name} ships no example.md`);
+	return doc;
 }
 
 /**

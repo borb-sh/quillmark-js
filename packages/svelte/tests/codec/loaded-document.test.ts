@@ -7,12 +7,12 @@
 import { describe, it, expect } from 'vitest';
 import type { Quill, Document } from '@quillmark/wasm';
 import { createField } from '$lib/core/codec';
-import { core, mount, quill, template, viewOf } from './_util.js';
+import { core, mount, quill, example, viewOf } from './_util.js';
 
 /** A saved document: templated, written, serialized, and parsed back. */
 function loaded(): { q: Quill; doc: Document } {
 	const q = quill();
-	const seed = template();
+	const seed = example();
 	q.writer(seed).set('title', 'Reloaded title');
 	const doc = core.Document.fromMarkdown(seed.toMarkdown());
 	seed.free();
