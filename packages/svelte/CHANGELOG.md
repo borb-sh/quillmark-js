@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.15.0 - 2026-09-29
+
 **The `@quillmark/wasm` peer floor is `>=0.117.0-0`, and nothing ghosts an example.** The schema carries no `example:` and no `body.example`, so an unset free-text field with no `default:` that prints draws nothing, where it ghosted its `example:` at rest and on focus, and an optional cell keeps `None` while it holds the focus. An empty body ghosts its resolved `default:`, else the `bodyPlaceholder` wording, else `bodyGhost`, on every kind. The codec's `example` option and `FieldController.setExample` are deleted, and a prose leaf's ghost is `data-placeholder` alone.
 
 ## v0.14.0 - 2026-09-27
