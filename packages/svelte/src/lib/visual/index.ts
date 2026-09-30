@@ -11,10 +11,8 @@
 
 // The theme derivation, which every control on this surface reads through `var()`.
 // Imported at the barrel because a subpath is what a consumer gets: this surface
-// reaches modules inside `core/` and never its entry, so a sheet hanging off that
-// entry arrives only for a consumer importing `/core` for some other reason. The
-// sheet rather than the entry, because the barrel needs the derivation and not
-// `init`. `check:deps` holds the reach.
+// reaches modules inside `core/` and never its entry, which carries no sheet.
+// `check:deps` holds the reach.
 import '../core/theme.css';
 
 export { default as VisualEditor } from './VisualEditor.svelte';

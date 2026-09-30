@@ -4,8 +4,8 @@
    geometry, type and motion are all derived here, so each is minted in one place
    instead of once per detached root.
 
-   Transport: a stylesheet, side-effect imported by `core/index.ts` and applied to
-   every element marked `data-qm-root`. The package imports it itself, so there is
+   Transport: a stylesheet, side-effect imported by each surface barrel and applied
+   to every element marked `data-qm-root`. The package imports it itself, so there is
    no `import './theme.css'` for a consumer to forget. A stylesheet rather than an
    inline `style` attribute is what buys the three things an attribute cannot
    carry: a selector consumer CSS outranks without `!important`, real properties
