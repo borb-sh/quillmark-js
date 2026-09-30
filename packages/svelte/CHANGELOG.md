@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.17.0 - 2026-09-30
+
 **The `@quillmark/wasm` peer floor is `>=0.121.0-0`, and a matrix member is held by being present.** A tick writes the member, its columns or the bare `true`, and an untick removes it, where both wrote `held`; a retick in the same mount restores the columns the untick took. A mapping naming no `held` draws ticked. A member's own address is its tick, so a landing on `<field>.<member>` focuses it and a preview click on a row a plate claims there lands on it. An edit to a member that stores `held` writes it back without it. An unset matrix whose `default:` holds members draws that set at the default rung, and the first gesture writes it; unticking the last member of a matrix with a `default:`, or of a `matrix?`, writes `{}`, nothing held.
 
 **An open matrix takes added items, and its add box searches the document first.** Under `open: true` the list ends in a combobox: typing offers the items of every card-level checklist in the document that the words name — `flt cc` finds `Flight CC`, `jqo` finds `Joint Qualified Officer` — then an option to add the typed words to this list. Enter alone takes a result only where every word names it whole or as an opening; a looser one is taken by an arrow or a press. Picking a result ticks it where it stands and lands on it; adding writes `{title}` under an id minted from the title and lands in the item's first column. An added item draws after the roster in id order, with a fixed tick, its title as an input and a remove. `VisualStrings` gains `matrixAdd`, `matrixAddNew`, `matrixIn`, `matrixHeldTag`, `matrixItemTitle` and `matrixRemove`.
