@@ -74,6 +74,13 @@
 </span>
 
 <style>
+	/* The switch stands on the first line of the boxes beside it: a row of controls tops
+	 out together, and a mark carries no line of its own to sit on. */
+	.qm-toggle-wrap {
+		display: flex;
+		align-items: center;
+		min-height: var(--_qm-box-line);
+	}
 	/* A primitive renders its own element, which a scoped selector cannot reach:
 	 styled through the wrapper with `:global`. */
 	/* The track is the drawn box and the target is `.qm-tap-floor`'s (controls.css): a

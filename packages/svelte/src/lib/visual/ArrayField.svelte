@@ -1066,8 +1066,12 @@
 		background: var(--_qm-surface);
 		box-shadow: 0 0 0 var(--_qm-ring-reach) var(--_qm-surface);
 	}
+	/* The glyph stands on the row's first line with the cells, however far the slab
+	 stretches under it. */
 	.qm-array-table-row > .qm-remove {
 		align-self: stretch;
+		align-items: start;
+		padding-block-start: calc((var(--_qm-box-line) - var(--_qm-glyph-control)) / 2);
 		height: auto;
 		border-radius: var(--_qm-radius-inner);
 		color: var(--_qm-ink-label);

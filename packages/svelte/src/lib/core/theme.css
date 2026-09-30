@@ -316,7 +316,14 @@
 	   for the type half. Asymmetric because the vertical is what leading leaves once
 	   it has taken the line box, and the horizontal is how far in the text starts,
 	   which nothing else fixes. */
-	--_qm-inset-control: var(--_qm-space) var(--_qm-space-3);
+	--_qm-inset-control-block: var(--_qm-space);
+	--_qm-inset-control: var(--_qm-inset-control-block) var(--_qm-space-3);
+	/* A box's first line, drawn: its line box and the inset over and under it. What a
+	   row of boxes lines up on however far one of them wraps, and so what a mark with no
+	   line of its own centres on to stand in that row (`BooleanField`). */
+	--_qm-box-line: calc(
+		var(--_qm-text-body) * var(--_qm-leading-body) + 2 * var(--_qm-inset-control-block)
+	);
 	/* The nesting step: the distance from one structural stroke to the next, and what
 	   makes the depths read as a ladder rather than as indents that happen to look
 	   alike. A rung because the boxes holding that distance are in two components and
