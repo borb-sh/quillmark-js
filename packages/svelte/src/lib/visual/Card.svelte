@@ -19,6 +19,7 @@
 	import { holdInView } from './hold.js';
 	import type { FieldDomIds } from './domid.js';
 	import Field from './Field.svelte';
+	import FieldHint from './FieldHint.svelte';
 	import ProseField from './ProseField.svelte';
 	import CardControls from './CardControls.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
@@ -270,21 +271,37 @@
 								{@const group = section.group as string}
 								{@const isOpen = expanded === group}
 								{@const panelId = ops.panelId(group)}
+								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
+								{@const headHint = section.head?.description}
 								<div class="qm-group" class:qm-open={isOpen}>
-									<button
-										type="button"
-										class="qm-group-header"
-										bind:this={headers[group]}
-										aria-expanded={isOpen}
-										aria-controls={panelId}
-										onclick={() => toggleGroup(group)}
-									>
-										<Icon
-											name="chevron-right"
-											class="qm-group-chevron"
-											size={CHEVRON}
-										/>{section.label}
-									</button>
+									<!-- A flat field alone in its section is named by the header, which
+								     takes its label id and parks its description: the field draws no
+								     label of its own to say the section's name twice. -->
+									<div class="qm-group-head">
+										<button
+											type="button"
+											class="qm-group-header"
+											id={headIds?.label}
+											bind:this={headers[group]}
+											aria-expanded={isOpen}
+											aria-controls={panelId}
+											onclick={() => toggleGroup(group)}
+										>
+											<Icon
+												name="chevron-right"
+												class="qm-group-chevron"
+												size={CHEVRON}
+											/>{section.label}
+										</button>
+										{#if headIds && headHint}
+											<FieldHint
+												description={headHint}
+												label={section.label}
+												describedBy={headIds.description}
+											/>
+											<span class="qm-visually-hidden" id={headIds.description}>{headHint}</span>
+										{/if}
+									</div>
 									<!-- The panel is clipped, not unmounted, so without `inert` every field
 								     in a hidden section keeps its place in the tab order and in the a11y
 								     tree, under a header announcing `aria-expanded="false"`. -->
@@ -295,7 +312,7 @@
 										bind:this={panels[group]}
 									>
 										<div class="qm-group-panel-inner">
-											{@render sectionFields(section.fields)}
+											{@render sectionFields(section.fields, section.head)}
 										</div>
 									</div>
 								</div>
@@ -332,7 +349,7 @@
 	{/if}
 </section>
 
-{#snippet sectionFields(fields: FieldModel[])}
+{#snippet sectionFields(fields: FieldModel[], head?: FieldModel)}
 	<div class="qm-fields qm-tracks">
 		{#each placeFields(fields) as { field: f, span } (mountKey(f.name, f.schema))}
 			<Field
@@ -354,6 +371,7 @@
 				{onError}
 				{leaves}
 				diagnostics={ops.diagFor(f.name)}
+				headed={f === head}
 			/>
 		{/each}
 	</div>
@@ -591,7 +609,8 @@
 		display: grid;
 		grid-template-columns: repeat(var(--cols), 1fr);
 		column-gap: var(--_qm-space-2);
-		row-gap: var(--_qm-space-3);
+		--row-gap: var(--_qm-space-3);
+		row-gap: var(--row-gap);
 	}
 	/* The nesting vertical, one `--_qm-nest` in from the card's edge with the panel's
 	 fields the same rung off it (ARCHITECTURE §"A plane is a tone"). `--_qm-border` and
@@ -679,6 +698,30 @@
 		color: var(--_qm-ink-label);
 		text-align: left;
 		transition: color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	/* The header row: the press target, and beside it the guidance marker a headed
+	 section carries (`FieldHint`), which is its own control and so not inside the
+	 button. Positioned for the reason the header is, the row being the box that
+	 now stands in the band. */
+	.qm-group-head {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: var(--_qm-space);
+	}
+	.qm-group-head > .qm-group-header {
+		flex: 1;
+		min-width: 0;
+	}
+	/* The parked description: `FieldLabel`'s recipe, for the one description a
+	 header rather than a label parks. */
+	.qm-visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 	.qm-group-header :global(.qm-group-chevron) {
 		flex-shrink: 0;

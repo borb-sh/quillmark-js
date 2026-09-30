@@ -68,6 +68,15 @@ export interface GroupSection {
 	group: string | undefined;
 	label: string;
 	fields: FieldModel[];
+	/** The field the section's header names in place of a label of its own: the one
+	 * field of a group section, where that field is {@link flatObject}. */
+	head?: FieldModel;
+}
+
+/** `ui.layout: flat` on a typed dictionary: no frame of its own, its properties
+ *  standing at the depth of the fields around it rather than a rung in. */
+export function flatObject(schema: QuillFieldSchema): boolean {
+	return controlKind(schema) === 'object' && schema.ui?.layout === 'flat';
 }
 
 /**
@@ -640,7 +649,8 @@ export function groupSections(
 	for (const g of order) {
 		const fs = fields.filter((f) => f.group === g);
 		if (fs.length) {
-			sections.push({ group: g, label: labelFor(g), fields: fs });
+			const head = fs.length === 1 && flatObject(fs[0].schema) ? fs[0] : undefined;
+			sections.push({ group: g, label: labelFor(g), fields: fs, head });
 			emitted.add(g);
 		}
 	}

@@ -18,6 +18,8 @@ main:
       layout: {}
       meta:
         title: Metadata
+      imprint:
+        title: Print run
   fields:
     title:
       type: richtext
@@ -360,6 +362,22 @@ main:
         group: meta
         compact: true
       description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`; two columns, one of them prose, that unfold under a held member. It declares no `default:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
+
+    imprint:
+      type: object
+      properties:
+        printer:
+          type: string
+          default: ""
+          description: Who prints it.
+        copies:
+          type: integer
+          default: 1
+          description: How many to print.
+      ui:
+        group: imprint
+        layout: flat
+      description: "A flat subform (`ui.layout: flat`) alone in its group: the section is its frame, so the header names it and carries this description, and its properties stand at the section's depth with no rung of their own."
 
     colophon:
       type: richtext

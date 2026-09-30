@@ -33,6 +33,7 @@
 		VARIANT_DISCRIMINANT,
 		arrayLayout,
 		baseType,
+		flatObject,
 		ghostDefault,
 		isContainer,
 		optionalCell,
@@ -88,6 +89,9 @@
 		 *  landing handle here, a prose leaf its controller from inside `ProseField`. */
 		leaves?: LeafRegistry;
 		diagnostics?: Diagnostic[];
+		/** The section's header names this field and parks its description, under this
+		 * field's own label and description ids ({@link GroupSection.head}). */
+		headed?: boolean;
 	}
 	let {
 		field,
@@ -107,7 +111,8 @@
 		onChange,
 		onError,
 		leaves,
-		diagnostics
+		diagnostics,
+		headed = false
 	}: Props = $props();
 
 	const t = wording();
@@ -157,6 +162,7 @@
 	const describedBy = $derived(field.description ? domIds.description : undefined);
 	// Two controls own their label row, the add chip and the held count sharing it.
 	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
+	const flat = $derived(flatObject(field.schema));
 
 	// A container walks its diagnostics down to the cell each names and draws the rest
 	// at its own foot (`diagnostics.ts`); every other control draws them here, under
@@ -257,7 +263,7 @@
 </script>
 
 <div class="qm-field" class:cell={span === 'cell'}>
-	{#if !ownsLabel}
+	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
 			controlId={labelable ? domIds.control : undefined}
@@ -376,6 +382,7 @@
 					bind:this={objectEl}
 					value={value as Record<string, unknown> | undefined}
 					properties={field.schema.properties}
+					{flat}
 					label={field.label}
 					idBase={domIds.control}
 					labelledBy={domIds.label}

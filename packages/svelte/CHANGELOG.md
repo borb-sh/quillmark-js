@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.119.0-0`, and a subform may be flat.** An `object` declaring `ui.layout: flat` draws no vertical and no rung, its properties standing at the depth of the fields around it. Alone in its group, it draws no label either: the section header names it and carries its description as a hint.
+
 ## v0.16.0 - 2026-09-30
 
 **`@quillmark/svelte/core` and the root import no stylesheet**, so `init` runs where there is no document. Under a dev server the entry's `theme.css` import was served as a module writing a `<style>` into the page, so importing `/core` in a Web Worker threw `document is not defined`. `/visual` and `/preview` import the theme themselves, so a mounted surface is styled as before.

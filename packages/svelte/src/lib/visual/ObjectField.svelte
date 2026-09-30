@@ -30,7 +30,9 @@
  member's id. So a cell reads at whatever depth it sits, which nothing here knows.
 
  `bare` is the table's row: the same cells with no labels and no figure of their own,
- laid onto the tracks the table's header names ({@link ArrayField}).
+ laid onto the tracks the table's header names ({@link ArrayField}). `flat` is
+ `ui.layout: flat`: the cells keep their labels and lose the figure, standing at the
+ depth of whatever holds the subform.
 -->
 <script lang="ts">
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
@@ -39,6 +41,7 @@
 		baseType,
 		controlKind,
 		declaredContent,
+		flatObject,
 		humanize,
 		isContainer,
 		mountKey,
@@ -93,6 +96,9 @@
 		/** A table's row: the cells alone, on the tracks the table's header names, with
 		 * no labels and no vertical of their own. */
 		bare?: boolean;
+		/** `ui.layout: flat`: no vertical and no rung, the properties at the depth of the
+		 * list the subform stands in. */
+		flat?: boolean;
 		/** Raw keydown off a text or prose cell, for a row whose own keys run through its
 		 * cells: the table's Enter and Backspace ({@link ArrayField}). */
 		onCellKey?: (e: KeyboardEvent, key: string) => void;
@@ -111,6 +117,7 @@
 		contentAt,
 		onCommit,
 		bare = false,
+		flat = false,
 		onCellKey,
 		diagnostics
 	}: Props = $props();
@@ -250,6 +257,7 @@
 	bind:this={rootEl}
 	class="qm-object"
 	class:qm-object-bare={bare}
+	class:qm-object-flat={flat}
 	role="group"
 	aria-labelledby={labelledBy}
 	aria-describedby={describedBy}
@@ -392,6 +400,7 @@
 						bind:this={nestedEls[key]}
 						value={obj[key] as Record<string, unknown> | undefined}
 						properties={sub.properties}
+						flat={flatObject(sub)}
 						label={ids ? undefined : fallbackName(key, sub)}
 						idBase={ids?.control}
 						labelledBy={ids?.label}
@@ -471,6 +480,8 @@
 	}
 	.qm-object:not(.qm-object-bare) {
 		container-type: inline-size;
+	}
+	.qm-object:not(.qm-object-bare, .qm-object-flat) {
 		border-inline-start: var(--_qm-vertical-width) solid var(--_qm-border);
 		padding-inline-start: var(--_qm-nest);
 		padding-block: var(--_qm-space);
@@ -481,7 +492,14 @@
 	.qm-object-grid {
 		display: grid;
 		grid-template-columns: repeat(var(--cols), 1fr);
-		gap: var(--_qm-space-2);
+		column-gap: var(--_qm-space-2);
+		--row-gap: var(--_qm-space-2);
+		row-gap: var(--row-gap);
+	}
+	/* Flat, the rows keep the rhythm of the list the subform stands in: a section's
+	   (`Card.svelte`) or an enclosing subform's, inherited rather than restated. */
+	.qm-object-flat > .qm-object-grid {
+		--row-gap: inherit;
 	}
 	/* A property measures like a field: two tracks over the subform's own rows, so a
 	   label wrapping in one column leaves its control on the row's baseline rather than a

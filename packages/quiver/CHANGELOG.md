@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.119.0-0`.**
+
 ## v0.32.0 - 2026-09-30
 
 **The `@quillmark/wasm` peer floor is `>=0.118.0-0`.**
