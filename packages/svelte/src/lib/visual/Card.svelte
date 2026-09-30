@@ -702,7 +702,7 @@
 	/* The header row: the press target, and beside it the guidance marker a headed
 	 section carries (`FieldHint`), which is its own control and so not inside the
 	 button. Positioned for the reason the header is, the row being the box that
-	 now stands in the band. */
+	 stands in the band. */
 	.qm-group-head {
 		position: relative;
 		display: flex;
