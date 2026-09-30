@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.16.0 - 2026-09-30
+
 **`@quillmark/svelte/core` and the root import no stylesheet**, so `init` runs where there is no document. Under a dev server the entry's `theme.css` import was served as a module writing a `<style>` into the page, so importing `/core` in a Web Worker threw `document is not defined`. `/visual` and `/preview` import the theme themselves, so a mounted surface is styled as before.
 
 **The `@quillmark/wasm` peer floor is `>=0.118.0-0`, and an added card carries its kind's `seed:`.** Add writes the document's `$seed` overlay for the kind where it carries one, else the kind's `seed:` from `Quill.yaml`, its `$body` included; the overlay replaces the kind's seed whole. A document's `$seed` draws the warnings the card it seeds would: an undeclared key below a seeded field, a cell outside its variant world, a `$body` that is not markdown, and a seeded array past its `max:`.
