@@ -82,8 +82,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	// ── Matrix control ────────────────────────────────────────────────────────
 	/** The count in the matrix's label row: how many of its items are held. */
 	matrixHeld: (held: number, total: number) => string;
-	/** An open matrix's add box at rest, naming the list it adds to: `+ Add to Staff…`;
-	 *  `list` is empty for a matrix mounted with no label. */
+	/** An open matrix's add box at rest, naming the list it adds to: `Add to Staff…`. The box
+	 *  draws its own `+`. `list` is empty for a matrix mounted with no label. */
 	matrixAdd: (list: string) => string;
 	/** The add box's last option, which adds what was typed as an item of this list. */
 	matrixAddNew: (title: string) => string;
@@ -209,7 +209,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	elementUntitled: (label, index) => `${label} ${index}`,
 	enumUnsetTag: 'default',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
-	matrixAdd: (list) => (list ? `+ Add to ${list}…` : '+ Add…'),
+	matrixAdd: (list) => (list ? `Add to ${list}…` : 'Add…'),
 	matrixAddNew: (title) => `Add “${title}”`,
 	matrixIn: (list) => `in ${list}`,
 	matrixHeldTag: 'held',

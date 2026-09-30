@@ -79,7 +79,7 @@ describe('a matrix field', () => {
 		// input is the open list's add box.
 		expect(m.querySelectorAll('.qm-object')).toHaveLength(0);
 		expect(m.querySelectorAll('input[type="text"]')).toHaveLength(1);
-		expect(addBox(m).placeholder).toBe('+ Add to Checks…');
+		expect(addBox(m).placeholder).toBe('Add to Checks…');
 	});
 
 	it('ticks by writing the member and unticks by removing it, a retick restoring its columns', () => {
