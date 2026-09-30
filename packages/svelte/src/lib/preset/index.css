@@ -1,6 +1,6 @@
 /* `@quillmark/svelte/preset`, the package's one CSS entry point: the endorsed look for
    the page a surface is mounted on. Opt-in and side-effect free until imported:
-   `core/index.ts` pulls `core/theme.css` for the surfaces and never this, because this
+   the surface barrels pull `core/theme.css` and never this, because this
    styles the document and nothing may put that in a consumer's page uninvited.
 
    Two files because one of them is exempt: `scale.css` is where the literals are

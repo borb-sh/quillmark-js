@@ -2,7 +2,7 @@
 // away, so the separation is held by a gate rather than by distance. Zero deps; run via
 // `npm run check:deps`.
 //
-// Four rules:
+// Five rules:
 //
 //   1. The graph. `@quillmark/wasm` is external and above everything; `svelte` and `quiver`
 //      are siblings at one tier with no edge between them, in either direction; and a node
@@ -31,9 +31,14 @@
 //      installs a rollup with no native binary on a Mac, and npm repairs nothing. CI runs
 //      one platform and the lock is platform-free data, so this is the only place the
 //      breach is visible before a contributor's install fails.
+//
+//   5. The substrate entries carry no sheet. `/core` and the root are reached where there is
+//      no document, a worker's `init` or a server's, and a dev server serves a side-effect
+//      stylesheet (or a component's `<style>`) as a module that writes into one. A built
+//      consumer extracts the sheet, so only the source graph shows the breach.
 
-import { readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { ROOT, filesUnder, packages, report } from './workspace.mjs';
 
 /** The graph. An edge absent from this table is a violation; an edge in it is optional. */
@@ -201,8 +206,39 @@ for (const [path, entry] of Object.entries(lock.packages ?? {}))
 			);
 	}
 
+// ── 5. The substrate entries ────────────────────────────────────────────────────
+
+/** A relative specifier's source file: `./x.js` is authored as `x.ts`. */
+const sourceOf = (from, spec) => {
+	const target = resolve(dirname(from), spec);
+	return [target, target.replace(/\.js$/, '.ts')].find((p) => existsSync(p)) ?? null;
+};
+
+const SUBSTRATE = [join(LIB, 'index.ts'), join(LIB, 'core', 'index.ts')];
+const reached = new Set();
+for (const entry of SUBSTRATE) {
+	const queue = [entry];
+	while (queue.length) {
+		const file = queue.pop();
+		if (reached.has(file)) continue;
+		reached.add(file);
+		if (/\.(css|svelte)$/.test(file)) {
+			fail(
+				`${relative(ROOT, file)}: reached from ${relative(ROOT, entry)} — a substrate entry carries no sheet`
+			);
+			continue;
+		}
+		for (const spec of specifiersOf(file)) {
+			if (!spec.startsWith('.')) continue;
+			const next = sourceOf(file, spec);
+			if (next) queue.push(next);
+			else fail(`${relative(ROOT, file)}: imports "${spec}", which resolves to no source`);
+		}
+	}
+}
+
 report(
 	'Dependency law check',
 	errors,
-	`Dependency law OK — ${PACKAGES.length} packages, ${WASM} pinned at ${pin}, /preview holds ${held} modules, lock resolves ${optionals} optionals.`
+	`Dependency law OK — ${PACKAGES.length} packages, ${WASM} pinned at ${pin}, /preview holds ${held} modules, the substrate entries reach ${reached.size}, lock resolves ${optionals} optionals.`
 );

@@ -1,11 +1,3 @@
-// The theme derivation: the public dials → the private `--_qm-*` scale, applied
-// to every `data-qm-root` element (THEMING.md). Imported at every barrel a
-// consumer can enter through — here, `/visual`, `/preview` — because a subpath is
-// what a consumer gets, and a surface reaching a module inside `core/` reaches
-// nothing this file imports. One sheet however many barrels name it: the
-// derivation is minted once rather than re-declared per detached root.
-import './theme.css';
-
 // `@quillmark/svelte/core`: what this package owns at the substrate seam.
 //
 // The `@quillmark/wasm` API is not re-exported: import it straight from the peer
@@ -15,6 +7,10 @@ import './theme.css';
 // here. What earns a line is what more than one surface speaks and no other
 // package declares: the address vocabulary and the error channel, plus the WASM
 // init gate.
+//
+// No stylesheet: a host reaches this entry where there is no document (a worker,
+// a server), and a dev server serves a side-effect sheet as a module that writes a
+// `<style>` into one. The surface barrels carry the theme; `check:deps` holds it.
 
 export { init } from './lifecycle.js';
 
