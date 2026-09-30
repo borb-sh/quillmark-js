@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.12.0 - 2026-09-30
+
 **The carried `@quillmark/wasm` is 0.118.0, and a quill that loaded may not.** A card kind may declare `seed:`, what Add writes into a new card of it, and the seed studio opens on carries each kind's in its card. A `seed:` failing its field's checks, or rendering as the unanswered field does, fails the load (`quill::seed_*`). A document's `$seed` warns wherever the card it seeds would, so `quillkit test` can fail a quill whose example carries one.
 
 ## v0.11.0 - 2026-09-29
