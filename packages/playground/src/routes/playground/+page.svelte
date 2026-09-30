@@ -25,10 +25,12 @@
   else: it fires on a bare arrow key, so a recompile hung off it would recompile
   on every one.
 
-  A document the engine refuses reaches no session, and the editor needs none: the shell
-  stands on `doc` and `quill`, the band says what refused, and the preview track waits.
-  The card the refusal named draws in its recovery shell, and the edit that retypes or
-  removes it tries the open again.
+  The editor needs no session: the shell stands on `doc` and `quill` as soon as the quill
+  resolves, and the session opens behind it, once the render build has loaded, over the
+  document as it stands by then. The preview track waits on its own. A document the engine
+  refuses reaches no session either: the band says what refused, the card the refusal
+  named draws in its recovery shell, and the edit that retypes or removes it tries the
+  open again.
 
   Under the preset's threshold the split shows one track and the switch band says
   which, so the bridge's preview→editor hop reveals the editor as well as placing
@@ -181,17 +183,30 @@
 		}
 	}
 
-	// A refused open is tried again by the edit that answers it; the session it lands joins
-	// the handles this open owns.
+	// Which open in force has a session attempt in flight, so an edit landing during the
+	// load starts no second one: the attempt reads the document after the load, edit included.
+	let attaching: number | undefined;
+
+	// The session behind the editor. The load comes first because `engine.open` reads the
+	// document before its own load, and an open awaited from the start compiles the
+	// document as it stood when the shell did. A refused open is tried again by the edit
+	// that answers it; the session it lands joins the handles this open owns.
 	async function reopen(): Promise<void> {
-		if (!engineHandle || !quillHandle || !docHandle) return;
-		const mine = generation;
+		const engine = engineHandle;
+		const quill = quillHandle;
+		const doc = docHandle;
+		if (!engine || !quill || !doc || attaching === generation) return;
+		const mine = (attaching = generation);
 		let opened: LiveSession;
 		try {
-			opened = await engineHandle.open(quillHandle, docHandle);
+			await engine.load(quill);
+			if (mine !== generation) return;
+			opened = await engine.open(quill, doc);
 		} catch (e) {
-			refused = e instanceof Error ? e.message : String(e);
+			if (mine === generation) refused = e instanceof Error ? e.message : String(e);
 			return;
+		} finally {
+			if (attaching === mine) attaching = undefined;
 		}
 		if (mine !== generation) return opened.free();
 		toFree.unshift(opened);
@@ -329,8 +344,7 @@
 		toFree = [];
 
 		// Handles created so far, newest first; freed in reverse creation order on a
-		// stale open and on a mid-chain failure (`engine.open` throwing after
-		// `quill`/`doc` already exist).
+		// stale open and on a throw after `quill`/`doc` already exist.
 		const created: Array<{ free(): void }> = [];
 		try {
 			// Dynamic: the WASM binary and VisualEditor's ProseMirror stack are the
@@ -376,31 +390,22 @@
 			// Always free: it answers off the backend descriptor without loading the binary
 			// or cloning the quill.
 			const emits = await engine.supportedFormats(quill);
-			// A refusal is a state of the document, not the end of the open: the editor binds
-			// `doc` and `quill` alone, so the shell stands without a session.
-			let openedSession: LiveSession | undefined;
-			let refusal: string | undefined;
-			try {
-				openedSession = await engine.open(quill, doc);
-				created.unshift(openedSession);
-			} catch (e) {
-				refusal = e instanceof Error ? e.message : String(e);
-			}
 			if (mine !== generation) {
 				for (const h of created) h.free();
 				return;
 			}
+			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the render
+			// build; the session follows behind it.
 			VisualEditor = visual.VisualEditor;
 			formats = emits;
 			engineHandle = engine;
-			session = openedSession;
-			refused = refusal;
 			quillHandle = quill;
 			docHandle = doc;
 			syncDiagnostics();
 			lastOpened = example ? 'example' : 'seed';
 			toFree = created;
 			status = { phase: 'ready' };
+			void reopen();
 		} catch (e) {
 			for (const h of created) h.free();
 			if (mine === generation)
@@ -601,6 +606,8 @@
 			<section class="qm-frame" aria-label="Live preview">
 				{#if session}
 					<Preview bind:this={previewRef} {session} onPick={handlePick} />
+				{:else if !refused}
+					<p data-testid="preview-status" class="qm-status phase">Loading the preview…</p>
 				{/if}
 			</section>
 		</div>

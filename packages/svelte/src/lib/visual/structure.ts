@@ -517,7 +517,7 @@ export type ArrayLayout =
  * The layout an array takes: `'table'` where the array's own `ui.layout` asks for it
  * and every cell of the row is short (a block prose cell declines it, at load width and
  * every width after), else `'list'`. That every column is a leaf is the loader's
- * contract (`quill::table_column_not_flat`); whether a leaf fits a cell is the surface's
+ * contract (`quill::table_column_not_leaf`); whether a leaf fits a cell is the surface's
  * answer (canon `SCHEMAS.md`): a table composes by position, so a row that would stack
  * inside a cell is not one.
  */

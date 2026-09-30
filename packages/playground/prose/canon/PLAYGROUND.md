@@ -45,7 +45,7 @@ A quill opens on its example document, the root `example.md` it carries in its b
 
 Off is `?examples=off`, which the toggle writes and a page reads once. The URL rather than the browser: a harness page travels in a report, and the link reproduces the document it was copied from, where a remembered switch would open the same URL two ways.
 
-Picking tears the shell down and stands it back up, so one session is live at a time. The surfaces come down before their handles do. The readouts reset with them, each having named something in the document that went.
+Picking tears the shell down and stands it back up, so one session is live at a time. The surfaces come down before their handles do. The readouts reset with them, each having named something in the document that went. The editor stands again once the quill resolves, and the preview track says it is loading until the session lands behind it ([HOSTING.md](../../../svelte/prose/canon/HOSTING.md) §Opening).
 
 The strip is drawn from the moment the catalog is known rather than with the panes: the picker at its end is what opens them, and a control that goes while what it asked for loads is one a hand cannot get back to.
 

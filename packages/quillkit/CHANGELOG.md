@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The carried `@quillmark/wasm` is 0.119.0.** An `object` may declare `ui.layout: flat`, and studio draws it without a frame of its own; an object alone in its group is named by the section header.
+**The carried `@quillmark/wasm` is 0.120.0.** An `object` may declare `ui.layout: flat`, and studio draws it without a frame of its own; an object alone in its group is named by the section header. A `ui.layout: table` column that is not a leaf fails the load as `quill::table_column_not_leaf`, where it was `quill::table_column_not_flat`.
 
 ## v0.12.0 - 2026-09-30
 
