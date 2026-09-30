@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.118.0-0`.**
+
 ## v0.31.0 - 2026-09-29
 
 **The `@quillmark/wasm` peer floor is `>=0.117.0-0`.** A quill's root `example.md` travels in its bundle as any file does, so `getQuill(ref).exampleDocument()` reads it.
