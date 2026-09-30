@@ -591,7 +591,11 @@
 				     column's rather than any one cell's. -->
 				<div class="qm-array-table-head">
 					{#each columns as [key, sub] (key)}
-						<div class="qm-array-table-col" class:mark={controlKind(sub) === 'boolean'}>
+						<div
+							class="qm-array-table-col"
+							class:mark={controlKind(sub) === 'boolean'}
+							class:prose={controlKind(sub) === 'prose'}
+						>
 							<FieldLabel
 								label={columnTitle(key, sub)}
 								required={obliged(sub)}
@@ -1044,6 +1048,9 @@
 	.qm-array-table-col.mark {
 		min-width: 0;
 	}
+	.qm-array-table-col.prose {
+		min-width: var(--_qm-track-prose);
+	}
 	/* The remove is the row's last track, pinned to the end edge of the box the table
 	 scrolls in: sticky, so it rests in its track while the table fits and rides over
 	 the cells once the box scrolls, on the card's plane so what passes under it is
@@ -1066,8 +1073,12 @@
 		background: var(--_qm-surface);
 		box-shadow: 0 0 0 var(--_qm-ring-reach) var(--_qm-surface);
 	}
+	/* The glyph stands on the row's first line with the cells, however far the slab
+	 stretches under it. */
 	.qm-array-table-row > .qm-remove {
 		align-self: stretch;
+		align-items: start;
+		padding-block-start: calc((var(--_qm-box-line) - var(--_qm-glyph-control)) / 2);
 		height: auto;
 		border-radius: var(--_qm-radius-inner);
 		color: var(--_qm-ink-label);

@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
-import { quill, example } from '../helpers/fixtures.js';
+import { quill, example, quillFromYaml } from '../helpers/fixtures.js';
 import { field, mountEditor, press, settle, type, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -60,6 +60,40 @@ describe('an array<object> declaring ui.layout: table', () => {
 		expect(
 			[...t.querySelectorAll('.qm-array-table-col')].map((c) => c.classList.contains('mark'))
 		).toEqual([false, false, false, true]);
+	});
+
+	it('widens the floor of the column a prose cell wraps in', () => {
+		const q = quillFromYaml(`quill:
+  name: prose_table
+  version: 1.0.0
+  backend: typst
+  description: A table with a prose column.
+typst:
+  plate_file: plate.typ
+main:
+  fields:
+    crew:
+      type: array
+      items:
+        type: object
+        properties:
+          who:
+            type: string
+          note:
+            type: plaintext
+            inline: true
+          lead:
+            type: boolean
+      ui:
+        layout: table
+`);
+		const t = field(mountEditor(q, q.seedDocument()).target, 'Crew');
+
+		expect(
+			[...t.querySelectorAll('.qm-array-table-col')].map((c) =>
+				['mark', 'prose'].filter((k) => c.classList.contains(k))
+			)
+		).toEqual([[], ['prose'], ['mark']]);
 	});
 
 	it('commits a cell into its row, the array committing whole', () => {
