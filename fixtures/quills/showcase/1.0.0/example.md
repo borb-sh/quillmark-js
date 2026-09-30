@@ -40,6 +40,12 @@ revisions:
   - note: Fig. 2 relabelled
     pages: 1
     detail: The caption named the wrong figure.
+checks:
+  spelling:
+    note: Two *typos* in the abstract.
+  kerning_pairs:
+    title: Kerning pairs
+    severity: major
 ~~~
 
 The body is a full block leaf: paragraphs, emphasis, and the containers the codec round-trips.

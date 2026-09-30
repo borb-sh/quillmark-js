@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The carried `@quillmark/wasm` is 0.120.0.** An `object` may declare `ui.layout: flat`, and studio draws it without a frame of its own; an object alone in its group is named by the section header. A `ui.layout: table` column that is not a leaf fails the load as `quill::table_column_not_leaf`, where it was `quill::table_column_not_flat`.
+**The carried `@quillmark/wasm` is 0.121.0, and a quill whose plate reads a matrix's `held` fails the render.** A matrix reaches the plate as the members it holds, so a plate reading `m.held` or `m.title` fails to compile; the helper's `roster(data, "<field>")` prints the vocabulary. A `seed:` or `default:` storing a member's `held` fails the load. Studio ticks a member by writing it and unticks by removing it, and an `open: true` matrix takes added items through an add box that searches the document's checklists first. An `object` may declare `ui.layout: flat`, and studio draws it without a frame of its own; an object alone in its group is named by the section header. A `ui.layout: table` column that is not a leaf fails the load as `quill::table_column_not_leaf`, where it was `quill::table_column_not_flat`.
 
 ## v0.12.0 - 2026-09-30
 

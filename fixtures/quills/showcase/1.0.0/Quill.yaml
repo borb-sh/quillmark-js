@@ -346,6 +346,7 @@ main:
         margins: Margins
         fonts: Fonts
         approved: Approved
+      open: true
       properties:
         note:
           type: plaintext
@@ -361,7 +362,7 @@ main:
       ui:
         group: meta
         compact: true
-      description: "The review checklist: a `matrix`, a closed vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`; two columns, one of them prose, that unfold under a held member. It declares no `default:` — a namespace carries none — so it seeds empty and every member rests unheld. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`."
+      description: "The review checklist: a `matrix`, a vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`, and `open: true`, so a document adds its own items beside them, each a snake_case key carrying a `title`. Two columns, one of them prose, unfold under a held member. A member is held by being present, and an unticked one is absent. It declares no `default:`, so it seeds empty. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`, and a member's own address is its tick."
 
     imprint:
       type: object

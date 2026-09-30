@@ -252,6 +252,20 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		).toBe(under.length);
 	});
 
+	it('regions a matrix member at its own address, unticked or added, and a cell under it', () => {
+		// A member's address is its tick, so a click on any row the roster prints lands on
+		// the tick the row stands for (VISUAL_EDITOR §"The matrix").
+		const fields = new Set(showcase.regions().map((r) => r.field));
+		for (const field of [
+			'main.checks.fonts',
+			'main.checks.spelling',
+			'main.checks.kerning_pairs',
+			'main.checks.spelling.note',
+			'main.checks.kerning_pairs.title'
+		])
+			expect(fields.has(field), field).toBe(true);
+	});
+
 	it('gives every address the shipped quill serves a box of its own', async () => {
 		// The invariant above, over a plate nobody here wrote: a region a real quill's
 		// plate mints is a region this tier has to be able to box.

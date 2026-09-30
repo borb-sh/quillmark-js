@@ -304,17 +304,19 @@ export function controlKind(f: QuillFieldSchema): ControlKind {
  *  would be a second spelling of a reserved key. No variant may declare it. */
 export const VARIANT_DISCRIMINANT = VARIANT_DISCRIMINANT_KEY;
 
-/** The tick cell of a matrix member, the second reserved key beside the discriminant.
- *  The boundary synthesizes it on every member and exports no constant for it, so this
- *  is where the package spells it once (canon `SCHEMAS.md` §Matrix). */
-export const MATRIX_HELD = 'held';
+/** The label key of an open matrix's added item, the one cell a roster member never
+ *  stores. The boundary exports no constant for it, so the package spells it once
+ *  (canon `SCHEMAS.md` §Matrix). */
+export const MATRIX_TITLE = 'title';
 
 // ── The matrix ───────────────────────────────────────────────────────────────
-// A namespace whose keys the roster fixes: `members` is the roster alone, and the
-// `{held, …columns}` object each member desugars to is derived at parse and not
-// serialized, so the control composes it from `members` × `properties` here.
+// A cell holding the members it ticks: a member is held by being present, as a bare
+// tick or a mapping of the columns. `members` is the roster; `open` admits items a
+// document adds beside it, each a snake_case key whose mapping carries a `title`. The
+// object a member is, roster or added, is derived at parse and not serialized, so the
+// control composes it from `members` × `properties` here.
 
-/** One member of the roster: its id and its title. */
+/** One item of a matrix: its id and its title. */
 export interface MatrixMember {
 	id: string;
 	title: string;
@@ -333,19 +335,13 @@ export function memberValue(map: Record<string, unknown> | undefined, id: string
 }
 
 /**
- * Whether a stored member is held. A bare scalar is the tick and a mapping is the member
- * object, whose `held` cell resolves as every absent cell does, to its `default:` of
- * `false` (canon `SCHEMAS.md` §Matrix): an absent key is unheld, a bare `true` is held,
- * and a member object is held only where its `held` cell says so. The spellings the
- * engine coerces to false — `false`, `0`, `"false"`, `null` — read false here; every other
- * present scalar reads held, so a document the engine would refuse still draws the tick
- * its spelling claims.
+ * Whether a stored member is held: by being present. A mapping is held whatever it
+ * carries, `{}` included, and a bare scalar is the tick itself, read as the engine's
+ * coercion reads it: `false`, `0`, `"false"` and `null` unheld, every other present
+ * scalar held, so a spelling the engine would refuse still draws the tick it claims.
  */
 export function matrixHeld(stored: unknown): boolean {
-	if (typeof stored === 'object' && stored !== null)
-		return (
-			Object.hasOwn(stored, MATRIX_HELD) && tickOf((stored as Record<string, unknown>)[MATRIX_HELD])
-		);
+	if (typeof stored === 'object' && stored !== null) return true;
 	return tickOf(stored);
 }
 
@@ -358,25 +354,35 @@ function tickOf(v: unknown): boolean {
 	return true;
 }
 
-/** A member's columns: the member object with its `held` cell taken out, `{}` for the
- *  bare and absent spellings. What the columns subform takes as its value. */
+/** The keys no column may take (`quill::matrix_reserved_column`): an added item's
+ *  label, and the `held` a member never stores. */
+const MATRIX_RESERVED = [MATRIX_TITLE, 'held'];
+
+/** A member's columns: its mapping without the reserved keys, `{}` for a bare tick or an
+ *  absent member. What the columns subform takes as its value, so an edit writes back
+ *  no `held` a document stored (`validation::held_stored`). */
 export function matrixColumns(stored: unknown): Record<string, unknown> {
 	if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {};
 	const rest = { ...(stored as Record<string, unknown>) };
-	delete rest[MATRIX_HELD];
+	for (const key of MATRIX_RESERVED) delete rest[key];
 	return rest;
+}
+
+/** What a matrix holding nothing commits: the unset field where unset prints nothing
+ *  held, and the authored `{}` where it would print a `default:` or `none` instead. */
+export function matrixEmpty(matrix: QuillFieldSchema): Record<string, unknown> | undefined {
+	return matrix.default !== undefined || optionalCell(matrix) ? {} : undefined;
 }
 
 /**
  * The map after one member moves: `next` written under `id`, or the key dropped where
  * `next` is `undefined`; a map left holding nothing is an unset field. Every other
- * member rides through in the spelling the document had, so a stored `cyber_200: true`
- * stays `true` while its neighbour is edited.
+ * member rides through in the spelling the document had.
  */
 export function commitMember(
 	map: Record<string, unknown> | undefined,
 	id: string,
-	next: Record<string, unknown> | undefined
+	next: unknown
 ): Record<string, unknown> | undefined {
 	const out = { ...(map ?? {}) };
 	if (next === undefined) delete out[id];
@@ -385,36 +391,87 @@ export function commitMember(
 }
 
 /**
- * The member a tick or an edit writes. Held with columns is the member object with an
- * explicit `held: true`; unheld keeps the columns under `held: false`, so tick, type,
- * untick, retick loses nothing; unheld with no columns is `undefined`, the key dropped.
- * Which columns are blank is the engine's rule and not restated here: a column control
- * that clears drops its key (`ObjectField`), so a member emptied by hand arrives with no
- * columns and only then leaves the map.
+ * The held member a tick or an edit writes: its columns, the bare tick `true` where
+ * it answers none, and an added item's `title` beside them. Unticking is removal
+ * ({@link commitMember} with `undefined`), never a write.
  */
-export function memberWrite(
-	held: boolean,
-	columns: Record<string, unknown>
-): Record<string, unknown> | undefined {
-	if (!held && Object.keys(columns).length === 0) return undefined;
-	return { [MATRIX_HELD]: held, ...columns };
+export function memberWrite(columns: Record<string, unknown>, title?: string): unknown {
+	if (title !== undefined) return { [MATRIX_TITLE]: title, ...columns };
+	return Object.keys(columns).length ? columns : true;
 }
 
-/** The `object` a matrix member desugars to, for the schema walk: `held` beside the
- *  declared columns. Composed here because the boundary serializes the roster alone. */
-export function matrixMemberSchema(matrix: QuillFieldSchema): QuillFieldSchema {
-	return {
-		type: 'object',
-		properties: {
-			[MATRIX_HELD]: { type: 'boolean', default: false },
-			...(matrix.properties ?? {})
-		}
-	};
+/** Whether `id` is spelled as a matrix id: snake_case, the rule the roster's ids and
+ *  an added item's key share. */
+export function matrixId(id: string): boolean {
+	return /^[a-z][a-z0-9_]*$/.test(id);
 }
 
 /** Whether `id` is on the roster. */
-export function matrixDeclares(matrix: QuillFieldSchema, id: string): boolean {
+export function onRoster(matrix: QuillFieldSchema, id: string): boolean {
 	return matrix.members != null && Object.hasOwn(matrix.members, id);
+}
+
+/**
+ * Whether a step under the matrix names a member, judged on the schema alone as an
+ * index step is: a roster id, or on an open matrix any key spelled as an id, the added
+ * item it would be. So an unheld member's address resolves.
+ */
+export function matrixDeclares(matrix: QuillFieldSchema, id: string): boolean {
+	return onRoster(matrix, id) || (!!matrix.open && matrixId(id));
+}
+
+/**
+ * The added items a stored map holds, sorted by id as the plate orders them: on an
+ * open matrix, each key off the roster spelled as an id whose mapping carries a
+ * `title`. Any other key off the roster is the engine's refusal, drawn nowhere and
+ * ridden through.
+ */
+export function addedItems(
+	matrix: QuillFieldSchema,
+	map: Record<string, unknown> | undefined
+): MatrixMember[] {
+	if (!matrix.open || !map) return [];
+	const out: MatrixMember[] = [];
+	for (const id of Object.keys(map)) {
+		if (onRoster(matrix, id) || !matrixId(id)) continue;
+		const stored = map[id];
+		if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) continue;
+		const title = (stored as Record<string, unknown>)[MATRIX_TITLE];
+		if (title == null) continue;
+		out.push({ id, title: String(title) });
+	}
+	return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * The id an item added under `title` takes: the title folded to snake_case, prefixed
+ * where it opens on no letter, and suffixed past every id `taken` names, the roster's
+ * and the document's alike. The id is the wire's and never drawn, so a later retitle
+ * leaves it where it is.
+ */
+export function addedId(title: string, taken: (id: string) => boolean): string {
+	const folded = title
+		.normalize('NFKD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '_')
+		.replace(/^_+|_+$/g, '');
+	const base = /^[a-z]/.test(folded) ? folded : `item${folded ? `_${folded}` : ''}`;
+	if (!taken(base)) return base;
+	let n = 2;
+	while (taken(`${base}_${n}`)) n++;
+	return `${base}_${n}`;
+}
+
+/** The `object` a matrix member is, for the schema walk: the declared columns, and an
+ *  added item's `title` beside them. Composed here because the boundary serializes the
+ *  roster and the columns alone. */
+export function matrixMemberSchema(matrix: QuillFieldSchema, id: string): QuillFieldSchema {
+	const columns = matrix.properties ?? {};
+	return {
+		type: 'object',
+		properties: onRoster(matrix, id) ? columns : { [MATRIX_TITLE]: { type: 'string' }, ...columns }
+	};
 }
 
 // ── The schema walk ──────────────────────────────────────────────────────────
@@ -454,7 +511,7 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
 				: undefined;
 		case 'matrix':
 			return typeof step === 'string' && matrixDeclares(schema, step)
-				? matrixMemberSchema(schema)
+				? matrixMemberSchema(schema, step)
 				: undefined;
 		case 'variant': {
 			if (typeof step !== 'string') return undefined;
@@ -571,9 +628,10 @@ export function commitDiscriminant(
 /**
  * Whether the schema obliges a cell: `default:`'s absence, which is the whole of the
  * obligation (DOCUMENT_MODEL). Exempt are the cells whose absence of one says nothing:
- * a typed dictionary and a matrix, since a namespace declares no `default:` at all and
- * `validate` anchors obligation on the leaves under it; and an optional cell, which can
- * declare none, its unanswered render being `none`.
+ * a typed dictionary, since a namespace declares no `default:` at all and `validate`
+ * anchors obligation on the leaves under it; a matrix, whose blank is nothing held, a
+ * whole answer; and an optional cell, which can declare none, its unanswered render
+ * being `none`.
  */
 export function obliged(schema: QuillFieldSchema): boolean {
 	return (

@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The `@quillmark/wasm` peer floor is `>=0.120.0-0`.** A `ui.layout: table` column that is not a leaf fails a packed quill's load as `quill::table_column_not_leaf`, where it was `quill::table_column_not_flat`.
+**The `@quillmark/wasm` peer floor is `>=0.121.0-0`.** A packed quill whose `seed:` or `default:` stores a matrix member's `held` fails its load (`quill::seed_held_stored`, `quill::default_held_stored`), and an acroform quill declaring an open matrix fails it as `quill::open_matrix_unsupported`. A `ui.layout: table` column that is not a leaf fails a packed quill's load as `quill::table_column_not_leaf`, where it was `quill::table_column_not_flat`.
 
 ## v0.32.0 - 2026-09-30
 

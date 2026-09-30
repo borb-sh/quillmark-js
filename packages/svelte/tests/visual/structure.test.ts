@@ -37,7 +37,10 @@ import {
 	declaredContent,
 	printedText,
 	resolveBodyGhost,
-	MATRIX_HELD
+	addedItems,
+	addedId,
+	matrixDeclares,
+	matrixEmpty
 } from '$lib/visual/structure';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quill } from '../helpers/fixtures.js';
@@ -715,14 +718,26 @@ describe('schemaAt', () => {
 		expect(schemaAt(bare, [0, 'deeper'])).toBeUndefined();
 	});
 
-	it('walks a matrix member into its held cell and its columns', () => {
+	it('walks a matrix member into its columns, its own address the tick', () => {
 		expect(schemaAt(matrix, ['a'])?.type).toBe('object');
-		expect(schemaAt(matrix, ['a', MATRIX_HELD])?.type).toBe('boolean');
+		expect(schemaAt(matrix, ['a', 'held'])).toBeUndefined();
 		expect(schemaAt(matrix, ['b', 'note'])?.type).toBe('plaintext');
 		expect(schemaAt(matrix, ['c'])).toBeUndefined();
 		expect(schemaAt(matrix, ['a', 'nope'])).toBeUndefined();
+		// A roster member stores no title; an added item's is its label cell.
+		expect(schemaAt(matrix, ['a', 'title'])).toBeUndefined();
 		// A prototype key is not on the roster.
 		expect(schemaAt(matrix, ['toString'])).toBeUndefined();
+	});
+
+	it('walks an open matrix into any id-spelled key, the added item it would be', () => {
+		const open = { ...matrix, open: true };
+		expect(schemaAt(open, ['wing_ig'])?.type).toBe('object');
+		expect(schemaAt(open, ['wing_ig', 'title'])?.type).toBe('string');
+		expect(schemaAt(open, ['wing_ig', 'note'])?.type).toBe('plaintext');
+		expect(schemaAt(open, ['Wing IG'])).toBeUndefined();
+		expect(schemaAt(open, ['2nd'])).toBeUndefined();
+		expect(matrixDeclares(matrix, 'wing_ig')).toBe(false);
 	});
 
 	it('walks a variant into the discriminant and the union of its worlds', () => {
@@ -741,18 +756,15 @@ describe('the matrix helpers', () => {
 		expect(matrixMembers(undefined)).toEqual([]);
 	});
 
-	it('reads held off both rest forms, a mapping unheld unless it names `held`', () => {
+	it('reads a member held by being present: a mapping whatever it carries, a scalar coerced', () => {
 		expect(matrixHeld(undefined)).toBe(false);
 		expect(matrixHeld(true)).toBe(true);
-		expect(matrixHeld({ note: 'x' })).toBe(false);
-		expect(matrixHeld({ held: false, note: 'x' })).toBe(false);
-		expect(matrixHeld({ held: true })).toBe(true);
-		// The spellings the engine coerces to false, and a mapping naming no tick.
-		for (const v of [false, 0, 'false', null, {}, { held: 0 }, { held: 'false' }, { held: null }])
-			expect(matrixHeld(v), JSON.stringify(v)).toBe(false);
+		expect(matrixHeld({})).toBe(true);
+		expect(matrixHeld({ note: 'x' })).toBe(true);
+		// The scalar spellings the engine coerces to false.
+		for (const v of [false, 0, 'false', null]) expect(matrixHeld(v), JSON.stringify(v)).toBe(false);
 		// Every other present tick reads held, `1` and `"true"` among them.
-		for (const v of [1, 'true', { held: 1 }, { held: {} }])
-			expect(matrixHeld(v), JSON.stringify(v)).toBe(true);
+		for (const v of [1, 'true']) expect(matrixHeld(v), JSON.stringify(v)).toBe(true);
 	});
 
 	it('reads a member off the map by own key', () => {
@@ -762,24 +774,68 @@ describe('the matrix helpers', () => {
 		expect(memberValue(undefined, 'a')).toBeUndefined();
 	});
 
-	it('takes the columns off a member, held aside', () => {
+	it('takes the columns off a member, an added title aside', () => {
+		expect(matrixColumns({ title: 'Wing IG', note: 'x' })).toEqual({ note: 'x' });
+		expect(matrixColumns({ note: 'x' })).toEqual({ note: 'x' });
+		// A stored `held` is the engine's refusal, and no column may be named it.
 		expect(matrixColumns({ held: true, note: 'x' })).toEqual({ note: 'x' });
 		expect(matrixColumns(true)).toEqual({});
 		expect(matrixColumns(undefined)).toEqual({});
 		expect(matrixColumns(['x'])).toEqual({});
 	});
 
-	it('writes a member with an explicit held, and drops an unheld one with no columns', () => {
-		expect(memberWrite(true, {})).toEqual({ held: true });
-		expect(memberWrite(true, { note: 'x' })).toEqual({ held: true, note: 'x' });
-		expect(memberWrite(false, { note: 'x' })).toEqual({ held: false, note: 'x' });
-		expect(memberWrite(false, {})).toBeUndefined();
+	it('writes a held member as its columns, the bare tick where it answers none', () => {
+		expect(memberWrite({})).toBe(true);
+		expect(memberWrite({ note: 'x' })).toEqual({ note: 'x' });
+		expect(memberWrite({}, 'Wing IG')).toEqual({ title: 'Wing IG' });
+		expect(memberWrite({ note: 'x' }, '')).toEqual({ title: '', note: 'x' });
+	});
+
+	it('commits nothing held as unset, or as `{}` where unset prints something else', () => {
+		expect(matrixEmpty(f({ type: 'matrix', members: { a: 'A' } }))).toBeUndefined();
+		expect(matrixEmpty(f({ type: 'matrix', members: { a: 'A' }, default: { a: true } }))).toEqual(
+			{}
+		);
+		expect(
+			matrixEmpty(f({ type: 'matrix?' as QuillFieldSchema['type'], members: { a: 'A' } }))
+		).toEqual({});
+	});
+
+	it("reads an open matrix's added items: id-spelled, titled, off the roster, in id order", () => {
+		const matrix = f({ type: 'matrix', members: { a: 'A' } });
+		const open = { ...matrix, open: true };
+		const map = {
+			a: true,
+			zeta: { title: 'Zeta' },
+			wing_ig: { title: 'Wing IG', note: 'x' },
+			untitled: { note: 'y' },
+			'Not An Id': { title: 'Nope' },
+			bare: true,
+			a_title: { title: null }
+		};
+		expect(addedItems(open, map)).toEqual([
+			{ id: 'wing_ig', title: 'Wing IG' },
+			{ id: 'zeta', title: 'Zeta' }
+		]);
+		expect(addedItems(matrix, map)).toEqual([]);
+		expect(addedItems(open, undefined)).toEqual([]);
+	});
+
+	it('mints an added id from the title, past every id taken', () => {
+		const none = () => false;
+		expect(addedId('Wing IG', none)).toBe('wing_ig');
+		expect(addedId('  Exec / Aide / CAG ', none)).toBe('exec_aide_cag');
+		expect(addedId('Café Crème', none)).toBe('cafe_creme');
+		expect(addedId('333 TRS', none)).toBe('item_333_trs');
+		expect(addedId('—', none)).toBe('item');
+		const taken = new Set(['wing_ig', 'wing_ig_2']);
+		expect(addedId('Wing IG', (id) => taken.has(id))).toBe('wing_ig_3');
 	});
 
 	it('commits one member into the map and leaves the rest as spelled', () => {
-		expect(commitMember({ a: true }, 'b', { held: true })).toEqual({ a: true, b: { held: true } });
-		expect(commitMember({ a: true, b: { held: true } }, 'b', undefined)).toEqual({ a: true });
+		expect(commitMember({ a: true }, 'b', { note: 'x' })).toEqual({ a: true, b: { note: 'x' } });
+		expect(commitMember({ a: true, b: { note: 'x' } }, 'b', undefined)).toEqual({ a: true });
 		expect(commitMember({ a: true }, 'a', undefined)).toBeUndefined();
-		expect(commitMember(undefined, 'a', { held: true })).toEqual({ a: { held: true } });
+		expect(commitMember(undefined, 'a', true)).toEqual({ a: true });
 	});
 });

@@ -1,4 +1,4 @@
-#import "@local/quillmark-helper:0.1.0": data, display, form-field, signature-field
+#import "@local/quillmark-helper:0.1.0": data, display, field-region, form-field, ink, roster, signature-field
 #import "@local/showcase-layout:1.0.0": (
   accent-rule, callout, mono-face, plain-text, showcase-page,
 )
@@ -271,15 +271,20 @@
     #rev.at("note", default: "revised") (#str(rev.at("pages", default: 0)) pp)#if rev.at("detail", default: "") != "" [ — #rev.detail]
     #linebreak()
   ]
-  // The matrix arrives total, every member in roster order carrying `held`, its roster
-  // `title`, and the columns. Only a held member prints. `note` is a content
-  // cell, so it regions at `main.checks.<member>.note`; `held` and `severity` are
-  // scalars read through the loop and reach the preview through the field.
-  #let held-checks = data.at("checks", default: (:)).pairs().filter(p => p.at(1).held)
-  #if held-checks.len() > 0 [
-    Checked: #for (id, m) in held-checks [#m.title#if m.at("severity", default: "minor") == "major" [ (major)]#if m.at("note", default: "") != "" [: #m.note]; ]
-    #linebreak()
-  ]
+  // The matrix arrives as the members it holds, each its columns; `roster` is the
+  // vocabulary, held or not, then each item the document adds. Each row claims its
+  // member's address, its tick, so an unticked box is clickable too. `note` is a
+  // content cell and an added item's `title` a string cell, so their ink keeps their
+  // own addresses inside the claim; `severity` is a scalar read through the loop and
+  // reaches the preview through the row.
+  Checks: #for row in roster(data, "checks") {
+    let title = if row.held { ink(row.value).at("title", default: row.title) } else { row.title }
+    field-region(row.path)[#(if row.held { "[x]" } else { "[ ]" }) #title]
+    if row.held and row.value.severity == "major" [ (major)]
+    if row.held and row.value.note != "" [: #ink(row.value).note]
+    [; ]
+  }
+  #linebreak()
   // A text widget over a boolean, so a boolean field reaches the region table the
   // same way the signature does — through a placement, not through a glyph span.
   // `form-field` keeps `text` and `signature`, so the mark is a character this plate
