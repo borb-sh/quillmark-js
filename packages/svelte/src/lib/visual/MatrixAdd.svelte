@@ -104,7 +104,7 @@
 	<!-- Always mounted, so `aria-controls` names an element at rest too; empty, it draws
 	     nothing. -->
 	<div
-		class="qm-matrix-add-list"
+		class="qm-menu-surface qm-matrix-add-list"
 		role="listbox"
 		id={listId}
 		aria-label={placeholder}
@@ -125,6 +125,7 @@
 				onpointermove={() => (walked = k)}
 				onclick={() => choose(k)}
 			>
+				{#if option.add}<Icon name="plus" class="qm-matrix-add-glyph" />{/if}
 				<span class="qm-matrix-add-title">{option.title}</span>
 				{#if option.note}<span class="qm-matrix-add-note">{option.note}</span>{/if}
 			</div>
@@ -133,21 +134,23 @@
 </div>
 
 <style>
+	/* The box's text, and every option's, starts past the glyph slot at its leading edge,
+	 so a result reads in the column the typed words stand in and the add option's `+`
+	 stands under the box's. */
 	.qm-matrix-add {
+		--_slot: calc(var(--_qm-space-2) * 2 + var(--_qm-glyph-control));
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space-half);
 		min-width: 0;
 	}
-	/* The glyph rides the input's leading edge, inside its well, so the box reads as the
-	 add chip it stands in for until it is typed in. */
 	.qm-matrix-add-field {
 		position: relative;
 		display: flex;
 		align-items: center;
 		min-width: 0;
 	}
-	.qm-matrix-add-field :global(.qm-matrix-add-glyph) {
+	.qm-matrix-add :global(.qm-matrix-add-glyph) {
 		position: absolute;
 		inset-inline-start: var(--_qm-space-2);
 		width: var(--_qm-glyph-control);
@@ -155,28 +158,45 @@
 		color: var(--_qm-ink-label);
 		pointer-events: none;
 	}
+	/* At rest the box is the add chip it stands in for: no well, its words at the label
+	 ink. The well comes up under the pointer, and stays while it holds the focus or
+	 typed words. */
 	.qm-matrix-add-field .qm-input {
 		flex: 1;
 		min-width: 0;
-		padding-inline-start: calc(var(--_qm-space-2) * 2 + var(--_qm-glyph-control));
+		padding-inline-start: var(--_slot);
+		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
+	.qm-matrix-add-field .qm-input:placeholder-shown:not(:focus) {
+		background: transparent;
+	}
+	.qm-matrix-add-field .qm-input:placeholder-shown:not(:focus):hover {
+		background: var(--_qm-surface-hover);
+	}
+	/* The list is a menu, raised over the card rather than cut into it, so its options
+	 read as choices and not as a second field. Its edge and inset come off each
+	 option's, which keeps the column. */
 	.qm-matrix-add-list {
 		display: flex;
 		flex-direction: column;
-		padding: var(--_qm-space-half);
-		border-radius: var(--_qm-radius-inner);
-		background: var(--_qm-surface-well);
 	}
 	.qm-matrix-add-list[hidden] {
 		display: none;
 	}
 	.qm-matrix-add-option {
+		position: relative;
 		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
 		gap: var(--_qm-space-2);
+		padding-inline-start: calc(var(--_slot) - var(--_qm-space-half) - var(--_qm-border-width));
 		font-size: var(--_qm-text-body);
 		color: var(--_qm-ink);
+	}
+	.qm-matrix-add-option :global(.qm-matrix-add-glyph) {
+		inset-inline-start: calc(var(--_qm-space-2) - var(--_qm-space-half) - var(--_qm-border-width));
+		inset-block-start: 50%;
+		translate: 0 -50%;
 	}
 	/* The add option reads at the label ink: it offers a new item, where a result names
 	 one the document already knows. */

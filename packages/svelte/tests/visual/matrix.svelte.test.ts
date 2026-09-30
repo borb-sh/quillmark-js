@@ -42,7 +42,9 @@ const addBox = (m: HTMLElement) => m.querySelector<HTMLInputElement>('input[role
 /** The add box's options as they read: title, then the note beside it. */
 const offered = (m: HTMLElement) =>
 	[...m.querySelectorAll<HTMLElement>('[role="option"]')].map((o) =>
-		[...o.children].map((c) => c.textContent).join(' | ')
+		[...o.querySelectorAll('.qm-matrix-add-title, .qm-matrix-add-note')]
+			.map((c) => c.textContent)
+			.join(' | ')
 	);
 /** Focus the add box and type into it. */
 function typeAdd(m: HTMLElement, words: string): HTMLInputElement {

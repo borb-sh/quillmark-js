@@ -548,15 +548,42 @@
 	.qm-member-title:hover {
 		color: var(--_qm-ink);
 	}
-	/* An added item's title is its value, so it takes the field's input, and spans what
-	 the head leaves beside the tick and the remove. */
+	/* An added item's title is its value, an input drawn as the roster's titles are: its
+	 text starts where theirs does, one gap past the tick, and its well comes up under
+	 the pointer and the focus, flush with the tick, so at rest the row reads as the rows
+	 above it. */
 	.qm-member-title-input {
 		flex: 1;
 		min-width: 0;
+		margin-inline-start: calc(-1 * var(--_qm-space-2));
+		padding-inline-start: var(--_qm-space-2);
+		background: transparent;
+		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
+	.qm-member-title-input:hover {
+		background: var(--_qm-surface-hover);
+	}
+	.qm-member-title-input:focus {
+		background: var(--_qm-surface-well);
+	}
+	/* The remove is offered by the row the pointer or the focus is in, as an array row's
+	 is, and says destructive under the pointer. */
 	.qm-member-remove {
 		flex-shrink: 0;
 		color: var(--_qm-ink-label);
+		opacity: var(--_qm-opacity-idle);
+		transition:
+			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-member.added:hover > .qm-member-head > .qm-member-remove,
+	.qm-member.added:focus-within > .qm-member-head > .qm-member-remove {
+		opacity: 1;
+	}
+	.qm-member-remove:hover {
+		background: var(--_qm-danger-tint);
+		color: var(--_qm-danger);
 	}
 	.qm-member-remove :global(svg) {
 		width: var(--_qm-glyph-control);
