@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.119.0-0`, and a subform may be flat.** An `object` declaring `ui.layout: flat` draws no vertical and no rung, its properties standing at the depth of the fields around it. Alone in its group, it draws no label either: the section header names it and carries its description as a hint.
+
 **A row of controls lines up on its first line.** A table row's cells stand at its top, where they centred on a prose cell that wrapped, and the row's remove glyph stands on that line too. A switch centres on a box's first line (`--_qm-box-line`), so it sits level with the boxes beside it in a section's row, a subform's and a table's. A table's prose column floors at twice a column's width (`--_qm-track-prose`), so a cell that wraps holds a phrase to the line rather than a word.
 
 ## v0.16.0 - 2026-09-30

@@ -338,6 +338,22 @@ describe('initialExpandedGroup', () => {
 	});
 });
 
+describe('groupSections', () => {
+	const flat = f({ type: 'object', ui: { group: 'q', layout: 'flat' }, properties: { a: f({}) } });
+	const framed = f({ type: 'object', ui: { group: 'q' }, properties: { a: f({}) } });
+	const sections = (fields: Record<string, QuillFieldSchema>) =>
+		groupSections(fieldModels({ fields }), ['q'], (g) => g);
+
+	it('heads a group section with its one field where that field is flat', () => {
+		const [section] = sections({ quals: flat });
+		expect(section.head?.name).toBe('quals');
+	});
+	it('heads none where the field is framed or has company', () => {
+		expect(sections({ quals: framed })[0].head).toBeUndefined();
+		expect(sections({ quals: flat, note: f({ ui: { group: 'q' } }) })[0].head).toBeUndefined();
+	});
+});
+
 describe('groupOrder', () => {
 	it('takes the typed ui.groups registry, in registry order', () => {
 		const schema = {
