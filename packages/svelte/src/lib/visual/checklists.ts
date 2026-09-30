@@ -2,8 +2,8 @@
  * The document's checklists, and the search an open matrix's add box runs over them
  * (VISUAL_EDITOR §"The matrix"). The editor root publishes every card-level matrix off
  * the model it derives, so a list in a collapsed group or another card is searched
- * as surely as the one the author is typing in; a matrix mounted off-tree, or nested
- * in a container, searches its own items alone.
+ * as surely as the one the author is typing in. A matrix mounted off-tree, or nested
+ * in a container, is not indexed and searches its own items alone.
  */
 import { getContext, setContext } from 'svelte';
 import type { QuillFieldSchema } from '@quillmark/wasm';
@@ -109,6 +109,11 @@ export interface AddOption {
 	note?: string;
 	/** The option that adds what was typed, rather than a result. */
 	add?: boolean;
+	/** A result the typed words name outright, which Enter takes unarrowed: an add box
+	 *  whose best result is weaker takes its add option instead. */
+	strong?: boolean;
+	/** What the owner reads back off a chosen option. */
+	payload?: unknown;
 }
 
 /** One search result: an item of some checklist, `list` naming which. */
@@ -118,15 +123,17 @@ export interface ChecklistHit<L> {
 	title: string;
 	held: boolean;
 	score: number;
+	/** Every query word claimed a title word whole or as its opening. */
+	strong: boolean;
 }
 
-/** Lowercase, unaccented words: `Exec / Aide / CAG` → `exec aide cag`. */
+/** Lowercase, unaccented words, any script: `Exec / Aide / CAG` → `exec aide cag`. */
 function words(s: string): string[] {
 	return s
 		.normalize('NFKD')
-		.replace(/[̀-ͯ]/g, '')
+		.replace(/[\u0300-\u036f]/g, '')
 		.toLowerCase()
-		.split(/[^a-z0-9]+/)
+		.split(/[^\p{L}\p{N}]+/u)
 		.filter(Boolean);
 }
 
@@ -138,39 +145,73 @@ function abbreviates(token: string, word: string): boolean {
 	return i === token.length;
 }
 
+/** How a query word claims one title word: whole (3), as its opening (2), as an
+ *  abbreviation (1), or not (0). */
+function claim(token: string, word: string): number {
+	return word === token ? 3 : word.startsWith(token) ? 2 : abbreviates(token, word) ? 1 : 0;
+}
+
+/** The end of the run of free words from `i` whose openings spell `token` in order —
+ *  `fcc` over `flight cc`, `jqo` over `joint qualified officer` — or `-1`. */
+function runFrom(token: string, w: readonly string[], free: readonly boolean[], i: number): number {
+	if (i >= w.length || !free[i]) return -1;
+	for (let k = Math.min(token.length, w[i].length); k > 0; k--) {
+		if (!w[i].startsWith(token.slice(0, k))) continue;
+		if (k === token.length) return i + 1;
+		const end = runFrom(token.slice(k), w, free, i + 1);
+		if (end >= 0) return end;
+	}
+	return -1;
+}
+
 /**
- * How well `query` names `title`, `0` for not at all. Each query word claims one title
- * word, whole (3), as its opening (2), or as an abbreviation of it (1): `flt cc` names
- * `Flight CC`. A query run together that opens the title's initials names it too:
- * `jqo` names `Joint Qualified Officer`. A title the query opens outright ranks above
- * the same words met out of order.
+ * How well `query` names `title`, or `undefined` for not at all. Each query word claims
+ * a title word — whole, as its opening, or as an abbreviation of it (`flt cc` names
+ * `Flight CC`) — the stronger claims taken first, so `c cc` names `CC Candidate`; a
+ * word left over may claim a run of words whose openings it spells (`fcc`, `jqo`). The
+ * title the query spells outright ranks first, then one it opens.
  */
-export function matchScore(query: string, title: string): number {
+export function matchTitle(
+	query: string,
+	title: string
+): { score: number; strong: boolean } | undefined {
 	const q = words(query);
 	const w = words(title);
-	if (!q.length || !w.length) return 0;
+	if (!q.length || !w.length) return undefined;
 	const free = w.map(() => true);
+	const left = q.map(() => true);
 	let score = 0;
-	for (const token of q) {
-		let best = 0;
-		let at = -1;
-		for (let i = 0; i < w.length; i++) {
-			if (!free[i]) continue;
-			const s = w[i] === token ? 3 : w[i].startsWith(token) ? 2 : abbreviates(token, w[i]) ? 1 : 0;
-			if (s > best) {
-				best = s;
-				at = i;
-			}
+	let strong = true;
+	for (const level of [3, 2, 1])
+		q.forEach((token, t) => {
+			if (!left[t]) return;
+			const at = w.findIndex((word, i) => free[i] && claim(token, word) === level);
+			if (at < 0) return;
+			free[at] = left[t] = false;
+			score += level;
+			if (level === 1) strong = false;
+		});
+	for (let t = 0; t < q.length; t++) {
+		if (!left[t]) continue;
+		let found = false;
+		for (let i = 0; i < w.length && !found; i++) {
+			const end = runFrom(q[t], w, free, i);
+			if (end - i < 2) continue;
+			for (let k = i; k < end; k++) free[k] = false;
+			found = true;
 		}
-		if (!best) {
-			const initials = w.map((x) => x[0]).join('');
-			const run = q.join('');
-			return run.length > 1 && initials.startsWith(run) ? 1 : 0;
-		}
-		free[at] = false;
-		score += best;
+		if (!found) return undefined;
+		score += 1;
+		strong = false;
 	}
-	return words(title).join(' ').startsWith(q.join(' ')) ? score + 1 : score;
+	const typed = q.join(' ');
+	const whole = w.join(' ');
+	return { score: score + (whole === typed ? 3 : whole.startsWith(typed) ? 1 : 0), strong };
+}
+
+/** {@link matchTitle}'s score, `0` for no match. */
+export function matchScore(query: string, title: string): number {
+	return matchTitle(query, title)?.score ?? 0;
 }
 
 /** What a search reads of one list: its items and their ticks. */
@@ -192,14 +233,14 @@ export function searchChecklists<L>(
 	const hits: ChecklistHit<L>[] = [];
 	for (const { list, schema, value } of lists)
 		for (const item of checklistItems(schema, value)) {
-			const score = matchScore(query, item.title);
-			if (score)
+			const match = matchTitle(query, item.title);
+			if (match)
 				hits.push({
 					list,
 					id: item.id,
 					title: item.title,
 					held: matrixHeld(memberValue(value, item.id)),
-					score
+					...match
 				});
 		}
 	return hits

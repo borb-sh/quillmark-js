@@ -2,7 +2,7 @@
 // across the document's checklists, and in what order.
 import { describe, it, expect } from 'vitest';
 import type { QuillFieldSchema } from '@quillmark/wasm';
-import { matchScore, matrixPrinted, searchChecklists } from '$lib/visual/checklists';
+import { matchScore, matchTitle, matrixPrinted, searchChecklists } from '$lib/visual/checklists';
 
 describe('matchScore', () => {
 	it('names a title by whole words, openings and abbreviations', () => {
@@ -13,9 +13,30 @@ describe('matchScore', () => {
 		expect(matchScore('cafe', 'Café')).toBeGreaterThan(0);
 	});
 
-	it('names a title by its initials run together', () => {
+	it('names a run of words by their openings run together', () => {
 		expect(matchScore('jqo', 'Joint Qualified Officer')).toBeGreaterThan(0);
 		expect(matchScore('jq', 'Joint Qualified Officer')).toBeGreaterThan(0);
+		expect(matchScore('jq officer', 'Joint Qualified Officer')).toBeGreaterThan(0);
+		expect(matchScore('fcc', 'Flight CC')).toBeGreaterThan(0);
+		expect(matchScore('sqcc', 'Sq/CC Candidate')).toBeGreaterThan(0);
+		expect(matchScore('flightcc', 'Flight CC')).toBeGreaterThan(0);
+		expect(matchScore('cyber200', 'Cyber 200')).toBeGreaterThan(0);
+	});
+
+	it('takes the stronger claims first, so a short word leaves the whole one its match', () => {
+		expect(matchScore('c cc', 'CC Candidate')).toBeGreaterThan(0);
+	});
+
+	it('reads any script', () => {
+		expect(matchScore('шта', 'Штаб')).toBeGreaterThan(0);
+		expect(matchScore('幕僚', '幕僚')).toBeGreaterThan(0);
+	});
+
+	it('is strong only where every word is claimed whole or as an opening', () => {
+		expect(matchTitle('flight c', 'Flight CC')?.strong).toBe(true);
+		expect(matchTitle('flt cc', 'Flight CC')?.strong).toBe(false);
+		expect(matchTitle('fcc', 'Flight CC')?.strong).toBe(false);
+		expect(matchTitle('wg', 'Wing IG')?.strong).toBe(false);
 	});
 
 	it('names nothing a word of the query cannot claim', () => {
@@ -32,6 +53,9 @@ describe('matchScore', () => {
 		expect(matchScore('op', 'Operations')).toBeGreaterThan(matchScore('ops', 'Operations'));
 		expect(matchScore('joint staff', 'Joint Staff')).toBeGreaterThan(
 			matchScore('staff joint', 'Joint Staff')
+		);
+		expect(matchScore('staff', 'Staff')).toBeGreaterThan(
+			matchScore('staff', 'Staff Officer Course')
 		);
 	});
 });

@@ -82,7 +82,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	// ── Matrix control ────────────────────────────────────────────────────────
 	/** The count in the matrix's label row: how many of its items are held. */
 	matrixHeld: (held: number, total: number) => string;
-	/** An open matrix's add box at rest, naming the list it adds to: `+ Add to Staff…`. */
+	/** An open matrix's add box at rest, naming the list it adds to: `+ Add to Staff…`;
+	 *  `list` is empty for a matrix mounted with no label. */
 	matrixAdd: (list: string) => string;
 	/** The add box's last option, which adds what was typed as an item of this list. */
 	matrixAddNew: (title: string) => string;
@@ -90,8 +91,9 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	matrixIn: (list: string) => string;
 	/** Beside a result already held: picking it lands on it and ticks nothing. */
 	matrixHeldTag: string;
-	/** An added item's title input, named for the list it stands in. */
-	matrixItemTitle: (list: string) => string;
+	/** An added item's title input, named for the list it stands in and its 1-based
+	 *  place among the added items; also what an untitled item is called. */
+	matrixItemTitle: (list: string, index: number) => string;
 	/** An added item's remove control, named for the item. */
 	matrixRemove: (title: string) => string;
 
@@ -207,11 +209,11 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	elementUntitled: (label, index) => `${label} ${index}`,
 	enumUnsetTag: 'default',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
-	matrixAdd: (list) => `+ Add to ${list}…`,
+	matrixAdd: (list) => (list ? `+ Add to ${list}…` : '+ Add…'),
 	matrixAddNew: (title) => `Add “${title}”`,
 	matrixIn: (list) => `in ${list}`,
 	matrixHeldTag: 'held',
-	matrixItemTitle: (list) => `${list} item`,
+	matrixItemTitle: (list, index) => `${list ? `${list} item` : 'Item'} ${index}`,
 	matrixRemove: (title) => `Remove ${title}`,
 	dateToday: 'Today',
 	fieldRequired: 'required',

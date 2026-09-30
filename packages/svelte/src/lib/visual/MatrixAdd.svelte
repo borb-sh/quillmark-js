@@ -2,9 +2,12 @@
  An open matrix's add box (VISUAL_EDITOR §"The matrix"): a combobox whose options are
  what the typed words name across the document's checklists, best first, and last the
  item they would add to this one. The list stands in flow under the input rather than
- floating, so a closing group panel clips nothing of it. The input keeps the caret
- throughout and the active option is `aria-activedescendant`, the combobox pattern:
- ↑/↓ walk, Enter picks, Escape clears.
+ floating, so a closing group panel clips nothing of it, and it closes while the focus
+ is elsewhere. The input keeps the caret throughout and the active option is
+ `aria-activedescendant`, the combobox pattern: ↑/↓ walk, Enter picks, Escape clears.
+ Unwalked, the active option is the first result the words name outright, else the add
+ option: a result named only by abbreviation, which may stand in another card, is
+ taken by an arrow or a press and never by Enter alone.
 -->
 <script lang="ts">
 	import Icon from './icons/Icon.svelte';
@@ -23,10 +26,19 @@
 	let { id, placeholder, options, onChoose }: Props = $props();
 
 	let query = $state('');
-	let active = $state(0);
+	/** The walked option, `undefined` until an arrow or the pointer moves it. */
+	let walked = $state<number | undefined>();
+	let focused = $state(false);
 	let inputEl = $state<HTMLInputElement | undefined>();
 	const shown = $derived(query.trim() ? options(query.trim()) : []);
-	const open = $derived(shown.length > 0);
+	const open = $derived(focused && shown.length > 0);
+	const active = $derived.by(() => {
+		if (walked !== undefined) return Math.min(walked, shown.length - 1);
+		const strong = shown.findIndex((o) => o.strong);
+		if (strong >= 0) return strong;
+		const add = shown.findIndex((o) => o.add);
+		return add >= 0 ? add : 0;
+	});
 	const listId = $derived(`${id}-list`);
 	const optionId = (k: number): string => `${id}-opt-${k}`;
 
@@ -39,17 +51,18 @@
 		if (!option) return;
 		const typed = query.trim();
 		query = '';
-		active = 0;
+		walked = undefined;
 		onChoose(option, typed);
 	}
 
 	function onkeydown(e: KeyboardEvent): void {
+		if (e.isComposing) return;
 		if (e.key === 'ArrowDown' && open) {
 			e.preventDefault();
-			active = (active + 1) % shown.length;
+			walked = (active + 1) % shown.length;
 		} else if (e.key === 'ArrowUp' && open) {
 			e.preventDefault();
-			active = (active - 1 + shown.length) % shown.length;
+			walked = (active - 1 + shown.length) % shown.length;
 		} else if (e.key === 'Enter' && open) {
 			e.preventDefault();
 			choose(active);
@@ -57,7 +70,7 @@
 			e.preventDefault();
 			e.stopPropagation();
 			query = '';
-			active = 0;
+			walked = undefined;
 		}
 	}
 </script>
@@ -81,8 +94,10 @@
 			value={query}
 			oninput={(e) => {
 				query = e.currentTarget.value;
-				active = 0;
+				walked = undefined;
 			}}
+			onfocus={() => (focused = true)}
+			onblur={() => (focused = false)}
 			{onkeydown}
 		/>
 	</span>
@@ -107,7 +122,7 @@
 				aria-selected={k === active}
 				data-highlighted={k === active ? '' : undefined}
 				onpointerdown={(e) => e.preventDefault()}
-				onpointermove={() => (active = k)}
+				onpointermove={() => (walked = k)}
 				onclick={() => choose(k)}
 			>
 				<span class="qm-matrix-add-title">{option.title}</span>

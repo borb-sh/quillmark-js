@@ -40,6 +40,7 @@
 		declaredContent,
 		matrixColumns,
 		matrixDeclares,
+		matrixEmpty,
 		matrixHeld,
 		matrixMembers,
 		memberValue,
@@ -109,7 +110,10 @@
 		diagnostics
 	}: Props = $props();
 
+	// A card's own matrix searches the document's lists; one nested in a container is
+	// not indexed, and searches its own items alone.
 	const index = checklists();
+	const others = (): readonly Checklist[] => (listKey != null ? (index?.list() ?? []) : []);
 	const members = $derived(matrixMembers(schema.members));
 	const compact = $derived(!!schema.ui?.compact);
 	const hasColumns = $derived(Object.keys(schema.properties ?? {}).length > 0);
@@ -139,6 +143,9 @@
 
 	/** The columns an untick took, by member id, for a retick in this mount to restore. */
 	const stash = new Map<string, Record<string, unknown>>();
+	/** Commit the map; one holding nothing is the field's empty answer (`matrixEmpty`). */
+	const commit = (next: Record<string, unknown> | undefined): void =>
+		onCommit(next ?? matrixEmpty(schema));
 
 	// The item boxes, the ticks, the title inputs and the column subforms, keyed by
 	// member id — stable for the item's life. `$state` for the binding's sake
@@ -177,6 +184,7 @@
 	function unticked(id: string): Record<string, unknown> | undefined {
 		const columns = matrixColumns(memberValue(map, id));
 		if (Object.keys(columns).length) stash.set(id, columns);
+		else stash.delete(id);
 		return commitMember(map, id, undefined);
 	}
 
@@ -185,25 +193,25 @@
 	 *  new to write. The reassert after the flush is what the styled controls get from
 	 *  their synced local (`synced.svelte.ts`): the document is what the face reads. */
 	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
-		onCommit(on ? commitMember(map, id, ticked(id)) : unticked(id));
+		commit(on ? commitMember(map, id, ticked(id)) : unticked(id));
 		await flush();
 		if (el.isConnected) el.checked = held(id);
 	}
 	/** A column edit lands on a held item, an added one keeping its `title`. */
 	function commitColumns(id: string, columns: Record<string, unknown>): void {
 		const title = onRoster(schema, id) ? undefined : itemTitle(id);
-		onCommit(commitMember(map, id, memberWrite(columns, title)));
+		commit(commitMember(map, id, memberWrite(columns, title)));
 	}
 	function itemTitle(id: string): string {
 		const stored = memberValue(map, id) as Record<string, unknown> | undefined;
 		return String(stored?.[MATRIX_TITLE] ?? '');
 	}
 	function retitle(id: string, title: string): void {
-		onCommit(commitMember(map, id, memberWrite(matrixColumns(memberValue(map, id)), title)));
+		commit(commitMember(map, id, memberWrite(matrixColumns(memberValue(map, id)), title)));
 	}
 	async function removeItem(id: string): Promise<void> {
 		const at = added.findIndex((item) => item.id === id);
-		onCommit(commitMember(map, id, undefined));
+		commit(commitMember(map, id, undefined));
 		await flush();
 		// The caret goes where the row was: the next added item, else the add box.
 		const next = added[at] ?? added[at - 1];
@@ -213,14 +221,13 @@
 
 	// ── The add box ────────────────────────────────────────────────────────────
 	/** A result's list: this one, or another of the document's. */
-	type ListRef = Checklist | undefined;
-	let hits: ChecklistHit<ListRef>[] = [];
+	type Hit = ChecklistHit<Checklist | undefined>;
 	function options(query: string): AddOption[] {
-		const own: Searchable<ListRef> = { list: undefined, schema, value: map };
-		const others: Searchable<ListRef>[] = (index?.list() ?? [])
+		const own: Searchable<Checklist | undefined> = { list: undefined, schema, value: map };
+		const lists: Searchable<Checklist | undefined>[] = others()
 			.filter((l) => l.key !== listKey)
 			.map((l) => ({ list: l, schema: l.schema, value: l.value }));
-		hits = searchChecklists(query, [own, ...others]);
+		const hits = searchChecklists(query, [own, ...lists]);
 		const out: AddOption[] = hits.map((h, k) => ({
 			key: `hit-${k}`,
 			title: h.title,
@@ -230,7 +237,9 @@
 					h.held ? t.strings.matrixHeldTag : undefined
 				]
 					.filter(Boolean)
-					.join(' · ') || undefined
+					.join(' · ') || undefined,
+			strong: h.strong,
+			payload: h
 		}));
 		// Offered last, and not where an item of this list already carries the words.
 		const fold = (s: string) => s.trim().toLowerCase();
@@ -240,15 +249,14 @@
 	}
 	async function choose(option: AddOption, query: string): Promise<void> {
 		if (option.add) return add(query);
-		const hit = hits[Number(option.key.slice('hit-'.length))];
-		if (!hit) return;
+		const hit = option.payload as Hit;
 		const other = hit.list;
 		if (other) {
 			if (!hit.held) other.commit(commitMember(other.value, hit.id, memberWrite({})));
 			index?.land(`${other.path}.${hit.id}`);
 			return;
 		}
-		if (!hit.held) onCommit(commitMember(map, hit.id, ticked(hit.id)));
+		if (!hit.held) commit(commitMember(map, hit.id, ticked(hit.id)));
 		await flush();
 		focusPath([hit.id]);
 		const box = ref(memberEls, hit.id);
@@ -257,7 +265,7 @@
 	async function add(title: string): Promise<void> {
 		const taken = (id: string) => onRoster(schema, id) || (map != null && Object.hasOwn(map, id));
 		const id = addedId(title, taken);
-		onCommit(commitMember(map, id, memberWrite({}, title)));
+		commit(commitMember(map, id, memberWrite({}, title)));
 		await flush();
 		const box = ref(memberEls, id);
 		// The item's columns are what the author came to fill; a checklist has none, and
@@ -355,7 +363,8 @@
 				{@render columns(m.id, m.title, on)}
 			</div>
 		{/each}
-		{#each added as item (item.id)}
+		{#each added as item, k (item.id)}
+			{@const name = item.title || t.strings.matrixItemTitle(label ?? '', k + 1)}
 			<div class="qm-member held added" bind:this={memberEls[item.id]}>
 				<div class="qm-member-head">
 					<!-- Held by being present: the tick is fixed, and the remove is its untick. -->
@@ -367,21 +376,21 @@
 						class="qm-input qm-focus-ring qm-member-title-input"
 						type="text"
 						id={itemTitleId(item.id)}
-						aria-label={t.strings.matrixItemTitle(label ?? '')}
+						aria-label={t.strings.matrixItemTitle(label ?? '', k + 1)}
 						value={item.title}
 						bind:this={titleEls[item.id]}
 						oninput={(e) => retitle(item.id, e.currentTarget.value)}
 					/>
-					<span class="qm-member-title" id={titleId(item.id)} hidden>{item.title}</span>
+					<span class="qm-member-title" id={titleId(item.id)} hidden>{name}</span>
 					<button
 						type="button"
 						class="qm-icon-btn qm-focus-ring qm-member-remove"
-						title={t.strings.matrixRemove(item.title)}
-						aria-label={t.strings.matrixRemove(item.title)}
+						title={t.strings.matrixRemove(name)}
+						aria-label={t.strings.matrixRemove(name)}
 						onclick={() => removeItem(item.id)}><Icon name="x" /></button
 					>
 				</div>
-				{@render columns(item.id, item.title, true)}
+				{@render columns(item.id, name, true)}
 			</div>
 		{/each}
 	</div>

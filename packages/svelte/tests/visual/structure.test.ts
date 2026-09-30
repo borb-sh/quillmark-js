@@ -39,7 +39,8 @@ import {
 	resolveBodyGhost,
 	addedItems,
 	addedId,
-	matrixDeclares
+	matrixDeclares,
+	matrixEmpty
 } from '$lib/visual/structure';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quill } from '../helpers/fixtures.js';
@@ -776,6 +777,8 @@ describe('the matrix helpers', () => {
 	it('takes the columns off a member, an added title aside', () => {
 		expect(matrixColumns({ title: 'Wing IG', note: 'x' })).toEqual({ note: 'x' });
 		expect(matrixColumns({ note: 'x' })).toEqual({ note: 'x' });
+		// A stored `held` is the engine's refusal, and no column may be named it.
+		expect(matrixColumns({ held: true, note: 'x' })).toEqual({ note: 'x' });
 		expect(matrixColumns(true)).toEqual({});
 		expect(matrixColumns(undefined)).toEqual({});
 		expect(matrixColumns(['x'])).toEqual({});
@@ -786,6 +789,16 @@ describe('the matrix helpers', () => {
 		expect(memberWrite({ note: 'x' })).toEqual({ note: 'x' });
 		expect(memberWrite({}, 'Wing IG')).toEqual({ title: 'Wing IG' });
 		expect(memberWrite({ note: 'x' }, '')).toEqual({ title: '', note: 'x' });
+	});
+
+	it('commits nothing held as unset, or as `{}` where unset prints something else', () => {
+		expect(matrixEmpty(f({ type: 'matrix', members: { a: 'A' } }))).toBeUndefined();
+		expect(matrixEmpty(f({ type: 'matrix', members: { a: 'A' }, default: { a: true } }))).toEqual(
+			{}
+		);
+		expect(
+			matrixEmpty(f({ type: 'matrix?' as QuillFieldSchema['type'], members: { a: 'A' } }))
+		).toEqual({});
 	});
 
 	it("reads an open matrix's added items: id-spelled, titled, off the roster, in id order", () => {

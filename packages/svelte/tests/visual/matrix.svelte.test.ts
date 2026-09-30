@@ -44,12 +44,12 @@ const offered = (m: HTMLElement) =>
 	[...m.querySelectorAll<HTMLElement>('[role="option"]')].map((o) =>
 		[...o.children].map((c) => c.textContent).join(' | ')
 	);
-/** Type into the add box and pick its first option, as Enter does. */
-async function addVia(m: HTMLElement, words: string): Promise<void> {
+/** Focus the add box and type into it. */
+function typeAdd(m: HTMLElement, words: string): HTMLInputElement {
 	const box = addBox(m);
+	box.focus();
 	type(box, words);
-	press(box, 'Enter', { cancelable: true });
-	await settle();
+	return box;
 }
 
 describe('a matrix field', () => {
@@ -156,6 +156,10 @@ describe('a matrix field', () => {
 		expect(tick(m, 'Margins').checked).toBe(true);
 		// The stored `held` is the engine's refusal, drawn under the member it names.
 		expect(member(m, 'Margins').querySelector('.qm-diag-line')).not.toBeNull();
+
+		// The member's next edit writes it back without it.
+		pick(member(m, 'Margins'), 'major');
+		expect(stored(doc)).toEqual({ fonts: true, margins: { note: 'x', severity: 'major' } });
 	});
 
 	it('keys as a checkbox group: every tick a tab stop, and no arrow walk', () => {
@@ -230,7 +234,7 @@ describe('an open matrix', () => {
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 
-		type(addBox(m), 'Kerning pairs');
+		typeAdd(m, 'Kerning pairs');
 		expect(offered(m)).toEqual(['Add “Kerning pairs”']);
 		press(addBox(m), 'Enter', { cancelable: true });
 		await settle();
@@ -311,8 +315,8 @@ describe('an open matrix', () => {
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 
-		type(addBox(m), 'fnt');
-		expect(offered(m)).toEqual(['Fonts', 'Add “fnt”']);
+		typeAdd(m, 'fon');
+		expect(offered(m)).toEqual(['Fonts', 'Add “fon”']);
 		press(addBox(m), 'Enter', { cancelable: true });
 		await settle();
 		expect(stored(doc)).toEqual({ fonts: true });
@@ -320,7 +324,7 @@ describe('an open matrix', () => {
 
 		// A held member is found as held, picking it lands on it and ticks nothing, and
 		// words an item of this list already carries offer no add.
-		type(addBox(m), 'fonts');
+		typeAdd(m, 'fonts');
 		expect(offered(m)).toEqual(['Fonts | held']);
 		press(addBox(m), 'Enter', { cancelable: true });
 		await settle();
@@ -332,8 +336,7 @@ describe('an open matrix', () => {
 		const q = quill();
 		const mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
-		const box = addBox(m);
-		type(box, 'f');
+		const box = typeAdd(m, 'f');
 		expect(box.getAttribute('aria-expanded')).toBe('true');
 		const active = () => document.getElementById(box.getAttribute('aria-activedescendant') ?? '');
 		expect(active()?.textContent).toContain('Figures');
@@ -346,6 +349,64 @@ describe('an open matrix', () => {
 		press(box, 'Escape', { cancelable: true });
 		expect(box.value).toBe('');
 		expect(box.getAttribute('aria-expanded')).toBe('false');
+
+		// It closes while the focus is elsewhere, and keeps what was typed.
+		type(box, 'f');
+		expect(box.getAttribute('aria-expanded')).toBe('true');
+		box.blur();
+		flushSync();
+		expect(box.getAttribute('aria-expanded')).toBe('false');
+		expect(box.value).toBe('f');
+	});
+
+	it('takes the add option on Enter where the words name a result only loosely', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const mounted = mountEditor(q, doc);
+		const m = matrix(mounted.target);
+		const box = typeAdd(m, 'fnt');
+		expect(offered(m)).toEqual(['Fonts', 'Add “fnt”']);
+		// An Enter mid-composition picks nothing.
+		press(box, 'Enter', { cancelable: true, isComposing: true });
+		expect(stored(doc)).toBeUndefined();
+		press(box, 'Enter', { cancelable: true });
+		await settle();
+		expect(stored(doc)).toEqual({ fnt: { title: 'fnt' } });
+	});
+
+	it('mints an added id past a roster id its title folds to', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const mounted = mountEditor(q, doc);
+		const m = matrix(mounted.target);
+		const box = typeAdd(m, 'Fonts!');
+		// `Fonts` is named outright, so the add option is an arrow away.
+		press(box, 'ArrowUp', { cancelable: true });
+		press(box, 'Enter', { cancelable: true });
+		await settle();
+		expect(stored(doc)).toEqual({ fonts_2: { title: 'Fonts!' } });
+	});
+
+	it('hands the caret to the next added item when one is removed', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		doc.storeField('checks', {
+			a_one: { title: 'A' },
+			b_two: { title: 'B' },
+			c_three: { title: 'C' }
+		});
+		const mounted = mountEditor(q, doc);
+		const m = matrix(mounted.target);
+		const removes = [...m.querySelectorAll<HTMLButtonElement>('.qm-member-remove')];
+		expect(removes.map((b) => b.getAttribute('aria-label'))).toEqual([
+			'Remove A',
+			'Remove B',
+			'Remove C'
+		]);
+		removes[1].click();
+		await settle();
+		expect(stored(doc)).toEqual({ a_one: { title: 'A' }, c_three: { title: 'C' } });
+		expect((document.activeElement as HTMLInputElement).value).toBe('C');
 	});
 });
 
@@ -375,6 +436,16 @@ main:
         detail:
           type: string
           default: ""
+    wrap:
+      type: object
+      title: Wrap
+      properties:
+        inner:
+          type: matrix
+          title: Inner
+          open: true
+          members:
+            x: Flight X
     preset:
       type: matrix
       title: Preset
@@ -401,8 +472,10 @@ describe('the add box across the document', () => {
 		const mounted = mountEditor(q, doc);
 		const staff = field(mounted.target, 'Staff');
 
-		type(addBox(staff), 'flt cc');
+		typeAdd(staff, 'flt cc');
 		expect(offered(staff)).toEqual(['Flight CC | in Leadership', 'Add “flt cc”']);
+		// Met only by abbreviation, so it is an arrow away from the add option Enter takes.
+		press(addBox(staff), 'ArrowDown', { cancelable: true });
 		press(addBox(staff), 'Enter', { cancelable: true });
 		await settle();
 		expect(doc.getStored('leadership')).toEqual({ flight_cc: true });
@@ -418,12 +491,22 @@ describe('the add box across the document', () => {
 		const mounted = mountEditor(q, doc);
 		const staff = field(mounted.target, 'Staff');
 
-		type(addBox(staff), 'range');
+		typeAdd(staff, 'range');
 		const [first] = offered(staff);
 		expect(first.startsWith('Range Safety | in Quals · ')).toBe(true);
 		press(addBox(staff), 'Enter', { cancelable: true });
 		await settle();
 		expect(doc.getStored({ card: 0, field: 'quals' })).toEqual({ range_safety: true });
+	});
+});
+
+describe('a matrix nested in a container', () => {
+	it('searches its own items alone', () => {
+		const q = quillFromYaml(LISTS);
+		const mounted = mountEditor(q, q.seedDocument());
+		const inner = mounted.target.querySelector<HTMLElement>('.qm-object .qm-matrix')!;
+		typeAdd(inner, 'flight');
+		expect(offered(inner)).toEqual(['Flight X', 'Add “flight”']);
 	});
 });
 
@@ -441,5 +524,13 @@ describe('a matrix declaring a default', () => {
 		flushSync();
 		expect(doc.getStored('preset')).toEqual({ a: true, b: true });
 		expect(preset.querySelector('.qm-matrix-roster')?.hasAttribute('data-default')).toBe(false);
+
+		// Nothing held is an answer that outranks the default, not a return to it.
+		tick(preset, 'Alpha').click();
+		flushSync();
+		tick(preset, 'Beta').click();
+		flushSync();
+		expect(doc.getStored('preset')).toEqual({});
+		expect(tick(preset, 'Alpha').checked).toBe(false);
 	});
 });

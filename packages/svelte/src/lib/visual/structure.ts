@@ -354,13 +354,24 @@ function tickOf(v: unknown): boolean {
 	return true;
 }
 
-/** A member's columns: its mapping without the added item's `title`, `{}` for a bare
- *  tick or an absent member. What the columns subform takes as its value. */
+/** The keys no column may take (`quill::matrix_reserved_column`): an added item's
+ *  label, and the `held` a member never stores. */
+const MATRIX_RESERVED = [MATRIX_TITLE, 'held'];
+
+/** A member's columns: its mapping without the reserved keys, `{}` for a bare tick or an
+ *  absent member. What the columns subform takes as its value, so an edit writes back
+ *  no `held` a document stored (`validation::held_stored`). */
 export function matrixColumns(stored: unknown): Record<string, unknown> {
 	if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {};
 	const rest = { ...(stored as Record<string, unknown>) };
-	delete rest[MATRIX_TITLE];
+	for (const key of MATRIX_RESERVED) delete rest[key];
 	return rest;
+}
+
+/** What a matrix holding nothing commits: the unset field where unset prints nothing
+ *  held, and the authored `{}` where it would print a `default:` or `none` instead. */
+export function matrixEmpty(matrix: QuillFieldSchema): Record<string, unknown> | undefined {
+	return matrix.default !== undefined || optionalCell(matrix) ? {} : undefined;
 }
 
 /**
