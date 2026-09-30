@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The `@quillmark/wasm` peer floor is `>=0.119.0-0`.**
+**The `@quillmark/wasm` peer floor is `>=0.120.0-0`.** A `ui.layout: table` column that is not a leaf fails a packed quill's load as `quill::table_column_not_leaf`, where it was `quill::table_column_not_flat`.
 
 ## v0.32.0 - 2026-09-30
 

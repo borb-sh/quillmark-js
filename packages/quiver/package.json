@@ -42,7 +42,7 @@
 		"NOTICE"
 	],
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.119.0-0"
+		"@quillmark/wasm": ">=0.120.0-0"
 	},
 	"dependencies": {
 		"fflate": "^0.8.2",

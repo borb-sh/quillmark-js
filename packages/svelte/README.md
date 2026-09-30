@@ -46,6 +46,8 @@ const session = await new Engine().open(quill, doc);
 // free() on teardown the handles you MINTED: this quill, this doc, this session.
 ```
 
+`<VisualEditor>` needs no session, and the first `open` loads the render build, so a host that mounts the editor over `doc` and `quill` first shows it without waiting on that load. The session opens behind it: `await engine.load(quill)`, then `engine.open(quill, doc)`, so its first compile reads what was typed meanwhile ([HOSTING.md](prose/canon/HOSTING.md)).
+
 ## The quill resolves from the document
 
 A stored document carries none of its quill's bytes, only a reference: `doc.quillRef` is `name@version`, persisted in the markdown itself. Resolution is **host code**: read the ref, map it to a `Quill`, open. No surface resolves, so one resolution per document holds by construction.
@@ -58,7 +60,7 @@ const session = await new Engine().open(quill, doc);
 
 `@quillmark/quiver` is one such registry, and the quill it hands back is **borrowed**: it is cached per ref and shared with every caller, so freeing it strands the next one.
 
-Opening a document that names a **different** quill is the same sequence, in order: resolve the new ref, `engine.open(quill, next)`, swap the props, then free the replaced handles that were yours to free. `<VisualEditor>` re-keys itself on the new `doc` (see below); `<Preview>` swaps by remount (`{#key session}`).
+Opening a document that names a **different** quill is the same sequence, in order: resolve the new ref, swap the editor's props, free the replaced handles that were yours to free, then open the next session behind the editor. `<VisualEditor>` re-keys itself on the new `doc` (see below); `<Preview>` swaps by remount (`{#key session}`).
 
 ## What a document is trusted to be
 

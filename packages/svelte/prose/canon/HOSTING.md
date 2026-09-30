@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-What an app is left holding once it mounts `<VisualEditor>` and `<Preview>`: the handles, the text edge, the recompile schedule, and the teardown. The surfaces mount over live `@quillmark/wasm` handles and mutate them in place, so none of it is the package's and none of it is visible from a prop.
+What an app is left holding once it mounts `<VisualEditor>` and `<Preview>`: the handles, the text edge, the order an open lands in, the recompile schedule, and the teardown. The surfaces mount over live `@quillmark/wasm` handles and mutate them in place, so none of it is the package's and none of it is visible from a prop.
 
 ## The text edge
 
@@ -18,7 +18,11 @@ What an app is left holding once it mounts `<VisualEditor>` and `<Preview>`: the
 
 **Guard the reopen with `doc.equals`, or the round trip eats the caret.** A host whose autosave writes `toMarkdown()` and whose store echoes the saved text back has a loop: the echo is a new markdown string, parsing it makes a new `Document`, and remounting on it drops the caret mid-keystroke. `equals` is structural, and its own doc at the boundary names this use. A host with no echo still wants it: two writes that settle to the same document should not remount.
 
-**A reopen is async and can race.** Resolving the quill and opening a session both await, so two reopens in flight can land out of order, and the loser must free what it opened rather than install it. A token bumped per attempt and re-read after each await is the whole of it.
+## Opening
+
+**The editor lands before the session.** `<VisualEditor>` binds `doc` and `quill` alone; the preview needs a `LiveSession`, and the first `engine.open` loads the render build, tens of megabytes fetched, compiled and instantiated on the main thread. So the host mounts the editor once the quill resolves and opens the session behind it, and the preview waits on its own. `engine.open` reads the document before it loads, so a session opened from the start compiles the document as it stood then, and an edit made during the load is missing from it. `await engine.load(quill)` first, then `open` over the document as it stands: one compile, and it is current. An edit that arrives while that attempt is in flight starts no second one, since the attempt reads the document only once the load lands. A session that fails to open is tried again by the next edit, a refusal being a state of the document rather than the end of the open.
+
+**A reopen is async and can race.** Resolving the quill, loading the backend and opening a session each await, so two reopens in flight can land out of order, and the loser must free what it opened rather than install it. A token bumped whenever the handles are released and re-read after each await is the whole of it, and the session attempt reads it as the reopen does: the editor's handles are installed before that attempt starts, so a session landing after its document was replaced frees itself rather than installing over the next one.
 
 ## Handles
 
