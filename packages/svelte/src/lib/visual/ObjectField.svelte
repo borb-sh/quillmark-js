@@ -5,8 +5,8 @@
  ProseValue}) over the boundary's nested read, and a container property — an `array`,
  an `object`, a `matrix`, a variant — mounts its own control here, at the next rung of
  the same figure. Depth is bounded by what is open, not by the schema: a repeater inside
- a subform is collapsed rows again, one open at a time, so an open row under an open
- row is one figure two rungs in.
+ a subform is collapsed rows again, so an open row under an open row is one figure two
+ rungs in.
 
  The nesting is a vertical at `--_qm-border`, the ladder's last stroke: the card's edge,
  an open section's vertical one `--_qm-nest` in where the field is in one, this one a rung
@@ -375,9 +375,8 @@
 				{:else if kind === 'array'}
 					<!-- The repeater owns its label row, the add chip sharing it (`Field` skips
 					     its own label for one too), so the names are handed down rather than
-					     drawn here. Its rows are collapsed rows again, one open at a time: the
-					     depth an open row under an open row costs is two rungs of the ladder
-					     and one figure. -->
+					     drawn here. Its rows are collapsed rows again: the depth an open row
+					     under an open row costs is two rungs of the ladder and one figure. -->
 					<ArrayField
 						bind:this={nestedEls[key]}
 						value={obj[key] as unknown[] | undefined}

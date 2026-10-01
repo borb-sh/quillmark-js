@@ -335,7 +335,7 @@ main:
       default: []
       ui:
         group: meta
-      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform, one at a time. A row's cells are read through the plate's loop binding, which carries no address, so only the content cell regions — `main.revisions[0].detail` is the fixture's one-rung nested-row address, and the scalar cells beside it reach the preview through the array's own region."
+      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform. A row's cells are read through the plate's loop binding, which carries no address, so only the content cell regions — `main.revisions[0].detail` is the fixture's one-rung nested-row address, and the scalar cells beside it reach the preview through the array's own region."
 
     checks:
       type: matrix

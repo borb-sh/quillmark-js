@@ -12,12 +12,12 @@
  neither a screen reader nor a touch user, and the count is the carrier.
 
  An `object` element collapses: the row is its own summary — a box, titled by the
- row's first short text cell ({@link rowSummary}) — and opens onto {@link ObjectField},
- one at a time. Stacking the subforms instead would nest a field one level past the
- depth the subform's own vertical draws, once per row.
- Opening is therefore part of a landing rather than something the user does first:
+ row's first short text cell ({@link rowSummary}) — and opens onto {@link ObjectField}.
+ Each row opens and closes on its own: a press on a summary toggles that row, and
+ opening one leaves every other where it stands, so a landing never folds the row the
+ author was in. Opening is part of a landing rather than something the user does first:
  `focusPath` opens the row it is aimed at before it focuses, and hands the rest of the
- walk to the subform it opened, which is how a row two closed boxes down is reached.
+ walk to that row's subform, which is how a row two closed boxes down is reached.
 
  The table (`layout: 'table'`, VISUAL_EDITOR §"Structure mirrors the schema") is the
  same row machine in another presentation: the same ids, the same splices, the same
@@ -54,6 +54,7 @@
  Removing the last row commits `[]`, the empty answer.
 -->
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import { wording } from './strings.js';
 
 	// The surface's words, ambient from the editor root; the package's English
@@ -76,7 +77,6 @@
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
-	import { holdInView } from './hold.js';
 	import { reorder, reorderArm } from './motion.js';
 	import Icon from './icons/Icon.svelte';
 	import TextField from './TextField.svelte';
@@ -214,7 +214,7 @@
 	const rowEls: Record<string, HTMLElement | undefined> = $state({});
 	// A table row's cells, on the same key: the subform a landing and the column-keeping
 	// Enter hop reach into. Every table row is open, so there is one per row where the
-	// list holds one for the open row alone.
+	// list holds one per open row.
 	type Subform = {
 		focus: () => void;
 		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
@@ -226,14 +226,14 @@
 		delete els[id];
 		delete rowEls[id];
 		delete cellEls[id];
+		delete objEls[id];
+		open.delete(id);
 	}
 
-	// ── Object elements: one open at a time ──────────────────────────────────────
-	// So an array of ten records is ten lines and one figure, whatever its length.
-	let openId = $state<string | undefined>(undefined);
-	// The open row's subform, for the landing below. One entry, never a map: only one
-	// row is open, so the ref is singular by the same rule the state is.
-	let openObjEl = $state<Subform | undefined>();
+	// ── Object elements: each row open on its own ────────────────────────────────
+	const open = new SvelteSet<string>();
+	// An open row's subform, on the row's id: the landing below walks into it.
+	const objEls: Record<string, Subform | undefined> = $state({});
 
 	/** A collapsed row's own words, or `undefined` while it has none. */
 	function elementTitle(k: number): string | undefined {
@@ -244,12 +244,9 @@
 	function untitled(k: number): string {
 		return label != null ? t.strings.elementUntitled(label, k + 1) : String(k + 1);
 	}
-	/** The summary is the anchor: a row closing above it is what would carry it off the fold,
-	 *  and a row's subform hangs under its own summary (`hold.ts`). */
-	function toggleRow(id: string, summary: HTMLElement): void {
-		holdInView(summary, () => {
-			openId = openId === id ? undefined : id;
-		});
+	function toggleRow(id: string): void {
+		if (open.has(id)) open.delete(id);
+		else open.add(id);
 	}
 	const rowName = (k: number): string | undefined =>
 		label != null ? `${label} ${k + 1}` : undefined;
@@ -300,7 +297,7 @@
 		onCommit(next);
 		// A row added is a row to fill in, so an object element arrives open: landing on
 		// a collapsed empty summary would make adding one a two-press gesture.
-		if (control === 'object' && !table) openId = id;
+		if (control === 'object' && !table) open.add(id);
 		void focusAfterFlush(id, column);
 	}
 	function add(): void {
@@ -319,9 +316,6 @@
 		const next = ids.filter((_, i) => i !== k);
 		ids = next;
 		drop(dropped);
-		// The open row can be the one removed; `openId` is cleared with it rather than
-		// left naming an element that has gone.
-		if (openId === dropped) openId = undefined;
 		onCommit(arr.filter((_, i) => i !== k));
 		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove);
 	}
@@ -370,7 +364,8 @@
 	/** An object row's landing: inside the subform when that row is the open one, on
 	 *  the row's own summary otherwise — a collapsed row's control is its summary. */
 	function focusObjectRow(id: string): void {
-		if (id === openId && openObjEl) return openObjEl.focus();
+		const sub = objEls[id];
+		if (open.has(id) && sub) return sub.focus();
 		rowEls[id]?.querySelector<HTMLElement>('.qm-element-summary')?.focus();
 	}
 	/** The box an arrival wash blooms in (`leaves.ts`, `core/bloom.ts`): the elements,
@@ -413,10 +408,11 @@
 			return rowEls[id];
 		}
 		if (control === 'object') {
-			openId = id;
+			open.add(id);
 			return (async () => {
 				if (!(await span.resumes(tick()))) return undefined;
-				if (rest.length && openObjEl) return (await openObjEl.focusPath(rest, pos)) ?? rowEls[id];
+				const sub = objEls[id];
+				if (rest.length && sub) return (await sub.focusPath(rest, pos)) ?? rowEls[id];
 				focusObjectRow(id);
 				return rowEls[id];
 			})();
@@ -636,7 +632,7 @@
 				     interaction of the row's own: the row is no tab stop. -->
 				<div
 					class="qm-array-row qm-element"
-					class:open={openId === id}
+					class:open={open.has(id)}
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
 					onkeydown={(e) => onRowKey(e, k)}
@@ -649,8 +645,8 @@
 						<button
 							type="button"
 							class="qm-control-box qm-focus-ring qm-element-summary"
-							aria-expanded={openId === id}
-							onclick={(e) => toggleRow(id, e.currentTarget)}
+							aria-expanded={open.has(id)}
+							onclick={() => toggleRow(id)}
 						>
 							<!-- Leading, and it rotates: trailing is the figure for pushing a new
 							     screen, where this unfolds in place. Same glyph, same rotation and
@@ -666,9 +662,9 @@
 							{@render rowActions(k)}
 						</div>
 					</div>
-					{#if openId === id}
+					{#if open.has(id)}
 						<ObjectField
-							bind:this={openObjEl}
+							bind:this={objEls[id]}
 							value={(arr[k] ?? {}) as Record<string, unknown>}
 							properties={items?.properties}
 							label={rowName(k)}

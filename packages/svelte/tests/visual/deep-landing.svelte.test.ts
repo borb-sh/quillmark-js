@@ -50,6 +50,22 @@ describe('a landing at depth', () => {
 		expect(mounted.errors).toHaveLength(0);
 	});
 
+	it('opens the row it lands in and leaves the open row it left', async () => {
+		const q = quill();
+		const mounted = mountEditor(q, example());
+		openGroup(mounted.target, 'Content');
+		const outer = field(mounted.target, 'Appendices');
+
+		await mounted.editor.setCaret({ field: 'main.appendices[0].title', pos: 0 });
+		await settle();
+		await mounted.editor.setCaret({ field: 'main.appendices[1].title', pos: 0 });
+		await settle();
+
+		const rows = [...outer.querySelector('.qm-array-rows')!.children] as HTMLElement[];
+		expect(rows.map((r) => r.classList.contains('open'))).toEqual([true, true]);
+		expect(rows[1].contains(document.activeElement)).toBe(true);
+	});
+
 	it('lands on a row it has to open, revealing the group first', async () => {
 		const q = quill();
 		const mounted = mountEditor(q, example());

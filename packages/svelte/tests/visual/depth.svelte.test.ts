@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The mirror reaching the schema's depth (VISUAL_EDITOR §"Structure mirrors the
 // schema"). A nested `array` or `object` property mounts its own control at the next
-// rung, and the figure it draws is the same one at every depth: collapsed rows, one open at a time, a subform under each.
+// rung, and the figure it draws is the same one at every depth: collapsed rows, a subform under each.
 // Driven off the reference quill's `appendices` — an `array<object<array<object>>>` —
 // and off the variant cell `distribution.embargoed.notices`, read back through the
 // document rather than off a captured callback.
