@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**An array's object rows open independently.** A press on a row's summary opens or closes that row alone, an added row opens beside the rows already open, and a landing opens the row it names and leaves the rest as they stand. A preview click into one entry of a record list folded the entry the author was in, the list having held one row open at a time.
+
 ## v0.17.0 - 2026-09-30
 
 **The `@quillmark/wasm` peer floor is `>=0.121.0-0`, and a matrix member is held by being present.** A tick writes the member, its columns or the bare `true`, and an untick removes it, where both wrote `held`; a retick in the same mount restores the columns the untick took. A mapping naming no `held` draws ticked. A member's own address is its tick, so a landing on `<field>.<member>` focuses it and a preview click on a row a plate claims there lands on it. An edit to a member that stores `held` writes it back without it. An unset matrix whose `default:` holds members draws that set at the default rung, and the first gesture writes it; unticking the last member of a matrix with a `default:`, or of a `matrix?`, writes `{}`, nothing held.

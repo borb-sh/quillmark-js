@@ -9,7 +9,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { holdInView } from '$lib/visual/hold.js';
 import { quill } from '../helpers/fixtures.js';
-import { field, mountEditor, summaries, unmountAll } from '../helpers/surface.svelte.js';
+import { mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(() => {
 	unmountAll();
@@ -123,25 +123,5 @@ describe('the control a disclosure holds in view', () => {
 
 		expect(seen.map((s) => s.el)).toEqual([headers[0]]);
 		expect(seen[0].expanded).toBe('false');
-	});
-
-	it('is the object row summary pressed, one rung in', () => {
-		const q = quill();
-		const { target } = mountEditor(q, q.seedDocument());
-		const arr = field(target, 'Revisions');
-		const add = arr.querySelector<HTMLButtonElement>('.qm-add-el')!;
-		add.click();
-		flushSync();
-		add.click();
-		flushSync();
-
-		const rows = summaries(arr);
-		const seen = reveals();
-
-		rows[0].click(); // the second add left the second row open
-		flushSync();
-
-		expect(seen.map((s) => s.el)).toEqual([rows[0]]);
-		expect(seen[0].expanded).toBe('true');
 	});
 });

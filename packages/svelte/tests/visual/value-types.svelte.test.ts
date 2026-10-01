@@ -164,7 +164,7 @@ describe('an array of objects', () => {
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut', pages: 3 }]);
 	});
 
-	it('titles a collapsed row by its first string cell, and opens one at a time', () => {
+	it('titles a collapsed row by its first string cell, and opens each row on its own', () => {
 		const q = quill();
 		const doc = emptied(q);
 		const { target } = mountEditor(q, doc);
@@ -178,12 +178,14 @@ describe('an array of objects', () => {
 			'Fig. 2 relabelled'
 		);
 
-		// The second add closes the first: one figure on screen per array, however many
-		// records it holds.
+		// The second add opens its own row and leaves the first where it stands.
 		add.click();
 		flushSync();
 		const rows = summaries(arr);
-		expect(rows.map((s) => s.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
+		expect(rows.map((s) => s.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+		rows[0].click();
+		flushSync();
+		expect(summaries(arr).map((s) => s.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
 
 		// A titled row reads as its own value; an untitled one falls back to the name its
 		// accessible label already spends.
@@ -210,8 +212,10 @@ describe('an array of objects', () => {
 		flushSync();
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'Kept' }, {}]);
 
-		// Removing the open row must not leave `openId` naming a row that has gone: the
-		// row sliding into its place would otherwise be un-openable by its own press.
+		// Removing an open row takes its open state with it: the closed row sliding into
+		// its place stays closed and opens on its own press.
+		summaries(arr)[0].click();
+		flushSync();
 		arr.querySelectorAll<HTMLButtonElement>('.qm-remove')[1].click();
 		flushSync();
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'Kept' }]);
