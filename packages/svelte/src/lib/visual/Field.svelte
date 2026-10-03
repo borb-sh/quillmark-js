@@ -235,12 +235,10 @@
 	 * an address to name. `el` is the field-wide box, which a landing at depth does not
 	 * wash: that lane hands back its own row (`leaves.ts`).
 	 */
-	let controlEl = $state<HTMLElement | undefined>();
-	$effect(() => {
-		if (field.control === 'prose' || !controlEl || !leaves) return;
+	function register(wrapper: HTMLElement): (() => void) | undefined {
+		if (field.control === 'prose' || !leaves) return;
 		const key = leafKey;
 		const registry = leaves;
-		const wrapper = controlEl;
 		registry.registerControl(key, {
 			focus: focusControl,
 			focusPath: isContainer(field.control) ? focusPath : undefined,
@@ -249,7 +247,7 @@
 			}
 		});
 		return () => registry.unregisterControl(key);
-	});
+	}
 
 	/**
 	 * A form control has no controller to report its focus through, so the wrapper
@@ -279,7 +277,7 @@
 	 rule below holds why). One markup for both spans; a field owning its row nests a
 	 level and measures the same. -->
 	<div class="qm-field-stack">
-		<div class="qm-field-control" bind:this={controlEl} onfocusin={reportFocus}>
+		<div class="qm-field-control" {@attach register} onfocusin={reportFocus}>
 			{#if field.control === 'prose'}
 				<ProseField
 					{quill}
