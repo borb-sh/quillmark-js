@@ -124,7 +124,18 @@ export default defineConfig({
 	// for the same reason: the base is a runtime fact, so a built studio serves from
 	// wherever it is put (STUDIO §"A client, and what serves it").
 	base: './',
-	plugins: [svelte(), quiverSource(), carriedFile()],
+	plugins: [
+		// Runes mode for every component outside `node_modules`, so legacy syntax fails to
+		// compile rather than switching its file's mode. `svelte-check` reads it from here.
+		svelte({
+			compilerOptions: {
+				runes: ({ filename }) =>
+					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
+			}
+		}),
+		quiverSource(),
+		carriedFile()
+	],
 	// The client is the whole of what lands in `dist/client` and it carries no quiver,
 	// so a public directory left behind by a dev run cannot ride into it. `emptyOutDir`
 	// is explicit because the target sits outside the root, and it clears the client's
