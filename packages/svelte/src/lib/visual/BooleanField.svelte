@@ -13,7 +13,6 @@
 -->
 <script lang="ts">
 	import { Switch } from 'bits-ui';
-	import { syncedLocal } from './synced.svelte.js';
 	import './controls.css';
 
 	interface Props {
@@ -36,18 +35,16 @@
 	}
 	let { value, fallback, optional = false, label, id, describedBy, onCommit }: Props = $props();
 
-	// Local toggle state synced to `value`; own-toggles stay local, only an external
-	// change reconciles back in (see `syncedLocal`). The primitive is driven
-	// controlled (`checked` + `onCheckedChange`, never `bind:`) so reconciliation
-	// stays the package's: a two-way bind hands the primitive a lane around it,
-	// which repeats the reconciliation hazard in miniature. `undefined` is the unset
-	// optional cell, the one state with no default to stand in for it.
-	const local = syncedLocal<boolean | undefined>(
-		() => value ?? fallback ?? (optional ? undefined : false)
-	);
-	const unset = $derived(local.value === undefined);
+	// Local toggle state derived from `value`: a toggle assigns it, and only an external
+	// change re-derives it. The primitive is driven controlled (`checked` +
+	// `onCheckedChange`, never `bind:`) so reconciliation stays the package's: a two-way
+	// bind hands the primitive a lane around it, which repeats the reconciliation hazard
+	// in miniature. `undefined` is the unset optional cell, the one state with no
+	// default to stand in for it.
+	let local = $derived<boolean | undefined>(value ?? fallback ?? (optional ? undefined : false));
+	const unset = $derived(local === undefined);
 	const tristate = $derived(
-		optional ? { role: 'checkbox', 'aria-checked': unset ? ('mixed' as const) : !!local.value } : {}
+		optional ? { role: 'checkbox', 'aria-checked': unset ? ('mixed' as const) : !!local } : {}
 	);
 </script>
 
@@ -57,13 +54,13 @@
 <span class="qm-toggle-wrap" data-unset={unset ? '' : undefined}>
 	<Switch.Root
 		class="qm-toggle qm-focus-ring qm-tap-floor"
-		checked={!!local.value}
+		checked={!!local}
 		{id}
 		aria-label={id ? undefined : label}
 		aria-describedby={describedBy}
 		onCheckedChange={(v) => {
 			// From unset the primitive reads the unchecked face, so its toggle is `true`.
-			local.value = v;
+			local = v;
 			onCommit(v);
 		}}
 	>

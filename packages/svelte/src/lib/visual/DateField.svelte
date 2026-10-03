@@ -25,9 +25,9 @@
  values are data, not input: `parseDate` throws on anything malformed, so a bad
  string degrades to an empty field rather than taking the editor down with it.
 
- `syncedLocal` reconciles by identity, so the local must hold the string, not the
- parsed value: a fresh `CalendarDate` is never `===` the last one, which would
- make every reconcile fire and re-render all seven segments on each commit.
+ A derived compares by identity, so the local must hold the string, not the parsed
+ value: a fresh `CalendarDate` is never `===` the last one, which would make every
+ re-derive re-render all seven segments on each commit.
 
  The ghost is the default's digits, not a format hint. An unset field
  carrying a `default:` prints the default's digits in the segments at the default
@@ -51,7 +51,6 @@
 	import { getLocalTimeZone, parseDate, today, type DateValue } from '@internationalized/date';
 	import Icon from './icons/Icon.svelte';
 	import { wording } from './strings.js';
-	import { syncedLocal } from './synced.svelte.js';
 	import './controls.css';
 
 	const t = wording();
@@ -109,31 +108,31 @@
 
 	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
 	/** The default is the primitive's value: from entering an unset field until an
-	 *  edit, a cleared segment or leaving. Part of the projection, so a reconcile
+	 *  edit, a cleared segment or leaving. Part of the derivation, so a re-derive
 	 *  neither drops a seat nor restores one over the segments a clear left. */
 	let seat = $state(false);
-	// Local value synced to `value` as a string (see the identity note above);
-	// own-edits stay local, only an external change reconciles back in. Driven
+	// Local value derived from `value` as a string (see the identity note above): an
+	// edit assigns it, and only a change to `value` or the seat re-derives it. Driven
 	// controlled (`value` + `onValueChange`, never `bind:`) so reconciliation stays
 	// the package's.
-	const local = syncedLocal(
-		() => value?.slice(0, 10) ?? (seat && fallbackDate ? fallbackDate.toString() : '')
+	let local = $derived(
+		value?.slice(0, 10) ?? (seat && fallbackDate ? fallbackDate.toString() : '')
 	);
-	const parsed = $derived(toDateValue(local.value));
+	const parsed = $derived(toDateValue(local));
 	// The date the empty segments ghost, or undefined when there is nothing to ghost:
 	// the field is unset and the default has a date form. A non-blank local that
 	// fails to parse is AUTHORED-but-malformed, which the empty field states
 	// honestly: the ghost would claim it unset. Held as the parsed value rather than
 	// a boolean so the substitution below narrows on the one fact it needs.
-	const ghost = $derived(local.value === '' ? fallbackDate : undefined);
-	const seated = $derived(value == null && seat && local.value !== '');
+	const ghost = $derived(local === '' ? fallbackDate : undefined);
+	const seated = $derived(value == null && seat && local !== '');
 	/** Who put `today` here, while the field follows the render date. */
 	const follows = $derived(
-		local.value === TODAY ? 'authored' : value == null && fallback === TODAY ? 'default' : undefined
+		local === TODAY ? 'authored' : value == null && fallback === TODAY ? 'default' : undefined
 	);
 
 	function write(next: string): void {
-		local.value = next;
+		local = next;
 		seat = false;
 		onCommit(next);
 	}
@@ -207,7 +206,7 @@
 			// seated default or `today` would write it.
 			const next = d?.toString() ?? '';
 			if (next === (parsed?.toString() ?? '')) return;
-			local.value = next;
+			local = next;
 			if (!d) seat = false;
 			onCommit(d?.toString());
 		}}
