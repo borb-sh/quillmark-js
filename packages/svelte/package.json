@@ -67,7 +67,7 @@
 	},
 	"peerDependencies": {
 		"@quillmark/wasm": ">=0.121.0-0",
-		"svelte": "^5.0.0"
+		"svelte": "^5.33.0"
 	},
 	"dependencies": {
 		"@internationalized/date": "^3.12.2",
