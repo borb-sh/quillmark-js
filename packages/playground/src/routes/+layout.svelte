@@ -13,8 +13,9 @@
 	import './chrome.css';
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
+	import type { LayoutProps } from './$types';
 
-	let { children } = $props();
+	let { children }: LayoutProps = $props();
 
 	const ROUTES = [
 		{ path: '/', label: 'Overview' },
