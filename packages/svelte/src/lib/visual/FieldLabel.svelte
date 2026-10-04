@@ -65,8 +65,7 @@
 	     label is not a tab stop, and the control it hands focus to is already the
 	     keyboard's own way in. -->
 	<label
-		class="qm-field-label"
-		class:targeted={controlId != null || onActivate != null}
+		class={['qm-field-label', { targeted: controlId != null || onActivate != null }]}
 		{id}
 		for={controlId}
 		onclick={onActivate}

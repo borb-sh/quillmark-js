@@ -260,7 +260,7 @@
 	const reportFocus = $derived(field.control === 'prose' ? undefined : () => onFocus?.(addr));
 </script>
 
-<div class="qm-field" class:cell={span === 'cell'}>
+<div class={['qm-field', { cell: span === 'cell' }]}>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}

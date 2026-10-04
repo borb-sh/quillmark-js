@@ -164,10 +164,10 @@
 
 <div
 	{@attach mountField}
-	class="qm-prose"
-	class:qm-control-box={!unframed}
-	class:qm-focus-ring-within={!unframed}
-	class:qm-prose-block={block}
+	class={[
+		'qm-prose',
+		{ 'qm-control-box': !unframed, 'qm-focus-ring-within': !unframed, 'qm-prose-block': block }
+	]}
 	data-leaf-key={leafKey}
 >
 	{#if held}

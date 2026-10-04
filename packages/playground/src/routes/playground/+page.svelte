@@ -491,8 +491,9 @@
 			>
 			<span class="stat"
 				><span class="qm-label">emit</span>
-				<span class="qm-readout" class:alert={lastEmit.startsWith('failed')} data-testid="last-emit"
-					>{lastEmit}</span
+				<span
+					class={['qm-readout', { alert: lastEmit.startsWith('failed') }]}
+					data-testid="last-emit">{lastEmit}</span
 				></span
 			>
 			<span class="stat"
@@ -503,7 +504,7 @@
 				><span class="qm-label">error</span>
 				<!-- The one reading on the strip that is a failure rather than a fact, so it
 				     is the one that takes colour when it holds one. -->
-				<span class="qm-readout" class:alert={lastError !== 'none'} data-testid="last-error"
+				<span class={['qm-readout', { alert: lastError !== 'none' }]} data-testid="last-error"
 					>{lastError}</span
 				></span
 			>

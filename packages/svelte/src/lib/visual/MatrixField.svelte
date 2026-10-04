@@ -333,15 +333,13 @@
 		</span>
 	</div>
 	<div
-		class="qm-matrix-roster"
-		class:qm-tracks={compact}
-		class:compact
+		class={['qm-matrix-roster', { 'qm-tracks': compact, compact }]}
 		data-default={defaulted ? '' : undefined}
 		bind:this={rosterEl}
 	>
 		{#each members as m (m.id)}
 			{@const on = held(m.id)}
-			<div class="qm-member" class:held={on} bind:this={memberEls[m.id]}>
+			<div class={['qm-member', { held: on }]} bind:this={memberEls[m.id]}>
 				<div class="qm-member-head">
 					<!-- A real checkbox with its face drawn here: the UA's face is shadow DOM no
 					     dial reaches, so the input is `appearance: none` and the box and the

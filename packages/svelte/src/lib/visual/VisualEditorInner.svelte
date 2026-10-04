@@ -937,7 +937,7 @@
 		 gaps between cards stay bare: the strip is the gap, and the pill each fills on
 		 hover draws what a label would state, the space the new card takes. -->
 		{@const marked = atIndex === model.cards.length}
-		<div class="qm-add-card" class:qm-add-card-marked={marked}>
+		<div class={['qm-add-card', { 'qm-add-card-marked': marked }]}>
 			<!-- Marked, the words are the accessible name and no `aria-label` doubles
 			 them; bare, the same words land as the label, the strip having no
 			 geometry to carry them. -->

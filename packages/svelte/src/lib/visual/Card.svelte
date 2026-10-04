@@ -200,10 +200,8 @@
  ancestor and nothing else marks the box its guidance belongs in. -->
 <section
 	bind:this={el}
-	class="qm-card"
+	class={['qm-card', { 'qm-main': card.isMain, 'qm-unschemable': card.unschemable }]}
 	data-qm-card
-	class:qm-main={card.isMain}
-	class:qm-unschemable={card.unschemable}
 >
 	{#if card.unschemable}
 		{@render recoveryShell()}
@@ -244,9 +242,7 @@
 		<div class="qm-card-body">
 			{#if hasMeta}
 				<div
-					class="qm-card-meta"
-					class:qm-meta-top={!card.isMain}
-					class:qm-meta-bottom={card.hasBody}
+					class={['qm-card-meta', { 'qm-meta-top': !card.isMain, 'qm-meta-bottom': card.hasBody }]}
 				>
 					{#each ungrouped as section (section.group ?? '_ungrouped')}
 						<div class="qm-section">
@@ -257,14 +253,14 @@
 					<!-- One open at a time. Rendered only when a card has groups, so an empty
 				     accordion does not stand a gap under the ungrouped fields. -->
 					{#if grouped.length}
-						<div class="qm-groups" class:qm-instant={!animate}>
+						<div class={['qm-groups', { 'qm-instant': !animate }]}>
 							{#each grouped as section (section.group)}
 								{@const group = section.group as string}
 								{@const isOpen = expanded === group}
 								{@const panelId = ops.panelId(group)}
 								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
 								{@const headHint = section.head?.description}
-								<div class="qm-group" class:qm-open={isOpen}>
+								<div class={['qm-group', { 'qm-open': isOpen }]}>
 									<!-- A flat field alone in its section is named by the header, which
 								     takes its label id and parks its description: the field draws no
 								     label of its own to say the section's name twice. -->

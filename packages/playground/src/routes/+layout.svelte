@@ -33,7 +33,7 @@
 	const fills = $derived(here === '/playground');
 </script>
 
-<div class="app" class:qm-workspace={fills}>
+<div class={['app', { 'qm-workspace': fills }]}>
 	<header class="head">
 		<div class="pg-width qm-bar head-row">
 			<a class="mark" href="{base}/">quillmark<span class="slash">/</span>playground</a>
