@@ -96,6 +96,31 @@ describe('Preview', () => {
 		expect(thrown?.message).toContain(prop);
 	});
 
+	it.each([
+		['session', () => mockSession()],
+		['margin', () => 48],
+		['onPick', () => () => {}],
+		['onError', () => () => {}],
+		['strings', () => ({ noPages: 'Rien à afficher' })]
+	])('holds what it mounted across a %s swap', (prop, next) => {
+		const { props } = mountSurface(Preview, {
+			session: mockSession(),
+			margin: 16,
+			onPick: () => {},
+			strings: { noPages: 'Nothing to show' }
+		});
+		const painted = () => document.querySelector('.qm-preview')?.firstElementChild;
+		const mounted = painted();
+		expect(mounted).toBeInstanceOf(HTMLElement);
+
+		(props as Record<string, unknown>)[prop] = next();
+		flushCatching();
+
+		// The controller's own node, not the container: a re-run attachment rebuilds
+		// inside the element it was handed.
+		expect(painted()).toBe(mounted);
+	});
+
 	it('stays quiet under an inline `strings` literal, and reports when its value moves', () => {
 		const { props, errors } = mountSurface(RebindHost, {
 			session: mockSession(),

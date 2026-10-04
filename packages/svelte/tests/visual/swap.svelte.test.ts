@@ -58,7 +58,13 @@ describe('swapping the quill prop alone', () => {
 	it('reports rebind-ignored once, at dev severity, and throws it', () => {
 		const q = quill();
 		const a = docWith(q, 'A');
-		const { props, errors } = mountEditor(q, a);
+		const { target, props, errors } = mountEditor(q, a);
+		const fieldView = () => titleLeaf(target)?.querySelector('.ProseMirror')?.firstChild;
+		const valueView = () => target.querySelector('.qm-prose-value .ProseMirror')?.firstChild;
+		const field = fieldView();
+		const value = valueView();
+		expect(field).toBeInstanceOf(Node);
+		expect(value).toBeInstanceOf(Node);
 
 		// A distinct handle over the same fixture: the pairing is what the guard
 		// watches, not the schema's contents.
@@ -81,5 +87,10 @@ describe('swapping the quill prop alone', () => {
 		expect(reported).toHaveLength(1);
 		expect(reported[0].severity).toBe('dev');
 		expect(thrown?.message).toContain('rebind-ignored');
+		// Reported, not acted on: an addressed leaf and a by-value one each keep the
+		// view they mounted. Read at the first node the view drew, not the view's root:
+		// a by-value leaf's view mounts onto its own element, which a remount reuses.
+		expect(fieldView()).toBe(field);
+		expect(valueView()).toBe(value);
 	});
 });
