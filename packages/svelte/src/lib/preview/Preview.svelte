@@ -7,7 +7,7 @@
   imperatively (e.g. after `session.apply` elsewhere).
 -->
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import { createPreview, type PreviewController } from './controller.js';
 	import { guardRebind } from '../core/rebind.svelte.js';
 	import type { PreviewStringsInput } from './strings.js';
@@ -16,9 +16,9 @@
 	import type { EditorErrorHandler } from '../core/errors.js';
 
 	/**
-	 * Remount contract. `createPreview` binds once in `onMount`; a later change to any
-	 * prop it closed over (`session`, `margin`, `onPick`, `onError`, `strings`) is not
-	 * observed, and each reports `rebind-ignored` when swapped. Swap
+	 * Remount contract. `createPreview` binds once, when its container mounts; a later
+	 * change to any prop it closed over (`session`, `margin`, `onPick`, `onError`,
+	 * `strings`) is not observed, and each reports `rebind-ignored` when swapped. Swap
 	 * the session by remounting (`{#key session}`, as the playground does); drive
 	 * in-place edits through the `refresh(change)` method, not a prop change.
 	 *
@@ -44,7 +44,6 @@
 
 	let { session, margin, onPick, onError, strings, class: className, style }: Props = $props();
 
-	let containerEl: HTMLDivElement | undefined = $state();
 	let controller: PreviewController | undefined;
 
 	guardRebind(
@@ -52,20 +51,16 @@
 		'Remount the preview ({#key session}) to rebind.'
 	);
 
-	onMount(() => {
-		if (!containerEl) return;
-		controller = createPreview(session, {
-			container: containerEl,
-			margin,
-			onPick,
-			onError,
-			strings
+	function mountPreview(container: HTMLDivElement): () => void {
+		return untrack(() => {
+			const mounted = createPreview(session, { container, margin, onPick, onError, strings });
+			controller = mounted;
+			return () => {
+				mounted.destroy();
+				controller = undefined;
+			};
 		});
-		return () => {
-			controller?.destroy();
-			controller = undefined;
-		};
-	});
+	}
 
 	export function refresh(change: ChangeSet): void {
 		controller?.refresh(change);
@@ -88,7 +83,7 @@
 	}
 </script>
 
-<div bind:this={containerEl} class="qm-preview {className ?? ''}" {style} data-qm-root></div>
+<div {@attach mountPreview} class="qm-preview {className ?? ''}" {style} data-qm-root></div>
 
 <style>
 	/* A detached root: the preview is not a descendant of the editor, so it carries
