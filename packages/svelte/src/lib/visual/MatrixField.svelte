@@ -191,7 +191,7 @@
 	/** A native checkbox carries its own state, so a commit the document declines leaves
 	 *  the face ticked over a map that says otherwise, `checked={held(id)}` having nothing
 	 *  new to write. The reassert after the flush is what the styled controls get from
-	 *  their synced local (`synced.svelte.ts`): the document is what the face reads. */
+	 *  their local, a `$derived` of the value: the document is what the face reads. */
 	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
 		commit(on ? commitMember(map, id, ticked(id)) : unticked(id));
 		await flush();

@@ -9,7 +9,6 @@
 	// Ambient from the editor root, with the package's English off-tree, so this
 	// component renders standalone too.
 	const t = wording();
-	import { untrack } from 'svelte';
 	import Icon from './icons/Icon.svelte';
 	import type { Document, Quill, Addr, Diagnostic } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
@@ -73,15 +72,7 @@
 		leaves
 	}: Props = $props();
 
-	// Local title reconcile (external change only), like the scalar controls.
-	// svelte-ignore state_referenced_locally
-	let localTitle = $state(card.titleOverride);
-	$effect(() => {
-		const incoming = card.titleOverride;
-		untrack(() => {
-			if (incoming !== localTitle) localTitle = incoming;
-		});
-	});
+	let localTitle = $derived(card.titleOverride);
 
 	// The pre-edit value Escape rolls back to; the rename itself stays live on input.
 	let titleAtFocus = '';

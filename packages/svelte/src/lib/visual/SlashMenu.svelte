@@ -33,15 +33,7 @@
 	}
 	let { menu, leaf, label }: Props = $props();
 
-	/** Raised whenever the codec reports offers. Mirrored into local state rather than
-	 * derived, because the primitive owns this prop: its own dismissal layer (an
-	 * outside press) writes it, and a derived it cannot write to is an error rather
-	 * than a dismissal. The next report re-syncs, so the codec stays the authority on
-	 * whether a run is live. */
-	let open = $state(false);
-	$effect(() => {
-		open = !!menu && menu.items.length > 0;
-	});
+	let open = $derived(!!menu && menu.items.length > 0);
 
 	/** The root to portal into, resolved from the leaf's own DOM so the menu lands
 	 * inside whichever `[data-qm-root]` raised it and inherits the consumer's dials;

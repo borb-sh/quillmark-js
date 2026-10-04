@@ -14,7 +14,6 @@
  unanswered, and an optional cell returns to `none`.
 -->
 <script lang="ts">
-	import { syncedLocal } from './synced.svelte.js';
 	import './controls.css';
 
 	interface Props {
@@ -40,11 +39,8 @@
 	}
 	let { value, fallback, placeholder, label, id, describedBy, onCommit, onKey }: Props = $props();
 
-	// Local input state synced to `value`, or to the default an unset field holds:
-	// own-typing stays local, only an external change reconciles back in (see
-	// `syncedLocal`).
-	const local = syncedLocal(() => value ?? fallback ?? '');
-	const defaulted = $derived(value == null && !!fallback && local.value === fallback);
+	let local = $derived(value ?? fallback ?? '');
+	const defaulted = $derived(value == null && !!fallback && local === fallback);
 
 	let inputEl: HTMLInputElement | undefined = $state();
 	/** Take the caret: what a parent placing focus on this control calls. */
@@ -57,7 +53,7 @@
 	bind:this={inputEl}
 	class="qm-input qm-focus-ring"
 	type="text"
-	value={local.value}
+	value={local}
 	{id}
 	{placeholder}
 	data-default={defaulted ? '' : undefined}
@@ -65,7 +61,7 @@
 	aria-describedby={describedBy}
 	onkeydown={onKey}
 	oninput={(e) => {
-		local.value = (e.currentTarget as HTMLInputElement).value;
-		onCommit(local.value !== '' ? local.value : fallback ? '' : undefined);
+		local = (e.currentTarget as HTMLInputElement).value;
+		onCommit(local !== '' ? local : fallback ? '' : undefined);
 	}}
 />
