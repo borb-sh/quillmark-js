@@ -2,8 +2,8 @@
 // Svelte 4 idiom, the successor is what the code writes. Forced runes mode holds half of it —
 // `export let`, `$:`, `$$props`, `$$restProps` and the `beforeUpdate` pair are compile errors,
 // so the compiler is their gate and this one does not restate them. The rest still compile,
-// some with a warning svelte-check prints and never fails on, so they are a table here, read
-// as text over every package that depends on `svelte`, build output aside. Comments are
+// some with a warning a `svelte-ignore` silences, so they are a table here, read as text
+// over every package that depends on `svelte`, build output aside. Comments are
 // blanked first, so prose naming a form is not the form. Zero deps; run via
 // `npm run check:svelte`.
 //
@@ -22,8 +22,8 @@
 //                                    and need not define; an app is built by the Vite config
 //                                    that defines it, so the apps are outside it
 //
-// Every finding fails the run, though each shows in a diff: a warning is for a rule whose
-// subject is still moving, and this one admits no exception for review to weigh.
+// Every finding is an error, though each shows in a diff: the rule admits no exception for
+// review to weigh (`report`).
 
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
