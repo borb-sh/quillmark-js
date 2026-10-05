@@ -22,7 +22,7 @@
 		"@quillmark/svelte": "*"
 	},
 	"devDependencies": {
-		"@quillmark/wasm": ">=0.121.0-0",
+		"@quillmark/wasm": ">=0.122.0-0",
 		"@sveltejs/adapter-static": "^4.0.0",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
