@@ -38,17 +38,37 @@ describe('a boolean field', () => {
 		expect(read(q, doc, 'draft_watermark')).toBe(false);
 	});
 
-	it('draws a stored non-boolean as it draws an absent value', () => {
-		const q = quill();
-		const doc = q.parse(
-			['~~~', '$quill: showcase@1.0.0', 'draft_watermark: yes', '~~~', ''].join('\n')
-		);
-		const { target } = mountEditor(q, doc);
+	// The render reads a stored boolean cell more widely than YAML does, so the switch is
+	// held to the engine's own reading, `reader.resolve()`, at a field and at a subform
+	// cell. A value the render refuses draws as an absent one, here the `false` default.
+	it.each(['true', '"False"', '"TRUE"', '0', '-1', 'yes', '" true"'])(
+		'draws %s as the render reads it',
+		(spelled) => {
+			const q = quill();
+			const doc = q.parse(
+				[
+					'~~~',
+					'$quill: showcase@1.0.0',
+					'contact:',
+					'  name: A',
+					`  listed: ${spelled}`,
+					`draft_watermark: ${spelled}`,
+					'~~~',
+					''
+				].join('\n')
+			);
+			const rows = new DocumentReader(q, doc).resolve().main.fields;
+			const rendered = (name: string) => rows.find((r) => r.name === name)?.value;
+			const contact = rendered('contact') as Record<string, unknown>;
+			const { target } = mountEditor(q, doc);
 
-		const sw = field(target, 'Draft watermark').querySelector<HTMLElement>('[role="switch"]')!;
-		expect(read(q, doc, 'draft_watermark')).toBe('yes');
-		expect(sw.getAttribute('aria-checked')).toBe('false');
-	});
+			const face = (sw: Element | null) => sw?.getAttribute('aria-checked');
+			const top = field(target, 'Draft watermark').querySelector('[role="switch"]');
+			const cell = target.querySelector('[data-qm-prop="listed"] [role="switch"]');
+			expect(face(top)).toBe(String(rendered('draft_watermark') === true));
+			expect(face(cell)).toBe(String(contact.listed === true));
+		}
+	);
 });
 
 describe('an object field', () => {

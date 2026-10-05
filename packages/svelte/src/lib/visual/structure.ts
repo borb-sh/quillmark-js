@@ -163,6 +163,17 @@ export function ghostDefault(row: ResolvedField | undefined): unknown {
 	return row?.source === 'default' ? row.value : undefined;
 }
 
+/** A stored `boolean` cell as the render reads it: a boolean, `true` or `false` in any
+ * case, or a number by whether it is non-zero; undefined where the render refuses the
+ * value. The engine's coercion, restated, so the suite holds it to `reader.resolve()`. */
+export function renderedBoolean(value: unknown): boolean | undefined {
+	if (typeof value === 'boolean') return value;
+	if (typeof value === 'number') return value !== 0;
+	if (typeof value === 'string' && /^(true|false)$/i.test(value))
+		return value.toLowerCase() === 'true';
+	return undefined;
+}
+
 /** A ghost value's string form, or undefined for null/object (only text ghosts
  * render a placeholder). A scalar's resolved default reads through it; a content
  * field's resolves as `Content`, which a prose leaf reads by its text instead

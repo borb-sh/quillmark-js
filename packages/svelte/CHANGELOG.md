@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The `@quillmark/wasm` peer floor is `>=0.122.0-0`.** Only `true` and `false` are booleans, so a document's unquoted `no`, `off` or `yes` draws as the text written in a text field, where it drew `false` or `true`, and under a `boolean`, `number` or `integer` field it carries `validation::type_mismatch`, the boolean switch drawing it as it draws an absent value.
+**The `@quillmark/wasm` peer floor is `>=0.122.0-0`.** Only `true` and `false` are booleans, so a document's unquoted `no`, `off` or `yes` draws as the text written in a text field, where it drew `false` or `true`, and under a `boolean`, `number` or `integer` field it carries `validation::type_mismatch`. The boolean switch draws a stored value as the render reads it, a `"False"` or a `0` off, and one the render refuses as an absent value, where it drew any non-empty string on.
 
 **The `svelte` peer floor is `^5.33.0`.** The components write an assigned `$derived`, `{@attach}` and `$props.id()`, which a compiler below the floor refuses, and the card's `:has()` rules, which one below 5.24 drops as unused; `/visual`'s `bits-ui` peers `^5.33.0` itself.
 

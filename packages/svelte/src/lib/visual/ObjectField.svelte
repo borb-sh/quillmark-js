@@ -48,6 +48,7 @@
 		obliged,
 		optionalCell,
 		printedText,
+		renderedBoolean,
 		shortCell
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
@@ -326,7 +327,7 @@
 						label={named}
 						id={ids?.control}
 						describedBy={describes}
-						value={typeof obj[key] === 'boolean' ? obj[key] : undefined}
+						value={renderedBoolean(obj[key])}
 						fallback={sub.default as boolean | undefined}
 						optional={optionalCell(sub)}
 						onCommit={(v) => commitProp(key, v)}

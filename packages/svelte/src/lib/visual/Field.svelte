@@ -38,6 +38,7 @@
 		isContainer,
 		optionalCell,
 		printedText,
+		renderedBoolean,
 		stringifyGhost,
 		titleText
 	} from './structure.js';
@@ -340,7 +341,7 @@
 				/>
 			{:else if field.control === 'boolean'}
 				<BooleanField
-					value={typeof value === 'boolean' ? value : undefined}
+					value={renderedBoolean(value)}
 					fallback={ghost as boolean | undefined}
 					{optional}
 					id={domIds.control}
