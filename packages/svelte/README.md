@@ -8,7 +8,7 @@ Editor + live-preview components for [Quillmark](https://github.com/borb-sh/quil
 npm install @quillmark/svelte
 ```
 
-`svelte@^5` and `@quillmark/wasm` are peer dependencies: the session's handles cross the package boundary, so the consumer supplies the one copy both sides mint them from.
+`svelte@^5.33` and `@quillmark/wasm` are peer dependencies: the session's handles cross the package boundary, so the consumer supplies the one copy both sides mint them from.
 
 ## Subpaths
 
