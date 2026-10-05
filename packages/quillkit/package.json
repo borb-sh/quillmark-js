@@ -37,7 +37,7 @@
 		"build": "tsc && vite build",
 		"prepack": "rm -rf dist && npm run build",
 		"test": "vitest run",
-		"check": "svelte-check --tsconfig ./tsconfig.client.json && tsc --noEmit -p tsconfig.check.json",
+		"check": "svelte-check --tsconfig ./tsconfig.client.json --fail-on-warnings && tsc --noEmit -p tsconfig.check.json",
 		"check:pack": "publint"
 	},
 	"devDependencies": {

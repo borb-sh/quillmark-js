@@ -66,7 +66,7 @@
 		"check:pack": "publint",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"check": "svelte-check --tsconfig ./tsconfig.json"
+		"check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
 	},
 	"peerDependencies": {
 		"@quillmark/wasm": ">=0.121.0-0",
