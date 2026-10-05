@@ -11,7 +11,7 @@
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { Preview } from '@quillmark/svelte/preview';
 	import type { Document, LiveSession, Quill } from '@quillmark/wasm';
 	import type { Landing } from '@quillmark/svelte/core';
@@ -97,7 +97,7 @@
 			session. An edit repaints the page; a click on the page moves the caret.
 		</p>
 		<div class="actions">
-			<a class="pg-cta" href="{base}/playground">Open the playground</a>
+			<a class="pg-cta" href={resolve('/playground')}>Open the playground</a>
 			<a class="pg-cta-quiet" href="#get-started">Get started</a>
 			<a class="pg-link" href="https://github.com/borb-sh/quillmark-js">Source</a>
 		</div>
@@ -210,7 +210,7 @@
 			<h2 class="qm-label">Next</h2>
 			<p>
 				Both surfaces on one session, with the caret bridged in both directions:
-				<a class="pg-link" href="{base}/playground">the playground</a>.
+				<a class="pg-link" href={resolve('/playground')}>the playground</a>.
 			</p>
 		</article>
 	</section>
