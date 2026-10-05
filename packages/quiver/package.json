@@ -52,7 +52,7 @@
 		"@types/node": "^24.19.1",
 		"publint": "^0.3.0",
 		"typescript": "^6.0.0",
-		"vitest": "^4.0.18"
+		"vitest": "^5.0.0"
 	},
 	"scripts": {
 		"build": "tsc",
