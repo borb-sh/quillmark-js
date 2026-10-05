@@ -48,6 +48,7 @@
 		obliged,
 		optionalCell,
 		printedText,
+		renderedBoolean,
 		shortCell
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
@@ -255,9 +256,7 @@
 
 <div
 	bind:this={rootEl}
-	class="qm-object"
-	class:qm-object-bare={bare}
-	class:qm-object-flat={flat}
+	class={['qm-object', { 'qm-object-bare': bare, 'qm-object-flat': flat }]}
 	role="group"
 	aria-labelledby={labelledBy}
 	aria-describedby={describedBy}
@@ -286,9 +285,7 @@
 			     (`packable`). A block prose cell spans it too, and keeps its label row. -->
 			{@const block = kind === 'prose' && !shortCell(sub)}
 			<div
-				class="qm-object-prop"
-				class:qm-prop-full={isContainer(kind)}
-				class:qm-prop-wide={block}
+				class={['qm-object-prop', { 'qm-prop-full': isContainer(kind), 'qm-prop-wide': block }]}
 				data-qm-prop={key}
 			>
 				{#if ids && kind !== 'array' && kind !== 'matrix'}
@@ -330,7 +327,7 @@
 						label={named}
 						id={ids?.control}
 						describedBy={describes}
-						value={obj[key] as boolean | undefined}
+						value={renderedBoolean(obj[key])}
 						fallback={sub.default as boolean | undefined}
 						optional={optionalCell(sub)}
 						onCommit={(v) => commitProp(key, v)}

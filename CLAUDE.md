@@ -10,7 +10,7 @@ Comments default to none, and one earns its place only where the code cannot car
 
 Every command is the root's; a package script is reached with `-w packages/<name>`. A verb name means one thing across the workspace, and the implementations differ per package. `gate` is the whole gate in one verb and `gate:fast` its first half, everything that needs no build; `gate` with `check:pack` is what CI (`.github/workflows/ci.yml`) holds. `check:registry` stands outside it, on its own schedule.
 
-What each gate holds and why is its own script's header (`scripts/check-*.mjs`); how one speaks is `report` in `scripts/workspace.mjs`, where an error is a fault the diff cannot show and a warning is one review can see for itself.
+What each gate holds and why is its own script's header (`scripts/check-*.mjs`); how one speaks is `report` in `scripts/workspace.mjs`, where an error is a fault the diff cannot show or a form a rule admitting no exception refuses, and a warning is one review can see and weigh for itself.
 
 ## Verification
 

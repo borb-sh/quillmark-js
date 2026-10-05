@@ -40,20 +40,19 @@
 	const index = $derived(Math.min(cursor, tips.length - 1));
 	const isLast = $derived(index >= tips.length - 1);
 
-	// The tip string is derived before the effect reads it, and that is load-bearing.
-	// Reading `tips[index]` inside the effect makes the parent's `model` derive the
-	// dependency (a fresh object every `revision` bump) so the effect would re-run
-	// on every unrelated commit, re-crossing the WASM boundary and rebuilding this
-	// `aria-live` region per keystroke. A derived string short-circuits on `===`.
+	// The tip string is derived before the attachment reads it, and that is
+	// load-bearing. Reading `tips[index]` inside the attachment makes the parent's
+	// `model` derive the dependency (a fresh object every `revision` bump) so the
+	// attachment would re-run on every unrelated commit, re-crossing the WASM boundary
+	// and rebuilding this `aria-live` region per keystroke. A derived string
+	// short-circuits on `===`.
 	const tip = $derived(tips[index] ?? '');
 
 	// The tip is DOM, not text: `renderTip` returns a fragment the codec's own
 	// `toDOM` built, so it is written in rather than interpolated.
-	let bodyEl: HTMLDivElement | undefined = $state();
-	$effect(() => {
-		const el = bodyEl;
-		if (el) el.replaceChildren(renderTip(tip, onError));
-	});
+	function paintTip(body: HTMLDivElement): void {
+		body.replaceChildren(renderTip(tip, onError));
+	}
 
 	function advance(): void {
 		if (isLast) onDismiss();
@@ -64,7 +63,7 @@
 <aside class="qm-tips" aria-label={t.strings.tipsLabel}>
 	<!-- Advancing swaps the text under a button that keeps focus, so the region
 	     announces rather than the change passing silently. -->
-	<div class="qm-tips-body" aria-live="polite" bind:this={bodyEl}></div>
+	<div class="qm-tips-body" aria-live="polite" {@attach paintTip}></div>
 	<div class="qm-tips-foot">
 		<!-- One tip is its own whole set, so a lone dot reports nothing the card does
 		     not already show. -->

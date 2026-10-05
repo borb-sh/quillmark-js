@@ -7,7 +7,7 @@
 // as the quiver does, so routes share one materialization across client-side
 // navigation instead of paying for their own.
 import { Quiver } from '@quillmark/quiver';
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 
 /** The quill a route opens unless it is asked for another. */
 export const DEFAULT_FIXTURE = 'showcase';
@@ -17,7 +17,7 @@ let quiverP: Promise<Quiver> | undefined;
 // A rejected promise is not nullish and would memoize the failure for the page's life, so
 // the memo clears before the rejection reaches the caller: the next call fetches again.
 function quiver(): Promise<Quiver> {
-	return (quiverP ??= Quiver.fromBuiltUrl(`${base}/quiver/`).catch((err: unknown) => {
+	return (quiverP ??= Quiver.fromBuiltUrl(`${resolve('/')}quiver/`).catch((err: unknown) => {
 		quiverP = undefined;
 		throw err;
 	}));

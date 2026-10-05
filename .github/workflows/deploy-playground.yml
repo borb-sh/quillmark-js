@@ -2,8 +2,8 @@
 # on every push to main. Separate from ci.yml, which gates PRs and never deploys.
 # The Actions-based Pages pipeline (no gh-pages branch): build → upload artifact
 # → deploy. `configure-pages` feeds the project-subpath base (`/quillmark-js`)
-# to the build as BASE_PATH; svelte.config.js reads it into kit.paths.base so
-# assets and links resolve under the subpath.
+# to the build as BASE_PATH; the playground's vite.config.ts reads it into
+# paths.base so assets and links resolve under the subpath.
 name: Deploy playground
 
 on:
@@ -42,8 +42,8 @@ jobs:
 
       - name: Build playground
         env:
-          # `/quillmark-js` for the project site; svelte.config.js reads it
-          # into kit.paths.base.
+          # `/quillmark-js` for the project site; vite.config.ts reads it
+          # into paths.base.
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: npm run build -w packages/playground
 

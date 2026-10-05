@@ -15,7 +15,6 @@
 <script lang="ts">
 	import { Select } from 'bits-ui';
 	import Icon from './icons/Icon.svelte';
-	import { syncedLocal } from './synced.svelte.js';
 	import { wording } from './strings.js';
 	import './controls.css';
 
@@ -67,23 +66,21 @@
 	// the like), so it never collides with a real option.
 	const UNSET = '__qm_unset__';
 
-	// Local selection synced to `value` (sentinel when unauthored); own-picks stay
-	// local, only an external change reconciles back in (see `syncedLocal`). Driven
-	// controlled (`value` + `onValueChange`, never `bind:`) so reconciliation stays
-	// the package's rather than the primitive's.
-	const local = syncedLocal(() => value ?? UNSET);
+	// Driven controlled (`value` + `onValueChange`, never `bind:`) so reconciliation
+	// stays the package's rather than the primitive's.
+	let local = $derived(value ?? UNSET);
 
 	/** The blank has no glyph of its own: the quill's `ui.blank_title` stands in for
 	 * it, else an em dash. */
 	const dash = (v: string | undefined) => v || blankTitle || '—';
 
-	const unset = $derived(local.value === UNSET);
+	const unset = $derived(local === UNSET);
 	/** The ghost is a member the render prints, rather than a word for the blank or for
 	 *  `none`: it draws at the default rung (theme.css). */
 	const ghostsMember = $derived(!optional && !!fallback);
 	const ghostText = $derived(optional ? t.strings.optionalGhost : dash(fallback));
 	/** What the closed trigger shows: the pick, or the ghosted default while unset. */
-	const shown = $derived(unset ? ghostText : dash(local.value));
+	const shown = $derived(unset ? ghostText : dash(local));
 
 	/** The root to portal into: `document.body` would escape the consumer's dials
 	 * along with the editor's subtree. `undefined` falls back to bits-ui's default. */
@@ -99,10 +96,10 @@
 	<Select.Root
 		type="single"
 		allowDeselect={false}
-		value={local.value}
+		value={local}
 		onValueChange={(v) => {
 			if (v == null) return;
-			local.value = v;
+			local = v;
 			// Sentinel → unset (parent `removeField`, default renders); any real pick
 			// (incl. the default value) → a genuine write.
 			onCommit(v === UNSET ? undefined : v);
@@ -152,12 +149,12 @@
 						     policy when it is the one selected: a listbox whose selected value
 						     has no row shows nothing for what the document says, and offers none
 						     for the primitive to mark, type-ahead to, or key onto
-						     (VISUAL_EDITOR §"Enum policy"). Off `local.value`, not `value`: the
+						     (VISUAL_EDITOR §"Enum policy"). Off `local`, not `value`: the
 						     row that exists is the row the control has selected, through the
 						     window where an own pick has not reconciled back. -->
 						{#each values as v (v)}
 							{@const allowed = optionAllowed?.(v) !== false}
-							{#if allowed || enumDisallowed === 'disable' || v === local.value}
+							{#if allowed || enumDisallowed === 'disable' || v === local}
 								<Select.Item
 									class="qm-menu-item qm-select-item"
 									value={v}

@@ -29,7 +29,6 @@
  numbers, and `1.000` as a whole one.
 -->
 <script lang="ts">
-	import { syncedLocal } from './synced.svelte.js';
 	import './controls.css';
 
 	interface Props {
@@ -53,11 +52,8 @@
 	}
 	let { value, integer, fallback, placeholder, label, id, describedBy, onCommit }: Props = $props();
 
-	// Local input state synced to `value` (as a string projection), or to the default
-	// an unset field holds; own-typing stays local, only an external change reconciles
-	// back in (see `syncedLocal`).
-	const local = syncedLocal(() => (value != null ? String(value) : (fallback ?? '')));
-	const defaulted = $derived(value == null && !!fallback && local.value === fallback);
+	let local = $derived(value != null ? String(value) : (fallback ?? ''));
+	const defaulted = $derived(value == null && !!fallback && local === fallback);
 
 	const partial = $derived(
 		integer ? /^\s*[+-]?\d*\s*$/ : /^\s*[+-]?\d*\.?\d*(?:[eE][+-]?\d*)?\s*$/
@@ -77,7 +73,7 @@
 		// `insertText` lands on the undo stack and fires `input`; `setRangeText` does neither.
 		if (document.execCommand?.('insertText', false, data)) return;
 		el.setRangeText(data, from, to, 'end');
-		local.value = el.value;
+		local = el.value;
 	}
 
 	// Parse a settled entry and emit it; `local` is owned by `oninput`. Blank →
@@ -89,7 +85,7 @@
 		const entry = raw.trim();
 		if (entry === '') {
 			onCommit(undefined);
-			local.value = el.value = fallback ?? '';
+			local = el.value = fallback ?? '';
 			return;
 		}
 		// Finite as well: a digit run past `Number.MAX_VALUE` reads as `Infinity`.
@@ -102,7 +98,7 @@
 	class="qm-input qm-focus-ring"
 	type="text"
 	inputmode={integer ? 'numeric' : 'decimal'}
-	value={local.value}
+	value={local}
 	{id}
 	{placeholder}
 	data-default={defaulted ? '' : undefined}
@@ -110,7 +106,7 @@
 	aria-describedby={describedBy}
 	onbeforeinput={filter}
 	oninput={(e) => {
-		local.value = (e.currentTarget as HTMLInputElement).value;
+		local = (e.currentTarget as HTMLInputElement).value;
 	}}
 	onchange={(e) => commit(e.currentTarget as HTMLInputElement)}
 />

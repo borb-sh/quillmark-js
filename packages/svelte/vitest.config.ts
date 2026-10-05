@@ -14,9 +14,8 @@ const lib = fileURLToPath(new URL('./src/lib', import.meta.url));
 // `svelte()` compiles the `.svelte` sources so a test can mount a surface, which
 // is what the remount contract needs to be checked rather than asserted: whether a
 // `doc` swap re-keys is a fact about the mounted tree and about which handle its
-// leaves commit to, and neither is reachable from the pure modules. `browser: false`
-// keeps the client build, which is what jsdom runs; the mounting tests declare
-// `@vitest-environment jsdom` per file, as the codec's already do.
+// leaves commit to, and neither is reachable from the pure modules. The mounting
+// tests declare `@vitest-environment jsdom` per file, as the codec's do.
 export default defineConfig({
 	plugins: [svelte({ compilerOptions: { hmr: false } })],
 	// Tests live under `tests/` (not colocated) so `src/lib` stays pure package

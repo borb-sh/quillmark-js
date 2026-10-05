@@ -33,30 +33,20 @@
 	}
 	let { menu, leaf, label }: Props = $props();
 
-	/** Raised whenever the codec reports offers. Mirrored into local state rather than
-	 * derived, because the primitive owns this prop: its own dismissal layer (an
-	 * outside press) writes it, and a derived it cannot write to is an error rather
-	 * than a dismissal. The next report re-syncs, so the codec stays the authority on
-	 * whether a run is live. */
-	let open = $state(false);
-	$effect(() => {
-		open = !!menu && menu.items.length > 0;
-	});
+	let open = $derived(!!menu && menu.items.length > 0);
 
 	/** The root to portal into, resolved from the leaf's own DOM so the menu lands
 	 * inside whichever `[data-qm-root]` raised it and inherits the consumer's dials;
 	 * `undefined` falls back to bits-ui's `document.body`. */
 	const portalTarget = $derived(leaf()?.el.closest<HTMLElement>('[data-qm-root]') ?? undefined);
 
-	let surface = $state<HTMLElement | undefined>();
-
 	/** Keep the keyboard's cursor in the port: the arrows move an index rather than a
 	 *  focus, so a row the list scrolled past has nothing bringing it back. `nearest`
 	 *  scrolls the least that works, and no ancestor the row is already visible in. */
-	$effect(() => {
+	function followHighlight(surface: HTMLElement): void {
 		void menu?.index;
-		surface?.querySelector('[data-highlighted]')?.scrollIntoView({ block: 'nearest' });
-	});
+		surface.querySelector('[data-highlighted]')?.scrollIntoView({ block: 'nearest' });
+	}
 
 	/** Swallow the item's own mousedown: without it the browser focuses the item and
 	 *  blurs the leaf, taking the trigger run's caret with it. */
@@ -98,7 +88,7 @@
 					     a thing to click, tab into, or read. -->
 					<div
 						{...props}
-						bind:this={surface}
+						{@attach followHighlight}
 						class="qm-slash-menu qm-menu-surface"
 						data-qm-root
 						role="group"

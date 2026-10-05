@@ -191,7 +191,7 @@
 	/** A native checkbox carries its own state, so a commit the document declines leaves
 	 *  the face ticked over a map that says otherwise, `checked={held(id)}` having nothing
 	 *  new to write. The reassert after the flush is what the styled controls get from
-	 *  their synced local (`synced.svelte.ts`): the document is what the face reads. */
+	 *  their local, a `$derived` of the value: the document is what the face reads. */
 	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
 		commit(on ? commitMember(map, id, ticked(id)) : unticked(id));
 		await flush();
@@ -333,15 +333,13 @@
 		</span>
 	</div>
 	<div
-		class="qm-matrix-roster"
-		class:qm-tracks={compact}
-		class:compact
+		class={['qm-matrix-roster', { 'qm-tracks': compact, compact }]}
 		data-default={defaulted ? '' : undefined}
 		bind:this={rosterEl}
 	>
 		{#each members as m (m.id)}
 			{@const on = held(m.id)}
-			<div class="qm-member" class:held={on} bind:this={memberEls[m.id]}>
+			<div class={['qm-member', { held: on }]} bind:this={memberEls[m.id]}>
 				<div class="qm-member-head">
 					<!-- A real checkbox with its face drawn here: the UA's face is shadow DOM no
 					     dial reaches, so the input is `appearance: none` and the box and the

@@ -48,7 +48,10 @@
 			"svelte": "./dist/visual/index.js",
 			"default": "./dist/visual/index.js"
 		},
-		"./preset": "./dist/preset/index.css"
+		"./preset": {
+			"types": "./dist/preset/index.d.ts",
+			"default": "./dist/preset/index.css"
+		}
 	},
 	"files": [
 		"dist",
@@ -57,21 +60,22 @@
 	],
 	"sideEffects": true,
 	"scripts": {
-		"build": "svelte-package",
+		"build": "svelte-package && node scripts/strip-dts-css.mjs",
 		"prepare": "npm run build",
 		"prepack": "rm -rf dist && npm run build",
 		"check:pack": "publint",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"check": "svelte-check --tsconfig ./tsconfig.json"
+		"check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
 	},
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.121.0-0",
-		"svelte": "^5.0.0"
+		"@quillmark/wasm": ">=0.122.0-0",
+		"svelte": "^5.33.0"
 	},
 	"dependencies": {
 		"@internationalized/date": "^3.12.2",
-		"bits-ui": "^2.0.0",
+		"bits-ui": "^2.19.0",
+		"esm-env": "^1.2.2",
 		"prosemirror-commands": "1.7.1",
 		"prosemirror-gapcursor": "1.3.2",
 		"prosemirror-history": "1.5.0",
@@ -84,15 +88,15 @@
 		"prosemirror-view": "1.42.1"
 	},
 	"devDependencies": {
-		"@sveltejs/package": "^2.5.0",
-		"@sveltejs/vite-plugin-svelte": "^6.0.0",
-		"@types/node": "^26.1.1",
-		"jsdom": "^29.1.1",
-		"publint": "^0.3.0",
-		"svelte": "^5.0.0",
-		"svelte-check": "^4.1.0",
-		"typescript": "^5.7.0",
-		"vitest": "^4.1.10"
+		"@sveltejs/package": "^3.0.0",
+		"@sveltejs/vite-plugin-svelte": "^7.3.0",
+		"@types/node": "^24.19.1",
+		"jsdom": "^30.1.0",
+		"publint": "^0.3.25",
+		"svelte": "^5.54.0",
+		"svelte-check": "^4.7.6",
+		"typescript": "^6.0.0",
+		"vitest": "^5.0.0"
 	},
 	"publishConfig": {
 		"access": "public"

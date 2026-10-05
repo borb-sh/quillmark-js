@@ -32,9 +32,6 @@
 
 	let { text, ref, onApply, said, onClose }: Props = $props();
 
-	let el = $state.raw<HTMLDialogElement | undefined>();
-	$effect(() => el?.showModal());
-
 	/** What the panel opened with, edited or replaced; studio's document is untouched
 	 *  until `apply`, so closing the panel discards this and nothing else. */
 	// svelte-ignore state_referenced_locally
@@ -76,12 +73,12 @@
 <!-- The dialog fills the viewport and centres the plate, so a click on the dialog itself
      landed outside the plate. -->
 <dialog
-	bind:this={el}
+	{@attach (dialog) => dialog.showModal()}
 	class="panel"
 	aria-label="Document source"
 	onclose={onClose}
 	onpointerdown={(e) => (pressed = e.target)}
-	onclick={(e) => e.target === el && pressed === el && onClose()}
+	onclick={(e) => e.target === e.currentTarget && pressed === e.currentTarget && onClose()}
 >
 	<div class="qm-panel plate">
 		<header class="head">
@@ -99,8 +96,7 @@
 			spellcheck="false"
 			rows="16"
 			aria-label="Document markdown"
-			bind:value={draft}
-		></textarea>
+			bind:value={draft}></textarea>
 
 		{#if refused}
 			<p class="qm-status qm-status-error" data-testid="markdown-refused">{refused}</p>

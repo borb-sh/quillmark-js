@@ -11,20 +11,18 @@
 	import '@quillmark/svelte/preset';
 	import './playground.css';
 	import './chrome.css';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import type { LayoutProps } from './$types';
 
-	let { children } = $props();
+	let { children }: LayoutProps = $props();
 
 	const ROUTES = [
 		{ path: '/', label: 'Overview' },
 		{ path: '/playground', label: 'Playground' }
-	];
+	] as const;
 
-	// The path with the deploy's base prefix removed: a project-subpath host
-	// (`/quillmark-js`) leaves the root as the bare base, so the empty
-	// remainder is `/`.
-	const here = $derived(page.url.pathname.slice(base.length) || '/');
+	const here = $derived(page.route.id);
 	// The tool route is a workspace, not a page: it takes the viewport less the
 	// head and scrolls inside itself, so the shell holds the head and hands it the
 	// rest. At every width: a narrow viewport stacks the panes into a column that
@@ -32,14 +30,14 @@
 	const fills = $derived(here === '/playground');
 </script>
 
-<div class="app" class:qm-workspace={fills}>
+<div class={['app', { 'qm-workspace': fills }]}>
 	<header class="head">
 		<div class="pg-width qm-bar head-row">
-			<a class="mark" href="{base}/">quillmark<span class="slash">/</span>playground</a>
+			<a class="mark" href={resolve('/')}>quillmark<span class="slash">/</span>playground</a>
 			<nav class="nav" aria-label="Playground">
 				{#each ROUTES as route (route.path)}
 					<a
-						href="{base}{route.path}"
+						href={resolve(route.path)}
 						class="nav-link"
 						aria-current={here === route.path ? 'page' : undefined}>{route.label}</a
 					>

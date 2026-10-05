@@ -42,17 +42,17 @@
 		"NOTICE"
 	],
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.121.0-0"
+		"@quillmark/wasm": ">=0.122.0-0"
 	},
 	"dependencies": {
 		"fflate": "^0.8.2",
 		"yaml": "^2.8.3"
 	},
 	"devDependencies": {
-		"@types/node": "^25.3.3",
-		"publint": "^0.3.0",
-		"typescript": "^5.9.3",
-		"vitest": "^4.0.18"
+		"@types/node": "^24.19.1",
+		"publint": "^0.3.25",
+		"typescript": "^6.0.0",
+		"vitest": "^5.0.0"
 	},
 	"scripts": {
 		"build": "tsc",

@@ -2,7 +2,7 @@
 # package: `check` is every verb but the suites, `test` is the suites. Each builds for itself,
 # since the suites spawn and read built artifacts too. One test loads the built client in a
 # browser (CLAUDE.md §Verification), which the runner image's Google Chrome answers; nothing
-# here installs one.
+# here installs one. A third job, `floor`, holds the library's `svelte` peer floor.
 name: CI
 
 on:
@@ -60,3 +60,35 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+  # The library suite at the lower bound of its `svelte` peer range, so a component reaching
+  # for an API newer than the floor fails here rather than in a consumer. One copy is both
+  # compiler and runtime: a root devDependency lands the floor at the root and the `$svelte`
+  # override resolves every other edge to it, where a workspace's own dev range would nest a
+  # current copy beside it. The toolchain's peer ranges sit above the floor, so the install
+  # leaves peers unresolved; the suite reads no build, so it runs no scripts.
+  floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: One svelte, at the peer floor
+        run: |
+          floor=$(node -p "require('./packages/svelte/package.json').peerDependencies.svelte.match(/\d+\.\d+\.\d+/)[0]")
+          npm pkg set "devDependencies.svelte=$floor" 'overrides.svelte=$svelte'
+          npm install --legacy-peer-deps --ignore-scripts
+          test "$(find node_modules packages/*/node_modules -path '*node_modules/svelte/package.json' | wc -l)" = 1 \
+            || { echo "::error::more than one svelte resolves at the floor"; exit 1; }
+          test "$(node -p "require('svelte/package.json').version")" = "$floor" \
+            || { echo "::error::the svelte that resolves is not $floor"; exit 1; }
+      # The committed config passes `runes` as a function of the filename, an option shape the
+      # floor's compiler refuses. `true` holds runes mode for the library's sources, and the
+      # components it also reaches in node_modules, bits-ui's, are runes-authored.
+      - name: Runes mode as a boolean
+        run: |
+          echo 'export default { compilerOptions: { runes: true } };' > packages/svelte/svelte.config.js
+      - run: npm test -w packages/svelte

@@ -114,8 +114,7 @@
 			<!-- The input keeps focus and owns the keys; a press picks without taking it. -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div
-				class="qm-menu-item qm-matrix-add-option"
-				class:add={option.add}
+				class={['qm-menu-item qm-matrix-add-option', { add: option.add }]}
 				role="option"
 				id={optionId(k)}
 				tabindex="-1"

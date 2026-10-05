@@ -535,8 +535,7 @@
 </script>
 
 <div
-	class="qm-array"
-	class:empty={ids.length === 0}
+	class={['qm-array', { empty: ids.length === 0 }]}
 	role="group"
 	aria-labelledby={label != null ? labelId : undefined}
 	aria-describedby={description ? descriptionId : undefined}
@@ -575,8 +574,7 @@
 	     each block's one child: a branch inside the block would stand between them. -->
 	{#if table}
 		<div
-			class="qm-array-rows qm-array-table"
-			class:empty={ids.length === 0}
+			class={['qm-array-rows qm-array-table', { empty: ids.length === 0 }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
@@ -588,9 +586,10 @@
 				<div class="qm-array-table-head">
 					{#each columns as [key, sub] (key)}
 						<div
-							class="qm-array-table-col"
-							class:mark={controlKind(sub) === 'boolean'}
-							class:prose={controlKind(sub) === 'prose'}
+							class={[
+								'qm-array-table-col',
+								{ mark: controlKind(sub) === 'boolean', prose: controlKind(sub) === 'prose' }
+							]}
 						>
 							<FieldLabel
 								label={columnTitle(key, sub)}
@@ -621,8 +620,7 @@
 		</div>
 	{:else if control === 'object'}
 		<div
-			class="qm-array-rows"
-			class:empty={ids.length === 0}
+			class={['qm-array-rows', { empty: ids.length === 0 }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
@@ -631,8 +629,7 @@
 				<!-- The handler catches a key from the controls inside the row and adds no
 				     interaction of the row's own: the row is no tab stop. -->
 				<div
-					class="qm-array-row qm-element"
-					class:open={open.has(id)}
+					class={['qm-array-row qm-element', { open: open.has(id) }]}
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
 					onkeydown={(e) => onRowKey(e, k)}
@@ -683,8 +680,7 @@
 		</div>
 	{:else}
 		<div
-			class="qm-array-rows"
-			class:empty={ids.length === 0}
+			class={['qm-array-rows', { empty: ids.length === 0 }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>

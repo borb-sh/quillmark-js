@@ -5,7 +5,7 @@
  this leaf's commits with the caret riding the untouched view.
 -->
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import { createField, type FieldController, type SlashState } from '../core/codec/index.js';
 	import type { LeafRegistry } from './leaves.js';
 	import SlashMenu from './SlashMenu.svelte';
@@ -82,7 +82,6 @@
 		diagnostics
 	}: Props = $props();
 
-	let containerEl: HTMLDivElement | undefined = $state();
 	let held = $state(false);
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
@@ -108,41 +107,43 @@
 		controller?.focus();
 	}
 
-	onMount(() => {
-		if (!containerEl) return;
-		controller = createField({
-			doc,
-			quill,
-			addr,
-			container: containerEl,
-			inline,
-			plaintext,
-			label,
-			labelledBy,
-			describedBy,
-			fallback,
-			placeholder,
-			placeholderUntilEdit,
-			tableStrings: () => t.strings,
-			onSlash: (next) => {
-				slash = next;
-			},
-			onFocus,
-			onCaretMove,
-			onChange,
-			onError,
-			heldNoteId: heldId,
-			onHold: (next) => {
-				held = next;
-			}
+	function mountField(container: HTMLDivElement): () => void {
+		return untrack(() => {
+			const mounted = createField({
+				doc,
+				quill,
+				addr,
+				container,
+				inline,
+				plaintext,
+				label,
+				labelledBy,
+				describedBy,
+				fallback,
+				placeholder,
+				placeholderUntilEdit,
+				tableStrings: () => t.strings,
+				onSlash: (next) => {
+					slash = next;
+				},
+				onFocus,
+				onCaretMove,
+				onChange,
+				onError,
+				heldNoteId: heldId,
+				onHold: (next) => {
+					held = next;
+				}
+			});
+			controller = mounted;
+			leaves?.registerProse(leafKey, mounted);
+			return () => {
+				leaves?.unregisterProse(leafKey);
+				mounted.destroy();
+				controller = undefined;
+			};
 		});
-		leaves?.registerProse(leafKey, controller);
-		return () => {
-			leaves?.unregisterProse(leafKey);
-			controller?.destroy();
-			controller = undefined;
-		};
-	});
+	}
 
 	// A retype does not remount the leaf (its key is the card's session id), so the new
 	// kind's ghost and default are pushed into the live view rather than paid for with
@@ -162,11 +163,11 @@
 </script>
 
 <div
-	bind:this={containerEl}
-	class="qm-prose"
-	class:qm-control-box={!unframed}
-	class:qm-focus-ring-within={!unframed}
-	class:qm-prose-block={block}
+	{@attach mountField}
+	class={[
+		'qm-prose',
+		{ 'qm-control-box': !unframed, 'qm-focus-ring-within': !unframed, 'qm-prose-block': block }
+	]}
 	data-leaf-key={leafKey}
 >
 	{#if held}

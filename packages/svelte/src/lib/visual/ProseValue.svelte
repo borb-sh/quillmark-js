@@ -31,7 +31,7 @@
  schema, read-only, with a note inside its box, and commits nothing.
 -->
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import { EditorState, Selection } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import {
@@ -101,7 +101,6 @@
 	const t = wording();
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
-	let editorEl: HTMLDivElement | undefined = $state();
 	let held = $state(false);
 	let view: EditorView | undefined;
 	/** Take the caret: what a parent placing focus on this leaf calls. The view's
@@ -134,61 +133,62 @@
 		view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 	}
 
-	onMount(() => {
-		if (!editorEl) return;
-		// The same keymap and plugin stack a `createField` leaf mounts (shared
-		// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
-		// the parent's value write, per the header.
-		const inline = !block;
-		const stored = content();
-		const rt = stored ?? fallback ?? emptyContent();
-		let defaulted = stored === undefined && !!fallback;
-		held = !fitsLeaf(rt, { inline, plaintext });
-		const named = held
-			? heldAttributes({ label, labelledBy, describedBy }, heldId)
-			: (proseAttributes({ label, labelledBy, describedBy }) ?? {});
-		const defaultNamed = { ...named, 'data-default': '' };
-		const schema = held ? blockSchema : leafSchema({ plaintext, inline });
-		const state = EditorState.create({
-			doc: decode(rt, schema),
-			plugins: held
-				? []
-				: proseLeafPlugins(schema, {
-						inline,
-						placeholder: () => placeholder,
-						placeholderUntilEdit: true
-					})
-		});
-		const mounted = new EditorView(
-			{ mount: editorEl },
-			{
-				state,
-				editable: () => !held,
-				// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
-				// (`proseAttributes`), so a cell carrying a label element and a row carrying
-				// none cannot name their regions by different rules.
-				attributes: () => (defaulted ? defaultNamed : named),
-				dispatchTransaction(tr) {
-					const next = mounted.state.apply(tr);
-					const edit = tr.docChanged && !held;
-					if (edit) defaulted = false;
-					mounted.updateState(next);
-					if (edit) onChange(pmToContent(next.doc));
-				},
-				handleDOMEvents: {
-					keydown: (_v, e) => {
-						onKey?.(e);
-						return false;
+	function mountView(mount: HTMLDivElement): () => void {
+		return untrack(() => {
+			// The same keymap and plugin stack a `createField` leaf mounts (shared
+			// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
+			// the parent's value write, per the header.
+			const inline = !block;
+			const stored = content();
+			const rt = stored ?? fallback ?? emptyContent();
+			let defaulted = stored === undefined && !!fallback;
+			held = !fitsLeaf(rt, { inline, plaintext });
+			const named = held
+				? heldAttributes({ label, labelledBy, describedBy }, heldId)
+				: (proseAttributes({ label, labelledBy, describedBy }) ?? {});
+			const defaultNamed = { ...named, 'data-default': '' };
+			const schema = held ? blockSchema : leafSchema({ plaintext, inline });
+			const state = EditorState.create({
+				doc: decode(rt, schema),
+				plugins: held
+					? []
+					: proseLeafPlugins(schema, {
+							inline,
+							placeholder: () => placeholder,
+							placeholderUntilEdit: true
+						})
+			});
+			const mounted = new EditorView(
+				{ mount },
+				{
+					state,
+					editable: () => !held,
+					// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
+					// (`proseAttributes`), so a cell carrying a label element and a row carrying
+					// none cannot name their regions by different rules.
+					attributes: () => (defaulted ? defaultNamed : named),
+					dispatchTransaction(tr) {
+						const next = mounted.state.apply(tr);
+						const edit = tr.docChanged && !held;
+						if (edit) defaulted = false;
+						mounted.updateState(next);
+						if (edit) onChange(pmToContent(next.doc));
+					},
+					handleDOMEvents: {
+						keydown: (_v, e) => {
+							onKey?.(e);
+							return false;
+						}
 					}
 				}
-			}
-		);
-		view = mounted;
-		return () => {
-			view = undefined;
-			mounted.destroy();
-		};
-	});
+			);
+			view = mounted;
+			return () => {
+				view = undefined;
+				mounted.destroy();
+			};
+		});
+	}
 </script>
 
 <!-- `.qm-control-box` (controls.css) is the whole box, so an array of `richtext` and
@@ -197,7 +197,7 @@
  line of prose measure one line. Width is the row's or the cell's to give: the leaf
  fills the track it is placed in. -->
 <div class="qm-prose-value qm-control-box qm-focus-ring-within">
-	<div bind:this={editorEl}></div>
+	<div {@attach mountView}></div>
 	<!-- Inside the box, so the cell or row holds one child either way: a subform cell's
 	     subgrid has a row for the label and one for the box, and an array row's slabs
 	     stand the box's height. -->

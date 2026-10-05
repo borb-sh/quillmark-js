@@ -52,6 +52,7 @@
  selection the command is supposed to act on.
 -->
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { wording } from './strings.js';
 
 	// The surface's words, ambient from the editor root; the package's English
@@ -105,7 +106,6 @@
 	/** Whether the selection carried a link when the prompt was raised. */
 	let linkPresent = $state(false);
 	let linkValue = $state('');
-	let linkInputEl = $state<HTMLInputElement | undefined>(undefined);
 	let contentEl = $state<HTMLElement | undefined>(undefined);
 	/** The root to portal into: `document.body` escapes the editor's subtree and
 	 * the consumer's dials with it, so a pane-scoped palette misses this surface.
@@ -212,25 +212,11 @@
 		deferredSync();
 	}
 
-	$effect(() => {
-		document.addEventListener('selectionchange', deferredSync);
-		document.addEventListener('focusout', deferredSync);
-		// Capture, so the gesture is seen whatever a view in the middle of it does with
-		// the event. `pointercancel` is the release a gesture the browser takes over gets.
-		document.addEventListener('pointerdown', onPointerDown, true);
-		document.addEventListener('pointerup', onPointerUp, true);
-		document.addEventListener('pointercancel', onPointerUp, true);
-		return () => {
-			document.removeEventListener('selectionchange', deferredSync);
-			document.removeEventListener('focusout', deferredSync);
-			document.removeEventListener('pointerdown', onPointerDown, true);
-			document.removeEventListener('pointerup', onPointerUp, true);
-			document.removeEventListener('pointercancel', onPointerUp, true);
-			// A burst-coalescing rAF may still be in flight at teardown; cancel it so
-			// `sync()` never runs against the destroyed component.
-			if (pending) cancelAnimationFrame(rafHandle);
-			pending = false;
-		};
+	// A burst-coalescing rAF may still be in flight at teardown; cancel it so
+	// `sync()` never runs against the destroyed component.
+	onDestroy(() => {
+		if (pending) cancelAnimationFrame(rafHandle);
+		pending = false;
 	});
 
 	// Any close path that bypasses `sync` (e.g. Escape while the link input holds
@@ -245,12 +231,10 @@
 	// surface already open, so without this the URL is typed into the document.
 	// Selected rather than merely focused, the input arriving seeded and replacing
 	// that value being what the prompt is usually raised for.
-	$effect(() => {
-		if (linkPromptOpen && linkInputEl) {
-			linkInputEl.focus();
-			linkInputEl.select();
-		}
-	});
+	function focusPrompt(input: HTMLInputElement): void {
+		input.focus();
+		input.select();
+	}
 
 	/** Swallow the button's mousedown so focus/selection never leave the leaf. */
 	function keepFocus(e: MouseEvent): void {
@@ -338,6 +322,17 @@
 	}
 </script>
 
+<!-- The pointer handlers capture, so the gesture is seen whatever a view in the middle of
+     it does with the event. `pointercancel` is the release a gesture the browser takes
+     over gets. -->
+<svelte:document
+	onselectionchange={deferredSync}
+	onfocusout={deferredSync}
+	onpointerdowncapture={onPointerDown}
+	onpointerupcapture={onPointerUp}
+	onpointercancelcapture={onPointerUp}
+/>
+
 <Popover.Root bind:open>
 	<Popover.Portal to={portalTarget}>
 		<!-- A flip is measured against the root the surface portals into, which is the box
@@ -383,7 +378,7 @@
 								}}
 							>
 								<input
-									bind:this={linkInputEl}
+									{@attach focusPrompt}
 									class="qm-link-input"
 									type="text"
 									placeholder={t.strings.linkPlaceholder}

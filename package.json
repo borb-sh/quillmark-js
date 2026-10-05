@@ -24,19 +24,20 @@
 		"check:docs": "node scripts/check-docs.mjs",
 		"check:style": "node scripts/check-style.mjs",
 		"check:deps": "node scripts/check-deps.mjs",
+		"check:svelte": "node scripts/check-svelte.mjs",
 		"check:bundle": "node scripts/check-style.mjs --built",
 		"check:pack": "npm run check:pack --workspaces --if-present",
 		"check:registry": "node scripts/check-registry.mjs",
-		"gate:fast": "npm run lint && npm run check && npm run check:docs && npm run check:style && npm run check:deps",
+		"gate:fast": "npm run lint && npm run check && npm run check:docs && npm run check:style && npm run check:deps && npm run check:svelte",
 		"gate": "npm run gate:fast && npm run build && npm run check:bundle && npm test"
 	},
 	"overrides": {
-		"@quillmark/wasm": "0.121.0"
+		"@quillmark/wasm": "0.122.0"
 	},
 	"devDependencies": {
-		"@quillmark/wasm": "0.121.0",
+		"@quillmark/wasm": "0.122.0",
 		"postcss": "^8.5.0",
-		"prettier": "^3.4.0",
-		"prettier-plugin-svelte": "^3.3.0"
+		"prettier": "^3.9.0",
+		"prettier-plugin-svelte": "^4.1.0"
 	}
 }

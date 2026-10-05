@@ -27,8 +27,8 @@
 //      hop further — `../core/codec` — pulls all of ProseMirror.
 //
 //   4. The lock's platforms. The lock resolves every platform an optional dependency
-//      offers, not the one that wrote it: a lock missing `@rollup/rollup-darwin-arm64`
-//      installs a rollup with no native binary on a Mac, and npm repairs nothing. CI runs
+//      offers, not the one that wrote it: a lock missing `@rolldown/binding-darwin-arm64`
+//      installs a rolldown with no native binary on a Mac, and npm repairs nothing. CI runs
 //      one platform and the lock is platform-free data, so this is the only place the
 //      breach is visible before a contributor's install fails.
 //

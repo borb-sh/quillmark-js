@@ -19,6 +19,7 @@
 -->
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { DropdownMenu } from 'bits-ui';
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
 	import {
@@ -135,14 +136,7 @@
 	// Local commit-error diagnostics (VISUAL_EDITOR §Diagnostics, producer #2),
 	// id-keyed rather than positional so an error stays pinned to its field across a
 	// card reorder.
-	let commitErrors = $state(new Map<string, RoutedDiagnostic>());
-	/** Edit the commit-error map copy-on-write: a `$state` Map is not deeply
-	 * reactive, so a mutation in place re-derives nothing. */
-	function editCommitErrors(edit: (m: Map<string, RoutedDiagnostic>) => void): void {
-		const next = new Map(commitErrors);
-		edit(next);
-		commitErrors = next;
-	}
+	const commitErrors = new SvelteMap<string, RoutedDiagnostic>();
 
 	const kinds = $derived(Object.keys(quill.schema.card_kinds ?? {}));
 
@@ -350,14 +344,14 @@
 					w.card(i).set(name, value);
 				}
 			}
-			if (commitErrors.has(keyStr)) editCommitErrors((m) => m.delete(keyStr));
+			commitErrors.delete(keyStr);
 			bump('field', id, makeAddr(id, isMain, name));
 		} catch (e) {
 			const diagnostic: Diagnostic = (isQuillmarkError(e) ? e.diagnostics[0] : undefined) ?? {
 				severity: 'error',
 				message: errorMessage(e)
 			};
-			editCommitErrors((m) => m.set(keyStr, { key, diagnostic }));
+			commitErrors.set(keyStr, { key, diagnostic });
 			// Both channels, deliberately: the diagnostic pins to the field on
 			// screen, the error reaches the app's sink (core/errors.ts).
 			reportError(onError, {
@@ -462,9 +456,7 @@
 		// because nothing else will ever clear it.
 		const prefix = `${id}:`;
 		const stale = [...commitErrors.keys()].filter((k) => k.startsWith(prefix));
-		// Guarded: `editCommitErrors` clones the map, and a removal matching nothing has
-		// nothing to re-derive.
-		if (stale.length) editCommitErrors((m) => stale.forEach((k) => m.delete(k)));
+		for (const k of stale) commitErrors.delete(k);
 		// No addr: the removed card has none left and every survivor's shifted. The
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
 		bump('structure', id);
@@ -937,7 +929,7 @@
 		 gaps between cards stay bare: the strip is the gap, and the pill each fills on
 		 hover draws what a label would state, the space the new card takes. -->
 		{@const marked = atIndex === model.cards.length}
-		<div class="qm-add-card" class:qm-add-card-marked={marked}>
+		<div class={['qm-add-card', { 'qm-add-card-marked': marked }]}>
 			<!-- Marked, the words are the accessible name and no `aria-label` doubles
 			 them; bare, the same words land as the label, the strip having no
 			 geometry to carry them. -->
