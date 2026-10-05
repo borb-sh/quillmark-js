@@ -48,7 +48,10 @@
 			"svelte": "./dist/visual/index.js",
 			"default": "./dist/visual/index.js"
 		},
-		"./preset": "./dist/preset/index.css"
+		"./preset": {
+			"types": "./dist/preset/index.d.ts",
+			"default": "./dist/preset/index.css"
+		}
 	},
 	"files": [
 		"dist",
@@ -87,12 +90,12 @@
 	"devDependencies": {
 		"@sveltejs/package": "^2.5.0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
-		"@types/node": "^26.1.1",
+		"@types/node": "^24.19.1",
 		"jsdom": "^29.1.1",
 		"publint": "^0.3.0",
 		"svelte": "^5.54.0",
 		"svelte-check": "^4.1.0",
-		"typescript": "^5.7.0",
+		"typescript": "^6.0.0",
 		"vitest": "^4.1.10"
 	},
 	"publishConfig": {

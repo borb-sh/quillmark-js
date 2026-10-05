@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`import '@quillmark/svelte/preset'` type-checks under TypeScript 6.** The `./preset` export carries a `types` condition over an empty declaration, so the import passes `noUncheckedSideEffectImports`, on by default, with no `*.css` declaration or compiler setting of the consumer's own.
+
 **The development-build `rebind-ignored` throw follows the `development` export condition** (`esm-env`). A once-bound prop swapped in place throws after its report under any bundler's development build, where only Vite's threw and every other reported alone; a production build reports alone.
 
 **An array's object rows open independently.** A press on a row's summary opens or closes that row alone, an added row opens beside the rows already open, and a landing opens the row it names and leaves the rest as they stand. A preview click into one entry of a record list folded the entry the author was in, the list having held one row open at a time.
