@@ -6,12 +6,8 @@
 // A guard over one prop of a set is worse than none: a consumer who learns the
 // surface complains when it ignores a prop reads silence on the rest as reactivity.
 // The snapshot is every once-bound prop, and one report names whichever went stale.
+import { DEV } from 'esm-env';
 import { reportError, type EditorErrorHandler } from './errors.js';
-
-// True in a dev build whose bundler injects `import.meta.env`. Cast, since the package
-// declares no bundler's ambient types; false where nothing injects it, so a toolchain
-// that does not answer gets the report alone.
-const DEV = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
 
 /** The once-bound props by name, `onError` among them. */
 export type Bound = Record<string, unknown> & { onError?: EditorErrorHandler };
