@@ -340,7 +340,7 @@
 				/>
 			{:else if field.control === 'boolean'}
 				<BooleanField
-					value={value as boolean | undefined}
+					value={typeof value === 'boolean' ? value : undefined}
 					fallback={ghost as boolean | undefined}
 					{optional}
 					id={domIds.control}

@@ -326,7 +326,7 @@
 						label={named}
 						id={ids?.control}
 						describedBy={describes}
-						value={obj[key] as boolean | undefined}
+						value={typeof obj[key] === 'boolean' ? obj[key] : undefined}
 						fallback={sub.default as boolean | undefined}
 						optional={optionalCell(sub)}
 						onCommit={(v) => commitProp(key, v)}

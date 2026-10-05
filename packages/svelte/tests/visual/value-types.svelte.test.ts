@@ -37,6 +37,18 @@ describe('a boolean field', () => {
 		flushSync();
 		expect(read(q, doc, 'draft_watermark')).toBe(false);
 	});
+
+	it('draws a stored non-boolean as it draws an absent value', () => {
+		const q = quill();
+		const doc = q.parse(
+			['~~~', '$quill: showcase@1.0.0', 'draft_watermark: yes', '~~~', ''].join('\n')
+		);
+		const { target } = mountEditor(q, doc);
+
+		const sw = field(target, 'Draft watermark').querySelector<HTMLElement>('[role="switch"]')!;
+		expect(read(q, doc, 'draft_watermark')).toBe('yes');
+		expect(sw.getAttribute('aria-checked')).toBe('false');
+	});
 });
 
 describe('an object field', () => {
