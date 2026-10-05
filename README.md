@@ -29,10 +29,11 @@ npm run gate               # gate:fast, then build, bundle and the suite
 npm run check:docs         # every cross-doc section reference, and the stated wasm pin
 npm run check:style        # the closed `--_qm-*` / `--pg-*` / `--st-*` scales
 npm run check:deps         # the dependency law
+npm run check:svelte       # the Svelte 5 forms, over every package that depends on svelte
 npm run check:bundle       # the same scales, in a built consumer
 ```
 
-Three gates, and each holds what a reviewer cannot see for itself: a rung that resolves to nothing, a promise that outranks a consumer, a pointer at a heading that moved, an edge between two siblings. What is legible in a diff — a value's own shape, a manifest's, a declaration in a JS string — is review's.
+The gates hold what a reviewer cannot see for itself: a rung that resolves to nothing, a promise that outranks a consumer, a pointer at a heading that moved, an edge between two siblings. What is legible in a diff — a value's own shape, a manifest's, a declaration in a JS string — is review's, with one exception: the Svelte 5 rule admits no case for review to weigh, so `check:svelte` refuses a Svelte 4 form outright.
 
 Everything runs against the one reference quill, [`fixtures/quills/showcase/1.0.0`](fixtures/quills/showcase), a dev fixture at the workspace root, never published: it declares a field for every control the tier draws and three card kinds, so a surface is exercised against a schema rather than against a mock.
 

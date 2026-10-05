@@ -15,6 +15,22 @@ TS-first, zero `.js`. Two layers:
 
 The heavy machinery (ProseMirror, canvas paint) is already framework-agnostic, so the core carries the substance and the chrome stays thin. Svelte earns its place in the stateful UI; a vanilla-core consumer wraps a mount API in a few lines.
 
+**The chrome is Svelte 5 throughout.** A component compiles in runes mode or not at all, each package's compiler options forcing it outside `node_modules`, and where Svelte 5 names a successor to a Svelte 4 idiom, the successor is what the code writes:
+
+| Idiom | Svelte 5 form |
+| --- | --- |
+| `export let`, `$:`, `$$props`, `on:`, `<slot>`, dispatchers, stores, `svelte/legacy` | runes, callback props, snippets |
+| state an `$effect` writes from a prop | a writable `$derived` |
+| a `Map` or `Set` in `$state`, reassigned to notify | `SvelteMap`, `SvelteSet` |
+| `use:`; a `bind:this` that only feeds an effect; an element-scoped `onMount` | `{@attach}` |
+| `addEventListener` on `document` or `window` in a component | `<svelte:document>`, `<svelte:window>` |
+| `class:` | the `class` attribute's object or array form |
+| `import.meta.env` in shipped code | `esm-env` |
+
+What stays is Svelte 5's own current API: `onMount`/`onDestroy` for work scoped to the component rather than an element, `getContext`/`setContext` behind the typed accessors, a component's `export function`s reached through `bind:this`, `tick`/`flushSync`/`untrack`, and a seed-once `$state` under `svelte-ignore state_referenced_locally`, which reads its prop once on purpose. The vanilla core is outside the rule: `/core`, the codec and the preview's paint loop stay framework-free and keep their own listeners.
+
+Runes mode makes `export let`, `$:` and `$$props` compile errors. The rest still compile, so `check:svelte` refuses them as text in every package that depends on `svelte`: each directive, import and listener the table names, and a `Map` or `Set` constructed inside `$state`. The semantic half, an `$effect` writing state a `$derived` would hold or a collection reaching `$state` by another path, is review's.
+
 ## Packaging
 
 **One package, `@quillmark/svelte`, with subpath exports**: `/core`, `/preview`, `/visual` ship; `/form` is reserved for the metadata surface.
