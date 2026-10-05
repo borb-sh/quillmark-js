@@ -7,8 +7,9 @@
 // blanked first, so prose naming a form is not the form. Zero deps; run via
 // `npm run check:svelte`.
 //
-//   class:  use:  on:  <slot>        a component's markup, its script and style blanked, so a
-//                                    `class: className` destructuring is not a directive
+//   class:  use:  on:  let:  <slot>  a component's markup, its script and style blanked, so a
+//   <svelte:fragment>                `class: className` destructuring is not a directive
+//   <svelte:component>  <svelte:self>
 //   createEventDispatcher,           any source
 //   svelte/store, svelte/legacy
 //   document/window listeners        a component; the framework-free cores (`core/`, the
@@ -54,11 +55,39 @@ const RULES = [
 		re: /(?<=\s)on:[\w$]/g
 	},
 	{
+		what: '`let:` directive',
+		form: 'a snippet prop with parameters',
+		files: /\.svelte$/,
+		markup: true,
+		re: /(?<=\s)let:[\w$]/g
+	},
+	{
 		what: '`<slot>`',
 		form: 'a snippet prop and `{@render}`',
 		files: /\.svelte$/,
 		markup: true,
 		re: /<slot\b/g
+	},
+	{
+		what: '`<svelte:fragment>`',
+		form: 'a snippet',
+		files: /\.svelte$/,
+		markup: true,
+		re: /<svelte:fragment\b/g
+	},
+	{
+		what: '`<svelte:component>`',
+		form: 'the component value as a tag, `<Thing />`',
+		files: /\.svelte$/,
+		markup: true,
+		re: /<svelte:component\b/g
+	},
+	{
+		what: '`<svelte:self>`',
+		form: 'the component importing itself',
+		files: /\.svelte$/,
+		markup: true,
+		re: /<svelte:self\b/g
 	},
 	{
 		what: '`createEventDispatcher`',

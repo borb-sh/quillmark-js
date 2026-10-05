@@ -19,7 +19,8 @@ The heavy machinery (ProseMirror, canvas paint) is already framework-agnostic, s
 
 | Idiom | Svelte 5 form |
 | --- | --- |
-| `export let`, `$:`, `$$props`, `on:`, `<slot>`, dispatchers, stores, `svelte/legacy` | runes, callback props, snippets |
+| `export let`, `$:`, `$$props`, `on:`, `<slot>`, `let:`, `<svelte:fragment>`, dispatchers, stores, `svelte/legacy` | runes, callback props, snippets |
+| `<svelte:component>`, `<svelte:self>` | the component value as a tag, a self-import |
 | state an `$effect` writes from a prop | a writable `$derived` |
 | a `Map` or `Set` in `$state`, reassigned to notify | `SvelteMap`, `SvelteSet` |
 | `use:`; a `bind:this` that only feeds an effect; an element-scoped `onMount` | `{@attach}` |
@@ -29,7 +30,7 @@ The heavy machinery (ProseMirror, canvas paint) is already framework-agnostic, s
 
 What stays is Svelte 5's own current API: `onMount`/`onDestroy` for work scoped to the component rather than an element, `getContext`/`setContext` behind the typed accessors, a component's `export function`s reached through `bind:this`, `tick`/`flushSync`/`untrack`, and a seed-once `$state` under `svelte-ignore state_referenced_locally`, which reads its prop once on purpose. The vanilla core is outside the rule: `/core`, the codec and the preview's paint loop stay framework-free and keep their own listeners.
 
-Runes mode makes `export let`, `$:` and `$$props` compile errors. The rest still compile, so `check:svelte` refuses them as text in every package that depends on `svelte`: each directive, import and listener the table names, and a `Map` or `Set` constructed inside `$state`. The semantic half, an `$effect` writing state a `$derived` would hold or a collection reaching `$state` by another path, is review's.
+Runes mode makes `export let`, `$:` and `$$props` compile errors. The rest still compile, so `check:svelte` refuses them as text in every package that depends on `svelte`: each Svelte 4 directive, element, import and listener the table names, a `Map` or `Set` constructed inside `$state`, and `import.meta.env` in the library. The semantic half, an `$effect` writing state a `$derived` would hold or a collection reaching `$state` by another path, is review's.
 
 ## Packaging
 
