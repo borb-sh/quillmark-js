@@ -96,8 +96,7 @@
 			spellcheck="false"
 			rows="16"
 			aria-label="Document markdown"
-			bind:value={draft}
-		></textarea>
+			bind:value={draft}></textarea>
 
 		{#if refused}
 			<p class="qm-status qm-status-error" data-testid="markdown-refused">{refused}</p>

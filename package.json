@@ -36,7 +36,7 @@
 	"devDependencies": {
 		"@quillmark/wasm": "0.121.0",
 		"postcss": "^8.5.0",
-		"prettier": "^3.4.0",
-		"prettier-plugin-svelte": "^3.3.0"
+		"prettier": "^3.9.0",
+		"prettier-plugin-svelte": "^4.1.0"
 	}
 }
