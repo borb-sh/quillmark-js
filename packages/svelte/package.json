@@ -60,7 +60,7 @@
 	],
 	"sideEffects": true,
 	"scripts": {
-		"build": "svelte-package",
+		"build": "svelte-package && node scripts/strip-dts-css.mjs",
 		"prepare": "npm run build",
 		"prepack": "rm -rf dist && npm run build",
 		"check:pack": "publint",

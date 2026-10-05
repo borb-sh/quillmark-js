@@ -6,7 +6,7 @@
 
 **The `svelte` peer floor is `^5.33.0`.** The components write an assigned `$derived`, `{@attach}` and `$props.id()`, which a compiler below the floor refuses, and the card's `:has()` rules, which one below 5.24 drops as unused; `/visual`'s `bits-ui` peers `^5.33.0` itself.
 
-**`import '@quillmark/svelte/preset'` type-checks under TypeScript 6.** The `./preset` export carries a `types` condition over an empty declaration, so the import passes `noUncheckedSideEffectImports`, on by default, with no `*.css` declaration or compiler setting of the consumer's own.
+**The package's declarations type-check under TypeScript 6, `skipLibCheck: false` included.** `noUncheckedSideEffectImports`, on by default, refuses a side-effect import no declaration answers. The `./preset` export carries a `types` condition over an empty declaration, and the shipped `.d.ts` files carry no stylesheet import, so neither `import '@quillmark/svelte/preset'` nor a subpath's declarations ask for a `*.css` declaration or compiler setting of the consumer's own.
 
 **The development-build `rebind-ignored` throw follows `esm-env`'s `DEV`.** A once-bound prop swapped in place throws after its report under the `development` export condition, or, under neither condition, where `NODE_ENV` is set and not production, as a test runner sets it; elsewhere it reports alone. Only a Vite development build threw before.
 
