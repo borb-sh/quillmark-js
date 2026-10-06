@@ -81,8 +81,25 @@
 		return lines === 1;
 	}
 
+	/** How far the trigger's target reaches past its glyph on the axis the surface stands
+	 * on, which makes the side offset clearance from the target rather than from the
+	 * glyph. The target is `.qm-tap-floor`'s box (controls.css), centred on the glyph and
+	 * read off it rather than restated. A surface landing on the target takes a resting
+	 * pointer off the trigger, which closes the surface, and hands the pointer back as it
+	 * goes: a loop. A DOM with no layout reads none. */
+	let reach = $state(0);
+
+	function targetReach(): number {
+		if (triggerEl === undefined) return 0;
+		const glyph = triggerEl.getBoundingClientRect();
+		const target = getComputedStyle(triggerEl, '::after');
+		const [across, own] = beside ? [target.width, glyph.width] : [target.height, glyph.height];
+		return Math.max(0, (parseFloat(across) - own) / 2) || 0;
+	}
+
 	function raise(): void {
 		beside = ridesTheRung();
+		reach = targetReach();
 		open = true;
 	}
 </script>
@@ -153,7 +170,7 @@
 			collisionBoundary={bounds}
 			side={beside ? 'right' : 'top'}
 			align={beside ? 'center' : 'start'}
-			sideOffset={6}
+			sideOffset={6 + reach}
 			trapFocus={false}
 			onOpenAutoFocus={(e: Event) => e.preventDefault()}
 			onCloseAutoFocus={(e: Event) => e.preventDefault()}

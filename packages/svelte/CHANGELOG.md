@@ -12,6 +12,8 @@
 
 **An open matrix's add box offers no add where an item of the list carries the typed words.** The add option is weighed against every item of the list, a roster member or an added item, its title read case and surrounding space aside, rather than against the results the box shows. Those end at a cap, and titles the search reads as the same words, `Kerning!` or `Kérning` beside `Kerning`, tie the exact title and could fill them ahead of it, so `Add “Kerning”` stood offered beside the `Kerning` the list held, and a pick added a second item of that title under a fresh id.
 
+**A field's guidance holds under a pointer resting at the edge of its info button.** The surface stands its offset clear of the button's target, the tap floor around the glyph, rather than of the glyph, which sets it that floor's overhang further out. Off the glyph it cleared the target by half a pixel, which the surface's rounding to the device pixel could spend: on a page zoomed out, or at some fractional pixel ratios, it landed on the target's edge, where a resting pointer left the button for the surface, closing it, and found the button again as it went, opening and closing it in a loop. A surface standing over its field and one riding the label rung both did.
+
 ## v0.18.0 - 2026-10-05
 
 **The `@quillmark/wasm` peer floor is `>=0.122.0-0`.** Only `true` and `false` are booleans, so a document's unquoted `no`, `off` or `yes` draws as the text written in a text field, where it drew `false` or `true`, and under a `boolean`, `number` or `integer` field it carries `validation::type_mismatch`. The boolean switch draws a stored value as the render reads it, a `"False"` or a `0` off, and one the render refuses as an absent value, where it drew any non-empty string on.
