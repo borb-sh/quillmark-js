@@ -690,6 +690,7 @@
 						<ProseValue
 							bind:this={els[id]}
 							content={() => readAt([k])}
+							value={arr[k]}
 							plaintext={items != null && baseType(items) === 'plaintext'}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}

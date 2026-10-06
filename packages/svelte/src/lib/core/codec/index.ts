@@ -64,7 +64,7 @@ export { usvToPM, pmToUsv, buildLineIndex } from './positions.js';
 export type { LineIndex } from './positions.js';
 
 // Reconciliation gate.
-export { createReconciler, contentEqual } from './reconcile.js';
+export { createReconciler, contentEqual, valueEqual } from './reconcile.js';
 export type { Reconciler } from './reconcile.js';
 
 // Input rules (`createField` mounts them unless `noInputRules`/`plaintext`).

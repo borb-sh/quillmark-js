@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A prose element or prose cell follows a write that lands under it.** An array's prose element and a subform's prose cell, an `object`'s property, a variant's cell or a matrix column, read their content again through `reader.getContentAt` wherever the form's re-derive, which every field and structure edit runs, hands down a value that moved, and replace the view where the read differs from what the leaf last committed or took. A write from the source view, another author or another surface is what the next keystroke edits, where the leaf kept the content it mounted over and its next keystroke wrote that back over the write. The hold is judged again of each replacement, so a value gaining a list holds the leaf before a keystroke can flatten it, and one becoming a single plain paragraph releases it. The leaf's own commit comes back through the same re-derive and replaces nothing, so its caret and its undo history stay.
+
 ## v0.18.0 - 2026-10-05
 
 **The `@quillmark/wasm` peer floor is `>=0.122.0-0`.** Only `true` and `false` are booleans, so a document's unquoted `no`, `off` or `yes` draws as the text written in a text field, where it drew `false` or `true`, and under a `boolean`, `number` or `integer` field it carries `validation::type_mismatch`. The boolean switch draws a stored value as the render reads it, a `"False"` or a `0` off, and one the render refuses as an absent value, where it drew any non-empty string on.
