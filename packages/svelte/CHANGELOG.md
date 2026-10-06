@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.19.0 - 2026-10-06
+
 **The `@quillmark/wasm` peer floor is `>=0.123.0-0`.** An open matrix's added item whose `title` is `""` or whitespace alone carries `validation::enum_violation` at its key, which blocks the render, so emptying an added item's title input draws that diagnostic under the item until a title is typed. A number under a `boolean` field prints by whether it is non-zero, as its switch already draws it, so `1e-17` prints on where it printed off, and a comment drops the whitespace ending its line. An options object, `Addr` or `CardInput` that is not a plain object throws; every one the components pass is plain.
 
 **A bare value under an `array` field draws as one row.** The render reads `letterhead_caption: YOUR SQUADRON HERE` under an `array` as the one-element list it spells, and the field draws that row, where it drew a row per character, each empty under `richtext` or `plaintext` items, and threw on every edit, add, remove or move. The first gesture writes the list whole.
