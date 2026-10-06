@@ -3,8 +3,8 @@
 // it renders is PM's own: a leaf node's substitute DOM, holding one nested
 // `EditorView` per cell.
 //
-// A cell is a second content unit inside the first, so it gets the codec's inline mode
-// (one paragraph, no containers, no islands, marks and input rules intact);
+// A cell is a second content unit inside the first, so it gets its own schema (one
+// paragraph with hard breaks, no containers, no islands, marks and input rules intact);
 // `table.ts` owns that translation. A cell edit does not touch the field's text:
 // the projection goes back onto the node's `props` attribute with `setNodeMarkup`,
 // and the field's own `dispatchTransaction` lowers that to an `islandOps` `set`
@@ -33,7 +33,8 @@ import type { TableCell, TableProps } from '@quillmark/wasm';
 import { decode } from './decode.js';
 import { inputRulesPlugin } from './inputrules.js';
 import { tablePropsOfNode } from './islands.js';
-import { inlineSchema } from './schema.js';
+import { breakKeymap } from './breaks.js';
+import { cellSchema } from './schema.js';
 import {
 	cellAt,
 	cellContent,
@@ -175,7 +176,7 @@ function chromeButton(className: string, label: string, run: () => void): HTMLBu
 /** A cell's plugin stack: marks and the markdown shorthands, and nothing that
  *  belongs to the field (history, anchors, the ghost). */
 function cellPlugins(keys: Record<string, Command>) {
-	return [inputRulesPlugin(inlineSchema), keymap(keys), keymap(baseKeymap)];
+	return [inputRulesPlugin(cellSchema), keymap(keys), keymap(baseKeymap)];
 }
 
 /** The band's controls, each of which answers for its own press. Spelled apart from
@@ -364,7 +365,7 @@ class TableIslandView implements NodeView {
 			if (cellEqual(stored, mounted.shown)) continue;
 			const head = mounted.view.state.selection.head;
 			const fresh = EditorState.create({
-				doc: decode(cellContent(stored), inlineSchema),
+				doc: decode(cellContent(stored), cellSchema),
 				plugins: cellPlugins(this.cellKeys(mounted.r, mounted.c))
 			});
 			mounted.view.updateState(fresh);
@@ -1100,7 +1101,7 @@ class TableIslandView implements NodeView {
 		const seed = cellAt(props, r, c);
 		const view: EditorView = new EditorView(host, {
 			state: EditorState.create({
-				doc: decode(cellContent(seed), inlineSchema),
+				doc: decode(cellContent(seed), cellSchema),
 				plugins: cellPlugins(this.cellKeys(r, c))
 			}),
 			attributes: { 'aria-label': name, class: 'qm-table-cell-editor' },
@@ -1195,15 +1196,14 @@ class TableIslandView implements NodeView {
 	 * (VISUAL_EDITOR §Chrome), except that it binds on the nested view: the outer
 	 * keymap never sees a keystroke a cell handled (`stopEvent`).
 	 *
-	 * Enter is the next row, forced: a `TableCell` has one `text` and no line
-	 * concept, and `continues` is a line flag with no cell analogue, so a newline in
-	 * a cell has no representation to be a preference about.
+	 * Enter is the next row. Shift-Enter is a line break, the body's own command
+	 * (`breaks.ts`): one `\n` in the cell's `text`.
 	 */
 	private cellKeys(r: number, c: number): Record<string, Command> {
 		const marks: Record<string, Command> = {};
-		if (inlineSchema.marks.strong) marks['Mod-b'] = toggleMark(inlineSchema.marks.strong);
-		if (inlineSchema.marks.em) marks['Mod-i'] = toggleMark(inlineSchema.marks.em);
-		if (inlineSchema.marks.underline) marks['Mod-u'] = toggleMark(inlineSchema.marks.underline);
+		if (cellSchema.marks.strong) marks['Mod-b'] = toggleMark(cellSchema.marks.strong);
+		if (cellSchema.marks.em) marks['Mod-i'] = toggleMark(cellSchema.marks.em);
+		if (cellSchema.marks.underline) marks['Mod-u'] = toggleMark(cellSchema.marks.underline);
 		// Up and down are the grid's own walk: nothing else moves the caret vertically,
 		// and `focusCell` clamps, so neither can grow the table. Left and right do not
 		// traverse at all: at a text edge they would call what Tab and Shift-Tab already
@@ -1254,6 +1254,7 @@ class TableIslandView implements NodeView {
 		};
 		return {
 			...marks,
+			...breakKeymap(cellSchema),
 			// One undo stack per leaf: a cell carries no history of its own, so Mod-z
 			// unwinds a cell keystroke and a row op in the order they happened.
 			'Mod-z': () => undo(this.outer.state, this.outer.dispatch),
@@ -1271,10 +1272,6 @@ class TableIslandView implements NodeView {
 			'Alt-ArrowRight': line('column', 1, true),
 			Tab: () => this.step(r, c, 1),
 			'Shift-Tab': () => this.step(r, c, -1),
-			// A cell is one line (`normalize` rewrites a cell newline to a space), so the
-			// key the body answers with a break is claimed here and does nothing: Enter
-			// already means the next row, and an unclaimed key is the browser's `<br>`.
-			'Shift-Enter': () => true,
 			Enter: () => {
 				// Over a rectangle it hands the caret back, which is the line verbs' own
 				// exit: the caret never left the cell, so there is nowhere else to put it.

@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.123.1-0`.** A table cell's `text` carries a `\n` as a line break, which the cell draws as one and markdown spells `<br>`. An inline `<br>` in a body is a hard break, where it rendered nothing, and one in a `richtext(inline)` field's value carries `validation::not_inline`, which blocks the render, so the field draws that diagnostic until the `<br>` is removed.
+
+**Shift-Enter in a table cell inserts a line break.** The cell stores it as one `\n` in its text, which markdown spells `<br>` and the preview typesets as a line break, and a cell holding one draws it as a break. Enter is the next row, as before.
+
 ## v0.19.0 - 2026-10-06
 
 **The `@quillmark/wasm` peer floor is `>=0.123.0-0`.** An open matrix's added item whose `title` is `""` or whitespace alone carries `validation::enum_violation` at its key, which blocks the render, so emptying an added item's title input draws that diagnostic under the item until a title is typed. A number under a `boolean` field prints by whether it is non-zero, as its switch already draws it, so `1e-17` prints on where it printed off, and a comment drops the whitespace ending its line. An options object, `Addr` or `CardInput` that is not a plain object throws; every one the components pass is plain.
