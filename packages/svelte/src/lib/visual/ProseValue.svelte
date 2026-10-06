@@ -25,16 +25,15 @@
  declaring no `inline` takes the full row ({@link ObjectField}), a `richtext` one on the
  block schema and a `plaintext` one on the plain schema, paragraphs and hard breaks.
  An array element is one textblock whatever it declares, since Enter there is the
- repeater's. There is no slash menu at either width, and an island draws as its
- placeholder: an atom a keystroke can delete and no view edits.
+ repeater's. There is no slash menu at either width, and no island view.
 
- A leaf over content its schema cannot hold is held: a narrowed one over anything but
- one plain paragraph (`fitsInline`), a plain one over anything but plain lines
- (`fitsPlain`). Its decode would join or drop what is left over, and the first
- keystroke would write that loss back, so a held leaf draws its content on the block
- schema, read-only, with a note inside its box, and commits nothing. The hold is judged
- of what each mount and each replacement reads, so a write moving the value takes it
- or releases it.
+ A leaf over content it cannot edit is held (`fitsLeaf`): a narrowed one over anything
+ but one plain paragraph, a plain one over anything but plain lines, where the decode
+ would join or drop what is left over for the first keystroke to write back, and a block
+ one over an island, which draws as its placeholder tag, an atom a keystroke deletes
+ unseen. A held leaf draws its content on the block schema, read-only, with a note
+ inside its box, and commits nothing. The hold is judged of what each mount and each
+ replacement reads, so a write moving the value takes it or releases it.
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
@@ -152,13 +151,14 @@
 	function mountView(mount: HTMLDivElement): () => void {
 		return untrack(() => {
 			const inline = !block;
+			const leaf = { inline, plaintext, islands: false };
 			const names = { label, labelledBy, describedBy };
 			const shown = (stored: Content | undefined): Content => stored ?? fallback ?? emptyContent();
 			const stored = content();
 			let seen = value;
 			let defaulted = stored === undefined && !!fallback;
 			const reconciler = createReconciler(shown(stored));
-			held = !fitsLeaf(reconciler.last, { inline, plaintext });
+			held = !fitsLeaf(reconciler.last, leaf);
 			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
 			// (`proseAttributes`), so a cell carrying a label element and a row carrying
 			// none cannot name their regions by different rules.
@@ -214,7 +214,7 @@
 				seen = next;
 				const read = content();
 				const current = shown(read);
-				const holds = !fitsLeaf(current, { inline, plaintext });
+				const holds = !fitsLeaf(current, leaf);
 				const wasDefaulted = defaulted;
 				defaulted = read === undefined && !!fallback;
 				if (holds === held && !reconciler.shouldRehydrate(current)) {

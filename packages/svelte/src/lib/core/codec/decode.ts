@@ -114,12 +114,18 @@ export function fitsPlain(rt: Content): boolean {
 	return core().isPlain({ ...rt, marks: [] });
 }
 
-/** Whether `rt` decodes under the schema a leaf so declared mounts, losing nothing its
- *  first commit would store: {@link fitsInline} narrowed, {@link fitsPlain} plain, and
- *  anything on the block schema. What a leaf held over the rest reads. */
-export function fitsLeaf(rt: Content, leaf: { inline: boolean; plaintext: boolean }): boolean {
+/** Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed
+ *  and {@link fitsPlain} plain, past which the decode drops what the first commit would
+ *  store; on the block schema anything, but an island where the leaf mounts no island
+ *  view (`islands`), which draws as its placeholder tag, an atom a keystroke deletes
+ *  unseen. What a leaf held over the rest reads. */
+export function fitsLeaf(
+	rt: Content,
+	leaf: { inline: boolean; plaintext: boolean; islands: boolean }
+): boolean {
 	if (leaf.inline) return fitsInline(rt);
-	return !leaf.plaintext || fitsPlain(rt);
+	if (leaf.plaintext) return fitsPlain(rt);
+	return leaf.islands || rt.islands.length === 0;
 }
 
 /** Inline decode: one paragraph, containers and islands stripped. */

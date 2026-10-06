@@ -108,8 +108,9 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	/** What an unset optional cell (`t?`) ghosts at rest: the `none` it prints
 	 *  unanswered, in the product's words. */
 	optionalGhost: string;
-	/** Under a prose leaf holding more structure than it can edit (paragraphs, a list,
-	 *  an island in a one-line cell), which it draws read-only rather than flatten. */
+	/** Under a prose leaf holding more structure than it can edit (paragraphs, a list or
+	 *  an island in a one-line leaf, an island in any subform cell), which it draws
+	 *  read-only rather than lose. */
 	proseHeld: string;
 
 	// ── Formatting popover ────────────────────────────────────────────────────

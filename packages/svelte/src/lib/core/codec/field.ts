@@ -356,7 +356,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// Judged of the value being mounted rather than read off a diagnostic: a routed set
 	// can predate the value it arrives with, and `validation::not_plain` stands in for
 	// `not_inline` on a `plaintext(inline)` field.
-	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext });
+	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext, islands: true });
 	let held = holds(reconciler.last);
 	const named = proseAttributes(opts) ?? {};
 	const defaultNamed = { ...named, 'data-default': '' };
