@@ -32,10 +32,10 @@
 		"gate": "npm run gate:fast && npm run build && npm run check:bundle && npm test"
 	},
 	"overrides": {
-		"@quillmark/wasm": "0.122.0"
+		"@quillmark/wasm": "0.123.0"
 	},
 	"devDependencies": {
-		"@quillmark/wasm": "0.122.0",
+		"@quillmark/wasm": "0.123.0",
 		"postcss": "^8.5.0",
 		"prettier": "^3.9.0",
 		"prettier-plugin-svelte": "^4.1.0"
