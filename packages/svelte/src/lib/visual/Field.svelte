@@ -407,7 +407,6 @@
 					labelId={domIds.label}
 					descriptionId={domIds.description}
 					idBase={domIds.control}
-					listKey={leafKey}
 					{contentAt}
 					onCommit={onCommitScalar}
 					diagnostics={deep}

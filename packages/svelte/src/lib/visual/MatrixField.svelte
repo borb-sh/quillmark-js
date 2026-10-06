@@ -10,8 +10,9 @@
 
  An open matrix's added items follow the roster in id order, as the plate prints them:
  held by being present, so each draws a fixed tick, its `title` as an input, a remove,
- and the same columns. The add box closes the list ({@link MatrixAdd}): it searches
- every checklist of the document before it offers to add what was typed.
+ and the same columns. The add box closes the list ({@link MatrixAdd}): what is typed
+ there is added under an id minted from it past every id the list holds, so a title the
+ list already carries is a second item.
 
  The control owns its label row, as an array does: the count of held items sits
  where an array's add chip sits, so {@link Field} skips its own label for it.
@@ -48,16 +49,7 @@
 		onRoster,
 		schemaAt
 	} from './structure.js';
-	import {
-		checklistCarries,
-		checklists,
-		matrixPrinted,
-		searchChecklists,
-		type AddOption,
-		type Checklist,
-		type ChecklistHit,
-		type Searchable
-	} from './checklists.js';
+	import { matrixPrinted } from './checklists.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
 	import { propertyDomIds } from './domid.js';
@@ -86,9 +78,6 @@
 		/** The field's control id: the base a member's tick and columns derive their own
 		 *  names from, one `-m-<member id>` segment down. */
 		idBase?: string;
-		/** The field's leaf key, where it is a card's own field: how the add box tells
-		 *  this list from the rest of the document's (`checklists.ts`). */
-		listKey?: string;
 		/** The boundary's nested content read, rooted at this field: a member's content
 		 *  column reads at `[id, column]` (`reader.getContentAt`). */
 		contentAt: (path: PathStep[]) => Content | undefined;
@@ -105,16 +94,11 @@
 		labelId,
 		descriptionId,
 		idBase,
-		listKey,
 		contentAt,
 		onCommit,
 		diagnostics
 	}: Props = $props();
 
-	// A card's own matrix searches the document's lists; one nested in a container is
-	// not indexed, and searches its own items alone.
-	const index = checklists();
-	const others = (): readonly Checklist[] => (listKey != null ? (index?.list() ?? []) : []);
 	const members = $derived(matrixMembers(schema.members));
 	const compact = $derived(!!schema.ui?.compact);
 	const hasColumns = $derived(Object.keys(schema.properties ?? {}).length > 0);
@@ -221,47 +205,6 @@
 	}
 
 	// ── The add box ────────────────────────────────────────────────────────────
-	/** A result's list: this one, or another of the document's. */
-	type Hit = ChecklistHit<Checklist | undefined>;
-	function options(query: string): AddOption[] {
-		const own: Searchable<Checklist | undefined> = { list: undefined, schema, value: map };
-		const lists: Searchable<Checklist | undefined>[] = others()
-			.filter((l) => l.key !== listKey)
-			.map((l) => ({ list: l, schema: l.schema, value: l.value }));
-		const hits = searchChecklists(query, [own, ...lists]);
-		const out: AddOption[] = hits.map((h, k) => ({
-			key: `hit-${k}`,
-			title: h.title,
-			note:
-				[
-					h.list ? t.strings.matrixIn(h.list.label) : undefined,
-					h.held ? t.strings.matrixHeldTag : undefined
-				]
-					.filter(Boolean)
-					.join(' · ') || undefined,
-			strong: h.strong,
-			payload: h
-		}));
-		// Offered last, and not where an item of this list already carries the words.
-		if (!checklistCarries(schema, map, query))
-			out.push({ key: 'add', title: t.strings.matrixAddNew(query), add: true });
-		return out;
-	}
-	async function choose(option: AddOption, query: string): Promise<void> {
-		if (option.add) return add(query);
-		const hit = option.payload as Hit;
-		const other = hit.list;
-		if (other) {
-			if (!hit.held) other.commit(commitMember(other.value, hit.id, memberWrite({})));
-			index?.land(`${other.path}.${hit.id}`);
-			return;
-		}
-		if (!hit.held) commit(commitMember(map, hit.id, ticked(hit.id)));
-		await flush();
-		focusPath([hit.id]);
-		const box = ref(memberEls, hit.id);
-		if (box) bloomInside(box);
-	}
 	async function add(title: string): Promise<void> {
 		const taken = (id: string) => onRoster(schema, id) || (map != null && Object.hasOwn(map, id));
 		const id = addedId(title, taken);
@@ -397,8 +340,7 @@
 			bind:this={addEl}
 			id={`${base}-add`}
 			placeholder={t.strings.matrixAdd(label ?? '')}
-			{options}
-			onChoose={choose}
+			onAdd={add}
 		/>
 	{/if}
 	<DiagnosticList diagnostics={foot} />

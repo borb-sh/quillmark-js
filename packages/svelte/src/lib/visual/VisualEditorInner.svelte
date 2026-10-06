@@ -82,7 +82,6 @@
 	import { createLeafRegistry, type ActiveProse, type FieldControl } from './leaves.js';
 	import { reorder, reorderArm, reorderTrips } from './motion.js';
 	import { tipsChannel } from './tips.js';
-	import { cardChecklists, setChecklists } from './checklists.js';
 	import { patchEditorExt } from './ext.js';
 	import Card from './Card.svelte';
 	import TipsCard from './TipsCard.svelte';
@@ -653,20 +652,6 @@
 			)
 		};
 	});
-
-	// The document's checklists, which an open matrix's add box searches whole
-	// (`checklists.ts`): off the model, so a list in a closed group or another card is
-	// reached without being mounted.
-	const lists = $derived(
-		cardChecklists(
-			[model.main, ...model.cards],
-			(c) => c.titleOverride || c.titlePlaceholder,
-			(c, field) => pathFor(makeAddr(c.id, c.isMain, field)),
-			(c, field) => fieldKeyToString({ card: c.isMain ? undefined : c.id, field }),
-			(c, field, next) => commitScalar(c.id, c.isMain, field, next)
-		)
-	);
-	setChecklists({ list: () => lists, land: (path) => void focusField(path) });
 
 	// ── Public entry points ─────────────────────────────────────────────────────
 	/**
