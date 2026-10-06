@@ -142,7 +142,7 @@
           bottom + center,
           dy: -0.625in,
           align(center)[
-            #text(fill: LETTERHEAD_COLOR, font: "cinzel", size: 15pt)[#footer-tag-line]
+            #text(fill: LETTERHEAD_COLOR, font: "Spectral SC", size: 15pt)[#footer-tag-line]
           ],
         )
       }
