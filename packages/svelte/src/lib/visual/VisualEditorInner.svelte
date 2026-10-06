@@ -46,7 +46,7 @@
 	import type { VisualEditorProps } from './props.js';
 	import { mergeStrings, setWording } from './strings.js';
 	import type { CardId, ChangeSource } from './signals.js';
-	import type { FieldController } from '../core/codec/index.js';
+	import type { FieldController, LeafViews } from '../core/codec/index.js';
 	import {
 		IdSeq,
 		controlKind,
@@ -79,7 +79,7 @@
 		type RoutedDiagnostic
 	} from './diagnostics.js';
 	import { fieldDomIds, groupPanelId } from './domid.js';
-	import { createLeafRegistry, type FieldControl } from './leaves.js';
+	import { createLeafRegistry, type ActiveProse, type FieldControl } from './leaves.js';
 	import { reorder, reorderArm, reorderTrips } from './motion.js';
 	import { tipsChannel } from './tips.js';
 	import { cardChecklists, setChecklists } from './checklists.js';
@@ -694,12 +694,18 @@
 		const box = await land(found, at.granularity === 'segment' ? undefined : at.pos);
 		if (span.alive) bloomInside(box);
 	}
-	/** The active leaf's controller: the formatting popover's observation seam.
-	 *  `undefined` for a focused form control, which holds no marks to toggle. */
-	export function getActiveLeaf(): FieldController | undefined {
+	/** The active prose leaf: the formatting popover's observation seam. The active
+	 *  field's controller where it registered one, else the by-value leaf focused last
+	 *  under it (`leaves.ts`); `undefined` for a form control, which holds no marks to
+	 *  toggle. */
+	export function getActiveLeaf(): ActiveProse | undefined {
 		if (!activeAddr) return undefined;
 		const card = activeAddr.card != null ? activeCardId : undefined;
-		return leaves.prose(fieldKeyToString({ card, field: activeAddr.field }));
+		const key = fieldKeyToString({ card, field: activeAddr.field });
+		const controller = leaves.prose(key);
+		if (controller) return { views: controller as FieldController & LeafViews, controller };
+		const views = leaves.value(key);
+		return views && { views };
 	}
 
 	/**

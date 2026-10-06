@@ -2,16 +2,18 @@
  The formatting selection popover (VISUAL_EDITOR §Chrome). One popover,
  shell-owned, observing the active leaf through
  `getActiveLeaf`: the VisualEditor's accessor over its `leaves` registry, and
- the whole of what this surface knows about the editor. A non-empty selection in
- the active leaf raises it over
- that leaf's selection rect; each button dispatches a PM `toggleMark` command
- straight at the leaf's `EditorView`. The codec's own `dispatchTransaction`
- (field.ts, read-only from here) lowers the resulting transaction to
- `markOps` and commits via `applyChange`: this component never touches the
- content. The keymap mirror (Mod-b/i/u) already lives in the codec's keymap
- (field.ts); this is the pointer affordance for all six marks.
+ the whole of what this surface knows about the editor. The active leaf is a
+ field's or a by-value one (an array's element, a subform's cell): its views either
+ way, its controller only for a field's. A non-empty selection in the active leaf
+ raises it over that leaf's selection rect; each button dispatches a PM `toggleMark`
+ command straight at the leaf's `EditorView`, whose own `dispatchTransaction` commits
+ the result as it commits a keystroke: a field's lowers it to `markOps` through
+ `applyChange` (field.ts), a by-value leaf's hands the re-encoded value to its parent
+ (`ProseValue`). This component never touches the content. The keymap mirror
+ (Mod-b/i/u) already lives in the codec's keymap (field.ts); this is the pointer
+ affordance for all six marks.
 
- Selection observation. The view's `dispatchTransaction` is the codec's
+ Selection observation. The view's `dispatchTransaction` is the leaf's
  (read-only), so there is no hook to observe transactions from outside.
  Fallback: a document-level `selectionchange` listener, coalesced to one
  `requestAnimationFrame`-deferred check (see `deferredSync` below: a bare
@@ -65,21 +67,14 @@
 	import { Popover } from 'bits-ui';
 	import Icon from './icons/Icon.svelte';
 	import type { IconName } from './icons/nodes.js';
-	import {
-		hasMarks,
-		rangeAnchor,
-		type FieldController,
-		type LeafViews,
-		type RangeAnchor
-	} from '../core/codec/index.js';
+	import { hasMarks, rangeAnchor, type RangeAnchor } from '../core/codec/index.js';
+	import type { ActiveProse } from './leaves.js';
 	import { clearLink, hrefInSelection, normalizeHref, setLink } from './links.js';
 	import './controls.css';
 
-	type LeafWithView = FieldController & Partial<LeafViews>;
-
 	interface Props {
 		/** The observation seam VisualEditor exposes over its `leaves` registry. */
-		getActiveLeaf: () => FieldController | undefined;
+		getActiveLeaf: () => ActiveProse | undefined;
 	}
 	let { getActiveLeaf }: Props = $props();
 
@@ -99,8 +94,8 @@
 	let open = $state(false);
 	/** A pointer is down outside this surface: the selection is still being made. */
 	let pressed = false;
-	/** Whether the selection is in the field's coordinate space, which an anchor needs
-	 *  and a table cell is not (see `sync`). */
+	/** Whether an anchor can be minted over the selection: in a field's own view, never
+	 *  in a table cell or a by-value leaf (see `sync`). */
 	let anchorAvailable = $state(true);
 	let linkPromptOpen = $state(false);
 	/** Whether the selection carried a link when the prompt was raised. */
@@ -122,8 +117,7 @@
 	 * too, so a selection in a cell raises the same popover and toggles the same
 	 * commands; only `anchor` is withheld (below). */
 	function activeLeafView(): EditorView | undefined {
-		const leaf = getActiveLeaf() as LeafWithView | undefined;
-		return leaf?.focusedView?.() ?? leaf?.view;
+		return getActiveLeaf()?.views.focusedView();
 	}
 
 	function sync(): void {
@@ -134,8 +128,8 @@
 		// returns early, so a surface frozen here still tracks the selection it covers.
 		if (insidePopover) return;
 		if (pressed) return;
-		const leaf = getActiveLeaf() as LeafWithView | undefined;
-		const view = leaf?.focusedView?.() ?? leaf?.view;
+		const leaf = getActiveLeaf();
+		const view = leaf?.views.focusedView();
 		// A non-empty text selection. A node selection is non-empty too and has nothing
 		// to format: it covers a leaf block (an island, a rule), which is exactly where
 		// Escape out of a table cell lands.
@@ -160,11 +154,13 @@
 		portalTarget = view.dom.closest<HTMLElement>('[data-qm-root]') ?? undefined;
 		const { from, to } = view.state.selection;
 		anchor = rangeAnchor(view, from, to);
-		// A selection inside a table cell is not in the field's coordinate space at all:
-		// the field's position map holds one `atom` run for the whole island, so there is
-		// no USV offset to mint an anchor at. The button is withheld rather than
-		// disabled, because what it would toggle does not exist there (CODEC §Islands).
-		anchorAvailable = !!leaf && view === leaf.view;
+		// An anchor is minted through a field's controller, which a by-value leaf has
+		// none of: its anchors are dropped on the parent's value write. A selection inside
+		// a table cell is not in the field's coordinate space at all: the field's position
+		// map holds one `atom` run for the whole island, so there is no USV offset to mint
+		// an anchor at. The button is withheld rather than disabled, because what it would
+		// toggle does not exist there (CODEC §Islands).
+		anchorAvailable = !!leaf?.controller && view === leaf.views.view;
 		open = true;
 	}
 
@@ -283,7 +279,7 @@
 	 * the content, its chrome awaiting comment-thread UX.
 	 */
 	function toggleAnchor(): void {
-		const leaf = getActiveLeaf();
+		const leaf = getActiveLeaf()?.controller;
 		const view = activeLeafView();
 		if (!leaf || !view || view.state.selection.empty) return;
 		const { from, to } = leaf.selectionRange();

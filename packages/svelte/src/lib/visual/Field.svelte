@@ -27,7 +27,7 @@
 		ResolvedField
 	} from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
-	import type { LandingBox, LeafRegistry } from './leaves.js';
+	import { seatValueLeaves, type LandingBox, type LeafRegistry } from './leaves.js';
 	import type { FieldModel, FieldSpan } from './structure.js';
 	import {
 		VARIANT_DISCRIMINANT,
@@ -249,6 +249,13 @@
 		});
 		return () => registry.unregisterControl(key);
 	}
+
+	// A by-value prose leaf anywhere inside this field's containers is reached under
+	// this field's key: the active address names the field, never the element or cell.
+	seatValueLeaves({
+		focus: (leaf) => leaves?.focusValue(leafKey, leaf),
+		release: (leaf) => leaves?.releaseValue(leafKey, leaf)
+	});
 
 	/**
 	 * A form control has no controller to report its focus through, so the wrapper

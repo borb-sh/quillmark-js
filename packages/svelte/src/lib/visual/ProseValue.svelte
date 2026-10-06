@@ -11,6 +11,12 @@
  Mounts once per stable key (an element's session id, a property's name), so the
  parent's re-derive leaves the caret where it is.
 
+ Having no address, it registers no controller: it announces its views into the
+ registry's by-value lane under the field it stands in (`leaves.ts`), the formatting
+ popover's door to it. A focus on an editable leaf announces them, and so does a write
+ releasing the leaf under the caret; a hold and an unmount withdraw them, and a blur
+ does not, the popover's link prompt taking the focus from the view it writes to.
+
  The content is read, not passed: `reader.getContentAt(addr, path)` decodes through
  the codec the leaf's own declared type names, so what it rests as — the content
  object, a `plaintext` literal, the authored string a transport door left — stops
@@ -53,8 +59,10 @@
 		buildLineIndex,
 		pmToUsv,
 		usvToPM,
-		valueEqual
+		valueEqual,
+		type LeafViews
 	} from '../core/codec/index.js';
+	import { valueLeafSeat } from './leaves.js';
 	import { wording } from './strings.js';
 	import './controls.css';
 	import type { Content } from '@quillmark/wasm';
@@ -112,6 +120,7 @@
 	}: Props = $props();
 
 	const t = wording();
+	const seat = valueLeafSeat();
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
 	let held = $state(false);
@@ -201,6 +210,10 @@
 						reconciler.commit(shown(content()));
 					},
 					handleDOMEvents: {
+						focus: () => {
+							if (!held) seat?.focus(views);
+							return false;
+						},
 						keydown: (_v, e) => {
 							onKey?.(e);
 							return false;
@@ -208,6 +221,11 @@
 					}
 				}
 			);
+			const views: LeafViews = {
+				view: mounted,
+				focusedView: () => mounted,
+				nestedViews: () => []
+			};
 			view = mounted;
 			follow = (next) => {
 				if (valueEqual(next, seen)) return;
@@ -222,6 +240,8 @@
 					return;
 				}
 				held = holds;
+				if (held) seat?.release(views);
+				else if (mounted.hasFocus()) seat?.focus(views);
 				// The caret keeps its offset, clamped, as a field's re-hydrate keeps it.
 				const caret = pmToUsv(buildLineIndex(mounted.state.doc), mounted.state.selection.head);
 				const fresh = build(current);
@@ -230,6 +250,7 @@
 				reconciler.commit(current);
 			};
 			return () => {
+				seat?.release(views);
 				follow = undefined;
 				view = undefined;
 				mounted.destroy();
