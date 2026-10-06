@@ -361,7 +361,7 @@
 			{:else if field.control === 'array'}
 				<ArrayField
 					bind:this={arrayEl}
-					value={value as unknown[] | undefined}
+					{value}
 					fallback={Array.isArray(field.schema.default) ? field.schema.default : undefined}
 					items={field.schema.items}
 					layout={arrayLayout(field.schema)}

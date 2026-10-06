@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A bare value under an `array` field draws as one row.** The render reads `letterhead_caption: YOUR SQUADRON HERE` under an `array` as the one-element list it spells, and the field draws that row, where it drew a row per character, each empty under `richtext` or `plaintext` items, and threw on every edit, add, remove or move. The first gesture writes the list whole.
+
 ## v0.18.0 - 2026-10-05
 
 **The `@quillmark/wasm` peer floor is `>=0.122.0-0`.** Only `true` and `false` are booleans, so a document's unquoted `no`, `off` or `yes` draws as the text written in a text field, where it drew `false` or `true`, and under a `boolean`, `number` or `integer` field it carries `validation::type_mismatch`. The boolean switch draws a stored value as the render reads it, a `"False"` or a `0` off, and one the render refuses as an absent value, where it drew any non-empty string on.
