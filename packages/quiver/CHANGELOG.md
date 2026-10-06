@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.34.0 - 2026-10-05
+
 **The `@quillmark/wasm` peer floor is `>=0.122.0-0`.** A packed quill writing a word where `Quill.yaml` takes a boolean fails its load: a `default:` as `quill::default_type_mismatch`, a kind's `seed:` as `quill::seed_type_mismatch`, `inline:`, `open:`, `ui.compact` or `ui.multiline` as `quill::field_parse_error`, `body.enabled` as `quill::invalid_body`, and `!!bool` on a word as `quill::yaml_parse_error`. A word in `values:`, as a matrix member's title or as a `string` field's `default:` loads as the string written.
 
 ## v0.33.0 - 2026-09-30
