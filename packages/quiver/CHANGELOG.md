@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.35.0 - 2026-10-06
+
 **The `@quillmark/wasm` peer floor is `>=0.123.0-0`.** A packed quill whose open matrix's `default:` holds an added item with a blank `title` fails its load as `quill::default_not_in_enum`, and a kind's `seed:` as `quill::seed_enum_violation`. An acroform quill whose `form.pdf` holds a widget in a page's `/Annots` fails to open as `pdf::existing_acroform`, and one whose trailer, catalog or page-tree node names a key twice or with no value as `pdf::parse`.
 
 ## v0.34.0 - 2026-10-05
