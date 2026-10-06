@@ -276,6 +276,26 @@ describe('an open matrix', () => {
 		expect(document.activeElement).toBe(addBox(m));
 	});
 
+	it("draws the engine's refusal of an emptied title under its item", () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		doc.storeField('checks', { kerning: { title: 'Kerning' } });
+		const first = mountEditor(q, doc);
+		const title = matrix(first.target).querySelector<HTMLInputElement>('.qm-member-title-input')!;
+
+		type(title, '');
+		expect(stored(doc)).toEqual({ kerning: { title: '' } });
+		const diagnostics = q.validate(doc);
+		expect(diagnostics.map((d) => [d.code, d.path])).toEqual([
+			['validation::enum_violation', 'main.checks.kerning']
+		]);
+		unmountAll();
+
+		const m = matrix(mountEditor(q, doc, { diagnostics }).target);
+		const item = m.querySelector<HTMLElement>('.qm-member.added')!;
+		expect(item.querySelector('.qm-diag-line')?.textContent).toBe(diagnostics[0].message);
+	});
+
 	it("draws added items after the roster in id order, the plate's order", () => {
 		const q = quill();
 		const doc = q.seedDocument();
