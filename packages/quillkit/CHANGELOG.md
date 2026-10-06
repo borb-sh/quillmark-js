@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.14.0 - 2026-10-05
+
 **The carried `@quillmark/wasm` is 0.122.0, and only `true` and `false` are booleans.** An unquoted `y`, `n`, `yes`, `no`, `on` or `off`, in any case, is the text written: a `string` field prints it where it printed `false` or `true`, and a `boolean`, `number` or `integer` field fails validation as `validation::type_mismatch` and the render as `validation::coercion_failed`. A word where `Quill.yaml` takes a boolean fails the load. A Typst `plate_file` holding a `\` fails to open as `typst::plate_path_invalid`, a tag warns as `parse::unsupported_yaml_tag` on every node that carries one, and a failed Typst render lists the quill's load warnings after its errors, which studio prints at their own severity.
 
 ## v0.13.0 - 2026-09-30
