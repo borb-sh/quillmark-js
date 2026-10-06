@@ -2,7 +2,13 @@
 // across the document's checklists, and in what order.
 import { describe, it, expect } from 'vitest';
 import type { QuillFieldSchema } from '@quillmark/wasm';
-import { matchScore, matchTitle, matrixPrinted, searchChecklists } from '$lib/visual/checklists';
+import {
+	checklistCarries,
+	matchScore,
+	matchTitle,
+	matrixPrinted,
+	searchChecklists
+} from '$lib/visual/checklists';
 
 describe('matchScore', () => {
 	it('names a title by whole words, openings and abbreviations', () => {
@@ -107,6 +113,21 @@ describe('searchChecklists', () => {
 		expect(
 			searchChecklists('member', [{ list: 0, schema: wide, value: undefined }], 3)
 		).toHaveLength(3);
+	});
+});
+
+describe('checklistCarries', () => {
+	const staff: QuillFieldSchema = { type: 'matrix', members: { haf: 'HAF Staff' }, open: true };
+	const value = { wing_cc: { title: 'Wing CC' } };
+
+	it('reads every item of the list, roster and added alike, case and surrounding space aside', () => {
+		expect(checklistCarries(staff, value, 'HAF Staff')).toBe(true);
+		expect(checklistCarries(staff, value, 'Wing CC')).toBe(true);
+		expect(checklistCarries(staff, value, 'haf staff')).toBe(true);
+		expect(checklistCarries(staff, value, '  Wing CC ')).toBe(true);
+		expect(checklistCarries(staff, value, 'Wing-CC')).toBe(false);
+		expect(checklistCarries(staff, value, 'Wing')).toBe(false);
+		expect(checklistCarries(staff, undefined, 'Wing CC')).toBe(false);
 	});
 });
 

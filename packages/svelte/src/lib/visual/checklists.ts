@@ -100,6 +100,16 @@ export function checklistItems(
 	return [...matrixMembers(schema.members), ...addedItems(schema, value)];
 }
 
+/** Whether an item of a matrix carries `title`, case and surrounding space aside. */
+export function checklistCarries(
+	schema: QuillFieldSchema,
+	value: Record<string, unknown> | undefined,
+	title: string
+): boolean {
+	const fold = (s: string) => s.trim().toLowerCase();
+	return checklistItems(schema, value).some((item) => fold(item.title) === fold(title));
+}
+
 /** One option of an add box. */
 export interface AddOption {
 	/** Stable across one query's options: the option element's id suffix. */

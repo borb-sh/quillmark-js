@@ -334,6 +334,32 @@ describe('an open matrix', () => {
 		expect(document.activeElement).toBe(tick(m, 'Fonts'));
 	});
 
+	it('offers no add where an item of the list carries the words past the results shown', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		// The search reads each as the one word `kerning`, so each ties the exact title
+		// and, ahead of it in id order, takes its place in the results.
+		const near = [
+			'Kerning!',
+			'Kerning?',
+			'Kerning.',
+			'Kerning:',
+			'(Kerning)',
+			'"Kerning"',
+			'Kérning',
+			'Kerning…'
+		];
+		doc.storeField('checks', {
+			...Object.fromEntries(near.map((title, i) => [`a${i}`, { title }])),
+			kerning: { title: 'Kerning' }
+		});
+		const mounted = mountEditor(q, doc);
+		const m = matrix(mounted.target);
+
+		typeAdd(m, 'Kerning');
+		expect(offered(m)).toEqual(near.map((title) => `${title} | held`));
+	});
+
 	it('walks its options with the arrows and clears on Escape', () => {
 		const q = quill();
 		const mounted = mountEditor(q, q.seedDocument());

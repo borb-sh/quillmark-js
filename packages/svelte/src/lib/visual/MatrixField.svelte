@@ -49,6 +49,7 @@
 		schemaAt
 	} from './structure.js';
 	import {
+		checklistCarries,
 		checklists,
 		matrixPrinted,
 		searchChecklists,
@@ -242,9 +243,8 @@
 			payload: h
 		}));
 		// Offered last, and not where an item of this list already carries the words.
-		const fold = (s: string) => s.trim().toLowerCase();
-		const dup = hits.some((h) => h.list === undefined && fold(h.title) === fold(query));
-		if (!dup) out.push({ key: 'add', title: t.strings.matrixAddNew(query), add: true });
+		if (!checklistCarries(schema, map, query))
+			out.push({ key: 'add', title: t.strings.matrixAddNew(query), add: true });
 		return out;
 	}
 	async function choose(option: AddOption, query: string): Promise<void> {
