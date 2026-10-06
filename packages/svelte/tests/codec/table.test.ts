@@ -12,7 +12,8 @@ import { describe, it, expect } from 'vitest';
 import { GapCursor } from 'prosemirror-gapcursor';
 import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { createField, decode, blockSchema, inlineSchema } from '$lib/core/codec';
+import { createField, decode, blockSchema } from '$lib/core/codec';
+import { cellSchema } from '$lib/core/codec/schema.js';
 import type { FieldController, LeafViews } from '$lib/core/codec';
 import {
 	cellContent,
@@ -35,7 +36,7 @@ import {
 } from '$lib/core/codec/table.js';
 import { mintIslandId } from '$lib/core/codec/islands.js';
 import type { Content, TableCell, TableProps } from '@quillmark/wasm';
-import { mount, press, quill, md } from './_util.js';
+import { core, mount, press, quill, md } from './_util.js';
 
 const TABLE_MD = 'para\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ntail';
 
@@ -152,7 +153,7 @@ describe('what the model already answers', () => {
 describe('the cell codec: a cell is its own content unit', () => {
 	/** A cell through decode and back: the round-trip a keystroke rides. */
 	function roundTrip(c: TableCell): TableCell {
-		return cellFromDoc(decode(cellContent(c), inlineSchema), c);
+		return cellFromDoc(decode(cellContent(c), cellSchema), c);
 	}
 
 	it("a cell's marks are cell-local and survive the trip", () => {
@@ -166,7 +167,7 @@ describe('the cell codec: a cell is its own content unit', () => {
 			marks: [{ start: 3, end: 3, type: 'anchor', attrs: { id: 'a1' } }] as TableCell['marks']
 		};
 		// Retype the cell to something longer, inserted before the anchor.
-		const edited = decode(cellContent({ text: 'XXabcd', marks: [] }), inlineSchema);
+		const edited = decode(cellContent({ text: 'XXabcd', marks: [] }), cellSchema);
 		const next = cellFromDoc(edited, c);
 		const anchor = next.marks.find((m) => m.type === 'anchor') as {
 			start: number;
@@ -182,7 +183,7 @@ describe('the cell codec: a cell is its own content unit', () => {
 			marks: [{ start: 2, end: 2, type: 'anchor', attrs: { id: 'a1' } }] as TableCell['marks']
 		};
 		// Typed at the anchor's own position: the one offset where the two assocs differ.
-		const edited = decode(cellContent({ text: 'abXcd', marks: [] }), inlineSchema);
+		const edited = decode(cellContent({ text: 'abXcd', marks: [] }), cellSchema);
 		const anchor = cellFromDoc(edited, c).marks.find((m) => m.type === 'anchor') as {
 			start: number;
 		};
@@ -212,9 +213,32 @@ describe('the cell codec: a cell is its own content unit', () => {
 		expect(cellEqual(stored, { ...stored, marks: [] })).toBe(false);
 	});
 
-	it('a cell holds no line: a stray newline joins rather than splitting', () => {
-		const c: TableCell = { text: 'one\ntwo', marks: [] };
-		expect(roundTrip(c).text).toBe('one two');
+	it('a hard break is one `\\n`, and a mark either side of it keeps its offsets', () => {
+		const strong = cellSchema.marks.strong.create();
+		const doc = cellSchema.node('doc', null, [
+			cellSchema.node('paragraph', null, [
+				cellSchema.text('a', [strong]),
+				cellSchema.node('hard_break'),
+				cellSchema.text('b', [strong]),
+				cellSchema.text('c')
+			])
+		]);
+		const cell = cellFromDoc(doc, emptyCell());
+		expect(cell).toEqual({
+			text: 'a\nbc',
+			marks: [
+				{ start: 0, end: 1, type: 'strong' },
+				{ start: 2, end: 3, type: 'strong' }
+			]
+		});
+		expect(decode(cellContent(cell), cellSchema).eq(doc)).toBe(true);
+	});
+
+	it('a mark spanning a stored `\\n` leaves the break unmarked, as decode does in prose', () => {
+		const spanning: TableCell = { text: 'a\nbc', marks: [{ start: 0, end: 3, type: 'strong' }] };
+		expect(decode(cellContent(spanning), cellSchema).toString()).toBe(
+			'doc(paragraph(strong("a"), hard_break, strong("b"), "c"))'
+		);
 	});
 });
 
@@ -655,6 +679,29 @@ describe('the table NodeView', () => {
 		expect(leafProps(field).header[0].text).toBe('h1');
 		// Where the edit was, not where a fresh state resolves to.
 		expect(cellViews(field)[0].state.selection.head).toBe(3);
+		field.destroy();
+	});
+
+	it('Shift-Enter in a cell is a line break: one `\\n` in its text, and no row', () => {
+		const { field } = tableLeaf(LETTERED);
+		const view = cellViews(field)[0];
+		view.focus();
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 2)));
+		press(view, 'Enter', { shiftKey: true });
+		expect(leafProps(field).header[0].text).toBe('h\n1');
+		expect(leafProps(field).rows).toHaveLength(2);
+		expect(view.state.doc.toString()).toBe('doc(paragraph("h", hard_break, "1"))');
+		expect((field as FieldController & LeafViews).focusedView()).toBe(view);
+		field.destroy();
+	});
+
+	it('a `<br>` in a pipe cell is a break in the cell view, and exports as one', () => {
+		const rt = md('| a<br>**b** |\n|---|\n| c |');
+		const { field } = tableLeaf(propsOf(rt));
+		expect(cellViews(field)[0].state.doc.toString()).toBe(
+			'doc(paragraph("a", hard_break, strong("b")))'
+		);
+		expect(core.exportMarkdown(field.getContent())).toContain('| a<br>**b** |');
 		field.destroy();
 	});
 

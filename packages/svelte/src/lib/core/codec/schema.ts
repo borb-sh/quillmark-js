@@ -6,7 +6,8 @@
 // single-textblock form for `richtext(inline)` (one paragraph, no block split, no
 // containers, no islands) and `plaintextSchema` is that one without marks, for
 // `plaintext(inline)`; `plainSchema` is a `plaintext` field without `inline`,
-// paragraphs and hard breaks and nothing else. Same decode/lower/position machinery,
+// paragraphs and hard breaks and nothing else; `cellSchema` is the inline form with
+// hard breaks, for a table cell. Same decode/lower/position machinery,
 // narrower shapes. Anchors are not marks here (decorations).
 //
 // `toDOM` and `parseDOM` are one tier, not two halves of a rendering: a copy and a
@@ -184,7 +185,7 @@ export const blockSchema = new Schema({
 	marks
 });
 
-// ── The constrained inline nodes (both inline schemas) ──────────────────────
+// ── The constrained inline nodes (the inline schemas and the cell's) ────
 // `doc: "paragraph"` (exactly one child) is what makes an Enter a no-op at the
 // model level: there is no second block for a split to land.
 const inlineNodes: Record<string, NodeSpec> = {
@@ -194,8 +195,7 @@ const inlineNodes: Record<string, NodeSpec> = {
 };
 
 /** The constrained inline schema: one paragraph, no block splitting, no
- *  containers, no islands, and the full mark set (a `richtext(inline)` field, and
- *  a table cell, which is the same content unit). */
+ *  containers, no islands, and the full mark set (a `richtext(inline)` field). */
 export const inlineSchema = new Schema({ nodes: inlineNodes, marks });
 
 /**
@@ -208,6 +208,17 @@ export const inlineSchema = new Schema({ nodes: inlineNodes, marks });
  * carrying (CODEC §Inline mode).
  */
 export const plaintextSchema = new Schema({ nodes: inlineNodes, marks: {} });
+
+/**
+ * A table cell: the inline schema plus `hard_break`, which a `TableCell` stores as a
+ * `\n` in its `text`. Still one paragraph, so Enter has no block to split; a break is
+ * Shift-Enter's (`breaks.ts`). Declaring the break routes `decode` through the plain
+ * path, which folds a cell's `continues` lines into that one paragraph.
+ */
+export const cellSchema = new Schema({
+	nodes: { ...inlineNodes, hard_break: inlineLeafNodes.hard_break },
+	marks
+});
 
 /**
  * A `plaintext` field without `inline`: paragraphs and hard breaks, no marks, no

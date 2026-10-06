@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Shift-Enter in a table cell inserts a line break.** The cell stores it as one `\n` in its text, which markdown spells `<br>` and the preview typesets as a line break, and a cell holding one draws it as a break. Enter is the next row, as before.
+
 ## v0.19.0 - 2026-10-06
 
 **The `@quillmark/wasm` peer floor is `>=0.123.0-0`.** An open matrix's added item whose `title` is `""` or whitespace alone carries `validation::enum_violation` at its key, which blocks the render, so emptying an added item's title input draws that diagnostic under the item until a title is typed. A number under a `boolean` field prints by whether it is non-zero, as its switch already draws it, so `1e-17` prints on where it printed off, and a comment drops the whitespace ending its line. An options object, `Addr` or `CardInput` that is not a plain object throws; every one the components pass is plain.
