@@ -69,7 +69,7 @@
 		"check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
 	},
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.123.0-0",
+		"@quillmark/wasm": ">=0.123.1-0",
 		"svelte": "^5.33.0"
 	},
 	"dependencies": {
