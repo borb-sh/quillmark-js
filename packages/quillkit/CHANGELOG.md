@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.123.1.** An inline `<br>` in a document body or a table cell renders as a line break, where it rendered nothing, and a `richtext(inline)` value holding one fails validation as `validation::not_inline`; a quill whose such field's `default:` holds one fails its load the same way.
+
+## v0.15.0 - 2026-10-06
+
+**The carried `@quillmark/wasm` is 0.123.0.** An acroform quill whose `form.pdf` holds a widget in a page's `/Annots` fails to open as `pdf::existing_acroform`, whatever its catalog `/AcroForm` holds, and one whose trailer, catalog or page-tree node names a key twice or with no value as `pdf::parse`. A Typst `plate_file: ./plate.typ` names the file at the quill root, where it failed as `typst::plate_missing`. An open matrix's added item with a blank `title` fails validation as `validation::enum_violation`, in a `default:` as `quill::default_not_in_enum`.
+
 ## v0.14.0 - 2026-10-05
 
 **The carried `@quillmark/wasm` is 0.122.0, and only `true` and `false` are booleans.** An unquoted `y`, `n`, `yes`, `no`, `on` or `off`, in any case, is the text written: a `string` field prints it where it printed `false` or `true`, and a `boolean`, `number` or `integer` field fails validation as `validation::type_mismatch` and the render as `validation::coercion_failed`. A word where `Quill.yaml` takes a boolean fails the load. A Typst `plate_file` holding a `\` fails to open as `typst::plate_path_invalid`, a tag warns as `parse::unsupported_yaml_tag` on every node that carries one, and a failed Typst render lists the quill's load warnings after its errors, which studio prints at their own severity.

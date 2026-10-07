@@ -97,8 +97,9 @@ function insertBreak(schema: Schema): Command {
 }
 
 /**
- * The line-break link of the body's key chains: `{}` for the inline schemas, which
- * declare no break node. A `richtext(inline)` field is one line by construction
+ * The line-break link of the body's key chains, and a table cell's Shift-Enter
+ * (`table-view.ts`): `{}` for the inline schemas, which declare no break node. A
+ * `richtext(inline)` field is one line by construction
  * (`Content::is_inline`), so there the key is swallowed beside Enter (`field.ts`)
  * rather than answered here.
  */

@@ -91,7 +91,7 @@
 	const CHEVRON = 16;
 
 	interface Props {
-		value: unknown[] | undefined;
+		value: unknown;
 		/** The declared `default:`: the rows an unset array draws, which a gesture takes. */
 		fallback?: unknown[];
 		items: QuillFieldSchema | undefined;
@@ -156,11 +156,18 @@
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
 	const defaulted = $derived(value == null && (fallback?.length ?? 0) > 0);
-	const arr = $derived((value ?? fallback ?? []) as unknown[]);
-	/** The rows' content read: the boundary's, or, while the rows are the default, the
-	 *  literal's own leaf at the codec its declared type names. */
+	// A bare value is the one-element list the render floor wraps it into (canon
+	// `SCHEMAS.md` §"Type coercion"), and the reader answers no element of it.
+	const bare = $derived(value != null && !Array.isArray(value));
+	const arr = $derived(rowsOf(value));
+	function rowsOf(v: unknown): unknown[] {
+		if (v == null) return fallback ?? [];
+		return Array.isArray(v) ? v : [v];
+	}
+	/** The rows' content read: the boundary's, or, while the rows are the default or a
+	 *  bare value, the literal's own leaf at the codec its declared type names. */
 	function readAt(path: PathStep[]): Content | undefined {
-		if (!defaulted) return contentAt(path);
+		if (!defaulted && !bare) return contentAt(path);
 		const leaf = schemaAt({ type: 'array', items }, path);
 		let v: unknown = arr;
 		for (const step of path) v = (v as Record<string | number, unknown> | undefined)?.[step];
@@ -177,7 +184,7 @@
 	// an effect-only seed mounts every element editor in a second render.
 	const seq = new IdSeq();
 	// svelte-ignore state_referenced_locally
-	let ids = $state<string[]>(seq.take((value ?? fallback ?? []).length));
+	let ids = $state<string[]>(seq.take(rowsOf(value).length));
 	// Length reconcile (defend against an out-of-band length change);
 	// order is maintained by the mutators, not here.
 	$effect(() => {

@@ -11,10 +11,9 @@
 // the shape only through them.
 //
 // A cell is its own content unit: `marks` are USV offsets into that cell's `text`,
-// not into `Content.text`. That is the second coordinate space, and the inline mode
-// the codec already runs (one paragraph, no containers, no islands) is exactly its
-// shape, so a cell decodes and projects through the same machinery a
-// `richtext(inline)` field does.
+// not into `Content.text`. That is the second coordinate space, and a cell is one
+// paragraph with no containers and no islands, a `\n` in its text being a hard break,
+// so it decodes and projects through the machinery a field does (`cellSchema`).
 import type { Content, TableCell, TableProps } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { core } from '../lifecycle.js';
@@ -239,15 +238,23 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
 // ── The cell codec ──────────────────────────────────────────────────────────
 
 /**
- * A cell as a one-line `Content`: what `decode` takes under the inline schema. The
- * cell's marks are that content's marks, because both are offsets into the same
- * text: the cell-local coordinate space is a `Content`'s coordinate space with
- * one line in it.
+ * A cell as a one-paragraph `Content`: what `decode` takes under `cellSchema`. Each
+ * `\n` in the text opens a `continues` line, which is the hard break it decodes to and
+ * the one USV `pmToContent` projects a break back to. The cell's marks are that
+ * content's marks, both being offsets into the same text.
  */
 export function cellContent(cell: TableCell): Content {
+	const breaks = cell.text.split('\n').length - 1;
 	return {
 		text: cell.text,
-		lines: [{ containers: [], kind: 'para' }],
+		lines: [
+			{ containers: [], kind: 'para' },
+			...Array.from({ length: breaks }, () => ({
+				containers: [],
+				kind: 'para' as const,
+				continues: true
+			}))
+		],
 		marks: cell.marks,
 		islands: []
 	};

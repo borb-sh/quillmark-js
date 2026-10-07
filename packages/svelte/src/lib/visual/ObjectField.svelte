@@ -377,7 +377,7 @@
 					     under an open row costs is two rungs of the ladder and one figure. -->
 					<ArrayField
 						bind:this={nestedEls[key]}
-						value={obj[key] as unknown[] | undefined}
+						value={obj[key]}
 						fallback={Array.isArray(sub.default) ? sub.default : undefined}
 						items={sub.items}
 						layout={arrayLayout(sub)}

@@ -10,7 +10,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
-import { quill } from '../helpers/fixtures.js';
+import { core, quill } from '../helpers/fixtures.js';
 import { field, mountEditor, summaries, type, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -257,5 +257,49 @@ describe('an array of objects', () => {
 		rows[0].click();
 		flushSync();
 		expect(summaries(arr)[0].getAttribute('aria-expanded')).toBe('true');
+	});
+});
+
+// The render reads a bare value under an `array` as the one-element list it spells
+// (canon `SCHEMAS.md` §"Type coercion"), and the transport door rests it as authored,
+// so the rows are the render's reading and a gesture writes that list whole.
+describe('an array holding a bare value', () => {
+	const loaded = (...fields: string[]): Document =>
+		core.Document.fromMarkdown(['~~~', '$quill: showcase@1.0.0', ...fields, '~~~', ''].join('\n'));
+	const rendered = (q: Quill, doc: Document, name: string) =>
+		new DocumentReader(q, doc).resolve().main.fields.find((r) => r.name === name)?.value;
+
+	it('draws a bare string as one row, and an edit writes the list', () => {
+		const q = quill();
+		const doc = loaded('authors: Ada Lovelace');
+		expect(doc.getStored('authors')).toBe('Ada Lovelace');
+		const { target } = mountEditor(q, doc);
+		const inputs = () => [
+			...field(target, 'Authors').querySelectorAll<HTMLInputElement>(
+				'input[aria-label^="Authors "]'
+			)
+		];
+
+		expect(inputs().map((i) => i.value)).toEqual(rendered(q, doc, 'authors'));
+		type(inputs()[0], 'Grace Hopper');
+		expect(doc.getStored('authors')).toEqual(['Grace Hopper']);
+	});
+
+	it('draws a bare string as one prose row at its codec, and an add writes the list', () => {
+		const q = quill();
+		const doc = loaded('errata: Page 9 omits the *colophon*.', 'keywords: A *bare* keyword');
+		const { target } = mountEditor(q, doc);
+		const rows = (label: string) =>
+			[...target.querySelectorAll<HTMLElement>(`.ProseMirror[aria-label^="${label} "]`)].map(
+				(r) => r.textContent
+			);
+
+		expect(rows('Errata')).toEqual(['Page 9 omits the *colophon*.']);
+		expect(rows('Keywords')).toEqual(['A bare keyword']);
+
+		field(target, 'Errata').querySelector<HTMLButtonElement>('.qm-add-el')!.click();
+		flushSync();
+		expect(doc.getStored('errata')).toEqual(['Page 9 omits the *colophon*.', '']);
+		expect(rows('Errata')).toEqual(['Page 9 omits the *colophon*.', '']);
 	});
 });

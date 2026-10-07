@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.123.1-0`.** A packed quill whose `richtext(inline)` field's `default:` holds an inline `<br>` fails its load as `validation::not_inline`, where the `<br>` rendered nothing. An inline `<br>` in a quill's `example.md` renders as a line break, in a paragraph and in a table cell.
+
+## v0.35.0 - 2026-10-06
+
+**The `@quillmark/wasm` peer floor is `>=0.123.0-0`.** A packed quill whose open matrix's `default:` holds an added item with a blank `title` fails its load as `quill::default_not_in_enum`, and a kind's `seed:` as `quill::seed_enum_violation`. An acroform quill whose `form.pdf` holds a widget in a page's `/Annots` fails to open as `pdf::existing_acroform`, and one whose trailer, catalog or page-tree node names a key twice or with no value as `pdf::parse`.
+
 ## v0.34.0 - 2026-10-05
 
 **The `@quillmark/wasm` peer floor is `>=0.122.0-0`.** A packed quill writing a word where `Quill.yaml` takes a boolean fails its load: a `default:` as `quill::default_type_mismatch`, a kind's `seed:` as `quill::seed_type_mismatch`, `inline:`, `open:`, `ui.compact` or `ui.multiline` as `quill::field_parse_error`, `body.enabled` as `quill::invalid_body`, and `!!bool` on a word as `quill::yaml_parse_error`. A word in `values:`, as a matrix member's title or as a `string` field's `default:` loads as the string written.
