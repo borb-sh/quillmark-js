@@ -11,13 +11,20 @@
 // `getActiveLeaf` returns nothing for a focused text input rather than raising a
 // formatting toolbar over one.
 //
+// A by-value prose leaf (`ProseValue`) is in neither lane: it is not addressable, and
+// every element of an array and every cell of a row shares its field's key. It
+// announces its views on focus into a third lane under that key, which holds the one
+// focused last and is the popover's alone: `getActiveLeaf` falls back to it where the
+// active field registered no controller, and a landing never reads it.
+//
 // A registry rather than a DOM query, for the reason `Card.revealLeaf` is a call: a
 // control's focus is its own (a PM view restores a selection, a date field lands on
 // its first segment, an array lands on its first element or its add affordance), so
 // the surface holds the answers it already gives a label click instead of re-deriving
 // them from markup.
+import { getContext, setContext } from 'svelte';
 import type { PathStep } from '@quillmark/wasm';
-import type { FieldController } from '../core/codec/index.js';
+import type { FieldController, LeafViews } from '../core/codec/index.js';
 
 /**
  * What a landing at depth hands back: the box the arrival wash blooms in, now or once
@@ -81,6 +88,12 @@ export interface LeafRegistry {
 	control(key: string): FieldControl | undefined;
 	/** The codec seam at `key`, `undefined` for a form control. */
 	prose(key: string): FieldController | undefined;
+	/** A by-value prose leaf under the field at `key`, by its views, on its focus. */
+	focusValue(key: string, leaf: LeafViews): void;
+	/** Dropped only by the leaf it names, so a leaf leaving takes no sibling's entry. */
+	releaseValue(key: string, leaf: LeafViews): void;
+	/** The by-value leaf focused last under `key`. */
+	value(key: string): LeafViews | undefined;
 	/** Drop everything: the surface going away as a whole, where a leaf's cleanup
 	 *  order relative to the parent's is Svelte's business. */
 	clear(): void;
@@ -89,6 +102,7 @@ export interface LeafRegistry {
 export function createLeafRegistry(): LeafRegistry {
 	const controls = new Map<string, FieldControl>();
 	const proses = new Map<string, FieldController>();
+	const values = new Map<string, LeafViews>();
 	return {
 		registerProse(key, controller) {
 			proses.set(key, controller);
@@ -111,9 +125,49 @@ export function createLeafRegistry(): LeafRegistry {
 		prose(key) {
 			return proses.get(key);
 		},
+		focusValue(key, leaf) {
+			values.set(key, leaf);
+		},
+		releaseValue(key, leaf) {
+			if (values.get(key) === leaf) values.delete(key);
+		},
+		value(key) {
+			return values.get(key);
+		},
 		clear() {
 			controls.clear();
 			proses.clear();
+			values.clear();
 		}
 	};
+}
+
+/**
+ * The active prose leaf as the formatting popover reaches it: the views a selection is
+ * read from and a mark toggled at, and the controller where the leaf is a field's. A
+ * by-value leaf has none, its anchors being dropped on the parent's value write, so the
+ * anchor verbs the controller carries have nothing to act on there.
+ */
+export interface ActiveProse {
+	views: LeafViews;
+	controller?: FieldController;
+}
+
+/** The by-value lane with a field's key bound: what a leaf under that field announces
+ *  itself through, knowing no key of its own. */
+export interface ValueLeafSeat {
+	focus(leaf: LeafViews): void;
+	release(leaf: LeafViews): void;
+}
+
+const SEAT = Symbol('qm-value-leaf');
+
+/** Seat every by-value leaf under the calling field, at any depth of its containers. */
+export function seatValueLeaves(seat: ValueLeafSeat): void {
+	setContext(SEAT, seat);
+}
+
+/** The seat under a mounted field; `undefined` off-tree. */
+export function valueLeafSeat(): ValueLeafSeat | undefined {
+	return getContext<ValueLeafSeat | undefined>(SEAT);
 }

@@ -11,24 +11,35 @@
  Mounts once per stable key (an element's session id, a property's name), so the
  parent's re-derive leaves the caret where it is.
 
+ Having no address, it registers no controller: it announces its views into the
+ registry's by-value lane under the field it stands in (`leaves.ts`), the formatting
+ popover's door to it. A focus on an editable leaf announces them, and so does a write
+ releasing the leaf under the caret; a hold and an unmount withdraw them, and a blur
+ does not, the popover's link prompt taking the focus from the view it writes to.
+
  The content is read, not passed: `reader.getContentAt(addr, path)` decodes through
  the codec the leaf's own declared type names, so what it rests as — the content
  object, a `plaintext` literal, the authored string a transport door left — stops
- being the row's or the cell's business. Read once, at mount, since that is when this
- leaf takes its state.
+ being the row's or the cell's business. It is read at mount and again wherever the
+ parent's re-derive hands down a `value` that moved, and a read differing from the
+ content the leaf last committed or took replaces the view, the gate `createField`
+ re-hydrates through (`reconcile.ts`): a write that lands in the store under a mounted
+ leaf is what its next keystroke edits. Its own commit is read back as the store took
+ it, so the echo replaces nothing and the caret and the history stay.
 
  The schema is the declared type's where the parent has room for it: a subform cell
  declaring no `inline` takes the full row ({@link ObjectField}), a `richtext` one on the
  block schema and a `plaintext` one on the plain schema, paragraphs and hard breaks.
  An array element is one textblock whatever it declares, since Enter there is the
- repeater's. There is no slash menu at either width, and an island draws as its
- placeholder: an atom a keystroke can delete and no view edits.
+ repeater's. There is no slash menu at either width, and no island view.
 
- A leaf over content its schema cannot hold is held: a narrowed one over anything but
- one plain paragraph (`fitsInline`), a plain one over anything but plain lines
- (`fitsPlain`). Its decode would join or drop what is left over, and the first
- keystroke would write that loss back, so a held leaf draws its content on the block
- schema, read-only, with a note inside its box, and commits nothing.
+ A leaf over content it cannot edit is held (`fitsLeaf`): a narrowed one over anything
+ but one plain paragraph, a plain one over anything but plain lines, where the decode
+ would join or drop what is left over for the first keystroke to write back, and a block
+ one over an island, which draws as its placeholder tag, an atom a keystroke deletes
+ unseen. A held leaf draws its content on the block schema, read-only, with a note
+ inside its box, and commits nothing. The hold is judged of what each mount and each
+ replacement reads, so a write moving the value takes it or releases it.
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
@@ -36,6 +47,7 @@
 	import { EditorView } from 'prosemirror-view';
 	import {
 		blockSchema,
+		createReconciler,
 		decode,
 		emptyContent,
 		fitsLeaf,
@@ -45,18 +57,26 @@
 		proseAttributes,
 		proseLeafPlugins,
 		buildLineIndex,
-		usvToPM
+		pmToUsv,
+		usvToPM,
+		valueEqual,
+		type LeafViews
 	} from '../core/codec/index.js';
+	import { valueLeafSeat } from './leaves.js';
 	import { wording } from './strings.js';
 	import './controls.css';
 	import type { Content } from '@quillmark/wasm';
 
 	interface Props {
-		/** This leaf's content, read at mount (the parent's boundary read), `undefined`
-		 * where nothing is stored. A thunk rather than a value: the parent re-derives
-		 * per revision and this leaf takes its state once, so a value prop would be a
-		 * boundary read per leaf per render, all but one of them discarded. */
+		/** This leaf's content (the parent's boundary read), `undefined` where nothing is
+		 * stored: read at mount and wherever {@link value} moves. A thunk rather than a
+		 * value: the parent re-derives per revision, and a value prop would be a
+		 * boundary read per leaf per render, all but the moved one discarded. */
 		content: () => Content | undefined;
+		/** This leaf's value as the parent's re-derive delivers it, stored form and all:
+		 * compared with the last one delivered, never drawn, so a move is what re-reads
+		 * {@link content}. */
+		value?: unknown;
 		/** The default an unset leaf holds, where it prints: drawn at the default rung,
 		 * and handed up whole with the first edit in it, as `createField` takes one. */
 		fallback?: Content;
@@ -87,6 +107,7 @@
 	}
 	let {
 		content,
+		value,
 		fallback,
 		plaintext = false,
 		block = false,
@@ -99,10 +120,13 @@
 	}: Props = $props();
 
 	const t = wording();
+	const seat = valueLeafSeat();
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
 	let held = $state(false);
 	let view: EditorView | undefined;
+	/** What the mounted view does with a value the parent's re-derive delivers. */
+	let follow: ((next: unknown) => void) | undefined;
 	/** Take the caret: what a parent placing focus on this leaf calls. The view's
 	 * focus, not the element's: a PM view restores its selection, where a bare DOM
 	 * focus on a contenteditable leaves the caret unplaced. And the reveal beside it,
@@ -135,46 +159,61 @@
 
 	function mountView(mount: HTMLDivElement): () => void {
 		return untrack(() => {
-			// The same keymap and plugin stack a `createField` leaf mounts (shared
-			// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
-			// the parent's value write, per the header.
 			const inline = !block;
+			const leaf = { inline, plaintext, islands: false };
+			const names = { label, labelledBy, describedBy };
+			const shown = (stored: Content | undefined): Content => stored ?? fallback ?? emptyContent();
 			const stored = content();
-			const rt = stored ?? fallback ?? emptyContent();
+			let seen = value;
 			let defaulted = stored === undefined && !!fallback;
-			held = !fitsLeaf(rt, { inline, plaintext });
-			const named = held
-				? heldAttributes({ label, labelledBy, describedBy }, heldId)
-				: (proseAttributes({ label, labelledBy, describedBy }) ?? {});
-			const defaultNamed = { ...named, 'data-default': '' };
-			const schema = held ? blockSchema : leafSchema({ plaintext, inline });
-			const state = EditorState.create({
-				doc: decode(rt, schema),
-				plugins: held
-					? []
-					: proseLeafPlugins(schema, {
-							inline,
-							placeholder: () => placeholder,
-							placeholderUntilEdit: true
-						})
-			});
+			const reconciler = createReconciler(shown(stored));
+			held = !fitsLeaf(reconciler.last, leaf);
+			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
+			// (`proseAttributes`), so a cell carrying a label element and a row carrying
+			// none cannot name their regions by different rules.
+			const plainNamed = proseAttributes(names) ?? {};
+			const heldNamed = heldAttributes(names, heldId);
+			const build = (rt: Content): EditorState => {
+				// The same keymap and plugin stack a `createField` leaf mounts (shared
+				// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
+				// the parent's value write, per the header.
+				const schema = held ? blockSchema : leafSchema({ plaintext, inline });
+				return EditorState.create({
+					doc: decode(rt, schema),
+					plugins: held
+						? []
+						: proseLeafPlugins(schema, {
+								inline,
+								placeholder: () => placeholder,
+								placeholderUntilEdit: true
+							})
+				});
+			};
 			const mounted = new EditorView(
 				{ mount },
 				{
-					state,
+					state: build(reconciler.last),
 					editable: () => !held,
-					// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
-					// (`proseAttributes`), so a cell carrying a label element and a row carrying
-					// none cannot name their regions by different rules.
-					attributes: () => (defaulted ? defaultNamed : named),
+					attributes: () => {
+						const named = held ? heldNamed : plainNamed;
+						return defaulted ? { ...named, 'data-default': '' } : named;
+					},
 					dispatchTransaction(tr) {
 						const next = mounted.state.apply(tr);
 						const edit = tr.docChanged && !held;
 						if (edit) defaulted = false;
 						mounted.updateState(next);
-						if (edit) onChange(pmToContent(next.doc));
+						if (!edit) return;
+						onChange(pmToContent(next.doc));
+						// The commit as the store took it, so its echo through the re-derive is no move.
+						seen = value;
+						reconciler.commit(shown(content()));
 					},
 					handleDOMEvents: {
+						focus: () => {
+							if (!held) seat?.focus(views);
+							return false;
+						},
 						keydown: (_v, e) => {
 							onKey?.(e);
 							return false;
@@ -182,13 +221,47 @@
 					}
 				}
 			);
+			const views: LeafViews = {
+				view: mounted,
+				focusedView: () => mounted,
+				nestedViews: () => []
+			};
 			view = mounted;
+			follow = (next) => {
+				if (valueEqual(next, seen)) return;
+				seen = next;
+				const read = content();
+				const current = shown(read);
+				const holds = !fitsLeaf(current, leaf);
+				const wasDefaulted = defaulted;
+				defaulted = read === undefined && !!fallback;
+				if (holds === held && !reconciler.shouldRehydrate(current)) {
+					if (defaulted !== wasDefaulted) mounted.setProps({});
+					return;
+				}
+				held = holds;
+				if (held) seat?.release(views);
+				else if (mounted.hasFocus()) seat?.focus(views);
+				// The caret keeps its offset, clamped, as a field's re-hydrate keeps it.
+				const caret = pmToUsv(buildLineIndex(mounted.state.doc), mounted.state.selection.head);
+				const fresh = build(current);
+				const sel = Selection.near(fresh.doc.resolve(usvToPM(buildLineIndex(fresh.doc), caret)));
+				mounted.updateState(fresh.apply(fresh.tr.setSelection(sel)));
+				reconciler.commit(current);
+			};
 			return () => {
+				seat?.release(views);
+				follow = undefined;
 				view = undefined;
 				mounted.destroy();
 			};
 		});
 	}
+
+	$effect(() => {
+		const next = value;
+		untrack(() => follow?.(next));
+	});
 </script>
 
 <!-- `.qm-control-box` (controls.css) is the whole box, so an array of `richtext` and

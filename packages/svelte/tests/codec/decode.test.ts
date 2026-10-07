@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	decode,
 	fitsInline,
+	fitsLeaf,
 	fitsPlain,
 	pmToContent,
 	rendersHref,
@@ -163,6 +164,15 @@ describe('inline / plaintext constraints', () => {
 		expect(fitsPlain(md('plain **bold** end'))).toBe(true);
 		for (const src of ['- one', '# Title', '> quoted', '```\ncode\n```', '![i](a.png)']) {
 			expect(fitsPlain(md(src)), src).toBe(false);
+		}
+	});
+
+	it('fitsLeaf refuses an island on the block schema only to a leaf mounting no island view', () => {
+		const block = { inline: false, plaintext: false };
+		expect(fitsLeaf(md('- one\n- two'), { ...block, islands: false })).toBe(true);
+		for (const src of ['| a |\n|---|\n| 1 |', 'see ![i](a.png)']) {
+			expect(fitsLeaf(md(src), { ...block, islands: true }), src).toBe(true);
+			expect(fitsLeaf(md(src), { ...block, islands: false }), src).toBe(false);
 		}
 	});
 });

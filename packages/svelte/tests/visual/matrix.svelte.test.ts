@@ -3,7 +3,7 @@
 // unfolding under a held member, one sparse map committed whole, a member held by being
 // present. Driven off the reference quill's `checks` — six members on one flat roster,
 // open to added items, two columns — and read back through the document; a probe quill
-// carries the lists the add box searches across.
+// carries an open checklist and a declared default.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
@@ -38,13 +38,11 @@ function member(m: HTMLElement, title: string): HTMLElement {
 const tick = (m: HTMLElement, title: string) =>
 	member(m, title).querySelector<HTMLInputElement>('input[type="checkbox"]')!;
 const count = (m: HTMLElement) => m.querySelector('.qm-matrix-count')?.textContent?.trim();
-const addBox = (m: HTMLElement) => m.querySelector<HTMLInputElement>('input[role="combobox"]')!;
-/** The add box's options as they read: title, then the note beside it. */
-const offered = (m: HTMLElement) =>
-	[...m.querySelectorAll<HTMLElement>('[role="option"]')].map((o) =>
-		[...o.querySelectorAll('.qm-matrix-add-title, .qm-matrix-add-note')]
-			.map((c) => c.textContent)
-			.join(' | ')
+const addBox = (m: HTMLElement) => m.querySelector<HTMLInputElement>('.qm-matrix-add input')!;
+/** The added items' titles, in the order they draw. */
+const addedTitles = (m: HTMLElement) =>
+	[...m.querySelectorAll<HTMLInputElement>('.qm-member.added .qm-member-title-input')].map(
+		(i) => i.value
 	);
 /** Focus the add box and type into it. */
 function typeAdd(m: HTMLElement, words: string): HTMLInputElement {
@@ -237,7 +235,6 @@ describe('an open matrix', () => {
 		const m = matrix(mounted.target);
 
 		typeAdd(m, 'Kerning pairs');
-		expect(offered(m)).toEqual(['Add “Kerning pairs”']);
 		press(addBox(m), 'Enter', { cancelable: true });
 		await settle();
 
@@ -331,69 +328,77 @@ describe('an open matrix', () => {
 		expect(mounted.errors).toHaveLength(0);
 	});
 
-	it('finds a member before offering to add, and ticks it where it stands', async () => {
+	it('adds a title the list already carries as a second item under its own id', async () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 
-		typeAdd(m, 'fon');
-		expect(offered(m)).toEqual(['Fonts', 'Add “fon”']);
-		press(addBox(m), 'Enter', { cancelable: true });
-		await settle();
-		expect(stored(doc)).toEqual({ fonts: true });
-		expect(document.activeElement).toBe(tick(m, 'Fonts'));
-
-		// A held member is found as held, picking it lands on it and ticks nothing, and
-		// words an item of this list already carries offer no add.
-		typeAdd(m, 'fonts');
-		expect(offered(m)).toEqual(['Fonts | held']);
-		press(addBox(m), 'Enter', { cancelable: true });
-		await settle();
-		expect(stored(doc)).toEqual({ fonts: true });
-		expect(document.activeElement).toBe(tick(m, 'Fonts'));
+		for (const title of ['Kerning pairs', 'Kerning pairs', 'KERNING PAIRS']) {
+			press(typeAdd(m, title), 'Enter', { cancelable: true });
+			await settle();
+		}
+		expect(stored(doc)).toEqual({
+			kerning_pairs: { title: 'Kerning pairs' },
+			kerning_pairs_2: { title: 'Kerning pairs' },
+			kerning_pairs_3: { title: 'KERNING PAIRS' }
+		});
+		expect(addedTitles(m)).toEqual(['Kerning pairs', 'Kerning pairs', 'KERNING PAIRS']);
+		expect(count(m)).toBe('3 of 9 held');
+		expect(mounted.errors).toHaveLength(0);
 	});
 
-	it('walks its options with the arrows and clears on Escape', () => {
+	it('adds nothing on Enter over whitespace or mid-composition', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const mounted = mountEditor(q, doc);
+		const m = matrix(mounted.target);
+
+		const box = typeAdd(m, '   ');
+		press(box, 'Enter', { cancelable: true });
+		expect(stored(doc)).toBeUndefined();
+		type(box, 'Kerning');
+		press(box, 'Enter', { cancelable: true, isComposing: true });
+		expect(stored(doc)).toBeUndefined();
+		expect(box.value).toBe('Kerning');
+	});
+
+	it('clears on Escape, taking the key only where there was something to clear', () => {
 		const q = quill();
 		const mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
-		const box = typeAdd(m, 'f');
-		expect(box.getAttribute('aria-expanded')).toBe('true');
-		const active = () => document.getElementById(box.getAttribute('aria-activedescendant') ?? '');
-		expect(active()?.textContent).toContain('Figures');
-		press(box, 'ArrowDown', { cancelable: true });
-		expect(active()?.textContent).toContain('Fonts');
-		press(box, 'ArrowUp', { cancelable: true });
-		press(box, 'ArrowUp', { cancelable: true });
-		expect(active()?.getAttribute('aria-selected')).toBe('true');
-		expect(active()?.textContent).toContain('Add');
-		press(box, 'Escape', { cancelable: true });
-		expect(box.value).toBe('');
-		expect(box.getAttribute('aria-expanded')).toBe('false');
-
-		// It closes while the focus is elsewhere, and keeps what was typed.
-		type(box, 'f');
-		expect(box.getAttribute('aria-expanded')).toBe('true');
-		box.blur();
-		flushSync();
-		expect(box.getAttribute('aria-expanded')).toBe('false');
-		expect(box.value).toBe('f');
+		let reached = 0;
+		const onEscape = (e: KeyboardEvent) => void (e.key === 'Escape' && reached++);
+		document.addEventListener('keydown', onEscape);
+		try {
+			const box = typeAdd(m, 'Kerning');
+			press(box, 'Escape', { cancelable: true });
+			expect(box.value).toBe('');
+			expect(reached).toBe(0);
+			press(box, 'Escape', { cancelable: true });
+			expect(reached).toBe(1);
+		} finally {
+			document.removeEventListener('keydown', onEscape);
+		}
 	});
 
-	it('takes the add option on Enter where the words name a result only loosely', async () => {
+	it('is a plain text input, with no combobox role and no listbox under it', () => {
 		const q = quill();
-		const doc = q.seedDocument();
-		const mounted = mountEditor(q, doc);
+		const mounted = mountEditor(q, q.seedDocument());
 		const m = matrix(mounted.target);
-		const box = typeAdd(m, 'fnt');
-		expect(offered(m)).toEqual(['Fonts', 'Add “fnt”']);
-		// An Enter mid-composition picks nothing.
-		press(box, 'Enter', { cancelable: true, isComposing: true });
-		expect(stored(doc)).toBeUndefined();
-		press(box, 'Enter', { cancelable: true });
-		await settle();
-		expect(stored(doc)).toEqual({ fnt: { title: 'fnt' } });
+
+		const box = typeAdd(m, 'f');
+		expect(box.type).toBe('text');
+		expect(box.getAttribute('aria-label')).toBe(box.placeholder);
+		for (const attr of [
+			'role',
+			'aria-autocomplete',
+			'aria-expanded',
+			'aria-controls',
+			'aria-activedescendant'
+		])
+			expect(box.hasAttribute(attr), attr).toBe(false);
+		expect(m.querySelector('[role="listbox"], [role="option"]')).toBeNull();
 	});
 
 	it('mints an added id past a roster id its title folds to', async () => {
@@ -401,10 +406,7 @@ describe('an open matrix', () => {
 		const doc = q.seedDocument();
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
-		const box = typeAdd(m, 'Fonts!');
-		// `Fonts` is named outright, so the add option is an arrow away.
-		press(box, 'ArrowUp', { cancelable: true });
-		press(box, 'Enter', { cancelable: true });
+		press(typeAdd(m, 'Fonts!'), 'Enter', { cancelable: true });
 		await settle();
 		expect(stored(doc)).toEqual({ fonts_2: { title: 'Fonts!' } });
 	});
@@ -436,38 +438,17 @@ const LISTS = `quill:
   name: lists
   version: 1.0.0
   backend: typst
-  description: Checklists the add box searches across.
+  description: An open checklist and a matrix declaring a default.
 typst:
   plate_file: plate.typ
 main:
   fields:
-    leadership:
+    tags:
       type: matrix
-      title: Leadership
-      members:
-        sq_cc: Squadron CC
-        flight_cc: Flight CC
-    staff:
-      type: matrix
-      title: Staff
+      title: Tags
       open: true
       members:
-        haf: HAF Staff
-        joint: Joint Staff
-      properties:
-        detail:
-          type: string
-          default: ""
-    wrap:
-      type: object
-      title: Wrap
-      properties:
-        inner:
-          type: matrix
-          title: Inner
-          open: true
-          members:
-            x: Flight X
+        draft: Draft
     preset:
       type: matrix
       title: Preset
@@ -476,59 +457,27 @@ main:
         b: Beta
       default:
         a: true
-card_kinds:
-  unit:
-    title: Unit
-    fields:
-      quals:
-        type: matrix
-        title: Quals
-        members:
-          range_safety: Range Safety
 `;
 
-describe('the add box across the document', () => {
-	it('offers a member of another list, and ticks it there', async () => {
+describe('an open checklist', () => {
+	it('keeps the caret in the add box for the next item', async () => {
 		const q = quillFromYaml(LISTS);
 		const doc = q.seedDocument();
 		const mounted = mountEditor(q, doc);
-		const staff = field(mounted.target, 'Staff');
+		const tags = field(mounted.target, 'Tags');
 
-		typeAdd(staff, 'flt cc');
-		expect(offered(staff)).toEqual(['Flight CC | in Leadership', 'Add “flt cc”']);
-		// Met only by abbreviation, so it is an arrow away from the add option Enter takes.
-		press(addBox(staff), 'ArrowDown', { cancelable: true });
-		press(addBox(staff), 'Enter', { cancelable: true });
+		press(typeAdd(tags, 'Reviewed'), 'Enter', { cancelable: true });
 		await settle();
-		expect(doc.getStored('leadership')).toEqual({ flight_cc: true });
-		expect(doc.getStored('staff')).toBeUndefined();
-		// The landing is the member's own address: its tick.
-		expect(document.activeElement).toBe(tick(field(mounted.target, 'Leadership'), 'Flight CC'));
+		expect(doc.getStored('tags')).toEqual({ reviewed: { title: 'Reviewed' } });
+		expect(document.activeElement).toBe(addBox(tags));
+		expect(addBox(tags).value).toBe('');
+
+		type(addBox(tags), 'Signed');
+		press(addBox(tags), 'Enter', { cancelable: true });
+		await settle();
+		expect(addedTitles(tags)).toEqual(['Reviewed', 'Signed']);
+		expect(document.activeElement).toBe(addBox(tags));
 		expect(mounted.errors).toHaveLength(0);
-	});
-
-	it("reaches a card's list, naming the card", async () => {
-		const q = quillFromYaml(LISTS);
-		const doc = q.seedDocument();
-		const mounted = mountEditor(q, doc);
-		const staff = field(mounted.target, 'Staff');
-
-		typeAdd(staff, 'range');
-		const [first] = offered(staff);
-		expect(first.startsWith('Range Safety | in Quals · ')).toBe(true);
-		press(addBox(staff), 'Enter', { cancelable: true });
-		await settle();
-		expect(doc.getStored({ card: 0, field: 'quals' })).toEqual({ range_safety: true });
-	});
-});
-
-describe('a matrix nested in a container', () => {
-	it('searches its own items alone', () => {
-		const q = quillFromYaml(LISTS);
-		const mounted = mountEditor(q, q.seedDocument());
-		const inner = mounted.target.querySelector<HTMLElement>('.qm-object .qm-matrix')!;
-		typeAdd(inner, 'flight');
-		expect(offered(inner)).toEqual(['Flight X', 'Add “flight”']);
 	});
 });
 

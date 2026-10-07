@@ -55,6 +55,10 @@ const LOAD_MS = 120_000;
  * whatever stands beside it. The element stands in for a document's own widest construct
  * — a table is as wide as its columns — so what is asserted is the boundary rather than
  * any one construct.
+ *
+ * `guidance` raises each field hint the pane shows as a pointer does, and reads the gap
+ * between its surface and the trigger's target: the glyph's box grown to the tap floor
+ * its `::after` draws, which is what the pointer holds.
  */
 const SURVEY = `(async () => {
 	const deadline = Date.now() + 30000;
@@ -88,6 +92,42 @@ const SURVEY = `(async () => {
 		wide.remove();
 		return { bare, held };
 	};
+	const frame = () => new Promise((wake) => requestAnimationFrame(wake));
+	const target = (trigger) => {
+		const box = trigger.getBoundingClientRect();
+		const floor = getComputedStyle(trigger, '::after');
+		const x = box.x + box.width / 2;
+		const y = box.y + box.height / 2;
+		const w = Math.max(box.width, parseFloat(floor.width)) / 2;
+		const h = Math.max(box.height, parseFloat(floor.height)) / 2;
+		return { left: x - w, right: x + w, top: y - h, bottom: y + h };
+	};
+	const guidance = async () => {
+		const gaps = [];
+		for (const trigger of pane.querySelectorAll('.qm-field-hint')) {
+			const box = trigger.getBoundingClientRect();
+			const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+			// In view, and not under a closed section or another surface.
+			if (!trigger.contains(hit)) continue;
+			trigger.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+			let surface = null;
+			for (let tries = 0; tries < 60 && surface === null; tries++) {
+				await frame();
+				surface = document.querySelector('.qm-hint-popover[data-state="open"]');
+			}
+			if (surface === null) continue;
+			await Promise.all(surface.getAnimations().map((done) => done.finished));
+			await frame();
+			const at = surface.getBoundingClientRect();
+			const to = target(trigger);
+			gaps.push(
+				Math.max(to.top - at.bottom, at.top - to.bottom, to.left - at.right, at.left - to.right)
+			);
+			trigger.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
+			for (let tries = 0; tries < 60 && surface.isConnected; tries++) await frame();
+		}
+		return { raised: gaps.length, clearance: Math.min(...gaps), pixel: 1 / devicePixelRatio };
+	};
 	return {
 		booted: shell !== null,
 		quiverResolved: picker !== null,
@@ -97,7 +137,8 @@ const SURVEY = `(async () => {
 		shellWidth: width(shell),
 		splitWidth: width(split),
 		search: location.search,
-		demand: pane === null ? null : demand()
+		demand: pane === null ? null : demand(),
+		guidance: pane === null ? null : await guidance()
 	};
 })()`;
 
@@ -113,6 +154,9 @@ interface Survey {
 	search: string;
 	/** The surface's own width demand, bare and holding a 4000px element. */
 	demand: { bare: number; held: number } | null;
+	/** How many hints raised a surface, the least gap between one and its trigger's
+	 *  target, and the device pixel in CSS px. */
+	guidance: { raised: number; clearance: number; pixel: number } | null;
 }
 
 const temp = scratch('quillkit-deploy-');
@@ -188,6 +232,22 @@ describe('the built client, served under a subpath', () => {
 			wide.demand?.bare ?? NaN,
 			0
 		);
+	});
+
+	// By more than the device pixel floating-ui rounds a surface's position to: one the
+	// rounding lands on the target takes a resting pointer off the trigger, which closes
+	// the surface, and hands the pointer back as it goes.
+	it("raises a field's guidance clear of the target that raised it", () => {
+		for (const page of [wide, narrow]) {
+			const where = `at ${page.viewport}px`;
+			expect(page.guidance?.raised, `a hint in view raises its surface ${where}`).toBeGreaterThan(
+				0
+			);
+			expect(
+				page.guidance?.clearance,
+				`a raised surface stands more than a device pixel clear of the target ${where}`
+			).toBeGreaterThan(page.guidance?.pixel ?? Infinity);
+		}
 	});
 
 	// A ref the quiver does not hold opens the catalog's first, the address bar corrected

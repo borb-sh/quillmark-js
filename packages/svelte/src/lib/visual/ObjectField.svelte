@@ -359,6 +359,7 @@
 					<ProseValue
 						bind:this={proseEls[key]}
 						content={() => contentAt([key])}
+						value={obj[key]}
 						fallback={contentDefault(sub)}
 						plaintext={baseType(sub) === 'plaintext'}
 						placeholder={noneOf(key, sub)}

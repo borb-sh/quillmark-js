@@ -183,9 +183,11 @@
 		}
 	}
 
-	// Which open in force has a session attempt in flight, so an edit landing during the
-	// load starts no second one: the attempt reads the document after the load, edit included.
+	// Which open in force has a session attempt in flight, so an edit landing during it
+	// starts no second one. An edit landing during the load is in the document the attempt
+	// reads; one landing after that read is `missed`, and recompiled once the session installs.
 	let attaching: number | undefined;
+	let missed = false;
 
 	// The session behind the editor. The load comes first because `engine.open` reads the
 	// document before its own load, and an open awaited from the start compiles the
@@ -195,12 +197,17 @@
 		const engine = engineHandle;
 		const quill = quillHandle;
 		const doc = docHandle;
-		if (!engine || !quill || !doc || attaching === generation) return;
+		if (!engine || !quill || !doc) return;
+		if (attaching === generation) {
+			missed = true;
+			return;
+		}
 		const mine = (attaching = generation);
 		let opened: LiveSession;
 		try {
 			await engine.load(quill);
 			if (mine !== generation) return;
+			missed = false;
 			opened = await engine.open(quill, doc);
 		} catch (e) {
 			if (mine === generation) refused = e instanceof Error ? e.message : String(e);
@@ -213,6 +220,7 @@
 		session = opened;
 		refused = undefined;
 		syncDiagnostics();
+		if (missed) scheduleRecompile();
 	}
 
 	// ── Bridge: preview → editor ────────────────────────────────────────────────

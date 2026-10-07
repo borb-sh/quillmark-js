@@ -6,8 +6,8 @@ import { mount, unmount, flushSync, tick, type Component } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
 import type { EditorError } from '$lib/core';
-import type { FieldController, LeafViews } from '$lib/core/codec';
 import type { ActiveLeaf, CardId, EditorChange } from '$lib/visual';
+import type { ActiveProse } from '$lib/visual/leaves';
 import type { VisualEditorProps } from '$lib/visual/props';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
@@ -39,9 +39,9 @@ export interface EditorRef {
 	setKind(cardId: CardId, kind: string): void;
 }
 
-/** `VisualEditorInner` also holds the active leaf's controller. */
+/** `VisualEditorInner` also holds the active prose leaf. */
 export interface InnerRef extends EditorRef {
-	getActiveLeaf(): FieldController | undefined;
+	getActiveLeaf(): ActiveProse | undefined;
 }
 
 export interface Mounted<E = EditorRef> {
@@ -102,8 +102,7 @@ export const mountInner = (q: Quill, doc: Document, extra: Partial<VisualEditorP
 	mountWith<InnerRef>(VisualEditorInner as Component<VisualEditorProps>, q, doc, extra);
 
 /** The focused leaf's own view, for a transaction to be dispatched into. */
-export const activeView = (editor: InnerRef): EditorView =>
-	(editor.getActiveLeaf() as FieldController & LeafViews).view;
+export const activeView = (editor: InnerRef): EditorView => editor.getActiveLeaf()!.views.view;
 
 /** A field by the text of its own label: the first label inside the field's box, which
  *  for a control that owns its label row (an array, a matrix) is that row's. */
