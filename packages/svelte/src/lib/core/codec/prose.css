@@ -371,7 +371,7 @@ li.ProseMirror-selectednode::after {
    What differs is which edge each hangs off and what it draws. The grips take the
    leading edges, where a line begins; the add bars take the trailing ones, past where
    the axis ends. Position is the whole of what says which is which: the grip's marks are
-   the only glyph on the island, and they say draggable rather than which control this
+   the only glyph in the band, and they say draggable rather than which control this
    is. */
 :is(.qm-table-grip, .qm-table-add) {
 	position: absolute;
@@ -501,6 +501,54 @@ li.ProseMirror-selectednode::after {
 .qm-table-add:focus-visible {
 	outline: var(--_qm-ring);
 	outline-offset: var(--_qm-ring-offset);
+}
+
+/* The held column's alignment cluster, hung off its header cell and floating over the
+   first row, the band's top edge being the grips'. Up only while its column is held and
+   absent otherwise (`table-view.ts` §`alignCluster`), so the reveal is `hidden` rather
+   than the band's opacity. It floats over content it did not choose, so the edge and
+   `--_qm-lift` separate it and the raised rung joins them in dark (ARCHITECTURE
+   §Styling). The pressed toggle takes the selected grip's tint and accent: it names the
+   held column's alignment the way the grip names the held line. */
+.qm-table-align {
+	position: absolute;
+	z-index: 2;
+	top: 100%;
+	inset-inline: 0;
+	width: max-content;
+	margin-inline: auto;
+	display: flex;
+	border: var(--_qm-border-width) solid var(--_qm-border);
+	border-radius: var(--_qm-radius-inner);
+	background: var(--_qm-surface-raised);
+	box-shadow: var(--_qm-lift);
+}
+.qm-table-align[hidden] {
+	display: none;
+}
+.qm-table-align-option {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--_qm-tap-min);
+	height: var(--_qm-tap-min);
+	padding: 0;
+	border: none;
+	border-radius: var(--_qm-radius-inner);
+	background: none;
+	color: var(--_qm-ink);
+	cursor: pointer;
+}
+.qm-table-align-option:hover {
+	background: var(--_qm-surface-hover);
+}
+.qm-table-align-option[aria-pressed='true'] {
+	background: var(--_qm-accent-tint);
+	color: var(--_qm-accent);
+}
+.qm-table-align-option svg {
+	width: var(--_qm-glyph-control);
+	height: var(--_qm-glyph-control);
 }
 
 /* A drag in flight. The lifted line reads as picked up by tone, never a shadow:
