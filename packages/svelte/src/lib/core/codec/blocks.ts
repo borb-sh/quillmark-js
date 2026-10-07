@@ -4,8 +4,9 @@
 //
 // A shorthand's `^` anchors it to the head of a textblock, so every command here
 // declines anywhere else, and a pick does what the shorthand would have done there —
-// the run consumed, the caret at the block's head. The menu asks each command whether
-// it would run rather than restating its guards (§`slashItems`).
+// the run consumed, the caret at the block's head. A list pick is the exception
+// (§`pickList`). The menu asks each command whether it would run rather than restating
+// its guards (§`slashItems`).
 //
 // `blockKeymap` is the other half of the file and answers to no door: the Enter cases
 // that are about the body rather than about any block in it, and the Delete that is
@@ -163,28 +164,64 @@ export function wrapInQuote(): Command {
 }
 
 /** `- ` / `1. `. `joinBefore` is the shorthand's ordinal test: `2. ` continues the list
- *  above where `7. ` opens one. A pick passes none and continues whatever list is
- *  above it. */
+ *  above where `7. ` opens one. */
 export function wrapInList(
 	ordered: boolean,
 	attrs: Attrs | null = null,
 	joinBefore?: (node: PMNode) => boolean
 ): Command {
+	return (state, dispatch) =>
+		atHead(state) && wrapBlock(state, dispatch, ordered, attrs, joinBefore);
+}
+
+/**
+ * A list pick, at whatever caret the writer has. `atHead` is the shorthand's guard,
+ * where a prefix firing mid-sentence would eat a dash; a pick is a gesture at the caret.
+ *
+ * At the end of a non-empty block it opens a fresh empty item below it, Enter then `- `
+ * as one gesture. Anywhere else it wraps the whole block, the smaller surprise: a writer
+ * who meant to split presses Enter first. It passes no `joinBefore`, so it continues
+ * whatever list is above.
+ */
+export function pickList(ordered: boolean): Command {
 	return (state, dispatch) => {
-		const { paragraph, list_item: item } = state.schema.nodes;
+		const { $from, empty } = state.selection;
+		if (!empty || !$from.parent.isTextblock) return false;
+		const size = $from.parent.content.size;
+		if (!size || $from.parentOffset < size) return wrapBlock(state, dispatch, ordered, null);
+		const { paragraph } = state.schema.nodes;
 		const list = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
-		const { $from } = state.selection;
-		if (!list || !paragraph || !atHead(state) || openingAnItem($from, item)) return false;
-		const pos = $from.pos;
-		const tr = state.tr;
-		// A paragraph item wherever this fires: `# ` inside the item is the gesture that
-		// mints `list_item > heading`, and a wrap keeping the heading is a second door onto
-		// that shape. Positions survive the retype — same content, same size.
-		if ($from.parent.type !== paragraph) tr.setBlockType(pos, pos, paragraph);
-		if (!wrapAt(tr, pos, list, attrs, joinBefore)) return false;
-		dispatch?.(tr);
+		if (!list || !paragraph) return false;
+		const at = $from.after();
+		const tr = state.tr.insert(at, paragraph.create());
+		if (!wrapAt(tr, at + 1, list, null)) return false;
+		dispatch?.(tr.setSelection(Selection.near(tr.doc.resolve(at + 1))));
 		return true;
 	};
+}
+
+/** Wrap the caret's whole block in a list, wherever in the block the caret sits: the
+ *  wrap opens at the block's head, so it joins the list above as the shorthand's does. */
+function wrapBlock(
+	state: EditorState,
+	dispatch: ((tr: Transaction) => void) | undefined,
+	ordered: boolean,
+	attrs: Attrs | null,
+	joinBefore?: (node: PMNode) => boolean
+): boolean {
+	const { paragraph, list_item: item } = state.schema.nodes;
+	const list = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
+	const { $from } = state.selection;
+	if (!list || !paragraph || openingAnItem($from, item)) return false;
+	const pos = $from.start();
+	const tr = state.tr;
+	// A paragraph item wherever this fires: `# ` inside the item is the gesture that
+	// mints `list_item > heading`, and a wrap keeping the heading is a second door onto
+	// that shape. Positions survive the retype — same content, same size.
+	if ($from.parent.type !== paragraph) tr.setBlockType(pos, pos, paragraph);
+	if (!wrapAt(tr, pos, list, attrs, joinBefore)) return false;
+	dispatch?.(tr);
+	return true;
 }
 
 /**

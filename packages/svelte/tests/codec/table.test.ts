@@ -10,9 +10,10 @@
 // every row and column op is asserted install-then-read against its own projection.
 import { describe, it, expect } from 'vitest';
 import { GapCursor } from 'prosemirror-gapcursor';
+import { undoDepth } from 'prosemirror-history';
 import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { createField, decode, blockSchema } from '$lib/core/codec';
+import { createField, decode, blockSchema, pmToContent } from '$lib/core/codec';
 import { cellSchema } from '$lib/core/codec/schema.js';
 import type { FieldController, LeafViews } from '$lib/core/codec';
 import {
@@ -765,6 +766,141 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 });
+
+// ── Alignment ───────────────────────────────────────────────────────────────
+//
+// A column's alignment is set on the held column: its cluster under a pointer, Shift+Left
+// and Shift+Right under the caret. Either writes `aligns[c]` as one `set`, so one `Mod-z`
+// takes it back.
+
+const UNALIGNED = normalizeTable({ ...LETTERED, aligns: ['none', 'none'] });
+
+/** A column's alignment cluster. */
+function cluster(field: FieldController, c: number): HTMLElement {
+	return field.el.querySelectorAll<HTMLElement>('.qm-table-align')[c]!;
+}
+
+/** One toggle of a column's cluster. Re-queried per press: a write rebuilds the chrome. */
+function toggle(field: FieldController, c: number, align: string): HTMLButtonElement {
+	return cluster(field, c).querySelector<HTMLButtonElement>(`[data-align='${align}']`)!;
+}
+
+describe('alignment is set on the held column', () => {
+	it('the cluster is up while its column is held, and absent otherwise', () => {
+		const { field } = tableLeaf(LETTERED);
+		expect(cluster(field, 0).hidden).toBe(true);
+		expect(cluster(field, 1).hidden).toBe(true);
+		grips(field, 'column')[1].click();
+		expect(cluster(field, 0).hidden).toBe(true);
+		expect(cluster(field, 1).hidden).toBe(false);
+		// Pressed on the alignment the column holds, and on nothing else.
+		expect(toggle(field, 1, 'right').getAttribute('aria-pressed')).toBe('true');
+		expect(toggle(field, 1, 'left').getAttribute('aria-pressed')).toBe('false');
+		// Out of the tab order, for the reason a grip is.
+		expect(toggle(field, 1, 'right').tabIndex).toBe(-1);
+		grips(field, 'row')[1].click();
+		expect(cluster(field, 1).hidden).toBe(true);
+		// A column swept cell by cell is the column its grip names.
+		layout(field);
+		sweep(field, 1, 5);
+		expect(cluster(field, 1).hidden).toBe(false);
+		cellViews(field)[0].focus();
+		expect(cluster(field, 1).hidden).toBe(true);
+		field.destroy();
+	});
+
+	it('a toggle writes its alignment as one undo step, and the column stays held', () => {
+		const { field } = tableLeaf(UNALIGNED);
+		for (const to of ['left', 'center', 'right'] as const) {
+			grips(field, 'column')[1].click();
+			toggle(field, 1, to).click();
+			expect(leafProps(field).aligns).toEqual(['none', to]);
+			expect(undoDepth(outerView(field).state)).toBe(1);
+			// Held through the rebuild the write costs, so the next press is about it too.
+			expect(washed(field)).toEqual(['0,1', '1,1', '2,1']);
+			expect(toggle(field, 1, to).getAttribute('aria-pressed')).toBe('true');
+			press(caret(field), 'z', { ctrlKey: true });
+			expect(leafProps(field).aligns).toEqual(['none', 'none']);
+		}
+		field.destroy();
+	});
+
+	it('the alignment the column already holds writes nothing', () => {
+		const { field } = tableLeaf(LETTERED);
+		grips(field, 'column')[1].click();
+		toggle(field, 1, 'right').click();
+		expect(leafProps(field).aligns).toEqual(['left', 'right']);
+		expect(undoDepth(outerView(field).state)).toBe(0);
+		field.destroy();
+	});
+
+	it('Shift+Left and Shift+Right step the held column along the cluster’s order', () => {
+		const { field } = tableLeaf(UNALIGNED);
+		grips(field, 'column')[1].click();
+		const slide = (key: string) => press(caret(field), key, { shiftKey: true });
+		// A column with no alignment steps from the first place.
+		slide('ArrowRight');
+		expect(leafProps(field).aligns).toEqual(['none', 'center']);
+		// And the step stops at either end.
+		slide('ArrowRight');
+		slide('ArrowRight');
+		expect(leafProps(field).aligns).toEqual(['none', 'right']);
+		slide('ArrowLeft');
+		slide('ArrowLeft');
+		slide('ArrowLeft');
+		expect(leafProps(field).aligns).toEqual(['none', 'left']);
+		expect(washed(field)).toEqual(['0,1', '1,1', '2,1']);
+		expect(toggle(field, 1, 'left').getAttribute('aria-pressed')).toBe('true');
+		field.destroy();
+	});
+
+	it('each Shift+arrow writes one alignment as one undo step', () => {
+		const steps = [
+			['none', 'ArrowLeft', 'left'],
+			['none', 'ArrowRight', 'center'],
+			['center', 'ArrowRight', 'right']
+		] as const;
+		for (const [from, key, to] of steps) {
+			const { field } = tableLeaf(normalizeTable({ ...LETTERED, aligns: ['none', from] }));
+			grips(field, 'column')[1].click();
+			press(caret(field), key, { shiftKey: true });
+			expect(leafProps(field).aligns).toEqual(['none', to]);
+			expect(undoDepth(outerView(field).state)).toBe(1);
+			press(caret(field), 'z', { ctrlKey: true });
+			expect(leafProps(field).aligns).toEqual(['none', from]);
+			field.destroy();
+		}
+	});
+
+	it('Shift+arrow over any other rectangle keeps the key; over none it is the caret’s', () => {
+		const { field } = tableLeaf(LETTERED);
+		const claims = (view: EditorView) =>
+			view.someProp('handleKeyDown', (f) =>
+				f(view, new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true }))
+			);
+		grips(field, 'row')[1].click();
+		expect(claims(caret(field))).toBe(true);
+		expect(leafProps(field).aligns).toEqual(['left', 'right']);
+		cellViews(field)[0].focus();
+		expect(claims(caret(field))).toBeFalsy();
+		field.destroy();
+	});
+
+	it('a set alignment is the delimiter row markdown spells, and decodes back', () => {
+		const { field } = tableLeaf(UNALIGNED);
+		grips(field, 'column')[0].click();
+		toggle(field, 0, 'center').click();
+		grips(field, 'column')[1].click();
+		press(caret(field), 'ArrowLeft', { shiftKey: true });
+		const out = core.exportMarkdown(field.getContent());
+		expect(out).toContain('| :---: | :--- |');
+		const back = md(out);
+		expect(propsOf(back).aligns).toEqual(['center', 'left']);
+		expect(propsOf(pmToContent(decode(back, blockSchema))).aligns).toEqual(['center', 'left']);
+		field.destroy();
+	});
+});
+
 // ── The selection ───────────────────────────────────────────────────────────
 //
 // One rectangle of cells, drawn two ways — a grip names the line it covers, a press

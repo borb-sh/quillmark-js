@@ -331,11 +331,19 @@ main:
             type: plaintext
             inline: true
             default: ""
-            description: What changed, in the reviser's own words. The row's content cell, and so the one cell of a row the preview can land a click on.
+            description: What changed, in the reviser's own words. A content cell, and so a cell of a row the preview can land a click on.
+          rationale:
+            type: richtext
+            default: ""
+            description: Why it changed, at whatever length. Block richtext, so the cell holds paragraphs and lists and spans the row under its label; one holding a table or an image is held read-only.
+          passage:
+            type: plaintext
+            default: ""
+            description: The changed passage as it now reads, line for line. Block plaintext, so the cell holds lines and spans the row too.
       default: []
       ui:
         group: meta
-      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform. A row's cells are read through the plate's loop binding, which carries no address, so only the content cell regions — `main.revisions[0].detail` is the fixture's one-rung nested-row address, and the scalar cells beside it reach the preview through the array's own region."
+      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform. A row's cells are read through the plate's loop binding, which carries no address, so only the content cells region — `main.revisions[0].detail` is the fixture's one-rung nested-row address, and the scalar cells beside it reach the preview through the array's own region."
 
     checks:
       type: matrix

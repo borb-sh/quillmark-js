@@ -14,9 +14,10 @@
 // field's, so one undo stack covers the leaf), no anchor plugin (an anchor in a cell
 // is preserved, never minted), and no placeholder.
 //
-// The chrome is a band and a selection (CODEC §"The table island"), and it raises
-// nothing. Every control is absolutely positioned out of the grid, so the band is in no
-// row and no column of it; `codec/prose.css` draws the band and the selection wash both.
+// The chrome is a band and a selection (CODEC §"The table island"), and the band raises
+// nothing: what floats over the grid is the held column's alignment cluster alone. Every
+// control is absolutely positioned out of the grid, so none is in a row or a column of
+// it; `codec/prose.css` draws the band, the cluster and the selection wash.
 import { baseKeymap, chainCommands, toggleMark } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -36,6 +37,7 @@ import { tablePropsOfNode } from './islands.js';
 import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
 import {
+	ALIGNS,
 	cellAt,
 	cellContent,
 	cellEqual,
@@ -52,8 +54,10 @@ import {
 	rowCells,
 	rowCount,
 	rowEmpty,
+	setAlign,
 	shapeEqual,
-	withCell
+	withCell,
+	type TableAlign
 } from './table.js';
 
 /** Everything the island's chrome says. Accessible names, not decoration: every
@@ -78,6 +82,10 @@ export interface TableChromeStrings {
 	/** The two trailing bars, each of which grows the table along its own axis. */
 	tableAddRow: string;
 	tableAddColumn: string;
+	/** The held column's alignment cluster, a name per toggle. */
+	tableAlignLeft: string;
+	tableAlignCenter: string;
+	tableAlignRight: string;
 }
 
 /**
@@ -97,7 +105,10 @@ export const DEFAULT_TABLE_STRINGS: TableChromeStrings = {
 	tableSelectRow: (index) => `Select row ${index}`,
 	tableSelectColumn: (index) => `Select column ${index}`,
 	tableAddRow: 'Add row',
-	tableAddColumn: 'Add column'
+	tableAddColumn: 'Add column',
+	tableAlignLeft: 'Align left',
+	tableAlignCenter: 'Align center',
+	tableAlignRight: 'Align right'
 };
 
 /** What the field hands each island view: its wording (read live, so a locale swap
@@ -116,25 +127,38 @@ export interface TableViewDeps {
 	clearance: number | undefined;
 }
 
-/** The one glyph this chrome draws, as the path data a DOM node can carry — its own set
- *  rather than `visual/icons/nodes.ts`, this being the one place chrome is built without
- *  Svelte, and `/core` reaching no surface module. Same 24×24 frame and the same origin,
- *  off an earlier release than the thirteen there; `NOTICE` carries the notices for
- *  both. The dots are zero-length strokes under a round cap, which is how that set draws
- *  a dot everywhere it has one. */
+/** The grip's glyph, as the path data a DOM node can carry — this chrome's own set rather
+ *  than `visual/icons/nodes.ts`, this being the one place chrome is built without Svelte,
+ *  and `/core` reaching no surface module. Same 24×24 frame and the same origin, off an
+ *  earlier release than the set there; `NOTICE` carries the notices for both. The dots
+ *  are zero-length strokes under a round cap, which is how that set draws a dot
+ *  everywhere it has one. */
 const GRIP: Record<Axis, string[]> = {
 	column: ['M5 9h.01', 'M12 9h.01', 'M19 9h.01', 'M5 15h.01', 'M12 15h.01', 'M19 15h.01'],
 	row: ['M9 5h.01', 'M9 12h.01', 'M9 19h.01', 'M15 5h.01', 'M15 12h.01', 'M15 19h.01']
 };
 
-/** The grip's marks. The stroke is heavy for a chrome glyph because they are dots, and a
- *  dot drawn at the line weight of a stroke disappears at the size the bar renders. */
-function svg(paths: string[]): SVGElement {
+/** An alignment a press sets: every one but `none`, which is what a column arrives at. */
+type Aligned = Exclude<TableAlign, 'none'>;
+
+/** The alignments the cluster draws and Shift+arrow steps through, in that order. */
+const SETTABLE = ALIGNS.filter((a): a is Aligned => a !== 'none');
+
+/** The cluster's glyphs, off the same release as the grip's. */
+const ALIGN_GLYPH: Record<Aligned, string[]> = {
+	left: ['M21 6H3', 'M15 12H3', 'M17 18H3'],
+	center: ['M21 6H3', 'M17 12H7', 'M19 18H5'],
+	right: ['M21 6H3', 'M21 12H9', 'M21 18H7']
+};
+
+/** A glyph's marks at `weight`: the set's own is 2, and the grip takes 3, its marks being
+ *  dots, which at the line weight of a stroke disappear at the size the bar renders. */
+function svg(paths: string[], weight: number): SVGElement {
 	const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 	el.setAttribute('viewBox', '0 0 24 24');
 	el.setAttribute('fill', 'none');
 	el.setAttribute('stroke', 'currentColor');
-	el.setAttribute('stroke-width', '3');
+	el.setAttribute('stroke-width', String(weight));
 	el.setAttribute('stroke-linecap', 'round');
 	el.setAttribute('stroke-linejoin', 'round');
 	el.setAttribute('aria-hidden', 'true');
@@ -179,11 +203,11 @@ function cellPlugins(keys: Record<string, Command>) {
 	return [inputRulesPlugin(cellSchema), keymap(keys), keymap(baseKeymap)];
 }
 
-/** The band's controls, each of which answers for its own press. Spelled apart from
+/** The controls, each of which answers for its own press. Spelled apart from
  *  {@link owned} because the pointer router needs them before it needs the cells: a grip
- *  is inside the cell it names, so the two selectors overlap on exactly the press whose
- *  reading they disagree about. */
-const CONTROLS = '.qm-table-grip, .qm-table-add';
+ *  and a cluster are inside the cell they name, so the two selectors overlap on exactly
+ *  the press whose reading they disagree about. */
+const CONTROLS = '.qm-table-grip, .qm-table-add, .qm-table-align';
 
 /** What the nested views and the band answer for themselves, which is what `stopEvent`
  *  keeps from PM. */
@@ -318,6 +342,8 @@ class TableIslandView implements NodeView {
 	 *  without a query. The typed twin of `cells`, `Line` included — a key parsed back
 	 *  into one is the `data-` attribute `MountedCell.box` refuses. */
 	private grips = new Map<string, { line: Line; grip: HTMLButtonElement }>();
+	/** The alignment clusters, by column. */
+	private clusters: HTMLElement[] = [];
 	/** The grid's own box, and the containing block every out-of-flow control is placed
 	 *  against. Not the scroller: an absolute inside a scroll container is placed
 	 *  against a padding box the scroll then slides out from under, so a control at the
@@ -677,17 +703,19 @@ class TableIslandView implements NodeView {
 		this.paintSelection();
 	}
 
-	/** Wash the selected cells and mark the grip of any line the selection exactly
-	 *  covers. Imperative rather than a re-render: a rebuild destroys the nested views,
-	 *  and a selection is exactly the state that must not cost the carets in them. */
+	/** Wash the selected cells, mark the grip of any line the selection exactly covers, and
+	 *  put up the cluster of a column it covers. Imperative rather than a re-render: a
+	 *  rebuild destroys the nested views, and a selection is exactly the state that must
+	 *  not cost the carets in them. */
 	private paintSelection(): void {
 		const held = this.selected;
 		const props = this.props();
-		for (const { line, grip } of this.grips.values())
-			grip.setAttribute(
-				'aria-pressed',
-				String(!!held && sameCells(held, this.lineCells(line, props)))
-			);
+		for (const { line, grip } of this.grips.values()) {
+			const named = !!held && sameCells(held, this.lineCells(line, props));
+			grip.setAttribute('aria-pressed', String(named));
+			const cluster = line.axis === 'column' ? this.clusters[line.index] : undefined;
+			if (cluster) cluster.hidden = !named;
+		}
 		for (const cell of this.cells)
 			cell.box.toggleAttribute(
 				'data-selected',
@@ -763,6 +791,15 @@ class TableIslandView implements NodeView {
 			line.axis === 'row' ? moveRow(props, line.index, by) : moveColumn(props, line.index, by)
 		);
 		this.selectLine({ axis: line.axis, index: to });
+	}
+
+	/** Set column `c`'s alignment and keep the column held: a changed alignment rebuilds
+	 *  the views, which retires the selection as a move's rebuild does. The alignment the
+	 *  column already holds writes nothing. */
+	private align(c: number, to: Aligned): void {
+		const props = this.props();
+		if (props.aligns[c] !== to) this.write(setAlign(props, c, to));
+		this.selectLine({ axis: 'column', index: c });
 	}
 
 	// ── Drag to reorder ───────────────────────────────────────────────────────
@@ -944,6 +981,7 @@ class TableIslandView implements NodeView {
 		this.endSweep();
 		this.teardownCells();
 		this.grips.clear();
+		this.clusters = [];
 		this.dom.textContent = '';
 		const props = tablePropsOfNode(this.node);
 		this.rendered = props;
@@ -1025,7 +1063,10 @@ class TableIslandView implements NodeView {
 			// row and the header is one: it selects, it deletes, and it drags, all by the
 			// rules every other row is under.
 			if (r === 0)
-				box.appendChild(this.grip({ axis: 'column', index: c }, s.tableSelectColumn(c + 1)));
+				box.append(
+					this.grip({ axis: 'column', index: c }, s.tableSelectColumn(c + 1)),
+					this.alignCluster(c, align, s)
+				);
 			if (c === 0)
 				box.appendChild(
 					this.grip(
@@ -1058,11 +1099,42 @@ class TableIslandView implements NodeView {
 		btn.setAttribute('aria-pressed', 'false');
 		btn.setAttribute('data-axis', line.axis);
 		const bar = el('span', 'qm-table-grip-bar');
-		bar.appendChild(svg(GRIP[line.axis]));
+		bar.appendChild(svg(GRIP[line.axis], 3));
 		btn.appendChild(bar);
 		btn.addEventListener('pointerdown', (e) => this.onGripDown(line, btn, e));
 		this.grips.set(lineKey(line), { line, grip: btn });
 		return btn;
+	}
+
+	/** A column's alignment cluster: a toggle per alignment, pressed on the one the column
+	 *  holds. Up only while the held rectangle is this column
+	 *  ({@link TableIslandView.paintSelection}), and absent rather than transparent the
+	 *  rest of the time: it floats over the first row, and a box hit-tested there at rest
+	 *  would take that cell's presses. Out of the tab order for the reason a grip is, its
+	 *  keyboard twin being Shift+Left and Shift+Right (§{@link TableIslandView.cellKeys}). */
+	private alignCluster(c: number, held: TableAlign, s: TableChromeStrings): HTMLElement {
+		const cluster = el('div', 'qm-table-align');
+		cluster.setAttribute('role', 'group');
+		cluster.setAttribute('aria-label', s.tableColumn(c + 1));
+		cluster.hidden = true;
+		// The cluster's own edge is no button, and a press on it would otherwise take the
+		// focus off the caret the write lands back on.
+		cluster.addEventListener('mousedown', (e) => e.preventDefault());
+		const names: Record<Aligned, string> = {
+			left: s.tableAlignLeft,
+			center: s.tableAlignCenter,
+			right: s.tableAlignRight
+		};
+		for (const align of SETTABLE) {
+			const btn = chromeButton('qm-table-align-option', names[align], () => this.align(c, align));
+			btn.tabIndex = -1;
+			btn.setAttribute('aria-pressed', String(held === align));
+			btn.setAttribute('data-align', align);
+			btn.appendChild(svg(ALIGN_GLYPH[align], 2));
+			cluster.appendChild(btn);
+		}
+		this.clusters[c] = cluster;
+		return cluster;
 	}
 
 	/** A trailing bar: the whole edge past the last line of its axis, and the one way a
@@ -1252,6 +1324,23 @@ class TableIslandView implements NodeView {
 				return true;
 			};
 		};
+		// Shift steps a held column's alignment a place along the cluster's order, stopping
+		// at either end, and a column with none steps from the first. Over any other
+		// rectangle it keeps the key, every arrow being the rectangle's while one is held.
+		const slide = (by: -1 | 1): Command => {
+			return () => {
+				if (!this.selected) return false;
+				const on = this.lineOn('column');
+				if (on === undefined) return true;
+				const held = this.props().aligns[on];
+				const at = Math.max(
+					0,
+					SETTABLE.findIndex((a) => a === held)
+				);
+				this.align(on, SETTABLE[Math.max(0, Math.min(at + by, SETTABLE.length - 1))]!);
+				return true;
+			};
+		};
 		return {
 			...marks,
 			...breakKeymap(cellSchema),
@@ -1270,6 +1359,8 @@ class TableIslandView implements NodeView {
 			'Alt-ArrowDown': line('row', 1, true),
 			'Alt-ArrowLeft': line('column', -1, true),
 			'Alt-ArrowRight': line('column', 1, true),
+			'Shift-ArrowLeft': slide(-1),
+			'Shift-ArrowRight': slide(1),
 			Tab: () => this.step(r, c, 1),
 			'Shift-Tab': () => this.step(r, c, -1),
 			Enter: () => {

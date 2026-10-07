@@ -102,7 +102,15 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 	it('offers the turns a shorthand mints, and the table no shorthand reaches', () => {
 		const { field, view, state } = leaf('');
 		typeAt(field, view, 0, '/');
-		expect(state()?.items).toEqual(['heading', 'list', 'numbered-list', 'quote', 'code', 'table']);
+		expect(state()?.items).toEqual([
+			'heading',
+			'list',
+			'numbered-list',
+			'subparagraph',
+			'quote',
+			'code',
+			'table'
+		]);
 		field.destroy();
 	});
 
@@ -174,10 +182,10 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 });
 
 describe('a name is offered only where its command would run', () => {
-	it('offers the island alone mid-paragraph, the rest turning the block the caret is in', () => {
+	it("offers the lists and the island past a block's head, the rest turning the block", () => {
 		const { field, view, state } = leaf('para');
 		typeAt(field, view, 4, ' /');
-		expect(state()?.items).toEqual(['table']);
+		expect(state()?.items).toEqual(['list', 'numbered-list', 'subparagraph', 'table']);
 		field.destroy();
 	});
 
@@ -192,6 +200,13 @@ describe('a name is offered only where its command would run', () => {
 		field.destroy();
 	});
 
+	it("drops them inside an item's first block too, where the pick would wrap the item's own text", () => {
+		const { field, view, state } = leaf('- alpha beta');
+		typeAt(field, view, 6, '/');
+		expect(state()?.items).toEqual(['table']);
+		field.destroy();
+	});
+
 	it('a pick the menu never offers consumes nothing: the run is left as typed', () => {
 		// `slashPick` is a public seam, so the decline is reachable without the menu.
 		const { field, view } = leaf('- alpha');
@@ -199,6 +214,103 @@ describe('a name is offered only where its command would run', () => {
 		type(view, '/list');
 		field.slashPick('list');
 		expect(field.getContent().text).toBe('/listalpha');
+		field.destroy();
+	});
+});
+
+// The shorthand's head guard is a prefix's: `- ` firing mid-sentence would eat a dash.
+// A pick is a gesture at the caret the writer has, so a list pick runs anywhere in the
+// block and the guard stays with the shorthand (`inputrules.test.ts`).
+describe('a list pick runs at any caret in the block', () => {
+	/** The `list_item` container an item at `ordinal` carries. */
+	const item = (ordered: boolean, ordinal = 0) => ({
+		container: 'list_item',
+		attrs: { ordered, start: 1, ordinal }
+	});
+
+	describe.each([
+		['list', false],
+		['numbered-list', true]
+	] as const)('`/%s`', (name, ordered) => {
+		it("at a block's head, wraps it in place", () => {
+			const { field, view, state } = leaf('alpha beta');
+			typeAt(field, view, 0, `/${name}`);
+			expect(state()?.items).toContain(name);
+			press(view, 'Enter');
+			const stored = field.getContent();
+			expect(stored.text).toBe('alpha beta');
+			expect(stored.lines.map((l) => l.containers)).toEqual([[item(ordered)]]);
+			field.destroy();
+		});
+
+		it('mid-block, wraps the whole block rather than splitting it', () => {
+			const { field, view, state } = leaf('alpha beta');
+			typeAt(field, view, 6, `/${name}`);
+			expect(state()?.items).toContain(name);
+			press(view, 'Enter');
+			const stored = field.getContent();
+			expect(stored.text).toBe('alpha beta');
+			expect(stored.lines.map((l) => l.containers)).toEqual([[item(ordered)]]);
+			// The caret stays where the run was.
+			const { $head } = view.state.selection;
+			expect($head.parent.textContent.slice($head.parentOffset)).toBe('beta');
+			field.destroy();
+		});
+
+		it('at the end of a non-empty block, opens a fresh empty item below it', () => {
+			const { field, view, state } = leaf('alpha');
+			typeAt(field, view, 5, ` /${name}`);
+			expect(state()?.items).toContain(name);
+			press(view, 'Enter');
+			const stored = field.getContent();
+			expect(stored.text).toBe('alpha \n');
+			expect(stored.lines.map((l) => l.containers)).toEqual([[], [item(ordered)]]);
+			// The caret is in the fresh item, where its text goes.
+			const { $head } = view.state.selection;
+			expect($head.parent.content.size).toBe(0);
+			expect($head.node(-1).type.name).toBe('list_item');
+			field.destroy();
+		});
+	});
+
+	it('mid-block, continues the list above it, the wrap opening at the head', () => {
+		const { field, view } = leaf('- alpha\n\nbeta gamma');
+		typeAt(field, view, 11, '/list');
+		press(view, 'Enter');
+		const stored = field.getContent();
+		expect(stored.text).toBe('alpha\nbeta gamma');
+		expect(stored.lines.map((l) => l.containers)).toEqual([[item(false)], [item(false, 1)]]);
+		field.destroy();
+	});
+
+	it("at the end of an item's text, opens the item below as a sub-list under it", () => {
+		const { field, view } = leaf('- alpha');
+		typeAt(field, view, 5, ' /list');
+		press(view, 'Enter');
+		const stored = field.getContent();
+		expect(stored.lines.map((l) => l.containers)).toEqual([
+			[item(false)],
+			[item(false), item(false)]
+		]);
+		field.destroy();
+	});
+});
+
+describe('`subparagraph` is a second name for `list`', () => {
+	it('completes on its own prefix, the word a memo writer has for a bullet', () => {
+		const { field, view, state } = leaf('');
+		typeAt(field, view, 0, '/sub');
+		expect(state()?.items).toEqual(['subparagraph']);
+		field.destroy();
+	});
+
+	it('mints the bullet item `/list` does', () => {
+		const { field, view } = leaf('alpha');
+		typeAt(field, view, 0, '/subparagraph');
+		press(view, 'Enter');
+		expect(field.getContent().lines[0].containers).toEqual([
+			{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }
+		]);
 		field.destroy();
 	});
 });

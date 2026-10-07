@@ -123,6 +123,21 @@ describe('the ` ``` ` fence shorthand', () => {
 	});
 });
 
+// A shorthand is a prefix, so it fires at a block's head alone: mid-sentence it would eat
+// a dash. The slash menu's list pick runs at any caret (`slash.test.ts`); this door
+// keeps the guard.
+describe('the list shorthands stay literal past the head of a block', () => {
+	it.each([
+		['alpha - ', 'doc(paragraph("alpha - "))'],
+		['alpha 1. ', 'doc(paragraph("alpha 1. "))']
+	])('%s', (typed, shape) => {
+		const view = mountView();
+		type(view, typed);
+		expect(view.state.doc.toString()).toBe(shape);
+		view.destroy();
+	});
+});
+
 // A list shorthand at the head of an item that already exists is the text an author
 // typed: firing there mints an item whose only content is another item, and Tab is the
 // gesture that nests (under the previous sibling, which is the shape a nesting has).
