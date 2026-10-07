@@ -26,7 +26,7 @@ import {
 } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { rangeAnchor, type RangeAnchor } from './anchor.js';
-import { consuming, toCodeBlock, toHeading, wrapInList, wrapInQuote } from './blocks.js';
+import { consuming, pickList, toCodeBlock, toHeading, wrapInQuote } from './blocks.js';
 import { mintIslandId } from './islands.js';
 import { newTable } from './table.js';
 
@@ -62,8 +62,8 @@ export const DEFAULT_SLASH_STRINGS: SlashStrings = {
  * The vocabulary a caret can run, in menu order: the names `SLASH_COMMANDS` is keyed
  * by, each asked whether it would fire here. A row that declines when picked is worse
  * than an absent one, and asking the command rather than restating its guards is what
- * keeps the menu from drifting off what the shorthand does. So the offers narrow as the
- * caret moves: the island alone mid-paragraph, no list at an item's head.
+ * keeps the menu from drifting off what a pick does. So the offers narrow as the caret
+ * moves: the lists and the island alone mid-paragraph, no list at an item's head.
  *
  * `state` is the state a pick leaves behind — the run already consumed — since that is
  * the caret every command answers for (`blocks.ts`).
@@ -361,13 +361,13 @@ function insertBlock(make: (state: EditorState) => PMNode): Command {
  *  level `# ` counts to. */
 const SLASH_COMMANDS: Record<string, Command> = {
 	heading: toHeading(1),
-	list: wrapInList(false),
-	'numbered-list': wrapInList(true),
+	list: pickList(false),
+	'numbered-list': pickList(true),
+	// A memo letters a bullet as a subparagraph, and that is the word its writer reaches for.
+	subparagraph: pickList(false),
 	quote: wrapInQuote(),
 	code: toCodeBlock(),
 	// The one command no shorthand reaches: a pipe row is not a prefix a rule can fire on.
-	// An insert rather than a turn, so it is also the only one a caret mid-paragraph is
-	// offered.
 	table: insertBlock((state) =>
 		state.schema.nodes.island_block.create({
 			id: mintIslandId(state.doc),
