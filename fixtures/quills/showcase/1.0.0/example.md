@@ -40,6 +40,21 @@ revisions:
   - note: Fig. 2 relabelled
     pages: 1
     detail: The caption named the wrong figure.
+    rationale: |
+      Two plates shared one caption:
+
+      - the second was captioned as the first;
+      - the list of figures repeated it.
+    passage: |-
+      Figure 2. The region table,
+      drawn over the second page.
+  - note: Margins widened
+    pages: 2
+    rationale: |
+      | Edge | Was | Is |
+      | --- | --- | --- |
+      | Inner | 18pt | 24pt |
+      | Outer | 18pt | 20pt |
 checks:
   spelling:
     note: Two *typos* in the abstract.

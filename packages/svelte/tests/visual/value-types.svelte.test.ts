@@ -186,7 +186,7 @@ describe('an array of objects', () => {
 		const props = [...arr.querySelectorAll<HTMLElement>('.qm-object-prop')];
 		expect(
 			props.map((p) => p.querySelector('.qm-field-label')?.textContent?.replace(/\s+/g, ' ').trim())
-		).toEqual(['Note *', 'Pages *', 'Detail']);
+		).toEqual(['Note *', 'Pages *', 'Detail', 'Rationale', 'Passage']);
 
 		type(props[0].querySelector('input')!, 'First cut');
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut' }]);
