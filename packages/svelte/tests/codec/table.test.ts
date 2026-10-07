@@ -37,6 +37,15 @@ import {
 import { mintIslandId } from '$lib/core/codec/islands.js';
 import type { Content, TableCell, TableProps } from '@quillmark/wasm';
 import { core, mount, press, quill, md } from './_util.js';
+import {
+	CHROME,
+	CHROME_PARTIAL,
+	EXCEL,
+	GOOGLE_DOCS,
+	GOOGLE_SHEETS,
+	WORD,
+	type Clipboard
+} from './_clipboard.js';
 
 const TABLE_MD = 'para\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ntail';
 
@@ -1200,18 +1209,19 @@ describe('a selection is the subject of the next command', () => {
 	});
 });
 
-// ── The clipboard door is shut ───────────────────────────────────────────────
+// ── The clipboard ──────────────────────────────────────────────────────────
 //
-// Markdown and HTML reach a field by import (CODEC §"Markdown at the edges"), never by
-// a paste, so no surface reads or writes a table on the clipboard. A pasted `<table>`
-// gets ProseMirror's own DOM parse against a schema that declares no `parseDOM` for an
-// island, which is to say it arrives as its text.
+// A table on the clipboard lands as an island (CODEC §"Markdown at the edges"): the HTML
+// every source writes, or, where the clipboard holds no HTML, the tab-separated text a
+// spreadsheet writes. Each fixture is what its source app puts on the clipboard
+// (`_clipboard.ts`), pasted through the leaf's own handler, and asserted twice: the props
+// the store holds, and the pipe table they export as.
 
 /** A clipboard event jsdom can carry: it implements no `DataTransfer`, and `getData` /
  *  `setData` are what a handler would reach for. The seed is what a paste arrives with;
  *  the same object is what a copy would be read back off, and stays empty. */
-function clipboard(kind: 'copy' | 'cut' | 'paste', seed: Record<string, string> = {}) {
-	const held: Record<string, string> = { ...seed };
+function clipboard(kind: 'copy' | 'cut' | 'paste', seed: Clipboard = {}) {
+	const held: Clipboard = { ...seed };
 	const event = new Event(kind, { bubbles: true, cancelable: true });
 	Object.defineProperty(event, 'clipboardData', {
 		value: {
@@ -1224,18 +1234,214 @@ function clipboard(kind: 'copy' | 'cut' | 'paste', seed: Record<string, string> 
 	return { event: event as ClipboardEvent, held };
 }
 
-const PASTED = '<table><tr><th>a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></table>';
+/** What the body stores after `data` is pasted at the end of `markdown`: a browser's paste
+ *  event on the leaf, read by the handler ProseMirror registers for one. */
+function pasted(data: Clipboard, markdown = 'para'): Content {
+	const doc = quill().seedDocument();
+	doc.overwrite({}, md(markdown));
+	const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+	const outer = outerView(field);
+	outer.dispatch(outer.state.tr.setSelection(Selection.atEnd(outer.state.doc)));
+	outer.dom.dispatchEvent(clipboard('paste', data).event);
+	const content = field.getContent();
+	field.destroy();
+	return content;
+}
 
-describe('no table crosses the clipboard', () => {
-	it('an HTML table pasted into the body mints no island', () => {
-		const { doc, field } = tableLeaf(LETTERED);
+const strong = (start: number, end: number) => ({ start, end, type: 'strong' as const });
+
+/** What a body of `para` exports as with a table pasted at its end. */
+const exported = (...lines: string[]): string => ['para', '', ...lines].join('\n');
+
+describe('a table on the clipboard lands as a table island', () => {
+	it('Word: the first row is the header, a merged cell splits, and its marks survive', () => {
+		const rt = pasted(WORD);
+		expect(rt.islands).toHaveLength(1);
+		expect(propsOf(rt)).toEqual({
+			header: [
+				{ text: 'Office', marks: [strong(0, 6)] },
+				{ text: 'Symbol', marks: [strong(0, 6)] },
+				{ text: 'Phone', marks: [strong(0, 5)] }
+			],
+			rows: [
+				[cell('Plans'), cell('XP'), cell('555-0100')],
+				// The row under a cell merged down takes an empty one in its column, and
+				// Word's empty paragraph is no text.
+				[cell(''), cell('XPX'), cell('')],
+				[
+					{ text: 'See attached roster', marks: [{ start: 4, end: 12, type: 'emph' }] },
+					cell(''),
+					cell('')
+				]
+			],
+			aligns: ['none', 'none', 'none']
+		});
+		expect(core.exportMarkdown(rt)).toBe(
+			exported(
+				'| **Office** | **Symbol** | **Phone** |',
+				'| --- | --- | --- |',
+				'| Plans | XP | 555-0100 |',
+				'|  | XPX |  |',
+				'| See *attached* roster |  |  |'
+			)
+		);
+	});
+
+	it('Excel: its markup and its text alone read as one table, a break a `\\n`', () => {
+		const both = pasted(EXCEL);
+		expect(propsOf(both)).toEqual({
+			header: [cell('Grade'), cell('Count')],
+			rows: [
+				[cell('O-3'), cell('12')],
+				[cell('Line one\nLine two'), cell('7')]
+			],
+			aligns: ['none', 'none']
+		});
+		expect(propsOf(pasted({ 'text/plain': EXCEL['text/plain'] }))).toEqual(propsOf(both));
+		expect(core.exportMarkdown(both)).toBe(
+			exported('| Grade | Count |', '| --- | --- |', '| O-3 | 12 |', '| Line one<br>Line two | 7 |')
+		);
+	});
+
+	// Docs spells bold as a `font-weight` style, which no parse rule reads: the header's
+	// text arrives and its weight is the header's own.
+	it("Google Docs: a cell's paragraphs are its lines, and a link survives", () => {
+		const rt = pasted(GOOGLE_DOCS);
+		expect(propsOf(rt)).toEqual({
+			header: [cell('Task'), cell('Reference')],
+			rows: [
+				[
+					cell('Submit roster\nby Friday'),
+					{
+						text: 'AFI 33-360',
+						marks: [
+							{
+								start: 0,
+								end: 10,
+								type: 'link',
+								attrs: { url: 'https://www.e-publishing.af.mil/' }
+							}
+						]
+					}
+				]
+			],
+			aligns: ['none', 'none']
+		});
+		expect(core.exportMarkdown(rt)).toBe(
+			exported(
+				'| Task | Reference |',
+				'| --- | --- |',
+				'| Submit roster<br>by Friday | [AFI 33-360](https://www.e-publishing.af.mil/) |'
+			)
+		);
+	});
+
+	it('Google Sheets: its markup and its text alone read as one table', () => {
+		const both = pasted(GOOGLE_SHEETS);
+		expect(grid(propsOf(both))).toEqual([
+			['Unit', 'Strength', 'Note'],
+			['1st Wing', '42', 'Line one\nLine two']
+		]);
+		expect(propsOf(pasted({ 'text/plain': GOOGLE_SHEETS['text/plain'] }))).toEqual(propsOf(both));
+		expect(core.exportMarkdown(both)).toBe(
+			exported(
+				'| Unit | Strength | Note |',
+				'| --- | --- | --- |',
+				'| 1st Wing | 42 | Line one<br>Line two |'
+			)
+		);
+	});
+
+	it('a web page: a `<thead>` is the header, and a code span and a link survive', () => {
+		const rt = pasted(CHROME);
+		expect(propsOf(rt)).toEqual({
+			header: [cell('Field'), cell('Meaning')],
+			rows: [
+				[
+					{ text: 'memo_for', marks: [{ start: 0, end: 8, type: 'code' }] },
+					{
+						text: 'Who the memo is addressed to',
+						marks: [
+							{
+								start: 16,
+								end: 25,
+								type: 'link',
+								attrs: { url: 'https://en.wikipedia.org/wiki/Memorandum' }
+							}
+						]
+					}
+				]
+			],
+			aligns: ['none', 'none']
+		});
+		expect(core.exportMarkdown(rt)).toBe(
+			exported(
+				'| Field | Meaning |',
+				'| --- | --- |',
+				'| `memo_for` | Who the memo is [addressed](https://en.wikipedia.org/wiki/Memorandum) to |'
+			)
+		);
+	});
+
+	it('a selection starting and ending mid-table arrives ragged and lands a rectangle', () => {
+		const rt = pasted(CHROME_PARTIAL);
+		expect(grid(propsOf(rt))).toEqual([
+			['b1', 'c1', ''],
+			['a2', 'b2', 'c2'],
+			['a3', '', '']
+		]);
+		expect(core.exportMarkdown(rt)).toBe(
+			exported('| b1 | c1 |  |', '| --- | --- | --- |', '| a2 | b2 | c2 |', '| a3 |  |  |')
+		);
+	});
+
+	it('a blank line closing the text is the terminator, not a row', () => {
+		const rt = pasted({ 'text/plain': 'Grade\tCount\r\nO-3\t12\r\n\r\n' });
+		expect(grid(propsOf(rt))).toEqual([
+			['Grade', 'Count'],
+			['O-3', '12']
+		]);
+	});
+
+	// A cell holding a tab, a line end or a quote is quoted, its own quotes doubled: the
+	// convention Excel and Sheets write, so the tab inside is the cell's text.
+	it('a quoted cell holding a tab is one cell, the tab its text', () => {
+		const rt = pasted({ 'text/plain': 'Code\tMeaning\r\n"A\tB"\t"5"" pipe"\r\n' });
+		expect(grid(propsOf(rt))).toEqual([
+			['Code', 'Meaning'],
+			['A\tB', '5" pipe']
+		]);
+		expect(core.exportMarkdown(rt)).toBe(
+			exported('| Code | Meaning |', '| --- | --- |', '| A\tB | 5" pipe |')
+		);
+	});
+
+	it('text with a tab on some lines and not all stays text', () => {
+		const rt = pasted({ 'text/plain': 'a\tb\nc\nd\te' });
+		expect(rt.islands).toEqual([]);
+		expect(rt.text).toBe('paraa\tb\nc\nd\te');
+	});
+
+	// `pasteText` is ProseMirror's paste as plain text, the one a Shift-held paste takes.
+	it('a paste as plain text keeps the tabs as text', () => {
+		const doc = quill().seedDocument();
+		doc.overwrite({}, md('para'));
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const outer = outerView(field);
 		outer.dispatch(outer.state.tr.setSelection(Selection.atEnd(outer.state.doc)));
-		outer.pasteHTML(PASTED, clipboard('paste').event);
-		expect(doc.main.body.islands).toHaveLength(1); // the one the leaf opened with
+		outer.pasteText(EXCEL['text/plain'], clipboard('paste').event);
+		expect(doc.main.body.islands).toEqual([]);
+		expect(doc.main.body.text).toContain('O-3\t12');
 		field.destroy();
 	});
 
+	it('the island arrives with no id, and the paste pass mints the next', () => {
+		const rt = pasted(GOOGLE_SHEETS, TABLE_MD);
+		expect(rt.islands.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
+	});
+});
+
+describe('the cell rectangle does not cross the clipboard', () => {
 	it('a copy over a held rectangle claims nothing and writes nothing', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[1].click();
@@ -1246,12 +1452,15 @@ describe('no table crosses the clipboard', () => {
 		field.destroy();
 	});
 
+	// A cell is one paragraph and holds no island, so a table is its cells' text there.
 	it('a table pasted into a cell is the cell’s own paste, and the table does not grow', () => {
-		const { field } = tableLeaf(LETTERED);
+		const { doc, field } = tableLeaf(LETTERED);
 		const view = cellViews(field)[3]; // row 1, column 1
 		view.focus();
-		view.pasteHTML(PASTED, clipboard('paste', { 'text/html': PASTED }).event);
+		view.dom.dispatchEvent(clipboard('paste', EXCEL).event);
 		expect(shapeEqual(leafProps(field), LETTERED)).toBe(true);
+		expect(doc.main.body.islands).toHaveLength(1);
+		expect(leafProps(field).rows[0][1].text).toBe('Grade Count O-3 12 Line one\nLine two 7a2');
 		field.destroy();
 	});
 });
