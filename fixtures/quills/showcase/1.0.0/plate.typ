@@ -270,6 +270,8 @@
   #for rev in data.at("revisions", default: ()) [
     #rev.at("note", default: "revised") (#str(rev.at("pages", default: 0)) pp)#if rev.at("detail", default: "") != "" [ — #rev.detail]
     #linebreak()
+    #if rev.at("rationale", default: "") != "" { block(inset: (left: 8pt), rev.rationale) }
+    #if rev.at("passage", default: "") != "" { block(inset: (left: 8pt), rev.passage) }
   ]
   // The matrix arrives as the members it holds, each its columns; `roster` is the
   // vocabulary, held or not, then each item the document adds. Each row claims its

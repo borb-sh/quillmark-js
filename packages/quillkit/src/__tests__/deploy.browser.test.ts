@@ -59,6 +59,11 @@ const LOAD_MS = 120_000;
  * `guidance` raises each field hint the pane shows as a pointer does, and reads the gap
  * between its surface and the trigger's target: the glyph's box grown to the tap floor
  * its `::after` draws, which is what the pointer holds.
+ *
+ * `unfolded` opens each section and every record row in it, as a hand does, and reads two
+ * relations off what that lays out: a block prose cell's inline edges against its subform
+ * grid's, and a held leaf's note against the box it is drawn in and the text above it, the
+ * leaf the note describes.
  */
 const SURVEY = `(async () => {
 	const deadline = Date.now() + 30000;
@@ -128,6 +133,43 @@ const SURVEY = `(async () => {
 		}
 		return { raised: gaps.length, clearance: Math.min(...gaps), pixel: 1 / devicePixelRatio };
 	};
+	const settled = async () => {
+		await frame();
+		await Promise.allSettled(document.getAnimations().map((done) => done.finished));
+		await frame();
+	};
+	const unfolded = async () => {
+		let cells = 0;
+		let offset = 0;
+		let notes = 0;
+		let spill = -Infinity;
+		for (const header of pane.querySelectorAll('.qm-group-header')) {
+			if (header.getAttribute('aria-expanded') !== 'true') header.click();
+			await settled();
+			const panel = document.getElementById(header.getAttribute('aria-controls'));
+			for (let shut; (shut = panel.querySelectorAll('.qm-element-summary[aria-expanded="false"]')).length; ) {
+				for (const summary of shut) summary.click();
+				await settled();
+			}
+			for (const cell of panel.querySelectorAll('.qm-prop-wide')) {
+				const at = cell.getBoundingClientRect();
+				const grid = cell.parentElement.getBoundingClientRect();
+				offset = Math.max(offset, Math.abs(at.left - grid.left), Math.abs(at.right - grid.right));
+				cells++;
+			}
+			for (const note of panel.querySelectorAll('.qm-prose-held-note')) {
+				const at = note.getBoundingClientRect();
+				const leaf = panel.querySelector('[aria-describedby~="' + CSS.escape(note.id) + '"]');
+				const box = leaf?.closest('.qm-control-box')?.getBoundingClientRect();
+				const text = leaf?.getBoundingClientRect();
+				spill = box
+					? Math.max(spill, box.left - at.left, at.right - box.right, text.bottom - at.top, at.bottom - box.bottom)
+					: Infinity;
+				notes++;
+			}
+		}
+		return { cells, offset, notes, spill };
+	};
 	return {
 		booted: shell !== null,
 		quiverResolved: picker !== null,
@@ -138,7 +180,8 @@ const SURVEY = `(async () => {
 		splitWidth: width(split),
 		search: location.search,
 		demand: pane === null ? null : demand(),
-		guidance: pane === null ? null : await guidance()
+		guidance: pane === null ? null : await guidance(),
+		unfolded: pane === null ? null : await unfolded()
 	};
 })()`;
 
@@ -157,6 +200,10 @@ interface Survey {
 	/** How many hints raised a surface, the least gap between one and its trigger's
 	 *  target, and the device pixel in CSS px. */
 	guidance: { raised: number; clearance: number; pixel: number } | null;
+	/** How many block prose cells and held notes the open sections lay out, the furthest a
+	 *  cell's inline edge stands off its subform grid's, and the furthest a note reaches past
+	 *  its box or up into its leaf's text, at most zero while it stands under the text. */
+	unfolded: { cells: number; offset: number; notes: number; spill: number } | null;
 }
 
 const temp = scratch('quillkit-deploy-');
@@ -247,6 +294,28 @@ describe('the built client, served under a subpath', () => {
 				page.guidance?.clearance,
 				`a raised surface stands more than a device pixel clear of the target ${where}`
 			).toBeGreaterThan(page.guidance?.pixel ?? Infinity);
+		}
+	});
+
+	it('spans a block prose cell across its subform', () => {
+		for (const page of [wide, narrow]) {
+			const where = `at ${page.viewport}px`;
+			expect(page.unfolded?.cells, `an open row lays out a block cell ${where}`).toBeGreaterThan(0);
+			expect(
+				page.unfolded?.offset,
+				`a block cell's inline extent is its subform grid's ${where}`
+			).toBeCloseTo(0, 0);
+		}
+	});
+
+	it("draws a held leaf's note inside its box, under its text", () => {
+		for (const page of [wide, narrow]) {
+			const where = `at ${page.viewport}px`;
+			expect(page.unfolded?.notes, `an open row lays out a held leaf ${where}`).toBeGreaterThan(0);
+			expect(
+				page.unfolded?.spill,
+				`a held leaf's note lies inside its box, under the text ${where}`
+			).toBeLessThanOrEqual(0);
 		}
 	});
 
