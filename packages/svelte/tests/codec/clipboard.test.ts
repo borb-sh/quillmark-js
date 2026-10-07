@@ -142,8 +142,8 @@ describe('what a paste from outside the editor states', () => {
 		expect(parse('<ol><li>a</li></ol>').child(0).attrs.start).toBe(1);
 	});
 
-	// The door that stays shut: a table is markup no `data-qm-island` names, so it
-	// flattens to its cells' text exactly as it did.
+	// The schema's own rules read no `<table>`: the island a paste makes of one is the
+	// block leaf's clipboard parser's (`table-paste.ts`), so the pair here is untouched.
 	it('a table flattens to its cells, minting no island', () => {
 		expect(parse('<table><tr><td>a</td><td>b</td></tr></table>').toString()).toBe(
 			'doc(paragraph("ab"))'

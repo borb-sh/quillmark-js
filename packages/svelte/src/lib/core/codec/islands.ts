@@ -198,9 +198,10 @@ function isIsland(node: PMNode): boolean {
 	return node.type.name === 'island_block' || node.type.name === 'island_inline';
 }
 
-/** `fragment` with every island whose id is already `taken` re-minted, or `null` where
- *  none was: an untouched paste stays the slice it arrived as. Every surviving id joins
- *  the set, so a slice carrying one id twice comes apart in the same pass. */
+/** `fragment` with every island whose id is empty or already `taken` minted afresh, or
+ *  `null` where none was: an untouched paste stays the slice it arrived as. Every
+ *  surviving id joins the set, so a slice carrying one id twice comes apart in the same
+ *  pass. */
 function remintIslands(
 	fragment: Fragment,
 	taken: Set<string>,
@@ -216,7 +217,7 @@ function remintIslands(
 			return;
 		}
 		let id = node.attrs.id as string;
-		if (taken.has(id)) {
+		if (!id || taken.has(id)) {
 			do id = mint();
 			while (taken.has(id));
 			changed = true;
@@ -230,7 +231,9 @@ function remintIslands(
 }
 
 /**
- * The paste's island pass: an id the field already holds is re-minted on the way in.
+ * The paste's island pass: an id the field already holds is re-minted on the way in, and
+ * an island arriving with none, a table read off foreign markup (`table-paste.ts`), takes
+ * its first.
  *
  * An id is an identity in the content and unique across the field, so two islands
  * wearing one is a projection the store has no shape for. A copy rather than a cut is

@@ -14,7 +14,8 @@
 // paste inside one body run the whole document through them (CODEC §"Markdown at the
 // edges"), so every attribute written here is read back here. Foreign HTML spells none
 // of this package's `data-qm-*` names, so what a paste takes off the web is unchanged;
-// the one rule that widens that door on purpose is the fence's.
+// the one rule here that widens that door on purpose is the fence's, a `<table>` being
+// the block leaf's clipboard parser's (`table-paste.ts`).
 import { Schema } from 'prosemirror-model';
 import type { MarkSpec, NodeSpec, NodeType } from 'prosemirror-model';
 import { islandBlockSpec, islandInlineSpec } from './islands.js';
