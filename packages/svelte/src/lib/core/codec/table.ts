@@ -226,8 +226,8 @@ export function clearCells(
 	});
 }
 
-/** Set column `c`'s alignment: the one table capability the content round-trips
- *  today and nothing in the editor could reach. */
+/** Set column `c`'s alignment: what the held column's cluster and Shift+arrow write
+ *  (`table-view.ts`). */
 export function setAlign(props: TableProps, c: number, align: TableAlign): TableProps {
 	return normalizeTable({
 		...props,
