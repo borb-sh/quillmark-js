@@ -20,9 +20,13 @@
  {@link FieldLabel} renders and the `aria-describedby` the control carries, which
  holds whether the surface is open or not. So no reader depends on a hover.
 
- Three ways in, one per input modality: hover (pointer), focus (keyboard), tap
- (touch); wired here rather than taken from `Tooltip`, whose trigger returns early
- on `pointerType === 'touch'` and closes on click.
+ Three ways in, one per input modality: hover (pointer), tap (touch), and an
+ activation with no pointer behind it (keyboard), wired here rather than taken from
+ `Tooltip`, whose trigger returns early on `pointerType === 'touch'` and closes on
+ click. The keyboard's activation is `Mod-/` on the control the description describes
+ (`guidance.ts`), not a stop on this glyph: a stop here would double every described
+ field's Tab stops, so the glyph is out of the tab order. A screen reader activating
+ it lands on the same toggle.
 -->
 <script lang="ts">
 	import { Popover } from 'bits-ui';
@@ -97,11 +101,35 @@
 		return Math.max(0, (parseFloat(across) - own) / 2) || 0;
 	}
 
-	function raise(): void {
+	/** What a keyboard raise was asked from: the described control, holding focus while
+	 * the trigger never does, so its leaving and its Escape are what lower the surface. */
+	let from = $state<HTMLElement | undefined>(undefined);
+
+	function raise(origin?: HTMLElement): void {
+		from = origin;
 		beside = ridesTheRung();
 		reach = targetReach();
 		open = true;
 	}
+
+	$effect(() => {
+		if (!open || !from) return;
+		const owner = from;
+		const leave = (e: FocusEvent) => {
+			if (!(e.relatedTarget instanceof Node && owner.contains(e.relatedTarget))) open = false;
+		};
+		const escape = (e: KeyboardEvent) => {
+			if (e.key !== 'Escape' || e.defaultPrevented) return;
+			e.stopPropagation();
+			open = false;
+		};
+		owner.addEventListener('focusout', leave);
+		owner.addEventListener('keydown', escape);
+		return () => {
+			owner.removeEventListener('focusout', leave);
+			owner.removeEventListener('keydown', escape);
+		};
+	});
 </script>
 
 <!-- The trigger is ours, not `Popover.Trigger`, and the surface anchors to it:
@@ -113,6 +141,7 @@
 	bind:this={triggerEl}
 	type="button"
 	class="qm-field-hint qm-icon-btn qm-focus-ring qm-tap-floor"
+	tabindex="-1"
 	aria-label="{label} guidance"
 	aria-expanded={open}
 	aria-describedby={describedBy}
@@ -131,11 +160,17 @@
 			else raise();
 		}
 	}}
-	onfocus={(e) => {
-		// Keyboard arrival only. A pointer press focuses the button too, and opening
-		// on that would re-open what the tap just toggled shut; `:focus-visible` is
-		// the UA's own answer to which arrival this was.
-		if (e.currentTarget.matches(':focus-visible')) raise();
+	onclick={(e) => {
+		// No pointer behind it (`detail` 0): the guidance key or a screen reader. A
+		// mouse click falls through to hover and a tap to `pointerup`, as above. The
+		// owner is whatever holds focus and is described by this trigger's node.
+		if (e.detail !== 0) return;
+		if (open) open = false;
+		else
+			raise(
+				document.activeElement?.closest<HTMLElement>(`[aria-describedby~="${describedBy}"]`) ??
+					undefined
+			);
 	}}
 	onblur={() => (open = false)}
 	onkeydown={(e) => {

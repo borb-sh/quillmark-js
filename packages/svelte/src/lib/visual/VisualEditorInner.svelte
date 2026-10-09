@@ -83,6 +83,7 @@
 	import { reorder, reorderArm, reorderTrips } from './motion.js';
 	import { tipsChannel } from './tips.js';
 	import { patchEditorExt } from './ext.js';
+	import { raiseGuidance } from './guidance.js';
 	import Card from './Card.svelte';
 	import TipsCard from './TipsCard.svelte';
 	import FormatPopover from './FormatPopover.svelte';
@@ -847,7 +848,15 @@
 	}
 </script>
 
-<div class="qm-editor {className ?? ''}" {style} data-qm-root bind:this={rootEl}>
+<!-- The keydown is a control's, bubbled: the root resolves which description it raises. -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="qm-editor {className ?? ''}"
+	{style}
+	data-qm-root
+	bind:this={rootEl}
+	onkeydown={raiseGuidance}
+>
 	<!-- `main` and the tips card are one block in the stack: the tips card tucks under
 	 `main`'s bottom corners, so the two share a seam rather than a gutter and the
 	 wrapper is what holds them to it. -->

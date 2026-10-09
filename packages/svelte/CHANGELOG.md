@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A described field is one Tab stop, and `Mod-/` raises its description.** The guidance glyph beside a label is out of the tab order, where it was a second stop that opened its popover over the form. `Mod-/` on the control raises the description that control carries and lowers it again; Escape or focus leaving the control lowers it too. Hover and tap are unchanged. A table cell carries its column's description in `aria-describedby`, so a screen reader announces it and `Mod-/` reaches it from any cell.
+
 **The `@quillmark/wasm` peer floor is `>=0.123.1-0`.** A table cell's `text` carries a `\n` as a line break, which the cell draws as one and markdown spells `<br>`. An inline `<br>` in a body is a hard break, where it rendered nothing, and one in a `richtext(inline)` field's value carries `validation::not_inline`, which blocks the render, so the field draws that diagnostic until the `<br>` is removed.
 
 **The slash menu offers `list` and `numbered-list` at any caret in a block leaf.** A pick at a block's head wraps the block, as before; mid-block it wraps the whole block, and at the end of a non-empty block it opens a fresh empty item below it, where past a block's head the menu offered `table` alone. In an item's first block the lists are offered only at its end, where the fresh item opens a sub-list under the text. `subparagraph` is a second name for `list`, so `/sub` reaches the bullet. The `- ` and `1. ` shorthands fire at a block's head alone, as before.
