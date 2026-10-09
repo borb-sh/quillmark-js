@@ -76,6 +76,7 @@
 		type ArrayLayout
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
+	import { propertyDomIds } from './domid.js';
 	import type { LandingBox } from './leaves.js';
 	import { reorder, reorderArm } from './motion.js';
 	import Icon from './icons/Icon.svelte';
@@ -600,6 +601,7 @@
 						>
 							<FieldLabel
 								label={columnTitle(key, sub)}
+								descriptionId={idBase != null ? propertyDomIds(idBase, key).description : undefined}
 								required={obliged(sub)}
 								description={sub.description}
 							/>
@@ -612,6 +614,7 @@
 						<ObjectField
 							bare
 							bind:this={cellEls[id]}
+							{idBase}
 							value={(arr[k] ?? {}) as Record<string, unknown>}
 							properties={items?.properties}
 							label={rowName(k)}

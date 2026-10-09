@@ -81,8 +81,10 @@
 		/**
 		 * The parent control's DOM id: the base each property's own three names derive
 		 * from ({@link propertyDomIds}). Absent — a subform mounted with no field around
-		 * it, or a table's row — the properties fall back to `aria-label`, which names
-		 * them without a `for` target to click.
+		 * it — the properties fall back to `aria-label`, which names them without a
+		 * `for` target to click. A table's row takes the table's own and names its
+		 * cells the same fallback way, reading only the description off it: the
+		 * header parks one per column, which every row's cell in it points at.
 		 */
 		idBase?: string;
 		/** Accessible-name prefix used only on the `aria-label` fallback above. */
@@ -268,7 +270,8 @@
 			{@const kind = controlKind(sub)}
 			{@const ids = idBase && !bare ? propertyDomIds(idBase, key) : undefined}
 			{@const named = ids ? undefined : fallbackName(key, sub)}
-			{@const describes = sub.description && ids ? ids.description : undefined}
+			{@const describes =
+				sub.description && idBase ? propertyDomIds(idBase, key).description : undefined}
 			{@const deep = routed.below.get(key)}
 			{@const own = isContainer(kind) ? undefined : deep?.map((d) => d.diagnostic)}
 			<!-- `for` reaches the labelable controls, a variant through its discriminant; the
