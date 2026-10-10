@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**ProseMirror is pinned at `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.** The other pins move with it: `prosemirror-model` 1.25.12, `prosemirror-transform` 1.12.2, `prosemirror-commands` 1.7.2, `prosemirror-history` 1.5.1 and `prosemirror-gapcursor` 1.4.1. A consumer overriding `prosemirror-view` to reach the fix can drop the override.
+
 ## v0.20.0 - 2026-10-10
 
 **An empty line under the caret says `Type / to insert`.** In a body or a block `richtext` field, the empty line a focused caret holds carries a faint hint naming the key that opens the slash menu there. It goes once the line holds text or the field loses the focus, and an empty field's own placeholder stands in its place. `SlashStrings` gains `slashHint`, and `VisualStrings` with it, so a whole `VisualStrings` literal fails to type-check without it; `CreateFieldOpts.slashStrings` carries it to a leaf.

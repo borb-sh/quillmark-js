@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/svelte` pins `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.**
+
 ## v0.16.0 - 2026-10-10
 
 **The carried `@quillmark/wasm` is 0.124.0.** An inline `<br>` in a document body or a table cell renders as a line break, where it rendered nothing, and a `richtext(inline)` value holding one fails validation as `validation::not_inline`; a quill whose such field's `default:` holds one fails its load the same way. A `qm-table` wrapper lays out its table by `widths`, `align` and `headless`, a `qm-cell` pair aligns its cell, `- [ ]` and `- [x]` render a box, and a `qm-<name>` element renders through the renderer its plate registers in the helper's `elements` state, warning `typst::unregistered_element` where it registers none. A plate styling `table.cell.where(y: 0)` styles a headless table's first row too.
