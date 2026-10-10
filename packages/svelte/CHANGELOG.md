@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.20.1 - 2026-10-10
+
 **ProseMirror is pinned at `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.** The other pins move with it: `prosemirror-model` 1.25.12, `prosemirror-transform` 1.12.2, `prosemirror-commands` 1.7.2, `prosemirror-history` 1.5.1 and `prosemirror-gapcursor` 1.4.1. A consumer overriding `prosemirror-view` to reach the fix can drop the override.
 
 ## v0.20.0 - 2026-10-10
