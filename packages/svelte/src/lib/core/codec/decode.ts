@@ -116,16 +116,25 @@ export function fitsPlain(rt: Content): boolean {
 
 /** Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed
  *  and {@link fitsPlain} plain, past which the decode drops what the first commit would
- *  store; on the block schema anything, but an island where the leaf mounts no island
- *  view (`islands`), which draws as its placeholder tag, an atom a keystroke deletes
- *  unseen. What a leaf held over the rest reads. */
+ *  store; on the block schema anything but an element or a task item ({@link editable}),
+ *  and an island where the leaf mounts no island view (`islands`), which draws as its
+ *  placeholder tag, an atom a keystroke deletes unseen. What a leaf held over the rest
+ *  reads. */
 export function fitsLeaf(
 	rt: Content,
 	leaf: { inline: boolean; plaintext: boolean; islands: boolean }
 ): boolean {
 	if (leaf.inline) return fitsInline(rt);
 	if (leaf.plaintext) return fitsPlain(rt);
-	return leaf.islands || rt.islands.length === 0;
+	return (leaf.islands || rt.islands.length === 0) && rt.lines.every(editable);
+}
+
+/** Whether every container on `line` is one the block schema edits: an element, and a
+ *  task item's `checked`, decode to no node, so the first commit would drop them. */
+function editable(line: ContentLine): boolean {
+	return line.containers.every(
+		(c) => c.container === 'quote' || (c.container === 'list_item' && c.attrs.checked === undefined)
+	);
 }
 
 /** Inline decode: one paragraph, containers and islands stripped. */
@@ -227,6 +236,20 @@ function groupBlocks(
 			i = j;
 			continue;
 		}
+		if (here.container === 'element') {
+			// No node holds an element, and a leaf holding one is held (`fitsLeaf`), so
+			// what it wraps draws in place, read-only.
+			const key = containerKey(here);
+			let j = i + 1;
+			while (j < leaves.length) {
+				const c = atDepth(leaves[j], depth);
+				if (!c || containerKey(c) !== key) break;
+				j++;
+			}
+			out.push(...groupBlocks(schema, leaves.slice(i, j), depth + 1, marks, cursor));
+			i = j;
+			continue;
+		}
 		// The quote, and the whole of what is left: `satisfies` is the exhaustiveness
 		// check, so a container added upstream is a compile error here rather than a
 		// blockquote it is not. A wrapper over the run of leaves carrying the identical
@@ -264,11 +287,12 @@ function instanceOf(c: ContentContainer): number {
 	return c.instance ?? 0;
 }
 
-/** Identity of a container for run gathering: its name and its `instance`, NUL-joined
- * as `markKey` joins a mark's. `list_item` carries its own run rule, so the quote is
- * what keys here. */
+/** Identity of a container for run gathering: its name, its `instance` and an element's
+ * attributes, NUL-joined as `markKey` joins a mark's. `list_item` carries its own run
+ * rule, so the quote and the element are what key here. */
 function containerKey(c: ContentContainer): string {
-	return `${c.container}\u0000${instanceOf(c)}`;
+	const attrs = c.container === 'element' ? JSON.stringify(c.attrs) : '';
+	return `${c.container}\u0000${instanceOf(c)}\u0000${attrs}`;
 }
 
 /** A single leaf block node from its segments. Exhaustive over the closed line

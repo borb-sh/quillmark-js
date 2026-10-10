@@ -83,7 +83,7 @@ describe('an array of plaintext', () => {
 	it('rests an edited element as its literal string', () => {
 		const q = quill();
 		const doc = example();
-		q.writer(doc).set('errata', [core.importMarkdown('Page 9 omits the colophon.')]);
+		q.writer(doc).set('errata', [core.importMarkdown('Page 9 omits the colophon.').content]);
 		expect(doc.getStored('errata')).toEqual(['Page 9 omits the colophon.']);
 	});
 
@@ -126,7 +126,7 @@ describe('an array of plaintext', () => {
 		const doc = example();
 		// An astral character before the offset is the hazard: 𝔘 is one code point and
 		// two UTF-16 units, so USV 9 is UTF-16 10 and a naive offset lands short of it.
-		q.writer(doc).set('errata', [core.importMarkdown('astral \u{1D518} tail here')]);
+		q.writer(doc).set('errata', [core.importMarkdown('astral \u{1D518} tail here').content]);
 		const { target, editor } = mountEditor(q, doc);
 
 		await editor.setCaret({ field: 'main.errata[0]', pos: 9, granularity: 'cluster' });

@@ -39,6 +39,8 @@ Contiguity plus an equal path is the whole of what makes one container, so `inst
 
 Marks apply over their `[start, end)` range; PM splits inline nodes at mark boundaries, so free overlap of *different* formatting kinds is representable without loss (`strong[0,4)` + `emph[2,6)` → text nodes `{strong}`, `{strong,emph}`, `{emph}`). An island slot decodes to an inline node (an image) unless it is a block island alone on its line, which decodes to a block node (a table), either carrying the island `id` and typed props.
 
+**An element and a task item are read, not edited.** No PM node holds an element or a `list_item`'s `checked`, and lowering restates every line's containers, so the first keystroke would store the field without them. A block leaf holding either is held as a narrowed leaf over structure is (§Inline mode): what an element wraps draws in place and a task item as a plain item, read-only, and nothing commits.
+
 Two mark kinds do **not** become PM marks: see §Marks.
 
 ## Encode: PM edit → `ChangeBundle`
@@ -148,11 +150,11 @@ Four of the content's discriminants name their whole vocabulary: a mark `type`, 
 | Axis | Members |
 | --- | --- |
 | line `kind` | `para`, `heading`, `code`, `rule` |
-| container | `list_item`, `quote` |
+| container | `list_item`, `quote`, `element` |
 | mark `type` | `strong`, `emph`, `underline`, `strike`, `code`, `link`, `anchor` |
 | island `type` | `table`, `image` |
 
-Reading is a discriminant check: `line.kind === 'heading'` reaches `line.attrs.level`, `m.type === 'link'` reaches `m.attrs.url`, with no guard in between. Writing is a literal the checker admits or rejects. **What the codec must not do is restate a set as a literal check**, which compiles unchanged against a widened union and silently refuses — or worse, flattens — the member it does not know. Each of the four places that names a set names it against the boundary's own: an exhaustive `switch` closed by a `never` for the line kinds and the marks, a `satisfies` for the container left after the list, and a `Record` keyed by the union for the island `type` the DOM reader admits and the decode reads a block off.
+Reading is a discriminant check: `line.kind === 'heading'` reaches `line.attrs.level`, `m.type === 'link'` reaches `m.attrs.url`, with no guard in between. Writing is a literal the checker admits or rejects. **What the codec must not do is restate a set as a literal check**, which compiles unchanged against a widened union and silently refuses — or worse, flattens — the member it does not know. Each of the four places that names a set names it against the boundary's own: an exhaustive `switch` closed by a `never` for the line kinds and the marks, a `satisfies` for the container left after the list and the element, and a `Record` keyed by the union for the island `type` the DOM reader admits and the decode reads a block off.
 
 **The PM schema names the whole vocabulary and nothing beside it.** Lowering restates every line's metadata as soon as any of it changed (§Encode), so a construct the PM tree cannot hold is destroyed by the first keystroke anywhere in the field — which is why an open set would need an inert carrier to ride on. There is nothing to carry: no decode produces a name outside a set and no write takes one, so every node, mark and attribute in the schema stands for a member.
 
