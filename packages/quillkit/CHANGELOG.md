@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.16.1 - 2026-10-10
+
 **The carried `@quillmark/svelte` pins `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.**
 
 ## v0.16.0 - 2026-10-10
