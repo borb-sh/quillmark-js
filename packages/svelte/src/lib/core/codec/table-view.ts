@@ -55,6 +55,7 @@ import {
 	rowCount,
 	rowEmpty,
 	setAlign,
+	setHeadless,
 	shapeEqual,
 	withCell,
 	type TableAlign
@@ -86,6 +87,8 @@ export interface TableChromeStrings {
 	tableAlignLeft: string;
 	tableAlignCenter: string;
 	tableAlignRight: string;
+	/** The held first row's toggle, pressed while the row draws as the header. */
+	tableHeaderToggle: string;
 }
 
 /**
@@ -108,7 +111,8 @@ export const DEFAULT_TABLE_STRINGS: TableChromeStrings = {
 	tableAddColumn: 'Add column',
 	tableAlignLeft: 'Align left',
 	tableAlignCenter: 'Align center',
-	tableAlignRight: 'Align right'
+	tableAlignRight: 'Align right',
+	tableHeaderToggle: 'Header row'
 };
 
 /** What the field hands each island view: its wording (read live, so a locale swap
@@ -150,6 +154,12 @@ const ALIGN_GLYPH: Record<Aligned, string[]> = {
 	center: ['M21 6H3', 'M17 12H7', 'M19 18H5'],
 	right: ['M21 6H3', 'M21 12H9', 'M21 18H7']
 };
+
+/** The header toggle's glyph, off the same release: a frame with its top band ruled off. */
+const HEADER_GLYPH = [
+	'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z',
+	'M3 9h18'
+];
 
 /** A glyph's marks at `weight`: the set's own is 2, and the grip takes 3, its marks being
  *  dots, which at the line weight of a stroke disappear at the size the bar renders. */
@@ -344,6 +354,8 @@ class TableIslandView implements NodeView {
 	private grips = new Map<string, { line: Line; grip: HTMLButtonElement }>();
 	/** The alignment clusters, by column. */
 	private clusters: HTMLElement[] = [];
+	/** The first row's header toggle, up while that row is held. */
+	private headerCluster: HTMLElement | undefined;
 	/** The grid's own box, and the containing block every out-of-flow control is placed
 	 *  against. Not the scroller: an absolute inside a scroll container is placed
 	 *  against a padding box the scroll then slides out from under, so a control at the
@@ -715,6 +727,8 @@ class TableIslandView implements NodeView {
 			grip.setAttribute('aria-pressed', String(named));
 			const cluster = line.axis === 'column' ? this.clusters[line.index] : undefined;
 			if (cluster) cluster.hidden = !named;
+			if (line.axis === 'row' && line.index === 0 && this.headerCluster)
+				this.headerCluster.hidden = !named;
 		}
 		for (const cell of this.cells)
 			cell.box.toggleAttribute(
@@ -982,6 +996,7 @@ class TableIslandView implements NodeView {
 		this.teardownCells();
 		this.grips.clear();
 		this.clusters = [];
+		this.headerCluster = undefined;
 		this.dom.textContent = '';
 		const props = tablePropsOfNode(this.node);
 		this.rendered = props;
@@ -996,13 +1011,20 @@ class TableIslandView implements NodeView {
 
 		// `thead`/`tbody` rather than one `tbody`: the header is a separate field in the
 		// model, and this is the markup that says so to something that cannot see the
-		// weight the header row draws.
+		// weight the header row draws. A headless table's first row is a body row on the
+		// page, so it is one here too, still holding row 0's chrome.
 		const table = el('table', 'qm-table');
-		const head = el('thead');
-		head.appendChild(this.row(props, 0, s));
+		const first = this.row(props, 0, s);
 		const body = el('tbody');
+		if (props.headless) {
+			body.appendChild(first);
+			table.append(body);
+		} else {
+			const head = el('thead');
+			head.appendChild(first);
+			table.append(head, body);
+		}
 		for (let r = 1; r < rowCount(props); r++) body.appendChild(this.row(props, r, s));
-		table.append(head, body);
 
 		// The frame is the grid's own box, and the two controls about an axis rather than
 		// about a line hang off its edges: an add bar along each trailing edge. A cell
@@ -1044,10 +1066,11 @@ class TableIslandView implements NodeView {
 
 	/** One table row: its cells, each carrying whatever chrome hangs off it. */
 	private row(props: TableProps, r: number, s: TableChromeStrings): HTMLElement {
-		const tr = el('tr', r === 0 ? 'qm-table-header-row' : undefined);
+		const heads = r === 0 && !props.headless;
+		const tr = el('tr', heads ? 'qm-table-header-row' : undefined);
 		rowCells(props, r).forEach((cell, c) => {
-			const box = el(r === 0 ? 'th' : 'td', 'qm-table-cell');
-			if (r === 0) box.setAttribute('scope', 'col');
+			const box = el(heads ? 'th' : 'td', 'qm-table-cell');
+			if (heads) box.setAttribute('scope', 'col');
 			box.setAttribute('data-r', String(r));
 			box.setAttribute('data-c', String(c));
 			const align = props.aligns[c] ?? 'none';
@@ -1071,9 +1094,11 @@ class TableIslandView implements NodeView {
 				box.appendChild(
 					this.grip(
 						{ axis: 'row', index: r },
-						r === 0 ? s.tableSelectHeaderRow : s.tableSelectRow(r)
+						heads ? s.tableSelectHeaderRow : s.tableSelectRow(props.headless ? r + 1 : r)
 					)
 				);
+			if (r === 0 && c === columnCount(props) - 1)
+				box.appendChild(this.headerToggle(!props.headless, s));
 			tr.appendChild(box);
 			this.mountCell(box, host, r, c, s);
 		});
@@ -1137,6 +1162,27 @@ class TableIslandView implements NodeView {
 		return cluster;
 	}
 
+	/** The first row's header toggle: one press draws the row as the header or as a body
+	 *  row, writing the table's `headless` as one `set`, and the row stays held. Up only
+	 *  while the first row is held, hanging under its last cell, and out of the tab order
+	 *  for the reason a grip is. */
+	private headerToggle(header: boolean, s: TableChromeStrings): HTMLElement {
+		const cluster = el('div', 'qm-table-align');
+		cluster.setAttribute('data-header', '');
+		cluster.hidden = true;
+		cluster.addEventListener('mousedown', (e) => e.preventDefault());
+		const btn = chromeButton('qm-table-align-option', s.tableHeaderToggle, () => {
+			this.write(setHeadless(this.props(), header));
+			this.selectLine({ axis: 'row', index: 0 });
+		});
+		btn.tabIndex = -1;
+		btn.setAttribute('aria-pressed', String(header));
+		btn.appendChild(svg(HEADER_GLYPH, 2));
+		cluster.appendChild(btn);
+		this.headerCluster = cluster;
+		return cluster;
+	}
+
 	/** A trailing bar: the whole edge past the last line of its axis, and the one way a
 	 *  pointer grows the table. It spans the edge rather than capping it, because what it
 	 *  appends to is the axis and not a line. It draws no glyph — the bar arriving under
@@ -1169,7 +1215,8 @@ class TableIslandView implements NodeView {
 		s: TableChromeStrings
 	): void {
 		const props = this.props();
-		const name = s.tableCell(r === 0 ? s.tableHeaderRow : s.tableRow(r), s.tableColumn(c + 1));
+		const row = props.headless ? s.tableRow(r + 1) : r === 0 ? s.tableHeaderRow : s.tableRow(r);
+		const name = s.tableCell(row, s.tableColumn(c + 1));
 		const seed = cellAt(props, r, c);
 		const view: EditorView = new EditorView(host, {
 			state: EditorState.create({

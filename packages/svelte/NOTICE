@@ -12,7 +12,8 @@ strikethrough, code, link, hash, info, plus, x, trash-2, minus, check, calendar
 and calendar-check.
 
 `core/codec/table-view.ts` holds grip-horizontal, grip-vertical, align-left,
-align-center and align-right, derived from an earlier release of the same project.
+align-center, align-right and panel-top, derived from an earlier release of the
+same project.
 
 ISC License
 

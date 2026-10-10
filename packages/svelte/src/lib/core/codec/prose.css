@@ -526,6 +526,11 @@ li.ProseMirror-selectednode::after {
 .qm-table-align[hidden] {
 	display: none;
 }
+/* The header toggle hangs under the first row's last cell, flush with the grid's
+   trailing edge, clear of whatever a held row raises over its first. */
+.qm-table-align[data-header] {
+	margin-inline: auto 0;
+}
 .qm-table-align-option {
 	display: flex;
 	align-items: center;
