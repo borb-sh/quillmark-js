@@ -4,7 +4,10 @@
 // A command is a name and nothing else, in the shape a chat client's slash commands
 // take: one lowercase kebab-case token typed after the `/`. A token is not wording, so
 // it is the same in every locale and `SlashStrings` carries only the menu's accessible
-// name.
+// name and the hint.
+//
+// The door's one mark on screen is that hint: on the empty line a focused caret holds,
+// it names the key (§`slashHint`).
 //
 // Every command but the island's is also a markdown shorthand, and the two doors share
 // one implementation (`blocks.ts`).
@@ -24,7 +27,7 @@ import {
 	type Command,
 	type Transaction
 } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
+import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { rangeAnchor, type RangeAnchor } from './anchor.js';
 import { consuming, pickList, toCodeBlock, toHeading, wrapInQuote } from './blocks.js';
 import { mintIslandId } from './islands.js';
@@ -46,16 +49,20 @@ export interface SlashState {
 	anchor: RangeAnchor;
 }
 
-/** The menu's wording, which is its accessible name and nothing else: the offers are
- *  command names, and a name is not translated. */
+/** The menu's wording, which is its accessible name and the empty line's hint: the
+ *  offers are command names, and a name is not translated. */
 export interface SlashStrings {
 	slashLabel: string;
+	/** Drawn on the empty line a focused caret holds, naming the key that opens the
+	 *  menu there. */
+	slashHint: string;
 }
 
 /** The package's English, beside the surface that draws it: the same rule the island
  *  chrome's wording follows, and the visual `strings` set extends both. */
 export const DEFAULT_SLASH_STRINGS: SlashStrings = {
-	slashLabel: 'Insert'
+	slashLabel: 'Insert',
+	slashHint: 'Type / to insert'
 };
 
 /**
@@ -130,7 +137,8 @@ function runQuery(state: EditorState, from: number): string | null {
  * text; only a pick does, and it consumes exactly the run.
  */
 export function slashPlugin(
-	onState: (state: SlashState | undefined) => void
+	onState: (state: SlashState | undefined) => void,
+	hint?: () => string | undefined
 ): Plugin<SlashRun | null> {
 	return new Plugin<SlashRun | null>({
 		key: slashKey,
@@ -163,6 +171,7 @@ export function slashPlugin(
 		// inserts with no menu on screen. An item's own press never reaches here: the
 		// chrome swallows its `mousedown`, so the caret never blurs.
 		props: {
+			decorations: (state) => slashHint(state, hint?.()),
 			handleDOMEvents: {
 				blur: (view) => {
 					if (slashKey.getState(view.state)) {
@@ -190,6 +199,24 @@ export function slashPlugin(
 			};
 		}
 	});
+}
+
+/**
+ * The hint on the empty line the caret holds, wherever a `/` there would open a menu
+ * with something in it: a node decoration whose attribute `prose.css` draws, so the
+ * text stays out of the document. The stylesheet shows it only while the leaf has the
+ * focus, which no transaction carries, and gives the line to the empty leaf's ghost
+ * where both stand (`field.ts` §`ghostPlugin`).
+ */
+function slashHint(state: EditorState, text: string | undefined): DecorationSet | null {
+	const { $from, empty } = state.selection;
+	const line = $from.parent;
+	if (!text || !empty || !line.isTextblock || line.content.size || line.type.spec.code) return null;
+	if (!slashItems(state).length) return null;
+	const at = $from.before();
+	return DecorationSet.create(state.doc, [
+		Decoration.node(at, at + line.nodeSize, { class: 'qm-slash-hint', 'data-slash-hint': text })
+	]);
 }
 
 /** The chrome's view of a live run: the filtered offers and the trigger's anchor.

@@ -50,7 +50,14 @@ import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
 import { tablePastePlugin } from './table-paste.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
-import { focusSlashItem, runSlashItem, slashPlugin, type SlashState } from './slash.js';
+import {
+	DEFAULT_SLASH_STRINGS,
+	focusSlashItem,
+	runSlashItem,
+	slashPlugin,
+	type SlashState,
+	type SlashStrings
+} from './slash.js';
 
 /** Options for {@link createField}. */
 export interface CreateFieldOpts {
@@ -97,6 +104,9 @@ export interface CreateFieldOpts {
 	 * it holds no island and no block to convert.
 	 */
 	onSlash?(state: SlashState | undefined): void;
+	/** The slash surface's wording, read per decoration pass. Absent leaves the
+	 *  package's English; read only beside {@link onSlash}, the hint being the menu's. */
+	slashStrings?: () => SlashStrings;
 	/** Accessible name → `aria-label` on the `contenteditable`. For a leaf nothing
 	 * else names: an array element (the field label plus its 1-based index), the
 	 * card body (no visible label at all). A leaf with a field label takes
@@ -463,6 +473,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			plugins: proseLeafPlugins(schema, {
 				inline,
 				slash,
+				slashHint: () => (opts.slashStrings?.() ?? DEFAULT_SLASH_STRINGS).slashHint,
 				noInputRules: opts.noInputRules,
 				// Always installed, so a leaf that mounts without a ghost can still be
 				// given one later; the plugin draws nothing while the text is empty.
@@ -703,6 +714,8 @@ export function proseLeafPlugins(
 		/** The slash menu's report channel; absent mounts no menu and leaves
 		 *  Enter/Escape/the arrows to the links below (`keymap.ts`). */
 		slash?: (state: SlashState | undefined) => void;
+		/** The empty line's hint, read live; drawn only beside `slash`. */
+		slashHint?: () => string | undefined;
 		noInputRules?: boolean;
 		/** Read live, not captured: the ghost can move after mount
 		 *  ({@link FieldController.setPlaceholder}), and a re-hydration rebuilds this
@@ -714,7 +727,7 @@ export function proseLeafPlugins(
 	}
 ): Plugin[] {
 	const list: Plugin[] = [history(), ...(opts.afterHistory ?? []), linebreakPlugin(schema)];
-	if (opts.slash) list.push(slashPlugin(opts.slash));
+	if (opts.slash) list.push(slashPlugin(opts.slash, opts.slashHint));
 	if (!opts.noInputRules) list.push(inputRulesPlugin(schema));
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));
