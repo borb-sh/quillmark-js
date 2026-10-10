@@ -48,6 +48,7 @@ import { inputRulesPlugin } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
+import { markdownPastePlugin } from './markdown-paste.js';
 import { tablePastePlugin } from './table-paste.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
 import { focusSlashItem, runSlashItem, slashPlugin, type SlashState } from './slash.js';
@@ -688,8 +689,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * a by-value leaf passes none), then {@link linebreakPlugin}, which normalizes what
  * the rest of the stack leaves, then the markdown-shorthand input rules, the field
  * keymap over the base keymap, and last the ones that answer to a block leaf's own
- * shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass (`islands.ts`)
- * and the table paste (`table-paste.ts`).
+ * shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass (`islands.ts`),
+ * the table paste (`table-paste.ts`) and the markdown paste (`markdown-paste.ts`).
  *
  * Every mark-shaped plugin reads the schema rather than a flag: over either plaintext
  * schema the shorthand rules build nothing (each is guarded on its mark type) and the
@@ -721,7 +722,13 @@ export function proseLeafPlugins(
 	// Each answers to something only the block schema holds: any other leaf is
 	// textblocks alone, with no island and no gap to put a cursor in.
 	if (isBlockSchema(schema))
-		list.push(gapCursor(), pastAtomPlugin(), islandPastePlugin(), tablePastePlugin());
+		list.push(
+			gapCursor(),
+			pastAtomPlugin(),
+			islandPastePlugin(),
+			tablePastePlugin(),
+			markdownPastePlugin()
+		);
 	if (schema === plainSchema) list.push(plainClipboardPlugin());
 	if (opts.placeholder) list.push(ghostPlugin(opts));
 	return list;
