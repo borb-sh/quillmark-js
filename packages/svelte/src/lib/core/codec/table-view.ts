@@ -58,6 +58,8 @@ import {
 	setCellLayout,
 	type CellAlign,
 	type CellValign,
+	columnShares,
+	setWidths,
 	shapeEqual,
 	withCell,
 	type TableAlign
@@ -261,7 +263,7 @@ function cellPlugins(keys: Record<string, Command>) {
  *  {@link owned} because the pointer router needs them before it needs the cells: a grip
  *  and a cluster are inside the cell they name, so the two selectors overlap on exactly
  *  the press whose reading they disagree about. */
-const CONTROLS = '.qm-table-grip, .qm-table-add, .qm-table-align';
+const CONTROLS = '.qm-table-grip, .qm-table-add, .qm-table-align, .qm-table-resize';
 
 /** What the nested views and the band answer for themselves, which is what `stopEvent`
  *  keeps from PM. */
@@ -383,6 +385,18 @@ interface Sweep {
 	boxes: { r: number; c: number; rect: DOMRect }[];
 }
 
+/** A column border in flight: the two columns either side of it, measured at the press,
+ *  and the narrowest either may reach, which is a cell's own measure floor. */
+interface Resize {
+	c: number;
+	handle: HTMLElement;
+	pointerId: number;
+	from: number;
+	widths: number[];
+	floor: number;
+	engaged: boolean;
+}
+
 class TableIslandView implements NodeView {
 	readonly dom: HTMLElement;
 	private cells: MountedCell[] = [];
@@ -407,6 +421,10 @@ class TableIslandView implements NodeView {
 	 *  grid's far end would drift into the middle of it. */
 	private frame: HTMLElement | undefined;
 	private dropMark: HTMLElement | undefined;
+	/** The grid's `<col>`s, which a border drag sizes live and a render sizes from the
+	 *  stored weights. */
+	private cols: HTMLTableColElement[] = [];
+	private resize: Resize | undefined;
 	/** A drag's trailing `click`, which would otherwise re-select the moved line. */
 	private suppressClick = false;
 
@@ -486,6 +504,7 @@ class TableIslandView implements NodeView {
 		this.dom.removeEventListener('mousedown', this.onPointerDown);
 		this.endDrag();
 		this.endSweep();
+		this.endResize();
 		this.teardownCells();
 	}
 
@@ -1095,6 +1114,110 @@ class TableIslandView implements NodeView {
 		}
 	}
 
+	// ── Column widths ─────────────────────────────────────────────────────────
+
+	/** Size the grid's columns, or return it to auto-fit. A weighted grid spans the leaf
+	 *  laid out fixed, as the page's fractional columns span the text block, so the
+	 *  proportions it draws are the ones the page prints. */
+	private weigh(widths: string[] | undefined): void {
+		this.frame?.toggleAttribute('data-weighted', widths !== undefined);
+		this.cols.forEach((col, c) => (col.style.width = widths?.[c] ?? ''));
+	}
+
+	/**
+	 * The border after column `c`, in the band: a press and a drag move it, trading width
+	 * between the two columns it divides, and the release writes every column's measured
+	 * width as its weight, one `set` and one undo step. A double-click returns the table
+	 * to auto-fit.
+	 *
+	 * Pointer chrome for the reason a grip is, and named to nothing: it is no button, and
+	 * a column's width has no keyboard route.
+	 */
+	private resizer(c: number): HTMLElement {
+		const handle = el('span', 'qm-table-resize');
+		handle.setAttribute('aria-hidden', 'true');
+		handle.addEventListener('mousedown', (e) => e.preventDefault());
+		handle.addEventListener('pointerdown', (e) => this.onResizeDown(c, handle, e));
+		handle.addEventListener('dblclick', () => {
+			if (this.props().widths) this.write(setWidths(this.props(), undefined));
+		});
+		return handle;
+	}
+
+	private readonly onResizeDown = (c: number, handle: HTMLElement, event: PointerEvent): void => {
+		if (event.button !== 0) return;
+		this.endResize();
+		const heads = this.cells.filter((m) => m.r === 0).sort((a, b) => a.c - b.c);
+		const widths = heads.map((m) => m.box.getBoundingClientRect().width);
+		// A cell's floor is its host's measure plus the box's own padding and border, read
+		// off the header cell the border hangs from.
+		const head = heads[c];
+		const floor = head
+			? Number.parseFloat(getComputedStyle(head.host).minWidth) +
+				head.box.getBoundingClientRect().width -
+				head.host.getBoundingClientRect().width
+			: 0;
+		this.resize = {
+			c,
+			handle,
+			pointerId: event.pointerId,
+			from: event.clientX,
+			widths,
+			floor: Number.isFinite(floor) ? floor : 0,
+			engaged: false
+		};
+		handle.setPointerCapture?.(event.pointerId);
+		handle.addEventListener('pointermove', this.onResizeMove);
+		handle.addEventListener('pointerup', this.onResizeUp);
+		handle.addEventListener('pointercancel', this.onResizeUp);
+	};
+
+	/** The widths a border at `x` leaves: the two columns it divides trade the travel,
+	 *  each clamped at the floor, and every other column keeps the width it was pressed at. */
+	private resized(resize: Resize, x: number): number[] {
+		const { c, widths, floor } = resize;
+		const left = widths[c] ?? 0;
+		const right = widths[c + 1] ?? 0;
+		const travel = Math.max(floor - left, Math.min(right - floor, x - resize.from));
+		return widths.map((w, i) => (i === c ? left + travel : i === c + 1 ? right - travel : w));
+	}
+
+	private readonly onResizeMove = (event: PointerEvent): void => {
+		const resize = this.resize;
+		if (!resize) return;
+		if (!resize.engaged && Math.abs(event.clientX - resize.from) < DEAD_ZONE) return;
+		resize.engaged = true;
+		resize.handle.setAttribute('data-active', '');
+		const widths = this.resized(resize, event.clientX);
+		const total = widths.reduce((a, b) => a + b, 0);
+		this.weigh(widths.map((w) => `${(w / total) * 100}%`));
+	};
+
+	private readonly onResizeUp = (event: PointerEvent): void => {
+		const resize = this.resize;
+		if (!resize) return;
+		this.endResize();
+		if (!resize.engaged) return;
+		if (event.type !== 'pointerup') {
+			this.weigh(columnShares(this.props())?.map((share) => `${share * 100}%`));
+			return;
+		}
+		const widths = this.resized(resize, event.clientX).map((w) => Math.max(1, Math.round(w)));
+		this.write(setWidths(this.props(), widths));
+	};
+
+	private endResize(): void {
+		const resize = this.resize;
+		if (!resize) return;
+		this.resize = undefined;
+		resize.handle.removeAttribute('data-active');
+		resize.handle.removeEventListener('pointermove', this.onResizeMove);
+		resize.handle.removeEventListener('pointerup', this.onResizeUp);
+		resize.handle.removeEventListener('pointercancel', this.onResizeUp);
+		if (resize.handle.hasPointerCapture?.(resize.pointerId))
+			resize.handle.releasePointerCapture(resize.pointerId);
+	}
+
 	// ── Render ────────────────────────────────────────────────────────────────
 
 	private teardownCells(): void {
@@ -1109,6 +1232,7 @@ class TableIslandView implements NodeView {
 		const seat = this.focusedSeat();
 		this.endDrag();
 		this.endSweep();
+		this.endResize();
 		this.teardownCells();
 		this.grips.clear();
 		this.clusters = [];
@@ -1128,11 +1252,14 @@ class TableIslandView implements NodeView {
 		// model, and this is the markup that says so to something that cannot see the
 		// weight the header row draws.
 		const table = el('table', 'qm-table');
+		const colgroup = el('colgroup');
+		this.cols = Array.from({ length: columnCount(props) }, () => el('col'));
+		colgroup.append(...this.cols);
 		const head = el('thead');
 		head.appendChild(this.row(props, 0, s));
 		const body = el('tbody');
 		for (let r = 1; r < rowCount(props); r++) body.appendChild(this.row(props, r, s));
-		table.append(head, body);
+		table.append(colgroup, head, body);
 
 		// The frame is the grid's own box, and the two controls about an axis rather than
 		// about a line hang off its edges: an add bar along each trailing edge. A cell
@@ -1140,9 +1267,10 @@ class TableIslandView implements NodeView {
 		// hang the row bar in, and a bar spans the whole edge rather than one line of it.
 		const frame = el('div', 'qm-table-frame');
 		frame.append(table, this.addBar('column', s.tableAddColumn), this.addBar('row', s.tableAddRow));
+		this.frame = frame;
+		this.weigh(columnShares(props)?.map((share) => `${share * 100}%`));
 		const scroller = el('div', 'qm-table-scroller');
 		scroller.appendChild(frame);
-		this.frame = frame;
 		this.dom.appendChild(scroller);
 		this.paintSelection();
 		this.reseat(seat);
@@ -1197,6 +1325,7 @@ class TableIslandView implements NodeView {
 					this.grip({ axis: 'column', index: c }, s.tableSelectColumn(c + 1)),
 					this.alignCluster(c, align, s)
 				);
+			if (r === 0 && c < columnCount(props) - 1) box.appendChild(this.resizer(c));
 			if (c === 0)
 				box.appendChild(
 					this.grip(
