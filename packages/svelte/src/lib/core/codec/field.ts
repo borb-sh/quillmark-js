@@ -73,7 +73,8 @@ export interface CreateFieldOpts {
 	 * Fired when the leaf holds or releases, and at mount when it mounts held. A leaf
 	 * declaring `inline`, or a `plaintext` one, is held over a value its schema cannot
 	 * hold (`fitsLeaf`, upstream's `isInline` and `isPlain`): the decode would join lines
-	 * and drop containers and islands for the first commit to store. A held leaf draws
+	 * and drop containers and islands for the first commit to store. Any leaf is held
+	 * over an element or a task item, which no node holds. A held leaf draws
 	 * its content on the block schema, read-only, and commits nothing. Judged of the value
 	 * each mount and re-hydrate reads, so {@link FieldController.applyExternal} is what
 	 * re-evaluates it.

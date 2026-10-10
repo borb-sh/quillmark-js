@@ -20,12 +20,14 @@ import {
 	cellContent,
 	cellEqual,
 	cellFromDoc,
+	clearCells,
 	columnCount,
 	deleteColumn,
 	deleteRow,
 	emptyCell,
 	insertColumn,
 	insertRow,
+	moveColumn,
 	moveRow,
 	newTable,
 	normalizeTable,
@@ -133,6 +135,52 @@ describe('the rectangle survives every op', () => {
 		expect(columnCount(ragged)).toBe(3);
 		expect(ragged.header.map((c) => c.text)).toEqual(['h', '', '']);
 		expect(ragged.aligns).toEqual(['none', 'none', 'none']);
+	});
+});
+
+describe('the layout keys ride every op', () => {
+	const LAID = normalizeTable({
+		...LETTERED,
+		header: [{ ...cell('h1'), align: 'right' }, cell('h2')],
+		widths: [2, null],
+		align: 'center',
+		headless: true
+	});
+
+	it('a column op carries its width, and the table its placement', () => {
+		const ops = [
+			insertColumn(LAID, -1),
+			deleteColumn(LAID, 1),
+			moveColumn(LAID, 0, 1),
+			insertRow(LAID, 0),
+			deleteRow(LAID, 0),
+			moveRow(LAID, 0, 1),
+			setAlign(LAID, 1, 'center'),
+			withCell(LAID, 1, 1, cell('typed')),
+			clearCells(LAID, 0, 0, 1, 0)
+		];
+		expect(ops.map((p) => p.widths)).toEqual([
+			[null, 2, null],
+			[2],
+			[null, 2],
+			[2, null],
+			[2, null],
+			[2, null],
+			[2, null],
+			[2, null],
+			[2, null]
+		]);
+		for (const next of ops) {
+			const back = propsOf(stored(withTable(next)));
+			expect(back.widths).toEqual(next.widths);
+			expect([back.align, back.headless]).toEqual(['center', true]);
+		}
+	});
+
+	it('a cell keeps its alignment through an edit and a clear', () => {
+		const projected = cellFromDoc(decode(cellContent(cell('typed')), cellSchema), LAID.header[0]);
+		expect(projected).toEqual({ text: 'typed', marks: [], align: 'right' });
+		expect(clearCells(LAID, 0, 0, 1, 0).header[0]).toEqual({ ...emptyCell(), align: 'right' });
 	});
 });
 

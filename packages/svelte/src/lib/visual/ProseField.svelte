@@ -155,7 +155,7 @@
 		controller?.setFallback(fallback);
 	});
 
-	// Only a narrowed or a plain leaf can hold, so only one of them asks.
+	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.
 	$effect(() => {
 		void diagnostics;
 		if (inline || plaintext) controller?.applyExternal();

@@ -40,7 +40,7 @@ export function tipsChannel(raw: unknown): string[] {
 export function renderTip(markdown: string, onError?: EditorErrorHandler): Node {
 	const { importMarkdown } = core();
 	try {
-		return renderContent(importMarkdown(markdown), inlineSchema);
+		return renderContent(importMarkdown(markdown).content, inlineSchema);
 	} catch (e) {
 		reportError(onError, {
 			code: 'tip-render-failed',

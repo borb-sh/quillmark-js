@@ -40,7 +40,7 @@ export { contentEqual };
 
 /** A content from markdown; a guaranteed-valid `Content` for test inputs. */
 export function md(markdown: string): Content {
-	return core.importMarkdown(markdown);
+	return core.importMarkdown(markdown).content;
 }
 
 /** The reference quill's seeded `title` (inline richtext) content. */
