@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.20.0 - 2026-10-10
+
 **An empty line under the caret says `Type / to insert`.** In a body or a block `richtext` field, the empty line a focused caret holds carries a faint hint naming the key that opens the slash menu there. It goes once the line holds text or the field loses the focus, and an empty field's own placeholder stands in its place. `SlashStrings` gains `slashHint`, and `VisualStrings` with it, so a whole `VisualStrings` literal fails to type-check without it; `CreateFieldOpts.slashStrings` carries it to a leaf.
 
 **Markdown text pasted into a body or a block `richtext` field lands parsed.** Where the clipboard holds no HTML, text in which a line opens a bullet (`- `, `* `, `+ `), a numbered item (`1. `, `1) `), a heading (`# `), a quote (`> `), a fence or a pipe table's delimiter row arrives as the structure it spells, read as the source editor reads it, where it arrived as its characters: a list drafted in Notepad or copied out of an LLM chat keeps its items and their nesting, and its headings, marks, fences and tables come with it. Text with none of those line heads stays literal, a paste as plain text keeps the text, and an inline or a `plaintext` field never parses. A line break inside a paragraph is markdown's, a space, so lines with no blank line between them join into one paragraph.
