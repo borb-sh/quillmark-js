@@ -503,6 +503,45 @@ li.ProseMirror-selectednode::after {
 	outline-offset: var(--_qm-ring-offset);
 }
 
+/* A weighted table spans the leaf, laid out fixed, so the stored weights are the
+   proportions its columns draw, as the page's fractional columns span the text block
+   (`table-view.ts` §`weigh`). An auto-fit table keeps its content's width. */
+.qm-table-frame[data-weighted] {
+	width: 100%;
+}
+.qm-table-frame[data-weighted] .qm-table {
+	width: 100%;
+	table-layout: fixed;
+}
+
+/* A column border's handle: in the band, astride the border after its header cell, the
+   band's height. It draws a rule along the border while the pointer is on it or while
+   it is being dragged, and nothing at rest. */
+.qm-table-resize {
+	position: absolute;
+	z-index: 1;
+	bottom: 100%;
+	right: calc(var(--_qm-space-3) / -2);
+	display: flex;
+	justify-content: center;
+	width: var(--_qm-space-3);
+	height: var(--_qm-tap-min);
+	cursor: col-resize;
+	/* The pointer owns this gesture, not the page's scroll: a border drags. */
+	touch-action: none;
+}
+.qm-table-resize::before {
+	content: '';
+	width: var(--_qm-ring-width);
+	border-radius: var(--_qm-radius-pill);
+	background: var(--_qm-accent);
+	opacity: 0;
+	transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.qm-table-resize:is(:hover, [data-active])::before {
+	opacity: 1;
+}
+
 /* The held column's alignment cluster, hung off its header cell and floating over the
    first row, the band's top edge being the grips'. Up only while its column is held and
    absent otherwise (`table-view.ts` §`alignCluster`), so the reveal is `hidden` rather
