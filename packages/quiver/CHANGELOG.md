@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.36.0 - 2026-10-10
+
 **The `@quillmark/wasm` peer floor is `>=0.124.0-0`.** A packed quill whose `richtext(inline)` field's `default:` holds an inline `<br>` fails its load as `validation::not_inline`, where the `<br>` rendered nothing. An inline `<br>` in a quill's `example.md` renders as a line break, in a paragraph and in a table cell. A quill's `example.md` lays out a `qm-table` wrapper's `widths`, `align` and `headless` and a `qm-cell`'s alignment, draws `- [ ]` and `- [x]` as boxes, and renders a `qm-<name>` element through the renderer its plate registers in the helper's `elements` state, warning `typst::unregistered_element` where it registers none.
 
 ## v0.35.0 - 2026-10-06
