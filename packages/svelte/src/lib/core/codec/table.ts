@@ -249,6 +249,12 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
 	});
 }
 
+/** Draw the first row as a header or as a body row: what the header toggle writes
+ *  (`table-view.ts`). */
+export function setHeadless(props: TableProps, headless: boolean): TableProps {
+	return normalizeTable({ ...props, headless: headless || undefined });
+}
+
 /** A cell's horizontal alignment, and its vertical one: the keys a cell holds beside
  *  its text, each absent at the default the column or the quill supplies. */
 export type CellAlign = NonNullable<TableCell['align']>;
@@ -368,13 +374,14 @@ export function cellEqual(a: TableCell, b: TableCell): boolean {
 	return a.text === b.text && valueEqual(a.marks, b.marks);
 }
 
-/** Whether two tables have the same rectangle, alignment and widths: the change that
- *  forces a rebuild rather than a per-cell reseed. */
+/** Whether two tables have the same rectangle, alignment, header and widths: the
+ *  change that forces a rebuild rather than a per-cell reseed. */
 export function shapeEqual(a: TableProps, b: TableProps): boolean {
 	return (
 		a.rows.length === b.rows.length &&
 		a.aligns.length === b.aligns.length &&
 		a.aligns.every((x, i) => x === b.aligns[i]) &&
+		!a.headless === !b.headless &&
 		valueEqual(a.widths, b.widths)
 	);
 }

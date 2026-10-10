@@ -34,6 +34,7 @@ import {
 	rowCells,
 	rowCount,
 	setAlign,
+	setHeadless,
 	setCellLayout,
 	setWidths,
 	shapeEqual,
@@ -834,6 +835,47 @@ function cluster(field: FieldController, c: number): HTMLElement {
 function toggle(field: FieldController, c: number, align: string): HTMLButtonElement {
 	return cluster(field, c).querySelector<HTMLButtonElement>(`[data-align='${align}']`)!;
 }
+
+describe('the first row is the header or a body row', () => {
+	const toggle = (field: FieldController) =>
+		field.el.querySelector<HTMLElement>('.qm-table-align[data-header]')!;
+
+	it('the held first row raises the toggle, and a press draws it as a body row', () => {
+		const { field } = tableLeaf(LETTERED);
+		expect(toggle(field).hidden).toBe(true);
+		grips(field, 'row')[1]!.click();
+		expect(toggle(field).hidden).toBe(true);
+		grips(field, 'row')[0]!.click();
+		expect(toggle(field).hidden).toBe(false);
+		const press = toggle(field).querySelector('button')!;
+		expect(press.getAttribute('aria-pressed')).toBe('true');
+		press.click();
+
+		expect(leafProps(field).headless).toBe(true);
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
+		expect(field.el.querySelector('thead')).toBeNull();
+		expect(field.el.querySelectorAll('th.qm-table-cell')).toHaveLength(0);
+		// Every row is a body row, numbered from the first.
+		expect(grips(field, 'row').map((g) => g.getAttribute('aria-label'))).toEqual([
+			'Select row 1',
+			'Select row 2',
+			'Select row 3'
+		]);
+		// The row stays held, and the toggle reads released.
+		expect(washed(field)).toEqual(['0,0', '0,1']);
+		expect(toggle(field).querySelector('button')!.getAttribute('aria-pressed')).toBe('false');
+
+		undo(outerView(field).state, outerView(field).dispatch);
+		expect(leafProps(field).headless).toBeUndefined();
+		expect(field.el.querySelectorAll('thead th.qm-table-cell')).toHaveLength(2);
+		field.destroy();
+	});
+
+	it('headless rides the store', () => {
+		expect(propsOf(stored(withTable(setHeadless(LETTERED, true)))).headless).toBe(true);
+		expect(propsOf(stored(withTable(setHeadless(LETTERED, false)))).headless).toBeUndefined();
+	});
+});
 
 describe('a cell is aligned on its own', () => {
 	const cellBoxes = (field: FieldController) =>
