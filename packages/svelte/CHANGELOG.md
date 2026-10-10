@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Markdown text pasted into a body or a block `richtext` field lands parsed.** Where the clipboard holds no HTML, text in which a line opens a bullet (`- `, `* `, `+ `), a numbered item (`1. `, `1) `), a heading (`# `), a quote (`> `), a fence or a pipe table's delimiter row arrives as the structure it spells, read as the source editor reads it, where it arrived as its characters: a list drafted in Notepad or copied out of an LLM chat keeps its items and their nesting, and its headings, marks, fences and tables come with it. Text with none of those line heads stays literal, a paste as plain text keeps the text, and an inline or a `plaintext` field never parses. A line break inside a paragraph is markdown's, a space, so lines with no blank line between them join into one paragraph.
+
 **A described field is one Tab stop, and `Mod-/` raises its description.** The guidance glyph beside a label is out of the tab order, where it was a second stop that opened its popover over the form. `Mod-/` on the control raises the description that control carries and lowers it again; Escape or focus leaving the control lowers it too. Hover and tap are unchanged. A table cell carries its column's description in `aria-describedby`, so a screen reader announces it and `Mod-/` reaches it from any cell.
 
 **The `@quillmark/wasm` peer floor is `>=0.123.1-0`.** A table cell's `text` carries a `\n` as a line break, which the cell draws as one and markdown spells `<br>`. An inline `<br>` in a body is a hard break, where it rendered nothing, and one in a `richtext(inline)` field's value carries `validation::not_inline`, which blocks the render, so the field draws that diagnostic until the `<br>` is removed.
