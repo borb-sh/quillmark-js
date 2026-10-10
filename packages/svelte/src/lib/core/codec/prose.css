@@ -223,6 +223,22 @@ li.ProseMirror-selectednode::after {
 	text-overflow: ellipsis;
 }
 
+/* The slash menu's hint (`slash.ts`, `slashHint`), drawn as the ghost is, on the one
+   empty line the caret holds. Only while the leaf has the focus: the decoration follows
+   the selection, which an unfocused leaf keeps. Upright, being chrome about the key
+   rather than an invitation in the document's voice, and never over a ghost, which is
+   the leaf's own word for the same empty line. */
+.ProseMirror-focused .qm-slash-hint:not(.qm-prose-placeholder)[data-slash-hint]::after {
+	content: attr(data-slash-hint);
+	display: block;
+	margin-top: -1lh;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--_qm-ink-label);
+	pointer-events: none;
+}
+
 /* ── The table island ────────────────────────────────────────────────────────
 
    The one construct in this file with chrome in it. The rest of the stylesheet
