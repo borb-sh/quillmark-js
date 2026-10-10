@@ -42,7 +42,7 @@ export function markdownPastePlugin(): Plugin {
 				const { importMarkdown } = core();
 				let rt: Content;
 				try {
-					rt = importMarkdown(text);
+					rt = importMarkdown(text).content;
 				} catch {
 					// Nesting past the store's depth is refused; the literal text holds it.
 					return null;

@@ -246,7 +246,7 @@ describe('a variant whose default is the blank', () => {
 		// reach here, as it is for an array's prose row.)
 		q.writer(doc).set('handling', {
 			value: 'CONTROLLED',
-			controlled_by: core.importMarkdown('SPEC/BB'),
+			controlled_by: core.importMarkdown('SPEC/BB').content,
 			caveat: ''
 		});
 		expect(held(doc)).toEqual({ value: 'CONTROLLED', controlled_by: 'SPEC/BB', caveat: '' });

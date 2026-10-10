@@ -2,8 +2,8 @@
 // doc) and the rectangularizing constructors every row and column op goes through
 // (CODEC §Islands, §"The table island").
 //
-// `TableProps` normalizes to one column count shared by `header`, every row, and
-// `aligns`, so a ragged table is not a state the content can hold. The editor keeps
+// `TableProps` normalizes to one column count shared by `header`, every row, `aligns`
+// and `widths`, so a ragged table is not a state the content can hold. The editor keeps
 // its optimistic PM and re-hydrates only on an external change (CODEC
 // §Reconciliation), so an op that emitted a ragged table would leave the store
 // rectangularized and PM ragged with no error channel and no repair. Every
@@ -65,10 +65,11 @@ export function columnCount(props: TableProps): number {
 }
 
 /**
- * The rectangularizing constructor: one column count across `header`, every row and
- * `aligns`, padding with empty cells and `none`. The column count is the widest
- * thing present, so a caller that appended to one axis alone still gets a rectangle
- * back, and a table is never narrower than one column.
+ * The rectangularizing constructor: one column count across `header`, every row,
+ * `aligns` and `widths`, padding with empty cells, `none` and auto-fit. The column
+ * count is the widest thing present, so a caller that appended to one axis alone still
+ * gets a rectangle back, and a table is never narrower than one column. The layout
+ * keys ride through, each absent at its default as the store writes it.
  */
 export function normalizeTable(props: TableProps): TableProps {
 	const cols = Math.max(
@@ -79,10 +80,14 @@ export function normalizeTable(props: TableProps): TableProps {
 	);
 	const fit = (cells: TableCell[]): TableCell[] =>
 		Array.from({ length: cols }, (_, c) => cells[c] ?? emptyCell());
+	const widths = Array.from({ length: cols }, (_, c) => props.widths?.[c] ?? null);
 	return {
 		header: fit(props.header),
 		rows: props.rows.map(fit),
-		aligns: Array.from({ length: cols }, (_, c) => props.aligns[c] ?? 'none')
+		aligns: Array.from({ length: cols }, (_, c) => props.aligns[c] ?? 'none'),
+		...(widths.some((w) => w !== null) && { widths }),
+		...(props.align && { align: props.align }),
+		...(props.headless && { headless: true })
 	};
 }
 
@@ -99,9 +104,9 @@ export function allRows(props: TableProps): TableCell[][] {
 /** A flat list back into the stored shape: whatever sits at index 0 is the header, by
  *  position rather than by having been one. No caller passes an empty list — every op
  *  that could reach one refuses the last row first. */
-function fromRows(rows: TableCell[][], aligns: TableAlign[]): TableProps {
+function fromRows(props: TableProps, rows: TableCell[][]): TableProps {
 	const [header = [], ...rest] = rows;
-	return normalizeTable({ header, rows: rest, aligns });
+	return normalizeTable({ ...props, header, rows: rest });
 }
 
 /** A fresh table: a header plus `bodyRows` empty rows, every column unaligned.
@@ -118,9 +123,9 @@ export function newTable(cols = 3, bodyRows = 2): TableProps {
 export function withCell(props: TableProps, r: number, c: number, cell: TableCell): TableProps {
 	const replace = (cells: TableCell[]) => cells.map((old, i) => (i === c ? cell : old));
 	return normalizeTable({
+		...props,
 		header: r === 0 ? replace(props.header) : props.header,
-		rows: props.rows.map((row, i) => (i === r - 1 ? replace(row) : row)),
-		aligns: props.aligns
+		rows: props.rows.map((row, i) => (i === r - 1 ? replace(row) : row))
 	});
 }
 
@@ -141,19 +146,21 @@ export function deleteRow(props: TableProps, r: number): TableProps {
 	const rows = allRows(props);
 	if (rows.length <= 1 || r < 0 || r >= rows.length) return normalizeTable(props);
 	return fromRows(
-		rows.filter((_, i) => i !== r),
-		props.aligns
+		props,
+		rows.filter((_, i) => i !== r)
 	);
 }
 
 /** A new empty column after column `c`. */
 export function insertColumn(props: TableProps, c: number): TableProps {
 	const at = Math.max(0, Math.min(c + 1, columnCount(props)));
-	const splice = (cells: TableCell[]) => [...cells.slice(0, at), emptyCell(), ...cells.slice(at)];
+	const splice = <T>(xs: T[], fresh: T): T[] => [...xs.slice(0, at), fresh, ...xs.slice(at)];
 	return normalizeTable({
-		header: splice(props.header),
-		rows: props.rows.map(splice),
-		aligns: [...props.aligns.slice(0, at), 'none' as TableAlign, ...props.aligns.slice(at)]
+		...props,
+		header: splice(props.header, emptyCell()),
+		rows: props.rows.map((row) => splice(row, emptyCell())),
+		aligns: splice(props.aligns, 'none'),
+		widths: props.widths && splice(props.widths, null)
 	});
 }
 
@@ -162,9 +169,11 @@ export function deleteColumn(props: TableProps, c: number): TableProps {
 	if (columnCount(props) <= 1) return normalizeTable(props);
 	const drop = <T>(xs: T[]) => xs.filter((_, i) => i !== c);
 	return normalizeTable({
+		...props,
 		header: drop(props.header),
 		rows: props.rows.map(drop),
-		aligns: drop(props.aligns)
+		aligns: drop(props.aligns),
+		widths: props.widths && drop(props.widths)
 	});
 }
 
@@ -185,20 +194,22 @@ export function moveRow(props: TableProps, r: number, by: number): TableProps {
 	const rows = allRows(props);
 	const to = Math.max(0, Math.min(r + by, rows.length - 1));
 	if (r === to || r < 0 || r >= rows.length) return normalizeTable(props);
-	return fromRows(move(rows, r, to), props.aligns);
+	return fromRows(props, move(rows, r, to));
 }
 
-/** Column `c` moved by `by` places, clamped. `aligns` travels with the column: an
- *  alignment is the column's property, so a move that left it behind would retint the
- *  column that took the index. */
+/** Column `c` moved by `by` places, clamped. `aligns` and `widths` travel with the
+ *  column: each is the column's property, so a move that left it behind would retint
+ *  or resize the column that took the index. */
 export function moveColumn(props: TableProps, c: number, by: number): TableProps {
 	const to = Math.max(0, Math.min(c + by, columnCount(props) - 1));
 	if (c === to || c < 0 || c >= columnCount(props)) return normalizeTable(props);
 	const shift = <T>(xs: T[]): T[] => move(xs, c, to);
 	return normalizeTable({
+		...props,
 		header: shift(props.header),
 		rows: props.rows.map(shift),
-		aligns: shift(props.aligns)
+		aligns: shift(props.aligns),
+		widths: props.widths && shift(props.widths)
 	});
 }
 
@@ -208,7 +219,8 @@ export function moveColumn(props: TableProps, c: number, by: number): TableProps
  * covers ranks and deletes them, and one spanning both is the table itself, so what
  * reaches here is a proper sub-rectangle and the shape it leaves is the shape it found.
  *
- * Alignment is the column's rather than the cells', so it survives a clear that spans one.
+ * A cell keeps its own alignment, and a column its alignment and width: what a clear
+ * empties is text.
  */
 export function clearCells(
 	props: TableProps,
@@ -218,11 +230,13 @@ export function clearCells(
 	c1: number
 ): TableProps {
 	const blank = (cells: TableCell[], r: number): TableCell[] =>
-		cells.map((cell, c) => (r >= r0 && r <= r1 && c >= c0 && c <= c1 ? emptyCell() : cell));
+		cells.map((cell, c) =>
+			r >= r0 && r <= r1 && c >= c0 && c <= c1 ? { ...cell, text: '', marks: [] } : cell
+		);
 	return normalizeTable({
+		...props,
 		header: blank(props.header, 0),
-		rows: props.rows.map((row, i) => blank(row, i + 1)),
-		aligns: props.aligns
+		rows: props.rows.map((row, i) => blank(row, i + 1))
 	});
 }
 
@@ -233,6 +247,63 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
 		...props,
 		aligns: props.aligns.map((a, i) => (i === c ? align : a))
 	});
+}
+
+/** Draw the first row as a header or as a body row: what the header toggle writes
+ *  (`table-view.ts`). */
+export function setHeadless(props: TableProps, headless: boolean): TableProps {
+	return normalizeTable({ ...props, headless: headless || undefined });
+}
+
+/** A cell's horizontal alignment, and its vertical one: the keys a cell holds beside
+ *  its text, each absent at the default the column or the quill supplies. */
+export type CellAlign = NonNullable<TableCell['align']>;
+export type CellValign = NonNullable<TableCell['valign']>;
+
+/** Every cell in the inclusive rectangle given `key`'s `value`, or cleared of it where
+ *  `value` is absent, which returns the cell to its column's alignment or the quill's. */
+export function setCellLayout<K extends 'align' | 'valign'>(
+	props: TableProps,
+	r0: number,
+	c0: number,
+	r1: number,
+	c1: number,
+	key: K,
+	value: TableCell[K] | undefined
+): TableProps {
+	const lay = (cells: TableCell[], r: number): TableCell[] =>
+		cells.map((cell, c) => {
+			if (r < r0 || r > r1 || c < c0 || c > c1) return cell;
+			const next: TableCell = { ...cell, [key]: value };
+			if (value === undefined) delete next[key];
+			return next;
+		});
+	return normalizeTable({
+		...props,
+		header: lay(props.header, 0),
+		rows: props.rows.map((row, i) => lay(row, i + 1))
+	});
+}
+
+/** Set or clear the column weights: what a border drag and its double-click write
+ *  (`table-view.ts`). `undefined` returns every column to auto-fit. */
+export function setWidths(props: TableProps, widths: (number | null)[] | undefined): TableProps {
+	return normalizeTable({ ...props, widths });
+}
+
+/**
+ * Each column's share of the table's width, summing to 1, or `undefined` for a table
+ * that auto-fits throughout. An auto-fit column beside weighted ones takes the mean
+ * weight: the page sizes it to its content, which the editor's grid, laid out fixed so
+ * the weights hold, cannot ask.
+ */
+export function columnShares(props: TableProps): number[] | undefined {
+	const set = props.widths?.filter((w): w is number => w !== null);
+	if (!props.widths || !set?.length) return undefined;
+	const mean = set.reduce((a, b) => a + b, 0) / set.length;
+	const weights = props.widths.map((w) => w ?? mean);
+	const total = weights.reduce((a, b) => a + b, 0);
+	return weights.map((w) => w / total);
 }
 
 // ── The cell codec ──────────────────────────────────────────────────────────
@@ -275,17 +346,25 @@ export function cellContent(cell: TableCell): Content {
 export function cellFromDoc(doc: PMNode, prior: TableCell): TableCell {
 	const projected = pmToContent(doc);
 	const text = projected.text;
+	const layout = cellLayout(prior);
 	const anchors = prior.marks.filter((m) => m.type === 'anchor');
-	if (!anchors.length) return { text, marks: projected.marks };
+	if (!anchors.length) return { ...layout, text, marks: projected.marks };
 	const before = cellContent(prior);
 	const delta = contentEdit(before, cellContent({ text, marks: [] })).delta;
 	const rebased = core()
 		.mapMarks(before, delta ? { delta } : {})
 		.filter((m) => m.type === 'anchor');
 	return {
+		...layout,
 		text,
 		marks: [...projected.marks, ...rebased].sort((a, b) => a.start - b.start || a.end - b.end)
 	};
+}
+
+/** A cell's keys beside its text and marks: what no edit of the text touches. */
+function cellLayout(cell: TableCell): Omit<TableCell, 'text' | 'marks'> {
+	const { text: _text, marks: _marks, ...layout } = cell;
+	return layout;
 }
 
 /** Whether two cells are the same value: what tells an own edit (the projection the
@@ -295,12 +374,14 @@ export function cellEqual(a: TableCell, b: TableCell): boolean {
 	return a.text === b.text && valueEqual(a.marks, b.marks);
 }
 
-/** Whether two tables have the same rectangle and alignment: the change that forces
- *  a rebuild rather than a per-cell reseed. */
+/** Whether two tables have the same rectangle, alignment, header and widths: the
+ *  change that forces a rebuild rather than a per-cell reseed. */
 export function shapeEqual(a: TableProps, b: TableProps): boolean {
 	return (
 		a.rows.length === b.rows.length &&
 		a.aligns.length === b.aligns.length &&
-		a.aligns.every((x, i) => x === b.aligns[i])
+		a.aligns.every((x, i) => x === b.aligns[i]) &&
+		!a.headless === !b.headless &&
+		valueEqual(a.widths, b.widths)
 	);
 }

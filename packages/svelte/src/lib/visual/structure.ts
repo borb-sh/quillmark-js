@@ -255,7 +255,7 @@ export function printedText(v: unknown): string | undefined {
 export function declaredContent(v: unknown, markdown: boolean): Content | undefined {
 	const text = printedText(v);
 	if (text === undefined) return undefined;
-	if (markdown) return core().importMarkdown(text);
+	if (markdown) return core().importMarkdown(text).content;
 	return {
 		text,
 		lines: text

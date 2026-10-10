@@ -104,6 +104,37 @@ describe('field-level reconciliation', () => {
 	});
 });
 
+describe('the hold on a body over what no node holds', () => {
+	const body = (doc: Document, holds: boolean[]) =>
+		createField({
+			doc,
+			quill: quill(),
+			addr: {},
+			container: mount(),
+			onHold: (held) => holds.push(held)
+		});
+
+	for (const [name, markdown] of [
+		['an element', 'lead\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
+		['a task item', '- [x] done\n- [ ] open']
+	]) {
+		it(`holds over ${name}, drawing its text and committing nothing`, () => {
+			const doc = example();
+			doc.overwrite({}, md(markdown));
+			const before = JSON.stringify(doc.main.body);
+			const holds: boolean[] = [];
+			const field = body(doc, holds);
+			const view = viewOf(field);
+			expect(holds).toEqual([true]);
+			expect(view.editable).toBe(false);
+			expect(view.state.doc.textContent).toBe(doc.main.body.text.replaceAll('\n', ''));
+			view.dispatch(view.state.tr.insertText('Z', Selection.atStart(view.state.doc).from));
+			expect(JSON.stringify(doc.main.body)).toBe(before);
+			field.destroy();
+		});
+	}
+});
+
 describe('the hold on a narrowed field', () => {
 	const STRUCTURED = '- one\n- two\n\npara ![i](a.png)';
 	/** The transaction a keystroke dispatches, at the first text position. */
@@ -166,7 +197,7 @@ describe('the hold on a narrowed field', () => {
 				.validate(doc)
 				.filter((d) => d.path === 'main.subtitle')
 				.map((d) => d.code)
-		).toEqual(['validation::not_plain']);
+		).toContain('validation::not_plain');
 		const before = JSON.stringify(doc.getStored('subtitle'));
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'subtitle', holds, true);

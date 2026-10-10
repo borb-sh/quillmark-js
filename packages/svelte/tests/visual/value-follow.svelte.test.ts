@@ -139,7 +139,7 @@ describe('a by-value prose leaf over an external write', () => {
 	it('releases a held leaf whose stored value becomes one plain paragraph', () => {
 		const q = probe();
 		const doc = load();
-		doc.storeField('jobs', [{ title: 'Archives', summary: core.importMarkdown(LIST) }]);
+		doc.storeField('jobs', [{ title: 'Archives', summary: core.importMarkdown(LIST).content }]);
 		const mounted = mountEditor(q, doc);
 		const leaf = summaryLeaf(mounted);
 		expect(leaf.getAttribute('contenteditable')).toBe('false');

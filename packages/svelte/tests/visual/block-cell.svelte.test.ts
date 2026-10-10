@@ -137,7 +137,9 @@ describe('a plaintext cell without `inline` on a record row', () => {
 	it('holds one over lines upstream does not call plain, and commits nothing', () => {
 		const q = probe();
 		const doc = load();
-		doc.storeField('jobs', [{ title: 'Archives', address: core.importMarkdown('- one\n- two') }]);
+		doc.storeField('jobs', [
+			{ title: 'Archives', address: core.importMarkdown('- one\n- two').content }
+		]);
 		const before = JSON.stringify(doc.getStored('jobs'));
 		const mounted = mountEditor(q, doc);
 		const jobs = field(mounted.target, 'Jobs');
