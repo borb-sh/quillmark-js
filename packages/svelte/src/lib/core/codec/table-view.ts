@@ -55,6 +55,9 @@ import {
 	rowCount,
 	rowEmpty,
 	setAlign,
+	setCellLayout,
+	type CellAlign,
+	type CellValign,
 	shapeEqual,
 	withCell,
 	type TableAlign
@@ -82,10 +85,16 @@ export interface TableChromeStrings {
 	/** The two trailing bars, each of which grows the table along its own axis. */
 	tableAddRow: string;
 	tableAddColumn: string;
-	/** The held column's alignment cluster, a name per toggle. */
+	/** The held column's alignment cluster, a name per toggle, and the held cells'
+	 *  cluster, which takes these three and the vertical three beside them. */
 	tableAlignLeft: string;
 	tableAlignCenter: string;
 	tableAlignRight: string;
+	tableAlignTop: string;
+	tableAlignMiddle: string;
+	tableAlignBottom: string;
+	/** The held cells' cluster's own name. */
+	tableCellAlignment: string;
 }
 
 /**
@@ -108,7 +117,11 @@ export const DEFAULT_TABLE_STRINGS: TableChromeStrings = {
 	tableAddColumn: 'Add column',
 	tableAlignLeft: 'Align left',
 	tableAlignCenter: 'Align center',
-	tableAlignRight: 'Align right'
+	tableAlignRight: 'Align right',
+	tableAlignTop: 'Align top',
+	tableAlignMiddle: 'Align middle',
+	tableAlignBottom: 'Align bottom',
+	tableCellAlignment: 'Cell alignment'
 };
 
 /** What the field hands each island view: its wording (read live, so a locale swap
@@ -150,6 +163,47 @@ const ALIGN_GLYPH: Record<Aligned, string[]> = {
 	center: ['M21 6H3', 'M17 12H7', 'M19 18H5'],
 	right: ['M21 6H3', 'M21 12H9', 'M21 18H7']
 };
+
+/** The held cells' vertical toggles' glyphs, off the same release. */
+const VALIGN_GLYPH: Record<CellValign, string[]> = {
+	top: [
+		'M6 6h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+		'M16 6h2a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+		'M22 2H2'
+	],
+	middle: [
+		'M2 12h20',
+		'M10 16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4',
+		'M10 8V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v4',
+		'M20 16v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1',
+		'M14 8V7c0-1.1.9-2 2-2h2a2 2 0 0 1 2 2v1'
+	],
+	bottom: [
+		'M6 2h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
+		'M16 9h2a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z',
+		'M22 22H2'
+	]
+};
+
+/** The vertical alignments a cell takes, in the cluster's order. */
+const VALIGNS: readonly CellValign[] = ['top', 'middle', 'bottom'];
+
+/** Draw a cell's alignment on its box: its own where it holds one, its column's
+ *  otherwise, and the vertical one where it holds one. */
+function layCell(box: HTMLElement, props: TableProps, r: number, c: number): void {
+	const cell = cellAt(props, r, c);
+	const column = props.aligns[c] ?? 'none';
+	box.style.textAlign = cell.align ?? (column === 'none' ? '' : column);
+	box.style.verticalAlign = cell.valign ?? '';
+}
+
+/** The cells of an inclusive rectangle, in reading order. */
+function allCells(props: TableProps, held: Cells): TableCell[] {
+	const out: TableCell[] = [];
+	for (let r = held.r0; r <= held.r1; r++)
+		for (let c = held.c0; c <= held.c1; c++) out.push(cellAt(props, r, c));
+	return out;
+}
 
 /** A glyph's marks at `weight`: the set's own is 2, and the grip takes 3, its marks being
  *  dots, which at the line weight of a stroke disappear at the size the bar renders. */
@@ -344,6 +398,9 @@ class TableIslandView implements NodeView {
 	private grips = new Map<string, { line: Line; grip: HTMLButtonElement }>();
 	/** The alignment clusters, by column. */
 	private clusters: HTMLElement[] = [];
+	/** The held cells' cluster, up over the first cell of a held rectangle that is no
+	 *  column, and built for each paint since what it presses is the cells'. */
+	private cellCluster: HTMLElement | undefined;
 	/** The grid's own box, and the containing block every out-of-flow control is placed
 	 *  against. Not the scroller: an absolute inside a scroll container is placed
 	 *  against a padding box the scroll then slides out from under, so a control at the
@@ -403,6 +460,10 @@ class TableIslandView implements NodeView {
 			const at = Math.min(head, fresh.doc.content.size);
 			mounted.view.dispatch(fresh.tr.setSelection(Selection.near(fresh.doc.resolve(at))));
 		}
+		// A cell's alignment is no part of its text, so it is restated on every box: the
+		// reseed above compares text and marks alone.
+		for (const mounted of this.cells) layCell(mounted.box, props, mounted.r, mounted.c);
+		this.paintSelection();
 		return true;
 	}
 
@@ -716,6 +777,7 @@ class TableIslandView implements NodeView {
 			const cluster = line.axis === 'column' ? this.clusters[line.index] : undefined;
 			if (cluster) cluster.hidden = !named;
 		}
+		this.paintCellCluster(props);
 		for (const cell of this.cells)
 			cell.box.toggleAttribute(
 				'data-selected',
@@ -800,6 +862,74 @@ class TableIslandView implements NodeView {
 		const props = this.props();
 		if (props.aligns[c] !== to) this.write(setAlign(props, c, to));
 		this.selectLine({ axis: 'column', index: c });
+	}
+
+	/** The held cells' cluster: up over the first cell of a held rectangle, where no
+	 *  column's own cluster is, each toggle pressed where every cell in the rectangle
+	 *  holds it. It floats over the cell under that one, as the column's floats over the
+	 *  first row, and is out of the tab order for the reason a grip is, its keyboard twin
+	 *  being `Mod-Shift-l`, `-e` and `-r` (§{@link TableIslandView.cellKeys}). */
+	private paintCellCluster(props: TableProps): void {
+		this.cellCluster?.remove();
+		this.cellCluster = undefined;
+		const held = this.selected;
+		if (!held || this.lineOn('column') !== undefined) return;
+		const first = this.cells.find((m) => m.r === held.r0 && m.c === held.c0);
+		if (!first) return;
+		const s = this.deps.strings();
+		const covered = allCells(props, held);
+		const holds = <K extends 'align' | 'valign'>(key: K, value: TableCell[K]): boolean =>
+			covered.every((cell) => cell[key] === value);
+		const cluster = el('div', 'qm-table-align');
+		cluster.setAttribute('role', 'group');
+		cluster.setAttribute('aria-label', s.tableCellAlignment);
+		cluster.setAttribute('data-cells', '');
+		cluster.addEventListener('mousedown', (e) => e.preventDefault());
+		const toggle = (label: string, glyph: string[], pressed: boolean, run: () => void) => {
+			const btn = chromeButton('qm-table-align-option', label, run);
+			btn.tabIndex = -1;
+			btn.setAttribute('aria-pressed', String(pressed));
+			btn.appendChild(svg(glyph, 2));
+			cluster.appendChild(btn);
+			return btn;
+		};
+		const names: Record<CellAlign, string> = {
+			left: s.tableAlignLeft,
+			center: s.tableAlignCenter,
+			right: s.tableAlignRight
+		};
+		for (const align of SETTABLE)
+			toggle(names[align], ALIGN_GLYPH[align], holds('align', align), () =>
+				this.layCells('align', align)
+			).setAttribute('data-align', align);
+		const vnames: Record<CellValign, string> = {
+			top: s.tableAlignTop,
+			middle: s.tableAlignMiddle,
+			bottom: s.tableAlignBottom
+		};
+		for (const valign of VALIGNS)
+			toggle(vnames[valign], VALIGN_GLYPH[valign], holds('valign', valign), () =>
+				this.layCells('valign', valign)
+			).setAttribute('data-valign', valign);
+		first.box.appendChild(cluster);
+		this.cellCluster = cluster;
+	}
+
+	/** Lay every held cell, or the caret's where none is held, at `value`, and clear the
+	 *  key from them where every one already holds it: the press that set an alignment
+	 *  takes it back to the column's. One `set`, and the rectangle stays held. */
+	private layCells<K extends 'align' | 'valign'>(
+		key: K,
+		value: TableCell[K],
+		at?: { r: number; c: number }
+	): void {
+		const held = this.selected ?? (at && { r0: at.r, c0: at.c, r1: at.r, c1: at.c });
+		if (!held) return;
+		const props = this.props();
+		const every = allCells(props, held).every((cell) => cell[key] === value);
+		this.write(
+			setCellLayout(props, held.r0, held.c0, held.r1, held.c1, key, every ? undefined : value)
+		);
 	}
 
 	// ── Drag to reorder ───────────────────────────────────────────────────────
@@ -1051,7 +1181,7 @@ class TableIslandView implements NodeView {
 			box.setAttribute('data-r', String(r));
 			box.setAttribute('data-c', String(c));
 			const align = props.aligns[c] ?? 'none';
-			if (align !== 'none') box.style.textAlign = align;
+			layCell(box, props, r, c);
 			const host = el('div', 'qm-table-cell-host');
 			box.appendChild(host);
 
@@ -1361,6 +1491,9 @@ class TableIslandView implements NodeView {
 			'Alt-ArrowRight': line('column', 1, true),
 			'Shift-ArrowLeft': slide(-1),
 			'Shift-ArrowRight': slide(1),
+			'Shift-Mod-l': () => (this.layCells('align', 'left', { r, c }), true),
+			'Shift-Mod-e': () => (this.layCells('align', 'center', { r, c }), true),
+			'Shift-Mod-r': () => (this.layCells('align', 'right', { r, c }), true),
 			Tab: () => this.step(r, c, 1),
 			'Shift-Tab': () => this.step(r, c, -1),
 			Enter: () => {

@@ -249,6 +249,36 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
 	});
 }
 
+/** A cell's horizontal alignment, and its vertical one: the keys a cell holds beside
+ *  its text, each absent at the default the column or the quill supplies. */
+export type CellAlign = NonNullable<TableCell['align']>;
+export type CellValign = NonNullable<TableCell['valign']>;
+
+/** Every cell in the inclusive rectangle given `key`'s `value`, or cleared of it where
+ *  `value` is absent, which returns the cell to its column's alignment or the quill's. */
+export function setCellLayout<K extends 'align' | 'valign'>(
+	props: TableProps,
+	r0: number,
+	c0: number,
+	r1: number,
+	c1: number,
+	key: K,
+	value: TableCell[K] | undefined
+): TableProps {
+	const lay = (cells: TableCell[], r: number): TableCell[] =>
+		cells.map((cell, c) => {
+			if (r < r0 || r > r1 || c < c0 || c > c1) return cell;
+			const next: TableCell = { ...cell, [key]: value };
+			if (value === undefined) delete next[key];
+			return next;
+		});
+	return normalizeTable({
+		...props,
+		header: lay(props.header, 0),
+		rows: props.rows.map((row, i) => lay(row, i + 1))
+	});
+}
+
 // ── The cell codec ──────────────────────────────────────────────────────────
 
 /**

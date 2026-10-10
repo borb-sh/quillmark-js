@@ -10,7 +10,7 @@
 // every row and column op is asserted install-then-read against its own projection.
 import { describe, it, expect } from 'vitest';
 import { GapCursor } from 'prosemirror-gapcursor';
-import { undoDepth } from 'prosemirror-history';
+import { undo, undoDepth } from 'prosemirror-history';
 import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { createField, decode, blockSchema, pmToContent } from '$lib/core/codec';
@@ -34,6 +34,7 @@ import {
 	rowCells,
 	rowCount,
 	setAlign,
+	setCellLayout,
 	shapeEqual,
 	withCell
 } from '$lib/core/codec/table.js';
@@ -832,6 +833,64 @@ function cluster(field: FieldController, c: number): HTMLElement {
 function toggle(field: FieldController, c: number, align: string): HTMLButtonElement {
 	return cluster(field, c).querySelector<HTMLButtonElement>(`[data-align='${align}']`)!;
 }
+
+describe('a cell is aligned on its own', () => {
+	const cellBoxes = (field: FieldController) =>
+		Array.from(field.el.querySelectorAll<HTMLElement>('.qm-table-cell'));
+	const cellCluster = (field: FieldController) =>
+		field.el.querySelector<HTMLElement>('.qm-table-align[data-cells]');
+
+	it('a cell layout rides the store, and clearing it returns the cell to its column', () => {
+		const laid = setCellLayout(LETTERED, 1, 0, 2, 0, 'valign', 'bottom');
+		const back = propsOf(stored(withTable(laid)));
+		expect(back.rows.map((row) => row[0]!.valign)).toEqual(['bottom', 'bottom']);
+		expect(back.header[0]!.valign).toBeUndefined();
+		const cleared = setCellLayout(laid, 0, 0, 2, 1, 'valign', undefined);
+		expect(propsOf(stored(withTable(cleared))).rows[0]![0]).toEqual(cell('a1'));
+	});
+
+	it('Mod-Shift-e centers the caret’s cell, and again returns it to its column', () => {
+		const { field } = tableLeaf(LETTERED);
+		cellViews(field)[2]!.focus(); // row 1, column 0, a left column
+		press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
+		expect(leafProps(field).rows[0]![0]).toEqual({ ...cell('a1'), align: 'center' });
+		expect(cellBoxes(field)[2]!.style.textAlign).toBe('center');
+		// The caret stays: an alignment is no part of the cell's text.
+		expect(cellViews(field).indexOf(caret(field))).toBe(2);
+		press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
+		expect(leafProps(field).rows[0]![0]).toEqual(cell('a1'));
+		expect(cellBoxes(field)[2]!.style.textAlign).toBe('left');
+		field.destroy();
+	});
+
+	it('a held row raises the cells’ cluster, and a press lays every cell in it', () => {
+		const { field } = tableLeaf(LETTERED);
+		cellViews(field)[3]!.focus();
+		press(caret(field), 'Escape');
+		expect(washed(field)).toEqual(['1,0', '1,1']);
+		const cluster = cellCluster(field)!;
+		expect(cluster.closest('.qm-table-cell')?.getAttribute('data-r')).toBe('1');
+		expect(cluster.querySelectorAll('button')).toHaveLength(6);
+		cluster.querySelector<HTMLButtonElement>('[data-valign="bottom"]')!.click();
+		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual(['bottom', 'bottom']);
+		// The row stays held, and the toggle reads pressed.
+		expect(washed(field)).toEqual(['1,0', '1,1']);
+		expect(
+			cellCluster(field)!.querySelector('[data-valign="bottom"]')!.getAttribute('aria-pressed')
+		).toBe('true');
+		expect(cellBoxes(field)[2]!.style.verticalAlign).toBe('bottom');
+		undo(outerView(field).state, outerView(field).dispatch);
+		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual([undefined, undefined]);
+		field.destroy();
+	});
+
+	it('a held column raises its own cluster and not the cells’', () => {
+		const { field } = tableLeaf(LETTERED);
+		grips(field, 'column')[1]!.click();
+		expect(cellCluster(field)).toBeNull();
+		field.destroy();
+	});
+});
 
 describe('alignment is set on the held column', () => {
 	it('the cluster is up while its column is held, and absent otherwise', () => {
