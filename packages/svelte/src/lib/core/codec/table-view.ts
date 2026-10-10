@@ -56,6 +56,11 @@ import {
 	rowEmpty,
 	setAlign,
 	setHeadless,
+	setCellLayout,
+	type CellAlign,
+	type CellValign,
+	columnShares,
+	setWidths,
 	shapeEqual,
 	withCell,
 	type TableAlign
@@ -83,12 +88,18 @@ export interface TableChromeStrings {
 	/** The two trailing bars, each of which grows the table along its own axis. */
 	tableAddRow: string;
 	tableAddColumn: string;
-	/** The held column's alignment cluster, a name per toggle. */
+	/** The held column's alignment cluster, a name per toggle, and the held cells'
+	 *  cluster, which takes these three and the vertical three beside them. */
 	tableAlignLeft: string;
 	tableAlignCenter: string;
 	tableAlignRight: string;
 	/** The held first row's toggle, pressed while the row draws as the header. */
 	tableHeaderToggle: string;
+	tableAlignTop: string;
+	tableAlignMiddle: string;
+	tableAlignBottom: string;
+	/** The held cells' cluster's own name. */
+	tableCellAlignment: string;
 }
 
 /**
@@ -112,7 +123,11 @@ export const DEFAULT_TABLE_STRINGS: TableChromeStrings = {
 	tableAlignLeft: 'Align left',
 	tableAlignCenter: 'Align center',
 	tableAlignRight: 'Align right',
-	tableHeaderToggle: 'Header row'
+	tableHeaderToggle: 'Header row',
+	tableAlignTop: 'Align top',
+	tableAlignMiddle: 'Align middle',
+	tableAlignBottom: 'Align bottom',
+	tableCellAlignment: 'Cell alignment'
 };
 
 /** What the field hands each island view: its wording (read live, so a locale swap
@@ -160,6 +175,47 @@ const HEADER_GLYPH = [
 	'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z',
 	'M3 9h18'
 ];
+
+/** The held cells' vertical toggles' glyphs, off the same release. */
+const VALIGN_GLYPH: Record<CellValign, string[]> = {
+	top: [
+		'M6 6h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+		'M16 6h2a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+		'M22 2H2'
+	],
+	middle: [
+		'M2 12h20',
+		'M10 16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4',
+		'M10 8V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v4',
+		'M20 16v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1',
+		'M14 8V7c0-1.1.9-2 2-2h2a2 2 0 0 1 2 2v1'
+	],
+	bottom: [
+		'M6 2h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
+		'M16 9h2a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z',
+		'M22 22H2'
+	]
+};
+
+/** The vertical alignments a cell takes, in the cluster's order. */
+const VALIGNS: readonly CellValign[] = ['top', 'middle', 'bottom'];
+
+/** Draw a cell's alignment on its box: its own where it holds one, its column's
+ *  otherwise, and the vertical one where it holds one. */
+function layCell(box: HTMLElement, props: TableProps, r: number, c: number): void {
+	const cell = cellAt(props, r, c);
+	const column = props.aligns[c] ?? 'none';
+	box.style.textAlign = cell.align ?? (column === 'none' ? '' : column);
+	box.style.verticalAlign = cell.valign ?? '';
+}
+
+/** The cells of an inclusive rectangle, in reading order. */
+function allCells(props: TableProps, held: Cells): TableCell[] {
+	const out: TableCell[] = [];
+	for (let r = held.r0; r <= held.r1; r++)
+		for (let c = held.c0; c <= held.c1; c++) out.push(cellAt(props, r, c));
+	return out;
+}
 
 /** A glyph's marks at `weight`: the set's own is 2, and the grip takes 3, its marks being
  *  dots, which at the line weight of a stroke disappear at the size the bar renders. */
@@ -217,7 +273,7 @@ function cellPlugins(keys: Record<string, Command>) {
  *  {@link owned} because the pointer router needs them before it needs the cells: a grip
  *  and a cluster are inside the cell they name, so the two selectors overlap on exactly
  *  the press whose reading they disagree about. */
-const CONTROLS = '.qm-table-grip, .qm-table-add, .qm-table-align';
+const CONTROLS = '.qm-table-grip, .qm-table-add, .qm-table-align, .qm-table-resize';
 
 /** What the nested views and the band answer for themselves, which is what `stopEvent`
  *  keeps from PM. */
@@ -339,6 +395,18 @@ interface Sweep {
 	boxes: { r: number; c: number; rect: DOMRect }[];
 }
 
+/** A column border in flight: the two columns either side of it, measured at the press,
+ *  and the narrowest either may reach, which is a cell's own measure floor. */
+interface Resize {
+	c: number;
+	handle: HTMLElement;
+	pointerId: number;
+	from: number;
+	widths: number[];
+	floor: number;
+	engaged: boolean;
+}
+
 class TableIslandView implements NodeView {
 	readonly dom: HTMLElement;
 	private cells: MountedCell[] = [];
@@ -356,12 +424,19 @@ class TableIslandView implements NodeView {
 	private clusters: HTMLElement[] = [];
 	/** The first row's header toggle, up while that row is held. */
 	private headerCluster: HTMLElement | undefined;
+	/** The held cells' cluster, up over the first cell of a held rectangle that is no
+	 *  column, and built for each paint since what it presses is the cells'. */
+	private cellCluster: HTMLElement | undefined;
 	/** The grid's own box, and the containing block every out-of-flow control is placed
 	 *  against. Not the scroller: an absolute inside a scroll container is placed
 	 *  against a padding box the scroll then slides out from under, so a control at the
 	 *  grid's far end would drift into the middle of it. */
 	private frame: HTMLElement | undefined;
 	private dropMark: HTMLElement | undefined;
+	/** The grid's `<col>`s, which a border drag sizes live and a render sizes from the
+	 *  stored weights. */
+	private cols: HTMLTableColElement[] = [];
+	private resize: Resize | undefined;
 	/** A drag's trailing `click`, which would otherwise re-select the moved line. */
 	private suppressClick = false;
 
@@ -415,6 +490,10 @@ class TableIslandView implements NodeView {
 			const at = Math.min(head, fresh.doc.content.size);
 			mounted.view.dispatch(fresh.tr.setSelection(Selection.near(fresh.doc.resolve(at))));
 		}
+		// A cell's alignment is no part of its text, so it is restated on every box: the
+		// reseed above compares text and marks alone.
+		for (const mounted of this.cells) layCell(mounted.box, props, mounted.r, mounted.c);
+		this.paintSelection();
 		return true;
 	}
 
@@ -437,6 +516,7 @@ class TableIslandView implements NodeView {
 		this.dom.removeEventListener('mousedown', this.onPointerDown);
 		this.endDrag();
 		this.endSweep();
+		this.endResize();
 		this.teardownCells();
 	}
 
@@ -730,6 +810,7 @@ class TableIslandView implements NodeView {
 			if (line.axis === 'row' && line.index === 0 && this.headerCluster)
 				this.headerCluster.hidden = !named;
 		}
+		this.paintCellCluster(props);
 		for (const cell of this.cells)
 			cell.box.toggleAttribute(
 				'data-selected',
@@ -814,6 +895,74 @@ class TableIslandView implements NodeView {
 		const props = this.props();
 		if (props.aligns[c] !== to) this.write(setAlign(props, c, to));
 		this.selectLine({ axis: 'column', index: c });
+	}
+
+	/** The held cells' cluster: up over the first cell of a held rectangle, where no
+	 *  column's own cluster is, each toggle pressed where every cell in the rectangle
+	 *  holds it. It floats over the cell under that one, as the column's floats over the
+	 *  first row, and is out of the tab order for the reason a grip is, its keyboard twin
+	 *  being `Mod-Shift-l`, `-e` and `-r` (§{@link TableIslandView.cellKeys}). */
+	private paintCellCluster(props: TableProps): void {
+		this.cellCluster?.remove();
+		this.cellCluster = undefined;
+		const held = this.selected;
+		if (!held || this.lineOn('column') !== undefined) return;
+		const first = this.cells.find((m) => m.r === held.r0 && m.c === held.c0);
+		if (!first) return;
+		const s = this.deps.strings();
+		const covered = allCells(props, held);
+		const holds = <K extends 'align' | 'valign'>(key: K, value: TableCell[K]): boolean =>
+			covered.every((cell) => cell[key] === value);
+		const cluster = el('div', 'qm-table-align');
+		cluster.setAttribute('role', 'group');
+		cluster.setAttribute('aria-label', s.tableCellAlignment);
+		cluster.setAttribute('data-cells', '');
+		cluster.addEventListener('mousedown', (e) => e.preventDefault());
+		const toggle = (label: string, glyph: string[], pressed: boolean, run: () => void) => {
+			const btn = chromeButton('qm-table-align-option', label, run);
+			btn.tabIndex = -1;
+			btn.setAttribute('aria-pressed', String(pressed));
+			btn.appendChild(svg(glyph, 2));
+			cluster.appendChild(btn);
+			return btn;
+		};
+		const names: Record<CellAlign, string> = {
+			left: s.tableAlignLeft,
+			center: s.tableAlignCenter,
+			right: s.tableAlignRight
+		};
+		for (const align of SETTABLE)
+			toggle(names[align], ALIGN_GLYPH[align], holds('align', align), () =>
+				this.layCells('align', align)
+			).setAttribute('data-align', align);
+		const vnames: Record<CellValign, string> = {
+			top: s.tableAlignTop,
+			middle: s.tableAlignMiddle,
+			bottom: s.tableAlignBottom
+		};
+		for (const valign of VALIGNS)
+			toggle(vnames[valign], VALIGN_GLYPH[valign], holds('valign', valign), () =>
+				this.layCells('valign', valign)
+			).setAttribute('data-valign', valign);
+		first.box.appendChild(cluster);
+		this.cellCluster = cluster;
+	}
+
+	/** Lay every held cell, or the caret's where none is held, at `value`, and clear the
+	 *  key from them where every one already holds it: the press that set an alignment
+	 *  takes it back to the column's. One `set`, and the rectangle stays held. */
+	private layCells<K extends 'align' | 'valign'>(
+		key: K,
+		value: TableCell[K],
+		at?: { r: number; c: number }
+	): void {
+		const held = this.selected ?? (at && { r0: at.r, c0: at.c, r1: at.r, c1: at.c });
+		if (!held) return;
+		const props = this.props();
+		const every = allCells(props, held).every((cell) => cell[key] === value);
+		this.write(
+			setCellLayout(props, held.r0, held.c0, held.r1, held.c1, key, every ? undefined : value)
+		);
 	}
 
 	// ── Drag to reorder ───────────────────────────────────────────────────────
@@ -979,6 +1128,110 @@ class TableIslandView implements NodeView {
 		}
 	}
 
+	// ── Column widths ─────────────────────────────────────────────────────────
+
+	/** Size the grid's columns, or return it to auto-fit. A weighted grid spans the leaf
+	 *  laid out fixed, as the page's fractional columns span the text block, so the
+	 *  proportions it draws are the ones the page prints. */
+	private weigh(widths: string[] | undefined): void {
+		this.frame?.toggleAttribute('data-weighted', widths !== undefined);
+		this.cols.forEach((col, c) => (col.style.width = widths?.[c] ?? ''));
+	}
+
+	/**
+	 * The border after column `c`, in the band: a press and a drag move it, trading width
+	 * between the two columns it divides, and the release writes every column's measured
+	 * width as its weight, one `set` and one undo step. A double-click returns the table
+	 * to auto-fit.
+	 *
+	 * Pointer chrome for the reason a grip is, and named to nothing: it is no button, and
+	 * a column's width has no keyboard route.
+	 */
+	private resizer(c: number): HTMLElement {
+		const handle = el('span', 'qm-table-resize');
+		handle.setAttribute('aria-hidden', 'true');
+		handle.addEventListener('mousedown', (e) => e.preventDefault());
+		handle.addEventListener('pointerdown', (e) => this.onResizeDown(c, handle, e));
+		handle.addEventListener('dblclick', () => {
+			if (this.props().widths) this.write(setWidths(this.props(), undefined));
+		});
+		return handle;
+	}
+
+	private readonly onResizeDown = (c: number, handle: HTMLElement, event: PointerEvent): void => {
+		if (event.button !== 0) return;
+		this.endResize();
+		const heads = this.cells.filter((m) => m.r === 0).sort((a, b) => a.c - b.c);
+		const widths = heads.map((m) => m.box.getBoundingClientRect().width);
+		// A cell's floor is its host's measure plus the box's own padding and border, read
+		// off the header cell the border hangs from.
+		const head = heads[c];
+		const floor = head
+			? Number.parseFloat(getComputedStyle(head.host).minWidth) +
+				head.box.getBoundingClientRect().width -
+				head.host.getBoundingClientRect().width
+			: 0;
+		this.resize = {
+			c,
+			handle,
+			pointerId: event.pointerId,
+			from: event.clientX,
+			widths,
+			floor: Number.isFinite(floor) ? floor : 0,
+			engaged: false
+		};
+		handle.setPointerCapture?.(event.pointerId);
+		handle.addEventListener('pointermove', this.onResizeMove);
+		handle.addEventListener('pointerup', this.onResizeUp);
+		handle.addEventListener('pointercancel', this.onResizeUp);
+	};
+
+	/** The widths a border at `x` leaves: the two columns it divides trade the travel,
+	 *  each clamped at the floor, and every other column keeps the width it was pressed at. */
+	private resized(resize: Resize, x: number): number[] {
+		const { c, widths, floor } = resize;
+		const left = widths[c] ?? 0;
+		const right = widths[c + 1] ?? 0;
+		const travel = Math.max(floor - left, Math.min(right - floor, x - resize.from));
+		return widths.map((w, i) => (i === c ? left + travel : i === c + 1 ? right - travel : w));
+	}
+
+	private readonly onResizeMove = (event: PointerEvent): void => {
+		const resize = this.resize;
+		if (!resize) return;
+		if (!resize.engaged && Math.abs(event.clientX - resize.from) < DEAD_ZONE) return;
+		resize.engaged = true;
+		resize.handle.setAttribute('data-active', '');
+		const widths = this.resized(resize, event.clientX);
+		const total = widths.reduce((a, b) => a + b, 0);
+		this.weigh(widths.map((w) => `${(w / total) * 100}%`));
+	};
+
+	private readonly onResizeUp = (event: PointerEvent): void => {
+		const resize = this.resize;
+		if (!resize) return;
+		this.endResize();
+		if (!resize.engaged) return;
+		if (event.type !== 'pointerup') {
+			this.weigh(columnShares(this.props())?.map((share) => `${share * 100}%`));
+			return;
+		}
+		const widths = this.resized(resize, event.clientX).map((w) => Math.max(1, Math.round(w)));
+		this.write(setWidths(this.props(), widths));
+	};
+
+	private endResize(): void {
+		const resize = this.resize;
+		if (!resize) return;
+		this.resize = undefined;
+		resize.handle.removeAttribute('data-active');
+		resize.handle.removeEventListener('pointermove', this.onResizeMove);
+		resize.handle.removeEventListener('pointerup', this.onResizeUp);
+		resize.handle.removeEventListener('pointercancel', this.onResizeUp);
+		if (resize.handle.hasPointerCapture?.(resize.pointerId))
+			resize.handle.releasePointerCapture(resize.pointerId);
+	}
+
 	// ── Render ────────────────────────────────────────────────────────────────
 
 	private teardownCells(): void {
@@ -993,6 +1246,7 @@ class TableIslandView implements NodeView {
 		const seat = this.focusedSeat();
 		this.endDrag();
 		this.endSweep();
+		this.endResize();
 		this.teardownCells();
 		this.grips.clear();
 		this.clusters = [];
@@ -1014,15 +1268,18 @@ class TableIslandView implements NodeView {
 		// weight the header row draws. A headless table's first row is a body row on the
 		// page, so it is one here too, still holding row 0's chrome.
 		const table = el('table', 'qm-table');
+		const colgroup = el('colgroup');
+		this.cols = Array.from({ length: columnCount(props) }, () => el('col'));
+		colgroup.append(...this.cols);
 		const first = this.row(props, 0, s);
 		const body = el('tbody');
 		if (props.headless) {
 			body.appendChild(first);
-			table.append(body);
+			table.append(colgroup, body);
 		} else {
 			const head = el('thead');
 			head.appendChild(first);
-			table.append(head, body);
+			table.append(colgroup, head, body);
 		}
 		for (let r = 1; r < rowCount(props); r++) body.appendChild(this.row(props, r, s));
 
@@ -1032,9 +1289,10 @@ class TableIslandView implements NodeView {
 		// hang the row bar in, and a bar spans the whole edge rather than one line of it.
 		const frame = el('div', 'qm-table-frame');
 		frame.append(table, this.addBar('column', s.tableAddColumn), this.addBar('row', s.tableAddRow));
+		this.frame = frame;
+		this.weigh(columnShares(props)?.map((share) => `${share * 100}%`));
 		const scroller = el('div', 'qm-table-scroller');
 		scroller.appendChild(frame);
-		this.frame = frame;
 		this.dom.appendChild(scroller);
 		this.paintSelection();
 		this.reseat(seat);
@@ -1074,7 +1332,7 @@ class TableIslandView implements NodeView {
 			box.setAttribute('data-r', String(r));
 			box.setAttribute('data-c', String(c));
 			const align = props.aligns[c] ?? 'none';
-			if (align !== 'none') box.style.textAlign = align;
+			layCell(box, props, r, c);
 			const host = el('div', 'qm-table-cell-host');
 			box.appendChild(host);
 
@@ -1090,6 +1348,7 @@ class TableIslandView implements NodeView {
 					this.grip({ axis: 'column', index: c }, s.tableSelectColumn(c + 1)),
 					this.alignCluster(c, align, s)
 				);
+			if (r === 0 && c < columnCount(props) - 1) box.appendChild(this.resizer(c));
 			if (c === 0)
 				box.appendChild(
 					this.grip(
@@ -1408,6 +1667,9 @@ class TableIslandView implements NodeView {
 			'Alt-ArrowRight': line('column', 1, true),
 			'Shift-ArrowLeft': slide(-1),
 			'Shift-ArrowRight': slide(1),
+			'Shift-Mod-l': () => (this.layCells('align', 'left', { r, c }), true),
+			'Shift-Mod-e': () => (this.layCells('align', 'center', { r, c }), true),
+			'Shift-Mod-r': () => (this.layCells('align', 'right', { r, c }), true),
 			Tab: () => this.step(r, c, 1),
 			'Shift-Tab': () => this.step(r, c, -1),
 			Enter: () => {

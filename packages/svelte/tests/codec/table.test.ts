@@ -35,6 +35,8 @@ import {
 	rowCount,
 	setAlign,
 	setHeadless,
+	setCellLayout,
+	setWidths,
 	shapeEqual,
 	withCell
 } from '$lib/core/codec/table.js';
@@ -875,6 +877,64 @@ describe('the first row is the header or a body row', () => {
 	});
 });
 
+describe('a cell is aligned on its own', () => {
+	const cellBoxes = (field: FieldController) =>
+		Array.from(field.el.querySelectorAll<HTMLElement>('.qm-table-cell'));
+	const cellCluster = (field: FieldController) =>
+		field.el.querySelector<HTMLElement>('.qm-table-align[data-cells]');
+
+	it('a cell layout rides the store, and clearing it returns the cell to its column', () => {
+		const laid = setCellLayout(LETTERED, 1, 0, 2, 0, 'valign', 'bottom');
+		const back = propsOf(stored(withTable(laid)));
+		expect(back.rows.map((row) => row[0]!.valign)).toEqual(['bottom', 'bottom']);
+		expect(back.header[0]!.valign).toBeUndefined();
+		const cleared = setCellLayout(laid, 0, 0, 2, 1, 'valign', undefined);
+		expect(propsOf(stored(withTable(cleared))).rows[0]![0]).toEqual(cell('a1'));
+	});
+
+	it('Mod-Shift-e centers the caret’s cell, and again returns it to its column', () => {
+		const { field } = tableLeaf(LETTERED);
+		cellViews(field)[2]!.focus(); // row 1, column 0, a left column
+		press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
+		expect(leafProps(field).rows[0]![0]).toEqual({ ...cell('a1'), align: 'center' });
+		expect(cellBoxes(field)[2]!.style.textAlign).toBe('center');
+		// The caret stays: an alignment is no part of the cell's text.
+		expect(cellViews(field).indexOf(caret(field))).toBe(2);
+		press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
+		expect(leafProps(field).rows[0]![0]).toEqual(cell('a1'));
+		expect(cellBoxes(field)[2]!.style.textAlign).toBe('left');
+		field.destroy();
+	});
+
+	it('a held row raises the cells’ cluster, and a press lays every cell in it', () => {
+		const { field } = tableLeaf(LETTERED);
+		cellViews(field)[3]!.focus();
+		press(caret(field), 'Escape');
+		expect(washed(field)).toEqual(['1,0', '1,1']);
+		const cluster = cellCluster(field)!;
+		expect(cluster.closest('.qm-table-cell')?.getAttribute('data-r')).toBe('1');
+		expect(cluster.querySelectorAll('button')).toHaveLength(6);
+		cluster.querySelector<HTMLButtonElement>('[data-valign="bottom"]')!.click();
+		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual(['bottom', 'bottom']);
+		// The row stays held, and the toggle reads pressed.
+		expect(washed(field)).toEqual(['1,0', '1,1']);
+		expect(
+			cellCluster(field)!.querySelector('[data-valign="bottom"]')!.getAttribute('aria-pressed')
+		).toBe('true');
+		expect(cellBoxes(field)[2]!.style.verticalAlign).toBe('bottom');
+		undo(outerView(field).state, outerView(field).dispatch);
+		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual([undefined, undefined]);
+		field.destroy();
+	});
+
+	it('a held column raises its own cluster and not the cells’', () => {
+		const { field } = tableLeaf(LETTERED);
+		grips(field, 'column')[1]!.click();
+		expect(cellCluster(field)).toBeNull();
+		field.destroy();
+	});
+});
+
 describe('alignment is set on the held column', () => {
 	it('the cluster is up while its column is held, and absent otherwise', () => {
 		const { field } = tableLeaf(LETTERED);
@@ -1251,6 +1311,68 @@ describe('a grip drag moves its line', () => {
 		// however many rows have passed through index 0.
 		expect(field.el.querySelectorAll('thead tr')).toHaveLength(1);
 		expect(field.el.querySelectorAll('th.qm-table-cell')[0].textContent).toBe('b1');
+		field.destroy();
+	});
+});
+
+describe('a column border sets the widths', () => {
+	/** The header cells' boxes and their hosts', 80 and 90 wide around 70-wide hosts
+	 *  whose measure floor is 20, so a column's floor is 30. */
+	function headerLayout(field: FieldController): void {
+		const boxes: Box[] = [
+			{ left: 20, top: 20, right: 100, bottom: 40 },
+			{ left: 100, top: 20, right: 190, bottom: 40 }
+		];
+		field.el.querySelectorAll<HTMLElement>('th.qm-table-cell').forEach((th, i) => {
+			th.getBoundingClientRect = () => domRect(boxes[i]!);
+			const host = th.querySelector<HTMLElement>('.qm-table-cell-host')!;
+			host.getBoundingClientRect = () => domRect({ ...boxes[i]!, right: boxes[i]!.left + 70 });
+			host.style.minWidth = '20px';
+		});
+	}
+	const cols = (field: FieldController) =>
+		Array.from(field.el.querySelectorAll<HTMLElement>('col')).map((c) => c.style.width);
+
+	it('draws the stored weights as the columns, and an auto-fit table as its content', () => {
+		const weighted = tableLeaf(setWidths(LETTERED, [3, 1])).field;
+		expect(cols(weighted)).toEqual(['75%', '25%']);
+		expect(weighted.el.querySelector('.qm-table-frame')?.hasAttribute('data-weighted')).toBe(true);
+		weighted.destroy();
+		const fit = tableLeaf(LETTERED).field;
+		expect(cols(fit)).toEqual(['', '']);
+		expect(fit.el.querySelector('.qm-table-frame')?.hasAttribute('data-weighted')).toBe(false);
+		fit.destroy();
+	});
+
+	it('a drag writes every column measured, one undo step, and a double-click clears', () => {
+		const { field } = tableLeaf(LETTERED);
+		headerLayout(field);
+		const handles = field.el.querySelectorAll<HTMLElement>('.qm-table-resize');
+		// One border between two columns, and none past the last.
+		expect(handles).toHaveLength(1);
+		dragGrip(handles[0] as HTMLButtonElement, [
+			[100, 10],
+			[110, 10],
+			[130, 10]
+		]);
+		expect(leafProps(field).widths).toEqual([110, 60]);
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
+		undo(outerView(field).state, outerView(field).dispatch);
+		expect(leafProps(field).widths).toBeUndefined();
+
+		headerLayout(field);
+		// Past the neighbour's floor, the border stops at it: the host's measure and the
+		// box's padding around it.
+		dragGrip(field.el.querySelector<HTMLElement>('.qm-table-resize') as HTMLButtonElement, [
+			[100, 10],
+			[300, 10]
+		]);
+		expect(leafProps(field).widths).toEqual([140, 30]);
+
+		field.el
+			.querySelector('.qm-table-resize')!
+			.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		expect(leafProps(field).widths).toBeUndefined();
 		field.destroy();
 	});
 });

@@ -255,6 +255,57 @@ export function setHeadless(props: TableProps, headless: boolean): TableProps {
 	return normalizeTable({ ...props, headless: headless || undefined });
 }
 
+/** A cell's horizontal alignment, and its vertical one: the keys a cell holds beside
+ *  its text, each absent at the default the column or the quill supplies. */
+export type CellAlign = NonNullable<TableCell['align']>;
+export type CellValign = NonNullable<TableCell['valign']>;
+
+/** Every cell in the inclusive rectangle given `key`'s `value`, or cleared of it where
+ *  `value` is absent, which returns the cell to its column's alignment or the quill's. */
+export function setCellLayout<K extends 'align' | 'valign'>(
+	props: TableProps,
+	r0: number,
+	c0: number,
+	r1: number,
+	c1: number,
+	key: K,
+	value: TableCell[K] | undefined
+): TableProps {
+	const lay = (cells: TableCell[], r: number): TableCell[] =>
+		cells.map((cell, c) => {
+			if (r < r0 || r > r1 || c < c0 || c > c1) return cell;
+			const next: TableCell = { ...cell, [key]: value };
+			if (value === undefined) delete next[key];
+			return next;
+		});
+	return normalizeTable({
+		...props,
+		header: lay(props.header, 0),
+		rows: props.rows.map((row, i) => lay(row, i + 1))
+	});
+}
+
+/** Set or clear the column weights: what a border drag and its double-click write
+ *  (`table-view.ts`). `undefined` returns every column to auto-fit. */
+export function setWidths(props: TableProps, widths: (number | null)[] | undefined): TableProps {
+	return normalizeTable({ ...props, widths });
+}
+
+/**
+ * Each column's share of the table's width, summing to 1, or `undefined` for a table
+ * that auto-fits throughout. An auto-fit column beside weighted ones takes the mean
+ * weight: the page sizes it to its content, which the editor's grid, laid out fixed so
+ * the weights hold, cannot ask.
+ */
+export function columnShares(props: TableProps): number[] | undefined {
+	const set = props.widths?.filter((w): w is number => w !== null);
+	if (!props.widths || !set?.length) return undefined;
+	const mean = set.reduce((a, b) => a + b, 0) / set.length;
+	const weights = props.widths.map((w) => w ?? mean);
+	const total = weights.reduce((a, b) => a + b, 0);
+	return weights.map((w) => w / total);
+}
+
 // ── The cell codec ──────────────────────────────────────────────────────────
 
 /**
@@ -323,13 +374,14 @@ export function cellEqual(a: TableCell, b: TableCell): boolean {
 	return a.text === b.text && valueEqual(a.marks, b.marks);
 }
 
-/** Whether two tables have the same rectangle, alignment and header: the change that
- *  forces a rebuild rather than a per-cell reseed. */
+/** Whether two tables have the same rectangle, alignment, header and widths: the
+ *  change that forces a rebuild rather than a per-cell reseed. */
 export function shapeEqual(a: TableProps, b: TableProps): boolean {
 	return (
 		a.rows.length === b.rows.length &&
 		a.aligns.length === b.aligns.length &&
 		a.aligns.every((x, i) => x === b.aligns[i]) &&
-		!a.headless === !b.headless
+		!a.headless === !b.headless &&
+		valueEqual(a.widths, b.widths)
 	);
 }
