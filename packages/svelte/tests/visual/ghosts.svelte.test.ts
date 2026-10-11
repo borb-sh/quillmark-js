@@ -432,7 +432,7 @@ describe('a default that prints', () => {
 		expect(segment(target, 'month').textContent?.trim()).toBe('01');
 	});
 
-	it('unsets a date as the focus leaves it with every segment empty', () => {
+	it('writes the blank as the focus leaves a date with every segment empty', () => {
 		const target = open({}, answering('dated: 2026-11-14'));
 		for (const [part, presses] of [
 			['month', 2],
@@ -448,8 +448,32 @@ describe('a default that prints', () => {
 
 		segment(target, 'year').blur();
 		flushSync();
-		expect(row('dated').source).toBe('default');
-		expect(rungs(target)).toEqual(['default', 'default', 'default']);
+		// Blank over the default, which an unset would have printed.
+		expect(row('dated')).toMatchObject({ source: 'authored', value: '' });
+		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
+	});
+
+	it('writes the blank for a seated default emptied whole, and the blank stays', () => {
+		const target = open();
+		for (const [part, presses] of [
+			['month', 2],
+			['day', 2],
+			['year', 4]
+		] as const) {
+			const seg = segment(target, part);
+			seg.focus();
+			flushSync();
+			for (let i = 0; i < presses; i++) press(seg, 'Backspace');
+		}
+		segment(target, 'year').blur();
+		flushSync();
+		expect(row('dated')).toMatchObject({ source: 'authored', value: '' });
+
+		// Entering a blank seats nothing: the default stays out of it.
+		segment(target, 'month').focus();
+		flushSync();
+		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
+		expect(q.reader(doc).get('dated')).toBe('');
 	});
 
 	it('puts a seated default back as it leaves a segment emptied, writing nothing', () => {

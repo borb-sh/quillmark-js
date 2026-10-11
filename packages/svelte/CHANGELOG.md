@@ -26,7 +26,7 @@
 
 **A slash pick or a block shorthand scrolls its caret into view.** A heading, list, quote, fence or divider opened at the pane's bottom edge brings the caret up past the fold, as typing does.
 
-**A date emptied under the caret writes nothing until the caret leaves.** A Backspace that empties a segment holds the field empty, the segment drawing its hint where the default's digits drew beside the ones still standing; leaving unsets the date where every segment is empty and otherwise puts the stored date back. An edit that leaves every segment filled still writes at once.
+**A date emptied under the caret writes nothing until the caret leaves.** A Backspace that empties a segment holds the field empty, the segment drawing its hint where the default's digits drew beside the ones still standing; leaving writes the blank `""` where every segment is empty and otherwise puts the stored date back. Over a `default:` the blank stays blank, where the emptied date unset and the default's digits came back; with no default it unsets. An edit that leaves every segment filled still writes at once.
 
 **The required `*` is drawn at the label's ink.** It drew in `--qm-danger`, which now marks diagnostics and the delete glyph alone.
 

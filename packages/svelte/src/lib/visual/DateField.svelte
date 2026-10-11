@@ -1,8 +1,8 @@
 <!--
  A `date` (or `datetime`) field → a styled segmented date field on bits-ui. The
- stored value is a string, `YYYY-MM-DD` or `today`; a cleared control commits
- `undefined` (the unset rung) as the focus leaves it: the parent removes the field,
- and the quill's `default:` applies. The value-object a date field lowers to is a render-time
+ stored value is a string, `YYYY-MM-DD` or `today`; a cleared control commits as the
+ focus leaves it, the blank `""` over a `default:`, which stays blank, and `undefined`
+ (the unset rung) where nothing is declared, the parent removing the field. The value-object a date field lowers to is a render-time
  concern: the editor only sees the stored string.
 
  `today` is the render date rather than a written one (canon `SCHEMAS.md`), so its
@@ -48,10 +48,10 @@
  A segment edit that leaves a segment empty empties the primitive's value, which is
  held rather than committed while the focus stays inside: the first Backspace through
  a date writes nothing unset, and the empty segment shows its hint, not the default's
- digits beside the ones still standing. Leaving settles it: unset where every segment
- is empty, otherwise the stored date back. A field with nothing stored puts its
- segments back by remounting the primitive, which re-reads an unchanged empty value as
- nothing to sync.
+ digits beside the ones still standing. Leaving settles it: blank where every segment
+ is empty, otherwise the stored date back. A field storing no date puts its segments
+ back by remounting the primitive, which re-reads an unchanged empty value as nothing
+ to sync.
 -->
 <script lang="ts">
 	import { DateField as BitsDateField } from 'bits-ui';
@@ -134,7 +134,7 @@
 	// fails to parse is AUTHORED-but-malformed, which the empty field states
 	// honestly: the ghost would claim it unset. Held as the parsed value rather than
 	// a boolean so the substitution below narrows on the one fact it needs.
-	const ghost = $derived(local === '' && !held ? fallbackDate : undefined);
+	const ghost = $derived(value == null && local === '' && !held ? fallbackDate : undefined);
 	const seated = $derived(value == null && seat && local !== '');
 	/** Who put `today` here, while the field follows the render date. */
 	const follows = $derived(
@@ -172,9 +172,10 @@
 		const filled = [...(wrapEl?.querySelectorAll('[data-segment]') ?? [])].some(
 			(s) => s.getAttribute('data-segment') !== 'literal' && !s.hasAttribute('data-ghosted')
 		);
+		const blank = fallbackDate ? '' : undefined;
 		if (!filled) {
-			if (value != null) onCommit(undefined);
-		} else if (value == null) generation++;
+			if (value !== blank) onCommit(blank);
+		} else if (!value) generation++;
 	}
 
 	// What one segment prints, and which rung it takes.
