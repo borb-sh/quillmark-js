@@ -446,7 +446,7 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('a cell under the pointer draws its row’s and its column’s grips faint', () => {
+	it('a cell under the pointer draws its row’s and its column’s grips', () => {
 		const { field } = tableLeaf(LETTERED);
 		const near = () =>
 			Array.from(field.el.querySelectorAll('.qm-table-grip[data-near]')).map((g) =>

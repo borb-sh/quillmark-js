@@ -453,7 +453,7 @@ class TableIslandView implements NodeView {
 	private resize: Resize | undefined;
 	/** A drag's trailing `click`, which would otherwise re-select the moved line. */
 	private suppressClick = false;
-	/** The grips of the row and column under the pointer, drawn faint. */
+	/** The grips of the row and column under the pointer, drawn up. */
 	private near: HTMLButtonElement[] = [];
 
 	constructor(
@@ -593,7 +593,7 @@ class TableIslandView implements NodeView {
 		else this.caretBeside(point);
 	};
 
-	/** A cell under the pointer draws its row's and its column's grips faint, so a line's
+	/** A cell under the pointer draws its row's and its column's grips, so a line's
 	 *  handle is found from the line rather than only from the band beside it. A control
 	 *  under the pointer is its own reveal, and draws no other. */
 	private readonly onHover = (event: MouseEvent): void => {

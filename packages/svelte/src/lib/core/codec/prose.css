@@ -519,7 +519,7 @@ li.ProseMirror-selectednode::after {
    pointer is on that control, while it holds the focus, or while it is what a gesture is
    about — the selected line's grip, and the lifted one, which is drawn through a drag the
    pointer has travelled off. A cell under the pointer draws its row's and its column's
-   grips at the idle rung (`table-view.ts` §`onHover`), one faint pill on each axis.
+   grips (`table-view.ts` §`onHover`), one pill on each axis and none anywhere else.
 
    Opacity rather than absence, so every control keeps its box and is hit-tested wherever
    it sits. A grip's reach is the pointer's alone and it holds no focus, so it carries no
@@ -531,11 +531,8 @@ li.ProseMirror-selectednode::after {
 	opacity: 0;
 	transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 }
-.qm-table-grip[data-near] {
-	opacity: var(--_qm-opacity-idle);
-}
 .qm-table-add:is(:hover, :focus-visible),
-.qm-table-grip:is(:hover, [aria-pressed='true'], .qm-table-lifted) {
+.qm-table-grip:is([data-near], :hover, [aria-pressed='true'], .qm-table-lifted) {
 	opacity: 1;
 }
 

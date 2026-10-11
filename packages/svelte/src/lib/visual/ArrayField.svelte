@@ -29,8 +29,8 @@
  container or a block prose cell.
 
  The row's controls are inside the element: a slab over the end of the element's own
- box, taking its two end-side corners — the remove, and on an `object` row the drag
- handle before it. So a row's box is the element's box, and an array's rows end where
+ box, taking its two end-side corners: the remove. An `object` row's drag handle hangs
+ off its start edge instead, as a table grip does. So a row's box is the element's box, and an array's rows end where
  every other field's control does. On an object element that box is the summary rather
  than the open row: a destructive control belongs to the line it sits on, not to
  everything that line has unfolded. A table's row carries the remove alone, in its last
@@ -703,6 +703,7 @@
 					     end-side corners) needs corners to take. So a list of records measures
 					     like a list of inputs whatever the element type. -->
 					<div class="qm-element-head">
+						{@render handle(k)}
 						<button
 							type="button"
 							class="qm-control-box qm-focus-ring qm-element-summary"
@@ -720,7 +721,7 @@
 							{/if}
 						</button>
 						<div class="qm-row-actions">
-							{@render rowActions(k)}
+							{@render removeButton(k)}
 						</div>
 					</div>
 					{#if open.has(id)}
@@ -792,22 +793,22 @@
 	>
 {/snippet}
 
-<!-- An `object` row's controls: the drag handle, then the remove. The handle holds no
-     focus, as a table grip does not: its keyboard twin is Alt+↑/↓ from anywhere in the
-     row. -->
-{#snippet rowActions(k: number)}
+<!-- An `object` row's drag handle, a table grip's twin hung off the row's start edge.
+     It holds no focus, as a grip does not: its keyboard twin is Alt+↑/↓ from anywhere in
+     the row. -->
+{#snippet handle(k: number)}
 	<button
 		type="button"
-		class="qm-icon-btn qm-row-btn qm-row-handle"
+		class="qm-row-handle"
 		tabindex="-1"
 		title={t.strings.arrayDrag}
 		aria-label={rowAction(t.strings.arrayDrag, k)}
 		onpointerdown={(e) => onHandleDown(e, k)}
 		onpointermove={onHandleMove}
 		onpointerup={onHandleUp}
-		onpointercancel={onHandleUp}><Icon name="grip-vertical" /></button
+		onpointercancel={onHandleUp}
+		><span class="qm-row-handle-bar"><Icon name="grip-vertical" /></span></button
 	>
-	{@render removeButton(k)}
 {/snippet}
 
 <style>
@@ -884,7 +885,7 @@
 	/* The end inset the slabs stand in, taken off whichever box the element drew:
 	 `.qm-input` is the text element, `.qm-control-box` the prose one — the row's own
 	 child, so a table's cells, which are boxes too, keep their inset — and an object
-	 row's summary, which stands two slabs off its end. `:global`, because the box
+	 row's summary, which stands one slab off its end. `:global`, because the box
 	 belongs to the child component's markup and the scope class stops at this
 	 component's. The longhand beats the family's `padding` shorthand without a
 	 specificity fight: `controls.css` ranks the family at zero inside `:where()`. */
@@ -893,7 +894,7 @@
 		padding-inline-end: var(--_qm-tap-min);
 	}
 	.qm-element-summary {
-		padding-inline-end: calc(2 * var(--_qm-tap-min));
+		padding-inline-end: var(--_qm-tap-min);
 	}
 	/* The box's end wall, floor to ceiling: a height of its own would leave a sliver of
 	 well above or below, and the corners it takes are the box's — the end-side pair keeps
@@ -901,8 +902,7 @@
 	 another gives up its corners on both sides.
 
 	 It comes up on its own row rather than on the field: a destructive control is offered
-	 by the row the pointer is on, not by every row at once, and the drag handle beside it
-	 comes up with it. Hover is where the remove says destructive, ink with fill, a
+	 by the row the pointer is on, not by every row at once. Hover is where the remove says destructive, ink with fill, a
 	 tint alone being a wash under a label-toned glyph. */
 	.qm-row-actions {
 		position: absolute;
@@ -938,27 +938,54 @@
 		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
 	}
-	/* The handle rests at nothing, where the remove rests faint: it comes up with the row
-	 the pointer is on, and stays up through the drag it is carrying. The pointer owns the
-	 gesture, not the page's scroll. */
+	/* The handle is a table grip's twin (prose.css §"One grip per line"): a pill carrying
+	 the grip's marks, hung off the row's start edge in the `--_qm-nest` every row stands
+	 in from the stroke outside it, which a group's panel clips at. It rests
+	 at nothing, where the remove rests faint, and comes up with the row the pointer is
+	 on, staying up through the drag it carries; a band flush with the row keeps the
+	 pointer on the row all the way to it. The pointer owns the gesture, not the page's
+	 scroll. */
 	.qm-row-handle {
-		opacity: 0;
+		position: absolute;
+		inset-block: 0;
+		inset-inline-end: 100%;
+		width: var(--_qm-nest);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--_qm-ink-label);
 		cursor: grab;
 		touch-action: none;
+		opacity: 0;
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	.qm-array-row:hover > .qm-element-head > .qm-row-actions > .qm-row-handle,
-	.qm-element.lifted > .qm-element-head > .qm-row-actions,
-	.qm-element.lifted > .qm-element-head > .qm-row-actions > .qm-row-handle {
+	.qm-row-handle-bar {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: var(--_qm-tap-min);
+		border-radius: var(--_qm-radius-pill);
+		background: var(--_qm-surface-band);
+	}
+	.qm-row-handle-bar :global(svg) {
+		width: var(--_qm-space-3);
+		height: var(--_qm-space-3);
+	}
+	.qm-array-row:hover > .qm-element-head > .qm-row-handle,
+	.qm-element.lifted > .qm-element-head > .qm-row-handle {
 		opacity: 1;
 	}
-	.qm-element.lifted > .qm-element-head > .qm-row-actions > .qm-row-handle {
+	.qm-element.lifted > .qm-element-head > .qm-row-handle {
 		cursor: grabbing;
 	}
 	/* The lifted row is a tone, and the drop is one rule on the edge it would land
 	 against, drawn out of flow so nothing reflows under the drag: the table island's
 	 own pair. */
-	.qm-element.lifted > .qm-element-head {
+	.qm-element.lifted > .qm-element-head > .qm-element-summary {
 		opacity: var(--_qm-opacity-muted);
 	}
 	.qm-element[data-drop]::after {
