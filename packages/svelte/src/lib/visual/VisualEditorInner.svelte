@@ -80,11 +80,12 @@
 	} from './diagnostics.js';
 	import { fieldDomIds, groupPanelId } from './domid.js';
 	import { createLeafRegistry, type ActiveProse, type FieldControl } from './leaves.js';
-	import { reorder, reorderArm, reorderTrips } from './motion.js';
+	import { reorder, reorderArm, reorderTrips, scrollSettled, slot } from './motion.js';
 	import { tipsChannel } from './tips.js';
 	import { patchEditorExt } from './ext.js';
 	import { raiseGuidance } from './guidance.js';
 	import Card from './Card.svelte';
+	import Icon from './icons/Icon.svelte';
 	import TipsCard from './TipsCard.svelte';
 	import FormatPopover from './FormatPopover.svelte';
 	// The add trigger and the kind menu draw shared recipes; a component carrying a
@@ -194,6 +195,7 @@
 	type CardHandle = {
 		revealLeaf(key: string): void;
 		scrollIntoViewCard(block: ScrollLogicalPosition): void;
+		focusHeader(): void;
 	};
 	let mainCard = $state<CardHandle | undefined>(undefined);
 	let cardRefs = $state<(CardHandle | undefined)[]>([]);
@@ -377,10 +379,10 @@
 	 * naming one id, on different terms — `center` against `nearest`.
 	 */
 	let scrollTicket = 0;
-	async function scrollCardIntoView(id: string, block: ScrollLogicalPosition): Promise<void> {
+	async function scrollCardIntoView(id: string, block: ScrollLogicalPosition): Promise<boolean> {
 		const ticket = ++scrollTicket;
-		if (!(await span.resumes(tick()))) return;
-		if (ticket !== scrollTicket) return;
+		if (!(await span.resumes(tick()))) return false;
+		if (ticket !== scrollTicket) return false;
 		// A reorder is running by this flush and holds the slot at its pre-move position
 		// for the length of the trip (`motion.ts`), so asking now measures the box the
 		// card is leaving — where a `nearest` would take the stack back to for the card
@@ -390,26 +392,33 @@
 		const slot = slotEls[cardIndexOf(id)];
 		const trips = slot ? reorderTrips(slot) : [];
 		if (trips.length) {
-			if (!(await span.resumes(Promise.allSettled(trips.map((trip) => trip.finished))))) return;
-			if (ticket !== scrollTicket) return;
+			if (!(await span.resumes(Promise.allSettled(trips.map((trip) => trip.finished)))))
+				return false;
+			if (ticket !== scrollTicket) return false;
 		}
 		const i = cardIndexOf(id);
-		if (i >= 0) cardRefs[i]?.scrollIntoViewCard(block);
+		if (i < 0) return false;
+		cardRefs[i]?.scrollIntoViewCard(block);
+		return true;
 	}
 	/** Returns the new card's session key, or `undefined` when the kind seeds nothing
-	 *  or the insert threw: what `insertCard` hands a host that wants to track it. */
-	function addCard(atIndex: number, kind: string): CardId | undefined {
+	 *  or the insert threw: what `insertCard` hands a host that wants to track it. The
+	 *  strip's own add `land`s focus in the new card; a host's leaves focus where it is. */
+	function addCard(atIndex: number, kind: string, land = false): CardId | undefined {
 		try {
 			const overlay = doc.seedOverlay(kind);
 			const card = quill.seedCard(kind, overlay);
 			if (!card) return undefined;
+			const from = document.activeElement;
 			doc.insertCard(card, atIndex);
 			const id = seq.next();
+			arm.arm();
 			cardIds = [...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)];
 			bump('structure', id, atIndex);
 			// Centred: the new card is the subject, and the neighbours it landed between
 			// are what say where it went.
-			void scrollCardIntoView(id, 'center');
+			const scrolled = scrollCardIntoView(id, 'center');
+			if (land) void landInCard(id, scrolled, from);
 			return id;
 		} catch (e) {
 			reportError(onError, {
@@ -421,8 +430,39 @@
 			return undefined;
 		}
 	}
-	// The reorder gesture's arming window (`motion.ts`): the reconcile that moves a slot
-	// is the trip, and every other reconcile that happens to move one is not.
+	/**
+	 * Focus the card the strip just added: its first field, else its body, else its title.
+	 *
+	 * After the centring scroll has run rather than beside it: a control's `focus()`
+	 * takes the browser's own scroll, which cuts a smooth one short wherever it had
+	 * reached. A focus that went elsewhere while the scroll ran was the user's, and stays.
+	 */
+	async function landInCard(
+		id: CardId,
+		scrolled: Promise<boolean>,
+		from: Element | null
+	): Promise<void> {
+		if (!(await scrolled) || !(await span.resumes(scrollSettled()))) return;
+		const now = document.activeElement;
+		if (now !== from && now !== document.body) return;
+		const at = cardIndexOf(id);
+		const shown = model.cards[at];
+		if (!shown) return;
+		const first = (shown.sections.find((s) => s.group == null) ?? shown.sections[0])?.fields[0];
+		const path = first || shown.hasBody ? pathFor({ card: at, field: first?.name }) : undefined;
+		const found = path && (await revealLeaf(path));
+		if (found) await land(found, undefined);
+		else cardRefs[cardIndexOf(id)]?.focusHeader();
+	}
+	// A kind picked off the menu lands focus in the card it added, so the menu's close
+	// hands none back to its trigger; an Escape out of the menu still does.
+	let picked = false;
+	function addPicked(atIndex: number, kind: string): void {
+		picked = addCard(atIndex, kind, true) != null;
+	}
+
+	// The list gesture's arming window (`motion.ts`): the reconcile that moves a slot is
+	// the trip, and every other reconcile that happens to move one is not.
 	const arm = reorderArm();
 	span.onEnd(arm.cancel);
 
@@ -445,7 +485,12 @@
 	function removeCardById(id: string): void {
 		const i = cardIndexOf(id);
 		if (i < 0) return;
+		// Held visibly, which a pointer's press on delete is not: some engines focus a
+		// pressed button, and the hand-on is the keyboard's.
+		const focused = document.activeElement;
+		const held = !!focused && !!slotEls[i]?.contains(focused) && focused.matches(':focus-visible');
 		doc.removeCard(i);
+		arm.arm();
 		cardIds = cardIds.filter((_, k) => k !== i);
 		if (activeCardId === id) {
 			activeCardId = undefined;
@@ -460,6 +505,15 @@
 		// No addr: the removed card has none left and every survivor's shifted. The
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
 		bump('structure', id);
+		if (held) void focusAfterRemove(i);
+	}
+	/** Hand the focus a removed card held to the title of the card before it, else the
+	 *  one that took its place, else the strip that adds one: a focused node the flush
+	 *  drops leaves the focus on the page's body, and the keyboard's place with it. */
+	async function focusAfterRemove(at: number): Promise<void> {
+		if (!(await span.resumes(tick()))) return;
+		if (cardIds.length) cardRefs[Math.max(at - 1, 0)]?.focusHeader();
+		else rootEl?.querySelector<HTMLElement>('.qm-add-btn')?.focus();
 	}
 	function retypeCardById(id: string, kind: string): void {
 		const i = cardIndexOf(id);
@@ -481,7 +535,10 @@
 			});
 		}
 	}
+	/** A title's blur can fire as the surface is torn down, against a document that may be
+	 *  freed. */
 	function renameCardById(id: string, title: string): void {
+		if (!span.alive) return;
 		const i = cardIndexOf(id);
 		if (i < 0) return;
 		patchEditorExt(doc, { card: i }, { title });
@@ -892,7 +949,7 @@
 	 rather than being slid across. It is also the shape `animate:` asks for, being the
 	 keyed block's only child. -->
 	{#each model.cards as c, i (c.id)}
-		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed}>
+		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed} in:slot out:slot>
 			<Card
 				bind:this={cardRefs[i]}
 				card={titled(c)}
@@ -925,9 +982,10 @@
 {#snippet addAffordance(atIndex: number)}
 	{#if kinds.length}
 		<!-- The strip past the last card is the append point, the one a reader looks for
-		 rather than finds by position, so it alone states itself in words at rest. The
-		 gaps between cards stay bare: the strip is the gap, and the pill each fills on
-		 hover draws what a label would state, the space the new card takes. -->
+		 rather than finds by position, so it alone states itself in words at rest. A gap
+		 between cards carries a plus where the words would be: the strip is the gap, the
+		 pill it fills on hover is the space the new card takes, and the plus says what a
+		 press there does. -->
 		{@const marked = atIndex === model.cards.length}
 		<div class={['qm-add-card', { 'qm-add-card-marked': marked }]}>
 			<!-- Marked, the words are the accessible name and no `aria-label` doubles
@@ -938,7 +996,8 @@
 					type="button"
 					class="qm-add-btn qm-add-affordance qm-tap-floor"
 					aria-label={marked ? undefined : merged.addCard}
-					onclick={() => addCard(atIndex, kinds[0])}>{marked ? merged.addCard : ''}</button
+					onclick={() => addCard(atIndex, kinds[0], true)}
+					>{#if marked}{merged.addCard}{:else}<Icon name="plus" class="qm-add-glyph" />{/if}</button
 				>
 			{:else}
 				<!-- Multi-kind add: pick the kind, then seed + insert. A menu rather than a
@@ -950,10 +1009,20 @@
 					<DropdownMenu.Trigger
 						class="qm-add-btn qm-add-affordance qm-tap-floor"
 						aria-label={marked ? undefined : merged.addCard}
-						>{marked ? merged.addCard : ''}</DropdownMenu.Trigger
+						>{#if marked}{merged.addCard}{:else}<Icon
+								name="plus"
+								class="qm-add-glyph"
+							/>{/if}</DropdownMenu.Trigger
 					>
 					<DropdownMenu.Portal to={rootEl}>
-						<DropdownMenu.Content collisionBoundary={rootEl ?? []} sideOffset={4}>
+						<DropdownMenu.Content
+							collisionBoundary={rootEl ?? []}
+							sideOffset={4}
+							onCloseAutoFocus={(e) => {
+								if (picked) e.preventDefault();
+								picked = false;
+							}}
+						>
 							<!-- Portalled out of the row but into the stack's root, and carrying the
 						     marker itself: floating is still a detached subtree to the
 						     derivation, like FormatPopover and the enum listbox. The root is the
@@ -961,7 +1030,7 @@
 						     the surface where the consumer scrolls one. -->
 							<div class="qm-menu-surface" data-qm-root>
 								{#each kinds as k (k)}
-									<DropdownMenu.Item class="qm-menu-item" onSelect={() => addCard(atIndex, k)}
+									<DropdownMenu.Item class="qm-menu-item" onSelect={() => addPicked(atIndex, k)}
 										>{kindTitle(quill.schema.card_kinds?.[k], k)}</DropdownMenu.Item
 									>
 								{/each}
@@ -1072,9 +1141,10 @@
 	/* Unboxed, like every button, and not dashed: a dashed edge is the placeholder idiom
 	 ("nothing is here yet"), which on a button reads as disabled or as a drop target. It
 	 stays honest in one place, the un-schemable card (`Card.svelte`), which is a state
-	 rather than a control. A bare trigger rests invisible, so the fill is the whole of
-	 what it shows: the pill fills the strip because the strip is what was pressed, and
-	 the strip is the gap, so the fill is the card-to-be drawn where it will land.
+	 rather than a control. A gap's trigger rests invisible, so the fill and the plus are
+	 the whole of what it shows: the pill fills the strip because the strip is what was
+	 pressed, and the strip is the gap, so the fill is the card-to-be drawn where it will
+	 land.
 
 	 No inset of its own: the pill and the gap are the same rectangle, and a bare strip is
 	 a band of gutter, so its height is a rhythm rung. The press floor the box gives up is
@@ -1097,8 +1167,15 @@
 		color: var(--_qm-ink-label);
 		opacity: 0;
 		transition:
-			opacity var(--_qm-reveal),
-			background-color var(--_qm-reveal);
+			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	/* The pill's own height, so a turned-down `--qm-space` shrinks the glyph with the
+	   strip rather than spilling it past the pill. */
+	.qm-add-card :global(.qm-add-glyph) {
+		height: 100%;
+		width: auto;
+		aspect-ratio: 1;
 	}
 	/* The strip that holds words at rest takes the height that centres them, and rests dim
 	   rather than absent, having something to be seen. */
@@ -1111,11 +1188,15 @@
 	/* One arrival, three ways in. Keyboard focus, because the fill is the only thing that
 	   reads as the trigger on a bare strip; and an open menu, because it portals out of
 	   the strip, so a pointer moving onto an item has left the row whose hover was drawing
-	   the pill the menu hangs from. */
+	   the pill the menu hangs from. The arrival takes the long trip and the leave the fast
+	   rung, a transition being the state's it ends in. */
 	.qm-add-card :global(.qm-add-btn:hover),
 	.qm-add-card :global(.qm-add-btn:focus-visible),
 	.qm-add-card :global(.qm-add-btn[data-state='open']) {
 		opacity: 1;
 		background: var(--_qm-add-fill);
+		transition:
+			opacity var(--_qm-reveal),
+			background-color var(--_qm-reveal);
 	}
 </style>
