@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+**Enter on an empty last row of a table leaves the table, and ArrowLeft and ArrowRight cross cells.** Enter on a table's last row, while it is empty, removes that row and puts the caret after the table, as Enter on an empty list item leaves the list; a table always keeps a row under its first. ArrowLeft at the start of a cell and ArrowRight at its end move to the neighbouring cell in reading order, a row's end wrapping to the next row, and stop at the table's first and last cells.
+
+**`Mod-Shift-L`, `Mod-Shift-E` and `Mod-Shift-R` over a held table column set the column's alignment**, as the column's cluster does, where they aligned each cell in it on its own. A cell's own alignment is left as it is.
+
+**`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table, as it does over every cell swept by the pointer.
+
+**Typing over a selected table writes into the empty paragraph after it**, where it opened a new paragraph above that one. An empty heading or code block after the table is left as it is.
+
 ## v0.20.1 - 2026-10-10
 
 **ProseMirror is pinned at `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.** The other pins move with it: `prosemirror-model` 1.25.12, `prosemirror-transform` 1.12.2, `prosemirror-commands` 1.7.2, `prosemirror-history` 1.5.1 and `prosemirror-gapcursor` 1.4.1. A consumer overriding `prosemirror-view` to reach the fix can drop the override.

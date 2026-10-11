@@ -18,7 +18,7 @@
 // nothing: what floats over the grid is the held column's alignment cluster alone. Every
 // control is absolutely positioned out of the grid, so none is in a row or a column of
 // it; `codec/prose.css` draws the band, the cluster and the selection wash.
-import { baseKeymap, chainCommands, toggleMark } from 'prosemirror-commands';
+import { baseKeymap, chainCommands, selectAll, toggleMark } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import type { Node as PMNode } from 'prosemirror-model';
@@ -615,17 +615,23 @@ class TableIslandView implements NodeView {
 	 *  leaf mounted without that plugin then answers "no gap" instead of dispatching
 	 *  a selection nothing draws. */
 	private caretBeside(point: Point): void {
-		const pos = this.getPos();
-		if (pos == null) return;
 		const box = this.dom.getBoundingClientRect();
-		const before = point.y < (box.top + box.bottom) / 2;
-		const $at = this.outer.state.doc.resolve(before ? pos : pos + this.node.nodeSize);
+		this.leave(point.y < (box.top + box.bottom) / 2 ? -1 : 1);
+	}
+
+	/** Land the document's caret on one side of the island, by
+	 *  {@link TableIslandView.caretBeside}'s rule; false where that side holds no caret. */
+	private leave(side: -1 | 1): boolean {
+		const pos = this.getPos();
+		if (pos == null) return false;
+		const $at = this.outer.state.doc.resolve(side < 0 ? pos : pos + this.node.nodeSize);
 		const selection =
 			this.outer.someProp('createSelectionBetween', (f) => f(this.outer, $at, $at)) ??
-			Selection.findFrom($at, before ? -1 : 1, true);
-		if (!selection) return;
+			Selection.findFrom($at, side, true);
+		if (!selection) return false;
 		this.outer.focus();
 		this.outer.dispatch(this.outer.state.tr.setSelection(selection));
+		return true;
 	}
 
 	/** The island as the selection: the Escape that climbs out of a cell or a held
@@ -1395,7 +1401,8 @@ class TableIslandView implements NodeView {
 	 *  ({@link TableIslandView.paintSelection}), and absent rather than transparent the
 	 *  rest of the time: it floats over the first row, and a box hit-tested there at rest
 	 *  would take that cell's presses. Out of the tab order for the reason a grip is, its
-	 *  keyboard twin being Shift+Left and Shift+Right (§{@link TableIslandView.cellKeys}). */
+	 *  keyboard twins being Shift+Left and Shift+Right and `Mod-Shift-l`, `-e` and `-r`
+	 *  (§{@link TableIslandView.cellKeys}). */
 	private alignCluster(c: number, held: TableAlign, s: TableChromeStrings): HTMLElement {
 		const cluster = el('div', 'qm-table-align');
 		cluster.setAttribute('role', 'group');
@@ -1552,21 +1559,33 @@ class TableIslandView implements NodeView {
 		if (focus) this.focusCell(focus.r, focus.c);
 	}
 
-	/** Land the caret at the end of a cell, clamped into the rectangle: where a row
-	 *  or column op puts it, since the op rebuilt the views the caret was in. */
-	private focusCell(r: number, c: number): void {
+	/** Land the caret at the end of a cell, or at its start, clamped into the rectangle:
+	 *  where a row or column op puts it, since the op rebuilt the views the caret was in. */
+	private focusCell(r: number, c: number, edge: 'start' | 'end' = 'end'): void {
 		const props = this.props();
 		const row = Math.max(0, Math.min(r, rowCount(props) - 1));
 		const col = Math.max(0, Math.min(c, columnCount(props) - 1));
 		const mounted = this.cells.find((m) => m.r === row && m.c === col);
 		if (!mounted) return;
 		const { view } = mounted;
+		const at =
+			edge === 'start' ? Selection.atStart(view.state.doc) : Selection.atEnd(view.state.doc);
 		// Flagged, for the reason the leaf's own landing is (`field.ts`, `setCaret`): PM
 		// focuses with `preventScroll`, so an unflagged dispatch lands the caret where no
 		// scroller has moved to — a Tab past the right edge of the horizontal scroller a
 		// wide table lives in, or the row an Enter on the last one appends below the fold.
 		view.focus();
-		view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)).scrollIntoView());
+		view.dispatch(view.state.tr.setSelection(at).scrollIntoView());
+	}
+
+	/** The cell beside `(r, c)` in reading order, a row's end wrapping to the next row's
+	 *  start; past the first or last cell its row is outside the table. */
+	private reading(r: number, c: number, dir: 1 | -1): { r: number; c: number } {
+		const cols = columnCount(this.props());
+		const next = c + dir;
+		if (next >= cols) return { r: r + 1, c: 0 };
+		if (next < 0) return { r: r - 1, c: cols - 1 };
+		return { r, c: next };
 	}
 
 	/**
@@ -1582,17 +1601,31 @@ class TableIslandView implements NodeView {
 		if (cellSchema.marks.strong) marks['Mod-b'] = toggleMark(cellSchema.marks.strong);
 		if (cellSchema.marks.em) marks['Mod-i'] = toggleMark(cellSchema.marks.em);
 		if (cellSchema.marks.underline) marks['Mod-u'] = toggleMark(cellSchema.marks.underline);
-		// Up and down are the grid's own walk: nothing else moves the caret vertically,
-		// and `focusCell` clamps, so neither can grow the table. Left and right do not
-		// traverse at all: at a text edge they would call what Tab and Shift-Tab already
-		// call, and inherit the append-past-the-last-cell that makes Tab a growth
-		// affordance and would make a caret key one.
+		// The arrows are the grid's own walk, each leaving a cell only from the text's edge
+		// on its side. Up and down reach the cell above or below, `focusCell` clamping at
+		// the top and bottom. Left and right reach the neighbour in reading order, landing
+		// at the edge they entered by and stopping at the first and last cells. No arrow
+		// grows the table, growth being Tab's and Enter's: on a caret key it would make a
+		// walk a growth affordance.
+		const caretAtEdge = (view: EditorView | undefined, dir: 'up' | 'down' | 'left' | 'right') => {
+			const { selection } = view?.state ?? {};
+			return (
+				!!view && selection instanceof TextSelection && selection.empty && view.endOfTextblock(dir)
+			);
+		};
 		const walk = (dir: 'up' | 'down'): Command => {
 			return (_state, _dispatch, view) => {
-				const { selection } = view?.state ?? {};
-				if (!view || !(selection instanceof TextSelection) || !selection.empty) return false;
-				if (!view.endOfTextblock(dir)) return false;
+				if (!caretAtEdge(view, dir)) return false;
 				this.focusCell(dir === 'up' ? r - 1 : r + 1, c);
+				return true;
+			};
+		};
+		const cross = (dir: -1 | 1): Command => {
+			return (_state, _dispatch, view) => {
+				if (!caretAtEdge(view, dir < 0 ? 'left' : 'right')) return false;
+				const to = this.reading(r, c, dir);
+				if (to.r < 0 || to.r >= rowCount(this.props())) return false;
+				this.focusCell(to.r, to.c, dir < 0 ? 'end' : 'start');
 				return true;
 			};
 		};
@@ -1647,6 +1680,39 @@ class TableIslandView implements NodeView {
 				return true;
 			};
 		};
+		// Over a held column an alignment chord sets the column's, as its cluster does: a
+		// cell's own alignment outranks its column's, so laying the column's cells would
+		// leave overrides behind that no column change reaches. Anywhere else it lays the
+		// held cells, or the caret's.
+		const chord = (to: Aligned): Command => {
+			return () => {
+				const on = this.lineOn('column');
+				if (on !== undefined) this.align(on, to);
+				else this.layCells('align', to, { r, c });
+				return true;
+			};
+		};
+		// Select-all grows a rung a press: the cell's text, which the base keymap's
+		// `selectAll` takes, then the caret's row, then every cell, then the document. Any
+		// held rectangle short of every cell grows to every cell.
+		const grow: Command = (state) => {
+			const props = this.props();
+			const every = { r0: 0, c0: 0, r1: rowCount(props) - 1, c1: columnCount(props) - 1 };
+			const held = this.selected;
+			if (held && sameCells(held, every)) {
+				this.clearSelection();
+				this.outer.focus();
+				return selectAll(this.outer.state, this.outer.dispatch);
+			}
+			if (held) this.select(every);
+			else {
+				const { from, to } = state.selection;
+				if (from > Selection.atStart(state.doc).from || to < Selection.atEnd(state.doc).to)
+					return false;
+				this.selectLine({ axis: 'row', index: r });
+			}
+			return true;
+		};
 		return {
 			...marks,
 			...breakKeymap(cellSchema),
@@ -1659,17 +1725,18 @@ class TableIslandView implements NodeView {
 			Delete: erase,
 			ArrowUp: chainCommands(line('row', -1, false), walk('up')),
 			ArrowDown: chainCommands(line('row', 1, false), walk('down')),
-			ArrowLeft: line('column', -1, false),
-			ArrowRight: line('column', 1, false),
+			ArrowLeft: chainCommands(line('column', -1, false), cross(-1)),
+			ArrowRight: chainCommands(line('column', 1, false), cross(1)),
 			'Alt-ArrowUp': line('row', -1, true),
 			'Alt-ArrowDown': line('row', 1, true),
 			'Alt-ArrowLeft': line('column', -1, true),
 			'Alt-ArrowRight': line('column', 1, true),
 			'Shift-ArrowLeft': slide(-1),
 			'Shift-ArrowRight': slide(1),
-			'Shift-Mod-l': () => (this.layCells('align', 'left', { r, c }), true),
-			'Shift-Mod-e': () => (this.layCells('align', 'center', { r, c }), true),
-			'Shift-Mod-r': () => (this.layCells('align', 'right', { r, c }), true),
+			'Shift-Mod-l': chord('left'),
+			'Shift-Mod-e': chord('center'),
+			'Shift-Mod-r': chord('right'),
+			'Mod-a': grow,
 			Tab: () => this.step(r, c, 1),
 			'Shift-Tab': () => this.step(r, c, -1),
 			Enter: () => {
@@ -1679,9 +1746,14 @@ class TableIslandView implements NodeView {
 					this.clearSelection();
 					return true;
 				}
+				// Past the last row it appends one, and on an empty trailing row it refuses the
+				// row on offer, as Tab's decline does and an empty item's Enter leaves a list:
+				// the row goes and the caret lands past the table. Row 1 is never the one
+				// refused, so the table keeps a row under its first.
 				const props = this.props();
-				if (r === rowCount(props) - 1) this.write(insertRow(props, r), { r: r + 1, c });
-				else this.focusCell(r + 1, c);
+				if (r < rowCount(props) - 1) this.focusCell(r + 1, c);
+				else if (r > 1 && rowEmpty(props, r) && this.leave(1)) this.write(deleteRow(props, r));
+				else this.write(insertRow(props, r), { r: r + 1, c });
 				return true;
 			},
 			// Escape climbs a rung a press: the caret's own row, then the island. The row
@@ -1712,22 +1784,12 @@ class TableIslandView implements NodeView {
 	 */
 	private step(r: number, c: number, dir: 1 | -1): boolean {
 		const props = this.props();
-		const cols = columnCount(props);
-		const rows = rowCount(props);
-		let nr = r;
-		let nc = c + dir;
-		if (nc >= cols) {
-			nr = r + 1;
-			nc = 0;
-		} else if (nc < 0) {
-			nr = r - 1;
-			nc = cols - 1;
-		}
-		if (nr < 0) return false;
-		if (nr >= rows) {
+		const to = this.reading(r, c, dir);
+		if (to.r < 0) return false;
+		if (to.r >= rowCount(props)) {
 			if (rowEmpty(props, r)) return false;
-			this.write(insertRow(props, r), { r: nr, c: 0 });
-		} else this.focusCell(nr, nc);
+			this.write(insertRow(props, r), to);
+		} else this.focusCell(to.r, to.c);
 		return true;
 	}
 }
