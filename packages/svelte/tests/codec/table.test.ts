@@ -960,6 +960,17 @@ describe('a delete against a table steps into it', () => {
 		expect(outerView(field).state.doc.childCount).toBe(3);
 		expect(caret(field)).toBe(cellViews(field).at(-1));
 	});
+	it('a placeholder island answers as an atom: Backspace below it selects it', () => {
+		const doc = quill().seedDocument();
+		const rt = md(TABLE_MD);
+		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS };
+		doc.overwrite({}, rt);
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		press(caretIn(field, 'tail', 0), 'Backspace');
+		const { selection } = outerView(field).state;
+		expect(selection instanceof NodeSelection && selection.node.type.name).toBe('island_block');
+		field.destroy();
+	});
 });
 
 const UNALIGNED = normalizeTable({ ...LETTERED, aligns: ['none', 'none'] });

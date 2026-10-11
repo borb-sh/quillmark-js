@@ -417,8 +417,9 @@ interface Resize {
 	engaged: boolean;
 }
 
-/** Each mounted island by its `dom`, which is what the outer view hands back for a
- *  position: how a key in the field reaches into a table ({@link enterTable}). */
+/** Each mounted island drawing a table, by its `dom`, which is what the outer view hands
+ *  back for a position: how a key in the field reaches into a table ({@link tableAt}). A
+ *  placeholder is absent, so it answers as the atom it draws. */
 const mounted = new WeakMap<Node, TableIslandView>();
 
 class TableIslandView implements NodeView {
@@ -465,7 +466,6 @@ class TableIslandView implements NodeView {
 		this.dom = el('div', 'qm-island qm-table-island');
 		this.dom.setAttribute('data-qm-island', node.attrs.islandType as string);
 		this.dom.setAttribute('data-qm-island-id', node.attrs.id as string);
-		mounted.set(this.dom, this);
 		this.dom.addEventListener('mousedown', this.onPointerDown);
 		this.dom.addEventListener('mouseover', this.onHover);
 		this.dom.addEventListener('mouseleave', this.onLeave);
@@ -1314,6 +1314,8 @@ class TableIslandView implements NodeView {
 		this.dom.textContent = '';
 		const props = tablePropsOfNode(this.node);
 		this.rendered = props;
+		if (props) mounted.set(this.dom, this);
+		else mounted.delete(this.dom);
 		if (!props) {
 			// Any other island type: the literal placeholder `toDOM` draws (islands.ts).
 			this.dom.appendChild(document.createTextNode(`[${this.node.attrs.islandType || 'island'}]`));

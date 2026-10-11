@@ -93,7 +93,7 @@ function paragraphAboveList(itemType: NodeType, paragraph: NodeType): Command {
  * ({@link joinOntoList}).
  *
  * Lifting a later item out splits its list, and an ordered list's items past the cut
- * keep their numbers: the list after the paragraph starts where they were, where a
+ * keep their numbers: the list after what the item held starts where they were, where a
  * fresh `ordered_list` would count from 1 again.
  */
 function liftAtItemStart(itemType: NodeType): Command {
@@ -101,26 +101,31 @@ function liftAtItemStart(itemType: NodeType): Command {
 		const at = atItemStart(state, itemType);
 		if (!at) return false;
 		const list = state.doc.nodeAt(at.listPos);
-		const start = list?.type.name === 'ordered_list' ? (list.attrs.start as number) : undefined;
+		const cut =
+			list?.type.name === 'ordered_list' && !at.nested && at.itemIndex < list.childCount - 1;
+		const listEnd = at.listPos + (list?.nodeSize ?? 0);
 		return liftListItem(itemType)(
 			state,
 			dispatch &&
 				((tr) => {
-					if (start !== undefined && !at.nested) renumberAfter(tr, start + at.itemIndex + 1);
+					if (cut)
+						renumberEndingAt(
+							tr,
+							tr.mapping.map(listEnd, -1),
+							(list.attrs.start as number) + at.itemIndex + 1
+						);
 					dispatch(tr);
 				})
 		);
 	};
 }
 
-/** Start the ordered list right after the caret's block at `start`: the items a lift cut
- *  off below the paragraph it left. */
-function renumberAfter(tr: Transaction, start: number): void {
-	const $at = tr.selection.$from;
-	const after = $at.after();
-	const next = tr.doc.nodeAt(after);
-	if (next?.type.name === 'ordered_list' && next.attrs.start !== start)
-		tr.setNodeMarkup(after, undefined, { ...next.attrs, start });
+/** Start the ordered list ending at `end` at `start`: the items a lift cut off, which
+ *  end where the whole list did, past whatever the lifted item held. */
+function renumberEndingAt(tr: Transaction, end: number, start: number): void {
+	const list = tr.doc.resolve(end).nodeBefore;
+	if (list?.type.name === 'ordered_list' && list.attrs.start !== start)
+		tr.setNodeMarkup(end - list.nodeSize, undefined, { ...list.attrs, start });
 }
 
 /**
@@ -173,7 +178,8 @@ function inItem($pos: ResolvedPos, itemType: NodeType): boolean {
  * pressed: a lift moves the item below, and Delete does not follow it.
  *
  * An empty item is the exception: its line is the whole of what Delete edits, so the
- * item below moves up into it rather than being lifted, and the empty item is spent.
+ * item below moves up into it rather than being lifted, and the empty item is spent. A
+ * fence below takes no prose line (`joinOntoList`), so there the empty line goes alone.
  *
  * Declining wherever the chain does is what keeps this to the list's own seams: a
  * boundary inside one item, and the list's outer edge, stay the base keymap's, where
@@ -186,7 +192,15 @@ function backspaceBelow(itemType: NodeType, press: Command): Command {
 		if (!inItem($from, itemType)) return false;
 		const below = Selection.near(state.doc.resolve($from.after()), 1);
 		if (below.from <= $from.pos) return false;
-		if ($from.parent.content.size === 0) return joinTextblockForward(state, dispatch);
+		if ($from.parent.content.size === 0) {
+			if (!!below.$from.parent.type.spec.code === !!$from.parent.type.spec.code)
+				return joinTextblockForward(state, dispatch);
+			if (dispatch) {
+				const tr = state.tr.deleteRange($from.before(), $from.after());
+				dispatch(tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(below.from)), 1)));
+			}
+			return true;
+		}
 		const pressed = $from.pos;
 		const keepCaret = (tr: Transaction): void =>
 			dispatch?.(tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(pressed))));

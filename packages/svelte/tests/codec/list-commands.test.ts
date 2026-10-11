@@ -194,6 +194,16 @@ describe('Backspace', () => {
 		expect(next.doc.child(2).attrs.start).toBe(5);
 	});
 
+	it('the items past a lifted one keep their numbers past a list it held', () => {
+		for (const nested of ['1. x\n    2. y', '- x\n    - y']) {
+			const next = press(startOf(`1. a\n2. b\n    ${nested}\n3. c`, 1), 'Backspace');
+			expect(next.doc.child(1).textContent).toBe('b');
+			expect(next.doc.child(2).attrs.start ?? 1, nested).toBe(1);
+			expect(next.doc.child(3).type.name).toBe('ordered_list');
+			expect(next.doc.child(3).attrs.start, nested).toBe(3);
+		}
+	});
+
 	it('a nested later item lifts one level', () => {
 		expectPress(
 			startOf('- a\n    - b\n    - c', 2),
@@ -268,6 +278,16 @@ describe('Delete is Backspace at the seam below', () => {
 			'Delete',
 			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("c"))))'
 		);
+	});
+
+	it('spends an empty item above a fence and leaves the fence a fence', () => {
+		const fence = n.code_block.create(null, blockSchema.text('code'));
+		const next = expectPress(
+			atBlockEnd(docOf(ul(li(p('a')), li(p()), li(fence))), 1),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("a")), list_item(code_block("code"))))'
+		);
+		expect(next.selection.$from.parent.type.name).toBe('code_block');
 	});
 
 	it('leaves the caret where the key was pressed, merging and lifting alike', () => {
