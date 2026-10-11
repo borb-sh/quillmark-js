@@ -82,7 +82,7 @@
 	}
 	let { getActiveLeaf }: Props = $props();
 
-	const SETTLE_MS = 300;
+	const SETTLE_MS = 450;
 	/** The six content formatting marks. `anchor` is a seventh, drawn separately below:
 	 *  a decoration toggle rather than a PM `toggleMark`. One string per mark carries both
 	 *  the tooltip and the accessible name; the anchor button spells the two separately. */

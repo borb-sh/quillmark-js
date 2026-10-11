@@ -29,6 +29,14 @@ li.ProseMirror-selectednode::after {
 	border: var(--_qm-ring);
 	left: calc(var(--_qm-space-4) * -1);
 }
+/* A node selection is drawn while its leaf holds the focus, as a text selection is: a
+   ring left behind on a field the focus has moved off names a subject no key reaches. */
+.ProseMirror:not(:focus-within) .ProseMirror-selectednode {
+	outline: none;
+}
+.ProseMirror:not(:focus-within) li.ProseMirror-selectednode::after {
+	border: none;
+}
 
 /* The gap cursor (`prosemirror-gapcursor`, imported beside this file): a caret
    between two blocks, where the document holds no text position for an ordinary one.
@@ -226,7 +234,8 @@ li.ProseMirror-selectednode::after {
 /* The slash menu's hint (`slash.ts`, `slashHint`), drawn as the ghost is, on the one
    empty line the caret holds. Only while the leaf has the focus: the decoration follows
    the selection, which an unfocused leaf keeps. Upright, being chrome about the key
-   rather than an invitation in the document's voice. */
+   rather than an invitation in the document's voice, and never over a ghost, which is
+   the leaf's own word for the same empty line. */
 .ProseMirror-focused .qm-slash-hint:not(.qm-prose-placeholder)[data-slash-hint]::after {
 	content: attr(data-slash-hint);
 	display: block;
@@ -236,13 +245,6 @@ li.ProseMirror-selectednode::after {
 	text-overflow: ellipsis;
 	color: var(--_qm-ink-label);
 	pointer-events: none;
-}
-
-/* The ghost and the hint on one line, the empty leaf's: the ghost, then the hint, in the
-   ghost's voice, one pseudo-element drawing the two. So a focused empty body names the
-   key, and an idle one shows its ghost alone. */
-.ProseMirror-focused .qm-prose-placeholder.qm-slash-hint[data-placeholder][data-slash-hint]::after {
-	content: attr(data-placeholder) '\2003' attr(data-slash-hint);
 }
 
 /* ── The table island ────────────────────────────────────────────────────────

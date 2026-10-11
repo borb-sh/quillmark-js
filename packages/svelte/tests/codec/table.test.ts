@@ -623,6 +623,18 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
+	it('a cell taking the caret back retires the island', () => {
+		const { field } = tableLeaf(LETTERED);
+		const views = cellViews(field);
+		views[3].focus();
+		press(caret(field), 'Escape');
+		press(caret(field), 'Escape');
+		expect(outerView(field).state.selection instanceof NodeSelection).toBe(true);
+		views[1].focus();
+		expect(outerView(field).state.selection instanceof NodeSelection).toBe(false);
+		field.destroy();
+	});
+
 	it('a cell edit retires the rectangle: typing is the caret’s', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[1].click();

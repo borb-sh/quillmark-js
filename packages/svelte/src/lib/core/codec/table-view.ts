@@ -789,17 +789,23 @@ class TableIslandView implements NodeView {
 		// One subject at a time: a cell selection retires an island one, or the surface
 		// paints a washed row inside an outlined table and the next Backspace has two
 		// honest readings.
-		const pos = this.getPos();
-		const outer = this.outer.state.selection;
-		if (pos != null && outer instanceof NodeSelection && outer.from === pos) {
-			const $at = this.outer.state.doc.resolve(pos);
-			const beside =
-				this.outer.someProp('createSelectionBetween', (f) => f(this.outer, $at, $at)) ??
-				Selection.findFrom($at, -1, true);
-			if (beside) this.outer.dispatch(this.outer.state.tr.setSelection(beside));
-		}
+		this.retireIsland();
 		this.selected = cells;
 		this.paintSelection();
+	}
+
+	/** Move the outer selection off this island when it holds it: a caret or a rectangle
+	 *  inside the grid is the subject from then on, and an outline left on the table says
+	 *  the next Backspace deletes it. */
+	private retireIsland(): void {
+		const pos = this.getPos();
+		const outer = this.outer.state.selection;
+		if (pos == null || !(outer instanceof NodeSelection) || outer.from !== pos) return;
+		const $at = this.outer.state.doc.resolve(pos);
+		const beside =
+			this.outer.someProp('createSelectionBetween', (f) => f(this.outer, $at, $at)) ??
+			Selection.findFrom($at, -1, true);
+		if (beside) this.outer.dispatch(this.outer.state.tr.setSelection(beside));
 	}
 
 	private clearSelection(): void {
@@ -1519,6 +1525,7 @@ class TableIslandView implements NodeView {
 			handleDOMEvents: {
 				focus: () => {
 					this.clearSelection();
+					this.retireIsland();
 					this.deps.onCellFocus();
 					return false;
 				}

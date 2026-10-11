@@ -12,13 +12,13 @@
 
 **Typing over a selected table writes into the empty paragraph after it**, where it opened a new paragraph above that one. An empty heading or code block after the table is left as it is.
 
+**A selected table's outline goes when the selection does.** A cell taking the caret back, by a click or by Tab, moves the selection off the table, where the outline stayed up around the cell being typed in. A node selection is drawn only while its field holds the focus, so moving to another field leaves no outline behind.
+
 **A paste from Google Docs keeps its bold, italic, underline and strike.** Docs writes each run as a span styled inline and wraps the whole copy in a `<b>` stating a regular weight, so a paste arrived entirely bold with the runs' own formatting dropped. A `<span>`'s `font-weight`, `font-style` and `text-decoration` read as the marks they spell, and a `<b>` stating a regular weight is no bold. An underline inside a link is the link's own, and the same style on a cell or a heading is that block's face rather than a mark, so a table pasted from Docs keeps its header's bold and a Sheets header stays plain.
 
 **Backspace right after a markdown shorthand takes it back.** Backspace on the press right after a shorthand fires (`# `, `- `, `1. `, `> `, a fence, `---` or a mark's closing delimiter) leaves the text it consumed, where it joined the line upward or did nothing. It holds in a table cell and a `richtext(inline)` field too. A slash pick keeps its result.
 
 **A URL pasted over selected text links the text.** Where the clipboard's text is one URL naming `https:`, `http:`, `mailto:`, `tel:` or `ftp:` and the selection lies within one block, the words stay and take the link, in any field that takes links and in a table cell, where the URL replaced them. Text around the URL, any other scheme, and a selection crossing blocks or inside a code block paste as before.
-
-**An empty body names the slash key while it holds the caret.** A focused empty field draws its placeholder, then `Type / to insert`, where the placeholder stood alone; unfocused it shows the placeholder alone.
 
 **A slash pick or a block shorthand scrolls its caret into view.** A heading, list, quote, fence or divider opened at the pane's bottom edge brings the caret up past the fold, as typing does.
 
@@ -32,7 +32,7 @@
 
 **The enum list's unset row is tagged `Default` or `Unset`.** `Default` where the row ghosts a member the render prints, `Unset` where it ghosts none. `VisualStrings` gains `enumUnsetTagNone`, the second word, so a whole `VisualStrings` literal fails to type-check without it, and `enumUnsetTag` reads `Default`, capitalized.
 
-**The format popover waits for a keyboard selection to stop.** A selection made without a press raises it once the selection has stood still for 300ms, so a Shift-arrow run or a select-all raises nothing on its way; a pointer's release still raises it at once, and an emptied selection lowers it at once.
+**The format popover waits for a keyboard selection to stop.** A selection made without a press raises it once the selection has stood still for 450ms, so a Shift-arrow run or a select-all raises nothing on its way; a pointer's release still raises it at once, and an emptied selection lowers it at once.
 
 **Glyphs and popover gaps follow the theme.** The guidance glyph, the enum chevron, the format popover's marks and the tips card's foot glyph draw at the chrome glyph size, 14px, where the guidance glyph drew at 13px and the format marks at 15px. The format popover, the enum list and the add-card menu stand off their anchors by a multiple of `--qm-space`, at the same gaps under the default dial.
 

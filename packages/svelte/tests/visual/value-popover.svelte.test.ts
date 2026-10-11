@@ -321,7 +321,7 @@ describe('the formatting popover over a field’s own leaf', () => {
 			expect(await surface()).toBeNull();
 			select(intro, 0, 4, false);
 			await surface();
-			vi.advanceTimersByTime(299);
+			vi.advanceTimersByTime(449);
 			expect(await surface()).toBeNull();
 			vi.advanceTimersByTime(1);
 			expect(await surface()).not.toBeNull();
