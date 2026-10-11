@@ -36,6 +36,16 @@
 
 **Glyphs and popover gaps follow the theme.** The guidance glyph, the enum chevron, the format popover's marks and the tips card's foot glyph draw at the chrome glyph size, 14px, where the guidance glyph drew at 13px and the format marks at 15px. The format popover, the enum list and the add-card menu stand off their anchors by a multiple of `--qm-space`, at the same gaps under the default dial.
 
+**A card the add strip makes takes the focus.** It lands at the new card's first field, else its body, else its title, once the scroll that centres the card has run, and a pick off the kind menu hands no focus back to its trigger. `insertCard` moves no focus, so a host inserting a card keeps the focus where it has it.
+
+**A card's delete rests hidden with its move arrows, and a delete hands the focus on.** The header's controls show together while the pointer or the focus is in the card, and delete stays in the Tab order. A delete from the keyboard, or one a host makes while the card holds the focus, moves the focus to the title of the card before, else the card after, else the add strip; a pointer's delete leaves it where the press put it.
+
+**Renaming a card writes once, on blur or Enter.** The title is one `onChange` and one `$ext.editor.title` write per rename, where each keystroke was one, and Escape restores the title without writing.
+
+**A card fades in and out of the stack while the cards past it slide.** An insert or a removal, from the chrome or a host's verb, moves the cards below it over the motion rung that a reorder takes, and the reduced-motion setting collapses it.
+
+**The add strip between two cards shows a plus while it shows, and hides at the fast rung.** The glyph is sized off the strip's height, so a turned-down `--qm-space` shrinks it with the strip.
+
 ## v0.20.1 - 2026-10-10
 
 **ProseMirror is pinned at `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.** The other pins move with it: `prosemirror-model` 1.25.12, `prosemirror-transform` 1.12.2, `prosemirror-commands` 1.7.2, `prosemirror-history` 1.5.1 and `prosemirror-gapcursor` 1.4.1. A consumer overriding `prosemirror-view` to reach the fix can drop the override.

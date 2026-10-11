@@ -6,6 +6,7 @@
 // by its `heading`, `figure` declares one.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
+import type { Document } from '@quillmark/wasm';
 import { fieldValues, humanize } from '$lib/visual/structure';
 import {
 	activeView,
@@ -65,11 +66,79 @@ describe('the card header', () => {
 		const mounted = mountEditor(q, example());
 		const section = cards(mounted.target)[0];
 		const title = header(section);
-		title.value = 'Renamed';
-		title.dispatchEvent(new Event('input', { bubbles: true }));
+		rename(title, 'Renamed');
+		title.blur();
 		flushSync();
 		type(field(section, 'Heading').querySelector('input')!, 'Methods');
 		expect(title.value).toBe('Renamed');
+	});
+});
+
+/** Type `value` into a focused title a keystroke at a time, as the input events land. */
+function rename(title: HTMLInputElement, value: string): void {
+	title.focus();
+	for (let n = 1; n <= value.length; n++) {
+		title.value = value.slice(0, n);
+		title.dispatchEvent(new Event('input', { bubbles: true }));
+	}
+	flushSync();
+}
+const stored = (doc: Document, at: number) =>
+	(doc.card(at).ext?.editor as { title?: string } | undefined)?.title;
+
+// The rename is one edit to the document, not one per keystroke: a host autosaving on a
+// structure change saves once.
+describe('a card rename', () => {
+	it('writes once, on blur', () => {
+		const q = quill();
+		const doc = example();
+		const { target, changes } = mountEditor(q, doc);
+		const title = header(cards(target)[0]);
+
+		rename(title, 'Methods');
+		expect(changes).toHaveLength(0);
+		expect(stored(doc, 0)).toBeUndefined();
+
+		title.blur();
+		flushSync();
+		expect(changes).toEqual([{ source: 'structure', cardId: 'c0', path: 'cards.section[0]' }]);
+		expect(stored(doc, 0)).toBe('Methods');
+	});
+
+	it('writes on Enter, and Escape restores the title without writing', () => {
+		const q = quill();
+		const doc = example();
+		const { target, changes } = mountEditor(q, doc);
+		const title = header(cards(target)[0]);
+
+		rename(title, 'Methods');
+		press(title, 'Enter');
+		expect(stored(doc, 0)).toBe('Methods');
+		expect(changes).toHaveLength(1);
+
+		rename(title, 'Results');
+		press(title, 'Escape');
+		expect(document.activeElement).not.toBe(title);
+		expect(title.value).toBe('Methods');
+		expect(stored(doc, 0)).toBe('Methods');
+		expect(changes).toHaveLength(1);
+	});
+
+	it('holds the edit across a change elsewhere, which re-derives the card', () => {
+		const q = quill();
+		const doc = example();
+		const { target, changes } = mountEditor(q, doc);
+		const section = cards(target)[0];
+		const title = header(section);
+
+		rename(title, 'Draft');
+		type(field(section, 'Heading').querySelector('input')!, 'Methods');
+		expect(changes.map((c) => c.source)).toEqual(['field']);
+		expect(title.value).toBe('Draft');
+
+		title.blur();
+		flushSync();
+		expect(stored(doc, 0)).toBe('Draft');
 	});
 });
 
