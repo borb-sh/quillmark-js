@@ -326,3 +326,31 @@ describe('outside a code block the links decline', () => {
 		);
 	});
 });
+
+describe('↓ on a final fence’s last line opens a line below it', () => {
+	const FINAL = 'head\n\n```\na\nb\n```';
+
+	it('a paragraph after the fence, the caret in it', () => {
+		const next = expectPress(
+			endOf(FINAL, 1),
+			'ArrowDown',
+			'doc(paragraph("head"), code_block("a\\nb"), paragraph)'
+		);
+		expect(next.selection.$from.parent.type.name).toBe('paragraph');
+		expect(next.selection.$from.index(0)).toBe(2);
+	});
+
+	it('from anywhere on that last line', () => {
+		const state = startOf(FINAL, 1);
+		const lastLine = EditorState.create({
+			doc: state.doc,
+			selection: TextSelection.create(state.doc, state.selection.from + 2)
+		});
+		expectPress(lastLine, 'ArrowDown', 'doc(paragraph("head"), code_block("a\\nb"), paragraph)');
+	});
+
+	it('declines above the last line, and where a block follows', () => {
+		expect(press(startOf(FINAL, 1), 'ArrowDown').doc.childCount).toBe(2);
+		expect(press(endOf(ABOVE, 0), 'ArrowDown').doc.childCount).toBe(2);
+	});
+});

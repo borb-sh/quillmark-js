@@ -12,6 +12,10 @@
 
 **Backspace edits only its own block.** At a heading's start it turns the heading into a paragraph, where it joined the heading's text onto the line above. At the start of any list item it lifts the item out of its list, a nested item one level, where an item after the first merged into the one above; the items after a lifted one keep their numbers, and the press after joins the line onto the list. Delete at the end of an item lifts the item below the same way. Beside a code block or a table, Backspace and Delete step the caret into it, where Backspace retyped a code block to a paragraph and selected a table; an empty line under either goes with the step.
 
+**A fence fires on Enter and keeps its language.** ` ``` ` stays the text it was typed as until Enter at the end of its line, so ` ```rust ` then Enter makes a code block carrying `rust`, where the fence fired on the third backtick and no language could be typed. Backspace right after takes it back. ↓ on the last line of a code block nothing follows opens a line below it.
+
+**"Type / to insert" fades in once the caret rests on an empty line**, where it drew at once, so typing on through Enter never flashes it.
+
 **`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table.
 
 **Typing over a selected table writes into the empty paragraph after it**, where it opened a new paragraph above that one. An empty heading or code block after the table is left as it is.

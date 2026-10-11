@@ -23,7 +23,7 @@
 // two of them, because a memo's typeset column is narrow. Outdent accepts both
 // forms regardless: imported content carries whatever its author wrote.
 import type { Node as PMNode, Schema } from 'prosemirror-model';
-import { TextSelection, type Command, type EditorState } from 'prosemirror-state';
+import { Selection, TextSelection, type Command, type EditorState } from 'prosemirror-state';
 import { newlineInCode } from 'prosemirror-commands';
 
 /** One indent level. */
@@ -178,6 +178,25 @@ function atProseEdge(side: -1 | 1): Command {
 	};
 }
 
+/** ↓ on the last line of a fence nothing follows → a paragraph after it, the caret
+ *  there: no block stands below to arrow to, and a gap cursor will not sit beside a
+ *  fence. */
+const belowFinalFence: Command = (state, dispatch) => {
+	const paragraph = state.schema.nodes.paragraph;
+	const { $from, empty } = state.selection;
+	if (!paragraph || !empty || !$from.parent.type.spec.code) return false;
+	if ($from.parent.textBetween($from.parentOffset, $from.parent.content.size).includes('\n'))
+		return false;
+	const $after = state.doc.resolve($from.after());
+	if (Selection.findFrom($after, 1)) return false;
+	if (!$after.parent.canReplaceWith($after.index(), $after.index(), paragraph)) return false;
+	if (dispatch) {
+		const tr = state.tr.insert($after.pos, paragraph.create());
+		dispatch(tr.setSelection(TextSelection.create(tr.doc, $after.pos + 1)).scrollIntoView());
+	}
+	return true;
+};
+
 /**
  * The `code_block` link of the body's key chains: `{}` for the inline/plaintext
  * schemas, which declare no code node.
@@ -187,9 +206,9 @@ function atProseEdge(side: -1 | 1): Command {
  * otherwise splits the item in two, each half holding a code block. `Shift-Enter` is
  * the same command because it is the same edit: the line break the key means
  * everywhere else (`breaks.ts`) is, inside a fence, the newline Enter already takes.
- * Every command here declines away from a code block — inside one for the four keys
- * about its text, against one for the two about its edge — so the list links keep the
- * keys elsewhere.
+ * Every command here declines away from a code block — inside one for the keys about
+ * its text and its last line, against one for the two about its edge — so the list
+ * links keep the keys elsewhere.
  */
 export function codeKeymap(schema: Schema): Record<string, Command> {
 	if (!schema.nodes.code_block) return {};
@@ -199,6 +218,7 @@ export function codeKeymap(schema: Schema): Record<string, Command> {
 		Enter: newlineInCode,
 		'Shift-Enter': newlineInCode,
 		Backspace: atProseEdge(-1),
-		Delete: atProseEdge(1)
+		Delete: atProseEdge(1),
+		ArrowDown: belowFinalFence
 	};
 }

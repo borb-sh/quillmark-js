@@ -112,16 +112,16 @@ export function toHeading(level: number): Command {
 	return retype('heading', { level });
 }
 
-/** A fence. The exit paragraph after it is the one a block island mints for the same
- *  reason, sharpened: a code block is the one block a gap cursor will not sit beside
- *  either, so a fence at the end of a body leaves the caret nowhere to go. The caret
- *  stays in the fence, not in the exit it minted. */
-export function toCodeBlock(): Command {
+/** A fence, carrying `attrs` (its `lang`). The exit paragraph after it is the one a
+ *  block island mints for the same reason, sharpened: a code block is the one block a
+ *  gap cursor will not sit beside either, so a fence at the end of a body leaves the
+ *  caret nowhere to go. The caret stays in the fence, not in the exit it minted. */
+export function toCodeBlock(attrs?: Attrs): Command {
 	return (state, dispatch) => {
 		const { code_block: code, paragraph } = state.schema.nodes;
 		const { $from } = state.selection;
 		if (!code || !paragraph || !atHead(state) || !fits($from, code)) return false;
-		const tr = state.tr.setBlockType($from.pos, $from.pos, code);
+		const tr = state.tr.setBlockType($from.pos, $from.pos, code, attrs);
 		const at = tr.doc.resolve($from.pos).after();
 		if (!tr.doc.nodeAt(at)) tr.insert(at, paragraph.create());
 		dispatch?.(tr);

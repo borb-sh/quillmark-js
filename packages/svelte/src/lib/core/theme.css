@@ -289,6 +289,10 @@
 	   arrival settles into its rest instead of stopping at it, and long enough that a
 	   control resting at nothing reads as arriving rather than as switching. */
 	--_qm-reveal: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+	/* A wait rather than a trip: how long a caret rests on an empty line before the
+	   slash hint comes up. Longer than the gap between two keystrokes, so typing on
+	   through an Enter never draws it. */
+	--_qm-hint-wait: 500ms;
 
 	/* ── Geometry ──────────────────────────────────────────────────────────*/
 	/* One stroke width for every edge the chrome draws and every rule it ranks

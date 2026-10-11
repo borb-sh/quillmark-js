@@ -103,11 +103,10 @@ const marks: Record<string, MarkSpec> = {
 };
 
 // ── The fence's language ────────────────────────────────────────────────────
-// The one attribute no keystroke in the visual editor mints: the shorthand fires on
-// the third backtick, before a language could be typed, and a slash command is a name
-// (VISUAL_EDITOR §"Settled and open"). A paste is the gesture that does, and this is
-// what reads it — a fence copied off a highlighted page arrives carrying the language
-// that page stated, one copied inside the body keeps its own.
+// Minted by the fence shorthand, which fires on Enter with the language typed after the
+// backticks (`inputrules.ts`), and by a paste, which this reads: a fence copied off a
+// highlighted page arrives carrying the language that page stated, one copied inside
+// the body keeps its own.
 
 /** A `language-x` / `lang-x` token in a class list. */
 const LANG_CLASS = /(?:^|\s)lang(?:uage)?-(\S+)/;

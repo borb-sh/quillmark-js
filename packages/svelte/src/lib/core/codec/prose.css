@@ -235,9 +235,12 @@ li.ProseMirror-selectednode::after {
    empty line the caret holds. Only while the leaf has the focus: the decoration follows
    the selection, which an unfocused leaf keeps. Upright, being chrome about the key
    rather than an invitation in the document's voice, and never over a ghost, which is
-   the leaf's own word for the same empty line. */
+   the leaf's own word for the same empty line. It comes up once the caret has rested
+   there, a new empty line starting the wait over. */
 .ProseMirror-focused .qm-slash-hint:not(.qm-prose-placeholder)[data-slash-hint]::after {
 	content: attr(data-slash-hint);
+	animation: qm-slash-hint-in var(--_qm-reveal) both;
+	animation-delay: var(--_qm-hint-wait);
 	display: block;
 	margin-top: -1lh;
 	white-space: nowrap;
@@ -245,6 +248,12 @@ li.ProseMirror-selectednode::after {
 	text-overflow: ellipsis;
 	color: var(--_qm-ink-label);
 	pointer-events: none;
+}
+
+@keyframes qm-slash-hint-in {
+	from {
+		opacity: 0;
+	}
 }
 
 /* ── The table island ────────────────────────────────────────────────────────
