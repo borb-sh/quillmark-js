@@ -5,10 +5,17 @@
 // (the inputrules plugin's entry), falling back to a plain insert when no rule claims
 // the char.
 import { describe, it, expect } from 'vitest';
-import { EditorState, TextSelection } from 'prosemirror-state';
+import { EditorState, TextSelection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { blockSchema, inputRulesPlugin } from '$lib/core/codec';
-import { representable } from './_util.js';
+import {
+	blockSchema,
+	createField,
+	inlineSchema,
+	inputRulesPlugin,
+	proseLeafPlugins
+} from '$lib/core/codec';
+import type { FieldController, LeafViews } from '$lib/core/codec';
+import { md, mount, press, quill, representable } from './_util.js';
 
 function mountView(): EditorView {
 	const state = EditorState.create({
@@ -251,6 +258,75 @@ describe('the `---` divider shorthand', () => {
 			'doc(bullet_list(list_item(horizontal_rule, paragraph)))'
 		);
 		expect(representable(view.state)).toBe(true);
+		view.destroy();
+	});
+});
+
+// The press right after a rule fired is where a writer says the shorthand guessed wrong,
+// so Backspace there leaves the text it consumed. Driven through a leaf's whole stack,
+// where the body's own Backspace chain would otherwise answer first.
+describe('Backspace right after a shorthand takes it back', () => {
+	function leafView(schema = blockSchema, inline = false): EditorView {
+		const state = EditorState.create({
+			doc: schema.nodes.doc.create(null, schema.nodes.paragraph.create()),
+			plugins: proseLeafPlugins(schema, { inline })
+		});
+		return new EditorView(document.createElement('div'), { state });
+	}
+
+	it.each(['# ', '- ', '1. ', '> ', '```', '---', 'a **b**', 'a ~~b~~'])('%s', (typed) => {
+		const view = leafView();
+		type(view, typed);
+		expect(view.state.doc.toString()).not.toBe(`doc(paragraph("${typed}"))`);
+		press(view, 'Backspace');
+		expect(view.state.doc.toString()).toBe(`doc(paragraph("${typed}"))`);
+		view.destroy();
+	});
+
+	it('only on that press: a keystroke between keeps the shorthand', () => {
+		const view = leafView();
+		type(view, '# x');
+		// The browser's own deletion of the `x`, which no keymap claims.
+		view.dispatch(view.state.tr.delete(1, 2));
+		press(view, 'Backspace');
+		expect(view.state.doc.toString()).toBe('doc(heading)');
+		view.destroy();
+	});
+
+	it("an inline leaf's mark rule", () => {
+		const view = leafView(inlineSchema, true);
+		type(view, '*em*');
+		press(view, 'Backspace');
+		expect(view.state.doc.toString()).toBe('doc(paragraph("*em*"))');
+		view.destroy();
+	});
+
+	it("a table cell's mark rule", () => {
+		const doc = quill().seedDocument();
+		doc.overwrite({}, md('| a | b |\n|---|---|\n| 1 | 2 |'));
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const cell = (field as FieldController & LeafViews).nestedViews()[2]!;
+		cell.dispatch(cell.state.tr.setSelection(TextSelection.atEnd(cell.state.doc)));
+		type(cell, ' **b**');
+		press(cell, 'Backspace');
+		expect(cell.state.doc.toString()).toBe('doc(paragraph("1 **b**"))');
+		field.destroy();
+	});
+});
+
+// The caret a block shorthand places is scrolled to, as a pick's is (`slash.test.ts`).
+describe('a block shorthand scrolls the caret it places into view', () => {
+	it.each(['# ', '- ', '1. ', '> ', '```', '---'])('%s', (typed) => {
+		const view = mountView();
+		type(view, typed.slice(0, -1));
+		const seen: Transaction[] = [];
+		const dispatch = view.dispatch;
+		view.dispatch = (tr) => {
+			seen.push(tr);
+			dispatch(tr);
+		};
+		type(view, typed.slice(-1));
+		expect(seen.map((tr) => tr.scrolledIntoView)).toEqual([true]);
 		view.destroy();
 	});
 });
