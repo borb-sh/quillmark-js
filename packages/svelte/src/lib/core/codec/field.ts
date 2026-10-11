@@ -44,10 +44,11 @@ import { lower, pmToContent, scanContent, scanDoc, contentEdit } from './encode.
 import { islandPastePlugin } from './islands.js';
 import { anchorsFromContent, type AnchorPos } from './marks.js';
 import { contentEqual, createReconciler, type Reconciler } from './reconcile.js';
-import { inputRulesPlugin } from './inputrules.js';
+import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
+import { linkPastePlugin } from './link-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
 import { tablePastePlugin } from './table-paste.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
@@ -698,15 +699,17 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * never fork the keymap/plugin ordering. History first, then any leaf-specific
  * plugins (`afterHistory`: the addressed leaf passes its anchor-position plugin;
  * a by-value leaf passes none), then {@link linebreakPlugin}, which normalizes what
- * the rest of the stack leaves, then the markdown-shorthand input rules, the field
- * keymap over the base keymap, and last the ones that answer to a block leaf's own
- * shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass (`islands.ts`),
- * the table paste (`table-paste.ts`) and the markdown paste (`markdown-paste.ts`).
+ * the rest of the stack leaves, then the markdown-shorthand input rules and the
+ * Backspace that takes one back, the field keymap over the base keymap, the URL paste
+ * that links a selection (`link-paste.ts`), and last the ones that answer to a block
+ * leaf's own shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass
+ * (`islands.ts`), the table paste (`table-paste.ts`) and the markdown paste
+ * (`markdown-paste.ts`).
  *
  * Every mark-shaped plugin reads the schema rather than a flag: over either plaintext
- * schema the shorthand rules build nothing (each is guarded on its mark type) and the
- * toggles bind no key, so a `**bold**` keeps the delimiters its author typed without
- * a second rule saying so.
+ * schema the shorthand rules build nothing (each is guarded on its mark type), the
+ * toggles bind no key and a pasted URL stays text, so a `**bold**` keeps the delimiters
+ * its author typed without a second rule saying so.
  */
 export function proseLeafPlugins(
 	schema: Schema,
@@ -729,9 +732,10 @@ export function proseLeafPlugins(
 ): Plugin[] {
 	const list: Plugin[] = [history(), ...(opts.afterHistory ?? []), linebreakPlugin(schema)];
 	if (opts.slash) list.push(slashPlugin(opts.slash, opts.slashHint));
-	if (!opts.noInputRules) list.push(inputRulesPlugin(schema));
+	if (!opts.noInputRules) list.push(inputRulesPlugin(schema), undoRuleKeymap());
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));
+	if (schema.marks.link) list.push(linkPastePlugin(schema.marks.link));
 	// Each answers to something only the block schema holds: any other leaf is
 	// textblocks alone, with no island and no gap to put a cursor in.
 	if (isBlockSchema(schema))

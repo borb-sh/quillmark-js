@@ -17,6 +17,7 @@ import { EditorView } from 'prosemirror-view';
 import { blockSchema as S, pmToContent, proseLeafPlugins } from '$lib/core/codec';
 import { tablePropsOfNode } from '$lib/core/codec/islands.js';
 import { freshDoc, mount } from './_util.js';
+import { GOOGLE_DOCS_PROSE } from './_clipboard.js';
 
 // The clipboard's own two halves, as PM registers them by default.
 function serialize(doc: PMNode): string {
@@ -140,6 +141,24 @@ describe('what a paste from outside the editor states', () => {
 	// The absence `toDOM` writes for the common case, which is not a zero.
 	it('an ordered list stating none starts at one', () => {
 		expect(parse('<ol><li>a</li></ol>').child(0).attrs.start).toBe(1);
+	});
+
+	// Docs spells every mark as a span's style, inside a `<b>` stating a regular weight.
+	it('a Google Docs copy keeps the marks each run states, a link underlining nothing', () => {
+		expect(parse(GOOGLE_DOCS_PROSE['text/html']).toString()).toBe(
+			'doc(paragraph("Plain, ", strong("bold"), ", ", em("italic"), ", ", strong(em("both")), ' +
+				'", ", underline("underlined"), " and ", strike("struck"), "."), ' +
+				'paragraph("See ", link("AFI 33-360"), "."))'
+		);
+	});
+
+	it("a block's own style is its face, no run's mark", () => {
+		expect(parse('<h2 style="font-weight:700"><span>x</span></h2>').toString()).toBe(
+			'doc(heading("x"))'
+		);
+		expect(parse('<p style="font-style:italic;text-decoration:underline">x</p>').toString()).toBe(
+			'doc(paragraph("x"))'
+		);
 	});
 
 	// The schema's own rules read no `<table>`: the island a paste makes of one is the

@@ -14,21 +14,71 @@
 // paste inside one body run the whole document through them (CODEC §"Markdown at the
 // edges"), so every attribute written here is read back here. Foreign HTML spells none
 // of this package's `data-qm-*` names, so what a paste takes off the web is unchanged;
-// the one rule here that widens that door on purpose is the fence's, a `<table>` being
-// the block leaf's clipboard parser's (`table-paste.ts`).
+// the rules here that widen that door on purpose are the fence's and a span's styled
+// marks, a `<table>` being the block leaf's clipboard parser's (`table-paste.ts`).
 import { Schema } from 'prosemirror-model';
-import type { MarkSpec, NodeSpec, NodeType } from 'prosemirror-model';
+import type { MarkSpec, NodeSpec, NodeType, TagParseRule } from 'prosemirror-model';
 import { islandBlockSpec, islandInlineSpec } from './islands.js';
 import { rendersHref, storableUrl } from './urls.js';
+
+// ── Marks spelled as style ──────────────────────────────────────────────────
+// A word processor writes formatting as a span's inline style rather than as a tag:
+// Google Docs spells all four marks below that way, and wraps a whole copy in a `<b>`
+// stating a regular weight. Read off a `<span>` alone, since the same style on a cell or
+// a heading is that block's face rather than a run's. An underline inside a link is the
+// link's own: Docs underlines every one, and Chrome inlines the computed decoration on a
+// copy off any page.
+
+/** Whether `el`'s inline style states a bold weight. */
+const bold = (el: HTMLElement): boolean => /^(?:bold(?:er)?|[6-9]\d\d)$/.test(el.style.fontWeight);
+
+/** The text decoration `el` states, as a shorthand or a longhand. */
+const decoration = (el: HTMLElement): string =>
+	`${el.style.textDecoration} ${el.style.textDecorationLine}`;
+
+/** A mark a `<span>` carries where `styled` holds of it. Not consuming, so every mark a
+ *  span states matches, and so do the span's own rules after them. */
+const styledSpan = (styled: (el: HTMLElement) => boolean): TagParseRule => ({
+	tag: 'span',
+	consuming: false,
+	getAttrs: (el) => styled(el) && null
+});
 
 // ── Marks (the block and inline schemas share them; plaintext declares none) ─
 const marks: Record<string, MarkSpec> = {
 	// Order matters: it fixes mark-set sort order and parse precedence. `link`
 	// last so it wraps outermost.
-	strong: { parseDOM: [{ tag: 'strong' }, { tag: 'b' }], toDOM: () => ['strong', 0] },
-	em: { parseDOM: [{ tag: 'em' }, { tag: 'i' }], toDOM: () => ['em', 0] },
-	underline: { parseDOM: [{ tag: 'u' }], toDOM: () => ['u', 0] },
-	strike: { parseDOM: [{ tag: 's' }, { tag: 'del' }], toDOM: () => ['s', 0] },
+	strong: {
+		parseDOM: [
+			{ tag: 'strong' },
+			{ tag: 'b', getAttrs: (el) => (!el.style.fontWeight || bold(el)) && null },
+			styledSpan(bold)
+		],
+		toDOM: () => ['strong', 0]
+	},
+	em: {
+		parseDOM: [
+			{ tag: 'em' },
+			{ tag: 'i' },
+			styledSpan((el) => /^(?:italic|oblique)\b/.test(el.style.fontStyle))
+		],
+		toDOM: () => ['em', 0]
+	},
+	underline: {
+		parseDOM: [
+			{ tag: 'u' },
+			styledSpan((el) => /\bunderline\b/.test(decoration(el)) && !el.closest('a'))
+		],
+		toDOM: () => ['u', 0]
+	},
+	strike: {
+		parseDOM: [
+			{ tag: 's' },
+			{ tag: 'del' },
+			styledSpan((el) => /\bline-through\b/.test(decoration(el)))
+		],
+		toDOM: () => ['s', 0]
+	},
 	code: { parseDOM: [{ tag: 'code' }], toDOM: () => ['code', 0] },
 	link: {
 		attrs: { href: { default: '' } },

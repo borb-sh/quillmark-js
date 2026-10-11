@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The slash menu's hint: where the decoration stands, and that it names the key in the
 // wording the host passes. Whether it shows is the stylesheet's too, which draws it
-// only in a focused leaf and never over the ghost (`prose.css`).
+// only in a focused leaf, and after the ghost where one stands (`prose.css`).
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { EditorView } from 'prosemirror-view';
 import { createField, DEFAULT_SLASH_STRINGS } from '$lib/core/codec';
@@ -55,6 +55,17 @@ describe('the hint stands on the empty line the caret holds', () => {
 		const { field, view } = leaf('');
 		field.setCaret(0);
 		expect(hints(view)).toHaveLength(1);
+		field.destroy();
+	});
+
+	// The one line both decorations stamp is what the stylesheet draws the pair off.
+	it('on an empty body beside its ghost, the one line carrying both', () => {
+		const { field, view } = leaf('', { placeholder: 'Write…' });
+		field.setCaret(0);
+		const [line, ...rest] = hints(view);
+		expect(rest).toEqual([]);
+		expect(line.classList).toContain('qm-prose-placeholder');
+		expect(line.dataset.placeholder).toBe('Write…');
 		field.destroy();
 	});
 

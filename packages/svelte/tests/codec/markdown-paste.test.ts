@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
-// Markdown on the clipboard as text (CODEC §"Markdown at the edges"): a block leaf reads
-// text holding a block's line head through `importMarkdown`, so a paste stores what the
-// source editor would; any other text, any other leaf, a paste as plain text and a
-// clipboard holding HTML keep the reading they had. Each paste is a browser's paste event
-// on the leaf, read by the handler ProseMirror registers for one, and asserted on what the
-// store holds.
+// Text on the clipboard (CODEC §"Markdown at the edges"): a block leaf reads text holding a
+// block's line head through `importMarkdown`, so a paste stores what the source editor
+// would; any other text, any other leaf, a paste as plain text and a clipboard holding
+// HTML keep the reading they had. One URL over a selection links it instead. Each paste is
+// a browser's paste event on the leaf, read by the handler ProseMirror registers for one,
+// and asserted on what the store holds.
 import { describe, it, expect } from 'vitest';
 import { splitBlock } from 'prosemirror-commands';
-import { Selection } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
-import type { Content, Document } from '@quillmark/wasm';
-import { createField } from '$lib/core/codec';
+import { EditorState, Selection, TextSelection } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
+import type { Content, Document, TableProps } from '@quillmark/wasm';
+import { createField, plaintextSchema, proseLeafPlugins } from '$lib/core/codec';
+import type { FieldController, LeafViews } from '$lib/core/codec';
 import { core, md, mount, probeQuill, quill, viewOf } from './_util.js';
 
 type Clipboard = Record<string, string>;
@@ -201,5 +202,102 @@ main:
 		const rt = pasteInto('line', { plaintext: true, inline: true });
 		expect(rt.text).toMatch(/^- Purpose/);
 		expect(listed(rt)).toBe(false);
+	});
+});
+
+// A URL over a selection is the selection's link, not its replacement: the leaf keeps the
+// words and the address becomes their href.
+describe('a URL pasted over a selection links it', () => {
+	const URL = 'https://www.e-publishing.af.mil/';
+
+	/** A body over `markdown` with `[from, to)` selected, as offsets into its first block
+	 *  (each later block one position further on per boundary it crosses). */
+	function selected(markdown: string, from: number, to: number) {
+		const doc = quill().seedDocument();
+		doc.overwrite({}, md(markdown));
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const view = viewOf(field);
+		view.dispatch(
+			view.state.tr.setSelection(TextSelection.create(view.state.doc, from + 1, to + 1))
+		);
+		return { field, view };
+	}
+
+	function pastedOver(markdown: string, from: number, to: number, data: Clipboard): Content {
+		const { field, view } = selected(markdown, from, to);
+		view.dom.dispatchEvent(pasteEvent(data));
+		const content = field.getContent();
+		field.destroy();
+		return content;
+	}
+
+	it('the words stay and take the link', () => {
+		const rt = pastedOver('see the roster', 4, 14, text(`  ${URL}\n`));
+		expect(rt.text).toBe('see the roster');
+		expect(rt.marks).toEqual([{ start: 4, end: 14, type: 'link', attrs: { url: URL } }]);
+	});
+
+	it('a link already there is exchanged for the pasted one', () => {
+		const rt = pastedOver('see [the roster](https://old.test/)', 4, 14, text(URL));
+		expect(rt.marks).toEqual([{ start: 4, end: 14, type: 'link', attrs: { url: URL } }]);
+	});
+
+	// The URL check is the whole gate: anything else on the clipboard is what it was.
+	it.each([
+		['text around the URL', `the ${URL}`],
+		['a scheme no renderer follows', 'javascript:alert(1)'],
+		['a host and port', 'localhost:5173'],
+		['no scheme at all', 'www.af.mil']
+	])('%s replaces the selection, as any text does', (_, clip) => {
+		const rt = pastedOver('see the roster', 4, 14, text(clip));
+		expect(rt.text).toBe(`see ${clip}`);
+		expect(rt.marks).toEqual([]);
+	});
+
+	it('a selection crossing blocks takes the default paste', () => {
+		const rt = pastedOver('see the\n\nroster', 4, 11, text(URL));
+		expect(rt.marks).toEqual([]);
+		expect(rt.text).toBe(`see ${URL}ster`);
+	});
+
+	it('a selection inside a fence takes the default paste', () => {
+		const rt = pastedOver('```\nconst a = 1;\n```', 6, 7, text(URL));
+		expect(rt.marks).toEqual([]);
+		expect(rt.text).toBe(`const ${URL} = 1;`);
+	});
+
+	it('an empty selection inserts the URL as text', () => {
+		const rt = pastedOver('see the roster', 4, 4, text(URL));
+		expect(rt.text).toBe(`see ${URL}the roster`);
+	});
+
+	it("a plaintext leaf has no link to make, and the URL is the leaf's text", () => {
+		const doc = plaintextSchema.node('doc', null, [
+			plaintextSchema.node('paragraph', null, plaintextSchema.text('see the roster'))
+		]);
+		const state = EditorState.create({
+			doc,
+			plugins: proseLeafPlugins(plaintextSchema, { inline: true })
+		});
+		const view = new EditorView(mount(), { state });
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 5, 15)));
+		view.dom.dispatchEvent(pasteEvent(text(URL)));
+		expect(view.state.doc.textContent).toBe(`see ${URL}`);
+		view.destroy();
+	});
+
+	it("a table cell's own paste links its words too", () => {
+		const doc = quill().seedDocument();
+		doc.overwrite({}, md('| a | b |\n|---|---|\n| the roster | 2 |'));
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const cell = (field as FieldController & LeafViews).nestedViews()[2]!;
+		cell.dispatch(cell.state.tr.setSelection(TextSelection.create(cell.state.doc, 5, 11)));
+		cell.dom.dispatchEvent(pasteEvent(text(URL)));
+		const props = field.getContent().islands[0]!.props as TableProps;
+		expect(props.rows[0]![0]).toEqual({
+			text: 'the roster',
+			marks: [{ start: 4, end: 10, type: 'link', attrs: { url: URL } }]
+		});
+		field.destroy();
 	});
 });

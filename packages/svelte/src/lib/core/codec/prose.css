@@ -226,8 +226,7 @@ li.ProseMirror-selectednode::after {
 /* The slash menu's hint (`slash.ts`, `slashHint`), drawn as the ghost is, on the one
    empty line the caret holds. Only while the leaf has the focus: the decoration follows
    the selection, which an unfocused leaf keeps. Upright, being chrome about the key
-   rather than an invitation in the document's voice, and never over a ghost, which is
-   the leaf's own word for the same empty line. */
+   rather than an invitation in the document's voice. */
 .ProseMirror-focused .qm-slash-hint:not(.qm-prose-placeholder)[data-slash-hint]::after {
 	content: attr(data-slash-hint);
 	display: block;
@@ -237,6 +236,13 @@ li.ProseMirror-selectednode::after {
 	text-overflow: ellipsis;
 	color: var(--_qm-ink-label);
 	pointer-events: none;
+}
+
+/* The ghost and the hint on one line, the empty leaf's: the ghost, then the hint, in the
+   ghost's voice, one pseudo-element drawing the two. So a focused empty body names the
+   key, and an idle one shows its ghost alone. */
+.ProseMirror-focused .qm-prose-placeholder.qm-slash-hint[data-placeholder][data-slash-hint]::after {
+	content: attr(data-placeholder) '\2003' attr(data-slash-hint);
 }
 
 /* ── The table island ────────────────────────────────────────────────────────

@@ -205,8 +205,8 @@ export function slashPlugin(
  * The hint on the empty line the caret holds, wherever a `/` there would open a menu
  * with something in it: a node decoration whose attribute `prose.css` draws, so the
  * text stays out of the document. The stylesheet shows it only while the leaf has the
- * focus, which no transaction carries, and gives the line to the empty leaf's ghost
- * where both stand (`field.ts` §`ghostPlugin`).
+ * focus, which no transaction carries, and after the empty leaf's ghost where both
+ * stand (`field.ts` §`ghostPlugin`).
  */
 function slashHint(state: EditorState, text: string | undefined): DecorationSet | null {
 	const { $from, empty } = state.selection;
@@ -313,7 +313,7 @@ export function runSlashItem(view: EditorView, name: string): void {
 	const done = consuming(view.state, run.from, view.state.selection.head, command);
 	if (!done) return;
 	done.tr.setMeta(slashKey, { op: 'dismiss' } as SlashMeta);
-	view.dispatch(done.tr);
+	view.dispatch(done.tr.scrollIntoView());
 	view.focus();
 	const island = done.produced.getMeta(islandKey) as number | undefined;
 	if (island !== undefined) focusFreshTable(view, island);

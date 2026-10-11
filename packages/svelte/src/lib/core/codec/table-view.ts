@@ -32,7 +32,8 @@ import {
 import { EditorView, type NodeView, type NodeViewConstructor } from 'prosemirror-view';
 import type { TableCell, TableProps } from '@quillmark/wasm';
 import { decode } from './decode.js';
-import { inputRulesPlugin } from './inputrules.js';
+import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
+import { linkPastePlugin } from './link-paste.js';
 import { tablePropsOfNode } from './islands.js';
 import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
@@ -263,10 +264,16 @@ function chromeButton(className: string, label: string, run: () => void): HTMLBu
 	return btn;
 }
 
-/** A cell's plugin stack: marks and the markdown shorthands, and nothing that
- *  belongs to the field (history, anchors, the ghost). */
+/** A cell's plugin stack: marks, the markdown shorthands and a pasted URL's link, and
+ *  nothing that belongs to the field (history, anchors, the ghost). */
 function cellPlugins(keys: Record<string, Command>) {
-	return [inputRulesPlugin(cellSchema), keymap(keys), keymap(baseKeymap)];
+	return [
+		inputRulesPlugin(cellSchema),
+		undoRuleKeymap(),
+		linkPastePlugin(cellSchema.marks.link),
+		keymap(keys),
+		keymap(baseKeymap)
+	];
 }
 
 /** The controls, each of which answers for its own press. Spelled apart from
