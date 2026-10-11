@@ -1,11 +1,11 @@
 <!--
   Card controls, composable cards only.
-  Right-aligned in the header: a move-up/move-down chevron pair revealed while the
-  pointer or the caret is in the card (each disabled at its edge), then delete.
+  Right-aligned in the header: a move-up/move-down chevron pair (each disabled at its
+  edge), then delete, the row revealed while the pointer or the caret is in the card.
   Reorder is buttons, not drag (V1). All three are chips (controls.css): fill arrives
-  on hover, and delete rests faded danger, full under the pointer. The card scopes
-  that reveal, so its condition lives in the parent's CSS; the pair keeps the narrower
-  guarantee here, that a focused chevron is a visible one.
+  on hover, and delete draws faded danger, full under the pointer. The card scopes
+  that reveal, so its condition lives in the parent's CSS; the row keeps the narrower
+  guarantee here, that a focused control is a visible one.
 -->
 <script lang="ts">
 	import { wording } from './strings.js';
@@ -56,21 +56,21 @@
 		display: flex;
 		align-items: center;
 		gap: var(--_qm-space-half);
-		/* One compositor layer for the row. Opacity on the pair otherwise snaps
-		   that box off the header's half-pixel, against delete which never leaves
-		   the document paint. */
+		opacity: 0;
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+		/* One compositor layer for the row at rest as well as mid-fade: a box handed
+		   back to the document paint when its fade ends snaps off the header's
+		   half-pixel as it lands. */
 		transform: translateZ(0);
 	}
 	.qm-card-reorder {
 		display: flex;
-		opacity: 0;
-		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	/* Opacity hides the pair without taking it out of the tab order, so the
-	   component holds its own floor: a chevron that has focus is drawn, and its ring
-	   with it. The card's reveal already covers this; the rule is here because the
-	   hidden state is. */
-	.qm-card-reorder:focus-within {
+	/* Opacity hides the row without taking it out of the tab order, which keeps
+	   delete the keyboard's way to remove a card, so the component holds its own
+	   floor: a control that has focus is drawn, and its ring with it. The card's
+	   reveal already covers this; the rule is here because the hidden state is. */
+	.qm-card-controls:focus-within {
 		opacity: 1;
 	}
 	/* Squares: the chip's inline pad is for a label. Width and height are one rung

@@ -75,9 +75,11 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	elementUntitled: (label: string, index: number) => string;
 
 	// ── Enum control ──────────────────────────────────────────────────────────
-	/** The tag on the unset sentinel's row, which is what tells it from the member it
-	 *  ghosts ({@link EnumField}). */
+	/** The tag on the unset sentinel's row where it ghosts a member, which is what tells
+	 *  it from that member ({@link EnumField}). */
 	enumUnsetTag: string;
+	/** The same row's tag where it ghosts no member: no `default:`, or a blank one. */
+	enumUnsetTagNone: string;
 
 	// ── Matrix control ────────────────────────────────────────────────────────
 	/** The count in the matrix's label row: how many of its items are held. */
@@ -202,7 +204,8 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
 	elementUntitled: (label, index) => `${label} ${index}`,
-	enumUnsetTag: 'default',
+	enumUnsetTag: 'Default',
+	enumUnsetTagNone: 'Unset',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
 	matrixAdd: (list) => (list ? `Add to ${list}…` : 'Add…'),
 	matrixItemTitle: (list, index) => `${list ? `${list} item` : 'Item'} ${index}`,

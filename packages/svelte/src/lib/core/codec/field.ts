@@ -44,10 +44,11 @@ import { lower, pmToContent, scanContent, scanDoc, contentEdit } from './encode.
 import { islandPastePlugin } from './islands.js';
 import { anchorsFromContent, type AnchorPos } from './marks.js';
 import { contentEqual, createReconciler, type Reconciler } from './reconcile.js';
-import { inputRulesPlugin } from './inputrules.js';
+import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
+import { linkPastePlugin } from './link-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
 import { tablePastePlugin } from './table-paste.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
@@ -698,15 +699,17 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * never fork the keymap/plugin ordering. History first, then any leaf-specific
  * plugins (`afterHistory`: the addressed leaf passes its anchor-position plugin;
  * a by-value leaf passes none), then {@link linebreakPlugin}, which normalizes what
- * the rest of the stack leaves, then the markdown-shorthand input rules, the field
- * keymap over the base keymap, and last the ones that answer to a block leaf's own
- * shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass (`islands.ts`),
- * the table paste (`table-paste.ts`) and the markdown paste (`markdown-paste.ts`).
+ * the rest of the stack leaves, then the markdown-shorthand input rules and the
+ * Backspace that takes one back, the field keymap over the base keymap, the URL paste
+ * that links a selection (`link-paste.ts`), and last the ones that answer to a block
+ * leaf's own shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass
+ * (`islands.ts`), the table paste (`table-paste.ts`) and the markdown paste
+ * (`markdown-paste.ts`).
  *
  * Every mark-shaped plugin reads the schema rather than a flag: over either plaintext
- * schema the shorthand rules build nothing (each is guarded on its mark type) and the
- * toggles bind no key, so a `**bold**` keeps the delimiters its author typed without
- * a second rule saying so.
+ * schema the shorthand rules build nothing (each is guarded on its mark type), the
+ * toggles bind no key and a pasted URL stays text, so a `**bold**` keeps the delimiters
+ * its author typed without a second rule saying so.
  */
 export function proseLeafPlugins(
 	schema: Schema,
@@ -729,9 +732,10 @@ export function proseLeafPlugins(
 ): Plugin[] {
 	const list: Plugin[] = [history(), ...(opts.afterHistory ?? []), linebreakPlugin(schema)];
 	if (opts.slash) list.push(slashPlugin(opts.slash, opts.slashHint));
-	if (!opts.noInputRules) list.push(inputRulesPlugin(schema));
+	if (!opts.noInputRules) list.push(inputRulesPlugin(schema), undoRuleKeymap());
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));
+	if (schema.marks.link) list.push(linkPastePlugin(schema.marks.link));
 	// Each answers to something only the block schema holds: any other leaf is
 	// textblocks alone, with no island and no gap to put a cursor in.
 	if (isBlockSchema(schema))
@@ -777,8 +781,10 @@ function plainClipboardPlugin(): Plugin {
  * A printable key over a selected atom writes past it. A selection is the subject
  * of the next command, never a thing armed for
  * replacement: Backspace deletes it, Mod-C copies it, and a character lands beside
- * it. A block island takes a new paragraph after it, an inline one the caret after
- * the image in the same line: one rule, both node types.
+ * it. A block island takes the empty paragraph after it, or a new one where there is
+ * none; an inline one the caret after the image in the same line: one rule, both node
+ * types. Only a paragraph is reused, since an empty heading or fence would set the
+ * text in a shape the key never asked for.
  *
  * PM routes text input over a non-`TextSelection` through `handleTextInput` before
  * falling back to replacing the selection, so this one prop is the whole of it.
@@ -793,8 +799,11 @@ function pastAtomPlugin(): Plugin {
 				if (!text || !(selection instanceof NodeSelection) || !selection.node.isAtom) return false;
 				const tr = view.state.tr;
 				const at = selection.to; // just past the node, in both coordinate senses
+				const after = tr.doc.resolve(at).nodeAfter;
 				if (selection.node.isInline) {
 					tr.setSelection(TextSelection.create(tr.doc, at)).insertText(text);
+				} else if (after?.type === schema.nodes.paragraph && after.content.size === 0) {
+					tr.setSelection(TextSelection.create(tr.doc, at + 1)).insertText(text);
 				} else {
 					const para = schema.nodes.paragraph.create(null, schema.text(text));
 					tr.insert(at, para);

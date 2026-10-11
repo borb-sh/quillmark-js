@@ -4,14 +4,18 @@
 // card header calls, through `bind:this`, and gets the same `onChange`. They speak
 // the public vocabulary — a `CardId` for a card, a `DocPath` for a place — so a host
 // drives them with what the hooks handed it.
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
 import { addrForFieldPath } from '$lib/core';
-import { quill, example } from '../helpers/fixtures.js';
-import { caret, mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
+import { humanize } from '$lib/visual/structure';
+import { quill, quillFromYaml, example } from '../helpers/fixtures.js';
+import { caret, field, mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
-afterEach(unmountAll);
+afterEach(() => {
+	unmountAll();
+	vi.restoreAllMocks();
+});
 
 const slots = (target: HTMLElement) => [...target.querySelectorAll<HTMLElement>('.qm-card-slot')];
 const leafKeys = (slot: HTMLElement) =>
@@ -88,28 +92,29 @@ describe('the card verbs', () => {
 	});
 });
 
+/**
+ * Exactly two `section` cards, the smallest stack a reorder is visible in. `section`
+ * carries the fixture's card-side `datetime` (`reviewed_at`), the one commit a mounted
+ * control cannot satisfy: the date control emits `YYYY-MM-DD` whatever the declared
+ * type, and a `datetime` coerces none (`edit::field_coercion_failed`).
+ */
+function twoSections(q: Quill): Document {
+	const doc = q.seedDocument();
+	for (let i = doc.cardCount - 1; i >= 0; i--) {
+		if (doc.card(i).kind !== 'section') doc.removeCard(i);
+	}
+	const card = q.seedCard('section', doc.seedOverlay('section'));
+	if (!card) throw new Error('fixture drift: the quill seeds no section card');
+	doc.insertCard(card, 1);
+	return doc;
+}
+
 // A card's address does not survive a `moveCard` (`Addr` and `DocPath` are both
 // positional), so every card-naming payload carries the session `cardId` beside it
 // (VISUAL_EDITOR §"The address is the spine"): after a move the address a host captured
 // names the other card, and the key still names the one that moved. The id-keyed
 // commit-error map rides the same fact, so a refused write travels with its card.
 describe('a reorder through the card control', () => {
-	/**
-	 * Exactly two `section` cards, the smallest stack a reorder is visible in. `section`
-	 * carries the fixture's card-side `datetime` (`reviewed_at`), the one commit a mounted
-	 * control cannot satisfy: the date control emits `YYYY-MM-DD` whatever the declared
-	 * type, and a `datetime` coerces none (`edit::field_coercion_failed`).
-	 */
-	function twoSections(q: Quill): Document {
-		const doc = q.seedDocument();
-		for (let i = doc.cardCount - 1; i >= 0; i--) {
-			if (doc.card(i).kind !== 'section') doc.removeCard(i);
-		}
-		const card = q.seedCard('section', doc.seedOverlay('section'));
-		if (!card) throw new Error('fixture drift: the quill seeds no section card');
-		doc.insertCard(card, 1);
-		return doc;
-	}
 	/** Focus a card's body leaf where PM listens: on the view's own element, and focus
 	 *  does not bubble. */
 	function focusBody(slot: HTMLElement): void {
@@ -408,5 +413,172 @@ describe('a verb handed a target the surface does not hold', () => {
 		expect(errors.map((e) => e.code)).toEqual(['target-unknown', 'target-unknown']);
 		expect(errors.every((e) => e.severity === 'dev')).toBe(true);
 		expect(errors.at(-1)?.path).toBe('main.no_such_field.0');
+	});
+});
+const title = (slot: HTMLElement) => slot.querySelector<HTMLInputElement>('.qm-card-title')!;
+const remove = (slot: HTMLElement) => slot.querySelector<HTMLButtonElement>('.qm-card-delete')!;
+const keyOf = (el: Element | null) => el?.closest('[data-leaf-key]')?.getAttribute('data-leaf-key');
+
+// A delete takes the node holding the focus with it, which leaves the focus on the page's
+// body; the card beside it is where a keyboard user deleting a run of cards goes next.
+describe('the focus a card delete held', () => {
+	it('goes to the title of the card before it', async () => {
+		const q = quill();
+		const { target } = mountEditor(q, twoSections(q));
+		const second = slots(target)[1];
+		title(second).focus();
+		remove(second).click();
+		await settle();
+		expect(document.activeElement).toBe(title(slots(target)[0]));
+	});
+
+	it('goes to the card that took the place of the first, and then to the add strip', async () => {
+		const q = quill();
+		const { target } = mountEditor(q, twoSections(q));
+		title(slots(target)[0]).focus();
+		remove(slots(target)[0]).click();
+		await settle();
+		expect(slots(target)).toHaveLength(1);
+		expect(document.activeElement).toBe(title(slots(target)[0]));
+
+		remove(slots(target)[0]).click();
+		await settle();
+		expect(slots(target)).toHaveLength(0);
+		expect(document.activeElement?.classList.contains('qm-add-btn')).toBe(true);
+	});
+
+	// An engine that focuses a pressed button gives it no ring, and the next card's title
+	// would take one, with its text selected, for a delete the keyboard never made.
+	it('stays with a pointer that pressed delete', async () => {
+		const q = quill();
+		const { target } = mountEditor(q, twoSections(q));
+		const button = remove(slots(target)[1]);
+		button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+		button.focus();
+		button.click();
+		await settle();
+		expect(slots(target)).toHaveLength(1);
+		expect(document.activeElement).toBe(document.body);
+	});
+
+	it('stays where it was when the removed card did not hold it', async () => {
+		const q = quill();
+		const { editor } = mountEditor(q, twoSections(q));
+		await editor.focusField('main.tracking_id');
+		const own = document.activeElement;
+		editor.removeCard('c1');
+		await settle();
+		expect(document.activeElement).toBe(own);
+	});
+});
+
+// The strip's add is a request to write in the card it makes. A host's `insertCard` is
+// not: the host holds the focus it means to, and an insert behind it moves none.
+describe('a card the add strip makes', () => {
+	it('takes the focus at its first field, once the centring scroll has run', async () => {
+		const q = quill();
+		const { target } = mountEditor(q, twoSections(q));
+		press([...target.querySelectorAll<HTMLElement>('.qm-add-btn')].at(-1)!, 'ArrowDown');
+		const pick = [...document.querySelectorAll<HTMLElement>('.qm-menu-item')].find(
+			(el) => el.textContent?.trim() === humanize('section')
+		)!;
+		pick.click();
+		flushSync();
+
+		const heading = field(slots(target)[2], 'Heading').querySelector('input');
+		await vi.waitFor(() => expect(document.activeElement).toBe(heading));
+		// The open menu locks the body's scroll and restores it on a timer that must not
+		// outlive the environment.
+		await new Promise((settled) => setTimeout(settled, 50));
+	});
+
+	it('takes it at its body where it draws no field, from a one-kind strip', async () => {
+		const q = quillFromYaml(BODY_ONLY);
+		const { target } = mountEditor(q, q.seedDocument());
+		target.querySelector<HTMLButtonElement>('.qm-add-btn')!.click();
+		flushSync();
+
+		await vi.waitFor(() => expect(keyOf(document.activeElement)).toBe('c1:$body'));
+	});
+
+	it('leaves the focus where a host holds it for an insert of its own', async () => {
+		const q = quill();
+		const { editor } = mountEditor(q, twoSections(q));
+		await editor.focusField('main.tracking_id');
+		const own = document.activeElement;
+		editor.insertCard('section');
+		await new Promise((settled) => setTimeout(settled, 100));
+		expect(document.activeElement).toBe(own);
+	});
+});
+
+const BODY_ONLY = `quill:
+  name: body_only_probe
+  version: 1.0.0
+  backend: typst
+  description: One kind, declaring no field.
+typst:
+  plate_file: plate.typ
+main:
+  fields: {}
+card_kinds:
+  aside:
+    fields: {}
+`;
+
+/** A computed style carrying the motion rungs, which jsdom's own reports as empty. */
+function withMotion(): void {
+	const rungs: Record<string, string> = {
+		'--_qm-duration-slow': '200ms',
+		'--_qm-ease-reverse': 'ease'
+	};
+	const real = window.getComputedStyle.bind(window);
+	vi.spyOn(window, 'getComputedStyle').mockImplementation((el, pseudo) => {
+		const style = real(el, pseudo);
+		const read = style.getPropertyValue.bind(style);
+		style.getPropertyValue = (p: string) => rungs[p] ?? read(p);
+		return style;
+	});
+}
+
+// The fade is the card's half of the trip; the slide is the neighbours', and needs a
+// layout jsdom does not have, so what is asserted is the run each slot asks for.
+describe('a card entering or leaving the stack', () => {
+	it('fades its slot over the slow rung, and holds a leaving one inert until it has', () => {
+		const q = quill();
+		const { target, editor } = mountEditor(q, twoSections(q));
+		withMotion();
+		const runs: { el: Element; keyframes: unknown; options: unknown }[] = [];
+		vi.spyOn(Element.prototype, 'animate').mockImplementation(function (
+			this: Element,
+			keyframes,
+			options
+		) {
+			runs.push({ el: this, keyframes, options });
+			return { cancel() {} } as Animation;
+		});
+		const fades = () => runs.filter((r) => (r.keyframes as { opacity?: unknown }).opacity);
+
+		editor.insertCard('section');
+		flushSync();
+		const arriving = slots(target)[2];
+		expect(fades()).toEqual([
+			{
+				el: arriving,
+				keyframes: { opacity: [0, 1] },
+				options: { duration: 200, easing: 'ease', fill: 'none' }
+			}
+		]);
+
+		const leaving = slots(target)[0];
+		editor.removeCard('c0');
+		flushSync();
+		expect(leaving.isConnected).toBe(true);
+		expect(leaving.inert).toBe(true);
+		expect(fades().at(-1)).toEqual({
+			el: leaving,
+			keyframes: { opacity: [1, 0] },
+			options: { duration: 200, easing: 'ease', fill: 'forwards' }
+		});
 	});
 });

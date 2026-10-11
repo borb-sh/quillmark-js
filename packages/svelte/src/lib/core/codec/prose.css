@@ -29,6 +29,14 @@ li.ProseMirror-selectednode::after {
 	border: var(--_qm-ring);
 	left: calc(var(--_qm-space-4) * -1);
 }
+/* A node selection is drawn while its leaf holds the focus, as a text selection is: a
+   ring left behind on a field the focus has moved off names a subject no key reaches. */
+.ProseMirror:not(:focus-within) .ProseMirror-selectednode {
+	outline: none;
+}
+.ProseMirror:not(:focus-within) li.ProseMirror-selectednode::after {
+	border: none;
+}
 
 /* The gap cursor (`prosemirror-gapcursor`, imported beside this file): a caret
    between two blocks, where the document holds no text position for an ordinary one.

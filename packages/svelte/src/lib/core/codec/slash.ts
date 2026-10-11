@@ -313,7 +313,7 @@ export function runSlashItem(view: EditorView, name: string): void {
 	const done = consuming(view.state, run.from, view.state.selection.head, command);
 	if (!done) return;
 	done.tr.setMeta(slashKey, { op: 'dismiss' } as SlashMeta);
-	view.dispatch(done.tr);
+	view.dispatch(done.tr.scrollIntoView());
 	view.focus();
 	const island = done.produced.getMeta(islandKey) as number | undefined;
 	if (island !== undefined) focusFreshTable(view, island);

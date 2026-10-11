@@ -24,7 +24,10 @@
  A press holds it down, which is what makes the surface answer a selection rather
  than a pointer: a drag fires `selectionchange` on every frame, so a surface driven
  by that alone rises on the first character and rides the cursor across the text it
- is covering. Keyboard selection holds nothing, so a Shift-arrow syncs as it fires.
+ is covering. Keyboard selection holds nothing, so it waits instead: a rise with no
+ release behind it comes once the selection has stood still for `SETTLE_MS`, so a
+ Shift-arrow run, or a select-all on its way to a cut, raises nothing until it stops.
+ A lowering never waits, and an open surface follows each step.
 
  Nothing here watches scroll. `sync` decides whether the surface is up, which a
  scroll does not change; where it sits is the anchor's own question, and the anchor
@@ -70,6 +73,7 @@
 	import { hasMarks, rangeAnchor, type RangeAnchor } from '../core/codec/index.js';
 	import type { ActiveProse } from './leaves.js';
 	import { clearLink, hrefInSelection, normalizeHref, setLink } from './links.js';
+	import { spacePx } from '../core/rungs.js';
 	import './controls.css';
 
 	interface Props {
@@ -78,7 +82,7 @@
 	}
 	let { getActiveLeaf }: Props = $props();
 
-	const GLYPH = 15;
+	const SETTLE_MS = 450;
 	/** The six content formatting marks. `anchor` is a seventh, drawn separately below:
 	 *  a decoration toggle rather than a PM `toggleMark`. One string per mark carries both
 	 *  the tooltip and the accessible name; the anchor button spells the two separately. */
@@ -120,7 +124,8 @@
 		return getActiveLeaf()?.views.focusedView();
 	}
 
-	function sync(): void {
+	function sync(wait = false): void {
+		clearTimeout(settling);
 		const insidePopover =
 			!!contentEl && !!document.activeElement && contentEl.contains(document.activeElement);
 		// Interacting with the popover itself (e.g. the link input): leave state as-is.
@@ -149,6 +154,10 @@
 		) {
 			open = false;
 			linkPromptOpen = false;
+			return;
+		}
+		if (wait && !open) {
+			settling = setTimeout(() => sync(), SETTLE_MS);
 			return;
 		}
 		portalTarget = view.dom.closest<HTMLElement>('[data-qm-root]') ?? undefined;
@@ -186,12 +195,17 @@
 	// selection. `pending` collapses a burst to a single scheduled callback.
 	let pending = false;
 	let rafHandle = 0;
+	/** The check in flight answers a pointer's release, which raises at once. */
+	let released = false;
+	let settling: ReturnType<typeof setTimeout> | undefined;
 	function deferredSync(): void {
 		if (pending) return;
 		pending = true;
 		rafHandle = requestAnimationFrame(() => {
 			pending = false;
-			sync();
+			const wait = !released;
+			released = false;
+			sync(wait);
 		});
 	}
 
@@ -205,14 +219,16 @@
 	function onPointerUp(): void {
 		if (!pressed) return;
 		pressed = false;
+		released = true;
 		deferredSync();
 	}
 
-	// A burst-coalescing rAF may still be in flight at teardown; cancel it so
-	// `sync()` never runs against the destroyed component.
+	// A burst-coalescing rAF or a settling rise may still be in flight at teardown;
+	// cancel both so `sync()` never runs against the destroyed component.
 	onDestroy(() => {
 		if (pending) cancelAnimationFrame(rafHandle);
 		pending = false;
+		clearTimeout(settling);
 	});
 
 	// Any close path that bypasses `sync` (e.g. Escape while the link input holds
@@ -342,7 +358,7 @@
 			side="top"
 			align="center"
 			trapFocus={false}
-			sideOffset={8}
+			sideOffset={spacePx(portalTarget, 2)}
 			onOpenAutoFocus={(e: Event) => e.preventDefault()}
 			onCloseAutoFocus={(e: Event) => e.preventDefault()}
 		>
@@ -411,7 +427,7 @@
 										title={m.title}
 										aria-label={m.title}
 										onmousedown={keepFocus}
-										onclick={() => toggle(m.name)}><Icon name={m.icon} size={GLYPH} /></button
+										onclick={() => toggle(m.name)}><Icon name={m.icon} /></button
 									>
 								{/each}
 								{#if anchorAvailable}
@@ -421,7 +437,7 @@
 										title={t.strings.formatAnchorTitle}
 										aria-label={t.strings.formatAnchor}
 										onmousedown={keepFocus}
-										onclick={toggleAnchor}><Icon name="hash" size={GLYPH} /></button
+										onclick={toggleAnchor}><Icon name="hash" /></button
 									>
 								{/if}
 							</div>

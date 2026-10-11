@@ -807,11 +807,15 @@
 		display: none;
 	}
 	/* The default's rows are what prints and nothing written: every value they draw takes
-	   the default rung (theme.css), and the first gesture, writing them, takes it off. */
+	   the default rung (theme.css), a checked switch's track included, and the first
+	   gesture, writing them, takes it off. */
 	.qm-array-rows[data-default] :global(:is(.qm-input, .ProseMirror, .qm-date)),
 	.qm-array-rows[data-default] :global(.qm-select:not([data-ghosted])),
 	.qm-array-rows[data-default] .qm-element-title:not(.untitled) {
 		color: var(--_qm-ink-default);
+	}
+	.qm-array-rows[data-default] :global(.qm-toggle[data-state='checked']) {
+		background: var(--_qm-accent-default);
 	}
 	/* A grid rather than a block: an `<input>` is inline-level and would sit on a
 	 baseline, standing the row a descender taller than the box the slab measures itself
@@ -871,10 +875,6 @@
 	.qm-row-btn:last-child {
 		border-start-end-radius: var(--_qm-radius-inner);
 		border-end-end-radius: var(--_qm-radius-inner);
-	}
-	.qm-row-btn :global(svg) {
-		width: var(--_qm-glyph-control);
-		height: var(--_qm-glyph-control);
 	}
 	/* Child combinators: a nested array shares this scope, and a row's hover is not its
 	 open subform's rows'. */

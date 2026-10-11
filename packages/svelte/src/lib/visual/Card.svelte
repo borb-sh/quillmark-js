@@ -72,13 +72,18 @@
 		leaves
 	}: Props = $props();
 
-	let localTitle = $derived(card.titleOverride);
+	// The rename in flight, written once on blur or Enter. Held apart from the stored
+	// title because a re-derive mid-edit hands `card` back with the title it stored.
+	let draft = $state<string | undefined>(undefined);
+	const shownTitle = $derived(draft ?? card.titleOverride);
 
-	// The pre-edit value Escape rolls back to; the rename itself stays live on input.
-	let titleAtFocus = '';
 	function onTitleFocus(e: FocusEvent): void {
-		titleAtFocus = localTitle;
+		draft = card.titleOverride;
 		(e.currentTarget as HTMLInputElement).select();
+	}
+	function onTitleBlur(): void {
+		if (draft !== undefined && draft !== card.titleOverride) ops.rename(draft);
+		draft = undefined;
 	}
 	// A press on an unfocused title would place a caret on mouseup, collapsing the
 	// focus-time select-all. A press while already focused stays normal, so clicking
@@ -102,13 +107,10 @@
 		const el = e.currentTarget as HTMLInputElement;
 		if (e.key === 'Enter') {
 			e.preventDefault();
-			el.blur(); // commit: the live value already persisted on input
+			el.blur();
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
-			if (localTitle !== titleAtFocus) {
-				localTitle = titleAtFocus;
-				ops.rename(titleAtFocus); // roll back the live edits
-			}
+			draft = undefined;
 			el.blur();
 		}
 	}
@@ -193,6 +195,11 @@
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 		el?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block });
 	}
+	/** Focus the title, or the header's first live control on a recovery shell, which has
+	 *  no title to focus. */
+	export function focusHeader(): void {
+		el?.querySelector<HTMLElement>('.qm-card-header :is(input, button:not(:disabled))')?.focus();
+	}
 </script>
 
 <!-- `data-qm-card` names the island for a floating surface that has to stay inside one
@@ -210,20 +217,18 @@
 			<header class="qm-card-header">
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div class="qm-card-rename" onmousedown={onRenameMousedown}>
-					<span class="qm-card-title-sizer" data-value={localTitle || card.titlePlaceholder}>
+					<span class="qm-card-title-sizer" data-value={shownTitle || card.titlePlaceholder}>
 						<input
 							class="qm-card-title qm-focus-ring"
-							value={localTitle}
+							value={shownTitle}
 							placeholder={card.titlePlaceholder}
 							aria-label={t.strings.cardTitle}
 							size="1"
 							onmousedown={onTitleMousedown}
 							onfocus={onTitleFocus}
+							onblur={onTitleBlur}
 							onkeydown={onTitleKeydown}
-							oninput={(e) => {
-								localTitle = (e.currentTarget as HTMLInputElement).value;
-								ops.rename(localTitle);
-							}}
+							oninput={(e) => (draft = (e.currentTarget as HTMLInputElement).value)}
 						/>
 					</span>
 				</div>
@@ -463,10 +468,10 @@
 		 what crosses the line. */
 		margin-inline-end: calc(-1 * (var(--_qm-tap-min) - var(--_qm-glyph-control)) / 2);
 	}
-	/* Focus as well as hover, so a caret in any leaf, the title, or a chevron holds the
-	 reveal: hover alone would strand the pair on keyboard and touch. */
-	.qm-card:hover :global(.qm-card-reorder),
-	.qm-card:focus-within :global(.qm-card-reorder) {
+	/* Focus as well as hover, so a caret in any leaf, the title, or a control holds the
+	 reveal: hover alone would strand the row on the keyboard. */
+	.qm-card:hover :global(.qm-card-controls),
+	.qm-card:focus-within :global(.qm-card-controls) {
 		opacity: 1;
 	}
 	/* The rename hit region is the header's free width at full height, so a press

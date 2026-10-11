@@ -23,3 +23,14 @@ export function rungMs(style: CSSStyleDeclaration, rung: string): number | undef
 	if (!Number.isFinite(n)) return undefined;
 	return raw.endsWith('ms') ? n : n * 1000;
 }
+
+/** `steps` of the space rung off `node`'s root, in px: a floating surface's offset from
+ *  its anchor. `--_qm-space` is registered, so it computes to px where the rungs derived
+ *  from it compute to their expressions; hence the multiple rather than a read of
+ *  `--_qm-space-2`. `undefined` where the derivation is out of reach, as for
+ *  {@link rungMs}. */
+export function spacePx(node: Element | undefined, steps = 1): number | undefined {
+	if (!node) return undefined;
+	const n = Number.parseFloat(rungStyle(node).getPropertyValue('--_qm-space'));
+	return Number.isFinite(n) ? n * steps : undefined;
+}

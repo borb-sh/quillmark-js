@@ -10,6 +10,9 @@
  `mixed` there reads as false), so an optional boolean's control is a `checkbox`, the
  toggle role that does, announcing `mixed` while unset. A press from unset writes
  `true`; nothing here returns the cell to unset.
+
+ An unset switch draws its `default:` at the default rung, as every control draws a
+ printed default: a checked track takes the accent's default rung.
 -->
 <script lang="ts">
 	import { Switch } from 'bits-ui';
@@ -41,6 +44,7 @@
 	// the unset optional cell, the one state with no default to stand in for it.
 	let local = $derived<boolean | undefined>(value ?? fallback ?? (optional ? undefined : false));
 	const unset = $derived(local === undefined);
+	const defaulted = $derived(value === undefined && fallback !== undefined);
 	const tristate = $derived(
 		optional ? { role: 'checkbox', 'aria-checked': unset ? ('mixed' as const) : !!local } : {}
 	);
@@ -49,7 +53,11 @@
 <!-- Not `.qm-switch`: that name is the preset's pane band, whose narrow-viewport rule
  stands every child of it at `--qmh-tap`, so a track wearing it grows a thumb three times
  its own height over the labels around it (`preset/recipes.css`, held by `check:style`). -->
-<span class="qm-toggle-wrap" data-unset={unset ? '' : undefined}>
+<span
+	class="qm-toggle-wrap"
+	data-unset={unset ? '' : undefined}
+	data-default={defaulted ? '' : undefined}
+>
 	<Switch.Root
 		class="qm-toggle qm-focus-ring qm-tap-floor"
 		checked={!!local}
@@ -100,6 +108,9 @@
 	}
 	.qm-toggle-wrap :global(.qm-toggle[data-state='checked']) {
 		background: var(--_qm-accent);
+	}
+	.qm-toggle-wrap[data-default] :global(.qm-toggle[data-state='checked']) {
+		background: var(--_qm-accent-default);
 	}
 	/* The focus ring rides `.qm-focus-ring` on the switch (controls.css). */
 	/* The thumb reads on tone alone: the base surface over the track's `hover` rung

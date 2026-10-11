@@ -233,7 +233,8 @@
 :where(.qm-chip:hover) {
 	color: var(--_qm-ink);
 }
-:where(.qm-chip svg) {
+:where(.qm-chip svg),
+:where(.qm-icon-btn svg) {
 	flex-shrink: 0;
 	width: var(--_qm-glyph-control);
 	height: var(--_qm-glyph-control);

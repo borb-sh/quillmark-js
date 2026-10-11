@@ -12,7 +12,8 @@
 // sets"), and a construct that arrives through `importMarkdown` must stay authorable or
 // a document opens carrying a shape the editor refuses to make. So one guard survives:
 // `- ` / `1. ` at the head of an existing item, where Tab owns the nesting.
-import { InputRule, inputRules } from 'prosemirror-inputrules';
+import { InputRule, inputRules, undoInputRule } from 'prosemirror-inputrules';
+import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
 import type { Command, EditorState, Plugin, Transaction } from 'prosemirror-state';
 import {
@@ -64,12 +65,13 @@ function markInputRule(regexp: RegExp, markType: MarkType, delimLen: number): In
 
 /** A block shorthand: the regexp that fires it, and the command it runs in the match's
  *  place. Every one is `^`-anchored, so the command's own head-of-a-textblock guard is
- *  the same position the regexp already stands at. */
+ *  the same position the regexp already stands at. The caret it places is scrolled to
+ *  here: `consuming` rebuilds the transaction, so a flag the command set is not on it. */
 function blockRule(regexp: RegExp, command: (match: RegExpMatchArray) => Command): InputRule {
 	return new InputRule(
 		regexp,
 		(state: EditorState, match: RegExpMatchArray, start: number, end: number) =>
-			consuming(state, start, end, command(match))?.tr ?? null
+			consuming(state, start, end, command(match))?.tr.scrollIntoView() ?? null
 	);
 }
 
@@ -110,4 +112,11 @@ export function markdownInputRules(schema: Schema): InputRule[] {
 /** The input-rules plugin the field mounts by default (opt-out via createField). */
 export function inputRulesPlugin(schema: Schema): Plugin {
 	return inputRules({ rules: markdownInputRules(schema) });
+}
+
+/** Backspace on the press right after a rule fired takes the rule back and leaves the
+ *  text it consumed, the way a writer who meant the literal `# ` says so. Mounted ahead
+ *  of every other keymap: it declines on any other press. */
+export function undoRuleKeymap(): Plugin {
+	return keymap({ Backspace: undoInputRule });
 }

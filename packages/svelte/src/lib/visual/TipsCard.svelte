@@ -31,9 +31,6 @@
 	}
 	let { tips, onDismiss, onError }: Props = $props();
 
-	/** Control-glyph size: the shared rule, as CardControls. */
-	const GLYPH = 14;
-
 	let cursor = $state(0);
 	// Clamped: the channel is consumer-authored and can be re-seeded shorter while
 	// the card is open, which would otherwise index past the end.
@@ -82,9 +79,9 @@
 		{/if}
 		<button type="button" class="qm-icon-btn qm-tips-action" onclick={advance}>
 			{#if isLast}
-				{t.strings.tipsDismiss} <Icon name="trash-2" size={GLYPH} />
+				{t.strings.tipsDismiss} <Icon name="trash-2" />
 			{:else}
-				{t.strings.tipsNext} <Icon name="arrow-right" size={GLYPH} />
+				{t.strings.tipsNext} <Icon name="arrow-right" />
 			{/if}
 		</button>
 	</div>
