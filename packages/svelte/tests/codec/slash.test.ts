@@ -2,6 +2,7 @@
 // The slash menu: the trigger's word boundary, the dismissals that edit no text, and
 // a pick that consumes exactly the trigger run in one commit.
 import { describe, it, expect, beforeAll } from 'vitest';
+import type { Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { createField } from '$lib/core/codec';
 import type { FieldController, LeafViews, SlashState } from '$lib/core/codec';
@@ -177,6 +178,25 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		// A code block is the one block no gap cursor sits beside, so the exit is minted;
 		// the caret stays in the fence.
 		expect(view.state.selection.$head.parent.type.name).toBe('code_block');
+		field.destroy();
+	});
+});
+
+// Every caret-placing command scrolls the minimum (VISUAL_EDITOR §"Focus and the preview bridge"), and a
+// pick is one: a heading or a fence opened at the fold would otherwise sit under it.
+describe('a pick scrolls the caret it places into view', () => {
+	it.each(['heading', 'list', 'quote', 'code', 'table'])('`/%s`', (name) => {
+		const { field, view } = leaf('alpha');
+		field.setCaret(0);
+		type(view, `/${name}`);
+		const seen: Transaction[] = [];
+		const dispatch = view.dispatch;
+		view.dispatch = (tr) => {
+			seen.push(tr);
+			dispatch(tr);
+		};
+		press(view, 'Enter');
+		expect(seen.map((tr) => tr.scrolledIntoView)).toEqual([true]);
 		field.destroy();
 	});
 });

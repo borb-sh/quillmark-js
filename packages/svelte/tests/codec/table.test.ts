@@ -1651,12 +1651,14 @@ describe('a table on the clipboard lands as a table island', () => {
 		);
 	});
 
-	// Docs spells bold as a `font-weight` style, which no parse rule reads: the header's
-	// text arrives and its weight is the header's own.
-	it("Google Docs: a cell's paragraphs are its lines, and a link survives", () => {
+	// Docs spells bold as a `font-weight` style on a span, and underlines its link's span.
+	it("Google Docs: a cell's paragraphs are its lines, and its bold and link survive", () => {
 		const rt = pasted(GOOGLE_DOCS);
 		expect(propsOf(rt)).toEqual({
-			header: [cell('Task'), cell('Reference')],
+			header: [
+				{ text: 'Task', marks: [strong(0, 4)] },
+				{ text: 'Reference', marks: [strong(0, 9)] }
+			],
 			rows: [
 				[
 					cell('Submit roster\nby Friday'),
@@ -1677,7 +1679,7 @@ describe('a table on the clipboard lands as a table island', () => {
 		});
 		expect(core.exportMarkdown(rt)).toBe(
 			exported(
-				'| Task | Reference |',
+				'| **Task** | **Reference** |',
 				'| --- | --- |',
 				'| Submit roster<br>by Friday | [AFI 33-360](https://www.e-publishing.af.mil/) |'
 			)
