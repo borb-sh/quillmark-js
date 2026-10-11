@@ -6,9 +6,19 @@
 
 **Enter on an empty last row of a table leaves the table, and ArrowLeft and ArrowRight cross cells.** Enter on a table's last row, while it is empty, removes that row and puts the caret after the table, as Enter on an empty list item leaves the list; a table always keeps a row under its first. ArrowLeft at the start of a cell and ArrowRight at its end move to the neighbouring cell in reading order, a row's end wrapping to the next row, and stop at the table's first and last cells.
 
-**`Mod-Shift-L`, `Mod-Shift-E` and `Mod-Shift-R` over a held table column set the column's alignment**, as the column's cluster does, where they aligned each cell in it on its own. A cell's own alignment is left as it is.
+**In a table, a grip holds a line and a sweep holds cells.** Backspace over cells swept by the pointer clears their text and keeps every row and column, where a sweep spanning a whole row, column or the table deleted it; an arrow over a sweep lets go of it, and the cell alignment buttons rise over a sweep alone, where a row's grip raised them too. A line its grip, Escape or `Mod-A` names deletes on Backspace and steps on an arrow, as before. `Mod-Shift-L`, `Mod-Shift-E` and `Mod-Shift-R` align nothing, so `Mod-Shift-R` is the browser's hard reload again.
 
-**`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table, as it does over every cell swept by the pointer.
+**A table draws rounder and even.** Its frame and its header round at the radius a card takes, every line between cells draws at the frame's strength, and the header's band steps toward the ink at both poles, a shade lighter than the card in dark where it drew darker. A grip is a short pill centred on its line, its marks at the label ink, and only a cell under the pointer draws its row's and its column's grips, nothing showing at rest.
+
+**Backspace edits only its own block.** At a heading's start it turns the heading into a paragraph, where it joined the heading's text onto the line above. At the start of any list item it lifts the item out of its list, a nested item one level, where an item after the first merged into the one above; the items after a lifted one keep their numbers, and the press after joins the line onto the list. Delete at the end of an item lifts the item below the same way. Beside a code block or a table, Backspace and Delete step the caret into it, where Backspace retyped a code block to a paragraph and selected a table; an empty line under either goes with the step.
+
+**A fence fires on Enter and keeps its language.** ` ``` ` stays the text it was typed as until Enter at the end of its line, so ` ```rust ` then Enter makes a code block carrying `rust`, where the fence fired on the third backtick and no language could be typed. Backspace right after takes it back. ↓ on the last line of a code block nothing follows opens a line below it.
+
+**A record row moves by a drag handle.** An `object` row's ↑/↓ buttons give way to a grip hung off the row's start edge, as a table's row grip is, and out of sight until the pointer is on the row: drag it and drop on the row to land at, a rule marking where it goes. Alt+↑/↓ from anywhere in the row moves it as before. The `arrayMoveUp` and `arrayMoveDown` strings are replaced by `arrayDrag`.
+
+**"Type / to insert" fades in once the caret rests on an empty line**, where it drew at once, so typing on through Enter never flashes it.
+
+**`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table.
 
 **Typing over a selected table writes into the empty paragraph after it**, where it opened a new paragraph above that one. An empty heading or code block after the table is left as it is.
 
@@ -22,7 +32,7 @@
 
 **A slash pick or a block shorthand scrolls its caret into view.** A heading, list, quote, fence or divider opened at the pane's bottom edge brings the caret up past the fold, as typing does.
 
-**A date emptied under the caret writes nothing until the caret leaves.** A Backspace that empties a segment holds the field empty, the segment drawing its hint where the default's digits drew beside the ones still standing; leaving unsets the date where every segment is empty and otherwise puts the stored date back. An edit that leaves every segment filled still writes at once.
+**A date emptied under the caret writes nothing until the caret leaves.** A Backspace that empties a segment holds the field empty, the segment drawing its hint where the default's digits drew beside the ones still standing; leaving writes the blank `""` where every segment is empty and otherwise puts the stored date back. Over a `default:` the blank stays blank, where the emptied date unset and the default's digits came back; with no default it unsets. An edit that leaves every segment filled still writes at once.
 
 **The required `*` is drawn at the label's ink.** It drew in `--qm-danger`, which now marks diagnostics and the delete glyph alone.
 

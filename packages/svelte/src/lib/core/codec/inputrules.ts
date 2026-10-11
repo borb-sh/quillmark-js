@@ -1,6 +1,6 @@
 // Input rules: the markdown-shorthand plugin the codec owns (`**`→strong, `*`→em,
 // `~~`→strike, `` ` ``→code, `# `→heading, `- `/`1. `→lists, `> `→blockquote,
-// `---`→divider, a fence→code block).
+// `---`→divider), and the fence, which fires on Enter rather than as typed.
 // Mark rules are hand-rolled (prosemirror-inputrules ships only node rules); every
 // block rule is one regexp over a command in `blocks.ts`, which is the slash menu's
 // implementation too. These produce transactions the codec already lowers: they add no
@@ -91,7 +91,6 @@ export function markdownInputRules(schema: Schema): InputRule[] {
 	// Block shorthands. Each command answers for the schema it is run against, so a
 	// schema without the node declines rather than being guarded here.
 	rules.push(blockRule(/^(#{1,6})\s$/, (match) => toHeading(match[1].length)));
-	rules.push(blockRule(/^```$/, toCodeBlock));
 	rules.push(blockRule(/^---$/, insertDivider));
 	// `- ` / `1. ` at the start of a block, here or nested inside an item — but not at
 	// the start of an item's own first block, where the command declines.
@@ -114,9 +113,38 @@ export function inputRulesPlugin(schema: Schema): Plugin {
 	return inputRules({ rules: markdownInputRules(schema) });
 }
 
+/** A fence's opening line: three backticks, then the language, if one is typed. */
+const FENCE = /^```([^\s`]*)$/;
+
+/**
+ * Enter at the end of a paragraph that is a fence's opening line → a code block carrying
+ * the language typed after the backticks. The one shorthand Enter fires rather than its
+ * last character: on the third backtick the language is not typed yet. It records itself
+ * as the input-rules plugin's last rule, so the Backspace after takes it back like any
+ * other shorthand.
+ */
+const fenceOnEnter: Command = (state, dispatch) => {
+	const { $from, empty } = state.selection;
+	const line = $from.parent;
+	if (!empty || line.type !== state.schema.nodes.paragraph) return false;
+	if ($from.parentOffset !== line.content.size || line.childCount !== 1 || !line.firstChild!.isText)
+		return false;
+	const match = FENCE.exec(line.textContent);
+	if (!match) return false;
+	const done = consuming(state, $from.start(), $from.pos, toCodeBlock({ lang: match[1] || null }));
+	if (!done) return false;
+	if (dispatch) {
+		const tr = done.tr.scrollIntoView();
+		const rules = state.plugins.find((plugin) => plugin.spec.isInputRules);
+		if (rules) tr.setMeta(rules, { transform: tr, from: $from.pos, to: $from.pos, text: '' });
+		dispatch(tr);
+	}
+	return true;
+};
+
 /** Backspace on the press right after a rule fired takes the rule back and leaves the
- *  text it consumed, the way a writer who meant the literal `# ` says so. Mounted ahead
- *  of every other keymap: it declines on any other press. */
+ *  text it consumed, the way a writer who meant the literal `# ` says so; and Enter fires
+ *  the fence. Mounted ahead of every other keymap: each declines on any other press. */
 export function undoRuleKeymap(): Plugin {
-	return keymap({ Backspace: undoInputRule });
+	return keymap({ Backspace: undoInputRule, Enter: fenceOnEnter });
 }

@@ -52,9 +52,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	// ── Array control ─────────────────────────────────────────────────────────
 	arrayAdd: string;
 	arrayRemove: string;
-	/** The reorder pair on an `object` row, accessible names: the buttons are glyphs. */
-	arrayMoveUp: string;
-	arrayMoveDown: string;
+	/** The drag handle on an `object` row: its tooltip and, with the row, its name. */
+	arrayDrag: string;
 	/**
 	 * A row control's accessible name, the action and the row it acts on: `Remove
 	 * Authors 2`. The action alone stays the tooltip. Parametric, so word order stays
@@ -199,8 +198,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	addCard: '+ Add Card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
-	arrayMoveUp: 'Move up',
-	arrayMoveDown: 'Move down',
+	arrayDrag: 'Drag to move',
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
 	elementUntitled: (label, index) => `${label} ${index}`,

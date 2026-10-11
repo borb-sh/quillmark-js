@@ -108,24 +108,60 @@ describe('`# ` inside an item', () => {
 
 // A code block is the one block a gap cursor will not sit beside, so a fence at the end
 // of a body strands the caret harder than a divider would: no arrow key reaches past it.
-// The rule therefore mints the same exit `---` and a block island do.
+// The rule therefore mints the same exit `---` and a block island do. It fires on Enter,
+// so the language typed after the backticks is there to keep.
 describe('the ` ``` ` fence shorthand', () => {
-	it('opens the paragraph after it, so the end of a body is not a dead end', () => {
-		const view = mountView();
+	function leafView(): EditorView {
+		const state = EditorState.create({
+			doc: blockSchema.nodes.doc.create(null, blockSchema.nodes.paragraph.create()),
+			plugins: proseLeafPlugins(blockSchema, { inline: false })
+		});
+		return new EditorView(document.createElement('div'), { state });
+	}
+
+	it('stays the text it was typed as until Enter', () => {
+		const view = leafView();
 		type(view, '```');
+		expect(view.state.doc.toString()).toBe('doc(paragraph("```"))');
+		view.destroy();
+	});
+
+	it('opens the paragraph after it, so the end of a body is not a dead end', () => {
+		const view = leafView();
+		type(view, '```');
+		press(view, 'Enter');
 		expect(view.state.doc.toString()).toBe('doc(code_block, paragraph)');
+		expect(view.state.doc.firstChild!.attrs.lang).toBe(null);
 		// The caret stays in the fence, not in the exit it minted.
 		expect(view.state.selection.$from.parent.type.name).toBe('code_block');
 		view.destroy();
 	});
 
+	it('keeps the language typed after the backticks', () => {
+		const view = leafView();
+		type(view, '```rust');
+		press(view, 'Enter');
+		expect(view.state.doc.toString()).toBe('doc(code_block, paragraph)');
+		expect(view.state.doc.firstChild!.attrs.lang).toBe('rust');
+		view.destroy();
+	});
+
 	it('keeps the block that already follows rather than opening a second', () => {
-		const view = mountView();
+		const view = leafView();
 		const { paragraph } = blockSchema.nodes;
 		view.dispatch(view.state.tr.insert(2, paragraph.create(null, blockSchema.text('after'))));
 		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)));
 		type(view, '```');
+		press(view, 'Enter');
 		expect(view.state.doc.toString()).toBe('doc(code_block, paragraph("after"))');
+		view.destroy();
+	});
+
+	it('is an ordinary Enter on any other line', () => {
+		const view = leafView();
+		type(view, 'a ```');
+		press(view, 'Enter');
+		expect(view.state.doc.toString()).toBe('doc(paragraph("a ```"), paragraph)');
 		view.destroy();
 	});
 });
@@ -274,12 +310,21 @@ describe('Backspace right after a shorthand takes it back', () => {
 		return new EditorView(document.createElement('div'), { state });
 	}
 
-	it.each(['# ', '- ', '1. ', '> ', '```', '---', 'a **b**', 'a ~~b~~'])('%s', (typed) => {
+	it.each(['# ', '- ', '1. ', '> ', '---', 'a **b**', 'a ~~b~~'])('%s', (typed) => {
 		const view = leafView();
 		type(view, typed);
 		expect(view.state.doc.toString()).not.toBe(`doc(paragraph("${typed}"))`);
 		press(view, 'Backspace');
 		expect(view.state.doc.toString()).toBe(`doc(paragraph("${typed}"))`);
+		view.destroy();
+	});
+
+	it('a fence, language and all', () => {
+		const view = leafView();
+		type(view, '```rust');
+		press(view, 'Enter');
+		press(view, 'Backspace');
+		expect(view.state.doc.toString()).toBe('doc(paragraph("```rust"))');
 		view.destroy();
 	});
 
@@ -289,7 +334,9 @@ describe('Backspace right after a shorthand takes it back', () => {
 		// The browser's own deletion of the `x`, which no keymap claims.
 		view.dispatch(view.state.tr.delete(1, 2));
 		press(view, 'Backspace');
-		expect(view.state.doc.toString()).toBe('doc(heading)');
+		// The heading's own Backspace answers instead: its shape goes, and the `# ` the
+		// shorthand consumed stays consumed.
+		expect(view.state.doc.toString()).toBe('doc(paragraph)');
 		view.destroy();
 	});
 
@@ -316,7 +363,7 @@ describe('Backspace right after a shorthand takes it back', () => {
 
 // The caret a block shorthand places is scrolled to, as a pick's is (`slash.test.ts`).
 describe('a block shorthand scrolls the caret it places into view', () => {
-	it.each(['# ', '- ', '1. ', '> ', '```', '---'])('%s', (typed) => {
+	it.each(['# ', '- ', '1. ', '> ', '---'])('%s', (typed) => {
 		const view = mountView();
 		type(view, typed.slice(0, -1));
 		const seen: Transaction[] = [];

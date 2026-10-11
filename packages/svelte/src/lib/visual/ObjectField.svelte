@@ -457,10 +457,8 @@
 	/* The vertical and the rung between it and the properties, `--_qm-nest` being the step
 	   the card and the section hold too.
 
-	   `--_qm-border` and not `--_qm-border-faint`: this is the stroke that structures
-	   (ARCHITECTURE §"A plane is a tone"), the one the card's edge and the section's
-	   vertical read. `faint` separates without structuring — a table's interior lines
-	   under a frame that is doing the structuring — which is the other job.
+	   `--_qm-border`: this is the stroke that structures (ARCHITECTURE §"A plane is a
+	   tone"), the one the card's edge and the section's vertical read.
 
 	   `padding-block` is the stroke's end caps, the same rung and the same reason as a
 	   section's (`Card.svelte`). A cap and not a leading gap: what stands the subform off

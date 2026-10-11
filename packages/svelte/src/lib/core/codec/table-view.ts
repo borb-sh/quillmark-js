@@ -15,9 +15,10 @@
 // is preserved, never minted), and no placeholder.
 //
 // The chrome is a band and a selection (CODEC §"The table island"), and the band raises
-// nothing: what floats over the grid is the held column's alignment cluster alone. Every
-// control is absolutely positioned out of the grid, so none is in a row or a column of
-// it; `codec/prose.css` draws the band, the cluster and the selection wash.
+// nothing: what floats over the grid is a held column's alignment, the held first row's
+// header toggle, or a sweep's cell alignment. Every control is absolutely positioned out
+// of the grid, so none is in a row or a column of it; `codec/prose.css` draws the band,
+// the clusters and the selection wash.
 import { baseKeymap, chainCommands, selectAll, toggleMark } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -345,27 +346,29 @@ interface Line {
  * island can name it: a cell index inside one leaf is not a position in the document's
  * coordinate space, and a custom `Selection` would have to be one to be dispatched.
  *
- * One state for both gestures — a grip press is the rectangle covering a whole line —
- * because the verb reading it is one verb. What Backspace means is decided by the
- * rectangle's extent rather than by which gesture drew it, so a row swept cell by cell
- * deletes exactly as the row its grip named does.
+ * `swept` is how the rectangle was drawn, and the verbs read it: a grip, Escape or
+ * select-all names lines, and a pointer travelling across cells holds those cells. A
+ * named line is what Backspace deletes and an arrow steps; swept cells are text, which
+ * Backspace clears and an arrow lets go of, whatever lines they happen to span.
  */
 interface Cells {
 	r0: number;
 	c0: number;
 	r1: number;
 	c1: number;
+	swept: boolean;
 }
 
 const sameCells = (a: Cells, b: Cells): boolean =>
-	a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
+	a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1 && a.swept === b.swept;
 
-/** The rectangle two corners span, in either order. */
+/** The block two corners span, in either order: what a sweep holds. */
 const spanCells = (a: { r: number; c: number }, b: { r: number; c: number }): Cells => ({
 	r0: Math.min(a.r, b.r),
 	c0: Math.min(a.c, b.c),
 	r1: Math.max(a.r, b.r),
-	c1: Math.max(a.c, b.c)
+	c1: Math.max(a.c, b.c),
+	swept: true
 });
 
 /** A drag in flight: the line lifted, where the press started, and whether it has
@@ -414,6 +417,11 @@ interface Resize {
 	engaged: boolean;
 }
 
+/** Each mounted island drawing a table, by its `dom`, which is what the outer view hands
+ *  back for a position: how a key in the field reaches into a table ({@link tableAt}). A
+ *  placeholder is absent, so it answers as the atom it draws. */
+const mounted = new WeakMap<Node, TableIslandView>();
+
 class TableIslandView implements NodeView {
 	readonly dom: HTMLElement;
 	private cells: MountedCell[] = [];
@@ -446,6 +454,8 @@ class TableIslandView implements NodeView {
 	private resize: Resize | undefined;
 	/** A drag's trailing `click`, which would otherwise re-select the moved line. */
 	private suppressClick = false;
+	/** The grips of the row and column under the pointer, drawn up. */
+	private near: HTMLButtonElement[] = [];
 
 	constructor(
 		private node: PMNode,
@@ -457,6 +467,8 @@ class TableIslandView implements NodeView {
 		this.dom.setAttribute('data-qm-island', node.attrs.islandType as string);
 		this.dom.setAttribute('data-qm-island-id', node.attrs.id as string);
 		this.dom.addEventListener('mousedown', this.onPointerDown);
+		this.dom.addEventListener('mouseover', this.onHover);
+		this.dom.addEventListener('mouseleave', this.onLeave);
 		this.render();
 	}
 
@@ -521,6 +533,8 @@ class TableIslandView implements NodeView {
 
 	destroy(): void {
 		this.dom.removeEventListener('mousedown', this.onPointerDown);
+		this.dom.removeEventListener('mouseover', this.onHover);
+		this.dom.removeEventListener('mouseleave', this.onLeave);
 		this.endDrag();
 		this.endSweep();
 		this.endResize();
@@ -577,6 +591,29 @@ class TableIslandView implements NodeView {
 		const grid = this.dom.querySelector('.qm-table');
 		if (grid && within(grid.getBoundingClientRect(), point)) this.focusNearestCell(point);
 		else this.caretBeside(point);
+	};
+
+	/** A cell under the pointer draws its row's and its column's grips, so a line's
+	 *  handle is found from the line rather than only from the band beside it. A control
+	 *  under the pointer is its own reveal, and draws no other. */
+	private readonly onHover = (event: MouseEvent): void => {
+		const target = event.target as Element | null;
+		const box = target?.closest?.(CONTROLS) ? null : target?.closest?.('.qm-table-cell');
+		const cell = box ? this.cells.find((m) => m.box === box) : undefined;
+		const next = cell
+			? [
+					this.grips.get(lineKey({ axis: 'row', index: cell.r }))?.grip,
+					this.grips.get(lineKey({ axis: 'column', index: cell.c }))?.grip
+				].filter((grip): grip is HTMLButtonElement => !!grip)
+			: [];
+		for (const grip of this.near) if (!next.includes(grip)) grip.removeAttribute('data-near');
+		for (const grip of next) grip.setAttribute('data-near', '');
+		this.near = next;
+	};
+
+	private readonly onLeave = (): void => {
+		for (const grip of this.near) grip.removeAttribute('data-near');
+		this.near = [];
 	};
 
 	/** The cell a press inside the frame belongs to: the nearest by rect, which for a
@@ -639,6 +676,14 @@ class TableIslandView implements NodeView {
 		this.outer.focus();
 		this.outer.dispatch(this.outer.state.tr.setSelection(selection));
 		return true;
+	}
+
+	/** Land the caret in the table from the block beside it: its last cell's end from
+	 *  below, its first cell's start from above. */
+	enter(side: -1 | 1): void {
+		const props = this.props();
+		if (side < 0) this.focusCell(rowCount(props) - 1, columnCount(props) - 1, 'end');
+		else this.focusCell(0, 0, 'start');
 	}
 
 	/** The island as the selection: the Escape that climbs out of a cell or a held
@@ -732,8 +777,8 @@ class TableIslandView implements NodeView {
 	 *  revalidates the whole table. */
 	private lineCells(line: Line, props: TableProps = this.props()): Cells {
 		return line.axis === 'row'
-			? { r0: line.index, c0: 0, r1: line.index, c1: columnCount(props) - 1 }
-			: { r0: 0, c0: line.index, r1: rowCount(props) - 1, c1: line.index };
+			? { r0: line.index, c0: 0, r1: line.index, c1: columnCount(props) - 1, swept: false }
+			: { r0: 0, c0: line.index, r1: rowCount(props) - 1, c1: line.index, swept: false };
 	}
 
 	/** The index space an axis allows, which is the whole of it on both. The header is
@@ -764,14 +809,12 @@ class TableIslandView implements NodeView {
 		} else if (held?.c !== line.index) this.focusCell(held?.r ?? 0, line.index);
 	}
 
-	/** Which line the held rectangle is, on one axis: a row spanning every column, a
-	 *  column spanning every row, and nothing at all for a block that spans neither. The
-	 *  extent rule reaching the line verbs ({@link TableIslandView.deleteSelection}) — a
-	 *  rectangle answers by what it covers, never by the gesture that drew it, so a row
-	 *  swept cell by cell moves exactly as the row a grip named does. */
+	/** Which line the held rectangle names, on one axis: a row spanning every column, a
+	 *  column spanning every row, and nothing for a block that spans neither or for cells
+	 *  a sweep holds, which are text however many lines they cross. */
 	private lineOn(axis: Axis): number | undefined {
 		const held = this.selected;
-		if (!held) return undefined;
+		if (!held || held.swept) return undefined;
 		const props = this.props();
 		if (axis === 'row')
 			return held.r0 === held.r1 && held.c0 === 0 && held.c1 === columnCount(props) - 1
@@ -838,18 +881,20 @@ class TableIslandView implements NodeView {
 	}
 
 	/**
-	 * What Backspace means over the selection, decided by its extent rather than by the
-	 * gesture that drew it (CODEC §"The table island").
-	 *
-	 * The both-axes arm is the rule's own limit rather than an exception to it: every rank
-	 * going at once leaves no table for a rank rule to have produced. It is the whole of
-	 * how a pointer deletes a table, and on a one-column or one-row table a single grip
-	 * draws it.
+	 * What Backspace means over the selection (CODEC §"The table island"). Swept cells
+	 * clear and keep their lines. Named lines go, read off their extent: every rank on
+	 * both axes is the table, which goes as the island, and on a one-column or one-row
+	 * table a single grip draws that.
 	 */
 	private deleteSelection(): void {
 		const held = this.selected;
 		if (!held) return;
 		const props = this.props();
+		if (held.swept) {
+			if (allCells(props, held).some((cell) => cell.text !== ''))
+				this.write(clearCells(props, held.r0, held.c0, held.r1, held.c1));
+			return;
+		}
 		const wide = held.c0 === 0 && held.c1 === columnCount(props) - 1;
 		const tall = held.r0 === 0 && held.r1 === rowCount(props) - 1;
 		if (tall && wide) return this.deleteIsland();
@@ -916,16 +961,15 @@ class TableIslandView implements NodeView {
 		this.selectLine({ axis: 'column', index: c });
 	}
 
-	/** The held cells' cluster: up over the first cell of a held rectangle, where no
-	 *  column's own cluster is, each toggle pressed where every cell in the rectangle
-	 *  holds it. It floats over the cell under that one, as the column's floats over the
-	 *  first row, and is out of the tab order for the reason a grip is, its keyboard twin
-	 *  being `Mod-Shift-l`, `-e` and `-r` (§{@link TableIslandView.cellKeys}). */
+	/** The swept cells' cluster: up over the first cell of a sweep, each toggle pressed
+	 *  where every cell in it holds it. It floats over the cell under that one, as the
+	 *  column's floats over the first row, and is out of the tab order for the reason a
+	 *  grip is. A named line raises none: a grip is pressed to move or delete its line. */
 	private paintCellCluster(props: TableProps): void {
 		this.cellCluster?.remove();
 		this.cellCluster = undefined;
 		const held = this.selected;
-		if (!held || this.lineOn('column') !== undefined) return;
+		if (!held?.swept) return;
 		const first = this.cells.find((m) => m.r === held.r0 && m.c === held.c0);
 		if (!first) return;
 		const s = this.deps.strings();
@@ -967,15 +1011,11 @@ class TableIslandView implements NodeView {
 		this.cellCluster = cluster;
 	}
 
-	/** Lay every held cell, or the caret's where none is held, at `value`, and clear the
-	 *  key from them where every one already holds it: the press that set an alignment
-	 *  takes it back to the column's. One `set`, and the rectangle stays held. */
-	private layCells<K extends 'align' | 'valign'>(
-		key: K,
-		value: TableCell[K],
-		at?: { r: number; c: number }
-	): void {
-		const held = this.selected ?? (at && { r0: at.r, c0: at.c, r1: at.r, c1: at.c });
+	/** Lay every held cell at `value`, and clear the key from them where every one already
+	 *  holds it: the press that set an alignment takes it back to the column's. One
+	 *  `set`, and the rectangle stays held. */
+	private layCells<K extends 'align' | 'valign'>(key: K, value: TableCell[K]): void {
+		const held = this.selected;
 		if (!held) return;
 		const props = this.props();
 		const every = allCells(props, held).every((cell) => cell[key] === value);
@@ -1268,11 +1308,14 @@ class TableIslandView implements NodeView {
 		this.endResize();
 		this.teardownCells();
 		this.grips.clear();
+		this.near = [];
 		this.clusters = [];
 		this.headerCluster = undefined;
 		this.dom.textContent = '';
 		const props = tablePropsOfNode(this.node);
 		this.rendered = props;
+		if (props) mounted.set(this.dom, this);
+		else mounted.delete(this.dom);
 		if (!props) {
 			// Any other island type: the literal placeholder `toDOM` draws (islands.ts).
 			this.dom.appendChild(document.createTextNode(`[${this.node.attrs.islandType || 'island'}]`));
@@ -1410,12 +1453,11 @@ class TableIslandView implements NodeView {
 	}
 
 	/** A column's alignment cluster: a toggle per alignment, pressed on the one the column
-	 *  holds. Up only while the held rectangle is this column
+	 *  holds. Up only while this column is the named line
 	 *  ({@link TableIslandView.paintSelection}), and absent rather than transparent the
 	 *  rest of the time: it floats over the first row, and a box hit-tested there at rest
 	 *  would take that cell's presses. Out of the tab order for the reason a grip is, its
-	 *  keyboard twins being Shift+Left and Shift+Right and `Mod-Shift-l`, `-e` and `-r`
-	 *  (§{@link TableIslandView.cellKeys}). */
+	 *  keyboard twins being Shift+Left and Shift+Right (§{@link TableIslandView.cellKeys}). */
 	private alignCluster(c: number, held: TableAlign, s: TableChromeStrings): HTMLElement {
 		const cluster = el('div', 'qm-table-align');
 		cluster.setAttribute('role', 'group');
@@ -1653,16 +1695,21 @@ class TableIslandView implements NodeView {
 		};
 		// The line verbs, over the held rectangle and nothing else: with none held every
 		// one of these declines and the key is the caret's, which is what lets them sit on
-		// keys a cell is already typing under. An arrow names the line on its own axis
-		// through the caret — the one already held steps to its neighbour and carries the
-		// caret, and any other rectangle turns into it, which is how a row becomes the
-		// column the caret is in. Alt moves the line instead, and over a rectangle that is
-		// not one it does nothing but keep the key: while a rectangle is held every arrow
-		// is its own, and an Alt+arrow handed back is the browser's Back on two platforms,
-		// mid-gesture.
+		// keys a cell is already typing under. An arrow over swept cells lets go of them,
+		// leaving the caret where it is, as an arrow collapses a text selection. Over named
+		// lines it names the line on its own axis through the caret — the one already held
+		// steps to its neighbour and carries the caret, and any other turns into it, which
+		// is how a row becomes the column the caret is in. Alt moves the line instead, and
+		// over a rectangle that is not one it does nothing but keep the key: while a
+		// rectangle is held every arrow is its own, and an Alt+arrow handed back is the
+		// browser's Back on two platforms, mid-gesture.
 		const line = (axis: Axis, by: -1 | 1, move: boolean): Command => {
 			return () => {
 				if (!this.selected) return false;
+				if (this.selected.swept && !move) {
+					this.clearSelection();
+					return true;
+				}
 				const on = this.lineOn(axis);
 				if (move) {
 					if (on !== undefined) this.moveLine({ axis, index: on }, by);
@@ -1694,24 +1741,18 @@ class TableIslandView implements NodeView {
 				return true;
 			};
 		};
-		// Over a held column an alignment chord sets the column's, as its cluster does: a
-		// cell's own alignment outranks its column's, so laying the column's cells would
-		// leave overrides behind that no column change reaches. Anywhere else it lays the
-		// held cells, or the caret's.
-		const chord = (to: Aligned): Command => {
-			return () => {
-				const on = this.lineOn('column');
-				if (on !== undefined) this.align(on, to);
-				else this.layCells('align', to, { r, c });
-				return true;
-			};
-		};
 		// Select-all grows a rung a press: the cell's text, which the base keymap's
 		// `selectAll` takes, then the caret's row, then every cell, then the document. Any
 		// held rectangle short of every cell grows to every cell.
 		const grow: Command = (state) => {
 			const props = this.props();
-			const every = { r0: 0, c0: 0, r1: rowCount(props) - 1, c1: columnCount(props) - 1 };
+			const every = {
+				r0: 0,
+				c0: 0,
+				r1: rowCount(props) - 1,
+				c1: columnCount(props) - 1,
+				swept: false
+			};
 			const held = this.selected;
 			if (held && sameCells(held, every)) {
 				this.clearSelection();
@@ -1747,9 +1788,6 @@ class TableIslandView implements NodeView {
 			'Alt-ArrowRight': line('column', 1, true),
 			'Shift-ArrowLeft': slide(-1),
 			'Shift-ArrowRight': slide(1),
-			'Shift-Mod-l': chord('left'),
-			'Shift-Mod-e': chord('center'),
-			'Shift-Mod-r': chord('right'),
 			'Mod-a': grow,
 			Tab: () => this.step(r, c, 1),
 			'Shift-Tab': () => this.step(r, c, -1),
@@ -1806,6 +1844,13 @@ class TableIslandView implements NodeView {
 		} else this.focusCell(to.r, to.c);
 		return true;
 	}
+}
+
+/** The table island mounted at `pos` in `view`, which a caret can step into; `undefined`
+ *  for any other node, or where no view is mounted. */
+export function tableAt(view: EditorView, pos: number): { enter(side: -1 | 1): void } | undefined {
+	const dom = view.nodeDOM(pos);
+	return dom ? mounted.get(dom) : undefined;
 }
 
 /** The `island_block` node view: a table island's editing surface, and the literal

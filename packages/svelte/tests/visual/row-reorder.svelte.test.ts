@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-// Reorder on an `object` row (VISUAL_EDITOR §"Settled and open"): ↑/↓ on the row's
-// head, disabled at either edge, and Alt+↑/↓ from anywhere in the row as the keyboard
-// twin, the nearest row answering. One splice of the ids and the values together, then
-// the array commits whole, so the element keeps its id and everything mounted under it.
-// Driven off the reference quill's `revisions` with three rows, and off `appendices`
-// for a row inside a row.
+// Reorder on an `object` row (VISUAL_EDITOR §"Settled and open"): a drag handle on the
+// row's head, and Alt+↑/↓ from anywhere in the row as the keyboard twin, the nearest row
+// answering. One splice of the ids and the values together, then the array commits
+// whole, so the element keeps its id and everything mounted under it. Driven off the
+// reference quill's `revisions` with three rows, and off `appendices` for a row inside a
+// row.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
@@ -38,52 +38,81 @@ function revisions(target: HTMLElement): HTMLElement {
 	openGroup(target, 'Metadata');
 	return field(target, 'Revisions');
 }
-/** A row's reorder pair, by title. */
-const rowButton = (arr: HTMLElement, k: number, title: string) =>
-	[...arr.querySelectorAll<HTMLElement>('.qm-element')][k].querySelector<HTMLButtonElement>(
-		`.qm-row-btn[title="${title}"]`
-	)!;
+const rows = (arr: HTMLElement) => [...arr.querySelectorAll<HTMLElement>('.qm-element')];
+const handle = (arr: HTMLElement, k: number) =>
+	rows(arr)[k].querySelector<HTMLButtonElement>('.qm-row-handle')!;
+/** Stand the rows 40px tall and 10px apart from the top, which jsdom lays out as none. */
+function layOut(arr: HTMLElement): void {
+	rows(arr).forEach((row, i) => {
+		const top = i * 50;
+		row.getBoundingClientRect = () => ({ top, bottom: top + 40 }) as DOMRect;
+	});
+}
+/** Drive a handle drag: the press, the travel and the release, all on the handle, which
+ *  holds the pointer once pressed. jsdom implements no pointer capture. */
+function dragHandle(el: HTMLElement, ys: number[], end = 'pointerup'): void {
+	const at = (type: string, y: number) =>
+		el.dispatchEvent(
+			new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, clientY: y })
+		);
+	at('pointerdown', ys[0]);
+	for (const y of ys.slice(1)) at('pointermove', y);
+	flushSync();
+	at(end, ys[ys.length - 1]);
+	flushSync();
+}
 
 describe('reorder on an object row', () => {
-	it('moves the row by button, commits the order, and disables at the edges', async () => {
+	it('moves the row by its handle onto the row it is dropped on, and commits the order', () => {
 		const q = quill();
 		const doc = threeRows(q);
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
+		layOut(arr);
 		expect(summaryTexts(arr)).toEqual(['A', 'B', 'C']);
-		expect(rowButton(arr, 0, 'Move up').disabled).toBe(true);
-		expect(rowButton(arr, 2, 'Move down').disabled).toBe(true);
-		expect(rowButton(arr, 1, 'Move up').disabled).toBe(false);
-		expect(rowButton(arr, 1, 'Move up').getAttribute('aria-label')).toBe('Move up Revisions 2');
+		const grip = handle(arr, 0);
+		expect(grip.tabIndex).toBe(-1);
+		expect(grip.getAttribute('aria-label')).toBe('Drag to move Revisions 1');
 
-		const down = rowButton(arr, 0, 'Move down');
-		down.focus();
-		down.click();
-		flushSync();
-		expect(order(q, doc)).toEqual(['B', 'A', 'C']);
-		expect(summaryTexts(arr)).toEqual(['B', 'A', 'C']);
+		dragHandle(grip, [20, 70, 120]);
+		expect(order(q, doc)).toEqual(['B', 'C', 'A']);
+		expect(summaryTexts(arr)).toEqual(['B', 'C', 'A']);
 		expect(mounted.changes.at(-1)).toMatchObject({ source: 'field', path: 'main.revisions' });
-		// The button that was pressed rode with its row, and is focused again once the
-		// flush has moved it: a second press keeps moving the same row.
-		await settle();
-		expect(document.activeElement).toBe(down);
-		expect(rowButton(arr, 1, 'Move down')).toBe(down);
+		// Past either end lands at that end.
+		layOut(arr);
+		dragHandle(handle(arr, 2), [120, -300]);
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
 	});
 
-	it('hands the focus to the twin arrow when a move carries the pressed one to its edge', async () => {
+	it('marks the lifted row and the drop while the drag is held, and leaves no trace', () => {
 		const q = quill();
 		const doc = threeRows(q);
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
-
-		const down = rowButton(arr, 1, 'Move down');
-		down.focus();
-		down.click();
+		layOut(arr);
+		const grip = handle(arr, 0);
+		grip.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 20 }));
+		grip.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientY: 70 }));
 		flushSync();
-		expect(order(q, doc)).toEqual(['A', 'C', 'B']);
-		await settle();
-		expect(down.disabled).toBe(true);
-		expect(document.activeElement).toBe(rowButton(arr, 2, 'Move up'));
+		expect(rows(arr)[0].classList.contains('lifted')).toBe(true);
+		expect(rows(arr)[1].dataset.drop).toBe('after');
+		grip.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, clientY: 70 }));
+		flushSync();
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
+		expect(arr.querySelector('.lifted, [data-drop]')).toBeNull();
+	});
+
+	it('moves nothing on a press that stays in the dead zone, or a drop on its own row', () => {
+		const q = quill();
+		const doc = threeRows(q);
+		const mounted = mountEditor(q, doc);
+		const arr = revisions(mounted.target);
+		layOut(arr);
+		const n = mounted.changes.length;
+		dragHandle(handle(arr, 1), [70, 72]);
+		dragHandle(handle(arr, 1), [70, 30, 75]);
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
+		expect(mounted.changes).toHaveLength(n);
 	});
 
 	it('leaves a key a cell already took to that cell', () => {
@@ -147,8 +176,8 @@ describe('reorder on an object row', () => {
 		const input = arr.querySelector<HTMLInputElement>('.qm-element.open input[type="text"]')!;
 		expect(input.value).toBe('A');
 
-		rowButton(arr, 0, 'Move down').click();
-		flushSync();
+		layOut(arr);
+		dragHandle(handle(arr, 0), [20, 70]);
 		// The keyed row moved as one node: the subform's input is the same element.
 		expect(arr.querySelector('.qm-element.open input[type="text"]')).toBe(input);
 		expect(order(q, doc)).toEqual(['B', 'A', 'C']);
@@ -182,7 +211,7 @@ describe('reorder on an object row', () => {
 		for (const name of ['Authors', 'Keywords']) {
 			openGroup(mounted.target, name === 'Authors' ? 'Who and what' : 'Content');
 			const f = field(mounted.target, name);
-			expect(f.querySelectorAll('.qm-row-btn[title="Move up"]')).toHaveLength(0);
+			expect(f.querySelectorAll('.qm-row-handle')).toHaveLength(0);
 			expect(f.querySelectorAll('.qm-row-btn.qm-remove').length).toBeGreaterThan(0);
 		}
 	});

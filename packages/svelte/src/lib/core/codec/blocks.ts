@@ -9,8 +9,9 @@
 // its guards (§`slashItems`).
 //
 // `blockKeymap` is the other half of the file and answers to no door: the Enter cases
-// that are about the body rather than about any block in it, and the Delete that is
-// about the caret's own line, outermost of the leaf's key chains (`keymap.ts`).
+// that are about the body rather than about any block in it, and the Backspace and
+// Delete that are about the caret's own line, outermost of the leaf's key chains
+// (`keymap.ts`).
 import type { Attrs, Node as PMNode, NodeType, ResolvedPos, Schema } from 'prosemirror-model';
 import { Selection } from 'prosemirror-state';
 import type { Command, EditorState, Transaction } from 'prosemirror-state';
@@ -111,16 +112,16 @@ export function toHeading(level: number): Command {
 	return retype('heading', { level });
 }
 
-/** A fence. The exit paragraph after it is the one a block island mints for the same
- *  reason, sharpened: a code block is the one block a gap cursor will not sit beside
- *  either, so a fence at the end of a body leaves the caret nowhere to go. The caret
- *  stays in the fence, not in the exit it minted. */
-export function toCodeBlock(): Command {
+/** A fence, carrying `attrs` (its `lang`). The exit paragraph after it is the one a
+ *  block island mints for the same reason, sharpened: a code block is the one block a
+ *  gap cursor will not sit beside either, so a fence at the end of a body leaves the
+ *  caret nowhere to go. The caret stays in the fence, not in the exit it minted. */
+export function toCodeBlock(attrs?: Attrs): Command {
 	return (state, dispatch) => {
 		const { code_block: code, paragraph } = state.schema.nodes;
 		const { $from } = state.selection;
 		if (!code || !paragraph || !atHead(state) || !fits($from, code)) return false;
-		const tr = state.tr.setBlockType($from.pos, $from.pos, code);
+		const tr = state.tr.setBlockType($from.pos, $from.pos, code, attrs);
 		const at = tr.doc.resolve($from.pos).after();
 		if (!tr.doc.nodeAt(at)) tr.insert(at, paragraph.create());
 		dispatch?.(tr);
@@ -353,6 +354,21 @@ const takeEmptyLine: Command = (state, dispatch) => {
 	return true;
 };
 
+/**
+ * Backspace at a heading's head → a paragraph, where it stands, and the press after is
+ * the join. The first press takes off the block's own shape, which is the whole of what
+ * it edits: the base keymap's join would merge the heading's text into the block above
+ * and lose the heading with it, and at the body's start it does nothing at all.
+ */
+const unheading: Command = (state, dispatch) => {
+	const paragraph = state.schema.nodes.paragraph;
+	const { $from } = state.selection;
+	if (!paragraph || !atHead(state) || $from.parent.type.name !== 'heading') return false;
+	if (!fits($from, paragraph)) return false;
+	dispatch?.(state.tr.setBlockType($from.pos, $from.pos, paragraph).scrollIntoView());
+	return true;
+};
+
 /** The body-wide link of the leaf's key chains: `{}` for a schema with no paragraph
  *  to mint. Outermost of the structural links, being about the body, or about the
  *  caret's own line, rather than about the surface either stands in. */
@@ -360,6 +376,7 @@ export function blockKeymap(schema: Schema): Record<string, Command> {
 	if (!schema.nodes.paragraph) return {};
 	return {
 		Enter: chainCommands(paragraphAtBodyStart, paragraphFromEmptyFence, splitAcrossBlocks),
+		Backspace: unheading,
 		Delete: takeEmptyLine
 	};
 }

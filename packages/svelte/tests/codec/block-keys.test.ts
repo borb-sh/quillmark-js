@@ -260,3 +260,18 @@ describe('and declines where the line is a construct, or the last of them', () =
 		expectPress(at('a\n\nb', 0, 1), 'Delete', 'doc(paragraph("ab"))');
 	});
 });
+
+describe('Backspace at a heading’s head unmarks it', () => {
+	it('a heading after a block becomes a paragraph, its text kept', () => {
+		expectPress(at('a\n\n## Title', 1, 0), 'Backspace', 'doc(paragraph("a"), paragraph("Title"))');
+	});
+
+	it('a heading that opens the body', () => {
+		expectPress(at('# Title', 0, 0), 'Backspace', 'doc(paragraph("Title"))');
+	});
+
+	it('the press after it joins as a paragraph does', () => {
+		const one = press(at('a\n\n## Title', 1, 0), 'Backspace');
+		expectPress(one, 'Backspace', 'doc(paragraph("aTitle"))');
+	});
+});

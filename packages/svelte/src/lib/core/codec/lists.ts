@@ -1,8 +1,9 @@
 // List editing: the body leaf's structural commands, over
 // `prosemirror-schema-list` primitives. Indent/outdent on Tab, and the three
 // structural keys lists redefine: Enter (split, exit an empty item, open a
-// paragraph where nothing above the list takes a caret), Backspace (merge, or
-// lift at the list's start) and Delete (Backspace at the seam below).
+// paragraph where nothing above the list takes a caret), Backspace (lift an item a
+// level, or join a block onto the list above it) and Delete (Backspace at the seam
+// below).
 //
 // Cleanup is command-local, never a global pass: `liftToOuterList` joins the
 // boundary it opens and `sinkListItem` reuses the previous item's nested list, so
@@ -15,7 +16,7 @@ import type { Node as PMNode, NodeType, ResolvedPos, Schema } from 'prosemirror-
 import { liftListItem, sinkListItem, splitListItem } from 'prosemirror-schema-list';
 import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import type { Command, Transaction } from 'prosemirror-state';
-import { chainCommands, joinTextblockBackward } from 'prosemirror-commands';
+import { chainCommands, joinTextblockBackward, joinTextblockForward } from 'prosemirror-commands';
 
 /** The caret's enclosing `list_item` when it sits at the very start of that item's
  * first block: the position both structural keys branch on. `null` otherwise
@@ -86,40 +87,74 @@ function paragraphAboveList(itemType: NodeType, paragraph: NodeType): Command {
 }
 
 /**
- * Backspace at the start of a list's first item → lift it: one level out for a
- * nested item, out of the list entirely (to a paragraph) at the top.
+ * Backspace at the start of an item → lift it: one level out for a nested item, out of
+ * the list to a paragraph at the top, whichever item it is. The first press takes off
+ * the item's own shape and joins nothing; the press after is the join
+ * ({@link joinOntoList}).
+ *
+ * Lifting a later item out splits its list, and an ordered list's items past the cut
+ * keep their numbers: the list after what the item held starts where they were, where a
+ * fresh `ordered_list` would count from 1 again.
  */
-function liftAtListStart(itemType: NodeType): Command {
+function liftAtItemStart(itemType: NodeType): Command {
 	return (state, dispatch) => {
 		const at = atItemStart(state, itemType);
-		if (!at || at.itemIndex !== 0) return false;
-		return liftListItem(itemType)(state, dispatch);
+		if (!at) return false;
+		const list = state.doc.nodeAt(at.listPos);
+		const cut =
+			list?.type.name === 'ordered_list' && !at.nested && at.itemIndex < list.childCount - 1;
+		const listEnd = at.listPos + (list?.nodeSize ?? 0);
+		return liftListItem(itemType)(
+			state,
+			dispatch &&
+				((tr) => {
+					if (cut)
+						renumberEndingAt(
+							tr,
+							tr.mapping.map(listEnd, -1),
+							(list.attrs.start as number) + at.itemIndex + 1
+						);
+					dispatch(tr);
+				})
+		);
 	};
 }
 
+/** Start the ordered list ending at `end` at `start`: the items a lift cut off, which
+ *  end where the whole list did, past whatever the lifted item held. */
+function renumberEndingAt(tr: Transaction, end: number, start: number): void {
+	const list = tr.doc.resolve(end).nodeBefore;
+	if (list?.type.name === 'ordered_list' && list.attrs.start !== start)
+		tr.setNodeMarkup(end - list.nodeSize, undefined, { ...list.attrs, start });
+}
+
 /**
- * Backspace at the start of any later item → join its text into the previous
- * item's last block, so the two items become one line.
+ * Backspace at the head of a block that stands right after a list → join its text into
+ * the list's last line, as two paragraphs join. The base keymap's answer there wraps the
+ * block into a fresh item instead, which undoes the lift that just took it out of the
+ * list ({@link liftAtItemStart}) and leaves the key toggling.
  *
- * Not the base keymap's `joinBackward`, which merges the block and leaves
- * `list_item(paragraph, paragraph)`: the item's marker gone while its text stays
- * on its own line, which the reference quill typesets as an unnumbered
- * continuation paragraph.
- *
- * Only between two blocks of one kind. A fence is not a line to put another line on,
- * and the join across that edge would retype one side's whole text as the other's
- * (`code.ts`, which refuses the same join between siblings); the base keymap's answer
- * stands here instead, merging the items with each block kept whole.
+ * Between a fence and prose the text does not join: a fence is not a line to put another
+ * line on, and the join would retype one side's whole text as the other's (`code.ts`,
+ * which refuses the same join between siblings). The block moves into the list's last
+ * item whole instead, a block of that item under its first.
  */
-function mergeIntoPreviousItem(itemType: NodeType): Command {
+function joinOntoList(itemType: NodeType): Command {
 	return (state, dispatch, view) => {
-		const at = atItemStart(state, itemType);
-		if (!at || at.itemIndex === 0) return false;
-		const into = lastBlockIn(state.doc.nodeAt(at.listPos)?.child(at.itemIndex - 1));
-		if (!into || !!into.type.spec.code !== !!state.selection.$from.parent.type.spec.code) {
-			return false;
+		const { $from, empty } = state.selection;
+		if (!empty || !$from.parent.isTextblock || $from.parentOffset !== 0) return false;
+		const before = state.doc.resolve($from.before()).nodeBefore;
+		if (before?.firstChild?.type !== itemType) return false;
+		const into = lastBlockIn(before);
+		if (!into) return false;
+		if (!!into.type.spec.code === !!$from.parent.type.spec.code)
+			return joinTextblockBackward(state, dispatch, view);
+		if (dispatch) {
+			const at = $from.before() - 2;
+			const tr = state.tr.delete($from.before(), $from.after()).insert(at, $from.parent);
+			dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 1)).scrollIntoView());
 		}
-		return joinTextblockBackward(state, dispatch, view);
+		return true;
 	};
 }
 
@@ -142,6 +177,10 @@ function inItem($pos: ResolvedPos, itemType: NodeType): boolean {
  * The reflection carries the edit and not the caret, which stays where the key was
  * pressed: a lift moves the item below, and Delete does not follow it.
  *
+ * An empty item is the exception: its line is the whole of what Delete edits, so the
+ * item below moves up into it rather than being lifted, and the empty item is spent. A
+ * fence below takes no prose line (`joinOntoList`), so there the empty line goes alone.
+ *
  * Declining wherever the chain does is what keeps this to the list's own seams: a
  * boundary inside one item, and the list's outer edge, stay the base keymap's, where
  * the two keys already answer alike.
@@ -153,6 +192,15 @@ function backspaceBelow(itemType: NodeType, press: Command): Command {
 		if (!inItem($from, itemType)) return false;
 		const below = Selection.near(state.doc.resolve($from.after()), 1);
 		if (below.from <= $from.pos) return false;
+		if ($from.parent.content.size === 0) {
+			if (!!below.$from.parent.type.spec.code === !!$from.parent.type.spec.code)
+				return joinTextblockForward(state, dispatch);
+			if (dispatch) {
+				const tr = state.tr.deleteRange($from.before(), $from.after());
+				dispatch(tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(below.from)), 1)));
+			}
+			return true;
+		}
 		const pressed = $from.pos;
 		const keepCaret = (tr: Transaction): void =>
 			dispatch?.(tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(pressed))));
@@ -176,8 +224,8 @@ function backspaceBelow(itemType: NodeType, press: Command): Command {
  * `splitListItem`, then `liftListItem`. The middle link carries two behaviors of
  * its own: it splits a non-empty item, and on an empty item it either splits the
  * wrapping item (a nested empty item, so Enter lifts exactly one level) or bails
- * so the third link lifts a top-level empty item out to a paragraph. `Backspace`
- * forks on the item's index: the first item lifts, any later one merges. `Delete` is
+ * so the third link lifts a top-level empty item out to a paragraph. `Backspace` lifts
+ * an item at its start, and joins a block onto the list it stands after. `Delete` is
  * that same chain at the seam below rather than a second table of cases beside it, so
  * the two keys cannot come to differ over a seam this link reaches. An empty line is
  * not one: the block link takes it ahead of this chain (`blocks.ts`), the caret's own
@@ -187,7 +235,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 	const itemType = schema.nodes.list_item;
 	const paragraph = schema.nodes.paragraph;
 	if (!itemType || !paragraph) return {};
-	const backspace = chainCommands(liftAtListStart(itemType), mergeIntoPreviousItem(itemType));
+	const backspace = chainCommands(liftAtItemStart(itemType), joinOntoList(itemType));
 	return {
 		Tab: sinkListItem(itemType),
 		'Shift-Tab': liftListItem(itemType),
