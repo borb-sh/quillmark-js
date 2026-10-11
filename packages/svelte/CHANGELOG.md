@@ -14,6 +14,8 @@
 
 **A fence fires on Enter and keeps its language.** ` ``` ` stays the text it was typed as until Enter at the end of its line, so ` ```rust ` then Enter makes a code block carrying `rust`, where the fence fired on the third backtick and no language could be typed. Backspace right after takes it back. ↓ on the last line of a code block nothing follows opens a line below it.
 
+**A record row moves by a drag handle.** An `object` row's ↑/↓ buttons give way to a grip beside the remove, out of sight until the pointer is on the row: drag it and drop on the row to land at, a rule marking where it goes. Alt+↑/↓ from anywhere in the row moves it as before. The `arrayMoveUp` and `arrayMoveDown` strings are replaced by `arrayDrag`.
+
 **"Type / to insert" fades in once the caret rests on an empty line**, where it drew at once, so typing on through Enter never flashes it.
 
 **`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table.

@@ -18,6 +18,14 @@ export const ICONS = {
 	],
 	'chevron-down': [['path', { d: 'm6 9 6 6 6-6' }]],
 	'chevron-up': [['path', { d: 'm18 15-6-6-6 6' }]],
+	'grip-vertical': [
+		['circle', { cx: '9', cy: '12', r: '1' }],
+		['circle', { cx: '9', cy: '5', r: '1' }],
+		['circle', { cx: '9', cy: '19', r: '1' }],
+		['circle', { cx: '15', cy: '12', r: '1' }],
+		['circle', { cx: '15', cy: '5', r: '1' }],
+		['circle', { cx: '15', cy: '19', r: '1' }]
+	],
 	bold: [['path', { d: 'M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8' }]],
 	italic: [
 		['line', { x1: '19', x2: '10', y1: '4', y2: '4' }],

@@ -29,8 +29,8 @@
  container or a block prose cell.
 
  The row's controls are inside the element: a slab over the end of the element's own
- box, taking its two end-side corners — the remove, and on an `object` row the reorder
- pair before it. So a row's box is the element's box, and an array's rows end where
+ box, taking its two end-side corners — the remove, and on an `object` row the drag
+ handle before it. So a row's box is the element's box, and an array's rows end where
  every other field's control does. On an object element that box is the summary rather
  than the open row: a destructive control belongs to the line it sits on, not to
  everything that line has unfolded. A table's row carries the remove alone, in its last
@@ -41,7 +41,8 @@
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
  caret there, Backspace on an empty element removes it and hands focus back up the
  list, Alt+↑/↓ anywhere in an `object` row of the list moves it, the nearest row
- answering and never the record around a nested one. A move is one splice of the ids
+ answering and never the record around a nested one, and is the twin of the handle's
+ drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
@@ -328,15 +329,13 @@
 		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove);
 	}
 	/**
-	 * Move element `k` one slot: one splice of the ids and of the values together, so
-	 * the element keeps its id and everything mounted under it. A no-op at either edge.
-	 * The control that was pressed rides with the row, so it is focused again once the
-	 * flush has moved it: a node moved in the DOM is a node the browser blurred. An arrow
-	 * the move carried to its edge is disabled and takes no focus, so its twin does.
+	 * Move element `k` to slot `to`: one splice of the ids and of the values together, so
+	 * the element keeps its id and everything mounted under it. A no-op outside the list.
+	 * The control that held the focus rides with the row, so it is focused again once the
+	 * flush has moved it: a node moved in the DOM is a node the browser blurred.
 	 */
-	function move(k: number, dir: -1 | 1): void {
-		const to = k + dir;
-		if (to < 0 || to >= ids.length) return;
+	function move(k: number, to: number): void {
+		if (to === k || to < 0 || to >= ids.length) return;
 		const pressed = document.activeElement;
 		arm.arm();
 		const nextIds = ids.slice();
@@ -349,14 +348,8 @@
 		onCommit(next);
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
-			if (!(pressed instanceof HTMLElement) || !pressed.isConnected) return;
-			const target =
-				pressed instanceof HTMLButtonElement && pressed.disabled
-					? [pressed.previousElementSibling, pressed.nextElementSibling].find(
-							(b) => b instanceof HTMLButtonElement && !b.disabled
-						)
-					: pressed;
-			if (target instanceof HTMLElement) target.focus();
+			if (pressed instanceof HTMLElement && pressed.isConnected && rowEls[id]?.contains(pressed))
+				pressed.focus();
 		})();
 	}
 	/** Take the caret: the first element, or the add affordance when the list is empty;
@@ -538,7 +531,64 @@
 		const dir = e.key === 'ArrowUp' ? -1 : 1;
 		if (k + dir < 0 || k + dir >= ids.length) return;
 		e.preventDefault();
-		move(k, dir);
+		move(k, k + dir);
+	}
+
+	// ── The drag handle ──────────────────────────────────────────────────────────
+	// Press-and-drag the handle moves its row; a press that does not travel past the dead
+	// zone does nothing. The rows are measured once the drag engages, nothing reflowing
+	// until the release (the lift is a tone and the drop rule is out of flow), and the
+	// release is the one splice `move` makes.
+	const DEAD_ZONE = 3;
+	type RowDrag = {
+		k: number;
+		origin: number;
+		engaged: boolean;
+		drop: number;
+		heads: { start: number; end: number }[];
+	};
+	let drag = $state<RowDrag | undefined>();
+	function onHandleDown(e: PointerEvent, k: number): void {
+		if (e.button !== 0) return;
+		e.preventDefault();
+		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+		drag = { k, origin: e.clientY, engaged: false, drop: k, heads: [] };
+	}
+	function onHandleMove(e: PointerEvent): void {
+		if (!drag) return;
+		if (!drag.engaged) {
+			if (Math.abs(e.clientY - drag.origin) < DEAD_ZONE) return;
+			drag.engaged = true;
+			drag.heads = ids.map((id) => {
+				const box = rowEls[id]?.getBoundingClientRect();
+				return { start: box?.top ?? 0, end: box?.bottom ?? 0 };
+			});
+		}
+		drag.drop = dropIndex(drag, e.clientY);
+	}
+	/** The row the pointer is over, or the nearest one past either end. */
+	function dropIndex(d: RowDrag, y: number): number {
+		let best = d.k;
+		let nearest = Infinity;
+		d.heads.forEach((head, i) => {
+			const gap = y < head.start ? head.start - y : y > head.end ? y - head.end : 0;
+			if (gap < nearest) {
+				nearest = gap;
+				best = i;
+			}
+		});
+		return best;
+	}
+	function onHandleUp(e: PointerEvent): void {
+		const done = drag;
+		drag = undefined;
+		if (!done?.engaged || e.type !== 'pointerup') return;
+		move(done.k, done.drop);
+	}
+	/** Where the drop rule draws on row `k`, while a drag would land the row there. */
+	function dropSide(k: number): 'before' | 'after' | undefined {
+		if (!drag?.engaged || drag.drop !== k || drag.drop === drag.k) return undefined;
+		return drag.drop > drag.k ? 'after' : 'before';
 	}
 </script>
 
@@ -639,7 +689,11 @@
 				<!-- The handler catches a key from the controls inside the row and adds no
 				     interaction of the row's own: the row is no tab stop. -->
 				<div
-					class={['qm-array-row qm-element', { open: open.has(id) }]}
+					class={[
+						'qm-array-row qm-element',
+						{ open: open.has(id), lifted: drag?.engaged && drag.k === k }
+					]}
+					data-drop={dropSide(k)}
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
 					onkeydown={(e) => onRowKey(e, k)}
@@ -738,24 +792,20 @@
 	>
 {/snippet}
 
-<!-- An `object` row's controls: the reorder pair, disabled at its edge as the card
-     header's is, then the remove. -->
+<!-- An `object` row's controls: the drag handle, then the remove. The handle holds no
+     focus, as a table grip does not: its keyboard twin is Alt+↑/↓ from anywhere in the
+     row. -->
 {#snippet rowActions(k: number)}
 	<button
 		type="button"
-		class="qm-icon-btn qm-row-btn qm-focus-ring"
-		title={t.strings.arrayMoveUp}
-		aria-label={rowAction(t.strings.arrayMoveUp, k)}
-		disabled={k === 0}
-		onclick={() => move(k, -1)}><Icon name="chevron-up" /></button
-	>
-	<button
-		type="button"
-		class="qm-icon-btn qm-row-btn qm-focus-ring"
-		title={t.strings.arrayMoveDown}
-		aria-label={rowAction(t.strings.arrayMoveDown, k)}
-		disabled={k === ids.length - 1}
-		onclick={() => move(k, 1)}><Icon name="chevron-down" /></button
+		class="qm-icon-btn qm-row-btn qm-row-handle"
+		tabindex="-1"
+		title={t.strings.arrayDrag}
+		aria-label={rowAction(t.strings.arrayDrag, k)}
+		onpointerdown={(e) => onHandleDown(e, k)}
+		onpointermove={onHandleMove}
+		onpointerup={onHandleUp}
+		onpointercancel={onHandleUp}><Icon name="grip-vertical" /></button
 	>
 	{@render removeButton(k)}
 {/snippet}
@@ -834,7 +884,7 @@
 	/* The end inset the slabs stand in, taken off whichever box the element drew:
 	 `.qm-input` is the text element, `.qm-control-box` the prose one — the row's own
 	 child, so a table's cells, which are boxes too, keep their inset — and an object
-	 row's summary, which stands three slabs off its end. `:global`, because the box
+	 row's summary, which stands two slabs off its end. `:global`, because the box
 	 belongs to the child component's markup and the scope class stops at this
 	 component's. The longhand beats the family's `padding` shorthand without a
 	 specificity fight: `controls.css` ranks the family at zero inside `:where()`. */
@@ -843,7 +893,7 @@
 		padding-inline-end: var(--_qm-tap-min);
 	}
 	.qm-element-summary {
-		padding-inline-end: calc(3 * var(--_qm-tap-min));
+		padding-inline-end: calc(2 * var(--_qm-tap-min));
 	}
 	/* The box's end wall, floor to ceiling: a height of its own would leave a sliver of
 	 well above or below, and the corners it takes are the box's — the end-side pair keeps
@@ -851,8 +901,8 @@
 	 another gives up its corners on both sides.
 
 	 It comes up on its own row rather than on the field: a destructive control is offered
-	 by the row the pointer is on, not by every row at once, and the reorder pair beside
-	 it comes up with it. Hover is where the remove says destructive, ink with fill, a
+	 by the row the pointer is on, not by every row at once, and the drag handle beside it
+	 comes up with it. Hover is where the remove says destructive, ink with fill, a
 	 tint alone being a wash under a label-toned glyph. */
 	.qm-row-actions {
 		position: absolute;
@@ -887,6 +937,44 @@
 	.qm-remove:hover:not(:disabled) {
 		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
+	}
+	/* The handle rests at nothing, where the remove rests faint: it comes up with the row
+	 the pointer is on, and stays up through the drag it is carrying. The pointer owns the
+	 gesture, not the page's scroll. */
+	.qm-row-handle {
+		opacity: 0;
+		cursor: grab;
+		touch-action: none;
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-array-row:hover > .qm-element-head > .qm-row-actions > .qm-row-handle,
+	.qm-element.lifted > .qm-element-head > .qm-row-actions,
+	.qm-element.lifted > .qm-element-head > .qm-row-actions > .qm-row-handle {
+		opacity: 1;
+	}
+	.qm-element.lifted > .qm-element-head > .qm-row-actions > .qm-row-handle {
+		cursor: grabbing;
+	}
+	/* The lifted row is a tone, and the drop is one rule on the edge it would land
+	 against, drawn out of flow so nothing reflows under the drag: the table island's
+	 own pair. */
+	.qm-element.lifted > .qm-element-head {
+		opacity: var(--_qm-opacity-muted);
+	}
+	.qm-element[data-drop]::after {
+		content: '';
+		position: absolute;
+		inset-inline: 0;
+		height: var(--_qm-ring-width);
+		background: var(--_qm-accent);
+		border-radius: var(--_qm-radius-pill);
+		pointer-events: none;
+	}
+	.qm-element[data-drop='before']::after {
+		top: calc(-0.5 * (var(--_qm-space) + var(--_qm-ring-width)));
+	}
+	.qm-element[data-drop='after']::after {
+		bottom: calc(-0.5 * (var(--_qm-space) + var(--_qm-ring-width)));
 	}
 	/* ── An object element ──────────────────────────────────────────────────────
 	 The row is a summary and the subform hangs under it. `row-gap` rather than a margin
@@ -1106,10 +1194,15 @@
 	.qm-array.empty .qm-add-el {
 		opacity: 1;
 	}
+	/* No hover to come up on: the controls stand at the muted rung, the handle with
+	 them. */
 	@media (hover: none) {
 		.qm-add-el,
 		.qm-row-actions {
 			opacity: var(--_qm-opacity-muted);
+		}
+		.qm-row-handle {
+			opacity: 1;
 		}
 	}
 </style>
