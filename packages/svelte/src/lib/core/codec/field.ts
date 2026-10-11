@@ -777,8 +777,10 @@ function plainClipboardPlugin(): Plugin {
  * A printable key over a selected atom writes past it. A selection is the subject
  * of the next command, never a thing armed for
  * replacement: Backspace deletes it, Mod-C copies it, and a character lands beside
- * it. A block island takes a new paragraph after it, an inline one the caret after
- * the image in the same line: one rule, both node types.
+ * it. A block island takes the empty paragraph after it, or a new one where there is
+ * none; an inline one the caret after the image in the same line: one rule, both node
+ * types. Only a paragraph is reused, since an empty heading or fence would set the
+ * text in a shape the key never asked for.
  *
  * PM routes text input over a non-`TextSelection` through `handleTextInput` before
  * falling back to replacing the selection, so this one prop is the whole of it.
@@ -793,8 +795,11 @@ function pastAtomPlugin(): Plugin {
 				if (!text || !(selection instanceof NodeSelection) || !selection.node.isAtom) return false;
 				const tr = view.state.tr;
 				const at = selection.to; // just past the node, in both coordinate senses
+				const after = tr.doc.resolve(at).nodeAfter;
 				if (selection.node.isInline) {
 					tr.setSelection(TextSelection.create(tr.doc, at)).insertText(text);
+				} else if (after?.type === schema.nodes.paragraph && after.content.size === 0) {
+					tr.setSelection(TextSelection.create(tr.doc, at + 1)).insertText(text);
 				} else {
 					const para = schema.nodes.paragraph.create(null, schema.text(text));
 					tr.insert(at, para);

@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { GapCursor } from 'prosemirror-gapcursor';
 import { undo, undoDepth } from 'prosemirror-history';
-import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
+import { AllSelection, NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { createField, decode, blockSchema, pmToContent } from '$lib/core/codec';
 import { cellSchema } from '$lib/core/codec/schema.js';
@@ -674,6 +674,40 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
+	it('a horizontal arrow crosses cells from the text’s edge, in reading order', () => {
+		const { field } = tableLeaf(LETTERED);
+		const views = cellViews(field);
+		const at = (view: EditorView, pos: number) => {
+			view.focus();
+			view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)));
+		};
+		// Inside the text the key is the caret's own.
+		at(views[0], 2);
+		press(views[0], 'ArrowRight');
+		expect(caret(field)).toBe(views[0]);
+		// From the end it lands at the next cell's start, the edge it entered by.
+		at(views[0], 3);
+		press(views[0], 'ArrowRight');
+		expect(caret(field)).toBe(views[1]);
+		expect(views[1].state.selection.head).toBe(1);
+		// A row's end wraps to the next row's start, and Left walks back to its end.
+		at(views[1], 3);
+		press(views[1], 'ArrowRight');
+		expect(caret(field)).toBe(views[2]);
+		press(views[2], 'ArrowLeft');
+		expect(caret(field)).toBe(views[1]);
+		expect(views[1].state.selection.head).toBe(3);
+		// The table's ends stop it, and no arrow grows the table.
+		at(views[0], 1);
+		press(views[0], 'ArrowLeft');
+		expect(caret(field)).toBe(views[0]);
+		at(views[5], 3);
+		press(views[5], 'ArrowRight');
+		expect(caret(field)).toBe(views[5]);
+		expect(leafProps(field).rows).toHaveLength(2);
+		field.destroy();
+	});
+
 	it('Tab declines at both ends, which is the island’s keyboard exit', () => {
 		const { field } = tableLeaf(LETTERED);
 		const claims = (view: EditorView, init: KeyboardEventInit = {}) =>
@@ -775,6 +809,35 @@ describe('the table NodeView', () => {
 		expect(leafProps(field).rows).toHaveLength(2); // and no row was appended
 		// The caret is in the cell below, which is the whole of what Enter means here.
 		expect((field as FieldController & LeafViews).focusedView()).toBe(views[2]);
+		field.destroy();
+	});
+
+	it('Enter on an empty trailing row refuses it, and the caret lands past the table', () => {
+		const { field } = tableLeaf(
+			normalizeTable({ ...LETTERED, rows: [...LETTERED.rows, [emptyCell(), emptyCell()]] })
+		);
+		const views = cellViews(field);
+		views[6].focus();
+		press(views[6], 'Enter');
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
+		const outer = outerView(field);
+		expect(cellViews(field).some((v) => v.hasFocus())).toBe(false);
+		expect(outer.state.selection.$head.parent.textContent).toBe('tail');
+		// One step: one undo brings the row back.
+		undo(outer.state, outer.dispatch);
+		expect(leafProps(field).rows).toHaveLength(3);
+		field.destroy();
+	});
+
+	it('Enter on row 1 appends rather than refusing it, and the next Enter refuses that', () => {
+		const { field } = tableLeaf(newTable(2, 1));
+		const views = cellViews(field);
+		views[2].focus();
+		press(views[2], 'Enter');
+		expect(leafProps(field).rows).toHaveLength(2);
+		press(caret(field), 'Enter');
+		expect(leafProps(field).rows).toHaveLength(1);
+		expect(outerView(field).state.selection.$head.parent.textContent).toBe('tail');
 		field.destroy();
 	});
 
@@ -1036,6 +1099,23 @@ describe('alignment is set on the held column', () => {
 		field.destroy();
 	});
 
+	it('an alignment chord over the held column sets the column, and leaves its cells’ own', () => {
+		const { field } = tableLeaf(setCellLayout(UNALIGNED, 1, 1, 1, 1, 'align', 'left'));
+		grips(field, 'column')[1].click();
+		const center = () => press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
+		center();
+		expect(leafProps(field).aligns).toEqual(['none', 'center']);
+		expect(leafProps(field).rows[0]![1]!.align).toBe('left');
+		expect(leafProps(field).header[1]!.align).toBeUndefined();
+		expect(undoDepth(outerView(field).state)).toBe(1);
+		expect(washed(field)).toEqual(['0,1', '1,1', '2,1']);
+		// Again is the alignment the column holds, which writes nothing, as its toggle.
+		center();
+		expect(leafProps(field).aligns).toEqual(['none', 'center']);
+		expect(undoDepth(outerView(field).state)).toBe(1);
+		field.destroy();
+	});
+
 	it('a set alignment is the delimiter row markdown spells, and decodes back', () => {
 		const { field } = tableLeaf(UNALIGNED);
 		grips(field, 'column')[0].click();
@@ -1117,6 +1197,25 @@ describe('a selection is a rectangle of cells, and Backspace reads its extent', 
 		// deletion to have produced, so what the selection covers is the table.
 		expect(doc.main.body.islands).toHaveLength(0);
 		expect(doc.main.body.text).toBe('para\ntail');
+		field.destroy();
+	});
+
+	it('select-all grows a rung a press: the cell’s text, its row, every cell, the document', () => {
+		const { field } = tableLeaf(LETTERED);
+		const view = cellViews(field)[3]; // row 1, column 1
+		view.focus();
+		const selectAll = () => press(caret(field), 'a', { ctrlKey: true });
+		selectAll();
+		const { from, to } = view.state.selection;
+		expect(view.state.doc.textBetween(from, to)).toBe('a2');
+		expect(washed(field)).toEqual([]);
+		selectAll();
+		expect(washed(field)).toEqual(['1,0', '1,1']);
+		selectAll();
+		expect(washed(field)).toHaveLength(6);
+		selectAll();
+		expect(washed(field)).toEqual([]);
+		expect(outerView(field).state.selection instanceof AllSelection).toBe(true);
 		field.destroy();
 	});
 
@@ -1537,6 +1636,40 @@ describe('a selection is the subject of the next command', () => {
 		expect(outer.state.selection instanceof TextSelection).toBe(true);
 		expect(outer.state.selection.empty).toBe(true);
 		field.destroy();
+	});
+
+	it('a printable key over a BLOCK island writes into the empty paragraph after it', () => {
+		/** The blocks after typing over the table with an empty `kind` block after it. */
+		const typed = (kind: 'paragraph' | 'heading') => {
+			const { field } = tableLeaf(LETTERED);
+			const outer = outerView(field);
+			const at = outer.state.doc.child(0).nodeSize;
+			const past = at + outer.state.doc.child(1).nodeSize;
+			outer.dispatch(outer.state.tr.insert(past, outer.state.schema.nodes[kind].create()));
+			outer.dispatch(outer.state.tr.setSelection(NodeSelection.create(outer.state.doc, at)));
+			expect(type(outer, 'x')).toBe(true);
+			const blocks: string[] = [];
+			outer.state.doc.forEach((block) =>
+				blocks.push(`${block.type.name}:${block.isAtom ? '' : block.textContent}`)
+			);
+			expect(outer.state.selection.$head.parent.textContent).toBe('x');
+			field.destroy();
+			return blocks;
+		};
+		expect(typed('paragraph')).toEqual([
+			'paragraph:para',
+			'island_block:',
+			'paragraph:x',
+			'paragraph:tail'
+		]);
+		// An empty heading would set the text as a heading, so the key opens a paragraph.
+		expect(typed('heading')).toEqual([
+			'paragraph:para',
+			'island_block:',
+			'paragraph:x',
+			'heading:',
+			'paragraph:tail'
+		]);
 	});
 
 	it('a printable key over an INLINE island lands after the image, in its line', () => {
