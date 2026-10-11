@@ -1,8 +1,8 @@
 <!--
  A `date` (or `datetime`) field → a styled segmented date field on bits-ui. The
  stored value is a string, `YYYY-MM-DD` or `today`; a cleared control commits
- `undefined` (the unset rung): the parent removes the field, and the quill's
- `default:` applies. The value-object a date field lowers to is a render-time
+ `undefined` (the unset rung) as the focus leaves it: the parent removes the field,
+ and the quill's `default:` applies. The value-object a date field lowers to is a render-time
  concern: the editor only sees the stored string.
 
  `today` is the render date rather than a written one (canon `SCHEMAS.md`), so its
@@ -43,8 +43,15 @@
 
  Entering an unset field seats the default as the primitive's value, still at the
  default rung, so an edit to one segment commits a whole date with the others the
- default's. Leaving without an edit unseats it, and nothing is written; so does
- clearing a segment.
+ default's. Leaving without an edit unseats it, and nothing is written.
+
+ A segment edit that leaves a segment empty empties the primitive's value, which is
+ held rather than committed while the focus stays inside: the first Backspace through
+ a date writes nothing unset, and the empty segment shows its hint, not the default's
+ digits beside the ones still standing. Leaving settles it: unset where every segment
+ is empty, otherwise the stored date back. A field with nothing stored puts its
+ segments back by remounting the primitive, which re-reads an unchanged empty value as
+ nothing to sync.
 -->
 <script lang="ts">
 	import { DateField as BitsDateField } from 'bits-ui';
@@ -108,13 +115,18 @@
 
 	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
 	/** The default is the primitive's value: from entering an unset field until an
-	 *  edit, a cleared segment or leaving. Part of the projection, so a re-derivation
-	 *  neither drops a seat nor restores one over the segments a clear left. */
+	 *  edit or leaving. Part of the projection, so a re-derivation keeps it. */
 	let seat = $state(false);
+	/** An emptied value held while the focus stays inside (see the header). Part of the
+	 *  projection too, so a re-derivation restores neither the stored date nor the seat
+	 *  over the segments it emptied. */
+	let held = $state(false);
+	/** Remounts the primitive when bumped (see the header). */
+	let generation = $state(0);
 	// Driven controlled (`value` + `onValueChange`, never `bind:`) so reconciliation
 	// stays the package's.
 	let local = $derived(
-		value?.slice(0, 10) ?? (seat && fallbackDate ? fallbackDate.toString() : '')
+		held ? '' : (value?.slice(0, 10) ?? (seat && fallbackDate ? fallbackDate.toString() : ''))
 	);
 	const parsed = $derived(toDateValue(local));
 	// The date the empty segments ghost, or undefined when there is nothing to ghost:
@@ -122,7 +134,7 @@
 	// fails to parse is AUTHORED-but-malformed, which the empty field states
 	// honestly: the ghost would claim it unset. Held as the parsed value rather than
 	// a boolean so the substitution below narrows on the one fact it needs.
-	const ghost = $derived(local === '' ? fallbackDate : undefined);
+	const ghost = $derived(local === '' && !held ? fallbackDate : undefined);
 	const seated = $derived(value == null && seat && local !== '');
 	/** Who put `today` here, while the field follows the render date. */
 	const follows = $derived(
@@ -130,6 +142,7 @@
 	);
 
 	function write(next: string): void {
+		held = false;
 		local = next;
 		seat = false;
 		onCommit(next);
@@ -152,7 +165,16 @@
 		if (!within(e) && value == null && fallbackDate) seat = true;
 	}
 	function leave(e: FocusEvent): void {
-		if (!within(e)) seat = false;
+		if (within(e)) return;
+		seat = false;
+		if (!held) return;
+		held = false;
+		const filled = [...(wrapEl?.querySelectorAll('[data-segment]') ?? [])].some(
+			(s) => s.getAttribute('data-segment') !== 'literal' && !s.hasAttribute('data-ghosted')
+		);
+		if (!filled) {
+			if (value != null) onCommit(undefined);
+		} else if (value == null) generation++;
 	}
 
 	// What one segment prints, and which rung it takes.
@@ -194,61 +216,67 @@
 	onfocusout={leave}
 	onkeydowncapture={shortcut}
 >
-	<BitsDateField.Root
-		value={parsed}
-		placeholder={fallbackDate}
-		onValueChange={(d) => {
-			// `CalendarDate.toString()` is exactly `YYYY-MM-DD`. A cleared or
-			// half-typed field yields undefined: the unset rung. The primitive reports
-			// its own value again as a segment loses focus, which is no edit, and over a
-			// seated default or `today` would write it.
-			const next = d?.toString() ?? '';
-			if (next === (parsed?.toString() ?? '')) return;
-			local = next;
-			if (!d) seat = false;
-			onCommit(d?.toString());
-		}}
-	>
-		<!-- `data-ghosted` states the rung the way the enum trigger does. The date
-		 primitive emits no per-segment placeholder marker (only bits' `select`
-		 does), so the tone rides the same attribute, set per segment from the
-		 substitution itself; which is also what keeps a half-typed date's own
-		 digits at full ink while the segments around them ghost. -->
-		<BitsDateField.Input
-			class="qm-date qm-control-box qm-focus-ring-within"
-			aria-label={labelledBy ? undefined : label}
-			aria-labelledby={labelledBy}
-			aria-describedby={describedBy}
-			data-ghosted={ghost ? '' : undefined}
-			data-default={seated || follows ? '' : undefined}
+	{#key generation}
+		<BitsDateField.Root
+			value={parsed}
+			placeholder={fallbackDate}
+			onValueChange={(d) => {
+				// `CalendarDate.toString()` is exactly `YYYY-MM-DD`. A cleared or
+				// half-typed field yields undefined, held until the focus leaves. The
+				// primitive reports its own value again as a segment loses focus, which is
+				// no edit, and over a seated default or `today` would write it.
+				const next = d?.toString() ?? '';
+				if (next === (parsed?.toString() ?? '')) return;
+				if (!d) {
+					held = true;
+					return;
+				}
+				held = false;
+				local = next;
+				onCommit(next);
+			}}
 		>
-			{#snippet children({ segments })}
-				<!-- Keyed by index: `part` repeats (the `literal` separators between
-				 segments all carry it) so a part-keyed block collides. -->
-				{#each segments as seg, i (i)}
-					{@const shown = segmentText(seg.part, seg.value)}
-					<BitsDateField.Segment
-						class="qm-date-segment"
-						part={seg.part}
-						data-ghosted={shown.ghosted}
-					>
-						{shown.text}
-					</BitsDateField.Segment>
-				{/each}
-				{#if !datetime}
-					<button
-						type="button"
-						class="qm-chip qm-tap-floor qm-focus-ring qm-date-today"
-						aria-pressed={!!follows}
-						data-default={follows === 'default' ? '' : undefined}
-						onclick={toggle}
-					>
-						<Icon name={follows ? 'calendar-check' : 'calendar'} />{t.strings.dateToday}
-					</button>
-				{/if}
-			{/snippet}
-		</BitsDateField.Input>
-	</BitsDateField.Root>
+			<!-- `data-ghosted` states the rung the way the enum trigger does. The date
+			 primitive emits no per-segment placeholder marker (only bits' `select`
+			 does), so the tone rides the same attribute, set per segment from the
+			 substitution itself; which is also what keeps a half-typed date's own
+			 digits at full ink while the segments around them ghost. -->
+			<BitsDateField.Input
+				class="qm-date qm-control-box qm-focus-ring-within"
+				aria-label={labelledBy ? undefined : label}
+				aria-labelledby={labelledBy}
+				aria-describedby={describedBy}
+				data-ghosted={ghost ? '' : undefined}
+				data-default={seated || follows ? '' : undefined}
+			>
+				{#snippet children({ segments })}
+					<!-- Keyed by index: `part` repeats (the `literal` separators between
+					 segments all carry it) so a part-keyed block collides. -->
+					{#each segments as seg, i (i)}
+						{@const shown = segmentText(seg.part, seg.value)}
+						<BitsDateField.Segment
+							class="qm-date-segment"
+							part={seg.part}
+							data-ghosted={shown.ghosted}
+						>
+							{shown.text}
+						</BitsDateField.Segment>
+					{/each}
+					{#if !datetime}
+						<button
+							type="button"
+							class="qm-chip qm-tap-floor qm-focus-ring qm-date-today"
+							aria-pressed={!!follows}
+							data-default={follows === 'default' ? '' : undefined}
+							onclick={toggle}
+						>
+							<Icon name={follows ? 'calendar-check' : 'calendar'} />{t.strings.dateToday}
+						</button>
+					{/if}
+				{/snippet}
+			</BitsDateField.Input>
+		</BitsDateField.Root>
+	{/key}
 </span>
 
 <style>

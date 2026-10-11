@@ -180,7 +180,7 @@
 			e.stopPropagation();
 			open = false;
 		}
-	}}><Icon name="info" size={13} /></button
+	}}><Icon name="info" /></button
 >
 
 <!-- Placement is the description's height. One line rides the label rung beside its own
@@ -249,8 +249,15 @@
 	 So the box is the glyph and the target is `.qm-tap-floor`'s (controls.css), which
 	 carries that split and the giving-up of the family floor together.
 
-	 It takes no fill either: the ink step below says hover, and the surface itself
-	 opens on it. */
+	 It takes no fill either: the surface itself opens on hover.
+
+	 At rest it recedes to the idle rung, a card describing every field otherwise
+	 standing a mark beside each label before anything is touched. It lifts with the
+	 scope that owns its row (the field, the property, the array or matrix, the table
+	 its column heads, the section a lone field is named by), each reached by child
+	 steps so a nested field's marker stays at rest under its container's hover, and
+	 while its surface is open. The keyboard's `Mod-/` and the parked description do not
+	 depend on the lift. */
 	.qm-field-hint {
 		/* The marker recedes to the label rung; the surface carries the text. */
 		color: var(--_qm-ink-label);
@@ -258,10 +265,20 @@
 		cursor: help;
 		padding: 0;
 		background: none;
+		opacity: var(--_qm-opacity-idle);
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
+	:global(:is(.qm-field, .qm-object-prop):is(:hover, :focus-within) > .qm-field-label-row)
+		> .qm-field-hint,
+	:global(:is(.qm-array, .qm-matrix):is(:hover, :focus-within) > * > .qm-field-label-row)
+		> .qm-field-hint,
+	:global(.qm-array-table:is(:hover, :focus-within) .qm-array-table-col > .qm-field-label-row)
+		> .qm-field-hint,
+	:global(.qm-group:is(:hover, :focus-within) > .qm-group-head) > .qm-field-hint,
 	.qm-field-hint:hover,
-	.qm-field-hint:focus-visible {
-		color: var(--_qm-ink-label);
+	.qm-field-hint:focus-visible,
+	.qm-field-hint[aria-expanded='true'] {
+		opacity: 1;
 	}
 	/* The lift, the translucency, the blur and the scale-in come from
 	 `.qm-popover-surface` (controls.css). This surface's own is a measure: guidance

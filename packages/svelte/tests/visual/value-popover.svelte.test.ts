@@ -8,7 +8,7 @@
 // declares no marks and a held leaf announces nothing, so neither raises it. A field's
 // own leaf answers through its controller, the anchor button with it. The probe is its
 // own quill.
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { toggleMark } from 'prosemirror-commands';
 import type { Content, Document, PathStep } from '@quillmark/wasm';
@@ -121,9 +121,11 @@ async function land(editor: InnerRef, path: string): Promise<HTMLElement> {
 	return leaf;
 }
 
-/** Select `[from, to)` of the leaf's first line as a pointer does: the DOM range, and
- *  the `selectionchange` both the view and the popover read it through. */
-function select(leaf: HTMLElement, from: number, to: number): void {
+/** Select `[from, to)` of the leaf's first line as a pointer does: a press, the DOM
+ *  range and the `selectionchange` both the view and the popover read it through, and the
+ *  release. `pointer: false` is the keyboard's selection, the range with no press. */
+function select(leaf: HTMLElement, from: number, to: number, pointer = true): void {
+	if (pointer) leaf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 	const text = leaf.querySelector('p')!.firstChild!;
 	const range = document.createRange();
 	range.setStart(text, from);
@@ -132,6 +134,7 @@ function select(leaf: HTMLElement, from: number, to: number): void {
 	sel.removeAllRanges();
 	sel.addRange(range);
 	document.dispatchEvent(new Event('selectionchange'));
+	if (pointer) leaf.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
 	flushSync();
 }
 
@@ -307,6 +310,26 @@ describe('the formatting popover over a field’s own leaf', () => {
 		expect(active?.views.view.dom).toBe(intro);
 		const popover = await surface();
 		expect(labels(popover!)).toContain(DEFAULT_VISUAL_STRINGS.formatAnchor);
+	});
+
+	it('rises over a keyboard selection once it stands still, and lowers at once', async () => {
+		const { editor } = mountInner(probe(), load());
+		const intro = await land(editor, 'main.intro');
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		try {
+			select(intro, 0, 3, false);
+			expect(await surface()).toBeNull();
+			select(intro, 0, 4, false);
+			await surface();
+			vi.advanceTimersByTime(299);
+			expect(await surface()).toBeNull();
+			vi.advanceTimersByTime(1);
+			expect(await surface()).not.toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
+		select(intro, 2, 2, false);
+		expect((await surface())?.dataset.state ?? 'closed').toBe('closed');
 	});
 
 	it('finds none once a form control takes the focus', async () => {

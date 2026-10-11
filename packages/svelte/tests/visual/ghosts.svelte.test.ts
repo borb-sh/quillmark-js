@@ -86,6 +86,9 @@ main:
       values: [low, high]
     flag:
       type: boolean?
+    notify:
+      type: boolean
+      default: true
     aside:
       type: plaintext?
       inline: true
@@ -332,6 +335,33 @@ describe('a default that prints', () => {
 		).toEqual(['(no marking)', 'low', 'high']);
 	});
 
+	it('tags the unset row Default where it ghosts a member', () => {
+		openList(trigger(field(open(), 'Tone')));
+		expect(document.querySelector('.qm-select-unset .qm-select-tag')?.textContent).toBe(
+			DEFAULT_VISUAL_STRINGS.enumUnsetTag
+		);
+	});
+
+	it('tags the unset row Unset where it ghosts none', () => {
+		openList(trigger(field(open(), 'Marking')));
+		expect(document.querySelector('.qm-select-unset .qm-select-tag')?.textContent).toBe(
+			DEFAULT_VISUAL_STRINGS.enumUnsetTagNone
+		);
+	});
+
+	it('holds a switch’s default at the default rung, which a press writes over', () => {
+		const target = open();
+		const notify = field(target, 'Notify');
+		const wrap = notify.querySelector<HTMLElement>('.qm-toggle-wrap')!;
+		expect(notify.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('true');
+		expect(wrap.hasAttribute('data-default')).toBe(true);
+
+		notify.querySelector<HTMLButtonElement>('[role="switch"]')!.click();
+		flushSync();
+		expect(row('notify')).toMatchObject({ source: 'authored', value: false });
+		expect(wrap.hasAttribute('data-default')).toBe(false);
+	});
+
 	it('words a stored blank by its `ui.blank_title` too, unghosted', () => {
 		const marking = trigger(field(open({}, answering('marking: ""')), 'Marking'));
 		expect(marking.textContent?.trim()).toBe('(no marking)');
@@ -378,6 +408,62 @@ describe('a default that prints', () => {
 		flushSync();
 		press(day, 'ArrowUp');
 		expect(row('dated')).toMatchObject({ source: 'authored', value: '2026-01-16' });
+	});
+
+	/** Each date segment's rung, year to day. */
+	const rungs = (target: HTMLElement): (string | undefined)[] =>
+		['year', 'month', 'day'].map((part) => segment(target, part).dataset.ghosted);
+
+	it('holds a date emptied under the focus, and puts the stored date back as it leaves', () => {
+		const target = open({}, answering('dated: 2026-11-14'));
+		const month = segment(target, 'month');
+		month.focus();
+		flushSync();
+		press(month, 'Backspace');
+		expect(q.reader(doc).get('dated')).toBe('2026-01-14');
+		press(month, 'Backspace');
+		expect(q.reader(doc).get('dated')).toBe('2026-01-14');
+		expect(rungs(target)).toEqual([undefined, 'hint', undefined]);
+
+		month.blur();
+		flushSync();
+		expect(q.reader(doc).get('dated')).toBe('2026-01-14');
+		expect(rungs(target)).toEqual([undefined, undefined, undefined]);
+		expect(segment(target, 'month').textContent?.trim()).toBe('01');
+	});
+
+	it('unsets a date as the focus leaves it with every segment empty', () => {
+		const target = open({}, answering('dated: 2026-11-14'));
+		for (const [part, presses] of [
+			['month', 2],
+			['day', 2],
+			['year', 4]
+		] as const) {
+			const seg = segment(target, part);
+			seg.focus();
+			flushSync();
+			for (let i = 0; i < presses; i++) press(seg, 'Backspace');
+		}
+		expect(q.reader(doc).get('dated')).toBe('2026-01-14');
+
+		segment(target, 'year').blur();
+		flushSync();
+		expect(row('dated').source).toBe('default');
+		expect(rungs(target)).toEqual(['default', 'default', 'default']);
+	});
+
+	it('puts a seated default back as it leaves a segment emptied, writing nothing', () => {
+		const target = open();
+		const month = segment(target, 'month');
+		month.focus();
+		flushSync();
+		press(month, 'Backspace');
+		expect(rungs(target)).toEqual([undefined, 'hint', undefined]);
+
+		month.blur();
+		flushSync();
+		expect(row('dated').source).toBe('default');
+		expect(rungs(target)).toEqual(['default', 'default', 'default']);
 	});
 });
 

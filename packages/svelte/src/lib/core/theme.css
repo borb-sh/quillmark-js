@@ -186,6 +186,11 @@
 	   stacks over whichever surface rung the cell already draws instead of replacing
 	   it. */
 	--_qm-accent-tint: color-mix(in oklab, var(--_qm-accent) 12%, transparent);
+	/* The accent at the default rung: a mark's fill where the `default:` supplies it, a
+	   switch's checked track and a held tick's box, stepped toward the card by the
+	   ratio `default` steps the ink. What is drawn over it in the card's colour, the
+	   thumb and the check, holds 3:1 at both poles, at 3.3:1 and 4.2:1. */
+	--_qm-accent-default: color-mix(in oklab, var(--_qm-accent), var(--_qm-bg) 20%);
 	/* The danger hue held: what a destructive control fills with where the family's
 	   neutral hover rung would read as one more button. Mixed at the accent tint's
 	   strength, so a held tint is a held tint whichever hue it carries. */
@@ -342,9 +347,9 @@
 	   it does not move when `--qm-space` does. Every button family reads it, so the
 	   floor is one number instead of one expression per control. */
 	--_qm-tap-min: 24px;
-	/* The chrome glyph: a chip's, and the in-well remove's. Sized in CSS rather than
-	   through the icon's `size`, so a stylesheet beats the SVG presentation attribute
-	   and one rung is the whole of what a control draws. */
+	/* The chrome glyph: a chip's, a glyph button's, the enum's chevron. Sized in CSS
+	   rather than through the icon's `size`, so a stylesheet beats the SVG presentation
+	   attribute and one rung is the whole of what a control draws. */
 	--_qm-glyph-control: 14px;
 	/* The narrowest track a control that fills its width stays usable in: a table's
 	   column floors at it, rises no further than its content, and a row of them scrolls

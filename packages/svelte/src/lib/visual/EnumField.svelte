@@ -16,6 +16,7 @@
 	import { Select } from 'bits-ui';
 	import Icon from './icons/Icon.svelte';
 	import { wording } from './strings.js';
+	import { spacePx } from '../core/rungs.js';
 	import './controls.css';
 
 	const t = wording();
@@ -79,6 +80,8 @@
 	 *  `none`: it draws at the default rung (theme.css). */
 	const ghostsMember = $derived(!optional && !!fallback);
 	const ghostText = $derived(optional ? t.strings.optionalGhost : dash(fallback));
+	/** The sentinel's tag says what picking it does: return to the default, or unset. */
+	const tag = $derived(ghostsMember ? t.strings.enumUnsetTag : t.strings.enumUnsetTagNone);
 	/** What the closed trigger shows: the pick, or the ghosted default while unset. */
 	const shown = $derived(unset ? ghostText : dash(local));
 
@@ -113,10 +116,10 @@
 			data-ghosted={unset ? (ghostsMember ? 'default' : '') : undefined}
 		>
 			<span class="qm-select-shown">{shown}</span>
-			<Icon name="chevron-down" class="qm-select-chevron" size={14} />
+			<Icon name="chevron-down" class="qm-select-chevron" />
 		</Select.Trigger>
 		<Select.Portal to={portalTarget}>
-			<Select.Content collisionBoundary={portalTarget ?? []} sideOffset={4}>
+			<Select.Content collisionBoundary={portalTarget ?? []} sideOffset={spacePx(wrapEl)}>
 				<!-- The list portals out of the trigger's DOM but into the nearest
 				     `[data-qm-root]`, and carries the marker itself, like FormatPopover.
 				     That root is the boundary a flip is measured against too, being the box
@@ -138,11 +141,11 @@
 						<Select.Item
 							class="qm-menu-item qm-select-item qm-select-unset"
 							value={UNSET}
-							label={optional ? ghostText : `${ghostText} ${t.strings.enumUnsetTag}`}
+							label={optional ? ghostText : `${ghostText} ${tag}`}
 						>
 							<span class="qm-select-ghost">{ghostText}</span>
 							{#if !optional}
-								<span class="qm-select-tag">{t.strings.enumUnsetTag}</span>
+								<span class="qm-select-tag">{tag}</span>
 							{/if}
 						</Select.Item>
 						<!-- A refused option still draws under `'disable'`, and under either
@@ -202,6 +205,8 @@
 	}
 	.qm-select-wrap :global(.qm-select-chevron) {
 		flex-shrink: 0;
+		width: var(--_qm-glyph-control);
+		height: var(--_qm-glyph-control);
 	}
 	/* The focus ring rides `.qm-focus-ring` on the trigger (controls.css). */
 	/* Shown-never-written: the closed control reads muted while unset, at the rung of
