@@ -116,12 +116,12 @@
 	.qm-field-label.targeted {
 		cursor: pointer;
 	}
-	/* Required marker: a quiet accent glyph, not an alarm; required-ness is guidance,
-	 the document still edits and renders unmet. */
+	/* Required marker: the label's own ink, not an alarm; required-ness is guidance,
+	 the document still edits and renders unmet, and the danger hue is a diagnostic's. */
 	.qm-field-required {
 		display: inline-flex;
 		align-items: center;
-		color: var(--_qm-danger);
+		color: var(--_qm-ink-label);
 		line-height: 1;
 	}
 	/* The parked description: in the accessibility tree, out of the layout, and never

@@ -33,6 +33,7 @@
 	import { errorMessage, reportError } from '../core/errors.js';
 	import { bloomInside } from '../core/bloom.js';
 	import { createLifespan } from '../core/teardown.js';
+	import { spacePx } from '../core/rungs.js';
 	import type {
 		Addr,
 		CardAddr,
@@ -953,7 +954,7 @@
 						>{marked ? merged.addCard : ''}</DropdownMenu.Trigger
 					>
 					<DropdownMenu.Portal to={rootEl}>
-						<DropdownMenu.Content collisionBoundary={rootEl ?? []} sideOffset={4}>
+						<DropdownMenu.Content collisionBoundary={rootEl ?? []} sideOffset={spacePx(rootEl)}>
 							<!-- Portalled out of the row but into the stack's root, and carrying the
 						     marker itself: floating is still a detached subtree to the
 						     derivation, like FormatPopover and the enum listbox. The root is the

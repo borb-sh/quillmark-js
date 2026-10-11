@@ -525,16 +525,19 @@
 		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
 	}
-	.qm-member-remove :global(svg) {
-		width: var(--_qm-glyph-control);
-		height: var(--_qm-glyph-control);
-	}
-	/* The default's set is what prints and nothing written: its titles and every value
-	 its columns draw take the default rung (theme.css), and the first gesture, writing
-	 it, takes it off. */
+	/* The default's set is what prints and nothing written: its titles, its ticks and
+	 every value its columns draw take the default rung (theme.css), and the first
+	 gesture, writing it, takes it off. */
 	.qm-matrix-roster[data-default] :global(:is(.qm-input, .ProseMirror, .qm-date)),
 	.qm-matrix-roster[data-default] :global(.qm-select:not([data-ghosted])),
 	.qm-matrix-roster[data-default] .qm-member.held .qm-member-title {
 		color: var(--_qm-ink-default);
+	}
+	.qm-matrix-roster[data-default] :is(.qm-tick-input:checked, .qm-tick-fixed) {
+		background: var(--_qm-accent-default);
+		border-color: var(--_qm-accent-default);
+	}
+	.qm-matrix-roster[data-default] :global(.qm-toggle[data-state='checked']) {
+		background: var(--_qm-accent-default);
 	}
 </style>

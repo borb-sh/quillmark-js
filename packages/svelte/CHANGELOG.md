@@ -4,6 +4,20 @@
 
 ## Unreleased
 
+**A date emptied under the caret writes nothing until the caret leaves.** A Backspace that empties a segment holds the field empty, the segment drawing its hint where the default's digits drew beside the ones still standing; leaving unsets the date where every segment is empty and otherwise puts the stored date back. An edit that leaves every segment filled still writes at once.
+
+**The required `*` is drawn at the label's ink.** It drew in `--qm-danger`, which now marks diagnostics and the delete glyph alone.
+
+**A field's guidance glyph rests faint until its field is hovered or focused.** The circled i draws at the idle opacity and comes up while the pointer is over its field, the focus is in it, or its description is open; a section header naming a lone field lifts it the same way.
+
+**A switch or a matrix tick at its `default:` draws on the default rung.** A checked switch's track and a held tick's box fill with the accent stepped toward the card, as a printed default's text steps off the ink, and an array's or a matrix's default rows draw their switches the same way. A switch defaulting to off draws as before.
+
+**The enum list's unset row is tagged `Default` or `Unset`.** `Default` where the row ghosts a member the render prints, `Unset` where it ghosts none. `VisualStrings` gains `enumUnsetTagNone`, the second word, so a whole `VisualStrings` literal fails to type-check without it, and `enumUnsetTag` reads `Default`, capitalized.
+
+**The format popover waits for a keyboard selection to stop.** A selection made without a press raises it once the selection has stood still for 300ms, so a Shift-arrow run or a select-all raises nothing on its way; a pointer's release still raises it at once, and an emptied selection lowers it at once.
+
+**Glyphs and popover gaps follow the theme.** The guidance glyph, the enum chevron, the format popover's marks and the tips card's foot glyph draw at the chrome glyph size, 14px, where the guidance glyph drew at 13px and the format marks at 15px. The format popover, the enum list and the add-card menu stand off their anchors by a multiple of `--qm-space`, at the same gaps under the default dial.
+
 ## v0.20.1 - 2026-10-10
 
 **ProseMirror is pinned at `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.** The other pins move with it: `prosemirror-model` 1.25.12, `prosemirror-transform` 1.12.2, `prosemirror-commands` 1.7.2, `prosemirror-history` 1.5.1 and `prosemirror-gapcursor` 1.4.1. A consumer overriding `prosemirror-view` to reach the fix can drop the override.
