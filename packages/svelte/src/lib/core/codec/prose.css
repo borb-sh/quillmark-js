@@ -321,19 +321,16 @@ li.ProseMirror-selectednode::after {
 .qm-table {
 	border-collapse: separate;
 	border-spacing: 0;
-	border: var(--_qm-border-width) solid var(--_qm-border);
-	border-radius: var(--_qm-radius-inner);
+	border: var(--_qm-border-width) solid var(--_qm-rule);
+	border-radius: var(--_qm-radius);
 }
-/* Two tiers of rule, because a table draws two different things. The frame and the
-   header's rule are structure and keep the full hairline; the lines between cells are
-   rhythm and drop to the faint rung, so the grid reads as one object with divisions
-   rather than as a stack of boxes. `separate` with zero spacing rather than
-   `collapse`: a collapsed border cannot be rounded, and the two tiers would fight
-   over which one wins an edge. */
+/* One rule at one strength, the frame's and every line between cells, so the grid
+   reads at the weight of the type it holds. `separate` with zero spacing rather than
+   `collapse`: a collapsed border cannot be rounded. */
 .qm-table-cell {
 	position: relative;
-	border-right: var(--_qm-border-width) solid var(--_qm-border-faint);
-	border-bottom: var(--_qm-border-width) solid var(--_qm-border-faint);
+	border-right: var(--_qm-border-width) solid var(--_qm-rule);
+	border-bottom: var(--_qm-border-width) solid var(--_qm-rule);
 	padding: var(--_qm-space) var(--_qm-space-2);
 	vertical-align: top;
 	font-weight: inherit;
@@ -347,13 +344,29 @@ li.ProseMirror-selectednode::after {
 }
 /* The header row is the one weight distinction the island draws: `header` is a
    separate field in the model rather than a flag on a row, so the surface says so.
-   It takes a tone with it, which is the same move a field makes: the well rung, a
-   band cut into the paper rather than a layer stacked on it, and a rung either way
-   rather than a shadow. The rest of a table's type is paper's. */
+   It takes a tone with it, the band rung, a step toward the ink at both poles. The
+   rest of a table's type is paper's. */
 .qm-table-header-row .qm-table-cell {
 	font-weight: var(--_qm-weight-strong);
-	background: var(--_qm-surface-well);
-	border-bottom: var(--_qm-border-width) solid var(--_qm-border);
+	background: var(--_qm-surface-band);
+}
+/* The corner cells take the frame's corner, inside its stroke, so a header's band or a
+   selection's wash keeps to the rounded edge rather than painting a square one over
+   it. The first row is the colgroup's next sibling's, whichever section holds it. */
+.qm-table > colgroup + * > tr:first-child > .qm-table-cell:first-child {
+	border-start-start-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
+}
+.qm-table > colgroup + * > tr:first-child > .qm-table-cell:last-child {
+	border-start-end-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
+}
+.qm-table
+	> :is(:last-child, thead:has(+ tbody:empty))
+	> tr:last-child
+	> .qm-table-cell:first-child {
+	border-end-start-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
+}
+.qm-table > :is(:last-child, thead:has(+ tbody:empty)) > tr:last-child > .qm-table-cell:last-child {
+	border-end-end-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
 }
 /* A cell holds a whole nested view. Its measure floor keeps an empty table from
    collapsing to a row of hairlines with nothing to aim at, and the caret is the
@@ -408,20 +421,16 @@ li.ProseMirror-selectednode::after {
 	color: var(--_qm-ink);
 	cursor: pointer;
 }
-/* The bar every one of them draws: a pill the length of what it acts on, a rhythm rung
-   thick where the target is the tap floor. Stated once, so a grip and an add bar cannot
-   drift into two shapes.
-
-   One tone, not a hover ladder: the control is drawn only while it is the one the
-   pointer is on or the one a gesture is about, so a resting tone under that would be a
-   rung nothing ever reaches. The selected grip's tint below is the one exception, and it
-   says which line the next command acts on rather than where the pointer is. */
+/* The pill every one of them draws, a rhythm rung thick where the target is the tap
+   floor. Stated once, so a grip and an add bar cannot drift into two shapes. The selected
+   grip's tint below says which line the next command acts on rather than where the
+   pointer is. */
 :is(.qm-table-grip-bar, .qm-table-add-bar) {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--_qm-radius-pill);
-	background: var(--_qm-border);
+	background: var(--_qm-surface-band);
 	transition:
 		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
 		color var(--_qm-duration-fast) var(--_qm-ease-reverse);
@@ -432,32 +441,34 @@ li.ProseMirror-selectednode::after {
 	width: var(--_qm-space-3);
 	height: var(--_qm-space-3);
 }
-/* A grip runs along the line it names; an add bar runs across the axis it appends to.
-   So the two families map one `data-axis` onto opposite orientations, and orientation
-   is the one thing the rule above cannot share with them: a column's grip is as wide as
-   its column, and the bar that adds a column is as tall as the table. */
-.qm-table-grip[data-axis='column'] .qm-table-grip-bar,
+/* An add bar runs across the axis it appends to, the length of the table; a grip is a
+   short pill centred on the line it names, the tap floor long. */
 .qm-table-add[data-axis='row'] .qm-table-add-bar {
 	width: 100%;
 	height: var(--_qm-space-3);
 }
-.qm-table-grip[data-axis='row'] .qm-table-grip-bar,
 .qm-table-add[data-axis='column'] .qm-table-add-bar {
 	width: var(--_qm-space-3);
 	height: 100%;
 }
+.qm-table-grip[data-axis='column'] .qm-table-grip-bar {
+	width: var(--_qm-tap-min);
+	height: var(--_qm-space-3);
+}
+.qm-table-grip[data-axis='row'] .qm-table-grip-bar {
+	width: var(--_qm-space-3);
+	height: var(--_qm-tap-min);
+}
 
-/* One grip per line, and it is a bar rather than a glyph: what a grip acts on is the
-   row or column it sits against, and spanning that line says so better than an icon
-   could. The bar carries the grip's own marks — two rows of three, the shape a thing
-   you can pick up has everywhere else — so the control reads as draggable before it is
-   dragged.
+/* One grip per line. The pill carries the grip's own marks at the label ink — two rows
+   of three, the shape a thing you can pick up has everywhere else — so the control reads
+   as draggable before it is dragged.
 
-   The target is the band and the bar is drawn inside it: a grip spans its line on one
-   axis and the tap floor on the other, and the bar is drawn thinner inside that. A grip
-   sized to its own bar would be a target the thickness of the mark on it, on a control
-   the pointer has to find. */
+   The target is the band and the pill is drawn inside it: a grip spans its line on one
+   axis and the tap floor on the other. A grip sized to its own pill would be a target
+   the size of the mark on it, on a control the pointer has to find. */
 .qm-table-grip {
+	color: var(--_qm-ink-label);
 	/* The pointer owns this gesture, not the page's scroll: a grip drags. */
 	touch-action: none;
 }
@@ -498,8 +509,8 @@ li.ProseMirror-selectednode::after {
 /* The reveal is the control's own (CODEC §"The table island"): one comes up while the
    pointer is on that control, while it holds the focus, or while it is what a gesture is
    about — the selected line's grip, and the lifted one, which is drawn through a drag the
-   pointer has travelled off. The controls' boxes meet at no point, so what is drawn is
-   the one line the pointer has picked out.
+   pointer has travelled off. A cell under the pointer draws its row's and its column's
+   grips at the idle rung (`table-view.ts` §`onHover`), one faint pill on each axis.
 
    Opacity rather than absence, so every control keeps its box and is hit-tested wherever
    it sits. A grip's reach is the pointer's alone and it holds no focus, so it carries no
@@ -510,6 +521,9 @@ li.ProseMirror-selectednode::after {
 :is(.qm-table-grip, .qm-table-add) {
 	opacity: 0;
 	transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.qm-table-grip[data-near] {
+	opacity: var(--_qm-opacity-idle);
 }
 .qm-table-add:is(:hover, :focus-visible),
 .qm-table-grip:is(:hover, [aria-pressed='true'], .qm-table-lifted) {

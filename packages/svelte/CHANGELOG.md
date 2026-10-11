@@ -6,9 +6,11 @@
 
 **Enter on an empty last row of a table leaves the table, and ArrowLeft and ArrowRight cross cells.** Enter on a table's last row, while it is empty, removes that row and puts the caret after the table, as Enter on an empty list item leaves the list; a table always keeps a row under its first. ArrowLeft at the start of a cell and ArrowRight at its end move to the neighbouring cell in reading order, a row's end wrapping to the next row, and stop at the table's first and last cells.
 
-**`Mod-Shift-L`, `Mod-Shift-E` and `Mod-Shift-R` over a held table column set the column's alignment**, as the column's cluster does, where they aligned each cell in it on its own. A cell's own alignment is left as it is.
+**In a table, a grip holds a line and a sweep holds cells.** Backspace over cells swept by the pointer clears their text and keeps every row and column, where a sweep spanning a whole row, column or the table deleted it; an arrow over a sweep lets go of it, and the cell alignment buttons rise over a sweep alone, where a row's grip raised them too. A line its grip, Escape or `Mod-A` names deletes on Backspace and steps on an arrow, as before. `Mod-Shift-L`, `Mod-Shift-E` and `Mod-Shift-R` align nothing, so `Mod-Shift-R` is the browser's hard reload again.
 
-**`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table, as it does over every cell swept by the pointer.
+**A table draws rounder and even.** Its frame and its header round at the radius a card takes, every line between cells draws at the frame's strength, and the header's band steps toward the ink at both poles, a shade lighter than the card in dark where it drew darker. A grip is a short pill centred on its line, its marks at the label ink, and a cell under the pointer draws its row's and its column's grips faint.
+
+**`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table.
 
 **Typing over a selected table writes into the empty paragraph after it**, where it opened a new paragraph above that one. An empty heading or code block after the table is left as it is.
 

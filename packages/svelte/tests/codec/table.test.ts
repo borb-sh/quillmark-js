@@ -446,6 +446,22 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
+	it('a cell under the pointer draws its row’s and its column’s grips faint', () => {
+		const { field } = tableLeaf(LETTERED);
+		const near = () =>
+			Array.from(field.el.querySelectorAll('.qm-table-grip[data-near]')).map((g) =>
+				g.getAttribute('aria-label')
+			);
+		const boxes = field.el.querySelectorAll('.qm-table-cell');
+		boxes[3]!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+		expect(near()).toEqual(['Select column 2', 'Select row 1']);
+		boxes[4]!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+		expect(near()).toEqual(['Select column 1', 'Select row 2']);
+		field.el.querySelector('.qm-table-island')!.dispatchEvent(new MouseEvent('mouseleave'));
+		expect(near()).toEqual([]);
+		field.destroy();
+	});
+
 	it('a grip press carries the caret onto the line, which is where the verbs bind', () => {
 		const { field } = tableLeaf(LETTERED);
 		const views = cellViews(field);
@@ -967,31 +983,17 @@ describe('a cell is aligned on its own', () => {
 		expect(propsOf(stored(withTable(cleared))).rows[0]![0]).toEqual(cell('a1'));
 	});
 
-	it('Mod-Shift-e centers the caret’s cell, and again returns it to its column', () => {
+	it('swept cells raise the cells’ cluster, and a press lays every cell in it', () => {
 		const { field } = tableLeaf(LETTERED);
-		cellViews(field)[2]!.focus(); // row 1, column 0, a left column
-		press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
-		expect(leafProps(field).rows[0]![0]).toEqual({ ...cell('a1'), align: 'center' });
-		expect(cellBoxes(field)[2]!.style.textAlign).toBe('center');
-		// The caret stays: an alignment is no part of the cell's text.
-		expect(cellViews(field).indexOf(caret(field))).toBe(2);
-		press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
-		expect(leafProps(field).rows[0]![0]).toEqual(cell('a1'));
-		expect(cellBoxes(field)[2]!.style.textAlign).toBe('left');
-		field.destroy();
-	});
-
-	it('a held row raises the cells’ cluster, and a press lays every cell in it', () => {
-		const { field } = tableLeaf(LETTERED);
-		cellViews(field)[3]!.focus();
-		press(caret(field), 'Escape');
+		layout(field);
+		sweep(field, 2, 3); // row 1, cell by cell
 		expect(washed(field)).toEqual(['1,0', '1,1']);
 		const cluster = cellCluster(field)!;
 		expect(cluster.closest('.qm-table-cell')?.getAttribute('data-r')).toBe('1');
 		expect(cluster.querySelectorAll('button')).toHaveLength(6);
 		cluster.querySelector<HTMLButtonElement>('[data-valign="bottom"]')!.click();
 		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual(['bottom', 'bottom']);
-		// The row stays held, and the toggle reads pressed.
+		// The sweep stays held, and the toggle reads pressed.
 		expect(washed(field)).toEqual(['1,0', '1,1']);
 		expect(
 			cellCluster(field)!.querySelector('[data-valign="bottom"]')!.getAttribute('aria-pressed')
@@ -999,6 +1001,18 @@ describe('a cell is aligned on its own', () => {
 		expect(cellBoxes(field)[2]!.style.verticalAlign).toBe('bottom');
 		undo(outerView(field).state, outerView(field).dispatch);
 		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual([undefined, undefined]);
+		field.destroy();
+	});
+
+	it('a row its grip or Escape names raises nothing over the row below', () => {
+		const { field } = tableLeaf(LETTERED);
+		grips(field, 'row')[1]!.click();
+		expect(washed(field)).toEqual(['1,0', '1,1']);
+		expect(cellCluster(field)).toBeNull();
+		cellViews(field)[5]!.focus();
+		press(caret(field), 'Escape');
+		expect(washed(field)).toEqual(['2,0', '2,1']);
+		expect(cellCluster(field)).toBeNull();
 		field.destroy();
 	});
 
@@ -1025,12 +1039,11 @@ describe('alignment is set on the held column', () => {
 		expect(toggle(field, 1, 'right').tabIndex).toBe(-1);
 		grips(field, 'row')[1].click();
 		expect(cluster(field, 1).hidden).toBe(true);
-		// A column swept cell by cell is the column its grip names.
+		// A column swept cell by cell holds cells, and raises theirs.
 		layout(field);
 		sweep(field, 1, 5);
-		expect(cluster(field, 1).hidden).toBe(false);
-		cellViews(field)[0].focus();
 		expect(cluster(field, 1).hidden).toBe(true);
+		expect(field.el.querySelector('.qm-table-align[data-cells]')).not.toBeNull();
 		field.destroy();
 	});
 
@@ -1111,23 +1124,6 @@ describe('alignment is set on the held column', () => {
 		field.destroy();
 	});
 
-	it('an alignment chord over the held column sets the column, and leaves its cells’ own', () => {
-		const { field } = tableLeaf(setCellLayout(UNALIGNED, 1, 1, 1, 1, 'align', 'left'));
-		grips(field, 'column')[1].click();
-		const center = () => press(caret(field), 'E', { shiftKey: true, ctrlKey: true, keyCode: 69 });
-		center();
-		expect(leafProps(field).aligns).toEqual(['none', 'center']);
-		expect(leafProps(field).rows[0]![1]!.align).toBe('left');
-		expect(leafProps(field).header[1]!.align).toBeUndefined();
-		expect(undoDepth(outerView(field).state)).toBe(1);
-		expect(washed(field)).toEqual(['0,1', '1,1', '2,1']);
-		// Again is the alignment the column holds, which writes nothing, as its toggle.
-		center();
-		expect(leafProps(field).aligns).toEqual(['none', 'center']);
-		expect(undoDepth(outerView(field).state)).toBe(1);
-		field.destroy();
-	});
-
 	it('a set alignment is the delimiter row markdown spells, and decodes back', () => {
 		const { field } = tableLeaf(UNALIGNED);
 		grips(field, 'column')[0].click();
@@ -1145,13 +1141,12 @@ describe('alignment is set on the held column', () => {
 
 // ── The selection ───────────────────────────────────────────────────────────
 //
-// One rectangle of cells, drawn two ways — a grip names the line it covers, a press
-// that travels sweeps the block it crossed — and one verb over it. What Backspace
-// means is read off the rectangle's extent, so these assert the extents rather than
-// the gestures: a row swept cell by cell has to delete exactly as the row its grip
-// named does, or there are two rules wearing one key.
+// One rectangle of cells, drawn two ways, and the verbs read which. A grip, Escape or
+// select-all names lines: Backspace deletes them and an arrow steps them. A press that
+// travels sweeps the cells it crossed: Backspace clears their text and an arrow lets go,
+// whatever lines the block happens to span.
 
-describe('a selection is a rectangle of cells, and Backspace reads its extent', () => {
+describe('a grip holds a line and a sweep holds cells', () => {
 	it('a press that travels out of its cell sweeps a block; one that stays is a caret', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
@@ -1167,7 +1162,7 @@ describe('a selection is a rectangle of cells, and Backspace reads its extent', 
 	it('a block of cells CLEARS on Backspace, and the rectangle stays selected', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
-		sweep(field, 2, 4); // rows 1–2, column 1 only: neither axis is spanned
+		sweep(field, 2, 4); // rows 1–2, column 1 only
 		expect(washed(field)).toEqual(['1,0', '2,0']);
 		press(cellViews(field)[2], 'Backspace');
 		expect(grid(leafProps(field))).toEqual([
@@ -1179,36 +1174,67 @@ describe('a selection is a rectangle of cells, and Backspace reads its extent', 
 		field.destroy();
 	});
 
-	it('a block spanning every column is a set of ROWS, and deletes them', () => {
+	it('a sweep across whole rows clears them, and the rows stay', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
 		sweep(field, 2, 5); // both body rows, both columns
 		press(cellViews(field)[2], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([['h1', 'h2']]);
+		expect(grid(leafProps(field))).toEqual([
+			['h1', 'h2'],
+			['', ''],
+			['', '']
+		]);
+		expect(washed(field)).toEqual(['1,0', '1,1', '2,0', '2,1']);
 		field.destroy();
 	});
 
-	it('a block spanning every row is a set of COLUMNS, and deletes them', () => {
+	it('a sweep down a whole column clears it, and the column stays', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
 		sweep(field, 1, 5); // header through last body row, column 2 only
 		expect(washed(field)).toEqual(['0,1', '1,1', '2,1']);
 		press(cellViews(field)[1], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([['h1'], ['a1'], ['b1']]);
-		expect(leafProps(field).aligns).toEqual(['left']);
+		expect(grid(leafProps(field))).toEqual([
+			['h1', ''],
+			['a1', ''],
+			['b1', '']
+		]);
+		expect(leafProps(field).aligns).toEqual(['left', 'right']);
 		field.destroy();
 	});
 
-	it('the whole table is the ISLAND, and Backspace deletes it', () => {
+	it('a sweep over every cell clears the table, and the table stays', () => {
 		const { doc, field } = tableLeaf(LETTERED);
 		layout(field);
-		sweep(field, 0, 5); // every cell
-		expect(washed(field)).toHaveLength(6);
+		sweep(field, 0, 5);
 		press(cellViews(field)[0], 'Backspace');
-		// The rule's own limit: every rank going at once leaves no table for a rank
-		// deletion to have produced, so what the selection covers is the table.
+		expect(doc.main.body.islands).toHaveLength(1);
+		expect(grid(leafProps(field))).toEqual([
+			['', ''],
+			['', ''],
+			['', '']
+		]);
+		// Emptied cells have nothing left to clear, so the next press writes nothing.
+		const depth = undoDepth(outerView(field).state);
+		press(cellViews(field)[0], 'Backspace');
+		expect(undoDepth(outerView(field).state)).toBe(depth);
+		field.destroy();
+	});
+
+	it('every cell select-all names is the ISLAND, and Backspace deletes it', () => {
+		const { doc, field } = tableLeaf(LETTERED);
+		cellViews(field)[3]!.focus();
+		for (let i = 0; i < 3; i++) press(caret(field), 'a', { ctrlKey: true });
+		expect(washed(field)).toHaveLength(6);
+		press(caret(field), 'Backspace');
+		// Every rank going at once leaves no table for a rank deletion to have produced,
+		// so what the selection names is the table.
 		expect(doc.main.body.islands).toHaveLength(0);
 		expect(doc.main.body.text).toBe('para\ntail');
+		// An ordinary transaction on the leaf's own view, so one undo brings it back whole.
+		press(outerView(field), 'z', { ctrlKey: true });
+		expect(doc.main.body.islands).toHaveLength(1);
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
 		field.destroy();
 	});
 
@@ -1228,20 +1254,6 @@ describe('a selection is a rectangle of cells, and Backspace reads its extent', 
 		selectAll();
 		expect(washed(field)).toEqual([]);
 		expect(outerView(field).state.selection instanceof AllSelection).toBe(true);
-		field.destroy();
-	});
-
-	it('one Mod-z brings the deleted table back whole', () => {
-		const { doc, field } = tableLeaf(LETTERED);
-		layout(field);
-		sweep(field, 0, 5);
-		press(cellViews(field)[0], 'Backspace');
-		expect(doc.main.body.islands).toHaveLength(0);
-		// The delete is an ordinary transaction on the leaf's own view, so it rides the
-		// one undo stack every other op here does and comes back in one step.
-		press(outerView(field), 'z', { ctrlKey: true });
-		expect(doc.main.body.islands).toHaveLength(1);
-		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
 		field.destroy();
 	});
 
@@ -1266,71 +1278,28 @@ describe('a selection is a rectangle of cells, and Backspace reads its extent', 
 		field.destroy();
 	});
 
-	it('a grip draws the same rectangle its line covers', () => {
-		// Swept or named, one rectangle: the grip is marked exactly when the selection is
-		// its own line, which is the only thing that tells the two gestures apart.
+	it('a swept row presses no grip: the pressed grip is what says a line is named', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
 		sweep(field, 2, 3);
 		expect(washed(field)).toEqual(['1,0', '1,1']);
-		expect(grips(field, 'row')[1].getAttribute('aria-pressed')).toBe('true');
+		expect(grips(field, 'row')[1].getAttribute('aria-pressed')).toBe('false');
 		field.destroy();
 	});
 
-	it('a swept row moves like the one a grip named: the extent is what a verb reads', () => {
+	it('an arrow lets go of a sweep, and Alt+arrow moves nothing', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
 		sweep(field, 2, 3); // row 1, cell by cell
 		press(caret(field), 'ArrowDown', { altKey: true });
-		expect(grid(leafProps(field))).toEqual([
-			['h1', 'h2'],
-			['b1', 'b2'],
-			['a1', 'a2']
-		]);
-		expect(washed(field)).toEqual(['2,0', '2,1']);
-		field.destroy();
-	});
-
-	it('every selected cell goes with its rank, header and all', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		// The header and the first body row, across every column: two rows, and both go.
-		// The header being stored apart from `rows` buys it no exemption — the row left
-		// at index 0 is the header, so the table below is one that lost two ranks.
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
+		expect(washed(field)).toEqual(['1,0', '1,1']);
 		sweep(field, 0, 3);
-		expect(washed(field)).toEqual(['0,0', '0,1', '1,0', '1,1']);
-		press(cellViews(field)[0], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([['b1', 'b2']]);
-		field.destroy();
-	});
-
-	it('the header row alone deletes, and the row under it is the header now', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		sweep(field, 0, 1); // the whole header, and nothing under it
-		press(cellViews(field)[0], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([
-			['a1', 'a2'],
-			['b1', 'b2']
-		]);
-		// And it is the header cell it landed in: the `thead` holds one row, whichever
-		// row that is.
-		expect(field.el.querySelectorAll('th.qm-table-cell')[0].textContent).toBe('a1');
-		field.destroy();
-	});
-
-	it('a sub-rectangle is the only thing left that clears', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		// One cell: it spans neither axis, so no rank covers it and no rank can go.
-		sweep(field, 0, 2);
-		expect(washed(field)).toEqual(['0,0', '1,0']);
-		press(cellViews(field)[0], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([
-			['', 'h2'],
-			['', 'a2'],
-			['b1', 'b2']
-		]);
+		const at = cellViews(field).indexOf(caret(field));
+		press(caret(field), 'ArrowRight');
+		expect(washed(field)).toEqual([]);
+		// The caret stays where the sweep began, as an arrow collapses a text selection.
+		expect(cellViews(field).indexOf(caret(field))).toBe(at);
 		field.destroy();
 	});
 });

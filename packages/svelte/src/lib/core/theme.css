@@ -117,9 +117,9 @@
 
 	   Two planes sink. `sunken` is the ground — the column behind the cards, the
 	   desk behind the sheets — and lifting the plane above it takes very little
-	   at the light pole. `well` is the hole cut into a card: a field, a table's
-	   header band, the one native select, none of which draw an edge, so the
-	   step is the whole of what says a value is typed there. The order at the
+	   at the light pole. `well` is the hole cut into a card: a field, the one
+	   native select, neither of which draws an edge, so the step is the whole of
+	   what says a value is typed there. The order at the
 	   light pole is card, ground, well; at the dark pole the two sink to within
 	   a channel of each other, which is where a card with little light left to
 	   give up leaves them.
@@ -148,6 +148,10 @@
 	   dark. */
 	--_qm-surface-raised: color-mix(in oklab, var(--_qm-bg), #fff 8%);
 	--_qm-surface-hover: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 8%);
+	/* A band laid on the card rather than cut into it: a table's header, and the pill a
+	   grip draws. It steps toward the ink at both poles, a shade under white in light
+	   and a shade over the card in dark, where `well` sinks to a black stripe. */
+	--_qm-surface-band: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%);
 	/* The one rung whose arms are not a single ratio: a stroke is read against what it
 	   separates, and the mix that reads as a hairline on the dark default draws the
 	   light card in a line heavier than the type it frames. The light arm is
@@ -157,12 +161,11 @@
 		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%),
 		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 17%)
 	);
-	/* A rule that separates without structuring: the lines between a table's cells,
-	   where the frame around them is the structure. Half the border, and read off
-	   it rather than restated as a percentage of its own, so the two hold their
-	   relationship at any mix: a stroke against the surface behind it, not a fill
-	   stacked on one. */
-	--_qm-border-faint: color-mix(in oklab, var(--_qm-bg), var(--_qm-border) 50%);
+	/* A stroke ruled through content rather than round it: a table's frame and every
+	   line between its cells. The light arm of `border` is a card's edge against the
+	   ground, and drawn between lines of type it vanishes, so a grid takes one ratio at
+	   both poles, which lands within a few points of `border` in dark. */
+	--_qm-rule: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 14%);
 	/* Three rungs, and nothing under the last: a step below `label` lands under 3:1 on
 	   the well a field draws it against, and what would take it — an unset value's word,
 	   an invitation — is content a reader has to read (WCAG 1.4.3), not decoration.
