@@ -10,8 +10,9 @@
 // swallowed at all and leaves the body a keyboard exit.
 //
 // The block link is the exception to that order and comes ahead of them all: it is
-// about the body itself — the one position no surface owns, its very start — and a
-// link reading a caret's own surface would answer there first and never let it run.
+// about the body itself — the one position no surface owns, its very start — or about
+// the caret's own block, and a link reading a caret's own surface would answer there
+// first and never let it run.
 //
 // The break link is no surface either: Shift-Enter is the caret's own line wherever it
 // is pressed. It sits behind the code link, the one surface holding a nearer answer to

@@ -417,6 +417,10 @@ interface Resize {
 	engaged: boolean;
 }
 
+/** Each mounted island by its `dom`, which is what the outer view hands back for a
+ *  position: how a key in the field reaches into a table ({@link enterTable}). */
+const mounted = new WeakMap<Node, TableIslandView>();
+
 class TableIslandView implements NodeView {
 	readonly dom: HTMLElement;
 	private cells: MountedCell[] = [];
@@ -461,6 +465,7 @@ class TableIslandView implements NodeView {
 		this.dom = el('div', 'qm-island qm-table-island');
 		this.dom.setAttribute('data-qm-island', node.attrs.islandType as string);
 		this.dom.setAttribute('data-qm-island-id', node.attrs.id as string);
+		mounted.set(this.dom, this);
 		this.dom.addEventListener('mousedown', this.onPointerDown);
 		this.dom.addEventListener('mouseover', this.onHover);
 		this.dom.addEventListener('mouseleave', this.onLeave);
@@ -671,6 +676,14 @@ class TableIslandView implements NodeView {
 		this.outer.focus();
 		this.outer.dispatch(this.outer.state.tr.setSelection(selection));
 		return true;
+	}
+
+	/** Land the caret in the table from the block beside it: its last cell's end from
+	 *  below, its first cell's start from above. */
+	enter(side: -1 | 1): void {
+		const props = this.props();
+		if (side < 0) this.focusCell(rowCount(props) - 1, columnCount(props) - 1, 'end');
+		else this.focusCell(0, 0, 'start');
 	}
 
 	/** The island as the selection: the Escape that climbs out of a cell or a held
@@ -1829,6 +1842,13 @@ class TableIslandView implements NodeView {
 		} else this.focusCell(to.r, to.c);
 		return true;
 	}
+}
+
+/** The table island mounted at `pos` in `view`, which a caret can step into; `undefined`
+ *  for any other node, or where no view is mounted. */
+export function tableAt(view: EditorView, pos: number): { enter(side: -1 | 1): void } | undefined {
+	const dom = view.nodeDOM(pos);
+	return dom ? mounted.get(dom) : undefined;
 }
 
 /** The `island_block` node view: a table island's editing surface, and the literal

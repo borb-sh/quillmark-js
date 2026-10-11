@@ -289,7 +289,9 @@ describe('Backspace right after a shorthand takes it back', () => {
 		// The browser's own deletion of the `x`, which no keymap claims.
 		view.dispatch(view.state.tr.delete(1, 2));
 		press(view, 'Backspace');
-		expect(view.state.doc.toString()).toBe('doc(heading)');
+		// The heading's own Backspace answers instead: its shape goes, and the `# ` the
+		// shorthand consumed stays consumed.
+		expect(view.state.doc.toString()).toBe('doc(paragraph)');
 		view.destroy();
 	});
 

@@ -4,10 +4,11 @@
 // `whitespace: 'pre'`, `marks: ''` (`schema.ts`).
 //
 // Backspace and Delete are here for the edge rather than for the inside: a press that
-// would join a fence with the prose block it stands against retypes the fence to a
-// paragraph and joins nothing, from either side. They are the two keys this link binds
-// from outside a code block, and they sit ahead of the list link like the rest, so a
-// fence inside an item is answered by its own edge rather than by the item's merge.
+// would join a fence with the prose block it stands against edits only the block the
+// caret is in. From inside the fence it retypes the fence to a paragraph; from the prose
+// side the caret steps into the fence and nothing changes. They are the two keys this
+// link binds from outside a code block, and they sit ahead of the list link like the
+// rest, so a fence inside an item is answered by its own edge rather than by the item's.
 //
 // A code block's lines are not `Content` lines the codec addresses one by one: a
 // fence decodes to one `code_block` whose text carries literal `\n`s, and encode
@@ -127,7 +128,7 @@ const outdentInCode: Command = (state, dispatch) => {
  * The textblock the caret's own block stands directly against on `side`: its sibling
  * under one parent, which is the only neighbour a press joins the text of. `null` at a
  * container's edge, where the base keymap moves the whole block in or out rather than
- * joining anything, and so retypes nothing.
+ * joining anything, and so changes nothing here.
  */
 function blockAgainst(state: EditorState, side: -1 | 1): { node: PMNode; pos: number } | null {
 	const { $from, empty } = state.selection;
@@ -140,22 +141,22 @@ function blockAgainst(state: EditorState, side: -1 | 1): { node: PMNode; pos: nu
 }
 
 /**
- * Backspace at a fence's head or Delete at its end, and the same two presses from the
- * block on the other side: retype the code block to a paragraph, and join nothing. The
- * press after that is an ordinary join between two prose blocks.
+ * Backspace or Delete at a fence's edge, from either side, edits only the block the caret
+ * is in.
  *
- * The join itself retypes one side's whole text as the other's kind on one keystroke —
- * a fence's lines as prose, or a typed line as code — which is the destruction
- * `atoms.ts` refuses for a neighbouring island, with nothing drawn first to say what is
- * about to go. This is `toCodeBlock`'s inverse in its place (`blocks.ts`), and it takes
- * no text with it: `linebreakReplacement` carries the fence's newlines across as breaks
- * (`schema.ts`). The caret stays in the block it was in.
+ * Inside the fence, a press at its head or its end retypes it to a paragraph and joins
+ * nothing: `toCodeBlock`'s inverse in its place (`blocks.ts`), taking no text with it,
+ * since `linebreakReplacement` carries the fence's newlines across as breaks
+ * (`schema.ts`). The press after that is an ordinary join between two prose blocks.
+ *
+ * From the prose block against it, the caret steps into the fence, to the end it faces,
+ * and the fence is left as it is: a join would retype one side's whole text as the
+ * other's kind, and a retype from outside edits a block the caret is not in. An empty
+ * line under a fence goes with the step, its Backspace having nothing of its own to edit.
  *
  * Declines where both sides are code and where neither is: those joins retype nothing.
- * An empty block on either side never reaches this at all: the block link takes the
- * empty line ahead of the chain (`blocks.ts`), and there is no text to retype.
  */
-function retypeAtProseEdge(side: -1 | 1): Command {
+function atProseEdge(side: -1 | 1): Command {
 	return (state, dispatch) => {
 		const paragraph = state.schema.nodes.paragraph;
 		const edge = blockAgainst(state, side);
@@ -163,8 +164,16 @@ function retypeAtProseEdge(side: -1 | 1): Command {
 		const { $from } = state.selection;
 		const inside = !!$from.parent.type.spec.code;
 		if (inside === !!edge.node.type.spec.code) return false;
-		const at = inside ? $from.pos : edge.pos + 1;
-		dispatch?.(state.tr.setBlockType(at, at, paragraph).scrollIntoView());
+		if (inside) {
+			dispatch?.(state.tr.setBlockType($from.pos, $from.pos, paragraph).scrollIntoView());
+			return true;
+		}
+		const tr = state.tr;
+		const index = $from.index(-1);
+		if (side < 0 && $from.parent.content.size === 0 && $from.node(-1).canReplace(index, index + 1))
+			tr.delete($from.before(), $from.after());
+		const into = side < 0 ? edge.pos + edge.node.nodeSize - 1 : edge.pos + 1;
+		dispatch?.(tr.setSelection(TextSelection.create(tr.doc, into)).scrollIntoView());
 		return true;
 	};
 }
@@ -189,7 +198,7 @@ export function codeKeymap(schema: Schema): Record<string, Command> {
 		'Shift-Tab': outdentInCode,
 		Enter: newlineInCode,
 		'Shift-Enter': newlineInCode,
-		Backspace: retypeAtProseEdge(-1),
-		Delete: retypeAtProseEdge(1)
+		Backspace: atProseEdge(-1),
+		Delete: atProseEdge(1)
 	};
 }

@@ -10,6 +10,8 @@
 
 **A table draws rounder and even.** Its frame and its header round at the radius a card takes, every line between cells draws at the frame's strength, and the header's band steps toward the ink at both poles, a shade lighter than the card in dark where it drew darker. A grip is a short pill centred on its line, its marks at the label ink, and a cell under the pointer draws its row's and its column's grips faint.
 
+**Backspace edits only its own block.** At a heading's start it turns the heading into a paragraph, where it joined the heading's text onto the line above. At the start of any list item it lifts the item out of its list, a nested item one level, where an item after the first merged into the one above; the items after a lifted one keep their numbers, and the press after joins the line onto the list. Delete at the end of an item lifts the item below the same way. Beside a code block or a table, Backspace and Delete step the caret into it, where Backspace retyped a code block to a paragraph and selected a table; an empty line under either goes with the step.
+
 **`Mod-A` in a table cell grows a step a press**: the cell's text, then its row, then every cell, then the whole field. With every cell held, Backspace deletes the table.
 
 **Typing over a selected table writes into the empty paragraph after it**, where it opened a new paragraph above that one. An empty heading or code block after the table is left as it is.

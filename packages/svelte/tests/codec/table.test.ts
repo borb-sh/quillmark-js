@@ -915,6 +915,53 @@ describe('the table NodeView', () => {
 // and Shift+Right under the caret. Either writes `aligns[c]` as one `set`, so one `Mod-z`
 // takes it back.
 
+/** The outer caret at `offset` into the textblock holding `text`. */
+function caretIn(field: FieldController, text: string, offset: number): EditorView {
+	const view = outerView(field);
+	let at = -1;
+	view.state.doc.descendants((node, pos) => {
+		if (at < 0 && node.isTextblock && node.textContent === text) at = pos + 1 + offset;
+	});
+	view.focus();
+	view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
+	return view;
+}
+
+describe('a delete against a table steps into it', () => {
+	it('Backspace below it lands at the end of its last cell, and edits nothing', () => {
+		const { field } = tableLeaf();
+		const before = outerView(field).state.doc;
+		press(caretIn(field, 'tail', 0), 'Backspace');
+		expect(outerView(field).state.doc.eq(before)).toBe(true);
+		const cell = caret(field);
+		expect(cell).toBe(cellViews(field).at(-1));
+		expect(cell.state.selection.from).toBe(cell.state.doc.content.size - 1);
+	});
+
+	it('Delete above it lands at the start of its first cell', () => {
+		const { field } = tableLeaf();
+		press(caretIn(field, 'para', 4), 'Delete');
+		const cell = caret(field);
+		expect(cell).toBe(cellViews(field)[0]);
+		expect(cell.state.selection.from).toBe(1);
+	});
+
+	it('an empty line under it goes with the step', () => {
+		const { field } = tableLeaf();
+		const view = outerView(field);
+		const tail = view.state.doc.lastChild!;
+		view.dispatch(
+			view.state.tr.insert(
+				view.state.doc.content.size - tail.nodeSize,
+				blockSchema.nodes.paragraph.create()
+			)
+		);
+		press(caretIn(field, '', 0), 'Backspace');
+		expect(outerView(field).state.doc.childCount).toBe(3);
+		expect(caret(field)).toBe(cellViews(field).at(-1));
+	});
+});
+
 const UNALIGNED = normalizeTable({ ...LETTERED, aligns: ['none', 'none'] });
 
 /** A column's alignment cluster. */

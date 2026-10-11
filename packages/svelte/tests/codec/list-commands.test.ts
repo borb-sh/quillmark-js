@@ -170,18 +170,35 @@ describe('Backspace', () => {
 		expect(run(after('- ab', 'a'), keys['Backspace'])).toBe(null);
 	});
 
-	it('across a code edge, declines: a fence is not a line to put a line on', () => {
-		// Either side of the edge; the base keymap merges the items whole there
-		// (`tests/codec/code-keys.test.ts`).
-		expect(run(startOf('- ```\n  code\n  ```\n- b', 1), keys['Backspace'])).toBe(null);
-		expect(run(startOf('- a\n- ```\n  code\n  ```', 1), keys['Backspace'])).toBe(null);
+	it('at the start of a later item, lifts it out and splits the list around it', () => {
+		const one = expectPress(
+			startOf('- a\n- b\n- c', 1),
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"), bullet_list(list_item(paragraph("c"))))'
+		);
+		// The press after joins the paragraph onto the list's last line.
+		expectPress(
+			one,
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("ab"))), bullet_list(list_item(paragraph("c"))))'
+		);
 	});
 
-	it('between two fences it is the ordinary merge', () => {
-		expectPress(
-			startOf('- ```\n  a\n  ```\n- ```\n  b\n  ```', 1),
+	it('the items past a lifted one keep their numbers', () => {
+		const next = expectPress(
+			startOf('3. a\n4. b\n5. c', 1),
 			'Backspace',
-			'doc(bullet_list(list_item(code_block("ab"))))'
+			'doc(ordered_list(list_item(paragraph("a"))), paragraph("b"), ordered_list(list_item(paragraph("c"))))'
+		);
+		expect(next.doc.child(0).attrs.start).toBe(3);
+		expect(next.doc.child(2).attrs.start).toBe(5);
+	});
+
+	it('a nested later item lifts one level', () => {
+		expectPress(
+			startOf('- a\n    - b\n    - c', 2),
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("b")))), list_item(paragraph("c"))))'
 		);
 	});
 
@@ -199,16 +216,21 @@ function seam(doc: PMNode, above: number, below: number, expected: string): void
 }
 
 describe('Delete is Backspace at the seam below', () => {
-	it('joins two items into one line', () => {
-		seam(decode(md('- a\n- b'), blockSchema), 0, 1, 'doc(bullet_list(list_item(paragraph("ab"))))');
+	it('lifts the item below out of the list', () => {
+		seam(
+			decode(md('- a\n- b'), blockSchema),
+			0,
+			1,
+			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"))'
+		);
 	});
 
-	it('the item that follows keeps its ordinal', () => {
+	it('the items past the lifted one keep their numbers', () => {
 		seam(
 			decode(md('1. a\n2. b\n3. c'), blockSchema),
 			0,
 			1,
-			'doc(ordered_list(list_item(paragraph("ab")), list_item(paragraph("c"))))'
+			'doc(ordered_list(list_item(paragraph("a"))), paragraph("b"), ordered_list(list_item(paragraph("c"))))'
 		);
 	});
 
@@ -221,9 +243,9 @@ describe('Delete is Backspace at the seam below', () => {
 		);
 	});
 
-	it('reads the item’s last block, not its first', () => {
+	it('joins a block after the list onto the list’s last line', () => {
 		seam(
-			docOf(ul(li(p('a'), p('cont')), li(p('b')))),
+			docOf(ul(li(p('a'), p('cont'))), p('b')),
 			1,
 			2,
 			'doc(bullet_list(list_item(paragraph("a"), paragraph("contb"))))'
@@ -235,15 +257,15 @@ describe('Delete is Backspace at the seam below', () => {
 			decode(md('- a\n    - b\n- c'), blockSchema),
 			1,
 			2,
-			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("bc"))))))'
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("b"))))), paragraph("c"))'
 		);
 	});
 
 	it('spends an empty item rather than unmarking the one below it', () => {
-		seam(
-			docOf(ul(li(p('a')), li(p()), li(p('c')))),
-			1,
-			2,
+		// Delete's one exception to the reflection: Backspace at `c` still lifts it.
+		expectPress(
+			atBlockEnd(docOf(ul(li(p('a')), li(p()), li(p('c')))), 1),
+			'Delete',
 			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("c"))))'
 		);
 	});
@@ -267,10 +289,8 @@ describe('Delete is Backspace at the seam below', () => {
 		expect(run(endOf('head\n\n- a', 0), keys['Delete'])).toBe(null);
 	});
 
-	// The list's outer boundary is the base keymap's on both keys, and what they agree on
-	// there is that the paragraph below becomes an item.
-	it('at the last item’s end, declines: the boundary below the list is not a seam', () => {
-		expect(run(atBlockEnd(docOf(ul(li(p('a'))), p('tail')), 0), keys['Delete'])).toBe(null);
+	it('at the last item’s end, joins the line below onto it', () => {
+		seam(docOf(ul(li(p('a'))), p('tail')), 0, 1, 'doc(bullet_list(list_item(paragraph("atail"))))');
 	});
 });
 

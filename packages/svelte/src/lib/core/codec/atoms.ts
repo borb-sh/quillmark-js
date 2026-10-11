@@ -1,5 +1,7 @@
 // The block-atom link of the body's Backspace/Delete chains: a delete against an
-// island or a divider selects it, and the press after that deletes it.
+// island or a divider selects it, and the press after that deletes it. A table is the
+// exception, having cells a caret can enter: the press steps into it instead, so a
+// delete against one edits nothing (§`againstAtom`).
 //
 // This is the neighbour half of the rule the leaf already holds for a key typed over a
 // selection (CODEC §"The table island"): a selection is the subject of the next
@@ -13,6 +15,7 @@
 // list.
 import { NodeSelection, TextSelection, type Command } from 'prosemirror-state';
 import type { ResolvedPos, Schema } from 'prosemirror-model';
+import { tableAt } from './table-view.js';
 
 /** The caret, when it sits at a textblock edge with an empty selection: the only place
  *  a delete is about a neighbour rather than about a character. `null` everywhere else,
@@ -43,18 +46,29 @@ function cutAt($pos: ResolvedPos, side: -1 | 1): ResolvedPos | null {
 	return null;
 }
 
-/** Select the block atom the caret is against, rather than deleting it. Declines when
- *  the neighbour is anything a caret can enter, so a paragraph, a heading, a quote and
- *  a list all keep the join the base keymap gives them. */
-function selectAtom(side: -1 | 1): Command {
-	return (state, dispatch) => {
+/** The press against a block atom: select it, rather than deleting it, or step into a
+ *  mounted table, its last cell from below and its first from above. An empty line under
+ *  a table goes with the step, its Backspace having nothing of its own to edit. Declines
+ *  when the neighbour is anything else a caret can enter, so a paragraph, a heading, a
+ *  quote and a list all keep the join the base keymap gives them. */
+function againstAtom(side: -1 | 1): Command {
+	return (state, dispatch, view) => {
 		const $head = atEdge(state, side);
 		const $cut = $head && cutAt($head, side);
-		if (!$cut) return false;
+		if (!$head || !$cut) return false;
 		const node = side < 0 ? $cut.nodeBefore : $cut.nodeAfter;
 		if (!node || !node.isAtom || !node.isBlock || !NodeSelection.isSelectable(node)) return false;
 		const at = side < 0 ? $cut.pos - node.nodeSize : $cut.pos;
-		dispatch?.(state.tr.setSelection(NodeSelection.create(state.doc, at)).scrollIntoView());
+		const table = view && tableAt(view, at);
+		if (!table) {
+			dispatch?.(state.tr.setSelection(NodeSelection.create(state.doc, at)).scrollIntoView());
+			return true;
+		}
+		if (!dispatch) return true;
+		const index = $head.index(-1);
+		if (side < 0 && $head.parent.content.size === 0 && $head.node(-1).canReplace(index, index + 1))
+			dispatch(state.tr.delete($head.before(), $head.after()));
+		table.enter(side);
 		return true;
 	};
 }
@@ -69,7 +83,7 @@ function selectAtom(side: -1 | 1): Command {
 export function atomKeymap(schema: Schema): Record<string, Command> {
 	if (!schema.nodes.island_block) return {};
 	return {
-		Backspace: selectAtom(-1),
-		Delete: selectAtom(1)
+		Backspace: againstAtom(-1),
+		Delete: againstAtom(1)
 	};
 }
