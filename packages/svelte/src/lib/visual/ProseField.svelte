@@ -166,7 +166,7 @@
 <div
 	{@attach mountField}
 	class={[
-		'qm-prose',
+		'qm-prose qm-wash',
 		{ 'qm-control-box': !unframed, 'qm-focus-ring-within': !unframed, 'qm-prose-block': block }
 	]}
 	data-leaf-key={leafKey}
@@ -178,14 +178,6 @@
 <SlashMenu menu={slash} leaf={() => controller} label={t.strings.slashLabel} />
 
 <style>
-	/* The box is `.qm-control-box` (controls.css), the same rule the input beside it
-	 draws, so the two agree on height by construction. No `min-height` with it:
-	 `core/codec/prose.css` resets the paragraph box, so one line of prose in this box
-	 measures one line of text in that one. */
-	.qm-prose {
-		/* Containing block for the arrival wash's inset child (`core/bloom.ts`). */
-		position: relative;
-	}
 	/* A leaf the inline schema does not constrain grows, and opens at one line box: the
 	 empty leaf is the height its first line will take, so the first keystroke displaces
 	 nothing below it. `1em`, not a size rung, which is the rule below's to name.

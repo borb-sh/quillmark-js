@@ -31,7 +31,7 @@
 		type Landing
 	} from '../core/address.js';
 	import { errorMessage, reportError } from '../core/errors.js';
-	import { bloomInside } from '../core/bloom.js';
+	import { bloom } from '../core/bloom.js';
 	import { createLifespan } from '../core/teardown.js';
 	import { spacePx } from '../core/rungs.js';
 	import type {
@@ -736,7 +736,7 @@
 		// (where landing a caret changes nothing on screen) or one off-screen, where the
 		// browser's focus-scroll moves the page and leaves the caret to be hunted for.
 		const box = await land(found, at.granularity === 'segment' ? undefined : at.pos);
-		if (span.alive) bloomInside(box);
+		if (span.alive) bloom(box);
 	}
 	/** The active prose leaf: the formatting popover's observation seam. The active
 	 *  field's controller where it registered one, else the by-value leaf focused last
@@ -826,7 +826,7 @@
 		const found = await revealLeaf(field);
 		if (!found) return missed(`no mounted field at ${field}`, field);
 		const box = await land(found, undefined);
-		if (span.alive) bloomInside(box);
+		if (span.alive) bloom(box);
 	}
 	/** Seed a card of `kind` and insert it at `at` (default: the end). Returns the new
 	 *  card's session key, or `undefined` when the quill seeds no card of that kind. */

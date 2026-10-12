@@ -680,7 +680,7 @@
 	     each block's one child: a branch inside the block would stand between them. -->
 	{#if table}
 		<div
-			class={['qm-array-rows qm-array-table', { empty: ids.length === 0 }]}
+			class={['qm-array-rows qm-array-table qm-wash', { empty: ids.length === 0 }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
@@ -708,7 +708,7 @@
 					<span class="qm-array-table-head-end"></span>
 				</div>
 				{#each ids as id, k (id)}
-					<div class="qm-array-row qm-array-table-row" bind:this={rowEls[id]}>
+					<div class="qm-array-row qm-array-table-row qm-wash" bind:this={rowEls[id]}>
 						<ObjectField
 							bare
 							bind:this={cellEls[id]}
@@ -728,7 +728,7 @@
 		</div>
 	{:else if control === 'object'}
 		<div
-			class={['qm-array-rows', { empty: ids.length === 0 }]}
+			class={['qm-array-rows qm-wash', { empty: ids.length === 0 }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
@@ -738,7 +738,7 @@
 				     interaction of the row's own: the row is no tab stop. -->
 				<div
 					class={[
-						'qm-array-row qm-element',
+						'qm-array-row qm-element qm-wash',
 						{ open: open.has(id), lifted: drag?.engaged && drag.k === k }
 					]}
 					data-drop={dropSide(k)}
@@ -794,12 +794,12 @@
 		</div>
 	{:else}
 		<div
-			class={['qm-array-rows', { empty: ids.length === 0 }]}
+			class={['qm-array-rows qm-wash', { empty: ids.length === 0 }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
 			{#each ids as id, k (id)}
-				<div class="qm-array-row" bind:this={rowEls[id]}>
+				<div class="qm-array-row qm-wash" bind:this={rowEls[id]}>
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
@@ -890,14 +890,13 @@
 	}
 	/* The elements, in a box of their own: the arrival wash blooms here rather than over
 	 the wrapper `Field` hands this component (`washBox`), which is the label's box too.
-	 Positioned for the wash's inset child, and rounded to the rung a row's own box
-	 draws, the way `.qm-field-control` is for every other control.
+	 Rounded to the rung a row's own box draws, the way `.qm-field-control` is for every
+	 other control.
 
 	 `display: none` when there are no elements, so the header does not stand a gap above
 	 an empty box; a wash over it then paints nothing, which is what an array with
 	 nothing in it has to show. */
 	.qm-array-rows {
-		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space);
@@ -922,7 +921,6 @@
 	 against. `minmax(0, …)` because a long unbroken value grows an `auto` track, and the
 	 edge with it. */
 	.qm-array-row {
-		position: relative;
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		row-gap: var(--_qm-space);
@@ -1034,7 +1032,7 @@
 	.qm-element.lifted > .qm-element-head > .qm-element-summary {
 		opacity: var(--_qm-opacity-muted);
 	}
-	.qm-element[data-drop]::after {
+	.qm-element[data-drop]::before {
 		content: '';
 		position: absolute;
 		inset-inline: 0;
@@ -1043,10 +1041,10 @@
 		border-radius: var(--_qm-radius-pill);
 		pointer-events: none;
 	}
-	.qm-element[data-drop='before']::after {
+	.qm-element[data-drop='before']::before {
 		top: calc(-0.5 * (var(--_qm-space) + var(--_qm-ring-width)));
 	}
-	.qm-element[data-drop='after']::after {
+	.qm-element[data-drop='after']::before {
 		bottom: calc(-0.5 * (var(--_qm-space) + var(--_qm-ring-width)));
 	}
 	/* ── An object element ──────────────────────────────────────────────────────

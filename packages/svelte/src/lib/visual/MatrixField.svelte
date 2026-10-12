@@ -53,7 +53,7 @@
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
 	import { propertyDomIds } from './domid.js';
-	import { bloomInside } from '../core/bloom.js';
+	import { bloom } from '../core/bloom.js';
 	import Icon from './icons/Icon.svelte';
 	import FieldLabel from './FieldLabel.svelte';
 	import ObjectField from './ObjectField.svelte';
@@ -215,7 +215,7 @@
 		// the box stays where the next item is typed.
 		const first = Object.keys(schema.properties ?? {})[0];
 		if (first !== undefined) ref(colEls, id)?.focusPath([first]);
-		if (box) bloomInside(box);
+		if (box) bloom(box);
 	}
 
 	/** Take the caret: the first item's control, else the add box. */
@@ -276,13 +276,13 @@
 		</span>
 	</div>
 	<div
-		class={['qm-matrix-roster', { 'qm-tracks': compact, compact }]}
+		class={['qm-matrix-roster qm-wash', { 'qm-tracks': compact, compact }]}
 		data-default={defaulted ? '' : undefined}
 		bind:this={rosterEl}
 	>
 		{#each members as m (m.id)}
 			{@const on = held(m.id)}
-			<div class={['qm-member', { held: on }]} bind:this={memberEls[m.id]}>
+			<div class={['qm-member qm-wash', { held: on }]} bind:this={memberEls[m.id]}>
 				<div class="qm-member-head">
 					<!-- A real checkbox with its face drawn here: the UA's face is shadow DOM no
 					     dial reaches, so the input is `appearance: none` and the box and the
@@ -306,7 +306,7 @@
 		{/each}
 		{#each added as item, k (item.id)}
 			{@const name = item.title || t.strings.matrixItemTitle(label ?? '', k + 1)}
-			<div class="qm-member held added" bind:this={memberEls[item.id]}>
+			<div class="qm-member qm-wash held added" bind:this={memberEls[item.id]}>
 				<div class="qm-member-head">
 					<!-- Held by being present: the tick is fixed, and the remove is its untick. -->
 					<span class="qm-tick" aria-hidden="true">
@@ -391,11 +391,9 @@
 		color: var(--_qm-ink-label);
 		font-variant-numeric: tabular-nums;
 	}
-	/* The roster, one member to a row in declaration order. Positioned for the wash's
-	 inset child (`washBox`), and rounded to the rung a row's box draws, as an array's
-	 rows are. */
+	/* The roster, one member to a row in declaration order, rounded for the wash
+	 (`washBox`) to the rung a row's box draws, as an array's rows are. */
 	.qm-matrix-roster {
-		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space);
@@ -411,10 +409,9 @@
 		align-items: start;
 		column-gap: var(--_qm-space-2);
 	}
-	/* A member is a row: positioned for the wash a landing on it blooms, rounded to the
-	 rung the rows around it draw. */
+	/* A member is a row, rounded for the wash a landing on it blooms to the rung the
+	 rows around it draw. */
 	.qm-member {
-		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space);
