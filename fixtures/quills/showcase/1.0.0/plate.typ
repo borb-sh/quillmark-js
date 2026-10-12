@@ -1,27 +1,27 @@
-#import "@local/quillmark-helper:0.1.0": data, display, field-region, form-field, ink, roster, signature-field
+#import "@local/quillmark-helper:0.2.0" as qm
 #import "@local/showcase-layout:1.0.0": (
   accent-rule, callout, mono-face, plain-text, showcase-page,
 )
 
-#let accent = data.at("accent", default: "slate")
+#let accent = qm.data.at("accent", default: "slate")
 
 #show: showcase-page.with(
   // A string, not `data.title`: see `showcase-page` on why the running head takes
   // a flattened projection and the block stays in the flow. The projection is the
   // quill's own walk — the helper offers no content-to-string coercion.
-  running-title: plain-text(data.title),
-  status: data.at("status", default: "draft"),
+  running-title: plain-text(qm.data.title),
+  status: qm.data.at("status", default: "draft"),
   accent: accent,
-  font-size: data.at("font_size", default: 10.5) * 1pt,
-  watermark: data.at("draft_watermark", default: false),
+  font-size: qm.data.at("font_size", default: 10.5) * 1pt,
+  watermark: qm.data.at("draft_watermark", default: false),
 )
 
 // A date arrives as a native `datetime`, so `data.<field>` is what arithmetic and
-// comparison take. Rendered ink is reached by schema address instead: `display`
+// comparison take. Rendered ink is reached by schema address instead: `qm.ink`
 // keys on the address, returns `none` for a blank date, and its glyphs carry that
 // address, so a date stays click-to-edit however it is formatted.
 #let shown-date(addr, fallback) = {
-  let ink = display(addr, "[year]-[month]-[day]")
+  let ink = qm.ink(qm.data, addr, "[year]-[month]-[day]")
   if ink == none { fallback } else { ink }
 }
 
@@ -32,19 +32,17 @@
 // guard — only its value is worth one.
 //
 // The discriminant is bound for the branching, and every *emitted* cell is read off
-// `data` directly: a direct read regions at the property, so these cells reach the
-// preview as `main.distribution.<cell>`. A cell read through a local binding carries
-// no address.
+// `qm.data` and printed by the plate, so it surfaces no region of its own.
 #let distribution-note = {
-  let world = data.distribution.value
+  let world = qm.data.distribution.value
   if world == "internal" [Internal]
-  else if world == "public" [Public · #data.distribution.license]
+  else if world == "public" [Public · #qm.data.distribution.license]
   else if world == "embargoed" [
-    Embargoed#if data.distribution.lift_on != "" [ until #data.distribution.lift_on]#if data.distribution.held_by != "" [ · #data.distribution.held_by]
+    Embargoed#if qm.data.distribution.lift_on != "" [ until #qm.data.distribution.lift_on]#if qm.data.distribution.held_by != "" [ · #qm.data.distribution.held_by]
     // A variant cell holding a record list. A row's `text` is a content cell, so it
     // regions at `main.distribution.notices[i].text` through the loop; `party` is a
     // scalar and reaches the preview through the field alone.
-    #for n in data.distribution.notices [ · #n.at("party", default: "")#if n.at("text", default: "") != "" [: #n.text]]
+    #for n in qm.data.distribution.notices [ · #n.at("party", default: "")#if n.at("text", default: "") != "" [: #n.text]]
   ] else [Distribution unset]
 }
 
@@ -54,10 +52,10 @@
 // block when written and as the empty string when not, so the guard is a content
 // field's anywhere else.
 #let handling-note = {
-  let world = data.handling.value
+  let world = qm.data.handling.value
   if world == "OPEN" [Open]
   else if world == "CONTROLLED" [
-    Controlled#if data.handling.controlled_by != "" [ by #data.handling.controlled_by]#if data.handling.caveat != "" [ · #data.handling.caveat]
+    Controlled#if qm.data.handling.controlled_by != "" [ by #qm.data.handling.controlled_by]#if qm.data.handling.caveat != "" [ · #qm.data.handling.caveat]
   ]
   else if world == "CLOSE HOLD" [Close hold]
   else [Handling unset]
@@ -70,12 +68,12 @@
   align: horizon,
   image("assets/mark.png", width: 46pt),
   {
-    text(size: 19pt, weight: "bold", data.title)
+    text(size: 19pt, weight: "bold", qm.data.title)
     // A blank content field arrives as the empty string and a written one as its
     // markup block, so `!= ""` is the guard a placement takes.
-    if data.at("subtitle", default: "") != "" {
+    if qm.data.at("subtitle", default: "") != "" {
       linebreak()
-      text(size: 11pt, style: "italic", data.subtitle)
+      text(size: 11pt, style: "italic", qm.data.subtitle)
     }
   },
 )
@@ -83,21 +81,21 @@
 #v(4pt)
 #accent-rule(accent: accent)
 
-#let authors = data.at("authors", default: ())
-#let poc = data.at("contact", default: (:))
+#let authors = qm.data.at("authors", default: ())
+#let poc = qm.data.at("contact", default: (:))
 #text(size: 9pt)[
-  #if authors.len() > 0 [#authors.join(", ")]
+  #if authors.len() > 0 [#qm.region("authors", authors.join(", "))]
   #if poc.at("name", default: "") != "" [
     · #poc.name#if poc.at("email", default: "") != "" [ (#poc.email)]
   ]
   · Issued #shown-date("issued", [—])
-  #let revised = display("revised_at", "[year]-[month]-[day] [hour]:[minute]")
+  #let revised = qm.ink(qm.data, "revised_at", "[year]-[month]-[day] [hour]:[minute]")
   #if revised != none [ · Revised #revised]
-  #if data.at("tracking_id", default: "") != "" [ · #raw(data.tracking_id)]
-  #if data.at("reference", default: none) != none [ · re #data.reference]
+  #if qm.data.at("tracking_id", default: "") != "" [ · #qm.region("tracking_id", raw(qm.data.tracking_id))]
+  #if qm.data.at("reference", default: none) != none [ · re #qm.data.reference]
   // A property's date is a `datetime` like a card-level one, so the property is
   // addressed the same way rather than placed as the string it used to be.
-  #let reply = display("contact.reply_by", "[year]-[month]-[day]")
+  #let reply = qm.ink(qm.data, "contact.reply_by", "[year]-[month]-[day]")
   #if reply != none [ · reply by #reply]
   #if poc.at("listed", default: false) [ · listed]
   #if poc.at("note", default: "") != "" [ · #poc.note]
@@ -106,7 +104,7 @@
 // A table's rows are all scalars, so the loop reaches the preview through the array's
 // own region and no row names itself. A date cell arrives as a native `datetime`, or as
 // the string blank where the row left it unset.
-#let contributors = data.at("contributors", default: ())
+#let contributors = qm.data.at("contributors", default: ())
 #if contributors.len() > 0 {
   v(4pt)
   text(size: 9pt, {
@@ -121,26 +119,26 @@
   })
 }
 
-#if data.at("epigraph", default: "") != "" {
+#if qm.data.at("epigraph", default: "") != "" {
   v(6pt)
-  align(center, block(width: 78%, text(size: 9.5pt, data.epigraph)))
+  align(center, block(width: 78%, text(size: 9.5pt, qm.data.epigraph)))
 }
 
 // ── Abstract, keywords ──────────────────────────────────────────────────────
-#if data.at("abstract", default: "") != "" {
+#if qm.data.at("abstract", default: "") != "" {
   v(8pt)
-  block(inset: (left: 14pt), text(size: 9.5pt, data.abstract))
+  block(inset: (left: 14pt), text(size: 9.5pt, qm.data.abstract))
 }
 
-#let keywords = data.at("keywords", default: ())
+#let keywords = qm.data.at("keywords", default: ())
 #if keywords.len() > 0 {
   v(4pt)
-  text(size: 9pt, { strong[Keywords: ]; keywords.map(box).join[, ] })
+  text(size: 9pt, { strong[Keywords: ]; qm.region("keywords", keywords.map(box).join[, ]) })
 }
 
 // `errata` rows are `plaintext`, so each row's markdown delimiters reach the page
 // as the characters they are rather than as the emphasis they would mark.
-#let errata = data.at("errata", default: ())
+#let errata = qm.data.at("errata", default: ())
 #if errata.len() > 0 {
   v(6pt)
   text(size: 9pt, {
@@ -151,15 +149,15 @@
 
 // ── Body ────────────────────────────────────────────────────────────────────
 #v(10pt)
-#columns(data.at("columns", default: 1), data.at("$body"))
+#columns(qm.data.at("columns", default: 1), qm.data.at("$body"))
 
 // ── Signature ───────────────────────────────────────────────────────────────
 // A widget, not text: `main.signature_block` reaches the region table through
 // this placement and through no glyph span of its own.
 #v(16pt)
 #align(right, {
-  signature-field("Signature", width: 200pt, height: 34pt, field: "signature_block")
-  for line in data.at("signature_block", default: ()) {
+  qm.signature-field("Signature", width: 200pt, height: 34pt, field: "signature_block")
+  for line in qm.data.at("signature_block", default: ()) {
     line
     linebreak()
   }
@@ -171,7 +169,7 @@
 // regardless, the guard being the plate's rather than the engine's.
 #{
   let section-no = 0
-  for (i, card) in data.at("$cards").enumerate() {
+  for (i, card) in qm.data.at("$cards").enumerate() {
     let kind = card.at("$kind", default: none)
     let path = card.at("$path")
     // The helper leaves an unset body as the empty string; only a written one is
@@ -235,7 +233,7 @@
       v(10pt)
       // The region keys on this card's own `$path`, so a click lands on this
       // instance's field rather than on the kind's first.
-      signature-field("Signoff_" + str(i), width: 180pt, height: 34pt, field: path + "signature_block")
+      qm.signature-field("Signoff_" + str(i), width: 180pt, height: 34pt, field: path + "signature_block")
       for line in card.at("signature_block", default: ()) {
         line
         linebreak()
@@ -253,10 +251,10 @@
 #v(4pt)
 // The title restated. Its second placement is what makes `main.title`'s regions
 // non-unique and page-spanning, the case a scroll-to-field rule has to answer.
-#text(size: 12pt, weight: "bold", data.title)
+#text(size: 12pt, weight: "bold", qm.data.title)
 #v(4pt)
 #text(font: mono-face, size: 8pt)[
-  #data.at("status", default: "draft") · #accent · #str(data.at("columns", default: 1)) col · #str(data.at("font_size", default: 10.5)) pt
+  #qm.region("status", [#qm.data.at("status", default: "draft")]) · #qm.region("accent", [#accent]) · #qm.region("columns", str(qm.data.at("columns", default: 1))) col · #qm.region("font_size", str(qm.data.at("font_size", default: 10.5))) pt
   #linebreak()
   #distribution-note
   #linebreak()
@@ -267,7 +265,7 @@
   // preview through `main.revisions` alone. A content cell's spans ride its value, so
   // `detail` regions at `main.revisions[i].detail` wherever it is placed: the nested
   // row address a landing resolves through.
-  #for rev in data.at("revisions", default: ()) [
+  #for rev in qm.data.at("revisions", default: ()) [
     #rev.at("note", default: "revised") (#str(rev.at("pages", default: 0)) pp)#if rev.at("detail", default: "") != "" [ — #rev.detail]
     #linebreak()
     #if rev.at("rationale", default: "") != "" { block(inset: (left: 8pt), rev.rationale) }
@@ -279,11 +277,11 @@
   // content cell and an added item's `title` a string cell, so their ink keeps their
   // own addresses inside the claim; `severity` is a scalar read through the loop and
   // reaches the preview through the row.
-  Checks: #for row in roster(data, "checks") {
-    let title = if row.held { ink(row.value).at("title", default: row.title) } else { row.title }
-    field-region(row.path)[#(if row.held { "[x]" } else { "[ ]" }) #title]
+  Checks: #for row in qm.roster(qm.data, "checks") {
+    let title = if row.held { if "title" in row.value { qm.ink(row.value, "title") } else { row.title } } else { row.title }
+    qm.region(row.path)[#(if row.held { "[x]" } else { "[ ]" }) #title]
     if row.held and row.value.severity == "major" [ (major)]
-    if row.held and row.value.note != "" [: #ink(row.value).note]
+    if row.held and row.value.note != "" [: #qm.ink(row.value, "note")]
     [; ]
   }
   #linebreak()
@@ -291,19 +289,19 @@
   // same way the signature does — through a placement, not through a glyph span.
   // `form-field` keeps `text` and `signature`, so the mark is a character this plate
   // writes; an interactive checkbox is an `acroform` quill's.
-  #form-field(
+  #qm.form-field(
     "DraftWatermark",
     type: "text",
-    value: if data.at("draft_watermark", default: false) { "X" } else { "" },
+    value: if qm.data.at("draft_watermark", default: false) { "X" } else { "" },
     field: "draft_watermark",
     width: 9pt,
     height: 9pt,
   )
   marked draft
 ]
-#if data.at("colophon", default: "") != "" {
+#if qm.data.at("colophon", default: "") != "" {
   v(4pt)
-  text(font: mono-face, size: 8pt, data.colophon)
+  text(font: mono-face, size: 8pt, qm.data.colophon)
 }
 
 // ── Appendices ──────────────────────────────────────────────────────────────
@@ -312,7 +310,7 @@
 // `label` and `note` are content cells, so each regions at
 // `main.appendices[i].entries[j].<cell>` through both loops; `title` and `page` are
 // scalars and reach the preview through `main.appendices` alone.
-#let appendices = data.at("appendices", default: ())
+#let appendices = qm.data.at("appendices", default: ())
 #if appendices.len() > 0 {
   v(10pt)
   for (i, app) in appendices.enumerate() {
