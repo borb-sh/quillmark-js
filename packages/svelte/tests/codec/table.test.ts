@@ -17,6 +17,7 @@ import { createField, decode, blockSchema, pmToContent } from '$lib/core/codec';
 import { cellSchema } from '$lib/core/codec/schema.js';
 import type { FieldController, LeafViews } from '$lib/core/codec';
 import {
+	cellAt,
 	cellContent,
 	cellEqual,
 	cellFromDoc,
@@ -1127,6 +1128,22 @@ describe('alignment is set on the held column', () => {
 		toggle(field, 1, 'right').click();
 		expect(leafProps(field).aligns).toEqual(['left', 'right']);
 		expect(undoDepth(outerView(field).state)).toBe(0);
+		field.destroy();
+	});
+
+	// A cell's own alignment outranks its column's, so a press that left it would draw no
+	// change over a column swept and aligned cell by cell.
+	it('a press clears its cells’ own alignment in the same step, even at the column’s', () => {
+		const { field } = tableLeaf(setCellLayout(LETTERED, 0, 1, 2, 1, 'align', 'center'));
+		const own = () => [0, 1, 2].map((r) => cellAt(leafProps(field), r, 1).align);
+		expect(own()).toEqual(['center', 'center', 'center']);
+		grips(field, 'column')[1].click();
+		toggle(field, 1, 'right').click();
+		expect(leafProps(field).aligns).toEqual(['left', 'right']);
+		expect(own()).toEqual([undefined, undefined, undefined]);
+		expect(undoDepth(outerView(field).state)).toBe(1);
+		press(caret(field), 'z', { ctrlKey: true });
+		expect(own()).toEqual(['center', 'center', 'center']);
 		field.destroy();
 	});
 

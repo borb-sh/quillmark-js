@@ -952,12 +952,18 @@ class TableIslandView implements NodeView {
 		this.selectLine({ axis: line.axis, index: to });
 	}
 
-	/** Set column `c`'s alignment and keep the column held: a changed alignment rebuilds
-	 *  the views, which retires the selection as a move's rebuild does. The alignment the
-	 *  column already holds writes nothing. */
+	/** Set column `c`'s alignment, clear its cells' own, which would outrank it, and keep
+	 *  the column held: a changed alignment rebuilds the views, which retires the selection
+	 *  as a move's rebuild does. One `set` for both, and a column already at `to` with no
+	 *  cell of its own writes nothing. */
 	private align(c: number, to: Aligned): void {
 		const props = this.props();
-		if (props.aligns[c] !== to) this.write(setAlign(props, c, to));
+		const last = rowCount(props) - 1;
+		const own = Array.from({ length: last + 1 }, (_, r) => cellAt(props, r, c)).some(
+			(cell) => cell.align !== undefined
+		);
+		if (props.aligns[c] !== to || own)
+			this.write(setCellLayout(setAlign(props, c, to), 0, c, last, c, 'align', undefined));
 		this.selectLine({ axis: 'column', index: c });
 	}
 
