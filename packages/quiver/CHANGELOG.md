@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.37.0 - 2026-10-12
+
 **The `@quillmark/wasm` peer floor is `>=0.125.0-0`.** A packed Typst quill's plate imports the helper as a module, `#import "@local/quillmark-helper:0.2.0" as qm`, and any other import fails its render as `typst::helper_import`. A card spelling `ui.group` or `ui.groups` loads with `quill::deprecated_groups`, and `sections:` loads clean.
 
 ## v0.36.0 - 2026-10-10
