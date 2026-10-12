@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.125.0, and every Typst plate migrates.** A plate imports the helper as a module, `#import "@local/quillmark-helper:0.2.0" as qm`, and reads its members through it: `qm.data`, `qm.ink(dict, "field")` where it wrote `ink(dict).field` or `display(..)`, `qm.region` where it wrote `field-region`. Any other import fails the render as `typst::helper_import`. A value the plate prints itself surfaces no region in studio's preview, so a field stays click-to-edit printed through `qm.ink` or claimed with `qm.region`. A card spelling `ui.group` warns `quill::deprecated_groups`; `sections:` replaces it. quillmark's 0.124 → 0.125 migration guide covers each step.
+
 ## v0.16.1 - 2026-10-10
 
 **The carried `@quillmark/svelte` pins `prosemirror-view` 1.42.6, which closes the paste-handling XSS of GHSA-c8x8-7fp4-3x9w.**
