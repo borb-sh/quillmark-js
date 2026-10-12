@@ -5,9 +5,9 @@
 // what the click resolved names the wrong thing — the field where the pick said the
 // row.
 //
-// Asserted as the wash node's host and never as its paint: `bloomInside` appends one
-// inset child per host, and which host holds it is the whole of what the granularity
-// decides.
+// Asserted as the host the wash played on and never as its paint: every host draws
+// the wash at mount, and which one a landing plays is the whole of what the
+// granularity decides.
 import { describe, it, expect, afterEach } from 'vitest';
 import { tick } from 'svelte';
 import { quill, example } from '../helpers/fixtures.js';
@@ -27,6 +27,27 @@ describe('the arrival wash', () => {
 		expect(host?.className).toContain('qm-array-row');
 		// The row the caret is in, so the wash and the landing cannot name two rows.
 		expect(document.activeElement?.closest('.qm-array-row')).toBe(host);
+	});
+
+	it('washes a table row with the plane it drew at mount, adding nothing to the tree', async () => {
+		const q = quill();
+		const { target, editor } = mountEditor(q, example());
+
+		// The row is a subgrid, and a box added to a laid-out one resizes its tracks in
+		// WebKit: the wash is the row's own `::after`, so a landing only plays it.
+		const added: Node[] = [];
+		const watch = new MutationObserver((records) => {
+			for (const r of records) added.push(...r.addedNodes);
+		});
+		watch.observe(target, { childList: true, subtree: true });
+		await editor.setCaret({ field: 'main.contributors[1].name' });
+		await tick();
+		watch.disconnect();
+
+		const host = washHost(target);
+		expect(host?.classList.contains('qm-array-table-row')).toBe(true);
+		expect(document.activeElement?.closest('.qm-array-table-row')).toBe(host);
+		expect(added).toEqual([]);
 	});
 
 	it('washes the whole list where the address named the field', async () => {

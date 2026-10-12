@@ -14,6 +14,8 @@
 
 **An un-renamed card's title draws at the label ink.** It took the browser's placeholder grey, brighter than the labels beneath it in dark mode.
 
+**A preview click into a table row leaves the row's columns on the header's in Safari.** The arrival wash was a box added inside the landed row, and WebKit sized that row's columns by its own contents from then on, its first column widening past its header. The wash is now a plane every landing target draws from mount, and a landing only plays it.
+
 ## v0.21.0 - 2026-10-12
 
 **The `@quillmark/wasm` peer floor is `>=0.125.0-0`.** A card grouping its fields under the legacy `ui.group` lists them in display order, its ungrouped fields first and then each group's in registry order, where it listed them as declared, so the editor draws and a new card seeds them in that order; a card declaring `sections:` lists them the same way. An object alone in its group carries `ui.layout: flat` and draws without a frame of its own. A value a plate prints itself surfaces no preview region, so a click on it lands on nothing unless the plate prints it through `qm.ink` or claims it with `qm.region`.

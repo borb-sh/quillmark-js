@@ -14,8 +14,8 @@ import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
 
 /**
  * What jsdom does not implement and a mount reaches: the reveal's scroll hop, the
- * reorder trip's query, the arrival wash (stubbed to a run that never finishes, so the
- * wash node stays where a test can read its host), the caret rects PM measures, and
+ * reorder trip's query, the arrival wash (stubbed to note the host it played on, where
+ * a test reads it), the caret rects PM measures, and
  * the pointer capture the enum trigger probes for. Every mount calls it; a file calls
  * it itself only to spy on a stub before its first mount. `??=` so a file stubbing its
  * own keeps it.
@@ -23,7 +23,10 @@ import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
 export function stubLayout(): void {
 	Element.prototype.scrollIntoView ??= () => {};
 	Element.prototype.getAnimations ??= () => [];
-	Element.prototype.animate ??= () => ({}) as Animation;
+	Element.prototype.animate ??= function (this: Element, _frames, options) {
+		if (typeof options === 'object' && options.pseudoElement === '::after') washed.add(this);
+		return {} as Animation;
+	};
 	Element.prototype.hasPointerCapture ??= () => false;
 	Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
 	Range.prototype.getBoundingClientRect ??= () => new DOMRect();
@@ -56,10 +59,13 @@ export interface Mounted<E = EditorRef> {
 }
 
 const live = new Set<() => void>();
+/** Every host a wash has played on since the last unmount. */
+const washed = new Set<Element>();
 
 /** Unmount every surface still mounted. */
 export function unmountAll(): void {
 	for (const off of [...live]) off();
+	washed.clear();
 }
 
 function mountWith<E>(
@@ -225,10 +231,10 @@ export const caret = () => {
 	return { text: sel?.anchorNode?.textContent, offset: sel?.anchorOffset };
 };
 
-/** The one wash on the surface: a landing is a discrete act, so there is never a
- *  second host holding one at rest. */
+/** The one host a wash played on: a landing is a discrete act, so a test that lands
+ *  once has one. */
 export function washHost(target: HTMLElement): HTMLElement | undefined {
-	const washes = [...target.querySelectorAll<HTMLElement>('.qm-bloom')];
-	if (washes.length !== 1) throw new Error(`${washes.length} washes on the surface`);
-	return washes[0].parentElement ?? undefined;
+	const hosts = [...washed].filter((h): h is HTMLElement => target.contains(h));
+	if (hosts.length !== 1) throw new Error(`${hosts.length} washes on the surface`);
+	return hosts[0];
 }

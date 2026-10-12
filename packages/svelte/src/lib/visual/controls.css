@@ -267,6 +267,22 @@
 	transform: translate(-50%, -50%);
 }
 
+/* The arrival wash: a plane over the host's box at rest, which a landing plays
+ (`core/bloom.ts`). On the host from mount, because WebKit resizes a laid-out subgrid's
+ tracks when an out-of-flow box is added to it. */
+:where(.qm-wash) {
+	position: relative;
+}
+:where(.qm-wash)::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--_qm-accent-wash);
+	opacity: 0;
+	pointer-events: none;
+}
+
 /* The capacity ladder: how many tracks a grid of fields steps to, off the width of
  the query container it stands in. One recipe, because three grids read it — a section's
  fields (`Card.svelte`), a subform's properties (`ObjectField`), each over its own

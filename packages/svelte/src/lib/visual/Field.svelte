@@ -221,7 +221,7 @@
 
 	/**
 	 * This field's landing handle. The wrapper is the bloom host rather than the
-	 * control: `bloomInside` appends an inset child and an `<input>` holds none. The
+	 * control: the wash is a box's `::after`, which an `<input>` draws none of. The
 	 * label is outside it, and stays out of the wash: an arrival marks where the caret
 	 * landed, which is the control. A control that owns its label (`ownsLabel`: the array
 	 * and the matrix) holds that row inside itself, so it names its own box
@@ -285,7 +285,7 @@
 	 rule below holds why). One markup for both spans; a field owning its row nests a
 	 level and measures the same. -->
 	<div class="qm-field-stack">
-		<div class="qm-field-control" {@attach registerControl} onfocusin={reportFocus}>
+		<div class="qm-field-control qm-wash" {@attach registerControl} onfocusin={reportFocus}>
 			{#if field.control === 'prose'}
 				<ProseField
 					{quill}
@@ -476,13 +476,10 @@
 		gap: var(--_qm-space);
 		min-width: 0;
 	}
-	/* Positioned for the arrival wash a landing inserts (`core/bloom.ts`), the way
-	   `.qm-prose` is: an inset child over the control, since an `<input>` takes none.
-	   The radius is the control's own, so the wash's corners are the box's rather than
-	   square over a rounded one; on an array or a subform it bounds a group, where
-	   there is no single box for it to disagree with. */
+	/* The arrival wash's host (`.qm-wash`). The radius is the control's own, so the
+	   wash's corners are the box's rather than square over a rounded one; on an array or
+	   a subform it bounds a group, where there is no single box for it to disagree with. */
 	.qm-field-control {
-		position: relative;
 		border-radius: var(--_qm-radius-inner);
 	}
 </style>

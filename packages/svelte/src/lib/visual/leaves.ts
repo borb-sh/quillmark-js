@@ -35,8 +35,8 @@ import type { FieldController, LeafViews } from '../core/codec/index.js';
 export type LandingBox = HTMLElement | undefined | Promise<HTMLElement | undefined>;
 
 /**
- * A mounted field's landing handle: focus it, and the element the arrival wash blooms
- * inside ({@link import('../core/bloom.js').bloomInside}).
+ * A mounted field's landing handle: focus it, and the `.qm-wash` box the arrival wash
+ * plays over ({@link import('../core/bloom.js').bloom}).
  *
  * A `FieldController` is one, which is what lets the two lanes share a lookup; `Field`
  * builds the same shape over a form control off the handoff a label click already
