@@ -78,9 +78,12 @@
 		local = el.value;
 	}
 
-	// A reverted entry can still fire `change` on leaving, its text differing from what
-	// the input held at focus; that one commits nothing.
+	// Where the reverted text differs from the last settled one, a browser fires `change`
+	// on leaving; that one commits nothing. An entry that settled outside the grammar was
+	// handed up as a string and refused, so taking it back settles the held value again,
+	// which clears the refusal drawn on the field.
 	let reverted = false;
+	let offered = false;
 	function revert(e: KeyboardEvent): void {
 		if (e.key !== 'Escape' || e.isComposing) return;
 		const el = e.currentTarget as HTMLInputElement;
@@ -88,6 +91,10 @@
 		e.preventDefault();
 		local = el.value = resting;
 		reverted = true;
+		if (offered) {
+			offered = false;
+			onCommit(value);
+		}
 	}
 
 	// Parse a settled entry and emit it; `local` is owned by `oninput`. Blank →
@@ -101,6 +108,7 @@
 		}
 		const raw = el.value;
 		const entry = raw.trim();
+		offered = false;
 		if (entry === '') {
 			onCommit(undefined);
 			local = el.value = fallback ?? '';
@@ -108,7 +116,8 @@
 		}
 		// Finite as well: a digit run past `Number.MAX_VALUE` reads as `Infinity`.
 		const n = whole.test(entry) ? Number(entry) : NaN;
-		onCommit(Number.isFinite(n) ? n : raw);
+		offered = !Number.isFinite(n);
+		onCommit(offered ? raw : n);
 	}
 </script>
 

@@ -193,6 +193,9 @@
 	.qm-tips-dot:hover {
 		opacity: var(--_qm-opacity-muted);
 	}
+	.qm-tips-dot:focus-visible {
+		opacity: 1;
+	}
 	.qm-tips-dot[aria-current='true'] {
 		opacity: 1;
 	}

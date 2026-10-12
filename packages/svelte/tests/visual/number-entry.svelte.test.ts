@@ -204,5 +204,16 @@ main:
 		.resolve()
 		.main.fields.find((r: ResolvedField) => r.name === 'pages')!;
 	expect(row.source).toBe('default');
-	expect(pages.querySelector('[role="status"]')?.textContent?.trim()).not.toBe('');
+	const status = () => pages.querySelector('[role="status"]')?.textContent?.trim() ?? '';
+	expect(status()).not.toBe('');
+
+	// Escape takes the refused entry back, and the refusal with it, writing nothing.
+	const input = pages.querySelector('input')!;
+	input.dispatchEvent(
+		new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+	);
+	flushSync();
+	expect(input.value).toBe('12');
+	expect(status()).toBe('');
+	expect(q.reader(doc).get('pages')).toBeUndefined();
 });

@@ -1031,9 +1031,7 @@
 						     the surface where the consumer scrolls one. -->
 							<div class="qm-menu-surface" data-qm-root>
 								{#each kinds as k (k)}
-									<DropdownMenu.Item
-										class="qm-menu-item qm-focus-ring"
-										onSelect={() => addPicked(atIndex, k)}
+									<DropdownMenu.Item class="qm-menu-item" onSelect={() => addPicked(atIndex, k)}
 										>{kindTitle(quill.schema.card_kinds?.[k], k)}</DropdownMenu.Item
 									>
 								{/each}

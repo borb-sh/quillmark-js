@@ -4,13 +4,15 @@
 
 ## Unreleased
 
-**A record row dragged to the edge of the view scrolls it.** Held near the top or bottom of the editor's scrolling pane, or of the page, a row's drag scrolls on toward the rows out of view, and the drop follows whatever the scroll brings under the pointer, a wheel scroll mid-drag included.
+**A record row dragged to the edge of the view scrolls it.** Held near the top or bottom of the editor's scrolling pane, or of the page, a row's drag scrolls on toward the rows out of view, and the drop follows whatever the scroll brings under the pointer, a wheel scroll mid-drag included. A drag pressed on a row already at the edge waits for the pointer to leave the edge before it scrolls.
 
-**A record row's drag handle is out of a screen reader's way.** It announced itself as a button that did nothing when pressed; it is now pointer-only, and the row's summary announces Alt+Up and Alt+Down, the keys that move the row.
+**A record row's drag handle is out of a screen reader's way.** It announced itself as a button that did nothing when pressed; it is now pointer-only, and the row's summary declares Alt+Up and Alt+Down as its shortcuts, the keys that move the row.
 
-**Escape in a number field takes back the edit in progress.** The field returns to the value it holds, or to its default, and leaving it writes nothing, as Escape takes back a card rename.
+**Escape in a number field takes back the edit in progress.** The field returns to the value it holds, or to its default, and leaving it writes nothing, as Escape takes back a card rename. Escape over an entry the field refused clears the refusal with it.
 
-**More controls draw the editor's own focus ring.** A section header, the add-card strip, the card-kind menu, the format popover's buttons and link field, and the tips card's controls show the themed ring under keyboard focus in place of the browser's outline, and an un-renamed card's title draws in the title's own ink, where it took the browser's placeholder grey, brighter than the labels beneath it in dark mode.
+**More controls draw the editor's own focus ring.** A section header, the add-card strip, the format popover's buttons and link field, and the tips card's controls show the themed ring under keyboard focus in place of the browser's outline. A card-kind menu item shows its highlight alone, as the field's list of choices does.
+
+**An un-renamed card's title draws at the label ink.** It took the browser's placeholder grey, brighter than the labels beneath it in dark mode.
 
 ## v0.21.0 - 2026-10-12
 

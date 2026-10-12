@@ -538,10 +538,10 @@
 	.qm-card-title:focus {
 		color: var(--_qm-ink);
 	}
-	/* The automatic title is the placeholder, and it reads as the title it stands for
-	 rather than in the UA's grey. */
+	/* The automatic title, at the label ink every placeholder takes rather than the UA's
+	 grey, and steady under focus, where a typed title steps to the ink. */
 	.qm-card-title::placeholder {
-		color: inherit;
+		color: var(--_qm-ink-label);
 		opacity: 1;
 	}
 	.qm-card-body {
