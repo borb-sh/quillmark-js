@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.21.0 - 2026-10-12
+
 **The `@quillmark/wasm` peer floor is `>=0.125.0-0`.** A card grouping its fields under the legacy `ui.group` lists them in display order, its ungrouped fields first and then each group's in registry order, where it listed them as declared, so the editor draws and a new card seeds them in that order; a card declaring `sections:` lists them the same way. An object alone in its group carries `ui.layout: flat` and draws without a frame of its own. A value a plate prints itself surfaces no preview region, so a click on it lands on nothing unless the plate prints it through `qm.ink` or claims it with `qm.region`.
 
 **Enter on an empty last row of a table leaves the table, and ArrowLeft and ArrowRight cross cells.** Enter on a table's last row, while it is empty, removes that row and puts the caret after the table, as Enter on an empty list item leaves the list; a table always keeps a row under its first. ArrowLeft at the start of a cell and ArrowRight at its end move to the neighbouring cell in reading order, a row's end wrapping to the next row, and stop at the table's first and last cells.
