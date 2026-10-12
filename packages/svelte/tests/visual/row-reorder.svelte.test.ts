@@ -5,7 +5,7 @@
 // whole, so the element keeps its id and everything mounted under it. Driven off the
 // reference quill's `revisions` with three rows, and off `appendices` for a row inside a
 // row.
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
 import { quill, example } from '../helpers/fixtures.js';
@@ -40,7 +40,7 @@ function revisions(target: HTMLElement): HTMLElement {
 }
 const rows = (arr: HTMLElement) => [...arr.querySelectorAll<HTMLElement>('.qm-element')];
 const handle = (arr: HTMLElement, k: number) =>
-	rows(arr)[k].querySelector<HTMLButtonElement>('.qm-row-handle')!;
+	rows(arr)[k].querySelector<HTMLElement>('.qm-row-handle')!;
 /** Stand the rows 40px tall and 10px apart from the top, which jsdom lays out as none. */
 function layOut(arr: HTMLElement): void {
 	rows(arr).forEach((row, i) => {
@@ -71,8 +71,10 @@ describe('reorder on an object row', () => {
 		layOut(arr);
 		expect(summaryTexts(arr)).toEqual(['A', 'B', 'C']);
 		const grip = handle(arr, 0);
+		// Pointer-only: nothing a screen reader reaches, the summary announcing the keys.
 		expect(grip.tabIndex).toBe(-1);
-		expect(grip.getAttribute('aria-label')).toBe('Drag to move Revisions 1');
+		expect(grip.getAttribute('aria-hidden')).toBe('true');
+		expect(summaries(arr)[0].getAttribute('aria-keyshortcuts')).toBe('Alt+ArrowUp Alt+ArrowDown');
 
 		dragHandle(grip, [20, 70, 120]);
 		expect(order(q, doc)).toEqual(['B', 'C', 'A']);
@@ -100,6 +102,57 @@ describe('reorder on an object row', () => {
 		flushSync();
 		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
 		expect(arr.querySelector('.lifted, [data-drop]')).toBeNull();
+	});
+
+	it('re-picks the drop as the rows scroll under a held drag, and scrolls at the edge', () => {
+		const q = quill();
+		const doc = threeRows(q);
+		const mounted = mountEditor(q, doc);
+		const arr = revisions(mounted.target);
+		layOut(arr);
+		const frames: FrameRequestCallback[] = [];
+		vi.stubGlobal('requestAnimationFrame', (f: FrameRequestCallback) => frames.push(f));
+		const page = document.scrollingElement ?? document.documentElement;
+		let scrolled = 0;
+		Object.defineProperty(page, 'scrollTop', {
+			configurable: true,
+			get: () => scrolled,
+			set: (v: number) => (scrolled = v)
+		});
+		try {
+			const grip = handle(arr, 0);
+			const at = (type: string, y: number) =>
+				grip.dispatchEvent(new PointerEvent(type, { bubbles: true, clientY: y }));
+			at('pointerdown', 20);
+			at('pointermove', 70);
+			flushSync();
+			expect(rows(arr)[1].dataset.drop).toBe('after');
+
+			// A scroll by any hand moves the rows under a still pointer.
+			rows(arr).forEach((row, i) => {
+				const top = i * 50 - 50;
+				row.getBoundingClientRect = () => ({ top, bottom: top + 40 }) as DOMRect;
+			});
+			arr.dispatchEvent(new Event('scroll'));
+			flushSync();
+			expect(rows(arr)[2].dataset.drop).toBe('after');
+
+			// Held at the page's bottom edge, each frame scrolls it on; nowhere near, none.
+			at('pointermove', innerHeight - 1);
+			frames.splice(0).forEach((f) => f(0));
+			expect(scrolled).toBeGreaterThan(0);
+			const held = scrolled;
+			at('pointermove', innerHeight / 2);
+			frames.splice(0).forEach((f) => f(0));
+			expect(scrolled).toBe(held);
+
+			at('pointerup', innerHeight / 2);
+			flushSync();
+			expect(order(q, doc)).toEqual(['B', 'C', 'A']);
+		} finally {
+			vi.unstubAllGlobals();
+			delete (page as { scrollTop?: number }).scrollTop;
+		}
 	});
 
 	it('moves nothing on a press that stays in the dead zone, or a drop on its own row', () => {

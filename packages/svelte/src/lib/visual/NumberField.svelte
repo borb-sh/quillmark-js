@@ -4,7 +4,8 @@
  (`-`, `1.`) is never a document state worth a boundary round-trip, and
  committing it live flashes a coercion diagnostic + `console.error` on every
  intermediate prefix, announced by `DiagnosticList`'s `role="status"` live
- region.
+ region. Escape takes a pending entry back to what the field holds, as it takes a
+ card rename back, and the focus stays; with nothing pending the key is not claimed.
 
  An unset field holds its resolved `default:` as its text, at the default rung
  (theme.css), and an edit that settles writes it as authored, as `TextField` takes
@@ -52,7 +53,8 @@
 	}
 	let { value, integer, fallback, placeholder, label, id, describedBy, onCommit }: Props = $props();
 
-	let local = $derived(value != null ? String(value) : (fallback ?? ''));
+	const resting = $derived(value != null ? String(value) : (fallback ?? ''));
+	let local = $derived(resting);
 	const defaulted = $derived(value == null && !!fallback && local === fallback);
 
 	const partial = $derived(
@@ -76,11 +78,27 @@
 		local = el.value;
 	}
 
+	// A reverted entry can still fire `change` on leaving, its text differing from what
+	// the input held at focus; that one commits nothing.
+	let reverted = false;
+	function revert(e: KeyboardEvent): void {
+		if (e.key !== 'Escape' || e.isComposing) return;
+		const el = e.currentTarget as HTMLInputElement;
+		if (el.value === resting) return;
+		e.preventDefault();
+		local = el.value = resting;
+		reverted = true;
+	}
+
 	// Parse a settled entry and emit it; `local` is owned by `oninput`. Blank →
 	// `undefined`, and the input takes the default back: nothing else reconciles it, the
 	// projection having read the default throughout. Onto the element as well, since the
 	// attribute Svelte last wrote may already be the default, and it writes no repeat.
 	function commit(el: HTMLInputElement): void {
+		if (reverted) {
+			reverted = false;
+			return;
+		}
 		const raw = el.value;
 		const entry = raw.trim();
 		if (entry === '') {
@@ -107,6 +125,8 @@
 	onbeforeinput={filter}
 	oninput={(e) => {
 		local = (e.currentTarget as HTMLInputElement).value;
+		reverted = false;
 	}}
+	onkeydown={revert}
 	onchange={(e) => commit(e.currentTarget as HTMLInputElement)}
 />

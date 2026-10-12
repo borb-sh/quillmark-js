@@ -69,7 +69,7 @@
 				{#each tips as _, i (i)}
 					<button
 						type="button"
-						class="qm-tips-dot"
+						class="qm-tips-dot qm-focus-ring"
 						aria-label={t.strings.tipsDot(i + 1, tips.length)}
 						aria-current={i === index}
 						onclick={() => (cursor = i)}
@@ -77,7 +77,7 @@
 				{/each}
 			</div>
 		{/if}
-		<button type="button" class="qm-icon-btn qm-tips-action" onclick={advance}>
+		<button type="button" class="qm-icon-btn qm-tips-action qm-focus-ring" onclick={advance}>
 			{#if isLast}
 				{t.strings.tipsDismiss} <Icon name="trash-2" />
 			{:else}

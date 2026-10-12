@@ -391,26 +391,28 @@
 							>
 								<input
 									{@attach focusPrompt}
-									class="qm-link-input"
+									class="qm-link-input qm-focus-ring"
 									type="text"
 									placeholder={t.strings.linkPlaceholder}
 									aria-label={t.strings.formatLink}
 									bind:value={linkValue}
 								/>
-								<button type="submit" class="qm-icon-btn qm-mark-btn">{t.strings.linkApply}</button>
+								<button type="submit" class="qm-icon-btn qm-mark-btn qm-focus-ring"
+									>{t.strings.linkApply}</button
+								>
 								<!-- Only where there is a link to remove: an arm that does nothing is
 								     an arm to read past on every other visit to the prompt. -->
 								{#if linkPresent}
 									<button
 										type="button"
-										class="qm-icon-btn qm-mark-btn"
+										class="qm-icon-btn qm-mark-btn qm-focus-ring"
 										onmousedown={keepFocus}
 										onclick={removeLink}>{t.strings.linkRemove}</button
 									>
 								{/if}
 								<button
 									type="button"
-									class="qm-icon-btn qm-mark-btn"
+									class="qm-icon-btn qm-mark-btn qm-focus-ring"
 									onmousedown={keepFocus}
 									onclick={cancelLink}>{t.strings.linkCancel}</button
 								>
@@ -423,7 +425,7 @@
 								{#each MARKS as m (m.name)}
 									<button
 										type="button"
-										class="qm-icon-btn qm-mark-btn"
+										class="qm-icon-btn qm-mark-btn qm-focus-ring"
 										title={m.title}
 										aria-label={m.title}
 										onmousedown={keepFocus}
@@ -433,7 +435,7 @@
 								{#if anchorAvailable}
 									<button
 										type="button"
-										class="qm-icon-btn qm-mark-btn"
+										class="qm-icon-btn qm-mark-btn qm-focus-ring"
 										title={t.strings.formatAnchorTitle}
 										aria-label={t.strings.formatAnchor}
 										onmousedown={keepFocus}

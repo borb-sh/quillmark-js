@@ -536,42 +536,49 @@
 
 	// ── The drag handle ──────────────────────────────────────────────────────────
 	// Press-and-drag the handle moves its row; a press that does not travel past the dead
-	// zone does nothing. The rows are measured once the drag engages, nothing reflowing
-	// until the release (the lift is a tone and the drop rule is out of flow), and the
-	// release is the one splice `move` makes.
+	// zone does nothing. The drop is the row under the pointer, measured where the rows
+	// stand now: held in an edge band of its scrollport, the drag scrolls it, and a scroll
+	// by any hand re-picks the drop. Nothing reflows until the release (the lift is a tone
+	// and the drop rule is out of flow), and the release is the one splice `move` makes.
 	const DEAD_ZONE = 3;
-	type RowDrag = {
-		k: number;
-		origin: number;
-		engaged: boolean;
-		drop: number;
-		heads: { start: number; end: number }[];
-	};
+	/** The band at a scrollport's top and bottom edges that scrolls it under a held drag,
+	 *  and the most one frame scrolls, reached at the edge itself. */
+	const EDGE = 48;
+	const STEP = 16;
+	type RowDrag = { k: number; origin: number; y: number; engaged: boolean; drop: number };
 	let drag = $state<RowDrag | undefined>();
+	let follow: { port: Element; frame: number } | undefined;
 	function onHandleDown(e: PointerEvent, k: number): void {
 		if (e.button !== 0) return;
 		e.preventDefault();
-		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-		drag = { k, origin: e.clientY, engaged: false, drop: k, heads: [] };
+		release();
+		const grip = e.currentTarget as HTMLElement;
+		grip.setPointerCapture?.(e.pointerId);
+		drag = { k, origin: e.clientY, y: e.clientY, engaged: false, drop: k };
+		follow = { port: scrollport(grip), frame: 0 };
 	}
 	function onHandleMove(e: PointerEvent): void {
 		if (!drag) return;
+		drag.y = e.clientY;
 		if (!drag.engaged) {
 			if (Math.abs(e.clientY - drag.origin) < DEAD_ZONE) return;
 			drag.engaged = true;
-			drag.heads = ids.map((id) => {
-				const box = rowEls[id]?.getBoundingClientRect();
-				return { start: box?.top ?? 0, end: box?.bottom ?? 0 };
-			});
+			addEventListener('scroll', repick, { capture: true, passive: true });
+			if (follow) follow.frame = requestAnimationFrame(edgeScroll);
 		}
-		drag.drop = dropIndex(drag, e.clientY);
+		repick();
+	}
+	function repick(): void {
+		if (drag?.engaged) drag.drop = dropIndex(drag.k, drag.y);
 	}
 	/** The row the pointer is over, or the nearest one past either end. */
-	function dropIndex(d: RowDrag, y: number): number {
-		let best = d.k;
+	function dropIndex(k: number, y: number): number {
+		let best = k;
 		let nearest = Infinity;
-		d.heads.forEach((head, i) => {
-			const gap = y < head.start ? head.start - y : y > head.end ? y - head.end : 0;
+		ids.forEach((id, i) => {
+			const box = rowEls[id]?.getBoundingClientRect();
+			if (!box) return;
+			const gap = y < box.top ? box.top - y : y > box.bottom ? y - box.bottom : 0;
 			if (gap < nearest) {
 				nearest = gap;
 				best = i;
@@ -579,9 +586,35 @@
 		});
 		return best;
 	}
+	const page = (): Element => document.scrollingElement ?? document.documentElement;
+	/** The nearest ancestor that scrolls vertically, else the page. */
+	function scrollport(from: Element): Element {
+		for (let el = from.parentElement; el; el = el.parentElement) {
+			const { overflowY } = getComputedStyle(el);
+			if (/auto|scroll/.test(overflowY) && el.scrollHeight > el.clientHeight) return el;
+		}
+		return page();
+	}
+	function edgeScroll(): void {
+		if (!follow || !drag?.engaged) return;
+		const { port } = follow;
+		const box = port === page() ? undefined : port.getBoundingClientRect();
+		const top = Math.max(box?.top ?? 0, 0);
+		const bottom = Math.min(box?.bottom ?? innerHeight, innerHeight);
+		const into = Math.min(drag.y - top - EDGE, 0) + Math.max(drag.y - bottom + EDGE, 0);
+		if (into) port.scrollTop += STEP * Math.max(-1, Math.min(1, into / EDGE));
+		follow.frame = requestAnimationFrame(edgeScroll);
+	}
+	function release(): void {
+		if (follow) cancelAnimationFrame(follow.frame);
+		follow = undefined;
+		removeEventListener('scroll', repick, { capture: true });
+	}
+	onDestroy(release);
 	function onHandleUp(e: PointerEvent): void {
 		const done = drag;
 		drag = undefined;
+		release();
 		if (!done?.engaged || e.type !== 'pointerup') return;
 		move(done.k, done.drop);
 	}
@@ -708,6 +741,7 @@
 							type="button"
 							class="qm-control-box qm-focus-ring qm-element-summary"
 							aria-expanded={open.has(id)}
+							aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
 							onclick={() => toggleRow(id)}
 						>
 							<!-- Leading, and it rotates: trailing is the figure for pushing a new
@@ -794,20 +828,19 @@
 {/snippet}
 
 <!-- An `object` row's drag handle, a table grip's twin hung off the row's start edge.
-     It holds no focus, as a grip does not: its keyboard twin is Alt+↑/↓ from anywhere in
-     the row. -->
+     Pointer-only and out of the accessibility tree: a press on it does nothing, so a
+     button there would be one a screen reader activates to no effect. Its twin is
+     Alt+↑/↓ from anywhere in the row, which the summary announces. -->
 {#snippet handle(k: number)}
-	<button
-		type="button"
+	<span
 		class="qm-row-handle"
-		tabindex="-1"
+		aria-hidden="true"
 		title={t.strings.arrayDrag}
-		aria-label={rowAction(t.strings.arrayDrag, k)}
 		onpointerdown={(e) => onHandleDown(e, k)}
 		onpointermove={onHandleMove}
 		onpointerup={onHandleUp}
 		onpointercancel={onHandleUp}
-		><span class="qm-row-handle-bar"><Icon name="grip-vertical" /></span></button
+		><span class="qm-row-handle-bar"><Icon name="grip-vertical" /></span></span
 	>
 {/snippet}
 
@@ -953,9 +986,6 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 0;
-		border: none;
-		background: none;
 		color: var(--_qm-ink-label);
 		cursor: grab;
 		touch-action: none;

@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+**A record row dragged to the edge of the view scrolls it.** Held near the top or bottom of the editor's scrolling pane, or of the page, a row's drag scrolls on toward the rows out of view, and the drop follows whatever the scroll brings under the pointer, a wheel scroll mid-drag included.
+
+**A record row's drag handle is out of a screen reader's way.** It announced itself as a button that did nothing when pressed; it is now pointer-only, and the row's summary announces Alt+Up and Alt+Down, the keys that move the row.
+
+**Escape in a number field takes back the edit in progress.** The field returns to the value it holds, or to its default, and leaving it writes nothing, as Escape takes back a card rename.
+
+**More controls draw the editor's own focus ring.** A section header, the add-card strip, the card-kind menu, the format popover's buttons and link field, and the tips card's controls show the themed ring under keyboard focus in place of the browser's outline, and an un-renamed card's title draws in the title's own ink, where it took the browser's placeholder grey, brighter than the labels beneath it in dark mode.
+
 ## v0.21.0 - 2026-10-12
 
 **The `@quillmark/wasm` peer floor is `>=0.125.0-0`.** A card grouping its fields under the legacy `ui.group` lists them in display order, its ungrouped fields first and then each group's in registry order, where it listed them as declared, so the editor draws and a new card seeds them in that order; a card declaring `sections:` lists them the same way. An object alone in its group carries `ui.layout: flat` and draws without a frame of its own. A value a plate prints itself surfaces no preview region, so a click on it lands on nothing unless the plate prints it through `qm.ink` or claims it with `qm.region`.

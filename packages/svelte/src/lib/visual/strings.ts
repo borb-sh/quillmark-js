@@ -52,7 +52,7 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	// ── Array control ─────────────────────────────────────────────────────────
 	arrayAdd: string;
 	arrayRemove: string;
-	/** The drag handle on an `object` row: its tooltip and, with the row, its name. */
+	/** The drag handle on an `object` row: its tooltip. */
 	arrayDrag: string;
 	/**
 	 * A row control's accessible name, the action and the row it acts on: `Remove

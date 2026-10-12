@@ -279,7 +279,7 @@
 									<div class="qm-group-head">
 										<button
 											type="button"
-											class="qm-group-header"
+											class="qm-group-header qm-focus-ring"
 											id={headIds?.label}
 											bind:this={headers[group]}
 											aria-expanded={isOpen}
@@ -537,6 +537,12 @@
 	.qm-card-title:hover,
 	.qm-card-title:focus {
 		color: var(--_qm-ink);
+	}
+	/* The automatic title is the placeholder, and it reads as the title it stands for
+	 rather than in the UA's grey. */
+	.qm-card-title::placeholder {
+		color: inherit;
+		opacity: 1;
 	}
 	.qm-card-body {
 		display: flex;
