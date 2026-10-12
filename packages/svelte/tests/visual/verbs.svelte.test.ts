@@ -432,6 +432,25 @@ describe('the focus a card delete held', () => {
 		expect(document.activeElement).toBe(title(slots(target)[0]));
 	});
 
+	// The key that pressed delete, pressed again, lands in the title it handed focus to.
+	it('lands at the end of that title, with nothing selected to replace', async () => {
+		const q = quill();
+		const { target } = mountEditor(q, twoSections(q));
+		const first = title(slots(target)[0]);
+		first.focus();
+		first.value = 'Findings';
+		first.dispatchEvent(new Event('input', { bubbles: true }));
+		first.blur();
+		flushSync();
+
+		const second = slots(target)[1];
+		title(second).focus();
+		remove(second).click();
+		await settle();
+		expect(document.activeElement).toBe(first);
+		expect([first.selectionStart, first.selectionEnd]).toEqual([8, 8]);
+	});
+
 	it('goes to the card that took the place of the first, and then to the add strip', async () => {
 		const q = quill();
 		const { target } = mountEditor(q, twoSections(q));
@@ -448,7 +467,7 @@ describe('the focus a card delete held', () => {
 	});
 
 	// An engine that focuses a pressed button gives it no ring, and the next card's title
-	// would take one, with its text selected, for a delete the keyboard never made.
+	// would take one for a delete the keyboard never made.
 	it('stays with a pointer that pressed delete', async () => {
 		const q = quill();
 		const { target } = mountEditor(q, twoSections(q));

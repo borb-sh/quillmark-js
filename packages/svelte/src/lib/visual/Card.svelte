@@ -77,9 +77,14 @@
 	let draft = $state<string | undefined>(undefined);
 	const shownTitle = $derived(draft ?? card.titleOverride);
 
+	// A focus the shell hands over (`focusHeader`) is not armed for replacement: the key
+	// that pressed a delete, pressed again, would retitle the card it landed on.
+	let handed = false;
 	function onTitleFocus(e: FocusEvent): void {
 		draft = card.titleOverride;
-		(e.currentTarget as HTMLInputElement).select();
+		const input = e.currentTarget as HTMLInputElement;
+		if (handed) input.setSelectionRange(input.value.length, input.value.length);
+		else input.select();
 	}
 	function onTitleBlur(): void {
 		if (draft !== undefined && draft !== card.titleOverride) ops.rename(draft);
@@ -195,10 +200,12 @@
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 		el?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block });
 	}
-	/** Focus the title, or the header's first live control on a recovery shell, which has
-	 *  no title to focus. */
+	/** Focus the title with the caret at its end, or the header's first live control on a
+	 *  recovery shell, which has no title to focus. */
 	export function focusHeader(): void {
+		handed = true;
 		el?.querySelector<HTMLElement>('.qm-card-header :is(input, button:not(:disabled))')?.focus();
+		handed = false;
 	}
 </script>
 
