@@ -19,14 +19,14 @@ afterEach(() => {
 	unmountAll();
 });
 
-/** A bare control over an empty value, its commits collected in order. */
-function control(integer: boolean) {
+/** A bare control, over an empty value unless given one, its commits collected in order. */
+function control(integer: boolean, held: { value?: number; fallback?: string } = {}) {
 	const target = document.createElement('div');
 	document.body.appendChild(target);
 	const commits: unknown[] = [];
 	const app = mount(NumberField, {
 		target,
-		props: { value: undefined, integer, label: 'n', onCommit: (v) => commits.push(v) }
+		props: { value: undefined, ...held, integer, label: 'n', onCommit: (v) => commits.push(v) }
 	});
 	flushSync();
 	mounted.push(() => {
@@ -107,6 +107,37 @@ describe('a paste', () => {
 	});
 });
 
+describe('Escape', () => {
+	const escape = (el: HTMLInputElement): boolean =>
+		el.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+		);
+	const leave = (el: HTMLInputElement) => el.dispatchEvent(new Event('change', { bubbles: true }));
+
+	it('takes a pending entry back to the value, and the leave after it commits nothing', () => {
+		const { input, commits } = control(true, { value: 3 });
+		offer(input, '4');
+		expect(escape(input)).toBe(false);
+		expect(input.value).toBe('3');
+		leave(input);
+		expect(commits).toEqual([]);
+		// Nothing pending: the key is not the field's.
+		expect(escape(input)).toBe(true);
+		offer(input, '5');
+		leave(input);
+		expect(commits).toEqual([35]);
+	});
+
+	it('takes an entry over a default back to the default, which stays unwritten', () => {
+		const { input, commits } = control(true, { fallback: '12' });
+		offer(input, '0');
+		escape(input);
+		expect(input.value).toBe('12');
+		leave(input);
+		expect(commits).toEqual([]);
+	});
+});
+
 describe('a settled entry', () => {
 	const settle = (integer: boolean, entries: string[]) => {
 		const { input, commits } = control(integer);
@@ -173,5 +204,16 @@ main:
 		.resolve()
 		.main.fields.find((r: ResolvedField) => r.name === 'pages')!;
 	expect(row.source).toBe('default');
-	expect(pages.querySelector('[role="status"]')?.textContent?.trim()).not.toBe('');
+	const status = () => pages.querySelector('[role="status"]')?.textContent?.trim() ?? '';
+	expect(status()).not.toBe('');
+
+	// Escape takes the refused entry back, and the refusal with it, writing nothing.
+	const input = pages.querySelector('input')!;
+	input.dispatchEvent(
+		new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+	);
+	flushSync();
+	expect(input.value).toBe('12');
+	expect(status()).toBe('');
+	expect(q.reader(doc).get('pages')).toBeUndefined();
 });

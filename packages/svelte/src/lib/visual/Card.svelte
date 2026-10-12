@@ -279,7 +279,7 @@
 									<div class="qm-group-head">
 										<button
 											type="button"
-											class="qm-group-header"
+											class="qm-group-header qm-focus-ring"
 											id={headIds?.label}
 											bind:this={headers[group]}
 											aria-expanded={isOpen}
@@ -537,6 +537,12 @@
 	.qm-card-title:hover,
 	.qm-card-title:focus {
 		color: var(--_qm-ink);
+	}
+	/* The automatic title, at the label ink every placeholder takes rather than the UA's
+	 grey, and steady under focus, where a typed title steps to the ink. */
+	.qm-card-title::placeholder {
+		color: var(--_qm-ink-label);
+		opacity: 1;
 	}
 	.qm-card-body {
 		display: flex;

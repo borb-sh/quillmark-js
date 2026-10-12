@@ -311,7 +311,8 @@
  highlight the keyboard cannot reach. It fills with the accent held rather than
  the hover rung: the mark is a cursor a keyboard drives, so it has to read at a
  glance from across the list, where a hover only has to confirm the pointer
- already under it.
+ already under it. So the mark is the item's whole focus indicator, and the
+ outline a focused item would draw beside it is taken off.
 
  The resting fill is the recipe's too: an item drawn on a `<button>` carries a UA
  fill to take back, and a scoped block outranks this file, so a caller taking it
@@ -338,6 +339,7 @@
 	background: transparent;
 	cursor: pointer;
 	user-select: none;
+	outline: none;
 }
 :where(.qm-menu-item[data-highlighted]) {
 	background: var(--_qm-accent-tint);

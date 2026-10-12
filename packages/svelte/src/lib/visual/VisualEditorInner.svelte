@@ -995,7 +995,7 @@
 			{#if kinds.length === 1}
 				<button
 					type="button"
-					class="qm-add-btn qm-add-affordance qm-tap-floor"
+					class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
 					aria-label={marked ? undefined : merged.addCard}
 					onclick={() => addCard(atIndex, kinds[0], true)}
 					>{#if marked}{merged.addCard}{:else}<Icon name="plus" class="qm-add-glyph" />{/if}</button
@@ -1008,7 +1008,7 @@
 			 rules below reach it through `:global`. -->
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger
-						class="qm-add-btn qm-add-affordance qm-tap-floor"
+						class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
 						aria-label={marked ? undefined : merged.addCard}
 						>{#if marked}{merged.addCard}{:else}<Icon
 								name="plus"
