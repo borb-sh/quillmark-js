@@ -148,6 +148,20 @@ li.ProseMirror-selectednode::after {
 	font-size: inherit;
 }
 
+/* A fence's language at the label rung in its top corner, read off the `data-lang` the
+   node writes (`schema.ts`). Generated content, so it is never text the caret reaches
+   or a copy takes; the code's lines wrap around it. Read-only: the language is changed
+   in source mode. */
+.ProseMirror pre[data-lang]::before {
+	content: attr(data-lang);
+	float: inline-end;
+	margin-inline-start: var(--_qm-space-3);
+	font-size: var(--_qm-text-label);
+	color: var(--_qm-ink-label);
+	user-select: none;
+	pointer-events: none;
+}
+
 /* A link takes the surface's ink (the UA's blue is the `#8cf` defect again) and a
    dotted underline. Dotted rather than solid because `underline` is a mark in the
    same schema, and a solid rule renders an authored `<u>` and a link identically in a
@@ -189,6 +203,59 @@ li.ProseMirror-selectednode::after {
 .ProseMirror :is(ul, ol) {
 	padding-left: var(--_qm-space-4);
 	list-style: revert;
+}
+
+/* A task item's checkbox (`tasks.ts`) stands after the item's marker and ahead of its
+   first line, the text wrapping back under it, as the paper sets the box. Its face is a
+   matrix tick's: the input drawn `appearance: none` as an edged well, held at the
+   accent, the check glyph over it in the surface ink. A disabled box is a held leaf's
+   or a copy's, and takes no press. */
+.ProseMirror .qm-task {
+	position: relative;
+	float: left;
+	display: flex;
+	align-items: center;
+	height: 1lh;
+	margin-right: var(--_qm-space-2);
+}
+.ProseMirror .qm-task-box {
+	appearance: none;
+	margin: 0;
+	width: var(--_qm-glyph-control);
+	height: var(--_qm-glyph-control);
+	border: var(--_qm-border-width) solid var(--_qm-border);
+	border-radius: calc(var(--_qm-radius-inner) / 2);
+	background: var(--_qm-surface-well);
+	cursor: pointer;
+	transition:
+		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+		border-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-task-box:checked {
+	background: var(--_qm-accent);
+	border-color: var(--_qm-accent);
+}
+.ProseMirror .qm-task-box:disabled {
+	cursor: default;
+}
+.ProseMirror .qm-task-box:focus-visible {
+	outline: var(--_qm-ring);
+	outline-offset: var(--_qm-ring-offset);
+}
+.ProseMirror .qm-task-mark {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	width: var(--_qm-glyph-control);
+	height: var(--_qm-glyph-control);
+	translate: 0 -50%;
+	pointer-events: none;
+	color: var(--_qm-surface);
+	opacity: 0;
+	transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-task:has(:checked) .qm-task-mark {
+	opacity: 1;
 }
 
 /* Six levels, one weight, no size step. The quill reads no level at all, so a size
@@ -516,35 +583,22 @@ li.ProseMirror-selectednode::after {
 	height: var(--_qm-tap-min);
 }
 /* The reveal is the control's own (CODEC §"The table island"): one comes up while the
-   pointer is on that control, while it holds the focus, or while it is what a gesture is
-   about — the selected line's grip, and the lifted one, which is drawn through a drag the
+   pointer is on that control, or while it is what a gesture is about — the selected line's grip, and the lifted one, which is drawn through a drag the
    pointer has travelled off. A cell under the pointer draws its row's and its column's
    grips (`table-view.ts` §`onHover`), one pill on each axis and none anywhere else.
 
    Opacity rather than absence, so every control keeps its box and is hit-tested wherever
-   it sits. A grip's reach is the pointer's alone and it holds no focus, so it carries no
-   focus rung: what a keyboard draws a line with is the cell the selection runs through
-   (`table-view.ts` §`cellKeys`), and the wash and the selected grip's tint are what say
-   so. The two bars are in the tab order, the Tab that declines off the last cell landing
-   on them, so the rung there draws one a keyboard has reached. */
+   it sits. A grip's reach and a bar's are the pointer's alone and neither holds focus, so
+   neither carries a focus rung: what a keyboard draws a line with is the cell the
+   selection runs through (`table-view.ts` §`cellKeys`), and the wash and the selected
+   grip's tint are what say so. */
 :is(.qm-table-grip, .qm-table-add) {
 	opacity: 0;
 	transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 }
-.qm-table-add:is(:hover, :focus-visible),
+.qm-table-add:hover,
 .qm-table-grip:is([data-near], :hover, [aria-pressed='true'], .qm-table-lifted) {
 	opacity: 1;
-}
-
-/* The ring, on the two add bars and nowhere else in this file. A prose leaf's focus
-   indicator is its caret and a cell's is too, so the outline is dropped there; a control
-   that comes up out of nothing has the reveal, and a ring under a keyboard is what says
-   the focus is there rather than on the paper behind it. Declared here rather than
-   reached for as `.qm-focus-ring`: that recipe is the visual tier's stylesheet, and the
-   island is inside the leaf, which is the codec's. */
-.qm-table-add:focus-visible {
-	outline: var(--_qm-ring);
-	outline-offset: var(--_qm-ring-offset);
 }
 
 /* A weighted table spans the leaf, laid out fixed, so the stored weights are the
@@ -610,7 +664,7 @@ li.ProseMirror-selectednode::after {
 	display: none;
 }
 /* The header toggle hangs under the first row's last cell, flush with the grid's
-   trailing edge, clear of whatever a held row raises over its first. */
+   trailing edge. */
 .qm-table-align[data-header] {
 	margin-inline: auto 0;
 }

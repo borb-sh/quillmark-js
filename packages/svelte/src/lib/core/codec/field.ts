@@ -51,6 +51,8 @@ import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js
 import { linkPastePlugin } from './link-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
 import { tablePastePlugin } from './table-paste.js';
+import { tableCopyPlugin } from './table-copy.js';
+import { taskPlugin } from './tasks.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
 import {
 	DEFAULT_SLASH_STRINGS,
@@ -83,7 +85,7 @@ export interface CreateFieldOpts {
 	 * declaring `inline`, or a `plaintext` one, is held over a value its schema cannot
 	 * hold (`fitsLeaf`, upstream's `isInline` and `isPlain`): the decode would join lines
 	 * and drop containers and islands for the first commit to store. Any leaf is held
-	 * over an element or a task item, which no node holds. A held leaf draws
+	 * over an element, which no node holds. A held leaf draws
 	 * its content on the block schema, read-only, and commits nothing. Judged of the value
 	 * each mount and re-hydrate reads, so {@link FieldController.applyExternal} is what
 	 * re-evaluates it.
@@ -703,8 +705,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * Backspace that takes one back, the field keymap over the base keymap, the URL paste
  * that links a selection (`link-paste.ts`), and last the ones that answer to a block
  * leaf's own shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass
- * (`islands.ts`), the table paste (`table-paste.ts`) and the markdown paste
- * (`markdown-paste.ts`).
+ * (`islands.ts`), the table paste (`table-paste.ts`), the markdown paste
+ * (`markdown-paste.ts`) and the task item's checkbox (`tasks.ts`).
  *
  * Every mark-shaped plugin reads the schema rather than a flag: over either plaintext
  * schema the shorthand rules build nothing (each is guarded on its mark type), the
@@ -744,7 +746,9 @@ export function proseLeafPlugins(
 			pastAtomPlugin(),
 			islandPastePlugin(),
 			tablePastePlugin(),
-			markdownPastePlugin()
+			tableCopyPlugin(),
+			markdownPastePlugin(),
+			taskPlugin()
 		);
 	if (schema === plainSchema) list.push(plainClipboardPlugin());
 	if (opts.placeholder) list.push(ghostPlugin(opts));

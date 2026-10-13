@@ -240,11 +240,19 @@ export function clearCells(
 	});
 }
 
-/** Set column `c`'s alignment: what the held column's cluster and Shift+arrow write
- *  (`table-view.ts`). */
+/** Set column `c`'s alignment and clear its cells' own `align`, which would outrank it:
+ *  what the held column's cluster and Shift+arrow write (`table-view.ts`). */
 export function setAlign(props: TableProps, c: number, align: TableAlign): TableProps {
+	const release = (cells: TableCell[]): TableCell[] =>
+		cells.map((cell, i) => {
+			if (i !== c || cell.align === undefined) return cell;
+			const { align: _align, ...rest } = cell;
+			return rest;
+		});
 	return normalizeTable({
 		...props,
+		header: release(props.header),
+		rows: props.rows.map(release),
 		aligns: props.aligns.map((a, i) => (i === c ? align : a))
 	});
 }
@@ -253,36 +261,6 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
  *  (`table-view.ts`). */
 export function setHeadless(props: TableProps, headless: boolean): TableProps {
 	return normalizeTable({ ...props, headless: headless || undefined });
-}
-
-/** A cell's horizontal alignment, and its vertical one: the keys a cell holds beside
- *  its text, each absent at the default the column or the quill supplies. */
-export type CellAlign = NonNullable<TableCell['align']>;
-export type CellValign = NonNullable<TableCell['valign']>;
-
-/** Every cell in the inclusive rectangle given `key`'s `value`, or cleared of it where
- *  `value` is absent, which returns the cell to its column's alignment or the quill's. */
-export function setCellLayout<K extends 'align' | 'valign'>(
-	props: TableProps,
-	r0: number,
-	c0: number,
-	r1: number,
-	c1: number,
-	key: K,
-	value: TableCell[K] | undefined
-): TableProps {
-	const lay = (cells: TableCell[], r: number): TableCell[] =>
-		cells.map((cell, c) => {
-			if (r < r0 || r > r1 || c < c0 || c > c1) return cell;
-			const next: TableCell = { ...cell, [key]: value };
-			if (value === undefined) delete next[key];
-			return next;
-		});
-	return normalizeTable({
-		...props,
-		header: lay(props.header, 0),
-		rows: props.rows.map((row, i) => lay(row, i + 1))
-	});
 }
 
 /** Set or clear the column weights: what a border drag and its double-click write

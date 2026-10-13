@@ -193,8 +193,13 @@ function scanBlock(
 			const start = ordered ? (node.attrs.start as number) : 1;
 			let itemPos = contentStart;
 			node.forEach((item, _off, index) => {
+				const checked = item.attrs.checked as boolean | null;
+				const attrs = { ordered, start, ordinal: index };
 				const container = withInstance(
-					{ container: 'list_item', attrs: { ordered, start, ordinal: index } },
+					{
+						container: 'list_item',
+						attrs: checked === null ? attrs : { ...attrs, checked }
+					},
 					instance
 				);
 				scanBlocks(acc, item, itemPos + 1, [...containers, container]);

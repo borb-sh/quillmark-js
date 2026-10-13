@@ -36,7 +36,6 @@ import {
 	rowCount,
 	setAlign,
 	setHeadless,
-	setCellLayout,
 	setWidths,
 	shapeEqual,
 	withCell
@@ -762,11 +761,11 @@ describe('the table NodeView', () => {
 
 	it('what sits in the tab order is what a key reaches', () => {
 		const { field } = tableLeaf(LETTERED);
-		// Five grips no Tab arrives at, so five stops the document does not spend.
-		for (const axis of ['row', 'column'] as const)
+		// Five grips and two caps no Tab arrives at, so the Tab off the last cell leaves.
+		for (const axis of ['row', 'column'] as const) {
 			for (const grip of grips(field, axis)) expect(grip.tabIndex).toBe(-1);
-		// The caps stay: they are the keyboard's route to growth on either axis.
-		for (const axis of ['row', 'column'] as const) expect(cap(field, axis).tabIndex).toBe(0);
+			expect(cap(field, axis).tabIndex).toBe(-1);
+		}
 		// And no key reaches a grip by any other route either: it is pointer chrome, and
 		// the line verbs bind in the cell the selection runs through.
 		grips(field, 'row')[1].click();
@@ -1027,58 +1026,65 @@ describe('the first row is the header or a body row', () => {
 	});
 });
 
-describe('a cell is aligned on its own', () => {
-	const cellBoxes = (field: FieldController) =>
-		Array.from(field.el.querySelectorAll<HTMLElement>('.qm-table-cell'));
-	const cellCluster = (field: FieldController) =>
-		field.el.querySelector<HTMLElement>('.qm-table-align[data-cells]');
+describe('a cell’s own alignment is carried, never authored', () => {
+	const OWN = normalizeTable({
+		...LETTERED,
+		rows: [
+			[{ ...cell('a1'), align: 'center', valign: 'bottom' }, cell('a2')],
+			[cell('b1'), { ...cell('b2'), align: 'left', valign: 'middle' }]
+		]
+	});
+	const own = (props: TableProps, text: string) => {
+		const found = Array.from({ length: rowCount(props) }, (_, r) => rowCells(props, r))
+			.flat()
+			.find((c) => c.text === text)!;
+		return [found.align, found.valign];
+	};
 
-	it('a cell layout rides the store, and clearing it returns the cell to its column', () => {
-		const laid = setCellLayout(LETTERED, 1, 0, 2, 0, 'valign', 'bottom');
-		const back = propsOf(stored(withTable(laid)));
-		expect(back.rows.map((row) => row[0]!.valign)).toEqual(['bottom', 'bottom']);
-		expect(back.header[0]!.valign).toBeUndefined();
-		const cleared = setCellLayout(laid, 0, 0, 2, 1, 'valign', undefined);
-		expect(propsOf(stored(withTable(cleared))).rows[0]![0]).toEqual(cell('a1'));
+	it('rides the store and every op that keeps its cell', () => {
+		const ops = [
+			insertRow(OWN, 0),
+			moveRow(OWN, 1, 1),
+			insertColumn(OWN, -1),
+			moveColumn(OWN, 0, 1),
+			deleteColumn(OWN, 1),
+			setAlign(OWN, 1, 'center'),
+			setHeadless(OWN, true)
+		];
+		for (const next of ops) {
+			const back = propsOf(stored(withTable(next)));
+			expect(own(back, 'a1')).toEqual(['center', 'bottom']);
+		}
 	});
 
-	it('swept cells raise the cells’ cluster, and a press lays every cell in it', () => {
-		const { field } = tableLeaf(LETTERED);
+	it('draws on its cell, survives a keystroke in it, and a sweep raises nothing', () => {
+		const { field } = tableLeaf(OWN);
+		const box = () => field.el.querySelectorAll<HTMLElement>('.qm-table-cell')[2]!;
+		expect([box().style.textAlign, box().style.verticalAlign]).toEqual(['center', 'bottom']);
+		const view = cellViews(field)[2]!;
+		view.dispatch(view.state.tr.insertText('!', 1));
+		expect(leafProps(field).rows[0]![0]).toEqual({
+			text: '!a1',
+			marks: [],
+			align: 'center',
+			valign: 'bottom'
+		});
 		layout(field);
-		sweep(field, 2, 3); // row 1, cell by cell
+		sweep(field, 2, 3);
 		expect(washed(field)).toEqual(['1,0', '1,1']);
-		const cluster = cellCluster(field)!;
-		expect(cluster.closest('.qm-table-cell')?.getAttribute('data-r')).toBe('1');
-		expect(cluster.querySelectorAll('button')).toHaveLength(6);
-		cluster.querySelector<HTMLButtonElement>('[data-valign="bottom"]')!.click();
-		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual(['bottom', 'bottom']);
-		// The sweep stays held, and the toggle reads pressed.
-		expect(washed(field)).toEqual(['1,0', '1,1']);
-		expect(
-			cellCluster(field)!.querySelector('[data-valign="bottom"]')!.getAttribute('aria-pressed')
-		).toBe('true');
-		expect(cellBoxes(field)[2]!.style.verticalAlign).toBe('bottom');
-		undo(outerView(field).state, outerView(field).dispatch);
-		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual([undefined, undefined]);
+		expect(field.el.querySelectorAll('.qm-table-align:not([hidden])')).toHaveLength(0);
 		field.destroy();
 	});
 
-	it('a row its grip or Escape names raises nothing over the row below', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'row')[1]!.click();
-		expect(washed(field)).toEqual(['1,0', '1,1']);
-		expect(cellCluster(field)).toBeNull();
-		cellViews(field)[5]!.focus();
-		press(caret(field), 'Escape');
-		expect(washed(field)).toEqual(['2,0', '2,1']);
-		expect(cellCluster(field)).toBeNull();
-		field.destroy();
-	});
-
-	it('a held column raises its own cluster and not the cells’', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'column')[1]!.click();
-		expect(cellCluster(field)).toBeNull();
+	it('a column press clears its cells’ own `align` and keeps their `valign`', () => {
+		const { field } = tableLeaf(OWN);
+		grips(field, 'column')[0]!.click();
+		toggle(field, 0, 'right').click();
+		expect(leafProps(field).rows[0]![0]).toEqual({ ...cell('a1'), valign: 'bottom' });
+		expect(field.el.querySelectorAll<HTMLElement>('.qm-table-cell')[2]!.style.textAlign).toBe(
+			'right'
+		);
+		expect(own(leafProps(field), 'b2')).toEqual(['left', 'middle']);
 		field.destroy();
 	});
 });
@@ -1098,11 +1104,10 @@ describe('alignment is set on the held column', () => {
 		expect(toggle(field, 1, 'right').tabIndex).toBe(-1);
 		grips(field, 'row')[1].click();
 		expect(cluster(field, 1).hidden).toBe(true);
-		// A column swept cell by cell holds cells, and raises theirs.
+		// A column swept cell by cell holds cells, and raises nothing.
 		layout(field);
 		sweep(field, 1, 5);
 		expect(cluster(field, 1).hidden).toBe(true);
-		expect(field.el.querySelector('.qm-table-align[data-cells]')).not.toBeNull();
 		field.destroy();
 	});
 
@@ -1132,9 +1137,16 @@ describe('alignment is set on the held column', () => {
 	});
 
 	// A cell's own alignment outranks its column's, so a press that left it would draw no
-	// change over a column swept and aligned cell by cell.
+	// change over a column whose cells arrive aligned.
 	it('a press clears its cells’ own alignment in the same step, even at the column’s', () => {
-		const { field } = tableLeaf(setCellLayout(LETTERED, 0, 1, 2, 1, 'align', 'center'));
+		const centered = (c: TableCell): TableCell => ({ ...c, align: 'center' });
+		const { field } = tableLeaf(
+			normalizeTable({
+				...LETTERED,
+				header: [LETTERED.header[0]!, centered(LETTERED.header[1]!)],
+				rows: LETTERED.rows.map(([a, b]) => [a!, centered(b!)])
+			})
+		);
 		const own = () => [0, 1, 2].map((r) => cellAt(leafProps(field), r, 1).align);
 		expect(own()).toEqual(['center', 'center', 'center']);
 		grips(field, 'column')[1].click();
@@ -1754,14 +1766,17 @@ describe('a selection is the subject of the next command', () => {
 // (`_clipboard.ts`), pasted through the leaf's own handler, and asserted twice: the props
 // the store holds, and the pipe table they export as.
 
-/** A clipboard event jsdom can carry: it implements no `DataTransfer`, and `getData` /
- *  `setData` are what a handler would reach for. The seed is what a paste arrives with;
- *  the same object is what a copy would be read back off, and stays empty. */
+/** A clipboard event jsdom can carry: it implements no `DataTransfer`, and `getData`,
+ *  `setData` and `clearData` are what a handler reaches for. The seed is what a paste
+ *  arrives with, and the same object is what a copy is read back off. */
 function clipboard(kind: 'copy' | 'cut' | 'paste', seed: Clipboard = {}) {
 	const held: Clipboard = { ...seed };
 	const event = new Event(kind, { bubbles: true, cancelable: true });
 	Object.defineProperty(event, 'clipboardData', {
 		value: {
+			clearData: () => {
+				for (const type of Object.keys(held)) delete held[type];
+			},
 			getData: (type: string) => held[type] ?? '',
 			setData: (type: string, value: string) => {
 				held[type] = value;
@@ -1980,15 +1995,49 @@ describe('a table on the clipboard lands as a table island', () => {
 	});
 });
 
-describe('the cell rectangle does not cross the clipboard', () => {
-	it('a copy over a held rectangle claims nothing and writes nothing', () => {
+describe('a table leaves by the clipboard and does not come back by it', () => {
+	it('a copy over a held rectangle writes its cells as a table and as tab-separated text', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[1].click();
 		const { event, held } = clipboard('copy');
 		field.el.querySelector('.qm-table-island')!.dispatchEvent(event);
-		expect(held).toEqual({});
-		expect(event.defaultPrevented).toBe(false);
+		expect(event.defaultPrevented).toBe(true);
+		expect(held['text/plain']).toBe('a1\ta2');
+		expect(held['text/html']).toBe('<table><tbody><tr><td>a1</td><td>a2</td></tr></tbody></table>');
 		field.destroy();
+	});
+
+	it('a held column from the header row writes the header as one', () => {
+		const props = withCell(LETTERED, 2, 1, { text: 'say "hi"\nthere', marks: [strong(0, 3)] });
+		const { field } = tableLeaf(props);
+		grips(field, 'column')[1].click();
+		const { event, held } = clipboard('copy');
+		field.el.querySelector('.qm-table-island')!.dispatchEvent(event);
+		expect(held['text/plain']).toBe('h2\na2\n"say ""hi""\nthere"');
+		expect(held['text/html']).toBe(
+			'<table><thead><tr><th>h2</th></tr></thead><tbody><tr><td>a2</td></tr>' +
+				'<tr><td><strong>say</strong> "hi"<br>there</td></tr></tbody></table>'
+		);
+		field.destroy();
+	});
+
+	it('a selected table copies as a table, and pastes back as the island it was', () => {
+		const { field } = tableLeaf(LETTERED);
+		const outer = outerView(field);
+		let at = -1;
+		outer.state.doc.descendants((node, pos) => {
+			if (node.type.name === 'island_block') at = pos;
+		});
+		outer.dispatch(outer.state.tr.setSelection(NodeSelection.create(outer.state.doc, at)));
+		const { event, held } = clipboard('copy');
+		outer.dom.dispatchEvent(event);
+		field.destroy();
+		expect(held['text/plain']).toBe('h1\th2\na1\ta2\nb1\tb2');
+		expect(held['text/html']).toContain('<table><thead><tr><th>h1</th><th>h2</th></tr></thead>');
+		expect(held['text/html']).not.toContain('[table]');
+		const rt = pasted({ 'text/html': held['text/html'] });
+		expect(rt.islands).toHaveLength(1);
+		expect(propsOf(rt)).toEqual(LETTERED);
 	});
 
 	// A cell is one paragraph and holds no island, so a table is its cells' text there.
