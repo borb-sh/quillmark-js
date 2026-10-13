@@ -19,6 +19,7 @@
 import { Schema } from 'prosemirror-model';
 import type { MarkSpec, NodeSpec, NodeType, TagParseRule } from 'prosemirror-model';
 import { islandBlockSpec, islandInlineSpec } from './islands.js';
+import { taskBody, taskChecked, taskDOM } from './tasks.js';
 import { rendersHref, storableUrl } from './urls.js';
 
 // ── Marks spelled as style ──────────────────────────────────────────────────
@@ -203,11 +204,20 @@ const blockNodes: Record<string, NodeSpec> = {
 		parseDOM: [{ tag: 'ul' }],
 		toDOM: () => ['ul', 0]
 	},
+	// `checked` is a task item's, `null` on every other item (`tasks.ts`).
 	list_item: {
 		content: 'block+',
 		defining: true,
-		parseDOM: [{ tag: 'li' }],
-		toDOM: () => ['li', 0]
+		attrs: { checked: { default: null } },
+		parseDOM: [
+			{
+				tag: 'li',
+				getAttrs: (el) => ({ checked: taskChecked(el) }),
+				contentElement: taskBody
+			}
+		],
+		toDOM: (node) =>
+			node.attrs.checked === null ? ['li', 0] : taskDOM(node.attrs.checked as boolean)
 	},
 	island_block: islandBlockSpec
 };

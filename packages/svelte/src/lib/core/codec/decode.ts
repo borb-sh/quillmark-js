@@ -116,7 +116,7 @@ export function fitsPlain(rt: Content): boolean {
 
 /** Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed
  *  and {@link fitsPlain} plain, past which the decode drops what the first commit would
- *  store; on the block schema anything but an element or a task item ({@link editable}),
+ *  store; on the block schema anything but an element ({@link editable}),
  *  and an island where the leaf mounts no island view (`islands`), which draws as its
  *  placeholder tag, an atom a keystroke deletes unseen. What a leaf held over the rest
  *  reads. */
@@ -129,12 +129,10 @@ export function fitsLeaf(
 	return (leaf.islands || rt.islands.length === 0) && rt.lines.every(editable);
 }
 
-/** Whether every container on `line` is one the block schema edits: an element, and a
- *  task item's `checked`, decode to no node, so the first commit would drop them. */
+/** Whether every container on `line` is one the block schema edits: an element decodes
+ *  to no node, so the first commit would drop it. */
 function editable(line: ContentLine): boolean {
-	return line.containers.every(
-		(c) => c.container === 'quote' || (c.container === 'list_item' && c.attrs.checked === undefined)
-	);
+	return line.containers.every((c) => c.container === 'quote' || c.container === 'list_item');
 }
 
 /** Inline decode: one paragraph, containers and islands stripped. */
@@ -225,7 +223,7 @@ function groupBlocks(
 				while (l < run.length && ordinalAt(run[l], depth) === ord) l++;
 				items.push(
 					schema.nodes.list_item.create(
-						null,
+						{ checked: checkedAt(run[k], depth) },
 						groupBlocks(schema, run.slice(k, l), depth + 1, marks, cursor)
 					)
 				);
@@ -278,6 +276,13 @@ function atDepth(leaf: Leaf, depth: number): ContentContainer | undefined {
 function ordinalAt(leaf: Leaf, depth: number): number {
 	const c = atDepth(leaf, depth);
 	return c?.container === 'list_item' ? c.attrs.ordinal : -1;
+}
+
+/** A task item's `checked` at `depth`, `null` on any other item: what the item's lines
+ * carry alike, so its first line answers for it. */
+function checkedAt(leaf: Leaf, depth: number): boolean | null {
+	const c = atDepth(leaf, depth);
+	return c?.container === 'list_item' ? (c.attrs.checked ?? null) : null;
 }
 
 /** A container's `instance`, absent meaning the zero a canonical read omits. It is what

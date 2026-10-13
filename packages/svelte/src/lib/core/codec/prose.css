@@ -205,6 +205,59 @@ li.ProseMirror-selectednode::after {
 	list-style: revert;
 }
 
+/* A task item's checkbox (`tasks.ts`) stands after the item's marker and ahead of its
+   first line, the text wrapping back under it, as the paper sets the box. Its face is a
+   matrix tick's: the input drawn `appearance: none` as an edged well, held at the
+   accent, the check glyph over it in the surface ink. A disabled box is a held leaf's
+   or a copy's, and takes no press. */
+.ProseMirror .qm-task {
+	position: relative;
+	float: left;
+	display: flex;
+	align-items: center;
+	height: 1lh;
+	margin-right: var(--_qm-space-2);
+}
+.ProseMirror .qm-task-box {
+	appearance: none;
+	margin: 0;
+	width: var(--_qm-glyph-control);
+	height: var(--_qm-glyph-control);
+	border: var(--_qm-border-width) solid var(--_qm-border);
+	border-radius: calc(var(--_qm-radius-inner) / 2);
+	background: var(--_qm-surface-well);
+	cursor: pointer;
+	transition:
+		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+		border-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-task-box:checked {
+	background: var(--_qm-accent);
+	border-color: var(--_qm-accent);
+}
+.ProseMirror .qm-task-box:disabled {
+	cursor: default;
+}
+.ProseMirror .qm-task-box:focus-visible {
+	outline: var(--_qm-ring);
+	outline-offset: var(--_qm-ring-offset);
+}
+.ProseMirror .qm-task-mark {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	width: var(--_qm-glyph-control);
+	height: var(--_qm-glyph-control);
+	translate: 0 -50%;
+	pointer-events: none;
+	color: var(--_qm-surface);
+	opacity: 0;
+	transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-task:has(:checked) .qm-task-mark {
+	opacity: 1;
+}
+
 /* Six levels, one weight, no size step. The quill reads no level at all, so a size
    ramp here would be the editor predicting a hierarchy the paper does not set; the
    level stays in the model, which is where the codec round-trips it. It is also all

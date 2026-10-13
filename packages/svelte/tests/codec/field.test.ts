@@ -116,7 +116,7 @@ describe('the hold on a body over what no node holds', () => {
 
 	for (const [name, markdown] of [
 		['an element', 'lead\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
-		['a task item', '- [x] done\n- [ ] open']
+		['an element beside a task item', '- [x] done\n\n<qm-keep>\n\nkept\n\n</qm-keep>']
 	]) {
 		it(`holds over ${name}, drawing its text and committing nothing`, () => {
 			const doc = example();

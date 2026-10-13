@@ -13,10 +13,11 @@
 // (`tests/codec/list-shapes.test.ts`), and fusing renumbers an imported `1, 2, 1`
 // in a region no edit touched. Reads preserve it; only an edit normalizes.
 import type { Node as PMNode, NodeType, ResolvedPos, Schema } from 'prosemirror-model';
-import { liftListItem, sinkListItem, splitListItem } from 'prosemirror-schema-list';
+import { liftListItem, sinkListItem } from 'prosemirror-schema-list';
 import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import type { Command, Transaction } from 'prosemirror-state';
 import { chainCommands, joinTextblockBackward, joinTextblockForward } from 'prosemirror-commands';
+import { splitTaskItem } from './tasks.js';
 
 /** The caret's enclosing `list_item` when it sits at the very start of that item's
  * first block: the position both structural keys branch on. `null` otherwise
@@ -221,7 +222,8 @@ function backspaceBelow(itemType: NodeType, press: Command): Command {
  * shell structural keymap (VISUAL_EDITOR §Settled and open).
  *
  * `Enter` is a chain in precedence order: the escape-above gesture, then
- * `splitListItem`, then `liftListItem`. The middle link carries two behaviors of
+ * `splitListItem` (`splitTaskItem`, which leaves a task item's new half an open task),
+ * then `liftListItem`. The middle link carries two behaviors of
  * its own: it splits a non-empty item, and on an empty item it either splits the
  * wrapping item (a nested empty item, so Enter lifts exactly one level) or bails
  * so the third link lifts a top-level empty item out to a paragraph. `Backspace` lifts
@@ -241,7 +243,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 		'Shift-Tab': liftListItem(itemType),
 		Enter: chainCommands(
 			paragraphAboveList(itemType, paragraph),
-			splitListItem(itemType),
+			splitTaskItem(itemType),
 			liftListItem(itemType)
 		),
 		Backspace: backspace,

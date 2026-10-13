@@ -69,6 +69,16 @@ describe('a copy and a paste carry the whole node', () => {
 				])
 			)
 		],
+		[
+			'task items, ticked and open, beside an ordinary item',
+			doc(
+				S.nodes.bullet_list.create(null, [
+					S.nodes.list_item.create({ checked: true }, para(S.text('done'))),
+					S.nodes.list_item.create({ checked: false }, para(S.text('open'))),
+					S.nodes.list_item.create(null, para(S.text('plain')))
+				])
+			)
+		],
 		['a table island', doc(table(TABLE))],
 		[
 			'an image island mid-paragraph',
