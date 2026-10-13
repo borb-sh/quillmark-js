@@ -10,8 +10,9 @@
  the result as it commits a keystroke: a field's lowers it to `markOps` through
  `applyChange` (field.ts), a by-value leaf's hands the re-encoded value to its parent
  (`ProseValue`). This component never touches the content. The keymap mirror
- (Mod-b/i/u) already lives in the codec's keymap (field.ts); this is the pointer
- affordance for all six marks.
+ (Mod-b/i/u) lives in the codec's keymap (field.ts); this is the pointer
+ affordance for all six marks. Mod-K is this surface's own key, the prompt it raises
+ being this surface's: a document `keydown` the leaf's keymap left unclaimed.
 
  Selection observation. The view's `dispatchTransaction` is the leaf's
  (read-only), so there is no hook to observe transactions from outside.
@@ -64,6 +65,7 @@
 	// off-tree, so this component renders standalone too.
 	const t = wording();
 	import { toggleMark } from 'prosemirror-commands';
+	import { keydownHandler } from 'prosemirror-keymap';
 	import { TextSelection, type Command } from 'prosemirror-state';
 	import type { EditorView } from 'prosemirror-view';
 	import type { MarkType } from 'prosemirror-model';
@@ -105,6 +107,10 @@
 	/** Whether the selection carried a link when the prompt was raised. */
 	let linkPresent = $state(false);
 	let linkValue = $state('');
+	/** The view the prompt was raised over. The prompt takes the focus, and a cell view
+	 *  without it is no longer the leaf's `focusedView`. */
+	let promptView: EditorView | undefined;
+	let promptInput = $state<HTMLInputElement | undefined>(undefined);
 	let contentEl = $state<HTMLElement | undefined>(undefined);
 	/** The root to portal into: `document.body` escapes the editor's subtree and
 	 * the consumer's dials with it, so a pane-scoped palette misses this surface.
@@ -266,6 +272,7 @@
 		if (name === 'link') {
 			linkValue = hrefInSelection(view.state);
 			linkPresent = linkValue.length > 0;
+			promptView = view;
 			linkPromptOpen = true;
 			return;
 		}
@@ -310,7 +317,8 @@
 	 *  leaf back its focus and the surface its buttons. */
 	function closePrompt(cmd?: Command): void {
 		linkPromptOpen = false;
-		const view = activeLeafView();
+		const view = promptView && !promptView.isDestroyed ? promptView : activeLeafView();
+		promptView = undefined;
 		if (view) {
 			cmd?.(view.state, view.dispatch);
 			view.focus();
@@ -323,6 +331,30 @@
 	 *  onto it would be a second thing to keep true. */
 	function submitLink(): void {
 		closePrompt(setLink(normalizeHref(linkValue)));
+	}
+
+	/** Mod-K is a press of the Link button: claimed only where the surface would stand
+	 *  over the selection, and a second press while the prompt is up hands it the focus. */
+	function raiseLink(view: EditorView): boolean {
+		const inside = !!contentEl?.contains(document.activeElement);
+		if (inside && linkPromptOpen) return true;
+		if (!inside && !view.hasFocus()) return false;
+		sync();
+		if (!open) return false;
+		const reraised = linkPromptOpen;
+		toggle('link');
+		if (reraised && promptInput) focusPrompt(promptInput);
+		return true;
+	}
+
+	const linkKey = keydownHandler({
+		'Mod-k': (_state, _dispatch, view) => !!view && raiseLink(view)
+	});
+
+	function onKeyDown(e: KeyboardEvent): void {
+		if (e.defaultPrevented) return;
+		const view = activeLeafView();
+		if (view && linkKey(view, e)) e.preventDefault();
 	}
 
 	function removeLink(): void {
@@ -338,6 +370,7 @@
      it does with the event. `pointercancel` is the release a gesture the browser takes
      over gets. -->
 <svelte:document
+	onkeydown={onKeyDown}
 	onselectionchange={deferredSync}
 	onfocusout={deferredSync}
 	onpointerdowncapture={onPointerDown}
@@ -391,6 +424,7 @@
 							>
 								<input
 									{@attach focusPrompt}
+									bind:this={promptInput}
 									class="qm-link-input qm-focus-ring"
 									type="text"
 									placeholder={t.strings.linkPlaceholder}

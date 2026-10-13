@@ -6,11 +6,13 @@
 // commits by value, as a keystroke does. The anchor verbs are a field's controller's,
 // so the surface over an embedded leaf carries no anchor button. A `plaintext` element
 // declares no marks and a held leaf announces nothing, so neither raises it. A field's
-// own leaf answers through its controller, the anchor button with it. The probe is its
-// own quill.
+// own leaf answers through its controller, the anchor button with it. Mod-K is a press
+// of the Link button wherever the button stands, a table island's cell included. The
+// probe is its own quill.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { toggleMark } from 'prosemirror-commands';
+import { TextSelection } from 'prosemirror-state';
 import type { Content, Document, PathStep } from '@quillmark/wasm';
 import { hasMarks } from '$lib/core/codec';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual';
@@ -341,5 +343,108 @@ describe('the formatting popover over a field’s own leaf', () => {
 		await settle();
 
 		expect(editor.getActiveLeaf()).toBeUndefined();
+	});
+});
+
+describe('Mod-K raises the link prompt', () => {
+	/** A cancelable Mod-K, so the test reads whether the editor claimed it. */
+	function modK(el: Element): KeyboardEvent {
+		const e = new KeyboardEvent('keydown', {
+			key: 'k',
+			ctrlKey: true,
+			bubbles: true,
+			cancelable: true
+		});
+		el.dispatchEvent(e);
+		flushSync();
+		return e;
+	}
+	const prompt = () => document.querySelector<HTMLInputElement>('.qm-link-input');
+	function submit(value: string): void {
+		const input = prompt()!;
+		input.value = value;
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		input.form!.requestSubmit();
+		flushSync();
+	}
+	const removeArm = () =>
+		[...document.querySelectorAll('.qm-link-prompt button')].some(
+			(b) => b.textContent === DEFAULT_VISUAL_STRINGS.linkRemove
+		);
+
+	it('over a selection, at once and without the browser, as the Link button does', async () => {
+		const q = probe();
+		const doc = load();
+		const { editor } = mountInner(q, doc);
+		const intro = await land(editor, 'main.intro');
+		select(intro, 0, 5, false);
+
+		const e = modK(intro);
+		expect(e.defaultPrevented).toBe(true);
+		expect(document.activeElement).toBe(prompt());
+		expect(prompt()!.value).toBe('');
+		expect(removeArm()).toBe(false);
+		submit('example.com');
+		const marks = q.reader(doc).getContent({ field: 'intro' })?.marks;
+		expect(marks?.map((m) => [m.type, m.start, m.end])).toEqual([['link', 0, 5]]);
+		expect(document.activeElement).toBe(intro);
+
+		// Over the link it seeds the href and carries the remove arm.
+		const view = editor.getActiveLeaf()!.views.view;
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 6)));
+		modK(intro);
+		expect(prompt()!.value).toBe('https://example.com');
+		expect(removeArm()).toBe(true);
+		// A second press inside the prompt is swallowed and keeps what is typed there.
+		prompt()!.value = 'typed';
+		prompt()!.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(modK(prompt()!).defaultPrevented).toBe(true);
+		expect(prompt()!.value).toBe('typed');
+	});
+
+	it('declines where the Link button would not stand, leaving the key to the browser', async () => {
+		const q = probe();
+		const doc = load();
+		const { editor } = mountInner(q, doc);
+		const intro = await land(editor, 'main.intro');
+		select(intro, 2, 2, false);
+		expect(modK(intro).defaultPrevented).toBe(false);
+		expect(prompt()).toBeNull();
+
+		const errata = await land(editor, 'main.errata[0]');
+		select(errata, 0, 5, false);
+		expect(modK(errata).defaultPrevented).toBe(false);
+		expect(prompt()).toBeNull();
+	});
+
+	it('in a table cell, writing the link into the cell', async () => {
+		const q = probe();
+		const doc = core.Document.fromMarkdown(
+			[
+				'~~~',
+				'$quill: value_popover@1.0.0',
+				'~~~',
+				'',
+				'| aa | bb |',
+				'|---|---|',
+				'| 1 | 2 |',
+				''
+			].join('\n')
+		);
+		const mounted = mountInner(q, doc);
+		await land(mounted.editor, 'main.body');
+		const cell = mounted.target.querySelector<HTMLElement>('.qm-table-cell-host .ProseMirror')!;
+		cell.focus();
+		flushSync();
+		select(cell, 0, 2, false);
+		expect(mounted.editor.getActiveLeaf()!.views.focusedView().dom).toBe(cell);
+
+		expect(modK(cell).defaultPrevented).toBe(true);
+		expect(document.activeElement).toBe(prompt());
+		submit('example.com');
+		const table = doc.main.body.islands[0].props as {
+			header: { text: string; marks: { type: string; start: number; end: number }[] }[];
+		};
+		expect(table.header[0].marks.map((m) => [m.type, m.start, m.end])).toEqual([['link', 0, 2]]);
 	});
 });

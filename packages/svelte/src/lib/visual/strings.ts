@@ -218,7 +218,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	formatUnderline: 'Underline (Mod-U)',
 	formatStrikethrough: 'Strikethrough',
 	formatCode: 'Code',
-	formatLink: 'Link',
+	formatLink: 'Link (Mod-K)',
 	formatAnchor: 'Anchor',
 	formatAnchorTitle: 'Anchor — an identity handle over the selection',
 	linkPlaceholder: 'https://…',
