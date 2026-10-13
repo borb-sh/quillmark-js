@@ -14,6 +14,8 @@
 
 **An un-renamed card's title draws at the label ink.** It took the browser's placeholder grey, brighter than the labels beneath it in dark mode.
 
+**Copying from a table pastes into a spreadsheet or a document as a table.** `Mod-C` over cells held by a grip, a sweep or select-all writes them as a table and as tab-separated text, where it wrote nothing; a selected table copies the same way, where it wrote the text `[table]`, and pasted back into the editor it is the table it was. A paste into a table still lands inside the one cell under the caret.
+
 **A preview click into a table row leaves the row's columns on the header's in Safari.** The arrival wash was a box added inside the landed row, and WebKit sized that row's columns by its own contents from then on, its first column widening past its header. The wash is now a plane every landing target draws from mount, and a landing only plays it.
 
 ## v0.21.0 - 2026-10-12

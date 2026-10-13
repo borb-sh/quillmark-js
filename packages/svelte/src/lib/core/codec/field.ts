@@ -51,6 +51,7 @@ import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js
 import { linkPastePlugin } from './link-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
 import { tablePastePlugin } from './table-paste.js';
+import { tableCopyPlugin } from './table-copy.js';
 import { DEFAULT_TABLE_STRINGS, tableNodeView, type TableChromeStrings } from './table-view.js';
 import {
 	DEFAULT_SLASH_STRINGS,
@@ -744,6 +745,7 @@ export function proseLeafPlugins(
 			pastAtomPlugin(),
 			islandPastePlugin(),
 			tablePastePlugin(),
+			tableCopyPlugin(),
 			markdownPastePlugin()
 		);
 	if (schema === plainSchema) list.push(plainClipboardPlugin());

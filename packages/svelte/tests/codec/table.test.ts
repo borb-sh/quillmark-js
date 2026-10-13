@@ -1754,14 +1754,17 @@ describe('a selection is the subject of the next command', () => {
 // (`_clipboard.ts`), pasted through the leaf's own handler, and asserted twice: the props
 // the store holds, and the pipe table they export as.
 
-/** A clipboard event jsdom can carry: it implements no `DataTransfer`, and `getData` /
- *  `setData` are what a handler would reach for. The seed is what a paste arrives with;
- *  the same object is what a copy would be read back off, and stays empty. */
+/** A clipboard event jsdom can carry: it implements no `DataTransfer`, and `getData`,
+ *  `setData` and `clearData` are what a handler reaches for. The seed is what a paste
+ *  arrives with, and the same object is what a copy is read back off. */
 function clipboard(kind: 'copy' | 'cut' | 'paste', seed: Clipboard = {}) {
 	const held: Clipboard = { ...seed };
 	const event = new Event(kind, { bubbles: true, cancelable: true });
 	Object.defineProperty(event, 'clipboardData', {
 		value: {
+			clearData: () => {
+				for (const type of Object.keys(held)) delete held[type];
+			},
 			getData: (type: string) => held[type] ?? '',
 			setData: (type: string, value: string) => {
 				held[type] = value;
@@ -1980,15 +1983,49 @@ describe('a table on the clipboard lands as a table island', () => {
 	});
 });
 
-describe('the cell rectangle does not cross the clipboard', () => {
-	it('a copy over a held rectangle claims nothing and writes nothing', () => {
+describe('a table leaves by the clipboard and does not come back by it', () => {
+	it('a copy over a held rectangle writes its cells as a table and as tab-separated text', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[1].click();
 		const { event, held } = clipboard('copy');
 		field.el.querySelector('.qm-table-island')!.dispatchEvent(event);
-		expect(held).toEqual({});
-		expect(event.defaultPrevented).toBe(false);
+		expect(event.defaultPrevented).toBe(true);
+		expect(held['text/plain']).toBe('a1\ta2');
+		expect(held['text/html']).toBe('<table><tbody><tr><td>a1</td><td>a2</td></tr></tbody></table>');
 		field.destroy();
+	});
+
+	it('a held column from the header row writes the header as one', () => {
+		const props = withCell(LETTERED, 2, 1, { text: 'say "hi"\nthere', marks: [strong(0, 3)] });
+		const { field } = tableLeaf(props);
+		grips(field, 'column')[1].click();
+		const { event, held } = clipboard('copy');
+		field.el.querySelector('.qm-table-island')!.dispatchEvent(event);
+		expect(held['text/plain']).toBe('h2\na2\n"say ""hi""\nthere"');
+		expect(held['text/html']).toBe(
+			'<table><thead><tr><th>h2</th></tr></thead><tbody><tr><td>a2</td></tr>' +
+				'<tr><td><strong>say</strong> "hi"<br>there</td></tr></tbody></table>'
+		);
+		field.destroy();
+	});
+
+	it('a selected table copies as a table, and pastes back as the island it was', () => {
+		const { field } = tableLeaf(LETTERED);
+		const outer = outerView(field);
+		let at = -1;
+		outer.state.doc.descendants((node, pos) => {
+			if (node.type.name === 'island_block') at = pos;
+		});
+		outer.dispatch(outer.state.tr.setSelection(NodeSelection.create(outer.state.doc, at)));
+		const { event, held } = clipboard('copy');
+		outer.dom.dispatchEvent(event);
+		field.destroy();
+		expect(held['text/plain']).toBe('h1\th2\na1\ta2\nb1\tb2');
+		expect(held['text/html']).toContain('<table><thead><tr><th>h1</th><th>h2</th></tr></thead>');
+		expect(held['text/html']).not.toContain('[table]');
+		const rt = pasted({ 'text/html': held['text/html'] });
+		expect(rt.islands).toHaveLength(1);
+		expect(propsOf(rt)).toEqual(LETTERED);
 	});
 
 	// A cell is one paragraph and holds no island, so a table is its cells' text there.

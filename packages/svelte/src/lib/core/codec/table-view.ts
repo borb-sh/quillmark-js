@@ -36,6 +36,7 @@ import { decode } from './decode.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
 import { tablePropsOfNode } from './islands.js';
+import { tableElement, tableText } from './table-copy.js';
 import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
 import {
@@ -469,6 +470,7 @@ class TableIslandView implements NodeView {
 		this.dom.addEventListener('mousedown', this.onPointerDown);
 		this.dom.addEventListener('mouseover', this.onHover);
 		this.dom.addEventListener('mouseleave', this.onLeave);
+		this.dom.addEventListener('copy', this.onCopy, true);
 		this.render();
 	}
 
@@ -535,6 +537,7 @@ class TableIslandView implements NodeView {
 		this.dom.removeEventListener('mousedown', this.onPointerDown);
 		this.dom.removeEventListener('mouseover', this.onHover);
 		this.dom.removeEventListener('mouseleave', this.onLeave);
+		this.dom.removeEventListener('copy', this.onCopy, true);
 		this.endDrag();
 		this.endSweep();
 		this.endResize();
@@ -614,6 +617,18 @@ class TableIslandView implements NodeView {
 	private readonly onLeave = (): void => {
 		for (const grip of this.near) grip.removeAttribute('data-near');
 		this.near = [];
+	};
+
+	/** A copy over a held rectangle writes its cells (`table-copy.ts`). Captured, since the
+	 *  caret's cell would otherwise copy its own text selection over them. */
+	private readonly onCopy = (event: ClipboardEvent): void => {
+		const held = this.selected;
+		if (!held || !event.clipboardData) return;
+		const props = this.props();
+		event.clipboardData.setData('text/html', tableElement(props, held).outerHTML);
+		event.clipboardData.setData('text/plain', tableText(props, held));
+		event.preventDefault();
+		event.stopPropagation();
 	};
 
 	/** The cell a press inside the frame belongs to: the nearest by rect, which for a
