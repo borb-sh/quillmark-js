@@ -516,35 +516,22 @@ li.ProseMirror-selectednode::after {
 	height: var(--_qm-tap-min);
 }
 /* The reveal is the control's own (CODEC §"The table island"): one comes up while the
-   pointer is on that control, while it holds the focus, or while it is what a gesture is
-   about — the selected line's grip, and the lifted one, which is drawn through a drag the
+   pointer is on that control, or while it is what a gesture is about — the selected line's grip, and the lifted one, which is drawn through a drag the
    pointer has travelled off. A cell under the pointer draws its row's and its column's
    grips (`table-view.ts` §`onHover`), one pill on each axis and none anywhere else.
 
    Opacity rather than absence, so every control keeps its box and is hit-tested wherever
-   it sits. A grip's reach is the pointer's alone and it holds no focus, so it carries no
-   focus rung: what a keyboard draws a line with is the cell the selection runs through
-   (`table-view.ts` §`cellKeys`), and the wash and the selected grip's tint are what say
-   so. The two bars are in the tab order, the Tab that declines off the last cell landing
-   on them, so the rung there draws one a keyboard has reached. */
+   it sits. A grip's reach and a bar's are the pointer's alone and neither holds focus, so
+   neither carries a focus rung: what a keyboard draws a line with is the cell the
+   selection runs through (`table-view.ts` §`cellKeys`), and the wash and the selected
+   grip's tint are what say so. */
 :is(.qm-table-grip, .qm-table-add) {
 	opacity: 0;
 	transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 }
-.qm-table-add:is(:hover, :focus-visible),
+.qm-table-add:hover,
 .qm-table-grip:is([data-near], :hover, [aria-pressed='true'], .qm-table-lifted) {
 	opacity: 1;
-}
-
-/* The ring, on the two add bars and nowhere else in this file. A prose leaf's focus
-   indicator is its caret and a cell's is too, so the outline is dropped there; a control
-   that comes up out of nothing has the reveal, and a ring under a keyboard is what says
-   the focus is there rather than on the paper behind it. Declared here rather than
-   reached for as `.qm-focus-ring`: that recipe is the visual tier's stylesheet, and the
-   island is inside the leaf, which is the codec's. */
-.qm-table-add:focus-visible {
-	outline: var(--_qm-ring);
-	outline-offset: var(--_qm-ring-offset);
 }
 
 /* A weighted table spans the leaf, laid out fixed, so the stored weights are the

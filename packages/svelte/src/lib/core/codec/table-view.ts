@@ -1531,12 +1531,10 @@ class TableIslandView implements NodeView {
 	 *  the pointer out past the last line is the claim — so its name carries the verb for
 	 *  everything that does not read position.
 	 *
-	 *  In the tab order, where a grip is not: growth is what the line verbs do not carry,
-	 *  so the column bar is the keyboard's only route to a new column, and the row bar is
-	 *  that control on the other axis, where Enter at the last row and Tab past the last
-	 *  cell reach the verb from inside a cell. They sit after the grid, so the Tab that
-	 *  declines off the last cell lands on them, and the focus rung draws the one it lands
-	 *  on (`codec/prose.css`). */
+	 *  Out of the tab order, as a grip is: the Tab that declines off the last cell leaves
+	 *  the island rather than landing on two controls drawn only under the pointer. A row
+	 *  is the keyboard's from inside a cell, by Enter at the last row and Tab past the
+	 *  last cell, and a column is the pointer's alone. */
 	private addBar(axis: Axis, label: string): HTMLButtonElement {
 		const btn = chromeButton('qm-table-add', label, () => {
 			const props = this.props();
@@ -1545,6 +1543,7 @@ class TableIslandView implements NodeView {
 			else this.write(insertColumn(props, columnCount(props) - 1), { r: 0, c: columnCount(props) });
 		});
 		btn.setAttribute('data-axis', axis);
+		btn.tabIndex = -1;
 		btn.appendChild(el('span', 'qm-table-add-bar'));
 		return btn;
 	}

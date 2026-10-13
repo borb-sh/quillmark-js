@@ -762,11 +762,11 @@ describe('the table NodeView', () => {
 
 	it('what sits in the tab order is what a key reaches', () => {
 		const { field } = tableLeaf(LETTERED);
-		// Five grips no Tab arrives at, so five stops the document does not spend.
-		for (const axis of ['row', 'column'] as const)
+		// Five grips and two caps no Tab arrives at, so the Tab off the last cell leaves.
+		for (const axis of ['row', 'column'] as const) {
 			for (const grip of grips(field, axis)) expect(grip.tabIndex).toBe(-1);
-		// The caps stay: they are the keyboard's route to growth on either axis.
-		for (const axis of ['row', 'column'] as const) expect(cap(field, axis).tabIndex).toBe(0);
+			expect(cap(field, axis).tabIndex).toBe(-1);
+		}
 		// And no key reaches a grip by any other route either: it is pointer chrome, and
 		// the line verbs bind in the cell the selection runs through.
 		grips(field, 'row')[1].click();
