@@ -3,10 +3,10 @@
 // open record row, a field-level subform's cell and a table's cell register no
 // controller, and each announces its views on focus under the field it stands in, so
 // the active-leaf seam hands back the focused one and a mark toggled at its view
-// commits by value, as a keystroke does. The anchor verbs are a field's controller's,
-// so the surface over an embedded leaf carries no anchor button. A `plaintext` element
-// declares no marks and a held leaf announces nothing, so neither raises it. A field's
-// own leaf answers through its controller, the anchor button with it. Mod-K is a press
+// commits by value, as a keystroke does. A `plaintext` element declares no marks and a
+// held leaf announces nothing, so neither raises it. A field's own leaf answers through
+// its controller's views. Over every leaf the surface draws the six mark buttons and
+// withholds the anchor's, an anchor drawing nothing until comments do. Mod-K is a press
 // of the Link button wherever the button stands, a table island's cell included. The
 // probe is its own quill.
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -149,6 +149,14 @@ async function surface(): Promise<HTMLElement | null> {
 }
 const labels = (popover: HTMLElement): (string | null)[] =>
 	[...popover.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
+const SIX = [
+	DEFAULT_VISUAL_STRINGS.formatBold,
+	DEFAULT_VISUAL_STRINGS.formatEmphasis,
+	DEFAULT_VISUAL_STRINGS.formatUnderline,
+	DEFAULT_VISUAL_STRINGS.formatStrikethrough,
+	DEFAULT_VISUAL_STRINGS.formatCode,
+	DEFAULT_VISUAL_STRINGS.formatLink
+];
 
 /** Commit the string beside the leaves: a revision, and so a re-derive. */
 function rederive(m: Mounted<InnerRef>): void {
@@ -178,7 +186,6 @@ describe('the formatting popover over a by-value prose leaf', () => {
 			const view = active!.views.focusedView();
 			expect(view.dom).toBe(leaf);
 			expect(view.hasFocus()).toBe(true);
-			expect(active!.controller).toBeUndefined();
 			expect(hasMarks(view.state.schema)).toBe(true);
 
 			// The popover's own `toggle`: the command straight at the view.
@@ -190,7 +197,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 		});
 	}
 
-	it('rises over an element’s selection without the anchor button, and its bold commits', async () => {
+	it('rises over an element’s selection, and its bold commits', async () => {
 		const q = probe();
 		const doc = load();
 		const { editor } = mountInner(q, doc);
@@ -198,7 +205,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 
 		const popover = await surface();
 		expect(popover).not.toBeNull();
-		expect(labels(popover!)).not.toContain(DEFAULT_VISUAL_STRINGS.formatAnchor);
+		expect(labels(popover!)).toEqual(SIX);
 		popover!
 			.querySelector<HTMLButtonElement>(`[aria-label="${DEFAULT_VISUAL_STRINGS.formatBold}"]`)!
 			.click();
@@ -299,7 +306,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 });
 
 describe('the formatting popover over a field’s own leaf', () => {
-	it('answers through the controller, the anchor button with it', async () => {
+	it('answers through the controller’s views, and withholds the anchor button', async () => {
 		const q = probe();
 		const doc = load();
 		const { editor } = mountInner(q, doc);
@@ -307,11 +314,10 @@ describe('the formatting popover over a field’s own leaf', () => {
 		const intro = await land(editor, 'main.intro');
 		select(intro, 0, 3);
 
-		const active = editor.getActiveLeaf();
-		expect(active?.controller).toBeDefined();
-		expect(active?.views.view.dom).toBe(intro);
+		expect(editor.getActiveLeaf()?.views.view.dom).toBe(intro);
 		const popover = await surface();
-		expect(labels(popover!)).toContain(DEFAULT_VISUAL_STRINGS.formatAnchor);
+		expect(labels(popover!)).toEqual(SIX);
+		expect(labels(popover!)).not.toContain(DEFAULT_VISUAL_STRINGS.formatAnchor);
 	});
 
 	it('rises over a keyboard selection once it stands still, and lowers at once', async () => {

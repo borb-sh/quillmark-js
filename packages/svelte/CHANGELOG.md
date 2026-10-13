@@ -28,6 +28,8 @@
 
 **`Mod-K` adds a link.** Over selected text, `Mod-K` opens the link field the format popover's Link button opens, filled with the link the text already carries and offering to remove it; over no selection it does nothing and the browser keeps the key. The Link button's tooltip names the shortcut. A link typed into that field over text in a table cell now lands in the cell, where it was lost.
 
+**The format popover draws six buttons.** The anchor button, which marked the selection with an invisible handle and changed nothing on screen, is gone until comments arrive to use it. Anchors already in a document are kept through every edit. `formatAnchor` and `formatAnchorTitle` stay in `VisualStrings`, drawn nowhere.
+
 ## v0.21.0 - 2026-10-12
 
 **The `@quillmark/wasm` peer floor is `>=0.125.0-0`.** A card grouping its fields under the legacy `ui.group` lists them in display order, its ungrouped fields first and then each group's in registry order, where it listed them as declared, so the editor draws and a new card seeds them in that order; a card declaring `sections:` lists them the same way. An object alone in its group carries `ui.layout: flat` and draws without a frame of its own. A value a plate prints itself surfaces no preview region, so a click on it lands on nothing unless the plate prints it through `qm.ink` or claims it with `qm.region`.

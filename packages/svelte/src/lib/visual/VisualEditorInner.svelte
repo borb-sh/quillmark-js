@@ -739,7 +739,7 @@
 		if (span.alive) bloom(box);
 	}
 	/** The active prose leaf: the formatting popover's observation seam. The active
-	 *  field's controller where it registered one, else the by-value leaf focused last
+	 *  field's own leaf where it registered one, else the by-value leaf focused last
 	 *  under it (`leaves.ts`); `undefined` for a form control, which holds no marks to
 	 *  toggle. */
 	export function getActiveLeaf(): ActiveProse | undefined {
@@ -747,7 +747,7 @@
 		const card = activeAddr.card != null ? activeCardId : undefined;
 		const key = fieldKeyToString({ card, field: activeAddr.field });
 		const controller = leaves.prose(key);
-		if (controller) return { views: controller as FieldController & LeafViews, controller };
+		if (controller) return { views: controller as FieldController & LeafViews };
 		const views = leaves.value(key);
 		return views && { views };
 	}

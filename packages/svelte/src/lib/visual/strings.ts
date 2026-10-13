@@ -116,7 +116,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	formatStrikethrough: string;
 	formatCode: string;
 	formatLink: string;
-	/** The anchor button's accessible name. */
+	/** The anchor button's accessible name. The popover withholds the button, so
+	 *  nothing draws this or the title below. */
 	formatAnchor: string;
 	/** Its hover title, which says what an anchor is; the name above only says what. */
 	formatAnchorTitle: string;
