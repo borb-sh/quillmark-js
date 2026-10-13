@@ -15,10 +15,10 @@
 // is preserved, never minted), and no placeholder.
 //
 // The chrome is a band and a selection (CODEC §"The table island"), and the band raises
-// nothing: what floats over the grid is a held column's alignment, the held first row's
-// header toggle, or a sweep's cell alignment. Every control is absolutely positioned out
-// of the grid, so none is in a row or a column of it; `codec/prose.css` draws the band,
-// the clusters and the selection wash.
+// nothing: what floats over the grid is a held column's alignment or the held first
+// row's header toggle. Every control is absolutely positioned out of the grid, so none
+// is in a row or a column of it; `codec/prose.css` draws the band, the clusters and the
+// selection wash.
 import { baseKeymap, chainCommands, selectAll, toggleMark } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
@@ -59,9 +59,6 @@ import {
 	rowEmpty,
 	setAlign,
 	setHeadless,
-	setCellLayout,
-	type CellAlign,
-	type CellValign,
 	columnShares,
 	setWidths,
 	shapeEqual,
@@ -91,18 +88,12 @@ export interface TableChromeStrings {
 	/** The two trailing bars, each of which grows the table along its own axis. */
 	tableAddRow: string;
 	tableAddColumn: string;
-	/** The held column's alignment cluster, a name per toggle, and the held cells'
-	 *  cluster, which takes these three and the vertical three beside them. */
+	/** The held column's alignment cluster, a name per toggle. */
 	tableAlignLeft: string;
 	tableAlignCenter: string;
 	tableAlignRight: string;
 	/** The held first row's toggle, pressed while the row draws as the header. */
 	tableHeaderToggle: string;
-	tableAlignTop: string;
-	tableAlignMiddle: string;
-	tableAlignBottom: string;
-	/** The held cells' cluster's own name. */
-	tableCellAlignment: string;
 }
 
 /**
@@ -126,11 +117,7 @@ export const DEFAULT_TABLE_STRINGS: TableChromeStrings = {
 	tableAlignLeft: 'Align left',
 	tableAlignCenter: 'Align center',
 	tableAlignRight: 'Align right',
-	tableHeaderToggle: 'Header row',
-	tableAlignTop: 'Align top',
-	tableAlignMiddle: 'Align middle',
-	tableAlignBottom: 'Align bottom',
-	tableCellAlignment: 'Cell alignment'
+	tableHeaderToggle: 'Header row'
 };
 
 /** What the field hands each island view: its wording (read live, so a locale swap
@@ -178,30 +165,6 @@ const HEADER_GLYPH = [
 	'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z',
 	'M3 9h18'
 ];
-
-/** The held cells' vertical toggles' glyphs, off the same release. */
-const VALIGN_GLYPH: Record<CellValign, string[]> = {
-	top: [
-		'M6 6h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
-		'M16 6h2a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
-		'M22 2H2'
-	],
-	middle: [
-		'M2 12h20',
-		'M10 16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4',
-		'M10 8V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v4',
-		'M20 16v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1',
-		'M14 8V7c0-1.1.9-2 2-2h2a2 2 0 0 1 2 2v1'
-	],
-	bottom: [
-		'M6 2h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
-		'M16 9h2a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z',
-		'M22 22H2'
-	]
-};
-
-/** The vertical alignments a cell takes, in the cluster's order. */
-const VALIGNS: readonly CellValign[] = ['top', 'middle', 'bottom'];
 
 /** Draw a cell's alignment on its box: its own where it holds one, its column's
  *  otherwise, and the vertical one where it holds one. */
@@ -440,9 +403,6 @@ class TableIslandView implements NodeView {
 	private clusters: HTMLElement[] = [];
 	/** The first row's header toggle, up while that row is held. */
 	private headerCluster: HTMLElement | undefined;
-	/** The held cells' cluster, up over the first cell of a held rectangle that is no
-	 *  column, and built for each paint since what it presses is the cells'. */
-	private cellCluster: HTMLElement | undefined;
 	/** The grid's own box, and the containing block every out-of-flow control is placed
 	 *  against. Not the scroller: an absolute inside a scroll container is placed
 	 *  against a padding box the scroll then slides out from under, so a control at the
@@ -887,7 +847,6 @@ class TableIslandView implements NodeView {
 			if (line.axis === 'row' && line.index === 0 && this.headerCluster)
 				this.headerCluster.hidden = !named;
 		}
-		this.paintCellCluster(props);
 		for (const cell of this.cells)
 			cell.box.toggleAttribute(
 				'data-selected',
@@ -973,76 +932,11 @@ class TableIslandView implements NodeView {
 	 *  cell of its own writes nothing. */
 	private align(c: number, to: Aligned): void {
 		const props = this.props();
-		const last = rowCount(props) - 1;
-		const own = Array.from({ length: last + 1 }, (_, r) => cellAt(props, r, c)).some(
+		const own = Array.from({ length: rowCount(props) }, (_, r) => cellAt(props, r, c)).some(
 			(cell) => cell.align !== undefined
 		);
-		if (props.aligns[c] !== to || own)
-			this.write(setCellLayout(setAlign(props, c, to), 0, c, last, c, 'align', undefined));
+		if (props.aligns[c] !== to || own) this.write(setAlign(props, c, to));
 		this.selectLine({ axis: 'column', index: c });
-	}
-
-	/** The swept cells' cluster: up over the first cell of a sweep, each toggle pressed
-	 *  where every cell in it holds it. It floats over the cell under that one, as the
-	 *  column's floats over the first row, and is out of the tab order for the reason a
-	 *  grip is. A named line raises none: a grip is pressed to move or delete its line. */
-	private paintCellCluster(props: TableProps): void {
-		this.cellCluster?.remove();
-		this.cellCluster = undefined;
-		const held = this.selected;
-		if (!held?.swept) return;
-		const first = this.cells.find((m) => m.r === held.r0 && m.c === held.c0);
-		if (!first) return;
-		const s = this.deps.strings();
-		const covered = allCells(props, held);
-		const holds = <K extends 'align' | 'valign'>(key: K, value: TableCell[K]): boolean =>
-			covered.every((cell) => cell[key] === value);
-		const cluster = el('div', 'qm-table-align');
-		cluster.setAttribute('role', 'group');
-		cluster.setAttribute('aria-label', s.tableCellAlignment);
-		cluster.setAttribute('data-cells', '');
-		cluster.addEventListener('mousedown', (e) => e.preventDefault());
-		const toggle = (label: string, glyph: string[], pressed: boolean, run: () => void) => {
-			const btn = chromeButton('qm-table-align-option', label, run);
-			btn.tabIndex = -1;
-			btn.setAttribute('aria-pressed', String(pressed));
-			btn.appendChild(svg(glyph, 2));
-			cluster.appendChild(btn);
-			return btn;
-		};
-		const names: Record<CellAlign, string> = {
-			left: s.tableAlignLeft,
-			center: s.tableAlignCenter,
-			right: s.tableAlignRight
-		};
-		for (const align of SETTABLE)
-			toggle(names[align], ALIGN_GLYPH[align], holds('align', align), () =>
-				this.layCells('align', align)
-			).setAttribute('data-align', align);
-		const vnames: Record<CellValign, string> = {
-			top: s.tableAlignTop,
-			middle: s.tableAlignMiddle,
-			bottom: s.tableAlignBottom
-		};
-		for (const valign of VALIGNS)
-			toggle(vnames[valign], VALIGN_GLYPH[valign], holds('valign', valign), () =>
-				this.layCells('valign', valign)
-			).setAttribute('data-valign', valign);
-		first.box.appendChild(cluster);
-		this.cellCluster = cluster;
-	}
-
-	/** Lay every held cell at `value`, and clear the key from them where every one already
-	 *  holds it: the press that set an alignment takes it back to the column's. One
-	 *  `set`, and the rectangle stays held. */
-	private layCells<K extends 'align' | 'valign'>(key: K, value: TableCell[K]): void {
-		const held = this.selected;
-		if (!held) return;
-		const props = this.props();
-		const every = allCells(props, held).every((cell) => cell[key] === value);
-		this.write(
-			setCellLayout(props, held.r0, held.c0, held.r1, held.c1, key, every ? undefined : value)
-		);
 	}
 
 	// ── Drag to reorder ───────────────────────────────────────────────────────

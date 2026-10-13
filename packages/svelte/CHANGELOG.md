@@ -20,6 +20,8 @@
 
 **A code block names its language.** A fence carrying a language, typed as ` ```rust ` or arriving in an import or a paste, draws the language as a small label in its top corner. The label is read-only; the language is changed in source mode.
 
+**A table aligns by column only.** The cluster of left, center, right, top, middle and bottom that rose over cells swept by the pointer is gone, and nothing in the visual editor aligns a single cell; a held column's cluster and Shift+Left and Shift+Right align a column, as before. A cell that arrives aligned from markdown or an import keeps its alignment through every edit and draws it, until a press on its column's alignment returns it to the column's. `TableChromeStrings` drops `tableAlignTop`, `tableAlignMiddle`, `tableAlignBottom` and `tableCellAlignment`, and `VisualStrings` with it, so an object literal typed as either that still names them fails to type-check.
+
 **A preview click into a table row leaves the row's columns on the header's in Safari.** The arrival wash was a box added inside the landed row, and WebKit sized that row's columns by its own contents from then on, its first column widening past its header. The wash is now a plane every landing target draws from mount, and a landing only plays it.
 
 ## v0.21.0 - 2026-10-12

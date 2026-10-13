@@ -611,7 +611,7 @@ li.ProseMirror-selectednode::after {
 	display: none;
 }
 /* The header toggle hangs under the first row's last cell, flush with the grid's
-   trailing edge, clear of whatever a held row raises over its first. */
+   trailing edge. */
 .qm-table-align[data-header] {
 	margin-inline: auto 0;
 }

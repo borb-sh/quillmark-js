@@ -36,7 +36,6 @@ import {
 	rowCount,
 	setAlign,
 	setHeadless,
-	setCellLayout,
 	setWidths,
 	shapeEqual,
 	withCell
@@ -1027,58 +1026,65 @@ describe('the first row is the header or a body row', () => {
 	});
 });
 
-describe('a cell is aligned on its own', () => {
-	const cellBoxes = (field: FieldController) =>
-		Array.from(field.el.querySelectorAll<HTMLElement>('.qm-table-cell'));
-	const cellCluster = (field: FieldController) =>
-		field.el.querySelector<HTMLElement>('.qm-table-align[data-cells]');
+describe('a cell’s own alignment is carried, never authored', () => {
+	const OWN = normalizeTable({
+		...LETTERED,
+		rows: [
+			[{ ...cell('a1'), align: 'center', valign: 'bottom' }, cell('a2')],
+			[cell('b1'), { ...cell('b2'), align: 'left', valign: 'middle' }]
+		]
+	});
+	const own = (props: TableProps, text: string) => {
+		const found = Array.from({ length: rowCount(props) }, (_, r) => rowCells(props, r))
+			.flat()
+			.find((c) => c.text === text)!;
+		return [found.align, found.valign];
+	};
 
-	it('a cell layout rides the store, and clearing it returns the cell to its column', () => {
-		const laid = setCellLayout(LETTERED, 1, 0, 2, 0, 'valign', 'bottom');
-		const back = propsOf(stored(withTable(laid)));
-		expect(back.rows.map((row) => row[0]!.valign)).toEqual(['bottom', 'bottom']);
-		expect(back.header[0]!.valign).toBeUndefined();
-		const cleared = setCellLayout(laid, 0, 0, 2, 1, 'valign', undefined);
-		expect(propsOf(stored(withTable(cleared))).rows[0]![0]).toEqual(cell('a1'));
+	it('rides the store and every op that keeps its cell', () => {
+		const ops = [
+			insertRow(OWN, 0),
+			moveRow(OWN, 1, 1),
+			insertColumn(OWN, -1),
+			moveColumn(OWN, 0, 1),
+			deleteColumn(OWN, 1),
+			setAlign(OWN, 1, 'center'),
+			setHeadless(OWN, true)
+		];
+		for (const next of ops) {
+			const back = propsOf(stored(withTable(next)));
+			expect(own(back, 'a1')).toEqual(['center', 'bottom']);
+		}
 	});
 
-	it('swept cells raise the cells’ cluster, and a press lays every cell in it', () => {
-		const { field } = tableLeaf(LETTERED);
+	it('draws on its cell, survives a keystroke in it, and a sweep raises nothing', () => {
+		const { field } = tableLeaf(OWN);
+		const box = () => field.el.querySelectorAll<HTMLElement>('.qm-table-cell')[2]!;
+		expect([box().style.textAlign, box().style.verticalAlign]).toEqual(['center', 'bottom']);
+		const view = cellViews(field)[2]!;
+		view.dispatch(view.state.tr.insertText('!', 1));
+		expect(leafProps(field).rows[0]![0]).toEqual({
+			text: '!a1',
+			marks: [],
+			align: 'center',
+			valign: 'bottom'
+		});
 		layout(field);
-		sweep(field, 2, 3); // row 1, cell by cell
+		sweep(field, 2, 3);
 		expect(washed(field)).toEqual(['1,0', '1,1']);
-		const cluster = cellCluster(field)!;
-		expect(cluster.closest('.qm-table-cell')?.getAttribute('data-r')).toBe('1');
-		expect(cluster.querySelectorAll('button')).toHaveLength(6);
-		cluster.querySelector<HTMLButtonElement>('[data-valign="bottom"]')!.click();
-		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual(['bottom', 'bottom']);
-		// The sweep stays held, and the toggle reads pressed.
-		expect(washed(field)).toEqual(['1,0', '1,1']);
-		expect(
-			cellCluster(field)!.querySelector('[data-valign="bottom"]')!.getAttribute('aria-pressed')
-		).toBe('true');
-		expect(cellBoxes(field)[2]!.style.verticalAlign).toBe('bottom');
-		undo(outerView(field).state, outerView(field).dispatch);
-		expect(leafProps(field).rows[0]!.map((c) => c.valign)).toEqual([undefined, undefined]);
+		expect(field.el.querySelectorAll('.qm-table-align:not([hidden])')).toHaveLength(0);
 		field.destroy();
 	});
 
-	it('a row its grip or Escape names raises nothing over the row below', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'row')[1]!.click();
-		expect(washed(field)).toEqual(['1,0', '1,1']);
-		expect(cellCluster(field)).toBeNull();
-		cellViews(field)[5]!.focus();
-		press(caret(field), 'Escape');
-		expect(washed(field)).toEqual(['2,0', '2,1']);
-		expect(cellCluster(field)).toBeNull();
-		field.destroy();
-	});
-
-	it('a held column raises its own cluster and not the cells’', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'column')[1]!.click();
-		expect(cellCluster(field)).toBeNull();
+	it('a column press clears its cells’ own `align` and keeps their `valign`', () => {
+		const { field } = tableLeaf(OWN);
+		grips(field, 'column')[0]!.click();
+		toggle(field, 0, 'right').click();
+		expect(leafProps(field).rows[0]![0]).toEqual({ ...cell('a1'), valign: 'bottom' });
+		expect(field.el.querySelectorAll<HTMLElement>('.qm-table-cell')[2]!.style.textAlign).toBe(
+			'right'
+		);
+		expect(own(leafProps(field), 'b2')).toEqual(['left', 'middle']);
 		field.destroy();
 	});
 });
@@ -1098,11 +1104,10 @@ describe('alignment is set on the held column', () => {
 		expect(toggle(field, 1, 'right').tabIndex).toBe(-1);
 		grips(field, 'row')[1].click();
 		expect(cluster(field, 1).hidden).toBe(true);
-		// A column swept cell by cell holds cells, and raises theirs.
+		// A column swept cell by cell holds cells, and raises nothing.
 		layout(field);
 		sweep(field, 1, 5);
 		expect(cluster(field, 1).hidden).toBe(true);
-		expect(field.el.querySelector('.qm-table-align[data-cells]')).not.toBeNull();
 		field.destroy();
 	});
 
@@ -1132,9 +1137,16 @@ describe('alignment is set on the held column', () => {
 	});
 
 	// A cell's own alignment outranks its column's, so a press that left it would draw no
-	// change over a column swept and aligned cell by cell.
+	// change over a column whose cells arrive aligned.
 	it('a press clears its cells’ own alignment in the same step, even at the column’s', () => {
-		const { field } = tableLeaf(setCellLayout(LETTERED, 0, 1, 2, 1, 'align', 'center'));
+		const centered = (c: TableCell): TableCell => ({ ...c, align: 'center' });
+		const { field } = tableLeaf(
+			normalizeTable({
+				...LETTERED,
+				header: [LETTERED.header[0]!, centered(LETTERED.header[1]!)],
+				rows: LETTERED.rows.map(([a, b]) => [a!, centered(b!)])
+			})
+		);
 		const own = () => [0, 1, 2].map((r) => cellAt(leafProps(field), r, 1).align);
 		expect(own()).toEqual(['center', 'center', 'center']);
 		grips(field, 'column')[1].click();
