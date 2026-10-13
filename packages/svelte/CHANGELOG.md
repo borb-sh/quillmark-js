@@ -18,6 +18,8 @@
 
 **Tab out of a table leaves it.** Tab past an empty last row moves the focus on from the table, where it first stopped on the add-column and add-row bars, which drew only once focused. The bars are the pointer's: a row is still added from the keyboard by Enter at the last row or Tab past the last cell, and adding a column takes the pointer.
 
+**A code block names its language.** A fence carrying a language, typed as ` ```rust ` or arriving in an import or a paste, draws the language as a small label in its top corner. The label is read-only; the language is changed in source mode.
+
 **A preview click into a table row leaves the row's columns on the header's in Safari.** The arrival wash was a box added inside the landed row, and WebKit sized that row's columns by its own contents from then on, its first column widening past its header. The wash is now a plane every landing target draws from mount, and a landing only plays it.
 
 ## v0.21.0 - 2026-10-12

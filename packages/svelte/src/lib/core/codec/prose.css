@@ -148,6 +148,20 @@ li.ProseMirror-selectednode::after {
 	font-size: inherit;
 }
 
+/* A fence's language at the label rung in its top corner, read off the `data-lang` the
+   node writes (`schema.ts`). Generated content, so it is never text the caret reaches
+   or a copy takes; the code's lines wrap around it. Read-only: the language is changed
+   in source mode. */
+.ProseMirror pre[data-lang]::before {
+	content: attr(data-lang);
+	float: inline-end;
+	margin-inline-start: var(--_qm-space-3);
+	font-size: var(--_qm-text-label);
+	color: var(--_qm-ink-label);
+	user-select: none;
+	pointer-events: none;
+}
+
 /* A link takes the surface's ink (the UA's blue is the `#8cf` defect again) and a
    dotted underline. Dotted rather than solid because `underline` is a mark in the
    same schema, and a solid rule renders an authored `<u>` and a link identically in a
