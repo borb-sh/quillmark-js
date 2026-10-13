@@ -44,7 +44,7 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 
 	// ── The add affordance ────────────────────────────────────────────────────
 	/** The trailing strip's visible words, which are also every strip's accessible
-	 * name; the plus rides the wording. One string over
+	 * name. One string over
 	 * one kind and many: the trigger seeds a card, and which kind is the menu's word
 	 * to say or the schema's to have already settled. */
 	addCard: string;
@@ -116,7 +116,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	formatStrikethrough: string;
 	formatCode: string;
 	formatLink: string;
-	/** The anchor button's accessible name. */
+	/** The anchor button's accessible name. The popover withholds the button, so
+	 *  nothing draws this or the title below. */
 	formatAnchor: string;
 	/** Its hover title, which says what an anchor is; the name above only says what. */
 	formatAnchorTitle: string;
@@ -187,6 +188,18 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
  */
 export type FormatDiagnostic = (d: Diagnostic) => string | undefined;
 
+/**
+ * A `Mod` chord as the writer's platform prints it: `⌘B` on Apple's, `Ctrl+B`
+ * elsewhere. The platform test is the one `prosemirror-keymap` resolves `Mod` by, so a
+ * tooltip names the chord the keymap binds.
+ */
+export function chord(
+	key: string,
+	platform = typeof navigator === 'undefined' ? '' : navigator.platform
+): string {
+	return /Mac|iP(hone|[oa]d)/.test(platform) ? `⌘${key}` : `Ctrl+${key}`;
+}
+
 /** The package's English. Every key, so the merge below is total. */
 export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	...DEFAULT_TABLE_STRINGS,
@@ -195,7 +208,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardMoveDown: 'Move down',
 	cardDelete: 'Delete card',
 	cardTitle: 'Card title',
-	addCard: '+ Add Card',
+	addCard: 'Add card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
 	arrayDrag: 'Drag to move',
@@ -213,12 +226,12 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	optionalGhost: 'None',
 	proseHeld: 'Holds more than this field can edit here.',
 	formatGroup: 'Formatting',
-	formatBold: 'Bold (Mod-B)',
-	formatEmphasis: 'Emphasis (Mod-I)',
-	formatUnderline: 'Underline (Mod-U)',
+	formatBold: `Bold (${chord('B')})`,
+	formatEmphasis: `Italic (${chord('I')})`,
+	formatUnderline: `Underline (${chord('U')})`,
 	formatStrikethrough: 'Strikethrough',
 	formatCode: 'Code',
-	formatLink: 'Link',
+	formatLink: `Link (${chord('K')})`,
 	formatAnchor: 'Anchor',
 	formatAnchorTitle: 'Anchor — an identity handle over the selection',
 	linkPlaceholder: 'https://…',
@@ -229,7 +242,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	tipsDismiss: 'Dismiss',
 	tipsNext: 'Next',
 	tipsDot: (index, count) => `Tip ${index} of ${count}`,
-	unknownKind: (kind) => `Unrecognized card type ${kind}. Its content is preserved.`,
+	unknownKind: (kind) => `Unknown card type ${kind}. Its content is kept.`,
 	retypeLabel: 'Change to',
 	retypePlaceholder: 'Choose a type…',
 	noCardKinds: 'This document declares no card types — delete this card to remove it.',

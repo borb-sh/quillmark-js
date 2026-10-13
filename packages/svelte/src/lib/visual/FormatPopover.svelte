@@ -3,15 +3,16 @@
  shell-owned, observing the active leaf through
  `getActiveLeaf`: the VisualEditor's accessor over its `leaves` registry, and
  the whole of what this surface knows about the editor. The active leaf is a
- field's or a by-value one (an array's element, a subform's cell): its views either
- way, its controller only for a field's. A non-empty selection in the active leaf
+ field's or a by-value one (an array's element, a subform's cell), reached through
+ its views. A non-empty selection in the active leaf
  raises it over that leaf's selection rect; each button dispatches a PM `toggleMark`
  command straight at the leaf's `EditorView`, whose own `dispatchTransaction` commits
  the result as it commits a keystroke: a field's lowers it to `markOps` through
  `applyChange` (field.ts), a by-value leaf's hands the re-encoded value to its parent
  (`ProseValue`). This component never touches the content. The keymap mirror
- (Mod-b/i/u) already lives in the codec's keymap (field.ts); this is the pointer
- affordance for all six marks.
+ (Mod-b/i/u) lives in the codec's keymap (field.ts); this is the pointer
+ affordance for all six marks. Mod-K is this surface's own key, the prompt it raises
+ being this surface's: a document `keydown` the leaf's keymap left unclaimed.
 
  Selection observation. The view's `dispatchTransaction` is the leaf's
  (read-only), so there is no hook to observe transactions from outside.
@@ -64,6 +65,7 @@
 	// off-tree, so this component renders standalone too.
 	const t = wording();
 	import { toggleMark } from 'prosemirror-commands';
+	import { keydownHandler } from 'prosemirror-keymap';
 	import { TextSelection, type Command } from 'prosemirror-state';
 	import type { EditorView } from 'prosemirror-view';
 	import type { MarkType } from 'prosemirror-model';
@@ -83,9 +85,8 @@
 	let { getActiveLeaf }: Props = $props();
 
 	const SETTLE_MS = 450;
-	/** The six content formatting marks. `anchor` is a seventh, drawn separately below:
-	 *  a decoration toggle rather than a PM `toggleMark`. One string per mark carries both
-	 *  the tooltip and the accessible name; the anchor button spells the two separately. */
+	/** The six content formatting marks. `anchor` is withheld: it draws nothing until
+	 *  comments do. One string per mark carries both the tooltip and the accessible name. */
 	const MARKS: { name: string; icon: IconName; title: string }[] = $derived([
 		{ name: 'strong', icon: 'bold', title: t.strings.formatBold },
 		{ name: 'em', icon: 'italic', title: t.strings.formatEmphasis },
@@ -98,13 +99,14 @@
 	let open = $state(false);
 	/** A pointer is down outside this surface: the selection is still being made. */
 	let pressed = false;
-	/** Whether an anchor can be minted over the selection: in a field's own view, never
-	 *  in a table cell or a by-value leaf (see `sync`). */
-	let anchorAvailable = $state(true);
 	let linkPromptOpen = $state(false);
 	/** Whether the selection carried a link when the prompt was raised. */
 	let linkPresent = $state(false);
 	let linkValue = $state('');
+	/** The view the prompt was raised over. The prompt takes the focus, and a cell view
+	 *  without it is no longer the leaf's `focusedView`. */
+	let promptView: EditorView | undefined;
+	let promptInput = $state<HTMLInputElement | undefined>(undefined);
 	let contentEl = $state<HTMLElement | undefined>(undefined);
 	/** The root to portal into: `document.body` escapes the editor's subtree and
 	 * the consumer's dials with it, so a pane-scoped palette misses this surface.
@@ -119,7 +121,7 @@
 	/** The view the caret is actually in: the leaf's own, or the nested cell view of a
 	 * table island (`codec/table-view.ts`). The six marks are the inline schema's
 	 * too, so a selection in a cell raises the same popover and toggles the same
-	 * commands; only `anchor` is withheld (below). */
+	 * commands. */
 	function activeLeafView(): EditorView | undefined {
 		return getActiveLeaf()?.views.focusedView();
 	}
@@ -133,8 +135,7 @@
 		// returns early, so a surface frozen here still tracks the selection it covers.
 		if (insidePopover) return;
 		if (pressed) return;
-		const leaf = getActiveLeaf();
-		const view = leaf?.views.focusedView();
+		const view = activeLeafView();
 		// A non-empty text selection. A node selection is non-empty too and has nothing
 		// to format: it covers a leaf block (an island, a rule), which is exactly where
 		// Escape out of a table cell lands.
@@ -163,13 +164,6 @@
 		portalTarget = view.dom.closest<HTMLElement>('[data-qm-root]') ?? undefined;
 		const { from, to } = view.state.selection;
 		anchor = rangeAnchor(view, from, to);
-		// An anchor is minted through a field's controller, which a by-value leaf has
-		// none of: its anchors are dropped on the parent's value write. A selection inside
-		// a table cell is not in the field's coordinate space at all: the field's position
-		// map holds one `atom` run for the whole island, so there is no USV offset to mint
-		// an anchor at. The button is withheld rather than disabled, because what it would
-		// toggle does not exist there (CODEC §Islands).
-		anchorAvailable = !!leaf?.controller && view === leaf.views.view;
 		open = true;
 	}
 
@@ -266,6 +260,7 @@
 		if (name === 'link') {
 			linkValue = hrefInSelection(view.state);
 			linkPresent = linkValue.length > 0;
+			promptView = view;
 			linkPromptOpen = true;
 			return;
 		}
@@ -274,43 +269,12 @@
 		sync();
 	}
 
-	/**
-	 * A fresh anchor id: 128 random bits as hex, the id being opaque to the
-	 * boundary and needing only to be unique. `crypto.randomUUID` is
-	 * secure-context-only, and absent on a page served over plain `http` to
-	 * something other than localhost; `getRandomValues` is there either way.
-	 */
-	function mintAnchorId(): string {
-		return [...crypto.getRandomValues(new Uint8Array(16))]
-			.map((b) => b.toString(16).padStart(2, '0'))
-			.join('');
-	}
-
-	/**
-	 * Toggle an identity anchor over the selection: the `anchor`
-	 * button's answer to a formatting toggle. If the selection already covers
-	 * anchors, remove them; else insert one at its start with a freshly-minted
-	 * unique id (the caller-supplied, invariant id the 0.97 policy settles).
-	 * Zero-width and glyph-less (CODEC §Marks): the identity handle persists in
-	 * the content, its chrome awaiting comment-thread UX.
-	 */
-	function toggleAnchor(): void {
-		const leaf = getActiveLeaf()?.controller;
-		const view = activeLeafView();
-		if (!leaf || !view || view.state.selection.empty) return;
-		const { from, to } = leaf.selectionRange();
-		const covered = leaf.anchorsInRange(from, to);
-		if (covered.length) covered.forEach((id) => leaf.removeAnchor(id));
-		else leaf.insertAnchor(mintAnchorId(), from);
-		view.focus();
-		sync();
-	}
-
 	/** Every exit from the prompt: lower it, run `cmd` if there is one, and hand the
 	 *  leaf back its focus and the surface its buttons. */
 	function closePrompt(cmd?: Command): void {
 		linkPromptOpen = false;
-		const view = activeLeafView();
+		const view = promptView && !promptView.isDestroyed ? promptView : activeLeafView();
+		promptView = undefined;
 		if (view) {
 			cmd?.(view.state, view.dispatch);
 			view.focus();
@@ -323,6 +287,30 @@
 	 *  onto it would be a second thing to keep true. */
 	function submitLink(): void {
 		closePrompt(setLink(normalizeHref(linkValue)));
+	}
+
+	/** Mod-K is a press of the Link button: claimed only where the surface would stand
+	 *  over the selection, and a second press while the prompt is up hands it the focus. */
+	function raiseLink(view: EditorView): boolean {
+		const inside = !!contentEl?.contains(document.activeElement);
+		if (inside && linkPromptOpen) return true;
+		if (!inside && !view.hasFocus()) return false;
+		sync();
+		if (!open) return false;
+		const reraised = linkPromptOpen;
+		toggle('link');
+		if (reraised && promptInput) focusPrompt(promptInput);
+		return true;
+	}
+
+	const linkKey = keydownHandler({
+		'Mod-k': (_state, _dispatch, view) => !!view && raiseLink(view)
+	});
+
+	function onKeyDown(e: KeyboardEvent): void {
+		if (e.defaultPrevented) return;
+		const view = activeLeafView();
+		if (view && linkKey(view, e)) e.preventDefault();
 	}
 
 	function removeLink(): void {
@@ -338,6 +326,7 @@
      it does with the event. `pointercancel` is the release a gesture the browser takes
      over gets. -->
 <svelte:document
+	onkeydown={onKeyDown}
 	onselectionchange={deferredSync}
 	onfocusout={deferredSync}
 	onpointerdowncapture={onPointerDown}
@@ -391,6 +380,7 @@
 							>
 								<input
 									{@attach focusPrompt}
+									bind:this={promptInput}
 									class="qm-link-input qm-focus-ring"
 									type="text"
 									placeholder={t.strings.linkPlaceholder}
@@ -432,16 +422,6 @@
 										onclick={() => toggle(m.name)}><Icon name={m.icon} /></button
 									>
 								{/each}
-								{#if anchorAvailable}
-									<button
-										type="button"
-										class="qm-icon-btn qm-mark-btn qm-focus-ring"
-										title={t.strings.formatAnchorTitle}
-										aria-label={t.strings.formatAnchor}
-										onmousedown={keepFocus}
-										onclick={toggleAnchor}><Icon name="hash" /></button
-									>
-								{/if}
 							</div>
 						{/if}
 					</div>

@@ -805,6 +805,38 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
+	it('an undo in the middle of a cell puts the caret where the edit was', () => {
+		const { field } = tableLeaf(withCell(LETTERED, 0, 0, cell('hello')));
+		const view = cellViews(field)[0];
+		view.focus();
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3)));
+		view.dispatch(view.state.tr.insertText('XY', 3));
+		press(view, 'z', { ctrlKey: true });
+		expect(leafProps(field).header[0].text).toBe('hello');
+		expect(caret(field)).toBe(cellViews(field)[0]);
+		expect(cellViews(field)[0].state.selection.head).toBe(3);
+		field.destroy();
+	});
+
+	it('an undo of a row a key appended puts the caret where the key was pressed', () => {
+		for (const [key, at, cellIndex] of [
+			['Enter', 2, 4],
+			['Tab', 2, 5]
+		] as const) {
+			const { field } = tableLeaf(LETTERED);
+			const view = cellViews(field)[cellIndex];
+			view.focus();
+			view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
+			press(view, key);
+			expect(leafProps(field).rows).toHaveLength(3);
+			press(caret(field), 'z', { ctrlKey: true });
+			expect(leafProps(field).rows).toHaveLength(2);
+			expect(caret(field), key).toBe(cellViews(field)[cellIndex]);
+			expect(caret(field).state.selection.head, key).toBe(at);
+			field.destroy();
+		}
+	});
+
 	it('Shift-Enter in a cell is a line break: one `\\n` in its text, and no row', () => {
 		const { field } = tableLeaf(LETTERED);
 		const view = cellViews(field)[0];

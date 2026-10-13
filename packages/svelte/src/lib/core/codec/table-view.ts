@@ -386,6 +386,21 @@ interface Resize {
  *  placeholder is absent, so it answers as the atom it draws. */
 const mounted = new WeakMap<Node, TableIslandView>();
 
+/** A caret in the grid: its cell by position, and its offset in that cell's doc. */
+interface Seat {
+	r: number;
+	c: number;
+	head: number;
+}
+
+/**
+ * Where the caret stood as each table value was written over, keyed by that value. An
+ * undo hands the node back the very `props` object the undone edit replaced, so the seat
+ * held against it is where the edit was made from: where PM's history puts the caret
+ * back in a field's own text.
+ */
+const departures = new WeakMap<TableProps, Seat>();
+
 class TableIslandView implements NodeView {
 	readonly dom: HTMLElement;
 	private cells: MountedCell[] = [];
@@ -454,6 +469,7 @@ class TableIslandView implements NodeView {
 		// transaction, which is every keystroke in the table, and projecting each cell
 		// costs a `mapMarks` across the WASM boundary wherever one holds an anchor.
 		this.rendered = props;
+		const departure = departures.get(props);
 		for (const mounted of this.cells) {
 			const stored = cellAt(props, mounted.r, mounted.c);
 			if (cellEqual(stored, mounted.shown)) continue;
@@ -464,13 +480,13 @@ class TableIslandView implements NodeView {
 			});
 			mounted.view.updateState(fresh);
 			mounted.shown = stored;
-			// Best-effort caret continuity, the rule a field's own re-hydrate takes: keep
-			// the offset, clamped into the text that is there now. A fresh state resolves
-			// its selection to the start of the cell, so an undo would otherwise put the
-			// caret somewhere the edit it undid never was.
+			// The rule a field's own re-hydrate takes: keep the offset, clamped into the
+			// text that is there now, a fresh state resolving to the cell's start. An undo
+			// outranks it below, the departure being where the edit was.
 			const at = Math.min(head, fresh.doc.content.size);
 			mounted.view.dispatch(fresh.tr.setSelection(Selection.near(fresh.doc.resolve(at))));
 		}
+		if (departure && this.focusedSeat()) this.focusCell(departure.r, departure.c, departure.head);
 		// A cell's alignment is no part of its text, so it is restated on every box: the
 		// reseed above compares text and marks alone.
 		for (const mounted of this.cells) layCell(mounted.box, props, mounted.r, mounted.c);
@@ -1228,6 +1244,7 @@ class TableIslandView implements NodeView {
 		this.headerCluster = undefined;
 		this.dom.textContent = '';
 		const props = tablePropsOfNode(this.node);
+		const departure = props && departures.get(props);
 		this.rendered = props;
 		if (props) mounted.set(this.dom, this);
 		else mounted.delete(this.dom);
@@ -1272,7 +1289,7 @@ class TableIslandView implements NodeView {
 		scroller.appendChild(frame);
 		this.dom.appendChild(scroller);
 		this.paintSelection();
-		this.reseat(seat);
+		this.reseat(seat, departure);
 	}
 
 	/**
@@ -1286,17 +1303,20 @@ class TableIslandView implements NodeView {
 	 * without this the DOM under the focus is removed and the focus falls to the
 	 * document body, where the next undo reaches no view at all.
 	 */
-	private focusedSeat(): { r: number; c: number } | undefined {
+	private focusedSeat(): Seat | undefined {
 		const held = this.cells.find((m) => m.view.hasFocus());
-		return held && { r: held.r, c: held.c };
+		return held && { r: held.r, c: held.c, head: held.view.state.selection.head };
 	}
 
-	/** Put the caret back where {@link TableIslandView.focusedSeat} found it, clamped by
-	 *  `focusCell` into the rectangle that is there now: the seat may be the cell the
-	 *  rebuild removed. A caller that has a landing of its own overrides this by running
-	 *  after. */
-	private reseat(seat: { r: number; c: number } | undefined): void {
-		if (seat) this.focusCell(seat.r, seat.c);
+	/** Put the focus back after a rebuild: at the departure where the table returns to a
+	 *  value an edit was made from, which is an undo, else at the end of the cell
+	 *  {@link TableIslandView.focusedSeat} found, clamped by `focusCell` into the
+	 *  rectangle that is there now, the seat being perhaps a cell the rebuild removed. A
+	 *  caller that has a landing of its own overrides this by running after. */
+	private reseat(seat: Seat | undefined, departure: Seat | undefined): void {
+		if (!seat) return;
+		if (departure) this.focusCell(departure.r, departure.c, departure.head);
+		else this.focusCell(seat.r, seat.c);
 	}
 
 	/** One table row: its cells, each carrying whatever chrome hangs off it. */
@@ -1465,6 +1485,7 @@ class TableIslandView implements NodeView {
 			scrollThreshold: this.deps.clearance,
 			scrollMargin: this.deps.clearance,
 			dispatchTransaction: (tr) => {
+				const from = { r, c, head: view.state.selection.head };
 				const next = view.state.apply(tr);
 				view.updateState(next);
 				if (!tr.docChanged) return;
@@ -1476,7 +1497,7 @@ class TableIslandView implements NodeView {
 				const now = this.props();
 				const cell = cellFromDoc(next.doc, cellAt(now, r, c));
 				mounted.shown = cell;
-				this.write(withCell(now, r, c, cell));
+				this.write(withCell(now, r, c, cell), undefined, from);
 			},
 			handleDOMEvents: {
 				focus: () => {
@@ -1515,11 +1536,17 @@ class TableIslandView implements NodeView {
 	 * op is one commit and one undo step, which is why every op writes a whole
 	 * table rather than mutating the props in place.
 	 */
-	private write(next: TableProps, focus?: { r: number; c: number }): void {
+	private write(
+		next: TableProps,
+		focus?: { r: number; c: number },
+		from = this.focusedSeat()
+	): void {
 		const pos = this.getPos();
 		if (pos == null) return;
 		const node = this.outer.state.doc.nodeAt(pos);
 		if (!node || node.type !== this.node.type) return;
+		const left = tablePropsOfNode(node);
+		if (left && from) departures.set(left, from);
 		this.outer.dispatch(
 			this.outer.state.tr.setNodeMarkup(pos, undefined, {
 				...node.attrs,
@@ -1529,17 +1556,23 @@ class TableIslandView implements NodeView {
 		if (focus) this.focusCell(focus.r, focus.c);
 	}
 
-	/** Land the caret at the end of a cell, or at its start, clamped into the rectangle:
-	 *  where a row or column op puts it, since the op rebuilt the views the caret was in. */
-	private focusCell(r: number, c: number, edge: 'start' | 'end' = 'end'): void {
+	/** Land the caret at the end of a cell, at its start, or at an offset clamped into its
+	 *  text, the cell itself clamped into the rectangle: where a row or column op puts it,
+	 *  since the op rebuilt the views the caret was in. */
+	private focusCell(r: number, c: number, edge: 'start' | 'end' | number = 'end'): void {
 		const props = this.props();
 		const row = Math.max(0, Math.min(r, rowCount(props) - 1));
 		const col = Math.max(0, Math.min(c, columnCount(props) - 1));
 		const mounted = this.cells.find((m) => m.r === row && m.c === col);
 		if (!mounted) return;
 		const { view } = mounted;
+		const { doc } = view.state;
 		const at =
-			edge === 'start' ? Selection.atStart(view.state.doc) : Selection.atEnd(view.state.doc);
+			edge === 'start'
+				? Selection.atStart(doc)
+				: edge === 'end'
+					? Selection.atEnd(doc)
+					: Selection.near(doc.resolve(Math.min(edge, doc.content.size)));
 		// Flagged, for the reason the leaf's own landing is (`field.ts`, `setCaret`): PM
 		// focuses with `preventScroll`, so an unflagged dispatch lands the caret where no
 		// scroller has moved to — a Tab past the right edge of the horizontal scroller a

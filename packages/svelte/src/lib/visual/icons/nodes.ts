@@ -5,7 +5,7 @@
 //
 // Verbatim from lucide 1.28.0 — the version is stated because a glyph that drifts
 // from upstream is otherwise invisible, and because the notices in `NOTICE` are the
-// ones that release carries (ISC, and MIT for the Feather-derived ten).
+// ones that release carries (ISC, and MIT for the Feather-derived glyphs).
 
 /** One `<svg>` child: the element to make, and the attributes to set on it. */
 export type IconNode = readonly (readonly [string, Record<string, string>])[];
@@ -48,12 +48,6 @@ export const ICONS = {
 	link: [
 		['path', { d: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' }],
 		['path', { d: 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' }]
-	],
-	hash: [
-		['line', { x1: '4', x2: '20', y1: '9', y2: '9' }],
-		['line', { x1: '4', x2: '20', y1: '15', y2: '15' }],
-		['line', { x1: '10', x2: '8', y1: '3', y2: '21' }],
-		['line', { x1: '16', x2: '14', y1: '3', y2: '21' }]
 	],
 	info: [
 		['circle', { cx: '12', cy: '12', r: '10' }],

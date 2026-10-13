@@ -142,15 +142,10 @@ export function createLeafRegistry(): LeafRegistry {
 	};
 }
 
-/**
- * The active prose leaf as the formatting popover reaches it: the views a selection is
- * read from and a mark toggled at, and the controller where the leaf is a field's. A
- * by-value leaf has none, its anchors being dropped on the parent's value write, so the
- * anchor verbs the controller carries have nothing to act on there.
- */
+/** The active prose leaf as the formatting popover reaches it: the views a selection is
+ *  read from and a mark toggled at. */
 export interface ActiveProse {
 	views: LeafViews;
-	controller?: FieldController;
 }
 
 /** The by-value lane with a field's key bound: what a leaf under that field announces

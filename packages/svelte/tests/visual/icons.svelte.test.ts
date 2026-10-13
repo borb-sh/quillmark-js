@@ -7,7 +7,7 @@
 // one failure mode a copied table has is an entry the renderer cannot draw — plus the
 // two things a call site depends on and neither TypeScript nor a render of one icon
 // would catch: `class` reaching the `<svg>`, which is what the card's open/closed
-// rotation hangs off, and decorative-by-default, which is what keeps thirteen glyphs
+// rotation hangs off, and decorative-by-default, which is what keeps every glyph
 // out of the a11y tree inside buttons that already carry the name.
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount, unmount, type ComponentProps } from 'svelte';
