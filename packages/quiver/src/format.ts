@@ -4,8 +4,9 @@ export const INDEX = 'quiver.json';
 
 /**
  * The artifact's format, stamped into `quiver.json` and refused to be read past (QUIVER
- * §"The index"). Any change a reader assuming the previous shape would misread or reject
- * moves it: `quiver.json` is closed, so an added field is one of those.
+ * §"The index"). A change a reader assuming the previous shape would misread moves it, and
+ * so does the first added field, which format-2 readers before 0.38 refuse; from 3 on, an
+ * added field a reader can skip does not.
  */
 export const FORMAT = 2;
 

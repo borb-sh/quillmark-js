@@ -188,18 +188,6 @@ function sameFiles(a: BuiltQuillEntry, b: BuiltQuillEntry): boolean {
 	return a.bundle === b.bundle && JSON.stringify(a.fonts) === JSON.stringify(b.fonts);
 }
 
-function assertNoUnknownKeys(
-	obj: Record<string, unknown>,
-	allowed: string[],
-	context: string
-): void {
-	for (const key of Object.keys(obj)) {
-		if (!allowed.includes(key)) {
-			throw new QuiverError('quiver_invalid', `${context}: unknown field "${key}"`);
-		}
-	}
-}
-
 async function readIndex(read: ArtifactReader): Promise<BuiltIndex> {
 	let bytes: Uint8Array;
 	try {
@@ -227,8 +215,6 @@ function parseIndex(raw: string): BuiltIndex {
 
 	const obj = parsed as Record<string, unknown>;
 
-	// Read before the key check, so a newer document is refused as newer rather than as
-	// carrying a field this reader does not know.
 	const format = obj['format'];
 	if (typeof format !== 'number' || !Number.isInteger(format) || format < 1) {
 		throw new QuiverError(
@@ -243,8 +229,6 @@ function parseIndex(raw: string): BuiltIndex {
 				`Upgrade @quillmark/quiver, or for a served client the client itself, which carries the copy that reads this.`
 		);
 	}
-
-	assertNoUnknownKeys(obj, ['format', 'name', 'description', 'quills'], INDEX);
 
 	const name = obj['name'];
 	if (typeof name !== 'string' || name.length === 0) {
@@ -281,7 +265,6 @@ function parseIndex(raw: string): BuiltIndex {
 		}
 
 		const e = entry as Record<string, unknown>;
-		assertNoUnknownKeys(e, ['name', 'version', 'bundle', 'fonts'], at);
 
 		const quillName = e['name'];
 		if (typeof quillName !== 'string' || quillName.length === 0) {

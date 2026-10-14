@@ -425,13 +425,6 @@ describe('loadBuiltQuiver — the format', () => {
 		);
 	});
 
-	// The format is read before the key check, so a newer document is refused as newer.
-	it('a format above this loader wins over a field this loader does not know', async () => {
-		await expect(
-			loadBuiltQuiver(indexed({ format: FORMAT + 1, name: 't', quills: [], later: 1 }).read)
-		).rejects.toThrow(/Upgrade @quillmark\/quiver/);
-	});
-
 	it('an absent format → quiver_invalid', async () => {
 		await expect(loadBuiltQuiver(indexed({ name: 'test', quills: [] }).read)).rejects.toThrow(
 			expect.objectContaining({ code: 'quiver_invalid' })
@@ -467,10 +460,18 @@ describe('loadBuiltQuiver — invalid index', () => {
 		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
 	});
 
-	it('unknown top-level field → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(indexed({ format: FORMAT, name: 'test', quills: [], extra: true }).read)
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
+	it('a field this loader does not know is skipped, at the top and on an entry', async () => {
+		const quiver = await loadBuiltQuiver(
+			indexed({
+				format: FORMAT,
+				name: 'test',
+				later: { any: 'shape' },
+				quills: [
+					{ name: 'foo', version: '1.0.0', bundle: bundleName('foo', '1.0.0'), fonts: {}, later: 1 }
+				]
+			}).read
+		);
+		expect(quiver.quillNames()).toEqual(['foo']);
 	});
 
 	it('a quiver name that is not a quill name → quiver_invalid', async () => {
