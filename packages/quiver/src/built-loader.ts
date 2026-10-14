@@ -215,7 +215,6 @@ function parseIndex(raw: string): BuiltIndex {
 
 	const obj = parsed as Record<string, unknown>;
 
-	// A field this reader does not know is skipped; a change it would misread moves `format`.
 	const format = obj['format'];
 	if (typeof format !== 'number' || !Number.isInteger(format) || format < 1) {
 		throw new QuiverError(

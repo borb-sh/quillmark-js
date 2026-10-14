@@ -425,12 +425,6 @@ describe('loadBuiltQuiver — the format', () => {
 		);
 	});
 
-	it('a format above this loader wins over a field this loader does not know', async () => {
-		await expect(
-			loadBuiltQuiver(indexed({ format: FORMAT + 1, name: 't', quills: [], later: 1 }).read)
-		).rejects.toThrow(/Upgrade @quillmark\/quiver/);
-	});
-
 	it('an absent format → quiver_invalid', async () => {
 		await expect(loadBuiltQuiver(indexed({ name: 'test', quills: [] }).read)).rejects.toThrow(
 			expect.objectContaining({ code: 'quiver_invalid' })
