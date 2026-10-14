@@ -276,6 +276,22 @@ describe('a quill sits where its Quill.yaml says', () => {
 		);
 	});
 
+	it('reads an unquoted quill.version as written', async () => {
+		const root = await temp.dir();
+		await seat(root, 'memo', '1.0.0', 'quill:\n  name: memo\n  version: 1.2\n');
+
+		await expect(scanSourceQuiver(root)).rejects.toThrow(
+			expect.objectContaining({ code: 'quiver_invalid', message: expect.stringMatching(/"1.2"/) })
+		);
+	});
+
+	it('names the directory before what its Quill.yaml declares', async () => {
+		const root = await temp.dir();
+		await seat(root, 'My-Memo', '1.0.0', 'quill:\n  name: my_memo\n  version: "1.0.0"\n');
+
+		await expect(scanSourceQuiver(root)).rejects.toThrow(/directory "My-Memo"/);
+	});
+
 	it('refuses a quill.version that disagrees with its directory', async () => {
 		const root = await temp.dir();
 		await seat(root, 'memo', '1.1.0', 'quill:\n  name: memo\n  version: "1.0.0"\n');

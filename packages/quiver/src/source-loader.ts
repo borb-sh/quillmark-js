@@ -31,6 +31,20 @@ function refuseSymlink(st: Stats, path: string): void {
 }
 
 /**
+ * Asked of a directory holding a quill rather than of every directory, so a stray
+ * one holding none stays ignored: what has to be addressable is a catalog row.
+ */
+function refuseUnnamedQuill(quillName: string, quiverName: string): void {
+	if (!isQuillName(quillName)) {
+		throw new QuiverError(
+			'quiver_invalid',
+			`Quill directory "${quillName}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`,
+			{ quiverName }
+		);
+	}
+}
+
+/**
  * Refuse a `Quill.yaml` whose `quill.name` or `quill.version` disagrees with the
  * path it sits at: the catalog serves the path, and a document saved from the quill
  * names what `Quill.yaml` says. A field absent or malformed is the engine's to
@@ -44,7 +58,7 @@ function refuseMisplacedQuill(
 ): void {
 	let parsed: unknown;
 	try {
-		parsed = parseYaml(new TextDecoder().decode(raw));
+		parsed = parseYaml(new TextDecoder().decode(raw), { schema: 'failsafe' });
 	} catch {
 		return;
 	}
@@ -214,21 +228,13 @@ export async function scanSourceQuiver(rootDir: string): Promise<{
 					{ cause: err }
 				);
 			}
+			refuseUnnamedQuill(quillName, meta.name);
 			refuseMisplacedQuill(quillYaml, quillName, versionDir, meta.name);
 
 			versions.push(versionDir);
 		}
 
 		if (versions.length > 0) {
-			// Asked here rather than at the directory, so a stray one holding no quill
-			// stays ignored: what has to be addressable is a catalog row.
-			if (!isQuillName(quillName)) {
-				throw new QuiverError(
-					'quiver_invalid',
-					`Quill directory "${quillName}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`,
-					{ quiverName: meta.name }
-				);
-			}
 			versions.sort((a, b) => compareSemver(b, a));
 			catalog.set(quillName, versions);
 		}

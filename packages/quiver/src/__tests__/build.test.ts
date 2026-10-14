@@ -332,11 +332,11 @@ describe('buildQuiver — every name but the index carries the digest of its own
 });
 
 describe('buildQuiver — what it writes, a loader reads', () => {
-	// A quill directory outside the ref charset is refused at the scan, before a bundle
+	// A quill directory that is not a quill name is refused at the scan, before a bundle
 	// takes its name: a bundle filename the loader refuses fails the whole artifact,
 	// every healthy quill in it included.
 
-	it('refuses a source quill a ref cannot spell, and writes nothing', async () => {
+	it('refuses a source quill that is not a quill name, and writes nothing', async () => {
 		const src = await fresh();
 		const out = await fresh();
 

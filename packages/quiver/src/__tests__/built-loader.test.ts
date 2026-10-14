@@ -385,7 +385,7 @@ describe('loadBuiltQuiver — a host answering with something else', () => {
 describe('loadBuiltQuiver — font coalescing', () => {
 	it('two concurrent loads sharing a font read it exactly once', async () => {
 		const shared: [string, Uint8Array] = [fontKey(1), font(1, 2, 3)];
-		const artifact = makeArtifact('coalesce-test', [
+		const artifact = makeArtifact('coalesce_test', [
 			{ name: 'quill_a', version: '1.0.0', fonts: { 'fonts/shared.ttf': shared } },
 			{ name: 'quill_b', version: '1.0.0', fonts: { 'fonts/shared.ttf': shared } }
 		]);
@@ -473,6 +473,12 @@ describe('loadBuiltQuiver — invalid index', () => {
 		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
 	});
 
+	it('a quiver name that is not a quill name → quiver_invalid', async () => {
+		await expect(
+			loadBuiltQuiver(indexed({ format: FORMAT, name: 'My-Quiver', quills: [] }).read)
+		).rejects.toThrow(/is not a quill name/);
+	});
+
 	const withQuill = (quill: Record<string, unknown>) =>
 		loadBuiltQuiver(
 			indexed({
@@ -484,7 +490,7 @@ describe('loadBuiltQuiver — invalid index', () => {
 			}).read
 		);
 
-	it('a quill entry named outside the ref charset → quiver_invalid', async () => {
+	it('a quill entry that is not a quill name → quiver_invalid', async () => {
 		await expect(
 			withQuill({ name: 'my.quill', bundle: bundleName('my.quill', '1.0.0') })
 		).rejects.toThrow(/is not a quill name/);
