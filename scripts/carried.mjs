@@ -1,7 +1,9 @@
 // The three versions a quillkit bundle carries, read off the resolved manifests. A
 // browser resolves nothing, so the siblings are compiled in and their coordinate is for
 // diagnosis rather than resolution: what a consumer holding a tarball nobody can `npm ls`
-// needs in a bug report is which copies are in there.
+// needs in a bug report is which copies are in there. `quillkit init` also reads the file,
+// to range a fresh collection's loader and engine at the versions the client was built
+// against.
 //
 // The version as its manifest states it, for all three. Whether a checkout sits ahead of
 // the tag that version names is a question about a working tree, and a published tarball

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`quillkit init [dir]` lays a new quiver.** It writes `Quiver.yaml`, one quill under `quills/letter/0.1.0/` that passes `quillkit test` and opens in `quillkit studio`, and a `package.json` pinning `quillkit`, `@quillmark/quiver` and `@quillmark/wasm` at the versions this release carries. A directory already holding a `Quiver.yaml` or `quills/` is refused.
+
 ## v0.17.0 - 2026-10-12
 
 **The carried `@quillmark/wasm` is 0.125.0, and every Typst plate migrates.** A plate imports the helper as a module, `#import "@local/quillmark-helper:0.2.0" as qm`, and reads its members through it: `qm.data`, `qm.ink(dict, "field")` where it wrote `ink(dict).field` or `display(..)`, `qm.region` where it wrote `field-region`. Any other import fails the render as `typst::helper_import`. A value the plate prints itself surfaces no region in studio's preview, so a field stays click-to-edit printed through `qm.ink` or claimed with `qm.region`. A card spelling `ui.group` warns `quill::deprecated_groups`; `sections:` replaces it. quillmark's 0.124 → 0.125 migration guide covers each step.

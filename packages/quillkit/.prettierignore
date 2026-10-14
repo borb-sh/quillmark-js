@@ -1,6 +1,8 @@
 # Prettier reads the ignore file at its cwd, not the workspace root's, so a run started
-# here reads this one: canon, the build output, and the quiver packed into the served tree.
+# here reads this one: canon, the starter quiver, the build output, and the quiver packed
+# into the served tree.
 prose/
+starter/
 dist/
 build/
 .svelte-kit/

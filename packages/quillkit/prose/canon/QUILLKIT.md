@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-The verbs a quill author types, one bin over the whole loop: `test` gates, `build` packs, `studio` shows, `site` lays a deploy out. It is the only name in the toolchain an author runs, and the audit surface a production tree does not carry: a collection depends on [`@quillmark/quiver`](../../../quiver/prose/canon/QUIVER.md) for the loaders, and on this only in `devDependencies`.
+The verbs a quill author types, one bin over the whole loop: `init` starts, `test` gates, `build` packs, `studio` shows, `site` lays a deploy out. It is the only name in the toolchain an author runs, and the audit surface a production tree does not carry: a collection depends on [`@quillmark/quiver`](../../../quiver/prose/canon/QUIVER.md) for the loaders, and on this only in `devDependencies`.
 
 ## quillkit carries nothing it can resolve
 
@@ -43,6 +43,18 @@ The blueprint is what the two share: the client seeds the same way, so the docum
 
 The tarball holds two, and they never meet: the client bundles the copy it was built against, and the bin resolves the collection's when `test` runs. Neither half is importable, a `bin` being a process of its own and the client being bytes, so no handle minted by one can reach the other. That is what lets a compiled Node program and a bundled browser program share one manifest as a single bundled terminal.
 
+## Where a quiver comes from
+
+`init` lays one: `Quiver.yaml` and a single quill out of the tarball's `starter/`, plus the files that name versions or that a tarball cannot carry, written by the verb. Every other verb runs over a quiver that exists.
+
+**The starter is a collection the suite gates.** Carried as files rather than emitted from strings, so `cli.integration.test.ts` lays it and runs `test` over it: a scaffold that stops rendering fails CI before it fails an author on their first command.
+
+**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `string` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
+
+**The pins are the client's.** The written `package.json` ranges `@quillmark/quiver` and `@quillmark/wasm` at the versions `carried.json` records and `quillkit` at its own, the versions its client was built against. The ranges also keep an install on a Node below the `engines` floor from resolving releases from before it.
+
+**It refuses rather than merges.** An entry of `starter/` already in the directory fails the verb before anything is written. A `package.json` already there is left alone and the install line is printed instead; `.gitignore` and `.prettierignore` are written only where absent. The last is there because prettier rewrites a card's `~~~` fence as a backtick fence, which opens no card.
+
 ## The local loop
 
 `studio` packs the source into a served tree, serves the client at the root with the pack mounted at `/quiver` and any `--templates` directory at `/templates`, and repacks when the source changes. Templates are served from where they are written, so an edit to one reaches the next pick with no repack. Three parts, and only the first is subtle:
@@ -69,7 +81,7 @@ Both halves are asserted rather than assumed: a client carrying a `quiver/` or `
 
 ## Not
 
-Not a scaffolder: there is no `new`, and a collection is laid out by hand. Not a renderer: every render is `@quillmark/wasm`'s, through the collection's copy. Not a library: no importable entry, and the loaders stay quiver's, where a browser consumer can reach them.
+Not a generator: `init` lays one shape and takes no options. Not a renderer: every render is `@quillmark/wasm`'s, through the collection's copy. Not a library: no importable entry, and the loaders stay quiver's, where a browser consumer can reach them.
 
 ## Links
 

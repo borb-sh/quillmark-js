@@ -1,6 +1,19 @@
 # quillkit
 
-The quill author's toolchain: one command over the whole loop. Gate a quiver, pack it, look at it, ship it.
+The quill author's toolchain: one command over the whole loop. Start a quiver, gate it, pack it, look at it, ship it.
+
+## Start
+
+```sh
+npx quillkit@latest init my-quiver
+cd my-quiver
+npm install
+npx quillkit studio
+```
+
+`init` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`, `example.md`), and a `package.json` pinning the three packages below at the versions this quillkit was built with. The quill passes `quillkit test` as laid; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
+
+`@latest` names the release outright. An unversioned `npx quillkit` on a Node older than the `engines` floor resolves a release from before `init` existed.
 
 ## Install
 
@@ -16,12 +29,13 @@ That client compiles in its own copies of both libraries and the engine, which y
 
 | Verb              | What it does                                                       |
 | ----------------- | ------------------------------------------------------------------ |
+| `quillkit init`   | lay a new quiver holding one starter quill                         |
 | `quillkit test`   | the gate: every quill's seed and example document render           |
 | `quillkit build`  | pack the source layout into a servable artifact                    |
 | `quillkit studio` | the local loop: pack, serve, repack on save                        |
 | `quillkit site`   | the deploy layout: the client at a root, a built quiver beneath it |
 
-Every verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build`, `studio` and `site` take `--out <dir>`, `studio` takes `--port <n>` and `--host <addr>`, and `site` takes `--drafts`.
+`init` takes the directory to lay the quiver in, defaulting to the working directory. Every other verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build`, `studio` and `site` take `--out <dir>`, `studio` takes `--port <n>` and `--host <addr>`, and `site` takes `--drafts`.
 
 ## Gating
 

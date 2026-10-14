@@ -2,12 +2,12 @@
 
 The JavaScript tier downstream of the [`@quillmark/wasm`](https://github.com/borb-sh/quillmark) artifact.
 
-| Package                                |                                                                                                        |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| [`@quillmark/svelte`](packages/svelte) | Editing, live-preview and source surfaces over a session.                                              |
-| [`@quillmark/quiver`](packages/quiver) | Collections of quills, resolved and loaded.                                                            |
-| [`quillkit`](packages/quillkit)        | The quill author's toolchain: one bin over gate, pack, look at, ship, and the studio client it serves. |
-| [`playground`](packages/playground)    | The app that composes them, for a developer reading the library; deployed as the Pages site.           |
+| Package                                |                                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [`@quillmark/svelte`](packages/svelte) | Editing, live-preview and source surfaces over a session.                                                     |
+| [`@quillmark/quiver`](packages/quiver) | Collections of quills, resolved and loaded.                                                                   |
+| [`quillkit`](packages/quillkit)        | The quill author's toolchain: one bin over start, gate, pack, look at, ship, and the studio client it serves. |
+| [`playground`](packages/playground)    | The app that composes them, for a developer reading the library; deployed as the Pages site.                  |
 
 A quill author types one name, `quillkit`, and pins two: the tool resolves the loader and the engine out of the collection's own `node_modules`, so the versions a collection depends on decide what packs it and what renders it. The client it draws with is the tool's own, carried rather than resolved, since no version an author pins makes a client more theirs.
 

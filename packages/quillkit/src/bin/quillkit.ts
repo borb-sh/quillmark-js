@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The quill author's toolchain, one bin over the whole loop: gate, pack, look at, ship.
+ * The quill author's toolchain, one bin over the whole loop: start, gate, pack, look at, ship.
  * `usage()` below is the spelling of every verb and its flags.
  *
  * One wasm at most lives in this process, and only `test` puts it there: the packer
@@ -10,6 +10,7 @@
 import { join, resolve } from 'node:path';
 import type { Document } from '@quillmark/wasm';
 import { loadEngine, loadQuiverNode } from '../collection.js';
+import { layStarter } from '../init.js';
 import { CLIENT } from '../paths.js';
 import { createStaticServer, listen, type Mount } from '../serve.js';
 import { assertClient, assertPacked, laySite } from '../site.js';
@@ -37,6 +38,31 @@ const collection = (): string => resolve(flag('--quiver') ?? '.');
 function message(err: unknown): string {
 	if (!(err instanceof Error)) return String(err);
 	return err.cause == null ? err.message : `${err.message}\n  ${message(err.cause)}`;
+}
+
+// ---------------------------------------------------------------------------
+// init
+// ---------------------------------------------------------------------------
+
+/** A new quiver in the named directory, else the working one: one quill that passes
+ *  `test` and opens in `studio`. It refuses a directory that already holds a quiver
+ *  rather than merging into it. */
+async function init(): Promise<void> {
+	const args = argv.slice(1);
+	if (args.length > 1 || args.some((a) => a.startsWith('-'))) {
+		usage();
+		process.exit(1);
+	}
+	const dir = args[0] ?? '.';
+	const { at, wrotePackage, install } = await layStarter(dir);
+	const steps = [
+		...(resolve(dir) === resolve('.') ? [] : [`cd ${JSON.stringify(dir)}`]),
+		wrotePackage ? 'npm install' : `npm install --save-dev ${install.join(' ')}`,
+		'npx quillkit studio'
+	];
+	console.log(`quillkit init: ${at}`);
+	console.log('  quills/letter/0.1.0/ is the quill: Quill.yaml, plate.typ, example.md.');
+	console.log(`\nNext:\n${steps.map((s) => `  ${s}`).join('\n')}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +224,7 @@ function usage(): void {
 	console.error(
 		[
 			'Usage:',
+			'  quillkit init   [<dir>]',
 			'  quillkit test   [--quiver <dir>]',
 			'  quillkit build  [--quiver <dir>] [--out <dir>]',
 			'  quillkit studio [--quiver <dir>] [--out <dir>] [--port <n>] [--host <addr>] [--templates <dir>]',
@@ -211,7 +238,7 @@ function die(err: unknown): never {
 	process.exit(1);
 }
 
-const VERBS: Record<string, () => Promise<void>> = { test, build, studio, site };
+const VERBS: Record<string, () => Promise<void>> = { init, test, build, studio, site };
 
 // Own keys only: `in` reaches `Object.prototype`, and `quillkit toString` is a usage
 // line rather than a call onto whatever it found.
