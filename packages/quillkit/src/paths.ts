@@ -1,4 +1,4 @@
-/** The paths this package knows: the client it ships, and the containment three
+/** The paths this package knows: the client and the starter it ships, and the containment three
  *  refusals turn on (a watcher's own output, a server's mount, and an out that owns its
  *  input). */
 
@@ -18,6 +18,10 @@ import { fileURLToPath } from 'node:url';
  * under it.
  */
 export const CLIENT = fileURLToPath(new URL('../dist/client/', import.meta.url));
+
+/** The quiver `init` copies, carried as files so the suite can gate it. Anchored as
+ *  `CLIENT` is. */
+export const STARTER = fileURLToPath(new URL('../starter/', import.meta.url));
 
 /** True when `at` is `abs` or an ancestor of it. */
 export function within(at: string, abs: string): boolean {

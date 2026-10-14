@@ -21,6 +21,8 @@ export interface Scratch {
 	dir(): Promise<string>;
 	/** A copy of the reference quiver with the toolchain's peers installed beside it. */
 	collection(): Promise<string>;
+	/** The toolchain's peers installed into a collection laid elsewhere. */
+	peers(at: string): Promise<void>;
 	/** Remove everything handed out. */
 	cleanup(): Promise<void>;
 }
@@ -34,13 +36,18 @@ export function scratch(prefix: string): Scratch {
 		return at;
 	};
 
+	const peers = async (at: string): Promise<void> => {
+		await mkdir(join(at, 'node_modules'), { recursive: true });
+		await symlink(join(WORKSPACE_MODULES, '@quillmark'), join(at, 'node_modules', '@quillmark'));
+	};
+
 	return {
 		dir,
+		peers,
 		async collection() {
 			const at = join(await dir(), 'collection');
 			await cp(FIXTURES, at, { recursive: true });
-			await mkdir(join(at, 'node_modules'), { recursive: true });
-			await symlink(join(WORKSPACE_MODULES, '@quillmark'), join(at, 'node_modules', '@quillmark'));
+			await peers(at);
 			return at;
 		},
 		async cleanup() {

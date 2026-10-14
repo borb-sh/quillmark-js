@@ -1,12 +1,13 @@
 package-lock.json
 
-# Hand-formatted canon and design prose and the reference-quill fixture tree:
-# prettier would collapse aligned code-sketch comments and churn a test input.
+# Hand-formatted canon and design prose, and the quill trees: prettier would collapse
+# aligned code-sketch comments, and it rewrites a card's `~~~` fence as a backtick one.
 #
 # Prettier reads the ignore file at its cwd, so a run started inside a package reads that
 # package's copy and never this one; each package repeats the lines its cwd reaches.
 **/prose/
 fixtures/
+packages/quillkit/starter/
 
 # Claude Code tooling — agent config and skills copied from the sibling quillmark
 # checkout (hand-formatted prose). Never shipped, not package source, so it stays

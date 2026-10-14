@@ -1,0 +1,36 @@
+quill:
+  name: letter
+  version: 0.1.0
+  backend: typst
+  description: A one-page letter with a date, a subject line and optional P.S. notes
+
+typst:
+  plate_file: plate.typ
+
+main:
+  description: A letter from one person to another.
+  fields:
+    sender:
+      type: string
+      description: Your name, as it appears in the letterhead and the signature.
+    recipient:
+      type: string
+      description: Who the letter is addressed to.
+    date:
+      type: date
+      default: today
+      description: YYYY-MM-DD, or today to date the letter when it is rendered.
+    subject:
+      type: string
+      default: ""
+      description: One line naming what the letter is about. Leave blank for none.
+    closing:
+      type: enum
+      values: [sincerely, regards, thanks]
+      default: sincerely
+      description: The word before your signature.
+
+card_kinds:
+  postscript:
+    title: P.S.
+    description: A short note after the signature.

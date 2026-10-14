@@ -108,6 +108,33 @@ describe('quillkit test', () => {
 	);
 });
 
+describe('quillkit init', () => {
+	it(
+		'lays a quiver the gate passes, pinned to what the client carries',
+		async () => {
+			const at = join(await temp.dir(), 'fresh');
+			await run(process.execPath, [BIN, 'init', at]);
+			await temp.peers(at);
+
+			const { stdout } = await run(process.execPath, [BIN, 'test'], { cwd: at });
+			expect(stdout).toContain('pass  letter@0.1.0 (seed, example)');
+
+			const carried = JSON.parse(await readFile(join(DIST, 'client', 'carried.json'), 'utf8'));
+			const pkg = JSON.parse(await readFile(join(at, 'package.json'), 'utf8'));
+			expect(pkg.devDependencies['@quillmark/wasm']).toBe(`^${carried['@quillmark/wasm']}`);
+			expect(pkg.devDependencies['@quillmark/quiver']).toBe(`^${carried['@quillmark/quiver']}`);
+		},
+		RENDER_MS
+	);
+
+	it('refuses a directory that already holds a quiver', async () => {
+		const at = await temp.collection();
+		await expect(run(process.execPath, [BIN, 'init'], { cwd: at })).rejects.toThrow(
+			/Quiver\.yaml already exists/
+		);
+	});
+});
+
 describe('quillkit build', () => {
 	it('packs a collection into the directory it was pointed at', async () => {
 		const out = join(await temp.dir(), 'dist');
