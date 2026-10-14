@@ -85,15 +85,15 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		const sharedFontBytes = font(1, 2, 3, 4, 5, 6, 7, 8);
 
 		await seedSourceQuiver(src, {
-			name: 'font-test',
+			name: 'font_test',
 			quills: [
 				{
-					name: 'quillA',
+					name: 'quill_a',
 					version: '1.0.0',
 					fonts: [{ path: 'fonts/font.ttf', content: sharedFontBytes }]
 				},
 				{
-					name: 'quillB',
+					name: 'quill_b',
 					version: '1.0.0',
 					fonts: [{ path: 'fonts/font.ttf', content: sharedFontBytes }]
 				}
@@ -112,10 +112,10 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		const fontBytes = font(0xde, 0xad, 0xbe, 0xef);
 
 		await seedSourceQuiver(src, {
-			name: 'font-test',
+			name: 'font_test',
 			quills: [
 				{
-					name: 'quillA',
+					name: 'quill_a',
 					version: '1.0.0',
 					fonts: [{ path: 'fonts/font.otf', content: fontBytes }]
 				}
@@ -166,7 +166,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 	it('omits the description a Quiver.yaml does not carry', async () => {
 		const src = await fresh();
 		const out = await fresh();
-		await seedSourceQuiver(src, { quills: [{ name: 'quillA', version: '1.0.0' }] });
+		await seedSourceQuiver(src, { quills: [{ name: 'quill_a', version: '1.0.0' }] });
 		await buildQuiver(src, out);
 
 		expect(await indexOf(out)).not.toHaveProperty('description');
@@ -332,11 +332,11 @@ describe('buildQuiver — every name but the index carries the digest of its own
 });
 
 describe('buildQuiver — what it writes, a loader reads', () => {
-	// A quill directory outside the ref charset is refused at the scan, before a bundle
+	// A quill directory that is not a quill name is refused at the scan, before a bundle
 	// takes its name: a bundle filename the loader refuses fails the whole artifact,
 	// every healthy quill in it included.
 
-	it('refuses a source quill a ref cannot spell, and writes nothing', async () => {
+	it('refuses a source quill that is not a quill name, and writes nothing', async () => {
 		const src = await fresh();
 		const out = await fresh();
 
@@ -365,7 +365,7 @@ describe('buildQuiver — the draft floor', () => {
 		const src = await fresh();
 		await seedSourceQuiver(src, {
 			quills: [
-				{ name: 'draft-only', version: '0.0.1' },
+				{ name: 'draft_only', version: '0.0.1' },
 				{ name: 'floor', version: '0.1.0' },
 				{ name: 'memo', version: '0.0.9' },
 				{ name: 'memo', version: '1.0.0' }
@@ -379,7 +379,7 @@ describe('buildQuiver — the draft floor', () => {
 		const drafts = await fresh();
 		await buildQuiver(src, drafts, { drafts: true });
 		expect(await refsOf(drafts)).toEqual([
-			'draft-only@0.0.1',
+			'draft_only@0.0.1',
 			'floor@0.1.0',
 			'memo@0.0.9',
 			'memo@1.0.0'

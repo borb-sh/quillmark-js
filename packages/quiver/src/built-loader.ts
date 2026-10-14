@@ -250,6 +250,12 @@ function parseIndex(raw: string): BuiltIndex {
 	if (typeof name !== 'string' || name.length === 0) {
 		throw new QuiverError('quiver_invalid', `${INDEX} must have a non-empty string "name" field`);
 	}
+	if (!isQuillName(name)) {
+		throw new QuiverError(
+			'quiver_invalid',
+			`${INDEX} name "${name}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`
+		);
+	}
 
 	const description = obj['description'];
 	if (description !== undefined && typeof description !== 'string') {
@@ -285,7 +291,7 @@ function parseIndex(raw: string): BuiltIndex {
 		if (!isQuillName(quillName)) {
 			throw new QuiverError(
 				'quiver_invalid',
-				`${at}.name "${quillName}" is not a name a ref can spell — only [A-Za-z0-9_-] are allowed`
+				`${at}.name "${quillName}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`
 			);
 		}
 

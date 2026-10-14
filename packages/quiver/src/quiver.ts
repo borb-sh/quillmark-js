@@ -125,7 +125,9 @@ export class Quiver {
 	 * Resolves a selector ref → canonical ref (e.g. "memo" → "memo@1.1.0").
 	 *
 	 * Selector forms: `name`, `name@x`, `name@x.y`, `name@x.y.z`. Picks the
-	 * highest matching version in this quiver.
+	 * highest matching version in this quiver. A name prefixed with this quiver's
+	 * own name (`<quiver>.name`) resolves as the bare name does; one prefixed with
+	 * any other collection is `quill_not_found`. The canonical ref is bare.
 	 *
 	 * Sync, and in-memory by construction rather than by implementation: every
 	 * loader materializes the catalog as the quiver is built, and `QuiverLoader`
@@ -136,8 +138,9 @@ export class Quiver {
 	 *   - `quill_not_found` if no version matches
 	 */
 	resolve(ref: string): string {
-		const { name, selector } = parseQuillRef(ref);
-		const versions = this.#catalog.get(name);
+		const { collection, name, selector } = parseQuillRef(ref);
+		const versions =
+			collection === undefined || collection === this.name ? this.#catalog.get(name) : undefined;
 
 		if (versions !== undefined) {
 			// Every loader materializes a catalog sorted descending, so the first match is

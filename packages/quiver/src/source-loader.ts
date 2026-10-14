@@ -6,6 +6,7 @@
 import { readdir, readFile, lstat } from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 import { QuiverError } from './errors.js';
 import { parseQuiverYaml } from './quiver-yaml.js';
 import { isQuillName } from './ref.js';
@@ -30,6 +31,63 @@ function refuseSymlink(st: Stats, path: string): void {
 }
 
 /**
+ * Asked of a directory holding a quill rather than of every directory, so a stray
+ * one holding none stays ignored: what has to be addressable is a catalog row.
+ */
+function refuseUnnamedQuill(quillName: string, quiverName: string): void {
+	if (!isQuillName(quillName)) {
+		throw new QuiverError(
+			'quiver_invalid',
+			`Quill directory "${quillName}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`,
+			{ quiverName }
+		);
+	}
+}
+
+/**
+ * Refuse a `Quill.yaml` whose `quill.name` or `quill.version` disagrees with the
+ * path it sits at: the catalog serves the path, and a document saved from the quill
+ * names what `Quill.yaml` says. A field absent or malformed is the engine's to
+ * report when the quill loads.
+ */
+function refuseMisplacedQuill(
+	raw: Uint8Array,
+	name: string,
+	version: string,
+	quiverName: string
+): void {
+	let parsed: unknown;
+	try {
+		parsed = parseYaml(new TextDecoder().decode(raw), { schema: 'failsafe' });
+	} catch {
+		return;
+	}
+	const quill = (parsed as { quill?: unknown } | null)?.quill;
+	if (typeof quill !== 'object' || quill === null) return;
+	const declared = quill as { name?: unknown; version?: unknown };
+
+	if (typeof declared.name === 'string' && declared.name !== name) {
+		throw new QuiverError(
+			'quiver_invalid',
+			`Quill "${name}@${version}" declares quill.name "${declared.name}": a quill sits at quills/<quill.name>/<quill.version>/`,
+			{ quiverName, version }
+		);
+	}
+
+	if (typeof declared.version === 'string') {
+		const parts = declared.version.split('.');
+		const canonical = parts.length === 2 ? `${declared.version}.0` : declared.version;
+		if (!isCanonicalSemver(canonical) || compareSemver(canonical, version) !== 0) {
+			throw new QuiverError(
+				'quiver_invalid',
+				`Quill "${name}@${version}" declares quill.version "${declared.version}": a quill sits at quills/<quill.name>/<quill.version>/`,
+				{ quiverName, version }
+			);
+		}
+	}
+}
+
+/**
  * Scans a Source Quiver root directory.
  *
  * Reads `<rootDir>/Quiver.yaml`, then walks `<rootDir>/quills/<name>/<version>/`
@@ -37,9 +95,9 @@ function refuseSymlink(st: Stats, path: string): void {
  *
  * Throws:
  *   - `quiver_invalid` if Quiver.yaml is invalid, any rung it opens or reads is a
- *     symlink, a quill dir holding versions is named outside the ref charset, a
- *     version dir name is non-canonical, or a version dir is missing its Quill.yaml
- *     sentinel.
+ *     symlink, a quill dir holding versions is not a quill name, a version dir
+ *     name is non-canonical, or a version dir is missing its Quill.yaml or holds
+ *     one naming another quill or version.
  *   - `transport_error` for I/O failures (permissions, etc.).
  *
  * Missing `quills/` directory is not an error — the quiver is valid but empty.
@@ -150,8 +208,10 @@ export async function scanSourceQuiver(rootDir: string): Promise<{
 			}
 
 			const quillYamlPath = join(versionPath, 'Quill.yaml');
+			let quillYaml: Uint8Array;
 			try {
 				refuseSymlink(await lstat(quillYamlPath), quillYamlPath);
+				quillYaml = await readFile(quillYamlPath);
 			} catch (err) {
 				if (err instanceof QuiverError) throw err;
 				const code = (err as NodeJS.ErrnoException).code;
@@ -164,24 +224,17 @@ export async function scanSourceQuiver(rootDir: string): Promise<{
 				}
 				throw new QuiverError(
 					'transport_error',
-					`Failed to stat "Quill.yaml" at "${quillYamlPath}": ${(err as Error).message}`,
+					`Failed to read "Quill.yaml" at "${quillYamlPath}": ${(err as Error).message}`,
 					{ cause: err }
 				);
 			}
+			refuseUnnamedQuill(quillName, meta.name);
+			refuseMisplacedQuill(quillYaml, quillName, versionDir, meta.name);
 
 			versions.push(versionDir);
 		}
 
 		if (versions.length > 0) {
-			// Asked here rather than at the directory, so a stray one holding no quill
-			// stays ignored: what has to be addressable is a catalog row.
-			if (!isQuillName(quillName)) {
-				throw new QuiverError(
-					'quiver_invalid',
-					`Quill directory "${quillName}" is not a name a ref can spell — only [A-Za-z0-9_-] are allowed`,
-					{ quiverName: meta.name }
-				);
-			}
 			versions.sort((a, b) => compareSemver(b, a));
 			catalog.set(quillName, versions);
 		}

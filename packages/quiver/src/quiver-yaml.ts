@@ -21,7 +21,7 @@ const KNOWN_FIELDS = new Set(['name', 'description']);
  * Throws `QuiverError('quiver_invalid')` on:
  *   - YAML parse failure
  *   - Missing or non-string `name`
- *   - `name` fails charset validation [A-Za-z0-9_-]+
+ *   - `name` is not a quill name, `[a-z][a-z0-9_]*`
  *   - Unknown fields (strict)
  *   - `description` present but not a string
  */
@@ -73,7 +73,7 @@ export function parseQuiverYaml(raw: string | Uint8Array): QuiverMeta {
 	if (!isQuillName(name)) {
 		throw new QuiverError(
 			'quiver_invalid',
-			`Quiver.yaml: "name" value "${name}" contains invalid characters — only [A-Za-z0-9_-] are allowed`
+			`Quiver.yaml: "name" value "${name}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`
 		);
 	}
 
