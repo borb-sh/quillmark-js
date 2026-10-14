@@ -45,15 +45,15 @@ The tarball holds two, and they never meet: the client bundles the copy it was b
 
 ## Where a quiver comes from
 
-`init` lays one: `Quiver.yaml` and a single quill out of the tarball's `starter/`, plus the files that name versions or that a tarball cannot carry, written by the verb. Everything after the first command is a verb over a quiver that exists, and an empty directory can only be handed a verb.
+`init` lays one: `Quiver.yaml` and a single quill out of the tarball's `starter/`, plus the files that name versions or that a tarball cannot carry, written by the verb. Every other verb runs over a quiver that exists.
 
 **The starter is a collection the suite gates.** Carried as files rather than emitted from strings, so `cli.integration.test.ts` lays it and runs `test` over it: a scaffold that stops rendering fails CI before it fails an author on their first command.
 
-**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, an optional `string`, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
+**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `string` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
 
-**The pins are the client's.** The written `package.json` ranges `@quillmark/quiver` and `@quillmark/wasm` at the versions `carried.json` records and `quillkit` at its own, the one combination this build is known to run. The ranges also keep an install on a Node below the `engines` floor from resolving releases from before it.
+**The pins are the client's.** The written `package.json` ranges `@quillmark/quiver` and `@quillmark/wasm` at the versions `carried.json` records and `quillkit` at its own, the versions its client was built against. The ranges also keep an install on a Node below the `engines` floor from resolving releases from before it.
 
-**It refuses rather than merges.** A `Quiver.yaml` or `quills/` already in the directory fails the verb before anything is written. A `package.json` already there is left alone and the install line is printed instead; `.gitignore` and `.prettierignore` are written only where absent. The last is there because prettier rewrites a card's `~~~` fence as a backtick fence, which opens no card.
+**It refuses rather than merges.** An entry of `starter/` already in the directory fails the verb before anything is written. A `package.json` already there is left alone and the install line is printed instead; `.gitignore` and `.prettierignore` are written only where absent. The last is there because prettier rewrites a card's `~~~` fence as a backtick fence, which opens no card.
 
 ## The local loop
 

@@ -127,11 +127,21 @@ describe('quillkit init', () => {
 		RENDER_MS
 	);
 
-	it('refuses a directory that already holds a quiver', async () => {
-		const at = await temp.collection();
+	it('refuses a directory that already holds a quiver, before writing anything', async () => {
+		const at = await temp.dir();
+		await writeFile(join(at, 'Quiver.yaml'), 'name: mine\n');
 		await expect(run(process.execPath, [BIN, 'init'], { cwd: at })).rejects.toThrow(
 			/Quiver\.yaml already exists/
 		);
+		expect(await readdir(at)).toEqual(['Quiver.yaml']);
+	});
+
+	it('prints usage rather than laying a quiver under a flag', async () => {
+		const at = await temp.dir();
+		await expect(
+			run(process.execPath, [BIN, 'init', '--quiver', 'x'], { cwd: at })
+		).rejects.toThrow(/Usage:/);
+		expect(await readdir(at)).toEqual([]);
 	});
 });
 

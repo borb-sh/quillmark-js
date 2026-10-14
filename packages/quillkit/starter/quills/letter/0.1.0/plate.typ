@@ -11,9 +11,9 @@
 
 #align(right, qm.ink(qm.data, "date", "[month repr:long] [day padding:none], [year]"))
 
-Dear #qm.ink(qm.data, "recipient"),
+// A string left unanswered is `""`: guard its value.
+#if qm.data.recipient != "" [Dear #qm.ink(qm.data, "recipient"),]
 
-// A field with `default: ""` may be blank: guard its value.
 #if qm.data.subject != "" [*Re: #qm.ink(qm.data, "subject")*]
 
 #qm.data.at("$body", default: "")
@@ -29,7 +29,6 @@ Dear #qm.ink(qm.data, "recipient"),
 #qm.ink(qm.data, "sender")
 
 #for card in qm.data.at("$cards", default: ()) {
-  if card.at("$kind", default: none) == "postscript" [
-    P.S. #card.at("$body", default: "")
-  ]
+  let body = card.at("$body", default: "")
+  if card.at("$kind", default: none) == "postscript" and body != "" [P.S. #body]
 }

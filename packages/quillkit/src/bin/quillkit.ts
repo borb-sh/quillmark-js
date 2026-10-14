@@ -48,10 +48,15 @@ function message(err: unknown): string {
  *  `test` and opens in `studio`. It refuses a directory that already holds a quiver
  *  rather than merging into it. */
 async function init(): Promise<void> {
-	const dir = argv[1] !== undefined && !argv[1].startsWith('--') ? argv[1] : '.';
+	const args = argv.slice(1);
+	if (args.length > 1 || args.some((a) => a.startsWith('-'))) {
+		usage();
+		process.exit(1);
+	}
+	const dir = args[0] ?? '.';
 	const { at, wrotePackage, install } = await layStarter(dir);
 	const steps = [
-		...(resolve(dir) === resolve('.') ? [] : [`cd ${dir}`]),
+		...(resolve(dir) === resolve('.') ? [] : [`cd ${JSON.stringify(dir)}`]),
 		wrotePackage ? 'npm install' : `npm install --save-dev ${install.join(' ')}`,
 		'npx quillkit studio'
 	];

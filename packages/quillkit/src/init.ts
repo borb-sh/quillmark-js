@@ -1,11 +1,9 @@
 /**
- * `init`: a quiver from nothing. The quills come out of the tarball's `starter/`, which
- * the suite gates like any collection, so a scaffold that stops rendering fails CI
- * before it fails an author. The files that name versions are written here, against the
- * versions this build carries.
+ * `init`: a quiver from nothing (QUILLKIT §"Where a quiver comes from"). The quills come
+ * out of the tarball's `starter/`; the files that name versions are written here.
  */
 
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { CLIENT, STARTER } from './paths.js';
@@ -19,21 +17,20 @@ export interface Laid {
 	install: string[];
 }
 
-/** What `starter/` holds, each refused where it already stands. */
-const LAID = ['Quiver.yaml', 'quills'];
-
 /** What a scaffold writes beside the quills, and why each is absent from `starter/`:
  *  npm drops a `.gitignore` from a tarball, and prettier rewrites a card's `~~~` fence. */
 const BESIDE: Record<string, string> = {
-	'.gitignore': 'node_modules/\nsite/\n',
+	'.gitignore': 'node_modules/\ndist/\nsite/\n',
 	'.prettierignore': '# Prettier rewrites a card-yaml `~~~` fence as a backtick fence.\nquills/\n'
 };
 
 /** The versions a fresh collection pins: this tool's, and the loader and engine its client
- *  was built against, which are the pair it is known to run with. */
+ *  was built against. */
 async function versions(): Promise<Record<string, string>> {
 	const own = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-	const carried = JSON.parse(await readFile(join(CLIENT, 'carried.json'), 'utf8'));
+	const stamp = join(CLIENT, 'carried.json');
+	if (!existsSync(stamp)) throw new Error(`${stamp} is missing: the client is not built`);
+	const carried = JSON.parse(await readFile(stamp, 'utf8'));
 	return {
 		'@quillmark/quiver': carried['@quillmark/quiver'],
 		'@quillmark/wasm': carried['@quillmark/wasm'],
@@ -52,7 +49,8 @@ function packageName(dir: string): string {
 
 export async function layStarter(dir: string): Promise<Laid> {
 	const at = resolve(dir);
-	for (const entry of LAID) {
+	const laid = await readdir(STARTER);
+	for (const entry of laid) {
 		const path = join(at, entry);
 		if (existsSync(path)) throw new Error(`${path} already exists: init lays a new quiver`);
 	}
@@ -61,7 +59,7 @@ export async function layStarter(dir: string): Promise<Laid> {
 	const install = Object.entries(pins).map(([name, v]) => `${name}@^${v}`);
 
 	await mkdir(at, { recursive: true });
-	for (const entry of LAID) await cp(join(STARTER, entry), join(at, entry), { recursive: true });
+	for (const entry of laid) await cp(join(STARTER, entry), join(at, entry), { recursive: true });
 	for (const [file, text] of Object.entries(BESIDE))
 		if (!existsSync(join(at, file))) await writeFile(join(at, file), text);
 

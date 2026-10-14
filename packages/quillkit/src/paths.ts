@@ -19,8 +19,7 @@ import { fileURLToPath } from 'node:url';
  */
 export const CLIENT = fileURLToPath(new URL('../dist/client/', import.meta.url));
 
-/** The quiver `init` copies, carried as files so the suite can gate it. Anchored as
- *  `CLIENT` is. */
+/** The quiver `init` copies. Anchored as `CLIENT` is. */
 export const STARTER = fileURLToPath(new URL('../starter/', import.meta.url));
 
 /** True when `at` is `abs` or an ancestor of it. */
