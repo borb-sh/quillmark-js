@@ -27,16 +27,9 @@ describe('parseQuillRef — valid refs', () => {
 		expect(result.selector).toBe('1.2.3');
 	});
 
-	it('parses hyphenated and mixed name: a-b_c@1.0.0', () => {
-		const result = parseQuillRef('a-b_c@1.0.0');
-		expect(result.name).toBe('a-b_c');
-		expect(result.selector).toBe('1.0.0');
-	});
-
-	it('parses name with uppercase letters', () => {
-		const result = parseQuillRef('MyQuill@2.0.1');
-		expect(result.name).toBe('MyQuill');
-		expect(result.selector).toBe('2.0.1');
+	it('parses a collection-prefixed name: borb.usaf_memo@1.2', () => {
+		const result = parseQuillRef('borb.usaf_memo@1.2');
+		expect(result).toEqual({ collection: 'borb', name: 'usaf_memo', selector: '1.2' });
 	});
 
 	it('parses name with digits', () => {
@@ -69,6 +62,13 @@ describe('parseQuillRef — invalid refs', () => {
 	it('rejects foo@1.2.3+build (build metadata)', () => expectInvalidRef('foo@1.2.3+build'));
 	it('rejects foo!bar (invalid name char)', () => expectInvalidRef('foo!bar'));
 	it('rejects foo@1.2.3.4 (four-part selector)', () => expectInvalidRef('foo@1.2.3.4'));
-	it('rejects foo.bar (dot in name)', () => expectInvalidRef('foo.bar'));
+	it('rejects a.b.c (two collections)', () => expectInvalidRef('a.b.c'));
+	it('rejects .foo (empty collection)', () => expectInvalidRef('.foo'));
+	it('rejects foo. (empty name)', () => expectInvalidRef('foo.'));
+	it('rejects a-b (hyphen)', () => expectInvalidRef('a-b'));
+	it('rejects MyQuill (uppercase)', () => expectInvalidRef('MyQuill'));
+	it('rejects _memo (leading underscore)', () => expectInvalidRef('_memo'));
+	it('rejects 2memo (leading digit)', () => expectInvalidRef('2memo'));
+	it('rejects a name over 64 characters', () => expectInvalidRef('a'.repeat(65)));
 	it('rejects foo@1.x (non-digit in selector)', () => expectInvalidRef('foo@1.x'));
 });

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A quill name, a quill directory and a `Quiver.yaml` name are `[a-z][a-z0-9_]*`, at most 64 characters, the engine's rule.** A quiver named or holding a quill outside it fails as `quiver_invalid`, and a ref outside it as `invalid_ref`, where `[A-Za-z0-9_-]+` passed. A version directory whose `Quill.yaml` declares another `quill.name` or `quill.version` fails `fromDir` and `build` as `quiver_invalid`. A ref may name a collection, `<quiver>.memo@1`: `resolve` and `getQuill` answer one naming this quiver as they answer the bare name, and one naming any other as `quill_not_found`; `parseQuillRef` returns it as `collection`. (#769)
+
 ## v0.37.0 - 2026-10-12
 
 **The `@quillmark/wasm` peer floor is `>=0.125.0-0`.** A packed Typst quill's plate imports the helper as a module, `#import "@local/quillmark-helper:0.2.0" as qm`, and any other import fails its render as `typst::helper_import`. A card spelling `ui.group` or `ui.groups` loads with `quill::deprecated_groups`, and `sections:` loads clean.

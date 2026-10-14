@@ -81,7 +81,9 @@ The quill cache is the only one. A fetched tree lives for the length of the mate
 
 `resolve` is **sync**, and so are `quillNames()` and `versionsOf()`: the catalog is materialized as the quiver is built (`fromBuiltUrl` fetches `quiver.json`, `fromDir` scans the source tree), and `QuiverLoader` carries one verb, `loadTree`, which resolution never reaches. A promise there would price I/O the design does not admit.
 
-Every catalog row is a name a ref can spell. Both loaders hold the row to the charset `parseQuillRef` takes, so what `quillNames()` hands out is what `getQuill` takes back; a source directory or a `quiver.json` entry outside it is a `quiver_invalid` naming it, not a row the one verb lists and the other refuses.
+Every catalog row is a quill name, the engine's `[a-z][a-z0-9_]*`, which is the one rule a document's `$quill`, a `Quill.yaml` and a ref share. Both loaders hold the row to it, so what `quillNames()` hands out is what `getQuill` takes back; a source directory or a `quiver.json` entry outside it is a `quiver_invalid` naming it, not a row the one verb lists and the other refuses. A source version directory sits where its `Quill.yaml` says: `quills/<quill.name>/<quill.version>/`, refused as `quiver_invalid` otherwise, because the catalog serves the path and a document saved from the quill names what `Quill.yaml` declares.
+
+The quiver's own name is held to the same rule, because it is a collection name: a ref `<quiver>.memo` names the collection it was written for, and a quiver answers its own name as it answers the bare one and refuses any other as `quill_not_found`. Which quiver a ref naming another collection reaches is the host's to decide.
 
 `name` and `description` are what `Quiver.yaml` says the collection is, and both reach the class by the same road: parsed off the source tree, written into `quiver.json` by `build`, read back out of it by every built loader. A surface over a quiver has no other authored sentence to print — everything else it can show about a collection is a name a directory happens to carry.
 

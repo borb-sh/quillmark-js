@@ -55,6 +55,8 @@ One narrower verb sits beside `getQuill`: `resolve(ref)` returns the canonical r
 const canonicalRef = quiver.resolve('memo'); // "memo@1.1.0"
 ```
 
+A ref may name the collection, `<quiver>.memo@1`, the form a document's `$quill` takes to say which collection it was written for. A quiver answers its own name as it answers the bare one, and refuses any other as `quill_not_found`; the canonical ref is bare.
+
 ## Consuming a quiver (browser)
 
 Build at deploy time, serve the output as static files:

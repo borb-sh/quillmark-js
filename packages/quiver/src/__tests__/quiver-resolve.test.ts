@@ -28,6 +28,18 @@ describe('Quiver.resolve', () => {
 		expect(quiver.resolve('memo@1.0.0')).toBe('memo@1.0.0');
 	});
 
+	it('"sample.memo@1.0" names this quiver → "memo@1.0.0"', async () => {
+		const quiver = await fromDir(SAMPLE_FIXTURE);
+		expect(quiver.resolve('sample.memo@1.0')).toBe('memo@1.0.0');
+	});
+
+	it('"other.memo" names another collection → quill_not_found', async () => {
+		const quiver = await fromDir(SAMPLE_FIXTURE);
+		expect(() => quiver.resolve('other.memo')).toThrow(
+			expect.objectContaining({ code: 'quill_not_found' })
+		);
+	});
+
 	it('"memo@2.0.0" (not present) → quill_not_found', async () => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
 		expect(() => quiver.resolve('memo@2.0.0')).toThrow(

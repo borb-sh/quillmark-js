@@ -6,8 +6,8 @@ describe('parseQuiverYaml', () => {
 	// --- Happy paths ---
 
 	it('parses a valid Quiver.yaml with name only', () => {
-		const result = parseQuiverYaml('name: my-quiver\n');
-		expect(result).toEqual({ name: 'my-quiver' });
+		const result = parseQuiverYaml('name: my_quiver\n');
+		expect(result).toEqual({ name: 'my_quiver' });
 	});
 
 	it('parses a valid Quiver.yaml with name and description', () => {
@@ -21,9 +21,9 @@ describe('parseQuiverYaml', () => {
 		expect(result).toEqual({ name: 'my_quiver' });
 	});
 
-	it('accepts all valid name characters: alphanumeric, underscore, hyphen', () => {
-		const result = parseQuiverYaml('name: My-Quiver_123\n');
-		expect(result).toEqual({ name: 'My-Quiver_123' });
+	it('holds the name to the quill-name rule', () => {
+		expect(parseQuiverYaml('name: quiver_123\n')).toEqual({ name: 'quiver_123' });
+		expect(() => parseQuiverYaml('name: My-Quiver\n')).toThrow(QuiverError);
 	});
 
 	// --- Missing name ---
