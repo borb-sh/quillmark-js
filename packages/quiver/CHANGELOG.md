@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A `.ttc` or `.otc` font collection builds under `fonts/`**, named in `quiver.json` as every other font is, where `build` packed it into the quill's bundle and refused one over 16 MiB, the size of a typical CJK collection. (#759)
+
 **`isDraft(version)` is exported from `@quillmark/quiver/node`**: true for a version below the floor `build` packs from, so a tool asks the question `build` answers rather than restating `0.1.0`.
 
 **A `quiver.json` field this loader does not know is skipped**, at the top level and on a quill entry, where it failed the load as `quiver_invalid`. A newer `format` is still refused, naming the upgrade. (#771)
