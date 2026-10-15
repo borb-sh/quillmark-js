@@ -7,9 +7,9 @@ export function isCanonicalSemver(version: string): boolean {
 }
 
 /**
- * Returns true if `version` (canonical) matches `selector` (partial: `x`,
- * `x.y`, or `x.y.z`). `parseQuillRef` owns selector validation; this is a
- * prefix comparison over an already-valid selector.
+ * Returns true if `version` (canonical) matches `selector` (`x.y` or `x.y.z`).
+ * `parseQuillRef` owns selector validation; this is a prefix comparison over an
+ * already-valid selector.
  */
 export function matchesSemverSelector(version: string, selector: string): boolean {
 	const selectorParts = selector.split('.');

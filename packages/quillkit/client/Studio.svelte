@@ -243,7 +243,7 @@
 			const [name, version] = quiver!.resolve(asked).split('@');
 			at = { name: name!, version: version! };
 		} catch {
-			// Not in this quiver's catalog.
+			// Not a ref this quiver resolves.
 		}
 		if (!at) return `quiver "${catalog?.name}" holds no quills`;
 		sourceText = undefined;
@@ -338,7 +338,7 @@
 
 	/**
 	 * The quill a boot opens: what the URL asks for where the quiver holds it, else the
-	 * catalog's first. A selector is honoured (`?quill=showcase`, `?quill=showcase@1`),
+	 * catalog's first. A selector is honoured (`?quill=showcase`, `?quill=showcase@1.0`),
 	 * being the grammar `getQuill` already takes.
 	 *
 	 * A ref this quiver does not hold has nothing to honour, so the first quill opens and
@@ -351,7 +351,7 @@
 				const [name, version] = from.resolve(asked).split('@');
 				return { name: name!, version: version! };
 			} catch {
-				// Not in this quiver's catalog.
+				// Not a ref this quiver resolves.
 			}
 		}
 		const first = next.quills[0];

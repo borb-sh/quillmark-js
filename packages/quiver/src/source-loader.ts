@@ -47,8 +47,9 @@ function refuseUnnamedQuill(quillName: string, quiverName: string): void {
 /**
  * Refuse a `Quill.yaml` whose `quill.name` or `quill.version` disagrees with the
  * path it sits at: the catalog serves the path, and a document saved from the quill
- * names what `Quill.yaml` says. A field absent or malformed is the engine's to
- * report when the quill loads.
+ * names what `Quill.yaml` says. A canonical version has one spelling, so the declared
+ * one is compared as written. A field absent or not a string is the engine's to report
+ * when the quill loads.
  */
 function refuseMisplacedQuill(
 	raw: Uint8Array,
@@ -74,16 +75,15 @@ function refuseMisplacedQuill(
 		);
 	}
 
-	if (typeof declared.version === 'string') {
-		const parts = declared.version.split('.');
-		const canonical = parts.length === 2 ? `${declared.version}.0` : declared.version;
-		if (!isCanonicalSemver(canonical) || compareSemver(canonical, version) !== 0) {
-			throw new QuiverError(
-				'quiver_invalid',
-				`Quill "${name}@${version}" declares quill.version "${declared.version}": a quill sits at quills/<quill.name>/<quill.version>/`,
-				{ quiverName, version }
-			);
-		}
+	if (typeof declared.version === 'string' && declared.version !== version) {
+		const rule = isCanonicalSemver(declared.version)
+			? 'a quill sits at quills/<quill.name>/<quill.version>/'
+			: 'a quill version is x.y.z';
+		throw new QuiverError(
+			'quiver_invalid',
+			`Quill "${name}@${version}" declares quill.version "${declared.version}": ${rule}`,
+			{ quiverName, version }
+		);
 	}
 }
 

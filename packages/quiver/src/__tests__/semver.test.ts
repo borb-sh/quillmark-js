@@ -32,21 +32,20 @@ describe('isCanonicalSemver', () => {
 });
 
 describe('matchesSemverSelector', () => {
-	it('1.2.3 matches selector 1', () => expect(matchesSemverSelector('1.2.3', '1')).toBe(true));
 	it('1.2.3 matches selector 1.2', () => expect(matchesSemverSelector('1.2.3', '1.2')).toBe(true));
 	it('1.2.3 matches selector 1.2.3 (exact)', () =>
 		expect(matchesSemverSelector('1.2.3', '1.2.3')).toBe(true));
 
-	it('1.2.3 does not match selector 2', () =>
-		expect(matchesSemverSelector('1.2.3', '2')).toBe(false));
+	it('1.2.3 does not match selector 2.2', () =>
+		expect(matchesSemverSelector('1.2.3', '2.2')).toBe(false));
 	it('1.2.3 does not match selector 1.3', () =>
 		expect(matchesSemverSelector('1.2.3', '1.3')).toBe(false));
 	it('1.2.3 does not match selector 1.2.4', () =>
 		expect(matchesSemverSelector('1.2.3', '1.2.4')).toBe(false));
 
-	it('2.0.0 matches selector 2', () => expect(matchesSemverSelector('2.0.0', '2')).toBe(true));
-	it('2.0.0 does not match selector 1', () =>
-		expect(matchesSemverSelector('2.0.0', '1')).toBe(false));
+	it('2.0.0 matches selector 2.0', () => expect(matchesSemverSelector('2.0.0', '2.0')).toBe(true));
+	it('2.0.0 does not match selector 1.0', () =>
+		expect(matchesSemverSelector('2.0.0', '1.0')).toBe(false));
 
 	it('10.20.30 matches selector 10.20', () =>
 		expect(matchesSemverSelector('10.20.30', '10.20')).toBe(true));

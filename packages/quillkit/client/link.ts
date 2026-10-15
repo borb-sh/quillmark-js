@@ -11,7 +11,7 @@
 const PARAM = 'quill';
 
 /** What the URL asks for, or undefined where it asks for nothing. A selector is a ref
- *  (`showcase`, `showcase@1`), so what comes back is resolved through the quiver rather
+ *  (`showcase`, `showcase@1.0`), so what comes back is resolved through the quiver rather
  *  than parsed here. */
 export function askedRef(): string | undefined {
 	const asked = new URLSearchParams(window.location.search).get(PARAM)?.trim();
@@ -24,7 +24,7 @@ export function askedRef(): string | undefined {
  * `replaceState` rather than a push: studio is one screen, and back means leave rather
  * than unpick.
  *
- * Written as it is spelled everywhere else. A canonical ref is `[A-Za-z0-9_-]+@x.y.z`,
+ * Written as it is spelled everywhere else. A canonical ref is `[a-z][a-z0-9_]*@x.y.z`,
  * every character of which a query admits, and `URLSearchParams` would serialize the `@`
  * into a link carrying `%40` in the middle of the ref. Whatever else the query holds is
  * carried verbatim for the converse reason: studio did not write it, so it does not get
