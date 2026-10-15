@@ -33,7 +33,7 @@ import { scratch } from './helpers/scratch.js';
 const core = await init();
 
 // Two quills, `memo@1.0.0` and `plain@1.0.0`, both `backend: typst` (see their
-// `Quill.yaml`) and both render-complete — a comment-only `template.typ`
+// `Quill.yaml`) and both render-complete — a comment-only `plate.typ`
 // compiles to a valid PDF.
 const RENDER_FIXTURE = fileURLToPath(new URL('./fixtures/render-quiver', import.meta.url));
 
