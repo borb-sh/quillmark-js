@@ -35,7 +35,7 @@ That client compiles in its own copies of both libraries and the engine, which y
 | `quillkit studio` | the local loop: pack, serve, repack on save                        |
 | `quillkit site`   | the deploy layout: the client at a root, a built quiver beneath it |
 
-`init` takes the directory to lay the quiver in, defaulting to the working directory. Every other verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build`, `studio` and `site` take `--out <dir>`, `studio` takes `--port <n>` and `--host <addr>`, and `site` takes `--drafts`.
+`init` takes the directory to lay the quiver in, defaulting to the working directory. Every other verb takes `--quiver <dir>`, the collection root where `Quiver.yaml` lives, defaulting to the working directory. `build`, `studio` and `site` take `--out <dir>`, `studio` takes `--port <n>` and `--host <addr>`, and `test` and `site` take `--drafts`.
 
 ## Gating
 
@@ -48,7 +48,9 @@ That client compiles in its own copies of both libraries and the engine, which y
 }
 ```
 
-It loads the source layout with `fromDir`, then renders every quill's seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill. It finds the engine itself: a named `engine` export from `quillkit.config.js` at the collection root, else `@quillmark/wasm` from your own `node_modules`. A config that is there and throws fails the gate, naming the file and what threw: only a config you have not written falls through to the artifact.
+It loads the source layout with `fromDir`, then renders every quill's seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill, and so does any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is yours to fix. It finds the engine itself: a named `engine` export from `quillkit.config.js` at the collection root, else `@quillmark/wasm` from your own `node_modules`. A config that is there and throws fails the gate, naming the file and what threw: only a config you have not written falls through to the artifact.
+
+**`--templates <dir>` gates the collection's starter documents too**, the directory `studio` and `site` take. After the quills, each template the manifest lists opens in the quill its `$quill` names, `usaf_memo@0.3` resolving as a link does, and renders, held to every diagnostic as an example is. A ref the quiver does not hold fails the template, and so does one resolving to a draft, which a site laid without `--drafts` does not serve; `--drafts` admits it. A template is read with `@quillmark/wasm` from your tree, so that must resolve even where `quillkit.config.js` supplies the engine.
 
 On vitest, jest or `node:test`, spawn the bin rather than rebuilding the loop against the library. The gate stays one implementation, and the case gates what CI gates:
 

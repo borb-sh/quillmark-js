@@ -389,6 +389,7 @@
 					value={value as Record<string, unknown> | undefined}
 					properties={field.schema.properties}
 					{flat}
+					placed
 					label={field.label}
 					idBase={domIds.control}
 					labelledBy={domIds.label}

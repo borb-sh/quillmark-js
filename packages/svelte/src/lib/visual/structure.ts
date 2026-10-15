@@ -43,8 +43,9 @@ export interface FieldModel {
 	control: ControlKind;
 	/** `ui.group` (undefined = ungrouped). */
 	group: string | undefined;
-	/** `ui.compact`: asks to share a row with adjacent compacts. A request, not a
-	 * guarantee: `placeFields` declines it for the shapes that grow (see `packable`). */
+	/** Asks to share a row with adjacent compacts: `ui.compact` when declared, else
+	 * {@link packsByDefault}. A request, not a guarantee: `placeFields` declines it for
+	 * the shapes that grow (see `packable`). */
 	compact: boolean;
 	/** Display label: `title` when set, else the humanized field name. */
 	label: string;
@@ -659,20 +660,33 @@ export function humanize(name: string): string {
 	return spaced ? spaced[0].toUpperCase() + spaced.slice(1) : spaced;
 }
 
-/** Project a card schema's `fields` map (declaration = key order) into models. */
-export function fieldModels(cardSchema: QuillCardSchema): FieldModel[] {
-	return Object.entries(cardSchema.fields).map(([name, schema]) => ({
-		name,
-		schema,
-		control: controlKind(schema),
-		group: schema.ui?.group,
-		compact: !!schema.ui?.compact,
-		label: schema.title ?? humanize(name),
-		description: schema.description,
-		required: obliged(schema),
-		inline: !!schema.inline,
-		plaintext: baseType(schema) === 'plaintext'
-	}));
+/**
+ * Whether a field asks to share a row when its `ui.compact` is undeclared: a control
+ * whose type bounds its width. Text never does, its type saying nothing of whether a
+ * value is a rank or a subject line, so a short text field asks with `compact: true`.
+ */
+function packsByDefault(control: ControlKind): boolean {
+	return control === 'date' || control === 'enum' || control === 'number' || control === 'boolean';
+}
+
+/** Project a card schema's `fields` map (declaration = key order) into models. A
+ *  card-level object's `properties` project the same way. */
+export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldModel[] {
+	return Object.entries(cardSchema.fields).map(([name, schema]) => {
+		const control = controlKind(schema);
+		return {
+			name,
+			schema,
+			control,
+			group: schema.ui?.group,
+			compact: schema.ui?.compact ?? packsByDefault(control),
+			label: schema.title ?? humanize(name),
+			description: schema.description,
+			required: obliged(schema),
+			inline: !!schema.inline,
+			plaintext: baseType(schema) === 'plaintext'
+		};
+	});
 }
 
 /**
@@ -764,7 +778,7 @@ export interface PlacedField {
 }
 
 /**
- * Whether a field can share a row. `ui.compact` asks; a shape declines when the
+ * Whether a field can share a row. `compact` asks; a shape declines when the
  * document sets its height, because a row is as tall as its tallest cell and the cell
  * beside it does not grow in step: an object nests a whole field set, block richtext
  * (`inline` absent) holds paragraphs, and an array holds however many elements the

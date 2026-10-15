@@ -72,7 +72,7 @@ await build('./node_modules/@org/my-quiver', './public/quivers/my-quiver');
 
 `build` owns its output path outright: it assembles a generation in `<outDir>.stage`, moves it in whole, and deletes the one it replaced. A reader fetching mid-build sees the previous generation rather than a torn tree, and a build that throws leaves it serving. An `outDir` that is, or contains, the source quiver or the working directory is refused with a `transport_error` rather than deleted.
 
-Quills below `0.1.0` are drafts and are left out: they stay in the source layout, which `fromDir` reads whole, and reach the artifact only under `build(src, out, { drafts: true })`. A quill with no version above the floor is absent from the built catalog entirely.
+Quills below `0.1.0` are drafts and are left out: they stay in the source layout, which `fromDir` reads whole, and reach the artifact only under `build(src, out, { drafts: true })`. A quill with no version above the floor is absent from the built catalog entirely. `isDraft(version)`, from `@quillmark/quiver/node`, is the same reading of the floor.
 
 ```ts
 // browser runtime
