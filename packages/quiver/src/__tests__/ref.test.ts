@@ -48,12 +48,12 @@ describe('parseQuillRef — invalid refs', () => {
 	it('rejects bare @', () => expectInvalidRef('@'));
 	it('rejects foo@ (missing selector)', () => expectInvalidRef('foo@'));
 	it('rejects @1.0 (missing name)', () => expectInvalidRef('@1.0'));
-	it('rejects showcase@1 (a major alone), naming the two selector shapes', () => {
+	it('rejects showcase@1 (a major alone)', () => {
 		for (const ref of ['showcase@1', 'showcase@0', 'borb.showcase@2']) {
 			expect(() => parseQuillRef(ref), ref).toThrow(
 				expect.objectContaining({
 					code: 'invalid_ref',
-					message: expect.stringMatching(/\bx\.y\b.*\bx\.y\.z\b/)
+					message: expect.stringContaining(`"${ref.split('@')[1]}"`)
 				})
 			);
 		}

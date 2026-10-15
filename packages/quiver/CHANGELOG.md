@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A selector is `x.y` or `x.y.z`, and a declared `quill.version` is `x.y.z`.** A one-segment selector, `memo@1`, fails `parseQuillRef`, `resolve` and `getQuill` as `invalid_ref`, where it resolved to the highest `1.y.z`: a quill's compatibility boundary is `MAJOR.MINOR` below 1.0.0 and above it, so `memo@1.0` names a series and `memo@1.0.0` a version. A `Quill.yaml` declaring `quill.version: "1.2"` fails `fromDir` and `build` as `quiver_invalid`, where it was read as `1.2.0`.
+**A selector is `x.y` or `x.y.z`, and a declared `quill.version` is `x.y.z`.** A one-segment selector, `memo@1`, fails `resolve` and `getQuill` as `invalid_ref`, where it resolved to the highest `1.y.z`: a quill's compatibility boundary is `MAJOR.MINOR` below 1.0.0 and above it, so `memo@1.0` names a series and `memo@1.0.0` a version. A `Quill.yaml` declaring `quill.version: "1.2"` fails `fromDir` and `build` as `quiver_invalid`, where it was read as `1.2.0`.
 
 **A `quiver.json` field this loader does not know is skipped**, at the top level and on a quill entry, where it failed the load as `quiver_invalid`. A newer `format` is still refused, naming the upgrade. (#771)
 

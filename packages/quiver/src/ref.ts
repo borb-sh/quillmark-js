@@ -24,8 +24,7 @@ export function isQuillName(name: string): boolean {
  * Throws QuiverError('invalid_ref') on malformed input. The name is a quill name,
  * optionally prefixed `<collection>.`; the selector is `x.y` or `x.y.z`, digits
  * only, with no ranges or operators — a quiver resolves a prefix, it does not
- * solve a range. A quill's compatibility boundary is `MAJOR.MINOR`, so `x.y` is
- * the widest prefix that names a compatible series.
+ * solve a range.
  */
 export function parseQuillRef(ref: string): ParsedQuillRef {
 	if (!ref) {
@@ -67,6 +66,14 @@ export function parseQuillRef(ref: string): ParsedQuillRef {
 
 	if (selector === undefined) {
 		return parsed;
+	}
+
+	if (/^\d+$/.test(selector)) {
+		throw new QuiverError(
+			'invalid_ref',
+			`Invalid ref: selector "${selector}" is a major alone, which names no compatible series; write "${fullName}@${selector}.y" or "${fullName}@${selector}.y.z"`,
+			{ ref }
+		);
 	}
 
 	if (!SELECTOR_RE.test(selector)) {

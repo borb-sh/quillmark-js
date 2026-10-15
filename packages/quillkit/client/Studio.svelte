@@ -243,7 +243,7 @@
 			const [name, version] = quiver!.resolve(asked).split('@');
 			at = { name: name!, version: version! };
 		} catch {
-			// Not in this quiver's catalog.
+			// Not a ref this quiver resolves.
 		}
 		if (!at) return `quiver "${catalog?.name}" holds no quills`;
 		sourceText = undefined;
@@ -351,7 +351,7 @@
 				const [name, version] = from.resolve(asked).split('@');
 				return { name: name!, version: version! };
 			} catch {
-				// Not in this quiver's catalog.
+				// Not a ref this quiver resolves.
 			}
 		}
 		const first = next.quills[0];

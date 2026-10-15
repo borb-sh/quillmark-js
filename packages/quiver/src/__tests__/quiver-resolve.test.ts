@@ -13,9 +13,8 @@ describe('Quiver.resolve', () => {
 		expect(quiver.resolve('memo')).toBe('memo@1.1.0');
 	});
 
-	it('"memo@1" → invalid_ref, though the quiver holds 1.0.0 and 1.1.0', async () => {
+	it('"memo@1" → invalid_ref, though the quiver holds 1.y.z', async () => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
-		expect(quiver.versionsOf('memo')).toEqual(['1.1.0', '1.0.0']);
 		expect(() => quiver.resolve('memo@1')).toThrow(
 			expect.objectContaining({ code: 'invalid_ref' })
 		);

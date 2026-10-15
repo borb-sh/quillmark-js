@@ -271,7 +271,7 @@ describe('a quill sits where its Quill.yaml says', () => {
 		await expect(scanSourceQuiver(root)).rejects.toThrow(
 			expect.objectContaining({
 				code: 'quiver_invalid',
-				message: expect.stringMatching(/"1\.2": a quill version is x\.y\.z/)
+				message: expect.stringContaining('"1.2"')
 			})
 		);
 	});

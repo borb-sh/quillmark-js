@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**Studio's `?quill=` selector is `x.y` or `x.y.z`.** `?quill=showcase@1` names no quill, so the catalog's first opens and the address bar is corrected to it; `?quill=showcase@1.0` opens the highest `1.0.z`.
+**Studio's `?quill=` selector is `x.y` or `x.y.z`.** `?quill=showcase@1` names no quill, so the catalog's first opens and the address bar is corrected to it; `?quill=showcase@1.0` opens the highest `1.0.z`. An imported document whose `$quill` is `showcase@1` lands in the quill on screen.
 
 **`quillkit init [dir]` lays a new quiver.** It writes `Quiver.yaml`, one quill under `quills/letter/0.1.0/` that passes `quillkit test` and opens in `quillkit studio`, and a `package.json` pinning `quillkit`, `@quillmark/quiver` and `@quillmark/wasm` at the versions this release carries. A directory already holding a `Quiver.yaml` or `quills/` is refused.
 
