@@ -669,8 +669,9 @@ function packsByDefault(control: ControlKind): boolean {
 	return control === 'date' || control === 'enum' || control === 'number' || control === 'boolean';
 }
 
-/** Project a card schema's `fields` map (declaration = key order) into models. */
-export function fieldModels(cardSchema: QuillCardSchema): FieldModel[] {
+/** Project a card schema's `fields` map (declaration = key order) into models. A
+ *  card-level object's `properties` project the same way. */
+export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldModel[] {
 	return Object.entries(cardSchema.fields).map(([name, schema]) => {
 		const control = controlKind(schema);
 		return {

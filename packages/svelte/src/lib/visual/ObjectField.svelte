@@ -41,12 +41,14 @@
 		baseType,
 		controlKind,
 		declaredContent,
+		fieldModels,
 		flatObject,
 		humanize,
 		isContainer,
 		mountKey,
 		obliged,
 		optionalCell,
+		placeFields,
 		printedText,
 		renderedBoolean,
 		shortCell
@@ -102,6 +104,11 @@
 		/** `ui.layout: flat`: no vertical and no rung, the properties at the depth of the
 		 * list the subform stands in. */
 		flat?: boolean;
+		/** A card-level object: its properties are placed as a card's fields are
+		 * (`placeFields`), so moving a field into a group leaves its row as it was. Unset,
+		 * every short cell packs: an array's record, a variant's world and a matrix
+		 * member's columns are one record's cells, not a card's fields. */
+		placed?: boolean;
 		/** Raw keydown off a text or prose cell, for a row whose own keys run through its
 		 * cells: the table's Enter and Backspace ({@link ArrayField}). */
 		onCellKey?: (e: KeyboardEvent, key: string) => void;
@@ -121,6 +128,7 @@
 		onCommit,
 		bare = false,
 		flat = false,
+		placed = false,
 		onCellKey,
 		diagnostics
 	}: Props = $props();
@@ -129,6 +137,13 @@
 	const entries = $derived(Object.entries(properties ?? {}));
 	const obj = $derived((value ?? {}) as Record<string, unknown>);
 	const has = (key: string): boolean => Object.hasOwn(properties ?? {}, key);
+	const spans = $derived(
+		placed
+			? new Map(
+					placeFields(fieldModels({ fields: properties ?? {} })).map((p) => [p.field.name, p.span])
+				)
+			: undefined
+	);
 	const routed = $derived(splitDeep(diagnostics));
 	const foot = $derived(unrouted(routed, (step) => typeof step === 'string' && has(step)));
 
@@ -285,10 +300,17 @@
 				kind === 'boolean'}
 			<!-- A container takes the full span at every depth: its rows are the document's
 			     to count, and a track beside it would stand in a column of whitespace
-			     (`packable`). A block prose cell spans it too, and keeps its label row. -->
+			     (`packable`). A block prose cell spans it too, and keeps its label row, as
+			     does a placed cell `placeFields` gives the whole row. -->
 			{@const block = kind === 'prose' && !shortCell(sub)}
 			<div
-				class={['qm-object-prop', { 'qm-prop-full': isContainer(kind), 'qm-prop-wide': block }]}
+				class={[
+					'qm-object-prop',
+					{
+						'qm-prop-full': isContainer(kind),
+						'qm-prop-wide': block || (!isContainer(kind) && spans?.get(key) === 'full')
+					}
+				]}
 				data-qm-prop={key}
 			>
 				{#if ids && kind !== 'array' && kind !== 'matrix'}
@@ -514,15 +536,17 @@
 		align-items: start;
 		min-width: 0;
 	}
-	/* A subform of one takes half the capacity: at full capacity a single track reads as
-	   truncated, and there are no sibling properties for it to line up with. A stranded
-	   field takes the whole row instead (`placeFields`): the width it would leave empty is
-	   the card's, where this one sits inside a figure the nesting has already narrowed. */
+	/* A record of one cell takes half the capacity: at full capacity a single track reads
+	   as truncated, and there are no sibling properties for it to line up with. A stranded
+	   field takes the whole row instead (`placeFields`), a placed property with it: the
+	   width it would leave empty is the card's, where a record's sits inside a figure the
+	   nesting has already narrowed. */
 	.qm-object-prop:only-child {
 		grid-column: span var(--cols-half);
 	}
 	/* A block prose property holds paragraphs, so a track beside it stands in whitespace
-	   once it grows (`packable`); its label still rides the row above it. */
+	   once it grows (`packable`); its label still rides the row above it. A placed
+	   property `placeFields` gives the whole row spans it the same way. */
 	.qm-object-prop.qm-prop-wide,
 	.qm-object-prop.qm-prop-wide:only-child {
 		grid-column: 1 / -1;

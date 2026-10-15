@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A date, an enum, a number or a boolean shares a row with its neighbours without `ui.compact`.** A card-level field of one of those types asks to pack unless it declares `ui.compact: false`, so two of them in a row stand side by side where each took a row of its own; one alone still takes the row. Text, prose, arrays, objects, matrices and variants pack as before: a string or one-line prose under `ui.compact: true`, the rest never.
+**A date, an enum, a number or a boolean shares a row with its neighbours without `ui.compact`.** A card-level field of one of those types asks to pack unless it declares `ui.compact: false`, so two of them in a row stand side by side where each took a row of its own; one alone still takes the row. Text, prose, arrays, objects, matrices and variants pack as before: a string or one-line prose under `ui.compact: true`, the rest never. A card-level object's properties follow the same rule, where every short one packed: a string in it takes a row of its own unless it declares `ui.compact: true`. An array's record, a variant's world and a matrix member's columns still pack every short cell.
 
 **A record row dragged to the edge of the view scrolls it.** Held near the top or bottom of the editor's scrolling pane, or of the page, a row's drag scrolls on toward the rows out of view, and the drop follows whatever the scroll brings under the pointer, a wheel scroll mid-drag included. A drag pressed on a row already at the edge waits for the pointer to leave the edge before it scrolls.
 
