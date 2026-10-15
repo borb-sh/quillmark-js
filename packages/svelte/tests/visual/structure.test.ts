@@ -76,10 +76,8 @@ describe('controlKind', () => {
 
 describe('fieldModels', () => {
 	it('asks a field whose type bounds its width to pack, and `ui.compact` overrides either way', () => {
-		const card = (fields: Record<string, QuillFieldSchema>) =>
-			({ fields }) as unknown as Parameters<typeof fieldModels>[0];
 		const compact = (fields: Record<string, QuillFieldSchema>) =>
-			Object.fromEntries(fieldModels(card(fields)).map((m) => [m.name, m.compact]));
+			Object.fromEntries(fieldModels({ fields }).map((m) => [m.name, m.compact]));
 		expect(
 			compact({
 				date: f({ type: 'date' }),

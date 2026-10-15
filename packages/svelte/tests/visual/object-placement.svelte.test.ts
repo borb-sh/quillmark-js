@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// A card-level object's properties are placed as a card's fields are, so a field moved
-// into a group keeps its row; a record's cells pack wherever they are short.
+// A card-level object's properties, and those of an object nested in it, are placed as a
+// card's fields are, so a field moved into a group keeps its row; a record's cells pack
+// wherever they are short.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
@@ -26,6 +27,11 @@ main:
         office: { type: string }
         rank: { type: string, ui: { compact: true } }
         grade: { type: string, ui: { compact: true } }
+        branch:
+          type: object
+          properties:
+            street: { type: string }
+            opened: { type: date }
     jobs:
       type: array
       items:
@@ -59,7 +65,10 @@ describe('object properties', () => {
 			due: false,
 			office: true,
 			rank: false,
-			grade: false
+			grade: false,
+			branch: false,
+			street: true,
+			opened: true
 		});
 
 		const jobs = field(target, 'Jobs');

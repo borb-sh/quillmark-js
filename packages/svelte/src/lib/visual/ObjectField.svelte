@@ -104,8 +104,9 @@
 		/** `ui.layout: flat`: no vertical and no rung, the properties at the depth of the
 		 * list the subform stands in. */
 		flat?: boolean;
-		/** A card-level object: its properties are placed as a card's fields are
-		 * (`placeFields`), so moving a field into a group leaves its row as it was. Unset,
+		/** A card-level object, or one nested in it: its properties are placed as a
+		 * card's fields are (`placeFields`), so moving a field into a group leaves its row
+		 * as it was. Unset,
 		 * every short cell packs: an array's record, a variant's world and a matrix
 		 * member's columns are one record's cells, not a card's fields. */
 		placed?: boolean;
@@ -423,6 +424,7 @@
 						value={obj[key] as Record<string, unknown> | undefined}
 						properties={sub.properties}
 						flat={flatObject(sub)}
+						{placed}
 						label={ids ? undefined : fallbackName(key, sub)}
 						idBase={ids?.control}
 						labelledBy={ids?.label}
@@ -537,10 +539,9 @@
 		min-width: 0;
 	}
 	/* A record of one cell takes half the capacity: at full capacity a single track reads
-	   as truncated, and there are no sibling properties for it to line up with. A stranded
-	   field takes the whole row instead (`placeFields`), a placed property with it: the
-	   width it would leave empty is the card's, where a record's sits inside a figure the
-	   nesting has already narrowed. */
+	   as truncated, and there are no sibling properties for it to line up with. A placed
+	   property's span is `placeFields`', which strands a lone one to the whole row as it
+	   does a card's field. */
 	.qm-object-prop:only-child {
 		grid-column: span var(--cols-half);
 	}
