@@ -74,6 +74,52 @@ describe('controlKind', () => {
 	});
 });
 
+describe('fieldModels', () => {
+	it('asks a field whose type bounds its width to pack, and `ui.compact` overrides either way', () => {
+		const card = (fields: Record<string, QuillFieldSchema>) =>
+			({ fields }) as unknown as Parameters<typeof fieldModels>[0];
+		const compact = (fields: Record<string, QuillFieldSchema>) =>
+			Object.fromEntries(fieldModels(card(fields)).map((m) => [m.name, m.compact]));
+		expect(
+			compact({
+				date: f({ type: 'date' }),
+				datetime: f({ type: 'datetime' }),
+				enum: f({ type: 'enum', values: ['a'] }),
+				integer: f({ type: 'integer' }),
+				number: f({ type: 'number' }),
+				boolean: f({ type: 'boolean' }),
+				string: f({ type: 'string' }),
+				plaintext: f({ type: 'plaintext', inline: true }),
+				richtext: f({ type: 'richtext' }),
+				array: f({ type: 'array', items: f({ type: 'date' }) }),
+				object: f({ type: 'object', properties: {} }),
+				matrix: f({ type: 'matrix', members: {} }),
+				variant: f({ type: 'enum', values: ['a'], variants: { a: {} } })
+			})
+		).toEqual({
+			date: true,
+			datetime: true,
+			enum: true,
+			integer: true,
+			number: true,
+			boolean: true,
+			string: false,
+			plaintext: false,
+			richtext: false,
+			array: false,
+			object: false,
+			matrix: false,
+			variant: false
+		});
+		expect(
+			compact({
+				rank: f({ type: 'string', ui: { compact: true } }),
+				due: f({ type: 'date', ui: { compact: false } })
+			})
+		).toEqual({ rank: true, due: false });
+	});
+});
+
 describe('variantMember + variantCells', () => {
 	const schema = f({
 		type: 'enum',
