@@ -258,10 +258,22 @@ describe('a quill sits where its Quill.yaml says', () => {
 
 	it('admits a quill whose name and version match its path', async () => {
 		const root = await temp.dir();
-		await seat(root, 'memo', '1.2.0', 'quill:\n  name: memo\n  version: "1.2"\n');
+		await seat(root, 'memo', '1.2.0', 'quill:\n  name: memo\n  version: "1.2.0"\n');
 
 		const { catalog } = await scanSourceQuiver(root);
 		expect(catalog.get('memo')).toEqual(['1.2.0']);
+	});
+
+	it('refuses a two-segment quill.version, even under its x.y.0 directory', async () => {
+		const root = await temp.dir();
+		await seat(root, 'memo', '1.2.0', 'quill:\n  name: memo\n  version: "1.2"\n');
+
+		await expect(scanSourceQuiver(root)).rejects.toThrow(
+			expect.objectContaining({
+				code: 'quiver_invalid',
+				message: expect.stringContaining('"1.2"')
+			})
+		);
 	});
 
 	it('refuses a quill.name that disagrees with its directory', async () => {

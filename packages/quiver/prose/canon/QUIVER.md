@@ -69,7 +69,7 @@ The ceiling is a constant rather than an option a consumer raises: what a budget
 
 ## getQuill is the seam
 
-`quiver.getQuill(ref)` is the only way to obtain a quill from a quiver, and the only entry point a consumer needs. It accepts selector refs (`"memo"`, `"memo@1"`) and canonical ones (`"memo@1.0.0"`), resolves the selector, fetches the tree, materializes it through `Quill.fromTree`, and caches one instance per canonical ref for the quiver's lifetime. Concurrent calls for the same ref coalesce into a single load.
+`quiver.getQuill(ref)` is the only way to obtain a quill from a quiver, and the only entry point a consumer needs. It accepts selector refs (`"memo"`, `"memo@1.0"`) and canonical ones (`"memo@1.0.0"`), resolves the selector, fetches the tree, materializes it through `Quill.fromTree`, and caches one instance per canonical ref for the quiver's lifetime. Concurrent calls for the same ref coalesce into a single load.
 
 **It awaits the WASM gate itself**, so instantiating the core is not a precondition a consumer has to know about. `init()` is the only door to `Quill`, and it is memoized: this is one instantiation across every caller, overlapped with the fetch that pays for it. A consumer reaching the classes for its own reasons awaits the same gate.
 
@@ -81,7 +81,9 @@ The quill cache is the only one. A fetched tree lives for the length of the mate
 
 `resolve` is **sync**, and so are `quillNames()` and `versionsOf()`: the catalog is materialized as the quiver is built (`fromBuiltUrl` fetches `quiver.json`, `fromDir` scans the source tree), and `QuiverLoader` carries one verb, `loadTree`, which resolution never reaches. A promise there would price I/O the design does not admit.
 
-Every catalog row is a quill name, the engine's `[a-z][a-z0-9_]*`, which is the one rule a document's `$quill`, a `Quill.yaml` and a ref share. Both loaders hold the row to it, so what `quillNames()` hands out is what `getQuill` takes back; a source directory or a `quiver.json` entry outside it is a `quiver_invalid` naming it, not a row the one verb lists and the other refuses. A source version directory sits where its `Quill.yaml` says: `quills/<quill.name>/<quill.version>/`, refused as `quiver_invalid` otherwise, because the catalog serves the path and a document saved from the quill names what `Quill.yaml` declares.
+**A selector is `x.y` or `x.y.z`.** A quill's compatibility boundary is `MAJOR.MINOR` at every version, `0.x` included: a patch asks nothing of a stored document, and a minor step asks one to be rewritten. So `memo@1.0` is the highest `1.0.z` held, and `memo@1.0.0` is that version exactly. A major alone spans steps that rewrite a document, so `memo@1` names no series and is `invalid_ref`.
+
+Every catalog row is a quill name, the engine's `[a-z][a-z0-9_]*`, which is the one rule a document's `$quill`, a `Quill.yaml` and a ref share. Both loaders hold the row to it, so what `quillNames()` hands out is what `getQuill` takes back; a source directory or a `quiver.json` entry outside it is a `quiver_invalid` naming it, not a row the one verb lists and the other refuses. A source version directory sits where its `Quill.yaml` says: `quills/<quill.name>/<quill.version>/`, refused as `quiver_invalid` otherwise, because the catalog serves the path and a document saved from the quill names what `Quill.yaml` declares. The version is `x.y.z` in both places, as written: a `quill.version` of `1.2` is refused.
 
 The quiver's own name is held to the same rule, because it is a collection name: a ref `<quiver>.memo` names the collection it was written for, and a quiver answers its own name as it answers the bare one and refuses any other as `quill_not_found`. Which quiver a ref naming another collection reaches is the host's to decide.
 

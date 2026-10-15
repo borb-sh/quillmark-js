@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio's `?quill=` selector is `x.y` or `x.y.z`.** `?quill=showcase@1` names no quill, so the catalog's first opens and the address bar is corrected to it; `?quill=showcase@1.0` opens the highest `1.0.z`. An imported document whose `$quill` is `showcase@1` lands in the quill on screen.
+
 **`quillkit test --templates <dir>` gates a collection's templates.** After the quills, every template `templates.json` lists opens in the quill its `$quill` names, a selector such as `usaf_memo@0.3` resolving as studio's template door resolves it, and renders. A ref the quiver does not hold fails the template, and so does one resolving to a draft unless `--drafts` is given, since a site laid without `--drafts` does not serve it. Any diagnostic its parse, conform or `quill.validate` raises fails it, a warning included. A template is read with `@quillmark/wasm`, which must resolve from the collection even where `quillkit.config.js` supplies the engine. A manifest naming a file the directory does not hold is refused before anything renders.
 
 **A quill's `example.md` is held to every diagnostic.** `quillkit test` fails a quill whose example raises any diagnostic in its parse, its conform or `quill.validate`, a warning included, as `quillmark validate` fails it, where only an example that would not open or render failed the quill.

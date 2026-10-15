@@ -95,7 +95,7 @@ describe('quillkit test', () => {
 			const source = await temp.collection();
 			const example = join(source, 'quills', 'showcase', '1.0.0', 'example.md');
 			const md = await readFile(example, 'utf8');
-			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1\n'));
+			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1.0\n'));
 
 			const failure: Error & { stdout?: string } = await run(process.execPath, [BIN, 'test'], {
 				cwd: source
@@ -117,12 +117,12 @@ describe('quillkit test', () => {
 			const source = await temp.collection();
 			const templates = join(source, 'templates');
 			const showcase = await readFile(join(templates, 'showcase.md'), 'utf8');
-			const selector = showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@1\n');
+			const selector = showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@1.0\n');
 			expect(selector).not.toBe(showcase);
 			const added = {
 				'selector.md': selector,
 				'stray.md': showcase.replace('\n$kind: main\n', '\n$kind: main\nstray: kept\n'),
-				'elsewhere.md': showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@9\n')
+				'elsewhere.md': showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@9.0\n')
 			};
 			const manifest = join(templates, 'templates.json');
 			const listed = JSON.parse(await readFile(manifest, 'utf8'));

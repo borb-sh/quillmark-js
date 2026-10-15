@@ -124,8 +124,8 @@ export class Quiver {
 	/**
 	 * Resolves a selector ref → canonical ref (e.g. "memo" → "memo@1.1.0").
 	 *
-	 * Selector forms: `name`, `name@x`, `name@x.y`, `name@x.y.z`. Picks the
-	 * highest matching version in this quiver. A name prefixed with this quiver's
+	 * Selector forms: `name`, `name@x.y`, `name@x.y.z`. Picks the highest
+	 * matching version in this quiver. A name prefixed with this quiver's
 	 * own name (`<quiver>.name`) resolves as the bare name does; one prefixed with
 	 * any other collection is `quill_not_found`. The canonical ref is bare.
 	 *
@@ -169,7 +169,7 @@ export class Quiver {
 	 *
 	 * A core `Quill` renders directly: pass it to `engine.render(quill, doc)`.
 	 *
-	 * Selector refs (e.g. `"memo"`, `"memo@1"`) are resolved to canonical form
+	 * Selector refs (e.g. `"memo"`, `"memo@1.0"`) are resolved to canonical form
 	 * first. Materializes once and caches per canonical ref — concurrent calls
 	 * coalesce into a single load.
 	 *
