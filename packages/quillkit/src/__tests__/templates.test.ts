@@ -22,7 +22,7 @@ async function templates(manifest: unknown, files: string[] = []): Promise<strin
 describe('the templates manifest', () => {
 	it("passes the reference quiver's own", async () => {
 		const collection = await temp.collection();
-		expect(assertTemplates(join(collection, 'templates'))).toBe(join(collection, 'templates'));
+		expect(assertTemplates(join(collection, 'templates')).at).toBe(join(collection, 'templates'));
 	});
 
 	it('passes keys it does not read', async () => {
@@ -66,5 +66,14 @@ describe('the templates manifest', () => {
 		const dir = await templates([{ name: 'A', file: 'dir.md' }]);
 		await mkdir(join(dir, 'dir.md'));
 		expect(() => assertTemplates(dir)).toThrow(/not a file/);
+
+		// Inside the directory and on disk, and still a URL the client cannot fetch beneath
+		// `templates/`.
+		const absolute = await templates([], ['a.md']);
+		await writeFile(
+			join(absolute, 'templates.json'),
+			JSON.stringify([{ name: 'A', file: join(absolute, 'a.md') }])
+		);
+		expect(() => assertTemplates(absolute)).toThrow(/an absolute path/);
 	});
 });

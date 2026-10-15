@@ -94,6 +94,7 @@ export { Quiver } from './quiver.js';
 export { QuiverError } from './errors.js';
 export type { QuiverErrorCode } from './errors.js';
 export type { BuildOptions } from './build.js';
+export { isDraft } from './semver.js';
 
 // Engine types (`Quillmark`, `Quill`, `Document`, `RenderResult`, …) are not
 // re-exported: import them straight from the `@quillmark/wasm` peer dependency,

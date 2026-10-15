@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+**`quillkit test --templates <dir>` gates a collection's templates.** After the quills, every template `templates.json` lists opens in the quill its `$quill` names, a selector such as `usaf_memo@0.3` resolving as studio's template door resolves it, and renders. A ref the quiver does not hold fails the template, and so does one resolving to a draft unless `--drafts` is given, since a site laid without `--drafts` does not serve it. Any diagnostic its parse, conform or `quill.validate` raises fails it, a warning included. A template is read with `@quillmark/wasm`, which must resolve from the collection even where `quillkit.config.js` supplies the engine. A manifest naming a file the directory does not hold is refused before anything renders.
+
+**A quill's `example.md` is held to every diagnostic.** `quillkit test` fails a quill whose example raises any diagnostic in its parse, its conform or `quill.validate`, a warning included, as `quillmark validate` fails it, where only an example that would not open or render failed the quill.
+
+**A `templates.json` entry naming its file by an absolute path is refused** by `test`, `studio` and `site`, where one inside the directory passed and the client could not fetch it.
+
+**A flag that takes a value fails the verb when given none**: `--templates`, `--out` or `--quiver` last on the line, empty after `=`, or followed by another flag, where the verb ran as if the flag were absent or took the next flag as its value.
+
 **`quillkit init [dir]` lays a new quiver.** It writes `Quiver.yaml`, one quill under `quills/letter/0.1.0/` that passes `quillkit test` and opens in `quillkit studio`, and a `package.json` pinning `quillkit`, `@quillmark/quiver` and `@quillmark/wasm` at the versions this release carries. A directory already holding a `Quiver.yaml` or `quills/` is refused.
 
 ## v0.17.0 - 2026-10-12
