@@ -45,16 +45,20 @@ beforeAll(() => {
 
 describe('quillkit test', () => {
 	it(
-		'gates the reference quiver end-to-end',
+		'gates the reference quiver and its templates end-to-end',
 		async () => {
 			// A non-zero exit rejects, carrying the gate's own output as the failure.
-			const { stdout } = await run(process.execPath, [BIN, 'test'], {
-				cwd: await temp.collection()
-			});
+			const { stdout } = await run(
+				process.execPath,
+				[BIN, 'test', '--templates', 'templates', '--drafts'],
+				{ cwd: await temp.collection() }
+			);
 
 			expect(stdout).toContain('pass  showcase@1.0.0 (seed, example)');
 			expect(stdout).toContain('pass  usaf_memo@0.0.0 (seed, example)');
-			expect(stdout).toContain('2/2 passed');
+			expect(stdout).toContain('pass  showcase.md (showcase@1.0.0)');
+			expect(stdout).toContain('pass  usaf_memo.md (usaf_memo@0.0.0)');
+			expect(stdout).toContain('4/4 passed');
 		},
 		RENDER_MS
 	);
@@ -108,15 +112,17 @@ describe('quillkit test', () => {
 	);
 
 	it(
-		'renders every listed template in the quill it names, failing one that warns or names none held',
+		'renders every listed template in the quill it names, failing one that warns, names no quill held, or names a draft',
 		async () => {
 			const source = await temp.collection();
 			const templates = join(source, 'templates');
-			const memo = await readFile(join(templates, 'usaf_memo.md'), 'utf8');
+			const showcase = await readFile(join(templates, 'showcase.md'), 'utf8');
+			const selector = showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@1\n');
+			expect(selector).not.toBe(showcase);
 			const added = {
-				'selector.md': memo.replace('$quill: usaf_memo@0.0.0\n', '$quill: usaf_memo@0\n'),
-				'stray.md': memo.replace('\nsubject:', '\nstray: kept\nsubject:'),
-				'elsewhere.md': memo.replace('$quill: usaf_memo@0.0.0\n', '$quill: usaf_memo@9\n')
+				'selector.md': selector,
+				'stray.md': showcase.replace('\n$kind: main\n', '\n$kind: main\nstray: kept\n'),
+				'elsewhere.md': showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@9\n')
 			};
 			const manifest = join(templates, 'templates.json');
 			const listed = JSON.parse(await readFile(manifest, 'utf8'));
@@ -126,6 +132,7 @@ describe('quillkit test', () => {
 			}
 			await writeFile(manifest, JSON.stringify(listed));
 
+			// No `--drafts`, so `usaf_memo.md`, naming the draft `usaf_memo@0.0.0`, is refused.
 			const failure: Error & { stdout?: string } = await run(
 				process.execPath,
 				[BIN, 'test', '--templates', templates],
@@ -135,12 +142,13 @@ describe('quillkit test', () => {
 				(err: Error) => err
 			);
 
-			expect(failure.stdout).toContain('pass  usaf_memo.md (usaf_memo@0.0.0)');
-			expect(failure.stdout).toContain('pass  selector.md (usaf_memo@0.0.0)');
+			expect(failure.stdout).toContain('pass  showcase.md (showcase@1.0.0)');
+			expect(failure.stdout).toContain('pass  selector.md (showcase@1.0.0)');
 			expect(failure.message).toMatch(/FAIL {2}stray\.md — .*\(validation::unknown_field\)/);
-			expect(failure.message).toMatch(/FAIL {2}elsewhere\.md — .*"usaf_memo@9"/);
+			expect(failure.message).toMatch(/FAIL {2}elsewhere\.md — .*showcase@9/);
+			expect(failure.message).toMatch(/FAIL {2}usaf_memo\.md — .*--drafts/);
 			const passed = failure.stdout!.match(/^pass {2}/gm)!.length;
-			expect(failure.stdout).toContain(`${passed}/${passed + 2} passed`);
+			expect(failure.stdout).toContain(`${passed}/${passed + 3} passed`);
 		},
 		RENDER_MS
 	);
@@ -249,6 +257,13 @@ describe('how a flag is spelled', () => {
 		await expect(
 			run(process.execPath, [BIN, 'site', `--quiver=${bare}`, `--out=${join(bare, 'site')}`])
 		).rejects.toThrow(/npm install --save-dev @quillmark\/quiver/);
+	});
+
+	it('refuses a flag given no value', async () => {
+		// Read as absent, `--templates` with nothing after it gates no template and passes.
+		await expect(
+			run(process.execPath, [BIN, 'test', '--templates'], { cwd: await temp.dir() })
+		).rejects.toThrow(/--templates takes a value/);
 	});
 });
 

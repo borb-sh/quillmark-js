@@ -75,6 +75,13 @@ async function loadArtifact(collection: string): Promise<Wasm | undefined> {
 	return wasm;
 }
 
+const noArtifact = (collection: string, then: string): Error =>
+	new Error(
+		`Cannot find @quillmark/wasm in "${collection}".\n` +
+			'  Install it:  npm install --save-dev @quillmark/wasm\n' +
+			`  ${then}`
+	);
+
 /**
  * The engine `test` renders through: a named `engine` export from
  * `quillkit.config.js` at the collection root, else `@quillmark/wasm` out of the
@@ -88,7 +95,6 @@ async function loadArtifact(collection: string): Promise<Wasm | undefined> {
  * (QUILLKIT §"Blocked on, looked at").
  */
 export async function loadEngine(collection: string): Promise<Engine> {
-	// Absent, and a quillkit.config.js may still carry the engine.
 	const wasm = await loadArtifact(collection);
 
 	// Presence is the filesystem's answer: `ERR_MODULE_NOT_FOUND` is equally what an absent
@@ -100,27 +106,20 @@ export async function loadEngine(collection: string): Promise<Engine> {
 		if (engine != null) return engine;
 	}
 
-	if (wasm === undefined) {
-		throw new Error(
-			`Cannot find @quillmark/wasm in "${collection}".\n` +
-				'  Install it:  npm install --save-dev @quillmark/wasm\n' +
-				'  Or export { engine } from quillkit.config.js for a custom engine.'
+	if (wasm === undefined)
+		throw noArtifact(
+			collection,
+			'Or export { engine } from quillkit.config.js for a custom engine.'
 		);
-	}
 	return new wasm.Engine();
 }
 
-/** The artifact's core surface, which `Document.fromMarkdown` is on: a template's `$quill`
- *  is read before any quill is chosen for it. A config's engine carries no core, so here
- *  the artifact is required. */
+/** The artifact's core surface, `init()`'s: what the gate reads a document with
+ *  (`Document.fromMarkdown`, `formatDiagnostic`) whatever engine renders it, so the
+ *  artifact is required here even where a config carries the engine. */
 export async function loadCore(collection: string): Promise<CoreSurface> {
 	const wasm = await loadArtifact(collection);
-	if (wasm === undefined) {
-		throw new Error(
-			`Cannot find @quillmark/wasm in "${collection}".\n` +
-				'  Install it:  npm install --save-dev @quillmark/wasm\n' +
-				"  `--templates` reads each template's `$quill` with it."
-		);
-	}
+	if (wasm === undefined)
+		throw noArtifact(collection, 'quillkit test reads documents with it, whatever engine renders.');
 	return wasm.init();
 }

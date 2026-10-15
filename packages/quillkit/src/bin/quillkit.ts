@@ -21,14 +21,16 @@ import { serialize, watchCollection } from '../watch.js';
 const argv = process.argv.slice(2);
 const command = argv[0];
 
-/** One flag with a value, spelled either `--name value` or `--name=value`. */
+/** One flag with a value, spelled either `--name value` or `--name=value`. A flag given
+ *  without one is refused, where reading it as absent would run the verb without it. */
 function flag(name: string): string | undefined {
 	const eq = `${name}=`;
-	for (let i = 0; i < argv.length; i++) {
-		if (argv[i] === name) return i + 1 < argv.length ? argv[i + 1] : undefined;
-		if (argv[i].startsWith(eq)) return argv[i].slice(eq.length);
-	}
-	return undefined;
+	const at = argv.findIndex((arg) => arg === name || arg.startsWith(eq));
+	if (at === -1) return undefined;
+	const value = argv[at] === name ? argv[at + 1] : argv[at].slice(eq.length);
+	if (value === undefined || value === '' || value.startsWith('--'))
+		throw new Error(`${name} takes a value`);
+	return value;
 }
 
 /** The collection every verb runs against, defaulting to the working directory. */
@@ -72,12 +74,9 @@ async function init(): Promise<void> {
 
 /**
  * The gate: every quill's seed renders, and so does its root `example.md` where it ships
- * one. The seed is the one document every quill has; the example is the filled page
- * whose values reach the branches the blank leaves dark.
- *
- * With `--templates`, every template the manifest lists then opens in the quill its
- * `$quill` names, a selector resolving as in studio, and renders. A warning fails a
- * template: every value in one is the collection author's own to fix.
+ * one, and so does every template `--templates` lists. The seed is the one document every
+ * quill has; the example is the filled page whose values reach the branches the blank
+ * leaves dark.
  *
  * The only door onto the verdict, so an author on vitest, jest or another runner spawns
  * it (`execFileSync('quillkit', ['test'])`) rather than rebuilding the loop
@@ -86,9 +85,16 @@ async function init(): Promise<void> {
 async function test(): Promise<void> {
 	const source = collection();
 	const templates = flag('--templates');
-	const starters = templates === undefined ? undefined : assertTemplates(templates);
+	const listed = templates === undefined ? undefined : assertTemplates(templates);
+	const drafts = argv.includes('--drafts');
 	const engine = await loadEngine(source);
-	const { fromDir } = await loadQuiverNode(source);
+	// Before any verdict line, so an absent artifact fails the verb rather than every template.
+	const starters = listed && { ...listed, core: await loadCore(source) };
+	const { fromDir, isDraft } = await loadQuiverNode(source);
+	if (starters !== undefined && !drafts && typeof isDraft !== 'function')
+		throw new Error(
+			`@quillmark/quiver in "${source}" cannot say which versions are drafts: upgrade it, or pass --drafts`
+		);
 	const quiver = await fromDir(source);
 
 	const names = quiver.quillNames();
@@ -100,8 +106,6 @@ async function test(): Promise<void> {
 	let pass = 0;
 	let fail = 0;
 
-	/** One line of the verdict, counted: what `run` resolves to is printed beside the pass,
-	 *  and what it throws is the failure. */
 	async function tally(what: string, run: () => Promise<string>): Promise<void> {
 		try {
 			console.log(`pass  ${what} (${await run()})`);
@@ -110,6 +114,13 @@ async function test(): Promise<void> {
 			console.error(`FAIL  ${what} — ${message(err)}`);
 			fail++;
 		}
+	}
+
+	async function assertClean(quill: Quill, doc: Document, what: string): Promise<void> {
+		const said = [...doc.warnings, ...quill.validate(doc)];
+		if (said.length === 0) return;
+		const { formatDiagnostic } = starters?.core ?? (await loadCore(source));
+		throw new Error(`${what}: ${said.map((d) => formatDiagnostic(d)).join('\n')}`);
 	}
 
 	async function renders(quill: Quill, doc: Document, what: string): Promise<void> {
@@ -127,7 +138,10 @@ async function test(): Promise<void> {
 				const docs: [string, Document][] = [['seed', quill.seedDocument()]];
 				try {
 					const example = quill.exampleDocument();
-					if (example) docs.push(['example', example]);
+					if (example) {
+						docs.push(['example', example]);
+						await assertClean(quill, example, 'example');
+					}
 					for (const [what, doc] of docs) await renders(quill, doc, what);
 				} finally {
 					for (const [, doc] of docs) doc.free();
@@ -138,24 +152,25 @@ async function test(): Promise<void> {
 	}
 
 	if (starters !== undefined) {
-		const core = await loadCore(source);
 		for (const { file } of starters.templates) {
 			await tally(file, async () => {
-				const text = await readFile(join(starters.at, file), 'utf8');
-				const probe = core.Document.fromMarkdown(text);
+				const text = await readFile(resolve(starters.at, file), 'utf8');
+				const probe = starters.core.Document.fromMarkdown(text);
 				let ref: string;
 				try {
 					ref = quiver.resolve(probe.quillRef);
 				} finally {
 					probe.free();
 				}
+				if (!drafts && isDraft(ref.slice(ref.indexOf('@') + 1)))
+					throw new Error(
+						`names ${ref}, a draft a published site does not serve: pass --drafts to gate it`
+					);
 				const quill = await quiver.getQuill(ref);
 				const doc = quill.parse(text);
 				try {
-					const said = [...doc.warnings, ...quill.validate(doc)];
-					if (said.length > 0)
-						throw new Error(said.map((d) => core.formatDiagnostic(d)).join('\n'));
-					await renders(quill, doc, 'template');
+					await assertClean(quill, doc, ref);
+					await renders(quill, doc, ref);
 				} finally {
 					doc.free();
 				}
@@ -269,7 +284,7 @@ function usage(): void {
 		[
 			'Usage:',
 			'  quillkit init   [<dir>]',
-			'  quillkit test   [--quiver <dir>] [--templates <dir>]',
+			'  quillkit test   [--quiver <dir>] [--templates <dir>] [--drafts]',
 			'  quillkit build  [--quiver <dir>] [--out <dir>]',
 			'  quillkit studio [--quiver <dir>] [--out <dir>] [--port <n>] [--host <addr>] [--templates <dir>]',
 			'  quillkit site   [--quiver <dir>] [--out <dir>] [--drafts] [--templates <dir>]'

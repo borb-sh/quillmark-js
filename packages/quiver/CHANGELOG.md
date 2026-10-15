@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`isDraft(version)` is exported from `@quillmark/quiver/node`**: true for a version below the floor `build` packs from, so a tool asks the question `build` answers rather than restating `0.1.0`.
+
 **A `quiver.json` field this loader does not know is skipped**, at the top level and on a quill entry, where it failed the load as `quiver_invalid`. A newer `format` is still refused, naming the upgrade. (#771)
 
 **A quill name, a quill directory and a `Quiver.yaml` name are `[a-z][a-z0-9_]*`, at most 64 characters, the engine's rule.** A quiver named or holding a quill outside it fails as `quiver_invalid`, and a ref outside it as `invalid_ref`, where `[A-Za-z0-9_-]+` passed. A version directory whose `Quill.yaml` declares another `quill.name` or `quill.version` fails `fromDir` and `build` as `quiver_invalid`. A ref may name a collection, `<quiver>.memo@1`: `resolve` and `getQuill` answer one naming this quiver as they answer the bare name, and one naming any other as `quill_not_found`; `parseQuillRef` returns it as `collection`. (#769)

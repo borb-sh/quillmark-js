@@ -9,7 +9,7 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { within } from './paths.js';
 
 /** The manifest's name inside the directory, which is where the client fetches it. */
@@ -45,6 +45,10 @@ export function assertTemplates(dir: string): { at: string; templates: Template[
 			throw new Error(`${which} has no \`file\``);
 		if (entry.description !== undefined && typeof entry.description !== 'string')
 			throw new Error(`${which}'s \`description\` is not a string`);
+		if (isAbsolute(entry.file))
+			throw new Error(
+				`${which} names "${entry.file}", an absolute path: a file is relative to ${dir}`
+			);
 		const file = resolve(at, entry.file);
 		if (!within(at, file) || !existsSync(file) || !statSync(file).isFile())
 			throw new Error(`${which} names "${entry.file}", which is not a file in ${dir}`);

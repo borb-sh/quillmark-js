@@ -66,5 +66,14 @@ describe('the templates manifest', () => {
 		const dir = await templates([{ name: 'A', file: 'dir.md' }]);
 		await mkdir(join(dir, 'dir.md'));
 		expect(() => assertTemplates(dir)).toThrow(/not a file/);
+
+		// Inside the directory and on disk, and still a URL the client cannot fetch beneath
+		// `templates/`.
+		const absolute = await templates([], ['a.md']);
+		await writeFile(
+			join(absolute, 'templates.json'),
+			JSON.stringify([{ name: 'A', file: join(absolute, 'a.md') }])
+		);
+		expect(() => assertTemplates(absolute)).toThrow(/an absolute path/);
 	});
 });
