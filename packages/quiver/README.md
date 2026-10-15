@@ -55,7 +55,7 @@ One narrower verb sits beside `getQuill`: `resolve(ref)` returns the canonical r
 const canonicalRef = quiver.resolve('memo'); // "memo@1.1.0"
 ```
 
-A selector is `x.y` or `x.y.z`. `memo@1.0` is the highest `1.0.z` the quiver holds, and `memo@1.0.0` is exact. `memo@1` is `invalid_ref`: a minor step migrates a stored document, so a major alone names no compatible series.
+A selector is `x.y` or `x.y.z`. `memo@1.0` is the highest `1.0.z` the quiver holds, and `memo@1.0.0` is exact. `memo@1` is `invalid_ref`: a minor step asks a stored document to be rewritten, so a major alone names no compatible series.
 
 A ref may name the collection, `<quiver>.memo@1.0`, the form a document's `$quill` takes to say which collection it was written for. A quiver answers its own name as it answers the bare one, and refuses any other as `quill_not_found`; the canonical ref is bare.
 
