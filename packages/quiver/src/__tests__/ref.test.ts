@@ -9,12 +9,6 @@ describe('parseQuillRef — valid refs', () => {
 		expect(result.selector).toBeUndefined();
 	});
 
-	it('parses name@major: showcase@1', () => {
-		const result = parseQuillRef('showcase@1');
-		expect(result.name).toBe('showcase');
-		expect(result.selector).toBe('1');
-	});
-
 	it('parses name@major.minor: showcase@1.2', () => {
 		const result = parseQuillRef('showcase@1.2');
 		expect(result.name).toBe('showcase');
@@ -53,7 +47,17 @@ describe('parseQuillRef — invalid refs', () => {
 	it('rejects empty string', () => expectInvalidRef(''));
 	it('rejects bare @', () => expectInvalidRef('@'));
 	it('rejects foo@ (missing selector)', () => expectInvalidRef('foo@'));
-	it('rejects @1 (missing name)', () => expectInvalidRef('@1'));
+	it('rejects @1.0 (missing name)', () => expectInvalidRef('@1.0'));
+	it('rejects showcase@1 (a major alone), naming the two selector shapes', () => {
+		for (const ref of ['showcase@1', 'showcase@0', 'borb.showcase@2']) {
+			expect(() => parseQuillRef(ref), ref).toThrow(
+				expect.objectContaining({
+					code: 'invalid_ref',
+					message: expect.stringMatching(/\bx\.y\b.*\bx\.y\.z\b/)
+				})
+			);
+		}
+	});
 	it('rejects foo@^1 (caret range)', () => expectInvalidRef('foo@^1'));
 	it('rejects foo@~1 (tilde range)', () => expectInvalidRef('foo@~1'));
 	it('rejects foo@>=1 (gte range)', () => expectInvalidRef('foo@>=1'));

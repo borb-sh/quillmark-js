@@ -338,7 +338,7 @@
 
 	/**
 	 * The quill a boot opens: what the URL asks for where the quiver holds it, else the
-	 * catalog's first. A selector is honoured (`?quill=showcase`, `?quill=showcase@1`),
+	 * catalog's first. A selector is honoured (`?quill=showcase`, `?quill=showcase@1.0`),
 	 * being the grammar `getQuill` already takes.
 	 *
 	 * A ref this quiver does not hold has nothing to honour, so the first quill opens and

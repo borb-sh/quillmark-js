@@ -91,7 +91,7 @@ describe('quillkit test', () => {
 			const source = await temp.collection();
 			const example = join(source, 'quills', 'showcase', '1.0.0', 'example.md');
 			const md = await readFile(example, 'utf8');
-			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1\n'));
+			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1.0\n'));
 
 			const failure: Error & { stdout?: string } = await run(process.execPath, [BIN, 'test'], {
 				cwd: source

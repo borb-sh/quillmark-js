@@ -10,7 +10,7 @@ export interface ParsedQuillRef {
 }
 
 const NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
-const SELECTOR_RE = /^\d+(\.\d+){0,2}$/;
+const SELECTOR_RE = /^\d+\.\d+(\.\d+)?$/;
 
 /**
  * Whether `name` is a quill name: `[a-z][a-z0-9_]*`, at most 64 characters, the
@@ -22,9 +22,10 @@ export function isQuillName(name: string): boolean {
 
 /**
  * Throws QuiverError('invalid_ref') on malformed input. The name is a quill name,
- * optionally prefixed `<collection>.`; the selector is `x`, `x.y` or `x.y.z`,
- * digits only, with no ranges or operators — a quiver resolves a prefix, it does
- * not solve a range.
+ * optionally prefixed `<collection>.`; the selector is `x.y` or `x.y.z`, digits
+ * only, with no ranges or operators — a quiver resolves a prefix, it does not
+ * solve a range. A quill's compatibility boundary is `MAJOR.MINOR`, so `x.y` is
+ * the widest prefix that names a compatible series.
  */
 export function parseQuillRef(ref: string): ParsedQuillRef {
 	if (!ref) {
@@ -71,7 +72,7 @@ export function parseQuillRef(ref: string): ParsedQuillRef {
 	if (!SELECTOR_RE.test(selector)) {
 		throw new QuiverError(
 			'invalid_ref',
-			`Invalid ref: selector "${selector}" is not a valid semver selector (only x, x.y, x.y.z with digits allowed)`,
+			`Invalid ref: selector "${selector}" is not x.y (a compatible series) or x.y.z (an exact version), digits only`,
 			{ ref }
 		);
 	}

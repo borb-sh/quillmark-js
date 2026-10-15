@@ -4,9 +4,11 @@
 
 ## Unreleased
 
+**A selector is `x.y` or `x.y.z`, and a declared `quill.version` is `x.y.z`.** A one-segment selector, `memo@1`, fails `parseQuillRef`, `resolve` and `getQuill` as `invalid_ref`, where it resolved to the highest `1.y.z`: a quill's compatibility boundary is `MAJOR.MINOR` below 1.0.0 and above it, so `memo@1.0` names a series and `memo@1.0.0` a version. A `Quill.yaml` declaring `quill.version: "1.2"` fails `fromDir` and `build` as `quiver_invalid`, where it was read as `1.2.0`.
+
 **A `quiver.json` field this loader does not know is skipped**, at the top level and on a quill entry, where it failed the load as `quiver_invalid`. A newer `format` is still refused, naming the upgrade. (#771)
 
-**A quill name, a quill directory and a `Quiver.yaml` name are `[a-z][a-z0-9_]*`, at most 64 characters, the engine's rule.** A quiver named or holding a quill outside it fails as `quiver_invalid`, and a ref outside it as `invalid_ref`, where `[A-Za-z0-9_-]+` passed. A version directory whose `Quill.yaml` declares another `quill.name` or `quill.version` fails `fromDir` and `build` as `quiver_invalid`. A ref may name a collection, `<quiver>.memo@1`: `resolve` and `getQuill` answer one naming this quiver as they answer the bare name, and one naming any other as `quill_not_found`; `parseQuillRef` returns it as `collection`. (#769)
+**A quill name, a quill directory and a `Quiver.yaml` name are `[a-z][a-z0-9_]*`, at most 64 characters, the engine's rule.** A quiver named or holding a quill outside it fails as `quiver_invalid`, and a ref outside it as `invalid_ref`, where `[A-Za-z0-9_-]+` passed. A version directory whose `Quill.yaml` declares another `quill.name` or `quill.version` fails `fromDir` and `build` as `quiver_invalid`. A ref may name a collection, `<quiver>.memo@1.0`: `resolve` and `getQuill` answer one naming this quiver as they answer the bare name, and one naming any other as `quill_not_found`; `parseQuillRef` returns it as `collection`. (#769)
 
 ## v0.37.0 - 2026-10-12
 
