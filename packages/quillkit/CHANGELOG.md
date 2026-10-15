@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`quillkit test --templates <dir>` gates a collection's templates.** After the quills, every template `templates.json` lists opens in the quill its `$quill` names, a selector such as `usaf_memo@0.3` resolving as studio's template door resolves it, and renders. A ref the quiver does not hold fails the template, and so does any diagnostic its parse, conform or validation raises, a warning included. A manifest naming a file the directory does not hold is refused before anything renders.
+
 **`quillkit init [dir]` lays a new quiver.** It writes `Quiver.yaml`, one quill under `quills/letter/0.1.0/` that passes `quillkit test` and opens in `quillkit studio`, and a `package.json` pinning `quillkit`, `@quillmark/quiver` and `@quillmark/wasm` at the versions this release carries. A directory already holding a `Quiver.yaml` or `quills/` is refused.
 
 ## v0.17.0 - 2026-10-12

@@ -106,6 +106,44 @@ describe('quillkit test', () => {
 		},
 		RENDER_MS
 	);
+
+	it(
+		'renders every listed template in the quill it names, failing one that warns or names none held',
+		async () => {
+			const source = await temp.collection();
+			const templates = join(source, 'templates');
+			const memo = await readFile(join(templates, 'usaf_memo.md'), 'utf8');
+			const added = {
+				'selector.md': memo.replace('$quill: usaf_memo@0.0.0\n', '$quill: usaf_memo@0\n'),
+				'stray.md': memo.replace('\nsubject:', '\nstray: kept\nsubject:'),
+				'elsewhere.md': memo.replace('$quill: usaf_memo@0.0.0\n', '$quill: usaf_memo@9\n')
+			};
+			const manifest = join(templates, 'templates.json');
+			const listed = JSON.parse(await readFile(manifest, 'utf8'));
+			for (const [file, md] of Object.entries(added)) {
+				await writeFile(join(templates, file), md);
+				listed.push({ name: file, file });
+			}
+			await writeFile(manifest, JSON.stringify(listed));
+
+			const failure: Error & { stdout?: string } = await run(
+				process.execPath,
+				[BIN, 'test', '--templates', templates],
+				{ cwd: source }
+			).then(
+				() => new Error('the gate passed a template carrying a warning'),
+				(err: Error) => err
+			);
+
+			expect(failure.stdout).toContain('pass  usaf_memo.md (usaf_memo@0.0.0)');
+			expect(failure.stdout).toContain('pass  selector.md (usaf_memo@0.0.0)');
+			expect(failure.message).toMatch(/FAIL {2}stray\.md — .*\(validation::unknown_field\)/);
+			expect(failure.message).toMatch(/FAIL {2}elsewhere\.md — .*"usaf_memo@9"/);
+			const passed = failure.stdout!.match(/^pass {2}/gm)!.length;
+			expect(failure.stdout).toContain(`${passed}/${passed + 2} passed`);
+		},
+		RENDER_MS
+	);
 });
 
 describe('quillkit init', () => {

@@ -7,9 +7,10 @@
  * instantiates nothing, and the client is static bytes served to a browser tab.
  */
 
+import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import type { Document } from '@quillmark/wasm';
-import { loadEngine, loadQuiverNode } from '../collection.js';
+import type { Document, Quill } from '@quillmark/wasm';
+import { loadCore, loadEngine, loadQuiverNode } from '../collection.js';
 import { layStarter } from '../init.js';
 import { CLIENT } from '../paths.js';
 import { createStaticServer, listen, type Mount } from '../serve.js';
@@ -74,12 +75,18 @@ async function init(): Promise<void> {
  * one. The seed is the one document every quill has; the example is the filled page
  * whose values reach the branches the blank leaves dark.
  *
+ * With `--templates`, every template the manifest lists then opens in the quill its
+ * `$quill` names, a selector resolving as in studio, and renders. A warning fails a
+ * template: every value in one is the collection author's own to fix.
+ *
  * The only door onto the verdict, so an author on vitest, jest or another runner spawns
  * it (`execFileSync('quillkit', ['test'])`) rather than rebuilding the loop
  * (QUILLKIT §"Blocked on, looked at").
  */
 async function test(): Promise<void> {
 	const source = collection();
+	const templates = flag('--templates');
+	const starters = templates === undefined ? undefined : assertTemplates(templates);
 	const engine = await loadEngine(source);
 	const { fromDir } = await loadQuiverNode(source);
 	const quiver = await fromDir(source);
@@ -93,30 +100,67 @@ async function test(): Promise<void> {
 	let pass = 0;
 	let fail = 0;
 
+	/** One line of the verdict, counted: what `run` resolves to is printed beside the pass,
+	 *  and what it throws is the failure. */
+	async function tally(what: string, run: () => Promise<string>): Promise<void> {
+		try {
+			console.log(`pass  ${what} (${await run()})`);
+			pass++;
+		} catch (err) {
+			console.error(`FAIL  ${what} — ${message(err)}`);
+			fail++;
+		}
+	}
+
+	async function renders(quill: Quill, doc: Document, what: string): Promise<void> {
+		const result: { artifacts?: unknown[] } = await engine.render(quill, doc);
+		if (!Array.isArray(result.artifacts) || result.artifacts.length === 0) {
+			throw new Error(`${what} render produced no artifacts`);
+		}
+	}
+
 	for (const name of names) {
 		for (const version of quiver.versionsOf(name)) {
 			const ref = `${name}@${version}`;
-			try {
+			await tally(ref, async () => {
 				const quill = await quiver.getQuill(ref);
 				const docs: [string, Document][] = [['seed', quill.seedDocument()]];
 				try {
 					const example = quill.exampleDocument();
 					if (example) docs.push(['example', example]);
-					for (const [what, doc] of docs) {
-						const result: { artifacts?: unknown[] } = await engine.render(quill, doc);
-						if (!Array.isArray(result.artifacts) || result.artifacts.length === 0) {
-							throw new Error(`${what} render produced no artifacts`);
-						}
-					}
+					for (const [what, doc] of docs) await renders(quill, doc, what);
 				} finally {
 					for (const [, doc] of docs) doc.free();
 				}
-				console.log(`pass  ${ref} (${docs.map(([what]) => what).join(', ')})`);
-				pass++;
-			} catch (err) {
-				console.error(`FAIL  ${ref} — ${message(err)}`);
-				fail++;
-			}
+				return docs.map(([what]) => what).join(', ');
+			});
+		}
+	}
+
+	if (starters !== undefined) {
+		const core = await loadCore(source);
+		for (const { file } of starters.templates) {
+			await tally(file, async () => {
+				const text = await readFile(join(starters.at, file), 'utf8');
+				const probe = core.Document.fromMarkdown(text);
+				let ref: string;
+				try {
+					ref = quiver.resolve(probe.quillRef);
+				} finally {
+					probe.free();
+				}
+				const quill = await quiver.getQuill(ref);
+				const doc = quill.parse(text);
+				try {
+					const said = [...doc.warnings, ...quill.validate(doc)];
+					if (said.length > 0)
+						throw new Error(said.map((d) => core.formatDiagnostic(d)).join('\n'));
+					await renders(quill, doc, 'template');
+				} finally {
+					doc.free();
+				}
+				return ref;
+			});
 		}
 	}
 
@@ -151,7 +195,7 @@ async function studio(): Promise<void> {
 	// tree with the bin compiled and the client not.
 	assertClient(CLIENT);
 	const templates = flag('--templates');
-	const starters = templates === undefined ? undefined : assertTemplates(templates);
+	const starters = templates === undefined ? undefined : assertTemplates(templates).at;
 	const port = Number(flag('--port') ?? 5174);
 	const host = flag('--host') ?? 'localhost';
 
@@ -225,7 +269,7 @@ function usage(): void {
 		[
 			'Usage:',
 			'  quillkit init   [<dir>]',
-			'  quillkit test   [--quiver <dir>]',
+			'  quillkit test   [--quiver <dir>] [--templates <dir>]',
 			'  quillkit build  [--quiver <dir>] [--out <dir>]',
 			'  quillkit studio [--quiver <dir>] [--out <dir>] [--port <n>] [--host <addr>] [--templates <dir>]',
 			'  quillkit site   [--quiver <dir>] [--out <dir>] [--drafts] [--templates <dir>]'

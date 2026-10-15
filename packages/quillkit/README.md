@@ -50,6 +50,8 @@ That client compiles in its own copies of both libraries and the engine, which y
 
 It loads the source layout with `fromDir`, then renders every quill's seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill. It finds the engine itself: a named `engine` export from `quillkit.config.js` at the collection root, else `@quillmark/wasm` from your own `node_modules`. A config that is there and throws fails the gate, naming the file and what threw: only a config you have not written falls through to the artifact.
 
+**`--templates <dir>` gates the collection's starter documents too**, the directory `studio` and `site` take. After the quills, each template the manifest lists opens in the quill its `$quill` names, `usaf_memo@0.3` resolving as a link does, and renders. A ref the quiver does not hold fails the template, and so does any diagnostic its parse or validation raises, a warning included: every value in a template is yours to fix.
+
 On vitest, jest or `node:test`, spawn the bin rather than rebuilding the loop against the library. The gate stays one implementation, and the case gates what CI gates:
 
 ```ts

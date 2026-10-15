@@ -22,7 +22,7 @@ async function templates(manifest: unknown, files: string[] = []): Promise<strin
 describe('the templates manifest', () => {
 	it("passes the reference quiver's own", async () => {
 		const collection = await temp.collection();
-		expect(assertTemplates(join(collection, 'templates'))).toBe(join(collection, 'templates'));
+		expect(assertTemplates(join(collection, 'templates')).at).toBe(join(collection, 'templates'));
 	});
 
 	it('passes keys it does not read', async () => {

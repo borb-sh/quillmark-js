@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Engine } from '@quillmark/wasm';
+import type { CoreSurface, Engine } from '@quillmark/wasm';
 
 /** Typed off the real things, and type-only: no runtime edge exists. */
 type QuiverNode = typeof import('@quillmark/quiver/node');
@@ -57,6 +57,24 @@ export async function loadQuiverNode(collection: string): Promise<QuiverNode> {
 	return loadFrom<QuiverNode>('@quillmark/quiver', resolved);
 }
 
+/** `@quillmark/wasm` out of `collection`'s own tree, inited, or `undefined` where nothing
+ *  there answers to it. */
+async function loadArtifact(collection: string): Promise<Wasm | undefined> {
+	let resolved: string;
+	try {
+		resolved = requireFrom(collection).resolve('@quillmark/wasm');
+	} catch {
+		return undefined;
+	}
+	const wasm = await loadFrom<Wasm>('@quillmark/wasm', resolved);
+	try {
+		await wasm.init();
+	} catch (cause) {
+		throw new Error(`Cannot initialize @quillmark/wasm from "${resolved}".`, { cause });
+	}
+	return wasm;
+}
+
 /**
  * The engine `test` renders through: a named `engine` export from
  * `quillkit.config.js` at the collection root, else `@quillmark/wasm` out of the
@@ -70,22 +88,8 @@ export async function loadQuiverNode(collection: string): Promise<QuiverNode> {
  * (QUILLKIT §"Blocked on, looked at").
  */
 export async function loadEngine(collection: string): Promise<Engine> {
-	let resolved: string | undefined;
-	try {
-		resolved = requireFrom(collection).resolve('@quillmark/wasm');
-	} catch {
-		// Absent, and a quillkit.config.js may still carry the engine.
-	}
-
-	let wasm: Wasm | undefined;
-	if (resolved !== undefined) {
-		wasm = await loadFrom<Wasm>('@quillmark/wasm', resolved);
-		try {
-			await wasm.init();
-		} catch (cause) {
-			throw new Error(`Cannot initialize @quillmark/wasm from "${resolved}".`, { cause });
-		}
-	}
+	// Absent, and a quillkit.config.js may still carry the engine.
+	const wasm = await loadArtifact(collection);
 
 	// Presence is the filesystem's answer: `ERR_MODULE_NOT_FOUND` is equally what an absent
 	// config raises and what a config raises over a specifier of its own, so no error can
@@ -104,4 +108,19 @@ export async function loadEngine(collection: string): Promise<Engine> {
 		);
 	}
 	return new wasm.Engine();
+}
+
+/** The artifact's core surface, which `Document.fromMarkdown` is on: a template's `$quill`
+ *  is read before any quill is chosen for it. A config's engine carries no core, so here
+ *  the artifact is required. */
+export async function loadCore(collection: string): Promise<CoreSurface> {
+	const wasm = await loadArtifact(collection);
+	if (wasm === undefined) {
+		throw new Error(
+			`Cannot find @quillmark/wasm in "${collection}".\n` +
+				'  Install it:  npm install --save-dev @quillmark/wasm\n' +
+				"  `--templates` reads each template's `$quill` with it."
+		);
+	}
+	return wasm.init();
 }

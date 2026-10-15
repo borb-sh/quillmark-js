@@ -22,8 +22,9 @@ export interface Template {
 	description?: string;
 }
 
-/** Returns the directory, resolved, once every entry names a file inside it. */
-export function assertTemplates(dir: string): string {
+/** Returns the directory, resolved, and what its manifest lists, once every entry names a
+ *  file inside it. */
+export function assertTemplates(dir: string): { at: string; templates: Template[] } {
 	const at = resolve(dir);
 	const manifest = join(at, MANIFEST);
 	if (!existsSync(manifest)) throw new Error(`--templates ${dir} holds no ${MANIFEST}`);
@@ -49,5 +50,5 @@ export function assertTemplates(dir: string): string {
 			throw new Error(`${which} names "${entry.file}", which is not a file in ${dir}`);
 	});
 
-	return at;
+	return { at, templates: entries };
 }

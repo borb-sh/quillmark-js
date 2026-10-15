@@ -91,7 +91,7 @@ export async function laySite({
 	assertClient(dist);
 	assertSafeOut(collection, out);
 	const at = resolve(out);
-	const starters = templates === undefined ? undefined : assertTemplates(templates);
+	const starters = templates === undefined ? undefined : assertTemplates(templates).at;
 	if (starters !== undefined && within(at, starters))
 		throw new Error(
 			`Refusing to lay a site out in "${out}": the layout clears its output, and this one holds the templates ("${starters}").`
