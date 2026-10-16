@@ -71,6 +71,7 @@
 		controlKind,
 		declaredContent,
 		humanize,
+		literalText,
 		rowSummary,
 		schemaAt,
 		type ArrayLayout
@@ -793,7 +794,7 @@
 							bind:this={els[id]}
 							content={() => readAt([k])}
 							value={arr[k]}
-							plaintext={items != null && baseType(items) === 'plaintext'}
+							plaintext={items != null && literalText(items)}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
 							onKey={(e) => onElementKey(e, k)}

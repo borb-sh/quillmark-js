@@ -19,7 +19,7 @@ import { core } from '../core/lifecycle.js';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
 export type ControlKind =
-	| 'prose' // richtext / plaintext → a codec prose leaf
+	| 'prose' // richtext / text / plaintext → a codec prose leaf
 	| 'text' // string
 	| 'enum' // string+enum | type:'enum' → select
 	| 'variant' // type:'enum' + variants: → select, plus the live world's cells
@@ -225,8 +225,32 @@ export function optionalCell(f: QuillFieldSchema): boolean {
 
 /** The type a cell's control reads: the declared one, an optional cell's `?` stripped.
  *  The `?` moves the render floor and nothing else, so every read of a type is this. */
-export function baseType(f: QuillFieldSchema): QuillFieldType {
-	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as QuillFieldType;
+export function baseType(f: QuillFieldSchema): FieldType {
+	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as FieldType;
+}
+
+/** A field type as either schema echo spells it: the pinned boundary's union, plus
+ *  `text`, the plain-text type of the echo that carries `multiline` in place of
+ *  `inline` and types no `string` or `plaintext`. */
+export type FieldType = QuillFieldType | 'text';
+
+/**
+ * Whether a content field is one line: one paragraph, no container, no island. An echo
+ * carrying `multiline` (every `richtext`, and a `text` declaring it) or typing the field
+ * `text` is one line unless `multiline` is `true`; one carrying neither is one line
+ * where `inline` is `true`.
+ */
+export function oneLine(f: QuillFieldSchema): boolean {
+	const { multiline } = f as { multiline?: boolean };
+	if (typeof multiline === 'boolean' || baseType(f) === 'text') return multiline !== true;
+	return f.inline === true;
+}
+
+/** Whether a content field's codec is the literal one, its value text with no marks:
+ *  `text` and `plaintext`. */
+export function literalText(f: QuillFieldSchema): boolean {
+	const type = baseType(f);
+	return type === 'text' || type === 'plaintext';
 }
 
 /**
@@ -265,10 +289,11 @@ export function declaredContent(v: unknown, markdown: boolean): Content | undefi
 }
 
 /** A field's `{#each}` key: its name and what a mounted leaf reads once, its type and
- *  `inline` and its elements'. A retype or a quill swap that changes any of them under a
- *  name remounts the field, where a kept leaf would commit on the old schema. */
+ *  {@link oneLine} and its elements'. A retype or a quill swap that changes any of them
+ *  under a name remounts the field, where a kept leaf would commit on the old schema. */
 export function mountKey(name: string, f: QuillFieldSchema): string {
-	return `${name}\u0000${f.type}\u0000${f.inline === true}\u0000${f.items?.type ?? ''}\u0000${f.items?.inline === true}`;
+	const items = f.items;
+	return `${name}\u0000${f.type}\u0000${oneLine(f)}\u0000${items?.type ?? ''}\u0000${items ? oneLine(items) : ''}`;
 }
 
 /** Map a field schema to its control (precedence: prose › enum › text › …).
@@ -277,6 +302,7 @@ export function mountKey(name: string, f: QuillFieldSchema): string {
 export function controlKind(f: QuillFieldSchema): ControlKind {
 	switch (baseType(f)) {
 		case 'richtext':
+		case 'text':
 		case 'plaintext':
 			return 'prose';
 		case 'enum':
@@ -535,19 +561,18 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
 // ── Row summaries and layouts ────────────────────────────────────────────────
 
 /** Whether a cell is one line tall by declaration: the shape a table column and a row
- *  summary can hold. A prose cell is one where it declares `inline`, `richtext` or
- *  `plaintext` alike. */
+ *  summary can hold. A prose cell is one where it is {@link oneLine}. */
 export function shortCell(sub: QuillFieldSchema): boolean {
 	const kind = controlKind(sub);
-	if (kind === 'prose') return !!sub.inline;
+	if (kind === 'prose') return oneLine(sub);
 	return (
 		kind === 'text' || kind === 'enum' || kind === 'number' || kind === 'boolean' || kind === 'date'
 	);
 }
 
 /**
- * The first short text cell's words — the first `string`, or inline `richtext` /
- * `plaintext`, in declaration order — read through {@link titleText}; `undefined` where
+ * The first short text cell's words — the first `string`, or one-line `text` /
+ * `richtext` / `plaintext`, in declaration order — read through {@link titleText}; `undefined` where
  * there is no such cell or it is empty. The cell is picked by the schema alone, so an
  * instance is named by one cell whatever the others hold. What names an instance from
  * its own values: a collapsed row, and a card whose kind declares no `title`.
@@ -658,8 +683,8 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 			compact: schema.ui?.compact ?? packsByDefault(control),
 			label: schema.title ?? humanize(name),
 			description: schema.description,
-			inline: !!schema.inline,
-			plaintext: baseType(schema) === 'plaintext'
+			inline: oneLine(schema),
+			plaintext: literalText(schema)
 		};
 	});
 }
@@ -755,10 +780,10 @@ export interface PlacedField {
 /**
  * Whether a field can share a row. `compact` asks; a shape declines when the
  * document sets its height, because a row is as tall as its tallest cell and the cell
- * beside it does not grow in step: an object nests a whole field set, block richtext
- * (`inline` absent) holds paragraphs, and an array holds however many elements the
- * document carries. Any of them stands its neighbour in a column of whitespace. An
- * inline prose leaf is one line tall and packs like any scalar.
+ * beside it does not grow in step: an object nests a whole field set, a multiline prose
+ * leaf holds paragraphs or lines, and an array holds however many elements the
+ * document carries. Any of them stands its neighbour in a column of whitespace. A
+ * one-line prose leaf packs like any scalar.
  *
  * A variant declines for the same reason one step further in: its height is the live
  * world's cell count, so it is set by a pick rather than only by the document, and a

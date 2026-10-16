@@ -45,6 +45,7 @@
 		flatObject,
 		humanize,
 		isContainer,
+		literalText,
 		mountKey,
 		optionalCell,
 		placeFields,
@@ -378,7 +379,7 @@
 						content={() => contentAt([key])}
 						value={obj[key]}
 						fallback={contentDefault(sub)}
-						plaintext={baseType(sub) === 'plaintext'}
+						plaintext={literalText(sub)}
 						placeholder={noneOf(key, sub)}
 						{block}
 						label={named}
