@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`onActiveLeafChange` names the leaf inside a container.** A focus inside an object, an array, a variant or a matrix reports the property, element, cell or member it is in, `main.contact.email` or `main.keywords[0]`, the path a region and a diagnostic name it by, where it reported the field holding it. A move between two cells of one field reports again. `fieldPathForAddr` takes the steps below the field as an optional third argument.
+
 **A `text` field mounts as plain-text prose, one line unless it declares `multiline: true`.** Under a schema echo that types a field `text` and carries `multiline` in place of `inline`, a one-line `text` field draws and commits as a one-line `plaintext` field does, packing under `ui.compact`, standing as a table column and titling a collapsed row; a `multiline: true` one draws as a `plaintext` field without `inline`, and a `richtext` field is one paragraph unless it carries `multiline: true`. An echo carrying `inline` reads as before.
 
 **No field draws a required `*`.** A field without a `default:` drew a persistent `*` on its label, announced as "required", and a table cell or an object property without a label named itself with "required" after it; nothing draws or announces obligation now, a field's `description:` being where a quill says whether it wants an answer. A quill dropping a `default: ""` that only marked a field as skippable changes nothing in the editor. `VisualStrings` drops `fieldRequired`, so an object literal typed as it that still names the key fails to type-check.
