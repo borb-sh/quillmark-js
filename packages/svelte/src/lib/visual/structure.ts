@@ -52,13 +52,6 @@ export interface FieldModel {
 	/** Schema `description`: authoring help rendered beside the label,
 	 * undefined when the field declares none. Chrome-only; never gates. */
 	description: string | undefined;
-	/**
-	 * Required-ness: {@link obliged}. Drives a persistent label `*`; a field never
-	 * carries both it and a ghosted `default:`, that default being the whole of what
-	 * retires the obligation. Persistent (schema-derived, survives filling). Label
-	 * chrome only; never gates.
-	 */
-	required: boolean;
 	/** Prose-leaf flags (only meaningful when `control === 'prose'` / array items). */
 	inline: boolean;
 	plaintext: boolean;
@@ -637,23 +630,6 @@ export function commitDiscriminant(
 	return Object.keys(next).length ? next : undefined;
 }
 
-/**
- * Whether the schema obliges a cell: `default:`'s absence, which is the whole of the
- * obligation (DOCUMENT_MODEL). Exempt are the cells whose absence of one says nothing:
- * a typed dictionary, since a namespace declares no `default:` at all and `validate`
- * anchors obligation on the leaves under it; a matrix, whose blank is nothing held, a
- * whole answer; and an optional cell, which can declare none, its unanswered render
- * being `none`.
- */
-export function obliged(schema: QuillFieldSchema): boolean {
-	return (
-		schema.type !== 'object' &&
-		schema.type !== 'matrix' &&
-		!optionalCell(schema) &&
-		schema.default === undefined
-	);
-}
-
 /** `foo_bar` → `Foo bar`: the label fallback when a field declares no `title`. */
 export function humanize(name: string): string {
 	const spaced = name.replace(/_/g, ' ').trim();
@@ -682,7 +658,6 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 			compact: schema.ui?.compact ?? packsByDefault(control),
 			label: schema.title ?? humanize(name),
 			description: schema.description,
-			required: obliged(schema),
 			inline: !!schema.inline,
 			plaintext: baseType(schema) === 'plaintext'
 		};

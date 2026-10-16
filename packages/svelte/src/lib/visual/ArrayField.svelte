@@ -71,7 +71,6 @@
 		controlKind,
 		declaredContent,
 		humanize,
-		obliged,
 		rowSummary,
 		schemaAt,
 		type ArrayLayout
@@ -105,8 +104,6 @@
 		max?: number;
 		/** Accessible-name prefix for the element controls (`label` + 1-based index). */
 		label?: string;
-		/** No-default field → a persistent required `*` on the label. */
-		required?: boolean;
 		/** Schema `description`: the label's help affordance. */
 		description?: string;
 		/** The label's own DOM id. An array is a group (N inputs, no single `for`
@@ -140,7 +137,6 @@
 		layout = 'list',
 		max,
 		label,
-		required,
 		description,
 		labelId,
 		descriptionId,
@@ -648,14 +644,7 @@
 >
 	<div class="qm-array-header">
 		{#if label != null}
-			<FieldLabel
-				{label}
-				id={labelId}
-				{descriptionId}
-				onActivate={focus}
-				{required}
-				{description}
-			/>
+			<FieldLabel {label} id={labelId} {descriptionId} onActivate={focus} {description} />
 		{:else}
 			<span></span>
 		{/if}
@@ -687,8 +676,8 @@
 			<div class="qm-array-table-scroller" style:--table-cols={columns.length}>
 				<!-- The header names the columns, so a cell carries no label of its own: its
 				     accessible name is the row's and the column's composed (`ObjectField`). The
-				     obligation mark and the guidance affordance ride the header, being the
-				     column's rather than any one cell's. -->
+				     guidance affordance rides the header, being the column's rather than any
+				     one cell's. -->
 				<div class="qm-array-table-head">
 					{#each columns as [key, sub] (key)}
 						<div
@@ -700,7 +689,6 @@
 							<FieldLabel
 								label={columnTitle(key, sub)}
 								descriptionId={idBase != null ? propertyDomIds(idBase, key).description : undefined}
-								required={obliged(sub)}
 								description={sub.description}
 							/>
 						</div>

@@ -545,10 +545,9 @@ describe('an array’s default', () => {
 });
 
 describe('an optional cell', () => {
-	it('takes its base type’s control, draws no `*`, and ghosts `None` at rest', () => {
+	it('takes its base type’s control and ghosts `None` at rest', () => {
 		const target = open();
 		const ref = field(target, 'Ref');
-		expect(ref.querySelector('.qm-field-required')).toBeNull();
 		expect(input(ref).placeholder).toBe(NONE);
 
 		const size = field(target, 'Size');

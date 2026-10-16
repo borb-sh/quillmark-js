@@ -31,7 +31,6 @@ import {
 	memberValue,
 	memberWrite,
 	commitMember,
-	obliged,
 	optionalCell,
 	baseType,
 	declaredContent,
@@ -575,23 +574,6 @@ describe('rowSummary', () => {
 	});
 });
 
-describe('obliged', () => {
-	it('reads default absence at a leaf, and nothing at a namespace', () => {
-		expect(obliged(f({ type: 'string' }))).toBe(true);
-		// An empty string or array is a `default:` all the same.
-		expect(obliged(f({ type: 'string', default: '' }))).toBe(false);
-		expect(obliged(f({ type: 'array', default: [] }))).toBe(false);
-		expect(obliged(f({ type: 'object', properties: {} }))).toBe(false);
-		expect(obliged(f({ type: 'matrix', members: { a: 'A' } }))).toBe(false);
-	});
-
-	it('reads nothing at an optional cell, which can declare no `default:`', () => {
-		expect(obliged(f({ type: 'string?' }))).toBe(false);
-		expect(obliged(f({ type: 'enum?', values: ['a'] }))).toBe(false);
-		expect(obliged(f({ type: 'array?', items: f({}) }))).toBe(false);
-	});
-});
-
 // The `?` moves the render floor and nothing else, so an optional cell reads as its
 // base type everywhere a type is read.
 describe('optional cells', () => {
@@ -631,11 +613,10 @@ describe('optional cells', () => {
 		expect(rowSummary(items, { note: 'Primary' })).toBe('Primary');
 	});
 
-	it('project as the base type, unobliged', () => {
+	it('project as the base type', () => {
 		const [model] = fieldModels({ fields: { note: f({ type: 'plaintext?', inline: true }) } });
 		expect(model.control).toBe('prose');
 		expect(model.plaintext).toBe(true);
-		expect(model.required).toBe(false);
 	});
 });
 

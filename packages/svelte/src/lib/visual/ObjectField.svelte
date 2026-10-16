@@ -46,7 +46,6 @@
 		humanize,
 		isContainer,
 		mountKey,
-		obliged,
 		optionalCell,
 		placeFields,
 		printedText,
@@ -148,12 +147,6 @@
 	const routed = $derived(splitDeep(diagnostics));
 	const foot = $derived(unrouted(routed, (step) => typeof step === 'string' && has(step)));
 
-	/** Obligation, read off the cell exactly as `fieldModels` reads it off a field
-	 *  ({@link obliged}). `validate` anchors it per leaf, so a property with no
-	 *  `default:` is obliged in its own right and the container around it holds none
-	 *  (VISUAL_EDITOR §"Enum variants"). */
-	const required = obliged;
-
 	const title = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
 	/** What an unset optional cell ghosts, which is what it prints: `none`. An answered
 	 *  cell ghosts nothing, an empty answer printing empty. */
@@ -167,8 +160,7 @@
 	/** The `aria-label` fallback, for a subform mounted without a field's id space:
 	 *  the field's name and the property's, since nothing else names the control. */
 	const fallbackName = (key: string, sub: QuillFieldSchema): string =>
-		`${label != null ? `${label} ` : ''}${title(key, sub)}` +
-		(required(sub) ? ` ${t.strings.fieldRequired}` : '');
+		`${label != null ? `${label} ` : ''}${title(key, sub)}`;
 
 	/** The handles of the cells the DOM cannot answer for, keyed by property name —
 	 *  which is stable, a subform drawing its properties by declaration and never by
@@ -321,7 +313,6 @@
 						id={ids.label}
 						descriptionId={describes}
 						onActivate={labelable ? undefined : () => focusProp(key)}
-						required={required(sub)}
 						description={sub.description}
 					/>
 				{/if}
@@ -409,7 +400,6 @@
 						layout={arrayLayout(sub)}
 						max={sub.max}
 						label={title(key, sub)}
-						required={required(sub)}
 						description={sub.description}
 						labelId={ids?.label}
 						descriptionId={describes}

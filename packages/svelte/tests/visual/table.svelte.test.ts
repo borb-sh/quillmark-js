@@ -18,10 +18,9 @@ const headers = (t: HTMLElement) =>
 	[...t.querySelectorAll<HTMLElement>('.qm-array-table-head .qm-field-label')].map(
 		(l) => l.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 	);
-// The cell's name is the row's and the column's composed, and `name` is obliged, so the
-// word rides the name the way the `*` rides a label.
+// The cell's name is the row's and the column's composed.
 const nameCell = (t: HTMLElement, k: number) =>
-	t.querySelector<HTMLInputElement>(`input[aria-label="Contributors ${k + 1} Name required"]`)!;
+	t.querySelector<HTMLInputElement>(`input[aria-label="Contributors ${k + 1} Name"]`)!;
 const count = (t: HTMLElement) => t.querySelector('.qm-array-count')?.textContent;
 const addChip = (t: HTMLElement) => t.querySelector<HTMLButtonElement>('.qm-add-el')!;
 
@@ -34,8 +33,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 		expect(t.querySelector('.qm-array-table')).not.toBeNull();
 		expect(t.querySelector('.qm-element-summary')).toBeNull();
-		// The obligation mark rides the header: `name` declares no default.
-		expect(headers(t)).toEqual(['Name *', 'Role', 'Since', 'Lead']);
+		expect(headers(t)).toEqual(['Name', 'Role', 'Since', 'Lead']);
 		expect(t.querySelectorAll('.qm-array-table-row')).toHaveLength(2);
 
 		// Each cell is the property's own control, named by the row and the column.

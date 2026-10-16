@@ -84,7 +84,7 @@ describe('an object field', () => {
 		// `listed`'s default retires its own while the container above holds none either way.
 		expect(
 			props.map((p) => p.querySelector('.qm-field-label')?.textContent?.replace(/\s+/g, ' ').trim())
-		).toEqual(['Name *', 'Email *', 'Reply by *', 'Listed', 'Note']);
+		).toEqual(['Name', 'Email', 'Reply by', 'Listed', 'Note']);
 
 		type(props[0].querySelector('input')!, 'Ada Lovelace');
 		expect(read(q, doc, 'contact')).toEqual({ name: 'Ada Lovelace' });
@@ -186,7 +186,7 @@ describe('an array of objects', () => {
 		const props = [...arr.querySelectorAll<HTMLElement>('.qm-object-prop')];
 		expect(
 			props.map((p) => p.querySelector('.qm-field-label')?.textContent?.replace(/\s+/g, ' ').trim())
-		).toEqual(['Note *', 'Pages *', 'Detail', 'Rationale', 'Passage']);
+		).toEqual(['Note', 'Pages', 'Detail', 'Rationale', 'Passage']);
 
 		type(props[0].querySelector('input')!, 'First cut');
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut' }]);

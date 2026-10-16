@@ -5,7 +5,7 @@
 // drives it, and read back through the document rather than off a captured callback.
 //
 // The claims that are the feature: a world's cells appear and retire with the pick,
-// obligation is per world (`lift_on` is required on an embargoed document and exists
+// a cell exists in its own world only (`lift_on` is drawn on an embargoed document and
 // nowhere else), an answer the discriminant strands is kept rather than dropped, and a
 // content cell (`handling`'s two) is a leaf at the depth it sits.
 import { describe, it, expect, afterEach } from 'vitest';
@@ -20,10 +20,8 @@ afterEach(unmountAll);
 const pickWorld = (target: HTMLElement, text: string | null, name = 'Distribution') =>
 	pick(field(target, name), text);
 
-/** The drawn cells of the live world, label text in declaration order. The marker is
- *  a sibling node inside the label, so the text is normalized rather than compared
- *  raw: what the assertions are about is the name and its obligation, not the
- *  whitespace `FieldLabel`'s markup leaves between the two. */
+/** The drawn cells of the live world, label text in declaration order, normalized
+ *  past the whitespace `FieldLabel`'s markup leaves. */
 function cellLabels(target: HTMLElement, name = 'Distribution'): string[] {
 	return [
 		...field(target, name).querySelectorAll<HTMLElement>('.qm-object-prop .qm-field-label')
@@ -54,12 +52,10 @@ describe('a variant enum field', () => {
 		expect(stored(doc)).toBeUndefined();
 		expect(cellLabels(target)).toEqual([]);
 
-		// `lift_on` declares no `default:` and is obliged; `held_by` declares `""` and is
-		// not. The pair is what the axis buys: required *in this world*. `notices` is the
-		// world's third cell, a record list drawn at the next rung and labelled by its
+		// `notices` is the world's third cell, a record list drawn at the next rung and labelled by its
 		// own header row.
 		pickWorld(target, 'embargoed');
-		expect(cellLabels(target)).toEqual(['Lift on *', 'Held by', 'Notices']);
+		expect(cellLabels(target)).toEqual(['Lift on', 'Held by', 'Notices']);
 
 		// One world's cells are not the other's: the flip retires both and brings the
 		// licence in, rather than accumulating a union of every world's fields.
@@ -70,7 +66,7 @@ describe('a variant enum field', () => {
 		expect(cellLabels(target)).toEqual([]);
 	});
 
-	it('names an obliged cell through a real label, and says "required" on the marker', () => {
+	it('names a cell through a real label', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		const { target } = mountEditor(q, doc);
@@ -82,17 +78,7 @@ describe('a variant enum field', () => {
 		const input = cellInput(target, 'Lift on');
 		expect(input.getAttribute('aria-label')).toBeNull();
 		const label = target.querySelector<HTMLLabelElement>(`label[for="${input.id}"]`);
-		expect(label?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Lift on *');
-		// The glyph announces the word rather than the character, and it rides inside the
-		// label so it names the control along with the text.
-		expect(label?.querySelector('.qm-field-required')?.getAttribute('aria-label')).toBe('required');
-
-		const unobliged = cellInput(target, 'Held by');
-		expect(
-			target
-				.querySelector<HTMLLabelElement>(`label[for="${unobliged.id}"]`)
-				?.querySelector('.qm-field-required')
-		).toBeNull();
+		expect(label?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Lift on');
 	});
 
 	it('commits a cell into the container, keeping the discriminant beside it', () => {
@@ -195,15 +181,13 @@ describe('a variant whose default is the blank', () => {
 		expect(held(doc)).toBeUndefined();
 	});
 
-	it('names its prose cells, marks the obliged one, and mounts a leaf in each', () => {
+	it('names its prose cells and mounts a leaf in each', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'CONTROLLED', 'Handling');
-		// Obligation is per world and per cell: `controlled_by` declares no `default:`
-		// and `caveat` declares the blank.
-		expect(cellLabels(target, 'Handling')).toEqual(['Controlled by *', 'Caveat']);
+		expect(cellLabels(target, 'Handling')).toEqual(['Controlled by', 'Caveat']);
 
 		// A content cell is a leaf like any other, at the depth it sits: the cell mounts
 		// the prose leaf its scalar field mounts, named by the label beside it.
