@@ -1,7 +1,7 @@
 // The diagnostics, merged. Four producers say something about the document in hand — the
-// schema's verdict, the compile, the `conform::*` set a repack stranded, and what a
-// surface recovered from — and one field's one problem should read as one thing, so the
-// merged set is deduplicated before it reaches the editor that routes it.
+// schema's verdict, the compile, the `conform::*` set a repack stranded, and what the last
+// emit refused — and one field's one problem should read as one thing, so the merged set
+// is deduplicated before it reaches the editor that routes it.
 //
 // Routing is by `path`, the document's own address space: a diagnostic carrying one
 // reaches the control it is about. A diagnostic carrying `location` instead names a file,

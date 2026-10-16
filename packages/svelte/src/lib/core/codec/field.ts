@@ -50,6 +50,7 @@ import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
+import { nestingPlugin } from './nesting.js';
 import { tablePastePlugin } from './table-paste.js';
 import { tableCopyPlugin } from './table-copy.js';
 import { taskPlugin } from './tasks.js';
@@ -748,7 +749,8 @@ export function proseLeafPlugins(
 			tablePastePlugin(),
 			tableCopyPlugin(),
 			markdownPastePlugin(),
-			taskPlugin()
+			taskPlugin(),
+			nestingPlugin()
 		);
 	if (schema === plainSchema) list.push(plainClipboardPlugin());
 	if (opts.placeholder) list.push(ghostPlugin(opts));
