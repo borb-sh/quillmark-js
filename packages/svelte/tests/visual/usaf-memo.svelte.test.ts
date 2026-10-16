@@ -69,12 +69,8 @@ describe('the shipped quill on the surface', () => {
 		const { target } = mountEditor(q, doc);
 
 		const card = [...target.querySelectorAll<HTMLElement>('.qm-card')][1];
-		// The marker rides inside the label, so the text carries it: three of this kind's
-		// fields declare no `default:` and say so.
 		expect(texts(card, '.qm-field-label')).toEqual(
-			fieldModels(q.schema.card_kinds!.indorsement).map((m) =>
-				m.required ? `${m.label} *` : m.label
-			)
+			fieldModels(q.schema.card_kinds!.indorsement).map((m) => m.label)
 		);
 	});
 
@@ -117,11 +113,11 @@ describe('the shipped quill on the surface', () => {
 		const { target } = mountEditor(q, doc);
 
 		const classification = field(target, 'Classification');
-		// Named and obliged as the schema declares them, and each a `plaintext` leaf, so a
+		// Named as the schema declares them, and each a `plaintext` leaf, so a
 		// CUI document can be finished from this surface.
 		expect(texts(classification, '.qm-object-prop .qm-field-label')).toEqual([
-			'Controlled by *',
-			'Poc *',
+			'Controlled by',
+			'Poc',
 			'Category',
 			'Limited dissemination'
 		]);

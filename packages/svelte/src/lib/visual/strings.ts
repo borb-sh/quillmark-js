@@ -4,7 +4,7 @@
 // makes wording an override rather than a fork.
 //
 // Several of these are accessible names rather than decoration — the card
-// controls, the add trigger, the required marker — so an untranslated surface is
+// controls, the add trigger — so an untranslated surface is
 // not merely inconsistent, it reads the wrong language to a screen reader. That is
 // why this exists as a seam and not as a list of literals to grep for.
 //
@@ -14,7 +14,7 @@
 //
 // The strings reach the tree through context, not props. They are ambient,
 // read-only, and wanted eight components deep (a card's controls, a field's
-// required marker, the formatting popover, the tips card); threading them by hand
+// optional ghost, the formatting popover, the tips card); threading them by hand
 // would put a `strings` prop on every component between the root and each leaf,
 // which is a prop that means nothing to any of them.
 import { getContext, setContext } from 'svelte';
@@ -98,8 +98,6 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	dateToday: string;
 
 	// ── Field chrome ──────────────────────────────────────────────────────────
-	/** The required marker's accessible name; the glyph itself is a `*`. */
-	fieldRequired: string;
 	/** What an unset optional cell (`t?`) ghosts at rest: the `none` it prints
 	 *  unanswered, in the product's words. */
 	optionalGhost: string;
@@ -222,7 +220,6 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	matrixItemTitle: (list, index) => `${list ? `${list} item` : 'Item'} ${index}`,
 	matrixRemove: (title) => `Remove ${title}`,
 	dateToday: 'Today',
-	fieldRequired: 'required',
 	optionalGhost: 'None',
 	proseHeld: 'Holds more than this field can edit here.',
 	formatGroup: 'Formatting',

@@ -80,9 +80,7 @@ describe('the guidance key', () => {
 	it('reaches a table column’s description from any cell in it', () => {
 		const { target } = mountEditor(quill(), example());
 		const table = field(target, 'Contributors');
-		const cell = table.querySelector<HTMLInputElement>(
-			'input[aria-label="Contributors 2 Name required"]'
-		)!;
+		const cell = table.querySelector<HTMLInputElement>('input[aria-label="Contributors 2 Name"]')!;
 		expect(describedText(cell)).toEqual(['As credited.']);
 
 		cell.focus();

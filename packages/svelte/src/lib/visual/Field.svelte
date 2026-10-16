@@ -276,7 +276,6 @@
 			id={domIds.label}
 			descriptionId={domIds.description}
 			{onActivate}
-			required={field.required}
 			description={field.description}
 		/>
 	{/if}
@@ -374,7 +373,6 @@
 					layout={arrayLayout(field.schema)}
 					max={field.schema.max}
 					label={field.label}
-					required={field.required}
 					description={field.description}
 					labelId={domIds.label}
 					descriptionId={domIds.description}
