@@ -27,7 +27,7 @@
 		ResolvedField
 	} from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
-	import { seatValueLeaves, type LandingBox, type LeafRegistry } from './leaves.js';
+	import { seatValueLeaves, stepsTo, type LandingBox, type LeafRegistry } from './leaves.js';
 	import type { FieldModel, FieldSpan } from './structure.js';
 	import {
 		VARIANT_DISCRIMINANT,
@@ -82,7 +82,9 @@
 		optionAllowed?: (value: string) => boolean;
 		/** How a refused option draws: greyed (default) or left out. */
 		enumDisallowed?: 'hide' | 'disable';
-		onFocus?: (addr: Addr) => void;
+		/** A focus inside the field: its address, and the steps down to the cell holding
+		 *  the focus ({@link stepsTo}), `[]` on the field's own control. */
+		onFocus?: (addr: Addr, steps?: readonly PathStep[]) => void;
 		onCaretMove?: (addr: Addr, pos: number) => void;
 		onChange?: (addr: Addr) => void;
 		onError?: EditorErrorHandler;
@@ -251,7 +253,8 @@
 	}
 
 	// A by-value prose leaf anywhere inside this field's containers is reached under
-	// this field's key: the active address names the field, never the element or cell.
+	// this field's key: the registry and the active address name the field, never the
+	// element or cell.
 	seatValueLeaves({
 		focus: (leaf) => leaves?.focusValue(leafKey, leaf),
 		release: (leaf) => leaves?.releaseValue(leafKey, leaf)
@@ -261,11 +264,16 @@
 	 * A form control has no controller to report its focus through, so the wrapper
 	 * reports: `focusin` bubbles, so one handler covers a plain input, an array's N
 	 * elements and an object's properties alike, and the active leaf names a scalar
-	 * field the way it names a prose one. A prose leaf reports through its own
+	 * field the way it names a prose one, down to the element or cell the focus is in. A prose leaf reports through its own
 	 * controller — the source that drives its caret signals too — and is excluded here
 	 * rather than counted twice.
 	 */
-	const reportFocus = $derived(field.control === 'prose' ? undefined : () => onFocus?.(addr));
+	const reportFocus = $derived(
+		field.control === 'prose'
+			? undefined
+			: (e: FocusEvent & { currentTarget: HTMLElement }) =>
+					onFocus?.(addr, stepsTo(e.target, e.currentTarget))
+	);
 </script>
 
 <div class={['qm-field', { cell: span === 'cell' }]}>

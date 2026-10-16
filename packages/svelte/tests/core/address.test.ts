@@ -30,6 +30,15 @@ describe('fieldPathForAddr', () => {
 		expect(fieldPathForAddr({ card: 0, field: 'from' }, [''])).toBe('cards[0].from');
 	});
 
+	it('descends from the field by steps, in the region and diagnostic spelling', () => {
+		expect(fieldPathForAddr({ field: 'contact' }, [], ['email'])).toBe('main.contact.email');
+		expect(fieldPathForAddr({ field: 'keywords' }, [], [0])).toBe('main.keywords[0]');
+		expect(fieldPathForAddr({ card: 0, field: 'refs' }, ['note'], [2, 'org'])).toBe(
+			'cards.note[0].refs[2].org'
+		);
+		expect(fieldPathForAddr({ card: 0 }, ['note'], ['x'])).toBeUndefined();
+	});
+
 	it('drops an out-of-range or malformed card index', () => {
 		expect(fieldPathForAddr({ card: 5 }, ['indorsement'])).toBeUndefined();
 		expect(fieldPathForAddr({ card: -1 }, ['indorsement'])).toBeUndefined();

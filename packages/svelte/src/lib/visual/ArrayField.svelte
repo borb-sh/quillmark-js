@@ -71,6 +71,7 @@
 		controlKind,
 		declaredContent,
 		humanize,
+		literalText,
 		rowSummary,
 		schemaAt,
 		type ArrayLayout
@@ -696,7 +697,11 @@
 					<span class="qm-array-table-head-end"></span>
 				</div>
 				{#each ids as id, k (id)}
-					<div class="qm-array-row qm-array-table-row qm-wash" bind:this={rowEls[id]}>
+					<div
+						class="qm-array-row qm-array-table-row qm-wash"
+						data-qm-index={k}
+						bind:this={rowEls[id]}
+					>
 						<ObjectField
 							bare
 							bind:this={cellEls[id]}
@@ -730,6 +735,7 @@
 						{ open: open.has(id), lifted: drag?.engaged && drag.k === k }
 					]}
 					data-drop={dropSide(k)}
+					data-qm-index={k}
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
 					onkeydown={(e) => onRowKey(e, k)}
@@ -787,13 +793,13 @@
 			bind:this={rowsEl}
 		>
 			{#each ids as id, k (id)}
-				<div class="qm-array-row qm-wash" bind:this={rowEls[id]}>
+				<div class="qm-array-row qm-wash" data-qm-index={k} bind:this={rowEls[id]}>
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
 							content={() => readAt([k])}
 							value={arr[k]}
-							plaintext={items != null && baseType(items) === 'plaintext'}
+							plaintext={items != null && literalText(items)}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
 							onKey={(e) => onElementKey(e, k)}
