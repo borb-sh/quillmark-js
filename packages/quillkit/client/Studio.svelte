@@ -85,8 +85,8 @@
 	// ── The errors ──────────────────────────────────────────────────────────────
 	/** The diagnostics of a throw: a failed open or a failed recompile. */
 	let thrown = $state.raw<Diagnostic[]>([]);
-	/** What a surface last reported: an edit the store did not take as typed, a page that
-	 *  would not paint. About neither a field nor a line of source, so it reaches the strip
+	/** What a surface last reported: an edit the store does not hold, a page that would not
+	 *  paint. About neither a field nor a line of source, so it reaches the strip
 	 *  and not the editor, and holds until the next edit lands. */
 	let surfaced = $state.raw<EditorError | undefined>();
 	/** What the last carry stranded. Held for the open and dropped at the first edit:
@@ -487,11 +487,11 @@
 		previewRef?.endFollow();
 	}
 
-	/** Both surfaces report here. A `commit-refused` is already drawn on its field, as the
-	 *  diagnostic the editor pins beside it. Held from a microtask on: a `commit-fallback`
-	 *  still lands its edit, and the change that edit reports would clear it. */
+	/** Both surfaces report here, and two codes reach the strip: an edit the store does not
+	 *  hold and a page that would not paint. Every other code leaves the document and the
+	 *  paint as they read, or is drawn on its field already. */
 	function handleSurfaceError(err: EditorError): void {
-		if (err.code !== 'commit-refused') queueMicrotask(() => (surfaced = err));
+		if (err.code === 'commit-lost' || err.code === 'paint-failed') surfaced = err;
 	}
 
 	onMount(() => {
@@ -647,10 +647,9 @@
 					{#if halt}
 						<!-- A document that reaches no paint is a state of the paint, not a row under
 						     it: the failure at the surface it is about, carrying the place to open
-						     (STUDIO §"The errors"). The band below still lists it, one list being
-						     its job. The label says which it stands over: a stale paint, none, a
-						     paint an editor error may have left behind the editor, or a paint that is
-						     whole and would not be written out. -->
+						     (STUDIO §"The errors"). The label says which it stands over: a stale
+						     paint, none, a paint an editor error may have left behind the editor, or
+						     a paint that is whole and would not be written out. -->
 						<div class="stalled" data-testid="stalled" role="status">
 							<span class="qm-status qm-status-error">{halt.said}</span>
 							{#if halt.at}
