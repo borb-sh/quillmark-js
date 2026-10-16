@@ -22,7 +22,7 @@
 	],
 	"author": "Quillmark Contributors",
 	"engines": {
-		"node": ">=24"
+		"node": ">=22"
 	},
 	"files": [
 		"dist",

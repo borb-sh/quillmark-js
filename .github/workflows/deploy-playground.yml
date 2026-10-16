@@ -47,12 +47,14 @@ jobs:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: npm run build -w packages/playground
 
-      - name: SPA deep-link fallback
-        # adapter-static emits only the index.html shell (prerender is off).
-        # GitHub Pages serves 404.html for any unmatched path, so a hard load of
-        # /preview or /visual needs the shell under that name too — the client
-        # router then resolves the route. The homepage still gets index.html (200).
-        run: cp packages/playground/build/index.html packages/playground/build/404.html
+      - name: SPA route shells
+        # adapter-static emits only the index.html shell (prerender is off), and the
+        # client router resolves the route. Pages answers /playground with a 200 from
+        # playground.html, the form Kit's links take under its default trailingSlash
+        # ('never'); any other path gets the same shell as 404.html, with a 404.
+        run: |
+          cp packages/playground/build/index.html packages/playground/build/playground.html
+          cp packages/playground/build/index.html packages/playground/build/404.html
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -39,7 +39,10 @@ import {
 	addedItems,
 	addedId,
 	matrixDeclares,
-	matrixEmpty
+	matrixEmpty,
+	oneLine,
+	literalText,
+	mountKey
 } from '$lib/visual/structure';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quill } from '../helpers/fixtures.js';
@@ -70,6 +73,84 @@ describe('controlKind', () => {
 		expect(
 			controlKind(f({ type: 'enum', values, variants: { b: { note: f({ type: 'string' }) } } }))
 		).toBe('variant');
+	});
+});
+
+/** A schema in the echo that types `text` and carries `multiline`, which the pinned
+ *  boundary's types do not declare. */
+const wide = (over: Record<string, unknown>): QuillFieldSchema =>
+	over as unknown as QuillFieldSchema;
+
+describe('the one-line plain-text field, on either echo', () => {
+	it('mounts `text` as a literal prose leaf, one line unless `multiline: true`', () => {
+		for (const type of ['text', 'text?']) {
+			const short = wide({ type });
+			const tall = wide({ type, multiline: true });
+			expect(controlKind(short)).toBe('prose');
+			expect(controlKind(tall)).toBe('prose');
+			expect([oneLine(short), literalText(short)]).toEqual([true, true]);
+			expect([oneLine(tall), literalText(tall)]).toEqual([false, true]);
+		}
+	});
+
+	it('reads a `richtext` line shape off `multiline` where the echo carries it', () => {
+		expect(oneLine(wide({ type: 'richtext', multiline: false }))).toBe(true);
+		expect(oneLine(wide({ type: 'richtext', multiline: true }))).toBe(false);
+		expect(literalText(wide({ type: 'richtext', multiline: false }))).toBe(false);
+	});
+
+	it('reads it off `inline` where the echo carries no `multiline`', () => {
+		expect(oneLine(f({ type: 'richtext' }))).toBe(false);
+		expect(oneLine(f({ type: 'richtext', inline: true }))).toBe(true);
+		expect(oneLine(f({ type: 'plaintext' }))).toBe(false);
+		expect(oneLine(f({ type: 'plaintext?', inline: true }))).toBe(true);
+		expect(literalText(f({ type: 'plaintext' }))).toBe(true);
+		expect(controlKind(f({ type: 'string' }))).toBe('text');
+	});
+
+	it('projects one-line `text` as one-line `plaintext` projects, and multiline as block', () => {
+		const models = fieldModels({
+			fields: {
+				subject: wide({ type: 'text' }),
+				rank: wide({ type: 'text', ui: { compact: true } }),
+				address: wide({ type: 'text', multiline: true, ui: { compact: true } }),
+				legacy: f({ type: 'plaintext', inline: true, ui: { compact: true } })
+			}
+		});
+		const byName = Object.fromEntries(models.map((m) => [m.name, m]));
+		for (const name of ['subject', 'rank', 'legacy'])
+			expect([byName[name].control, byName[name].inline, byName[name].plaintext]).toEqual([
+				'prose',
+				true,
+				true
+			]);
+		expect([byName.address.inline, byName.address.plaintext]).toEqual([false, true]);
+		expect(byName.subject.compact).toBe(false);
+		expect(placeFields([byName.rank, byName.legacy, byName.address]).map((p) => p.span)).toEqual([
+			'cell',
+			'cell',
+			'full'
+		]);
+	});
+
+	it('holds a one-line `text` cell as a short cell: a table column and a row title', () => {
+		const items = wide({
+			type: 'object',
+			properties: { page: { type: 'integer' }, label: { type: 'text' } }
+		});
+		expect(shortCell(wide({ type: 'text' }))).toBe(true);
+		expect(shortCell(wide({ type: 'text', multiline: true }))).toBe(false);
+		expect(arrayLayout(wide({ type: 'array', ui: { layout: 'table' }, items }))).toBe('table');
+		expect(rowSummary(items, { page: 3, label: 'Primary' })).toBe('Primary');
+	});
+
+	it('remounts a field whose line shape moves under its name', () => {
+		expect(mountKey('a', wide({ type: 'text' }))).not.toBe(
+			mountKey('a', wide({ type: 'text', multiline: true }))
+		);
+		expect(mountKey('a', wide({ type: 'array', items: { type: 'text' } }))).not.toBe(
+			mountKey('a', wide({ type: 'array', items: { type: 'text', multiline: true } }))
+		);
 	});
 });
 

@@ -50,6 +50,7 @@ import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
+import { nestingPlugin } from './nesting.js';
 import { tablePastePlugin } from './table-paste.js';
 import { tableCopyPlugin } from './table-copy.js';
 import { taskPlugin } from './tasks.js';
@@ -422,6 +423,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		dispatchTransaction: (tr) => {
 			const oldRt = reconciler.last;
 			const next = view.state.apply(tr);
+			// A filtered transaction (`nesting.ts`) leaves the state as it was.
+			if (next === view.state) return;
 			// An edit takes a held default: the commit below writes the whole leaf, so the
 			// mark goes in the same update that draws the edit.
 			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) defaulted = false;
@@ -748,7 +751,8 @@ export function proseLeafPlugins(
 			tablePastePlugin(),
 			tableCopyPlugin(),
 			markdownPastePlugin(),
-			taskPlugin()
+			taskPlugin(),
+			nestingPlugin()
 		);
 	if (schema === plainSchema) list.push(plainClipboardPlugin());
 	if (opts.placeholder) list.push(ghostPlugin(opts));

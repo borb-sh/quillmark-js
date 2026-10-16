@@ -268,7 +268,34 @@ describe('the landing verbs over a form control', () => {
 		// and the report is the wrapper's bubbling `focusin` like every other control's.
 		await editor.focusField('main.keywords');
 		await tick();
-		expect(active.at(-1)).toEqual({ field: 'main.keywords', cardId: 'main' });
+		expect(active.at(-1)).toEqual({ field: 'main.keywords[0]', cardId: 'main' });
+	});
+
+	it('names the leaf a focus inside a container is in, not the container', async () => {
+		const q = quill();
+		const { target, editor, active } = mountEditor(q, example());
+
+		await editor.focusField('main.contact.email');
+		await tick();
+		expect(active.at(-1)).toEqual({ field: 'main.contact.email', cardId: 'main' });
+
+		// A move between two cells of one subform is a move between two leaves.
+		field(target, 'Point of contact')
+			.querySelector<HTMLElement>('[data-qm-prop="name"] input')!
+			.focus();
+		await tick();
+		expect(active.at(-1)).toEqual({ field: 'main.contact.name', cardId: 'main' });
+
+		await editor.setCaret({ field: 'main.appendices[0].entries[1].label', pos: 0 });
+		await settle();
+		expect(active.at(-1)).toEqual({
+			field: 'main.appendices[0].entries[1].label',
+			cardId: 'main'
+		});
+
+		await editor.focusField('main.checks.spelling');
+		await tick();
+		expect(active.at(-1)).toEqual({ field: 'main.checks.spelling', cardId: 'main' });
 	});
 
 	it('lands a preview hit on a control by focusing it, placing no caret', async () => {

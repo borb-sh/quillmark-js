@@ -10,7 +10,7 @@
 	},
 	"scripts": {
 		"quiver": "node scripts/build-quiver.mjs",
-		"predev": "npm run quiver",
+		"predev": "npm run quiver -- --drafts",
 		"dev": "vite dev",
 		"prebuild": "npm run quiver",
 		"build": "vite build",

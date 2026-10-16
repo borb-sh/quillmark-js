@@ -126,7 +126,7 @@ A *pick*, unlike a repack, carries nothing. A different quill is a different doc
 
 ## The errors
 
-Five producers say something about the document in hand — `quill.validate(doc)`, the compile (`session.warnings` and the diagnostics a throw carries), the `conform::*` set a repack stranded, what a surface recovered from, and what the last emit refused. They overlap by design, so the set is merged and deduplicated before anything reads it: one field's one problem is one thing on screen. The editor draws errors only; a warning in the set does not.
+Four producers say something about the document in hand — `quill.validate(doc)`, the compile (`session.warnings` and the diagnostics a throw carries), the `conform::*` set a repack stranded, and what the last emit refused. They overlap by design, so the set is merged and deduplicated before anything reads it: one field's one problem is one thing on screen. The editor draws errors only; a warning in the set does not.
 
 A throw is unwrapped rather than reported as one line: a `QuillmarkError` carries every diagnostic, and a broken plate is the case that matters.
 
@@ -135,6 +135,8 @@ A throw is unwrapped rather than reported as one line: a `QuillmarkError` carrie
 What that costs is the third shape. A diagnostic carrying neither address reaches nothing, and studio does not show it. A quill emitting one has a problem worth knowing about, and studio is not where it is found; `quillkit test` is blocked on and is where a quill's own faults are answered for.
 
 **A document that will not compile is a state of the paint.** The session is transactional, so the last good paint stays on screen and stops answering the document. A failed **open** is the same state with nothing under it, and takes the same register: the failure at the surface it is about, carrying the place to open. The paint stays whole underneath where there is one, being the only evidence of what the plate did before it stopped compiling, and the strip is laid over rather than stacked above, so breaking a plate and fixing it do not resize what is being judged.
+
+**Two of what a surface reports reach the strip.** An `EditorError` names no line of source and, from a prose leaf, no field, which would make it the third shape. But a `commit-lost` is an edit on screen that the document does not hold, so the paint stops answering the editor as a failed compile stops it answering the document, and a `paint-failed` is a page that does not answer it at all. The strip takes the latest of the two, its code where a failure's place stands and its message beside it, below a failed compile or open and above a failed download. The next edit that lands drops it. Every other code stays off the strip: a `commit-refused` is pinned on its field as a diagnostic already, and the rest leave the document and the paint as they read.
 
 **The editor stands either way.** It binds a quill and a document and needs no session, so a failed open costs the preview alone. That is what makes a refusal answerable: the card the refusal named is drawn where it can be retyped or removed, and the edit that answers it tries the open again.
 

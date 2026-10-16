@@ -282,7 +282,11 @@
 	>
 		{#each members as m (m.id)}
 			{@const on = held(m.id)}
-			<div class={['qm-member qm-wash', { held: on }]} bind:this={memberEls[m.id]}>
+			<div
+				class={['qm-member qm-wash', { held: on }]}
+				data-qm-prop={m.id}
+				bind:this={memberEls[m.id]}
+			>
 				<div class="qm-member-head">
 					<!-- A real checkbox with its face drawn here: the UA's face is shadow DOM no
 					     dial reaches, so the input is `appearance: none` and the box and the
@@ -306,7 +310,11 @@
 		{/each}
 		{#each added as item, k (item.id)}
 			{@const name = item.title || t.strings.matrixItemTitle(label ?? '', k + 1)}
-			<div class="qm-member qm-wash held added" bind:this={memberEls[item.id]}>
+			<div
+				class="qm-member qm-wash held added"
+				data-qm-prop={item.id}
+				bind:this={memberEls[item.id]}
+			>
 				<div class="qm-member-head">
 					<!-- Held by being present: the tick is fixed, and the remove is its untick. -->
 					<span class="qm-tick" aria-hidden="true">
@@ -317,6 +325,7 @@
 						class="qm-input qm-focus-ring qm-member-title-input"
 						type="text"
 						id={itemTitleId(item.id)}
+						data-qm-prop={MATRIX_TITLE}
 						aria-label={t.strings.matrixItemTitle(label ?? '', k + 1)}
 						value={item.title}
 						bind:this={titleEls[item.id]}
