@@ -210,15 +210,15 @@ function backspaceBelow(itemType: NodeType, press: Command): Command {
 	};
 }
 
-/** Tab → `sinkListItem`, claimed and inert where the sink would nest past
- *  `MAX_NESTING_DEPTH` (`nesting.ts`): a declined Tab is the browser's, which moves the
- *  focus out of the body. */
+/** Tab → `sinkListItem`, declined where the sink would nest past `MAX_NESTING_DEPTH`
+ *  (`nesting.ts`), so Tab there leaves the body as it does on an item with nothing to
+ *  sink under. */
 function sinkWithin(itemType: NodeType): Command {
 	const sink = sinkListItem(itemType);
 	return (state, dispatch) => {
 		let sunk: Transaction | undefined;
-		if (!sink(state, (tr) => (sunk = tr))) return false;
-		if (sunk && withinNesting(sunk.doc)) dispatch?.(sunk);
+		if (!sink(state, (tr) => (sunk = tr)) || !sunk || !withinNesting(sunk.doc)) return false;
+		dispatch?.(sunk);
 		return true;
 	};
 }

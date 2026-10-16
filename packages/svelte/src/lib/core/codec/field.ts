@@ -423,6 +423,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		dispatchTransaction: (tr) => {
 			const oldRt = reconciler.last;
 			const next = view.state.apply(tr);
+			// A filtered transaction (`nesting.ts`) leaves the state as it was.
+			if (next === view.state) return;
 			// An edit takes a held default: the commit below writes the whole leaf, so the
 			// mark goes in the same update that draws the edit.
 			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) defaulted = false;

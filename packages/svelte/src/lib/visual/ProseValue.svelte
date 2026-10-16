@@ -200,6 +200,7 @@
 					},
 					dispatchTransaction(tr) {
 						const next = mounted.state.apply(tr);
+						if (next === mounted.state) return;
 						const edit = tr.docChanged && !held;
 						if (edit) defaulted = false;
 						mounted.updateState(next);

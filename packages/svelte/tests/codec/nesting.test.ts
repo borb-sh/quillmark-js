@@ -13,7 +13,7 @@ import {
 	proseLeafPlugins
 } from '$lib/core/codec';
 import { pickList, wrapInList, wrapInQuote } from '$lib/core/codec/blocks.js';
-import { MAX_NESTING_DEPTH } from '$lib/core/codec/nesting.js';
+import { MAX_NESTING_DEPTH, nestingPlugin } from '$lib/core/codec/nesting.js';
 import { slashItems } from '$lib/core/codec/slash.js';
 import { md, mount, quill, representable, textblocks, viewOf } from './_util.js';
 
@@ -63,18 +63,18 @@ describe('Tab', () => {
 		expect(representable(next!)).toBe(true);
 	});
 
-	it(`is claimed and inert at level ${MAX_NESTING_DEPTH}`, () => {
+	it(`declines at level ${MAX_NESTING_DEPTH}`, () => {
 		const { handled, next } = apply(atLast(docOf(inItems(MAX_NESTING_DEPTH - 1, siblings))), tab);
-		expect(handled).toBe(true);
+		expect(handled).toBe(false);
 		expect(next).toBe(null);
 	});
 
 	it('counts a quote around the list', () => {
 		const doc = docOf(inQuotes(1, inItems(MAX_NESTING_DEPTH - 2, siblings)));
-		expect(apply(atLast(doc), tab)).toEqual({ handled: true, next: null });
+		expect(apply(atLast(doc), tab)).toEqual({ handled: false, next: null });
 	});
 
-	it('keeps the key in a mounted body at the bound', () => {
+	it('leaves the key to the browser in a mounted body at the bound', () => {
 		const doc = docOf(inItems(MAX_NESTING_DEPTH - 1, siblings));
 		const state = EditorState.create({
 			doc,
@@ -83,7 +83,7 @@ describe('Tab', () => {
 		});
 		const view = new EditorView(document.createElement('div'), { state });
 		const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-		expect(view.someProp('handleKeyDown', (f) => f(view, event))).toBe(true);
+		expect(view.someProp('handleKeyDown', (f) => f(view, event))).toBeFalsy();
 		expect(view.state.doc.eq(doc)).toBe(true);
 		view.destroy();
 	});
@@ -153,11 +153,19 @@ describe('a paste into a deep body', () => {
 	function deepBody(levels: number) {
 		const doc = quill().seedDocument();
 		doc.overwrite({}, md(`${'> '.repeat(levels)}a`));
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const changes = { count: 0 };
+		const field = createField({
+			doc,
+			quill: quill(),
+			addr: {},
+			container: mount(),
+			onChange: () => changes.count++
+		});
 		const view = viewOf(field);
 		view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)));
 		splitBlock(view.state, view.dispatch);
-		return { field, view };
+		changes.count = 0;
+		return { field, view, changes };
 	}
 
 	/** A browser's paste of `text` with no HTML beside it. jsdom implements no
@@ -179,7 +187,7 @@ describe('a paste into a deep body', () => {
 		[3, false],
 		[5, false]
 	])('a %i-level list at depth 10 lands: %s', (levels, lands) => {
-		const { field, view } = deepBody(10);
+		const { field, view, changes } = deepBody(10);
 		const before = field.getContent();
 		const beforeDoc = view.state.doc;
 		const thrown: unknown[] = [];
@@ -189,6 +197,7 @@ describe('a paste into a deep body', () => {
 		window.removeEventListener('error', onError);
 		expect(thrown).toEqual([]);
 		const after = field.getContent();
+		expect(changes.count).toBe(lands ? 1 : 0);
 		if (lands) {
 			expect(Math.max(...after.lines.map((l) => l.containers.length))).toBe(10 + levels);
 			expect(view.state.doc.textContent).toContain(`i${levels}`);
@@ -198,5 +207,25 @@ describe('a paste into a deep body', () => {
 			expect(view.state.doc.eq(beforeDoc)).toBe(true);
 		}
 		field.destroy();
+	});
+});
+
+describe('the nesting plugin past the bound', () => {
+	const past = docOf(inQuotes(MAX_NESTING_DEPTH + 1, p('a')));
+	const state = EditorState.create({
+		doc: past,
+		selection: atLast(past).selection,
+		plugins: [nestingPlugin()]
+	});
+
+	it('passes an edit that leaves the deepest level as deep', () => {
+		const tr = state.tr.split(state.selection.from);
+		expect(state.apply(tr)).not.toBe(state);
+	});
+
+	it('refuses one that deepens it', () => {
+		const range = state.selection.$from.blockRange()!;
+		const tr = state.tr.wrap(range, [{ type: n.blockquote }]);
+		expect(state.apply(tr)).toBe(state);
 	});
 });

@@ -8,22 +8,27 @@ import { ReplaceAroundStep, ReplaceStep } from 'prosemirror-transform';
  *  refused, and `@quillmark/wasm` exports no constant to read it from. */
 export const MAX_NESTING_DEPTH = 12;
 
-/** Whether every block in `doc` stands inside at most {@link MAX_NESTING_DEPTH}
- *  containers, counted as the store counts them: a `list_item` or a `blockquote` is one,
- *  the list around an item none, and no node holds an element (`decode.ts`). What a
- *  command that nests asks of the doc it would dispatch. */
-export function withinNesting(doc: PMNode): boolean {
-	const walk = (node: PMNode, depth: number): boolean => {
-		let within = true;
+/** The most containers any block in `doc` stands inside, counted as the store counts
+ *  them: a `list_item` or a `blockquote` is one, the list around an item none, and no
+ *  node holds an element (`decode.ts`). */
+export function nestingDepth(doc: PMNode): number {
+	const walk = (node: PMNode, depth: number): number => {
+		let deepest = depth;
 		node.forEach((child) => {
-			if (!within || child.isTextblock || child.isAtom) return;
+			if (child.isTextblock || child.isAtom) return;
 			const name = child.type.name;
 			const d = depth + (name === 'list_item' || name === 'blockquote' ? 1 : 0);
-			within = d <= MAX_NESTING_DEPTH && walk(child, d);
+			deepest = Math.max(deepest, walk(child, d));
 		});
-		return within;
+		return deepest;
 	};
 	return walk(doc, 0);
+}
+
+/** Whether `doc` nests within {@link MAX_NESTING_DEPTH}: what a command that nests asks
+ *  of the doc it would dispatch. */
+export function withinNesting(doc: PMNode): boolean {
+	return nestingDepth(doc) <= MAX_NESTING_DEPTH;
 }
 
 /** Whether a step of `tr` can move a block under another container: any replace but
@@ -46,12 +51,15 @@ function mayNest(tr: Transaction): boolean {
  * Refuses a transaction leaving `doc` past {@link MAX_NESTING_DEPTH}, which the commit
  * would lose: a paste or a drop into a deep item, whose slice the import bounded alone.
  * The nesting commands ask first and keep their key; this is what reaches the rest, and
- * a refused paste lands nothing. A doc already past the bound passes, so a body that
- * arrived that deep keeps its Enter.
+ * a refused paste lands nothing. Past the bound, a transaction passes where it leaves the
+ * deepest level no deeper, so a body that arrived that deep keeps its Enter.
  */
 export function nestingPlugin(): Plugin {
 	return new Plugin({
-		filterTransaction: (tr) =>
-			!tr.docChanged || !mayNest(tr) || withinNesting(tr.doc) || !withinNesting(tr.before)
+		filterTransaction: (tr) => {
+			if (!tr.docChanged || !mayNest(tr)) return true;
+			const after = nestingDepth(tr.doc);
+			return after <= MAX_NESTING_DEPTH || after <= nestingDepth(tr.before);
+		}
 	});
 }

@@ -6,7 +6,7 @@
 
 **The `engines` floor is Node 22**, where it was Node 24, so npm on Node 22 resolves the newest release rather than preferring one from before the floor rose. (#766)
 
-**Nesting stops at 12 levels.** Tab on a list item 12 levels deep, counting list items and quotes, does nothing, where it drew the 13th level and the edit was lost on commit. `> `, `- ` and `1. ` there stay text, and the `/` menu offers no list or quote. A paste or a drop that would nest past 12 lands nothing.
+**Nesting stops at 12 levels.** Tab on a list item 12 levels deep, counting list items and quotes, moves the focus on out of the editor, as Tab on an item with nothing above it to nest under does, where it drew the 13th level and the edit was lost on commit. `> `, `- ` and `1. ` there stay text, and the `/` menu offers no list or quote. A paste or a drop that would nest past 12 lands nothing.
 
 **`onActiveLeafChange` names the leaf inside a container.** A focus inside an object, an array, a variant or a matrix reports the property, element, cell or member it is in, `main.contact.email` or `main.keywords[0]`, the path a region and a diagnostic name it by, where it reported the field holding it. A move between two cells of one field reports again. `fieldPathForAddr` takes the steps below the field as an optional third argument.
 
