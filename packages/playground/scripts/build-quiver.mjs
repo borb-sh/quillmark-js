@@ -5,9 +5,9 @@
 // `static/` is Kit's verbatim-copy tree, so one output serves both `vite dev` and the
 // static build. Generated, and gitignored.
 //
-// The pack lifts the quiver's floor for dev and deploy alike: the playground is a
-// harness, a viewer rather than a quill deployment, and `usaf_memo@0.0.0` under the
-// floor is the fixture picker's second entry (fixtures/Quiver.yaml).
+// `--drafts` lifts the quiver's floor, and only `predev` passes it: a dev server offers
+// `usaf_memo@0.0.0` as the picker's second entry, and the Pages build serves `showcase`
+// alone (fixtures/Quiver.yaml).
 
 import { fileURLToPath } from 'node:url';
 import { build } from '@quillmark/quiver/node';
@@ -15,5 +15,8 @@ import { build } from '@quillmark/quiver/node';
 const SOURCE = fileURLToPath(new URL('../../../fixtures', import.meta.url));
 const OUT = fileURLToPath(new URL('../static/quiver', import.meta.url));
 
-await build(SOURCE, OUT, { drafts: true });
-console.log('quiver packed: fixtures/ → static/quiver (drafts included)');
+const drafts = process.argv.includes('--drafts');
+await build(SOURCE, OUT, { drafts });
+console.log(
+	`quiver packed: fixtures/ → static/quiver (drafts ${drafts ? 'included' : 'left out'})`
+);
