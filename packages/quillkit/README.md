@@ -13,7 +13,7 @@ npx quillkit studio
 
 `init` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`, `example.md`), and a `package.json` pinning the three packages below at the versions this quillkit was built with. The quill passes `quillkit test` as laid; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
 
-`@latest` names the release outright. An unversioned `npx quillkit` on a Node older than the `engines` floor resolves a release from before `init` existed.
+`@latest` names the release outright. An unversioned `npx quillkit` takes the newest release whose `engines` admits the running Node.
 
 ## Install
 

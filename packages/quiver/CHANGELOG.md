@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `engines` floor is Node 22**, where it was Node 24, so npm on Node 22 resolves the newest release rather than preferring one from before the floor rose. (#766)
+
 **A selector is `x.y` or `x.y.z`, and a declared `quill.version` is `x.y.z`.** A one-segment selector, `memo@1`, fails `resolve` and `getQuill` as `invalid_ref`, where it resolved to the highest `1.y.z`: a quill's compatibility boundary is `MAJOR.MINOR` below 1.0.0 and above it, so `memo@1.0` names a series and `memo@1.0.0` a version. A `Quill.yaml` declaring `quill.version: "1.2"` fails `fromDir` and `build` as `quiver_invalid`, where it was read as `1.2.0`.
 
 **`isDraft(version)` is exported from `@quillmark/quiver/node`**: true for a version below the floor `build` packs from, so a tool asks the question `build` answers rather than restating `0.1.0`.
