@@ -88,7 +88,9 @@ describe('Engine.render against a quiver quill', () => {
 		// own.
 		const doc = core.Document.fromMarkdown(stored);
 		try {
-			expect(doc.quillRef).toBe(`${authored.metadata.name}@${authored.metadata.version}`);
+			// A created document pins the series, `name@MAJOR.MINOR`, which resolves as a selector.
+			const [major, minor] = authored.metadata.version.split('.');
+			expect(doc.quillRef).toBe(`${authored.metadata.name}@${major}.${minor}`);
 			const quill = await quiver.getQuill(doc.quillRef);
 			// The per-canonical-ref cache answers with the authoring-side instance:
 			// one materialization per document, however many consumers resolve.

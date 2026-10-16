@@ -9,184 +9,192 @@ typst:
 
 main:
   description: "Write the body as plain paragraphs. They're numbered for you, and bullets become lettered subparagraphs. Use a block quote for lines that shouldn't be numbered, like a list of names."
-  sections:
-    addressing:
-      fields:
-        memo_for:
-          type: array
-          items:
-            type: plaintext
-            inline: true
-          ui:
-            compact: true
-          description: "Each recipient's office symbol, one per line. To address a person, add their rank and name in parentheses, for example 'ORG/SYMBOL (LT COL JANE DOE)'. For a long list, enter 'SEE DISTRIBUTION' and list everyone under Distribution."
+  ui:
+    groups: [addressing, letterhead, classification, additional]
+  fields:
+    memo_for:
+      type: array
+      items:
+        type: text
+      ui:
+        group: addressing
+        compact: true
+      description: "Each recipient's office symbol, one per line. To address a person, add their rank and name in parentheses, for example 'ORG/SYMBOL (LT COL JANE DOE)'. For a long list, enter 'SEE DISTRIBUTION' and list everyone under Distribution."
 
-        memo_from:
-          type: array
-          items:
-            type: plaintext
-            inline: true
-          default: []
-          ui:
-            compact: true
-          description: "Your office symbol. If any recipient is off your installation, add your full mailing address below it. Leave blank for a memorandum for record."
+    memo_from:
+      type: array
+      items:
+        type: text
+      default: []
+      ui:
+        group: addressing
+        compact: true
+      description: "Your office symbol. If any recipient is off your installation, add your full mailing address below it. Leave blank for a memorandum for record."
 
-        subject:
-          type: richtext
-          inline: true
-          description: "A brief subject in title case. Put any suspense date in parentheses at the end."
-    
-        date:
-          type: date
-          default: ""
-          ui:
-            compact: true
-          description: "The date you sign. Leave blank to add a fillable date field to the PDF instead."
-      
-        authority_line:
-          type: plaintext
-          inline: true
-          default: ""
-          ui:
-            compact: true
-          description: "Usually blank. When you sign on the commander's behalf or state the headquarters' position, enter 'FOR THE COMMANDER'. It prints above the signature block."
+    subject:
+      type: richtext
+      multiline: false
+      ui:
+        group: addressing
+      description: "A brief subject in title case. Put any suspense date in parentheses at the end."
 
-        signature_block:
-          type: array
-          items:
-            type: plaintext
-            inline: true
-          ui:
-            compact: true
-          description: "Your name in uppercase, grade, and service on the first line, for example 'FIRST M. LAST, Capt, USAF'. Your duty title on the second."
-    letterhead:
-      fields:
-        letterhead_title:
-          type: array
-          items:
-            type: plaintext
-            inline: true
-          default:
-            - DEPARTMENT OF THE AIR FORCE
-          description: "The letterhead, in uppercase. Keep the first line unless you work for a joint command or a DoW agency, and add your unit's full name on the lines below it."
+    date:
+      type: date
+      default: ""
+      ui:
+        group: addressing
+        compact: true
+      description: "The date you sign. Leave blank to add a fillable date field to the PDF instead."
 
-        letterhead_seal:
-          type: enum
-          values:
-            - dow
-            - dod
-          default: dow
-          ui:
-            compact: true
-          description: "The seal at the top left of the letterhead: Department of War or Department of Defense."
+    authority_line:
+      type: text
+      default: ""
+      ui:
+        group: addressing
+        compact: true
+      description: "Usually blank. When you sign on the commander's behalf or state the headquarters' position, enter 'FOR THE COMMANDER'. It prints above the signature block."
 
-        letterhead_seal_subtitle:
-          type: plaintext
-          inline: true
-          default: ""
-          ui:
-            compact: true
-          description: "An optional line in bold capitals under the seal."
+    signature_block:
+      type: array
+      items:
+        type: text
+      ui:
+        group: addressing
+        compact: true
+      description: "Your name in uppercase, grade, and service on the first line, for example 'FIRST M. LAST, Capt, USAF'. Your duty title on the second."
 
-        tag_line:
-          type: richtext
-          inline: true
-          default: ""
-          ui:
-            compact: true
-          description: "Your unit's motto, centered at the bottom of every page."
+    letterhead_title:
+      type: array
+      items:
+        type: text
+      default:
+        - DEPARTMENT OF THE AIR FORCE
+      ui:
+        group: letterhead
+      description: "The letterhead, in uppercase. Keep the first line unless you work for a joint command or a DoW agency, and add your unit's full name on the lines below it."
+
+    letterhead_seal:
+      type: enum
+      values:
+        - dow
+        - dod
+      default: dow
+      ui:
+        group: letterhead
+        compact: true
+      description: "The seal at the top left of the letterhead: Department of War or Department of Defense."
+
+    letterhead_seal_subtitle:
+      type: text
+      default: ""
+      ui:
+        group: letterhead
+        compact: true
+      description: "An optional line in bold capitals under the seal."
+
+    tag_line:
+      type: richtext
+      multiline: false
+      default: ""
+      ui:
+        group: letterhead
+        compact: true
+      description: "Your unit's motto, centered at the bottom of every page."
+
     classification:
-      fields:
-        classification:
-          type: enum
-          values:
-            - UNCLASSIFIED
-            - CUI
-            - CONFIDENTIAL
-            - SECRET
-            - TOP SECRET
-          default: ""
-          ui:
-            compact: true
-          description: "The classification banner at the top and bottom of every page. Leave blank for an unclassified document."
-          variants:
-            CUI:
-              controlled_by:
-                type: plaintext
-                inline: true
-                description: "The office that designated this information as CUI, for example 'SAF/AA'."
-              poc:
-                type: plaintext
-                inline: true
-                description: "Who to contact with questions about this CUI, with phone and email, for example 'Capt J. Smith, DSN 555-1234, john.smith@us.af.mil'."
-              category:
-                type: plaintext
-                inline: true
-                default: ""
-                description: "The category from the DoD CUI Registry, for example 'CTI' or 'PRVCY'."
-              limited_dissemination:
-                type: plaintext
-                inline: true
-                default: ""
-                description: "A dissemination control for the CUI block, for example 'FEDONLY' or 'NOFORN'. To add one to the banner, use Dissemination."
+      type: enum
+      values:
+        - UNCLASSIFIED
+        - CUI
+        - CONFIDENTIAL
+        - SECRET
+        - TOP SECRET
+      default: ""
+      ui:
+        group: classification
+        compact: true
+      description: "The classification banner at the top and bottom of every page. Leave blank for an unclassified document."
+      variants:
+        CUI:
+          controlled_by:
+            type: text
+            description: "The office that designated this information as CUI, for example 'SAF/AA'."
+          poc:
+            type: text
+            description: "Who to contact with questions about this CUI, with phone and email, for example 'Capt J. Smith, DSN 555-1234, john.smith@us.af.mil'."
+          category:
+            type: text
+            default: ""
+            description: "The category from the DoD CUI Registry, for example 'CTI' or 'PRVCY'."
+          limited_dissemination:
+            type: text
+            default: ""
+            description: "A dissemination control for the CUI block, for example 'FEDONLY' or 'NOFORN'. To add one to the banner, use Dissemination."
 
-        dissemination:
-          type: plaintext
-          inline: true
-          default: ""
-          ui:
-            compact: true
-          description: "A control added to the end of the banner. For example, 'NF' prints as CUI//NF."
-    additional:
-      fields:
-        references:
-          type: array
-          items:
-            type: richtext
-            inline: true
-          default: []
-          description: "Cite each by organization, type, date, and title. One reference prints after the subject; two or more print as a lettered list."
+    dissemination:
+      type: text
+      default: ""
+      ui:
+        group: classification
+        compact: true
+      description: "A control added to the end of the banner. For example, 'NF' prints as CUI//NF."
 
-        cc:
-          type: array
-          items:
-            type: plaintext
-            inline: true
-          default: []
-          description: Offices or people receiving a courtesy copy, one per line.
+    references:
+      type: array
+      items:
+        type: richtext
+        multiline: false
+      default: []
+      ui:
+        group: additional
+      description: "Cite each by organization, type, date, and title. One reference prints after the subject; two or more print as a lettered list."
 
-        distribution:
-          type: array
-          items:
-            type: plaintext
-            inline: true
-          default: []
-          description: "Everyone the memo goes to, when Memo For says 'SEE DISTRIBUTION'."
+    cc:
+      type: array
+      items:
+        type: text
+      default: []
+      ui:
+        group: additional
+      description: Offices or people receiving a courtesy copy, one per line.
 
-        attachments:
-          type: array
-          items:
-            type: richtext
-            inline: true
-          default: []
-          description: "Attachments in the order the memo mentions them. Describe each briefly and include its date. Don't write 'as stated'."
+    distribution:
+      type: array
+      items:
+        type: text
+      default: []
+      ui:
+        group: additional
+      description: "Everyone the memo goes to, when Memo For says 'SEE DISTRIBUTION'."
 
-        memo_style:
-          type: enum
-          values:
-            - usaf
-            - daf
-          default: usaf
-          ui:
-            compact: true
-          description: "USAF for most memos, DAF for headquarters memos. DAF style dates as 'September 15, 2026' and indents paragraphs instead of numbering them."
+    attachments:
+      type: array
+      items:
+        type: richtext
+        multiline: false
+      default: []
+      ui:
+        group: additional
+      description: "Attachments in the order the memo mentions them. Describe each briefly and include its date. Don't write 'as stated'."
 
-        font_size:
-          type: number
-          default: 12
-          ui:
-            compact: true
-          description: "Body text size in points. The standard is 12."
+    memo_style:
+      type: enum
+      values:
+        - usaf
+        - daf
+      default: usaf
+      ui:
+        group: additional
+        compact: true
+      description: "USAF for most memos, DAF for headquarters memos. DAF style dates as 'September 15, 2026' and indents paragraphs instead of numbering them."
+
+    font_size:
+      type: number
+      default: 12
+      ui:
+        group: additional
+        compact: true
+      description: "Body text size in points. The standard is 12."
 
 card_kinds:
   indorsement:
@@ -198,61 +206,62 @@ card_kinds:
       signature_block:
         - FIRST M. LAST, Rank, USAF
         - Duty Title
-    sections:
-      addressing:
-        fields:
-          from:
-            type: plaintext
-            inline: true
-            ui:
-              compact: true
-            description: "The endorser's office symbol."
-          for:
-            type: plaintext
-            inline: true
-            ui:
-              compact: true
-            description: "The office the indorsement goes to."
-          date:
-            type: date
-            default: ""
-            ui:
-              compact: true
-            description: "The date the endorser signs. Leave blank to add a fillable date field to the PDF instead."
-          authority_line:
-            type: plaintext
-            inline: true
-            default: ""
-            ui:
-              compact: true
-            description: "Usually blank. When the endorser signs on the commander's behalf, enter 'FOR THE COMMANDER'."
-          signature_block:
-            type: array
-            items:
-              type: plaintext
-              inline: true
-            ui:
-              compact: true
-            description: "The endorser's name in uppercase, grade, and service on the first line, for example 'FIRST M. LAST, Capt, USAF'. Their duty title on the second."
-      additional:
-        fields:
-          format:
-            type: enum
-            values:
-              - standard
-              - informal
-              - separate_page
-            default: standard
-            ui:
-              compact: true
-            description: "Standard continues on the same page and moves to a new one if it doesn't fit. Separate page always starts a new page. Informal leaves out the header."
-          action:
-            type: enum
-            values:
-              - undecided
-              - approve
-              - disapprove
-            default: ""
-            ui:
-              compact: true
-            description: "The endorser's decision. The last indorsement prints Approve/Disapprove and earlier ones print Concur/Nonconcur, with the choice underlined. Choose undecided to mark it by hand, or leave blank to omit."
+    ui:
+      groups: [addressing, additional]
+    fields:
+      from:
+        type: text
+        ui:
+          group: addressing
+          compact: true
+        description: "The endorser's office symbol."
+      for:
+        type: text
+        ui:
+          group: addressing
+          compact: true
+        description: "The office the indorsement goes to."
+      date:
+        type: date
+        default: ""
+        ui:
+          group: addressing
+          compact: true
+        description: "The date the endorser signs. Leave blank to add a fillable date field to the PDF instead."
+      authority_line:
+        type: text
+        default: ""
+        ui:
+          group: addressing
+          compact: true
+        description: "Usually blank. When the endorser signs on the commander's behalf, enter 'FOR THE COMMANDER'."
+      signature_block:
+        type: array
+        items:
+          type: text
+        ui:
+          group: addressing
+          compact: true
+        description: "The endorser's name in uppercase, grade, and service on the first line, for example 'FIRST M. LAST, Capt, USAF'. Their duty title on the second."
+      format:
+        type: enum
+        values:
+          - standard
+          - informal
+          - separate_page
+        default: standard
+        ui:
+          group: additional
+          compact: true
+        description: "Standard continues on the same page and moves to a new one if it doesn't fit. Separate page always starts a new page. Informal leaves out the header."
+      action:
+        type: enum
+        values:
+          - undecided
+          - approve
+          - disapprove
+        default: ""
+        ui:
+          group: additional
+          compact: true
+        description: "The endorser's decision. The last indorsement prints Approve/Disapprove and earlier ones print Concur/Nonconcur, with the choice underlined. Choose undecided to mark it by hand, or leave blank to omit."

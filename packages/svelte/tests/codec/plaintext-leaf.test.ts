@@ -27,10 +27,11 @@ typst:
 main:
   fields:
     note:
-      type: plaintext
+      type: text
+      multiline: true
     tag:
       type: richtext
-      inline: true
+      multiline: false
 `;
 
 const q = probeQuill(QUILL_YAML);

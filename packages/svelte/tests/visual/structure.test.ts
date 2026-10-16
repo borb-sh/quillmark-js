@@ -48,13 +48,13 @@ import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quill } from '../helpers/fixtures.js';
 
 const f = (over: Partial<QuillFieldSchema>): QuillFieldSchema =>
-	({ type: 'string', ...over }) as QuillFieldSchema;
+	({ type: 'text', ...over }) as QuillFieldSchema;
 
 describe('controlKind', () => {
 	it('maps each field type to its control', () => {
-		expect(controlKind(f({ type: 'richtext' }))).toBe('prose');
-		expect(controlKind(f({ type: 'plaintext' }))).toBe('prose');
-		expect(controlKind(f({ type: 'string' }))).toBe('text');
+		expect(controlKind(f({ type: 'richtext', multiline: true }))).toBe('prose');
+		expect(controlKind(f({ type: 'text', multiline: true }))).toBe('prose');
+		expect(controlKind(f({ type: 'text' }))).toBe('prose');
 		expect(controlKind(f({ type: 'enum', values: ['a'] }))).toBe('enum');
 		expect(controlKind(f({ type: 'number' }))).toBe('number');
 		expect(controlKind(f({ type: 'integer' }))).toBe('number');
@@ -65,27 +65,28 @@ describe('controlKind', () => {
 		expect(controlKind(f({ type: 'object' }))).toBe('object');
 		// Its own control, never the trailing arm's text input over a namespace.
 		expect(controlKind(f({ type: 'matrix', members: {} }))).toBe('matrix');
+		// A type this build does not know takes the text input.
+		expect(controlKind(unknownType({ type: 'rune' }))).toBe('text');
 	});
 
 	it('splits the enum on `variants:`, the key that changes its resting shape', () => {
 		const values = ['a', 'b'];
 		expect(controlKind(f({ type: 'enum', values }))).toBe('enum');
 		expect(
-			controlKind(f({ type: 'enum', values, variants: { b: { note: f({ type: 'string' }) } } }))
+			controlKind(f({ type: 'enum', values, variants: { b: { note: f({ type: 'text' }) } } }))
 		).toBe('variant');
 	});
 });
 
-/** A schema in the echo that types `text` and carries `multiline`, which the pinned
- *  boundary's types do not declare. */
-const wide = (over: Record<string, unknown>): QuillFieldSchema =>
+/** A schema whose `type` the boundary's union does not declare. */
+const unknownType = (over: Record<string, unknown>): QuillFieldSchema =>
 	over as unknown as QuillFieldSchema;
 
-describe('the one-line plain-text field, on either echo', () => {
+describe('the text field', () => {
 	it('mounts `text` as a literal prose leaf, one line unless `multiline: true`', () => {
-		for (const type of ['text', 'text?']) {
-			const short = wide({ type });
-			const tall = wide({ type, multiline: true });
+		for (const type of ['text', 'text?'] as const) {
+			const short = f({ type });
+			const tall = f({ type, multiline: true });
 			expect(controlKind(short)).toBe('prose');
 			expect(controlKind(tall)).toBe('prose');
 			expect([oneLine(short), literalText(short)]).toEqual([true, true]);
@@ -93,32 +94,23 @@ describe('the one-line plain-text field, on either echo', () => {
 		}
 	});
 
-	it('reads a `richtext` line shape off `multiline` where the echo carries it', () => {
-		expect(oneLine(wide({ type: 'richtext', multiline: false }))).toBe(true);
-		expect(oneLine(wide({ type: 'richtext', multiline: true }))).toBe(false);
-		expect(literalText(wide({ type: 'richtext', multiline: false }))).toBe(false);
+	it('reads a `richtext` line shape off `multiline`, which it always carries', () => {
+		expect(oneLine(f({ type: 'richtext', multiline: false }))).toBe(true);
+		expect(oneLine(f({ type: 'richtext', multiline: true }))).toBe(false);
+		expect(literalText(f({ type: 'richtext', multiline: false }))).toBe(false);
 	});
 
-	it('reads it off `inline` where the echo carries no `multiline`', () => {
-		expect(oneLine(f({ type: 'richtext' }))).toBe(false);
-		expect(oneLine(f({ type: 'richtext', inline: true }))).toBe(true);
-		expect(oneLine(f({ type: 'plaintext' }))).toBe(false);
-		expect(oneLine(f({ type: 'plaintext?', inline: true }))).toBe(true);
-		expect(literalText(f({ type: 'plaintext' }))).toBe(true);
-		expect(controlKind(f({ type: 'string' }))).toBe('text');
-	});
-
-	it('projects one-line `text` as one-line `plaintext` projects, and multiline as block', () => {
+	it('projects one-line `text` as a packable leaf, and multiline as block', () => {
 		const models = fieldModels({
 			fields: {
-				subject: wide({ type: 'text' }),
-				rank: wide({ type: 'text', ui: { compact: true } }),
-				address: wide({ type: 'text', multiline: true, ui: { compact: true } }),
-				legacy: f({ type: 'plaintext', inline: true, ui: { compact: true } })
+				subject: f({ type: 'text' }),
+				rank: f({ type: 'text', ui: { compact: true } }),
+				address: f({ type: 'text', multiline: true, ui: { compact: true } }),
+				unit: f({ type: 'text', ui: { compact: true } })
 			}
 		});
 		const byName = Object.fromEntries(models.map((m) => [m.name, m]));
-		for (const name of ['subject', 'rank', 'legacy'])
+		for (const name of ['subject', 'rank', 'unit'])
 			expect([byName[name].control, byName[name].inline, byName[name].plaintext]).toEqual([
 				'prose',
 				true,
@@ -126,7 +118,7 @@ describe('the one-line plain-text field, on either echo', () => {
 			]);
 		expect([byName.address.inline, byName.address.plaintext]).toEqual([false, true]);
 		expect(byName.subject.compact).toBe(false);
-		expect(placeFields([byName.rank, byName.legacy, byName.address]).map((p) => p.span)).toEqual([
+		expect(placeFields([byName.rank, byName.unit, byName.address]).map((p) => p.span)).toEqual([
 			'cell',
 			'cell',
 			'full'
@@ -134,22 +126,22 @@ describe('the one-line plain-text field, on either echo', () => {
 	});
 
 	it('holds a one-line `text` cell as a short cell: a table column and a row title', () => {
-		const items = wide({
+		const items = f({
 			type: 'object',
 			properties: { page: { type: 'integer' }, label: { type: 'text' } }
 		});
-		expect(shortCell(wide({ type: 'text' }))).toBe(true);
-		expect(shortCell(wide({ type: 'text', multiline: true }))).toBe(false);
-		expect(arrayLayout(wide({ type: 'array', ui: { layout: 'table' }, items }))).toBe('table');
+		expect(shortCell(f({ type: 'text' }))).toBe(true);
+		expect(shortCell(f({ type: 'text', multiline: true }))).toBe(false);
+		expect(arrayLayout(f({ type: 'array', ui: { layout: 'table' }, items }))).toBe('table');
 		expect(rowSummary(items, { page: 3, label: 'Primary' })).toBe('Primary');
 	});
 
 	it('remounts a field whose line shape moves under its name', () => {
-		expect(mountKey('a', wide({ type: 'text' }))).not.toBe(
-			mountKey('a', wide({ type: 'text', multiline: true }))
+		expect(mountKey('a', f({ type: 'text' }))).not.toBe(
+			mountKey('a', f({ type: 'text', multiline: true }))
 		);
-		expect(mountKey('a', wide({ type: 'array', items: { type: 'text' } }))).not.toBe(
-			mountKey('a', wide({ type: 'array', items: { type: 'text', multiline: true } }))
+		expect(mountKey('a', f({ type: 'array', items: { type: 'text' } }))).not.toBe(
+			mountKey('a', f({ type: 'array', items: { type: 'text', multiline: true } }))
 		);
 	});
 });
@@ -166,9 +158,9 @@ describe('fieldModels', () => {
 				integer: f({ type: 'integer' }),
 				number: f({ type: 'number' }),
 				boolean: f({ type: 'boolean' }),
-				string: f({ type: 'string' }),
-				plaintext: f({ type: 'plaintext', inline: true }),
-				richtext: f({ type: 'richtext' }),
+				text: f({ type: 'text' }),
+				multiline: f({ type: 'text', multiline: true }),
+				richtext: f({ type: 'richtext', multiline: true }),
 				array: f({ type: 'array', items: f({ type: 'date' }) }),
 				object: f({ type: 'object', properties: {} }),
 				matrix: f({ type: 'matrix', members: {} }),
@@ -181,8 +173,8 @@ describe('fieldModels', () => {
 			integer: true,
 			number: true,
 			boolean: true,
-			string: false,
-			plaintext: false,
+			text: false,
+			multiline: false,
 			richtext: false,
 			array: false,
 			object: false,
@@ -191,7 +183,7 @@ describe('fieldModels', () => {
 		});
 		expect(
 			compact({
-				rank: f({ type: 'string', ui: { compact: true } }),
+				rank: f({ type: 'text', ui: { compact: true } }),
 				due: f({ type: 'date', ui: { compact: false } })
 			})
 		).toEqual({ rank: true, due: false });
@@ -202,7 +194,7 @@ describe('variantMember + variantCells', () => {
 	const schema = f({
 		type: 'enum',
 		values: ['plain', 'rich'],
-		variants: { rich: { note: f({ type: 'string' }) } }
+		variants: { rich: { note: f({ type: 'text' }) } }
 	});
 
 	it('reads the authored discriminant, and falls back to the ghosted default', () => {
@@ -223,7 +215,7 @@ describe('variantMember + variantCells', () => {
 	});
 
 	it('answers cells only where that world declares them', () => {
-		expect(variantCells(schema, 'rich')).toEqual({ note: f({ type: 'string' }) });
+		expect(variantCells(schema, 'rich')).toEqual({ note: f({ type: 'text' }) });
 		expect(variantCells(schema, 'plain')).toBeUndefined();
 		expect(variantCells(schema, undefined)).toBeUndefined();
 	});
@@ -279,8 +271,8 @@ describe('titleText + cardTitle', () => {
 	it('rename wins, then the kind’s title, then the first short text cell, then the kind', () => {
 		const fields = {
 			tone: f({ type: 'enum', values: ['a'] }),
-			heading: f({ type: 'string' }),
-			lead: f({ type: 'richtext', inline: true })
+			heading: f({ type: 'text' }),
+			lead: f({ type: 'richtext', multiline: false })
 		};
 		const titled = { fields, title: 'Routing indorsement' };
 		const untitled = { fields };
@@ -316,7 +308,7 @@ describe('placeFields', () => {
 			compact,
 			control: 'text',
 			inline: false,
-			schema: { type: 'string' },
+			schema: { type: 'text' },
 			...extra
 		}) as unknown as ReturnType<typeof fieldModels>[number];
 	/** An array field of `items`, with the control the projection would give it. */
@@ -359,7 +351,7 @@ describe('placeFields', () => {
 	});
 
 	it('declines the compact hint for shapes that grow under their neighbours', () => {
-		// Block richtext (`inline` absent) holds paragraphs and an object nests a field
+		// Block richtext (`multiline: true`) holds paragraphs and an object nests a field
 		// set: either one stands its neighbours in a column of whitespace, so both take
 		// a full row despite `ui.compact`.
 		expect(
@@ -412,10 +404,10 @@ describe('placeFields', () => {
 		// past it. An array with no `items` has text elements and declines the same.
 		expect(
 			spans([
-				arr('strings', true, { type: 'string' }),
+				arr('strings', true, { type: 'text' }),
 				arr('untyped', true),
-				arr('inline_prose', true, { type: 'richtext', inline: true }),
-				arr('blocks', true, { type: 'richtext' }),
+				arr('inline_prose', true, { type: 'richtext', multiline: false }),
+				arr('blocks', true, { type: 'richtext', multiline: true }),
 				arr('objects', true, { type: 'object' })
 			])
 		).toEqual([
@@ -542,7 +534,7 @@ describe('against the real showcase schema', () => {
 		const models = fieldModels(schema);
 		expect(models.map((m) => m.name)).toEqual(Object.keys(schema.fields));
 		const byName = Object.fromEntries(models.map((m) => [m.name, m]));
-		// One of each shape the synthetic table covers: an inline richtext leaf, an
+		// One of each shape the synthetic table covers: a one-line richtext leaf, an
 		// enum, and an array whose items are themselves richtext.
 		expect(byName.title.control).toBe('prose');
 		expect(byName.title.inline).toBe(true);
@@ -551,15 +543,14 @@ describe('against the real showcase schema', () => {
 		expect(byName.keywords.schema.items?.type).toBe('richtext');
 	});
 
-	it('reads `inline` off what the boundary serves, which spells it at every type', () => {
+	it('reads the line shape off what the boundary serves', () => {
 		const byName = Object.fromEntries(fieldModels(main()).map((m) => [m.name, m]));
-		// `subtitle` and the `handling` cells declare `inline: true` on disk, and the
-		// schema carries it whatever the field's type, so a plaintext leaf is an inline
-		// one and `packable` takes the `ui.compact` it asks for.
-		expect(byName.subtitle.schema.type).toBe('plaintext');
+		// `subtitle` is a `text` declaring no `multiline`, so it is a one-line literal
+		// leaf and `packable` takes the `ui.compact` it asks for.
+		expect(byName.subtitle.schema.type).toBe('text');
 		expect(byName.subtitle.plaintext).toBe(true);
 		expect(byName.subtitle.inline).toBe(true);
-		expect(byName.epigraph.inline).toBe(true); // richtext, declared the same way
+		expect(byName.epigraph.inline).toBe(true); // richtext, `multiline: false`
 		expect(byName.subtitle.compact).toBe(true);
 		// Packable and alone is still `full`: a run of one has nothing to pack against.
 		expect(placeFields([byName.subtitle])).toEqual([{ field: byName.subtitle, span: 'full' }]);
@@ -614,21 +605,21 @@ describe('rowSummary', () => {
 	const content = (text: string) => ({ text, lines: [], marks: [], islands: [] });
 
 	it('reads the first short text cell, and no other while it is empty', () => {
-		const items = row({ title: f({ type: 'string' }), note: f({ type: 'string' }) });
+		const items = row({ title: f({ type: 'text' }), note: f({ type: 'text' }) });
 		expect(rowSummary(items, { title: 'Sources', note: 'n' })).toBe('Sources');
 		expect(rowSummary(items, { title: ' ', note: 'n' })).toBeUndefined();
 		expect(rowSummary(items, { note: 'n' })).toBeUndefined();
 		expect(rowSummary(items, {})).toBeUndefined();
 	});
 
-	it('takes inline prose as a text cell, in either rest form', () => {
+	it('takes one-line prose as a text cell, in either rest form', () => {
 		const items = row({
 			page: f({ type: 'integer' }),
-			label: f({ type: 'plaintext', inline: true }),
-			note: f({ type: 'richtext', inline: true })
+			label: f({ type: 'text' }),
+			note: f({ type: 'richtext', multiline: false })
 		});
-		// No `string` cell: the inline `plaintext` is the first title-bearing one, read
-		// through `titleText` whichever rest form it has.
+		// The one-line `text` is the first title-bearing cell, read through `titleText`
+		// whichever rest form it has.
 		expect(rowSummary(items, { page: 3, label: 'Primary' })).toBe('Primary');
 		expect(rowSummary(items, { page: 3, label: content('Primary') })).toBe('Primary');
 		expect(rowSummary(items, { page: 3, note: content('only a note') })).toBeUndefined();
@@ -637,8 +628,8 @@ describe('rowSummary', () => {
 
 	it('skips a block prose cell and every non-text cell', () => {
 		const items = row({
-			body: f({ type: 'richtext' }),
-			address: f({ type: 'plaintext' }),
+			body: f({ type: 'richtext', multiline: true }),
+			address: f({ type: 'text', multiline: true }),
 			n: f({ type: 'number' }),
 			on: f({ type: 'boolean' })
 		});
@@ -649,7 +640,7 @@ describe('rowSummary', () => {
 	});
 
 	it('reads a cell by own key: a declared name can be one every object inherits', () => {
-		const items = row({ constructor: f({ type: 'string' }) });
+		const items = row({ constructor: f({ type: 'text' }) });
 		expect(rowSummary(items, {})).toBeUndefined();
 		expect(rowSummary(items, { constructor: 'Ada' })).toBe('Ada');
 	});
@@ -659,14 +650,13 @@ describe('rowSummary', () => {
 // base type everywhere a type is read.
 describe('optional cells', () => {
 	const bases = [
-		'string',
+		'text',
 		'number',
 		'integer',
 		'boolean',
 		'date',
 		'datetime',
 		'richtext',
-		'plaintext',
 		'enum',
 		'array'
 	] as const;
@@ -682,20 +672,20 @@ describe('optional cells', () => {
 		}
 	});
 
-	it('keep the base type’s shape: an inline `plaintext?` cell is one line, a table column', () => {
-		expect(shortCell(f({ type: 'plaintext?', inline: true }))).toBe(true);
-		expect(shortCell(f({ type: 'plaintext?' }))).toBe(false);
-		expect(shortCell(f({ type: 'richtext?' }))).toBe(false);
+	it('keep the base type’s shape: a `text?` cell is one line, a table column', () => {
+		expect(shortCell(f({ type: 'text?' }))).toBe(true);
+		expect(shortCell(f({ type: 'text?', multiline: true }))).toBe(false);
+		expect(shortCell(f({ type: 'richtext?', multiline: true }))).toBe(false);
 		const items = f({
 			type: 'object',
-			properties: { note: f({ type: 'plaintext?', inline: true }), on: f({ type: 'boolean?' }) }
+			properties: { note: f({ type: 'text?' }), on: f({ type: 'boolean?' }) }
 		});
 		expect(arrayLayout(f({ type: 'array', items, ui: { layout: 'table' } }))).toBe('table');
 		expect(rowSummary(items, { note: 'Primary' })).toBe('Primary');
 	});
 
 	it('project as the base type', () => {
-		const [model] = fieldModels({ fields: { note: f({ type: 'plaintext?', inline: true }) } });
+		const [model] = fieldModels({ fields: { note: f({ type: 'text?' }) } });
 		expect(model.control).toBe('prose');
 		expect(model.plaintext).toBe(true);
 	});
@@ -730,13 +720,13 @@ describe('printedText', () => {
 
 describe('arrayLayout', () => {
 	const short = {
-		name: f({ type: 'string' }),
+		name: f({ type: 'text' }),
 		role: f({ type: 'enum', values: ['a'] }),
 		since: f({ type: 'date' }),
 		lead: f({ type: 'boolean' }),
 		n: f({ type: 'integer' }),
-		tag: f({ type: 'plaintext', inline: true }),
-		line: f({ type: 'richtext', inline: true })
+		tag: f({ type: 'text' }),
+		line: f({ type: 'richtext', multiline: false })
 	};
 	const arr = (properties: Record<string, QuillFieldSchema>, layout?: 'table') =>
 		({
@@ -752,11 +742,15 @@ describe('arrayLayout', () => {
 	});
 
 	it('declines for a block prose cell or a container, at every width', () => {
-		expect(arrayLayout(arr({ ...short, body: f({ type: 'richtext' }) }, 'table'))).toBe('list');
-		expect(arrayLayout(arr({ ...short, address: f({ type: 'plaintext' }) }, 'table'))).toBe('list');
+		expect(
+			arrayLayout(arr({ ...short, body: f({ type: 'richtext', multiline: true }) }, 'table'))
+		).toBe('list');
+		expect(
+			arrayLayout(arr({ ...short, address: f({ type: 'text', multiline: true }) }, 'table'))
+		).toBe('list');
 		expect(
 			arrayLayout(
-				arr({ ...short, rows: f({ type: 'array', items: f({ type: 'string' }) }) }, 'table')
+				arr({ ...short, rows: f({ type: 'array', items: f({ type: 'text' }) }) }, 'table')
 			)
 		).toBe('list');
 		expect(
@@ -766,7 +760,7 @@ describe('arrayLayout', () => {
 		expect(
 			arrayLayout({
 				type: 'array',
-				items: f({ type: 'string' }),
+				items: f({ type: 'text' }),
 				ui: { layout: 'table' }
 			} as QuillFieldSchema)
 		).toBe('list');
@@ -785,7 +779,7 @@ describe('schemaAt', () => {
 	const matrix = f({
 		type: 'matrix',
 		members: { a: 'A', b: 'B' },
-		properties: { note: f({ type: 'plaintext', inline: true }) }
+		properties: { note: f({ type: 'text' }) }
 	});
 	const vectors = f({
 		type: 'array',
@@ -794,7 +788,7 @@ describe('schemaAt', () => {
 			properties: {
 				tours: f({
 					type: 'array',
-					items: { type: 'object', properties: { title: f({ type: 'plaintext' }) } }
+					items: { type: 'object', properties: { title: f({ type: 'text', multiline: true }) } }
 				})
 			}
 		}
@@ -802,24 +796,24 @@ describe('schemaAt', () => {
 	const variant = f({
 		type: 'enum',
 		values: ['x', 'y'],
-		variants: { y: { note: f({ type: 'string' }) } }
+		variants: { y: { note: f({ type: 'text' }) } }
 	});
 
 	it('walks an index under an array, a key under an object, rung by rung', () => {
-		expect(schemaAt(vectors, [0, 'tours', 2, 'title'])?.type).toBe('plaintext');
+		expect(schemaAt(vectors, [0, 'tours', 2, 'title'])?.type).toBe('text');
 		expect(schemaAt(vectors, [0, 'tours'])?.type).toBe('array');
 		expect(schemaAt(vectors, [])).toBe(vectors);
 		expect(schemaAt(vectors, ['tours'])).toBeUndefined();
 		expect(schemaAt(vectors, [0, 'nothing'])).toBeUndefined();
 		expect(schemaAt(vectors, [0, 'tours', 'x'])).toBeUndefined();
-		expect(schemaAt(f({ type: 'string' }), [0])).toBeUndefined();
+		expect(schemaAt(f({ type: 'text' }), [0])).toBeUndefined();
 	});
 
 	it('takes an index into an array declaring no items, the text element it draws', () => {
 		// `controlKind` calls a missing `items` a text element, so an index into one is a
 		// place the tree mounts and the landing guard must not refuse.
 		const bare = f({ type: 'array' });
-		expect(schemaAt(bare, [0])?.type).toBe('string');
+		expect(schemaAt(bare, [0])?.type).toBe('text');
 		expect(schemaAt(bare, ['x'])).toBeUndefined();
 		expect(schemaAt(bare, [0, 'deeper'])).toBeUndefined();
 	});
@@ -827,7 +821,7 @@ describe('schemaAt', () => {
 	it('walks a matrix member into its columns, its own address the tick', () => {
 		expect(schemaAt(matrix, ['a'])?.type).toBe('object');
 		expect(schemaAt(matrix, ['a', 'held'])).toBeUndefined();
-		expect(schemaAt(matrix, ['b', 'note'])?.type).toBe('plaintext');
+		expect(schemaAt(matrix, ['b', 'note'])?.type).toBe('text');
 		expect(schemaAt(matrix, ['c'])).toBeUndefined();
 		expect(schemaAt(matrix, ['a', 'nope'])).toBeUndefined();
 		// A roster member stores no title; an added item's is its label cell.
@@ -839,8 +833,8 @@ describe('schemaAt', () => {
 	it('walks an open matrix into any id-spelled key, the added item it would be', () => {
 		const open = { ...matrix, open: true };
 		expect(schemaAt(open, ['wing_ig'])?.type).toBe('object');
-		expect(schemaAt(open, ['wing_ig', 'title'])?.type).toBe('string');
-		expect(schemaAt(open, ['wing_ig', 'note'])?.type).toBe('plaintext');
+		expect(schemaAt(open, ['wing_ig', 'title'])?.type).toBe('text');
+		expect(schemaAt(open, ['wing_ig', 'note'])?.type).toBe('text');
 		expect(schemaAt(open, ['Wing IG'])).toBeUndefined();
 		expect(schemaAt(open, ['2nd'])).toBeUndefined();
 		expect(matrixDeclares(matrix, 'wing_ig')).toBe(false);
@@ -848,7 +842,7 @@ describe('schemaAt', () => {
 
 	it('walks a variant into the discriminant and the union of its worlds', () => {
 		expect(schemaAt(variant, ['value'])?.type).toBe('enum');
-		expect(schemaAt(variant, ['note'])?.type).toBe('string');
+		expect(schemaAt(variant, ['note'])?.type).toBe('text');
 		expect(schemaAt(variant, ['other'])).toBeUndefined();
 	});
 });

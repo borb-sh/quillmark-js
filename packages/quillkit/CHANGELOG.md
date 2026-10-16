@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.126.0, and every quill migrates.** `string` and `plaintext` are `text`, `inline:` and `ui.multiline` are `multiline:`, an array declares `items:`, a PDF-form quill carries `form.yaml`, and a Typst plate computing with a former `string` value reads the string off the content it now receives through `qm.str(..)`; `sections:` fails the load, and `ui.group` loads with `quill::deprecated_groups`, which `quillkit test` does not read. The starter quill spells `text`. A document studio seeds pins `name@MAJOR.MINOR`. quillmark's 0.125 → 0.126 migration guide covers each step.
+
 **The `engines` floor is Node 22**, where it was Node 24, so npm on Node 22 resolves the newest release rather than preferring one from before the floor rose. (#766)
 
 **Studio shows a lost edit over the paint.** An edit the document did not store (`commit-lost`) and a page the preview would not paint (`paint-failed`) take the strip over the preview, with the error's code and message, until the next edit lands. They reached nothing on screen, so a lost edit went unseen.

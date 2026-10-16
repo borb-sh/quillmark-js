@@ -11,17 +11,17 @@ main:
   description: A letter from one person to another.
   fields:
     sender:
-      type: string
+      type: text
       description: Your name, as it appears in the letterhead and the signature.
     recipient:
-      type: string
+      type: text
       description: Who the letter is addressed to.
     date:
       type: date
       default: today
       description: YYYY-MM-DD, or today to date the letter when it is rendered.
     subject:
-      type: string
+      type: text
       default: ""
       description: One line naming what the letter is about. Leave blank for none.
     closing:

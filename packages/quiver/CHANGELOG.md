@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.126.0-0`.** A document the engine creates pins `name@MAJOR.MINOR`, which `getQuill` resolves as the series it names. A packed quill spells `text` where it spelled `string` or `plaintext`, `multiline:` where it spelled `inline:` or `ui.multiline`, `items:` on every array and `form.yaml` where it carried `form.json`; `sections:` fails its load, and `ui.group` loads with `quill::deprecated_groups`. A Typst plate receives a `text` value as content and reads the string off it through `qm.str(..)`.
+
 **The `engines` floor is Node 22**, where it was Node 24, so npm on Node 22 resolves the newest release rather than preferring one from before the floor rose. (#766)
 
 **A selector is `x.y` or `x.y.z`, and a declared `quill.version` is `x.y.z`.** A one-segment selector, `memo@1`, fails `resolve` and `getQuill` as `invalid_ref`, where it resolved to the highest `1.y.z`: a quill's compatibility boundary is `MAJOR.MINOR` below 1.0.0 and above it, so `memo@1.0` names a series and `memo@1.0.0` a version. A `Quill.yaml` declaring `quill.version: "1.2"` fails `fromDir` and `build` as `quiver_invalid`, where it was read as `1.2.0`.

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-// A top-level field declaring `inline`, or a `plaintext` one, over a stored value its
-// schema cannot hold is held: the decode would join the lines and drop the list and the
-// image, and the first commit would store that. The hold is judged of the value each
-// mount and re-hydrate reads, and every set of diagnostics routed to the field
-// re-hydrates it, so a re-validation after an external write releases it or takes it.
-// The probe is its own quill: one field of each shape, a card kind holding one, and a
-// string whose commit re-validates.
+// A top-level one-line field, or a `text` one, over a stored value its schema cannot
+// hold is held: the decode would join the lines and drop the list and the image, and
+// the first commit would store that. The hold is judged of the value each mount and
+// re-hydrate reads, and every set of diagnostics routed to the field re-hydrates it, so
+// a re-validation after an external write releases it or takes it. The probe is its own
+// quill: one field of each shape, a card kind holding one, and a number whose commit
+// re-validates.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { isQuillmarkError, type Document } from '@quillmark/wasm';
@@ -33,22 +33,22 @@ main:
   fields:
     title:
       type: richtext
-      inline: true
+      multiline: false
     line:
-      type: plaintext
-      inline: true
+      type: text
       default: ""
     address:
-      type: plaintext
+      type: text
+      multiline: true
       default: ""
-    author:
-      type: string
+    pages:
+      type: integer
 card_kinds:
   note:
     fields:
       heading:
         type: richtext
-        inline: true
+        multiline: false
 `;
 const probe = () => quillFromYaml(YAML);
 const STRUCTURED = '- one\n- two\n\npara ![i](a.png)';
@@ -73,9 +73,9 @@ const load = (title: string, ...cards: string[]): Document =>
 const leafOf = (target: HTMLElement, label: string): HTMLElement =>
 	field(target, label).querySelector<HTMLElement>('.ProseMirror')!;
 
-/** Commit the string beside the fields: a revision, and so a re-validation. */
+/** Commit the number beside the fields: a revision, and so a re-validation. */
 function revalidate(m: Mounted): void {
-	type(field(m.target, 'Author').querySelector<HTMLInputElement>('input')!, 'Ann');
+	type(field(m.target, 'Pages').querySelector<HTMLInputElement>('input')!, '7');
 }
 
 function expectHeld(leaf: HTMLElement): void {
@@ -92,7 +92,7 @@ function expectStructure(leaf: HTMLElement): void {
 	expect(leaf.querySelector('[data-qm-island="image"]')).not.toBeNull();
 }
 
-describe('a top-level inline richtext field over stored block content', () => {
+describe('a top-level one-line richtext field over stored block content', () => {
 	it('draws the list and the image read-only, where a paste lands nothing', () => {
 		const doc = load(STRUCTURED);
 		const mounted = mountEditor(probe(), doc);
@@ -105,7 +105,7 @@ describe('a top-level inline richtext field over stored block content', () => {
 		expect(mounted.changes).toEqual([]);
 	});
 
-	it('releases once a re-validation follows an external write that leaves it inline', () => {
+	it('releases once a re-validation follows an external write that leaves it one line', () => {
 		const q = probe();
 		const doc = load(STRUCTURED);
 		const mounted = mountEditor(q, doc);
@@ -138,7 +138,7 @@ describe('a top-level inline richtext field over stored block content', () => {
 		} catch (e) {
 			refused = isQuillmarkError(e) ? e.diagnostics[0]?.code : undefined;
 		}
-		expect(refused).toBe('edit::field_not_inline');
+		expect(refused).toBe('edit::field_not_single_line');
 		doc.storeField('title', STRUCTURED);
 		revalidate(mounted);
 
@@ -172,8 +172,8 @@ describe('a top-level inline richtext field over stored block content', () => {
 	});
 });
 
-describe('a top-level plaintext field over content upstream does not call plain', () => {
-	it('holds one declaring inline, whose refusal upstream names not_plain', () => {
+describe('a top-level text field over content upstream does not call plain', () => {
+	it('holds a one-line one, whose refusal upstream names not_plain', () => {
 		const doc = load('plain');
 		doc.overwrite({ field: 'line' }, core.importMarkdown(STRUCTURED).content);
 		const mounted = mountEditor(probe(), doc);
@@ -182,7 +182,7 @@ describe('a top-level plaintext field over content upstream does not call plain'
 		expectStructure(leaf);
 	});
 
-	it('releases one without inline once a re-validation follows an external write', () => {
+	it('releases a multiline one once a re-validation follows an external write', () => {
 		const q = probe();
 		const doc = load('plain');
 		doc.overwrite({ field: 'address' }, core.importMarkdown(STRUCTURED).content);

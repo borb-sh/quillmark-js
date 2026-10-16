@@ -74,7 +74,7 @@ function againstAtom(side: -1 | 1): Command {
 }
 
 /**
- * The block-atom bindings for a block-schema leaf: `{}` for the inline/plaintext
+ * The block-atom bindings for a block-schema leaf: `{}` for the one-line and plain
  * schemas, which hold no block to be against.
  *
  * Both keys are the same command on opposite sides, because what a delete against an

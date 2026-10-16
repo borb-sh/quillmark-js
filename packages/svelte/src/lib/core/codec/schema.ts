@@ -3,9 +3,9 @@
 // (list_item/quote → lists/blockquote); marks mirror the content formatting set.
 // Each set is closed upstream, so the schema names its whole vocabulary and carries
 // nothing inert. `blockSchema` is the full field; `inlineSchema` is the constrained
-// single-textblock form for `richtext(inline)` (one paragraph, no block split, no
-// containers, no islands) and `plaintextSchema` is that one without marks, for
-// `plaintext(inline)`; `plainSchema` is a `plaintext` field without `inline`,
+// single-textblock form for a one-line `richtext` (one paragraph, no block split, no
+// containers, no islands) and `plaintextSchema` is that one without marks, for a
+// one-line `text`; `plainSchema` is a `text` field declaring `multiline: true`,
 // paragraphs and hard breaks and nothing else; `cellSchema` is the inline form with
 // hard breaks, for a table cell. Same decode/lower/position machinery,
 // narrower shapes. Anchors are not marks here (decorations).
@@ -281,7 +281,7 @@ export const cellSchema = new Schema({
 });
 
 /**
- * A `plaintext` field without `inline`: paragraphs and hard breaks, no marks, no
+ * A `text` field declaring `multiline: true`: paragraphs and hard breaks, no marks, no
  * islands, no containers, which is the shape `Content::is_plain` admits. Mark-free
  * for the reason {@link plaintextSchema} is.
  *
@@ -306,7 +306,7 @@ export function leafSchema(opts: { plaintext?: boolean; inline?: boolean }): Sch
 	return opts.inline ? inlineSchema : blockSchema;
 }
 
-/** Whether `schema` can carry formatting at all: false for the two plaintext schemas.
+/** Whether `schema` can carry formatting at all: false for the two mark-free schemas.
  *  What a mark command asks before it offers itself. */
 export function hasMarks(schema: Schema): boolean {
 	return Object.keys(schema.marks).length > 0;

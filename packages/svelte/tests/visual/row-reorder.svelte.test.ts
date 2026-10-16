@@ -222,7 +222,9 @@ describe('reorder on an object row', () => {
 		const arr = revisions(mounted.target);
 		summaries(arr)[1].click();
 		flushSync();
-		const input = arr.querySelector<HTMLInputElement>('.qm-element.open input[type="text"]')!;
+		const input = arr.querySelector<HTMLInputElement>(
+			'.qm-element.open input[inputmode="numeric"]'
+		)!;
 		// Cancelable, as a key off the keyboard is, so the cell's `preventDefault` lands.
 		input.addEventListener('keydown', (e) => e.preventDefault(), { once: true });
 		press(input, 'ArrowDown', { altKey: true, cancelable: true });
@@ -273,13 +275,15 @@ describe('reorder on an object row', () => {
 		const arr = revisions(mounted.target);
 		summaries(arr)[0].click();
 		flushSync();
-		const input = arr.querySelector<HTMLInputElement>('.qm-element.open input[type="text"]')!;
-		expect(input.value).toBe('A');
+		const note = arr.querySelector<HTMLElement>(
+			'.qm-element.open [data-qm-prop="note"] .ProseMirror'
+		)!;
+		expect(note.textContent).toBe('A');
 
 		layOut(arr);
 		dragHandle(handle(arr, 0), [20, 70]);
-		// The keyed row moved as one node: the subform's input is the same element.
-		expect(arr.querySelector('.qm-element.open input[type="text"]')).toBe(input);
+		// The keyed row moved as one node: the subform's leaf is the same element.
+		expect(arr.querySelector('.qm-element.open [data-qm-prop="note"] .ProseMirror')).toBe(note);
 		expect(order(q, doc)).toEqual(['B', 'A', 'C']);
 	});
 
@@ -307,7 +311,7 @@ describe('reorder on an object row', () => {
 	it('offers no reorder on a scalar or prose row', () => {
 		const q = quill();
 		const mounted = mountEditor(q, example());
-		// `authors` is `string[]` and `keywords` `richtext[]`: edit-in-place rows.
+		// `authors` is `text[]` and `keywords` `richtext[]`: edit-in-place rows.
 		for (const name of ['Authors', 'Keywords']) {
 			openGroup(mounted.target, name === 'Authors' ? 'Who and what' : 'Content');
 			const f = field(mounted.target, name);

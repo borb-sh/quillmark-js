@@ -67,7 +67,7 @@ export type { LineIndex } from './positions.js';
 export { createReconciler, contentEqual, valueEqual } from './reconcile.js';
 export type { Reconciler } from './reconcile.js';
 
-// Input rules (`createField` mounts them unless `noInputRules`/`plaintext`).
+// Input rules (`createField` mounts them unless `noInputRules`, or over a mark-free schema).
 export { inputRulesPlugin } from './inputrules.js';
 
 // The body leaf's structural keys: `createField` binds the composed chains

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// An array of `plaintext`, which the reference quill declares as `errata`: rows an
+// An array of `text`, which the reference quill declares as `errata`: rows an
 // author writes verbatim, where markdown in one is the text rather than markup.
 //
 // The type is what the row has to agree with, and it agrees on both lanes. The row
@@ -7,7 +7,7 @@
 // `items` type names, so a literal string opens as content carrying its own
 // asterisks and no mark. It writes back the `Content` every prose leaf hands up,
 // which the typed writer rests as the literal string again — the claim that lets a
-// `plaintext` element mount the same prose leaf its scalar field does.
+// `text` element mount the same prose leaf its field does.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';

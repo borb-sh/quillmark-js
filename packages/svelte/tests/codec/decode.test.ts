@@ -1,5 +1,5 @@
 // Decode: idempotence up to normalization, overlapping-mark inline splits, island
-// round-trip, the inline/plaintext constraints, and the href gate the link mark
+// round-trip, the one-line and plain constraints, and the href gate the link mark
 // renders through (its DOM is asserted where a DOM exists, `visual/tips.test.ts`).
 import { describe, it, expect } from 'vitest';
 import {
@@ -93,7 +93,7 @@ describe('island round-trip (id preserved)', () => {
 	});
 });
 
-describe('inline / plaintext constraints', () => {
+describe('one-line / plain constraints', () => {
 	it('fitsInline admits one plain paragraph and refuses what the inline decode drops', () => {
 		expect(fitsInline(md(''))).toBe(true);
 		expect(fitsInline(md('plain **bold** end'))).toBe(true);
@@ -131,7 +131,7 @@ describe('inline / plaintext constraints', () => {
 	});
 
 	// A content carrying marks under the mark-free schema: what an older build's
-	// popover left on a plaintext field, and what has to open rather than throw.
+	// popover left on a text field, and what has to open rather than throw.
 	it('the plaintext schema strips marks', () => {
 		const doc = decode(md('plain **bold** *em*'), plaintextSchema);
 		const anyMark = doc.child(0).children.some((n) => n.marks.length > 0);

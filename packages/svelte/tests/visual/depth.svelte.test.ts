@@ -11,6 +11,7 @@ import type { Document, Quill } from '@quillmark/wasm';
 import { quill, example } from '../helpers/fixtures.js';
 import {
 	field,
+	leaf,
 	mountEditor,
 	openGroup,
 	pick,
@@ -18,6 +19,7 @@ import {
 	summaries,
 	summaryTexts,
 	type,
+	typeLeaf,
 	unmountAll
 } from '../helpers/surface.svelte.js';
 
@@ -46,11 +48,11 @@ describe('a nested array property', () => {
 		// The open row's subform holds the `title` cell and, one rung in, the `entries`
 		// repeater: a nested array mounts the control an array field mounts.
 		const row = outer.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(row.querySelector('input[type="text"]')).not.toBeNull();
+		expect(row.querySelector('[data-qm-prop="title"] .ProseMirror')).not.toBeNull();
 		const inner = repeater(row.querySelector('.qm-object')!);
 		expect(inner.querySelector('.qm-field-label span')?.textContent).toBe('Entries');
-		// Its rows are collapsed rows again, summarized by the inline `plaintext` label —
-		// the row has no `string` cell, so the fallback reads the first short prose cell.
+		// Its rows are collapsed rows again, summarized by the `label` cell, the row's
+		// first short text.
 		expect(summaryTexts(inner)).toEqual(['Primary', 'Secondary']);
 	});
 
@@ -90,21 +92,23 @@ describe('a nested array property', () => {
 		summaries(outer)[0].click();
 		flushSync();
 		const appendix = outer.querySelector<HTMLElement>('.qm-element.open')!;
-		const title = appendix.querySelector<HTMLInputElement>('input[type="text"]')!;
+		const title = leaf(appendix.querySelector<HTMLElement>('[data-qm-prop="title"]')!);
 		const inner = repeater(appendix.querySelector('.qm-object')!);
 		summaries(inner)[0].click();
 		flushSync();
 		const entry = inner.querySelector<HTMLElement>('.qm-element.open')!;
-		const leaf = entry.querySelector<HTMLElement>('.ProseMirror')!;
+		const label = leaf(entry);
 
 		type(entry.querySelector<HTMLInputElement>('input[inputmode="numeric"]')!, '13');
 
 		// Both rows are keyed by session id, so the re-derive the commit causes leaves the
-		// appendix's title input and the entry's prose leaf as the same nodes: no remount,
+		// appendix's title leaf and the entry's label leaf as the same nodes: no remount,
 		// no caret lost.
-		expect(outer.querySelector('.qm-element.open input[type="text"]')).toBe(title);
+		expect(leaf(outer.querySelector<HTMLElement>('.qm-element.open [data-qm-prop="title"]')!)).toBe(
+			title
+		);
 		expect(inner.querySelector('.qm-element.open')).toBe(entry);
-		expect(entry.querySelector('.ProseMirror')).toBe(leaf);
+		expect(leaf(entry)).toBe(label);
 	});
 
 	it('adds a nested row open and removes it, the list committing whole each time', () => {
@@ -169,14 +173,14 @@ describe('a container inside a variant cell', () => {
 		notices.querySelector<HTMLButtonElement>('.qm-add-el')!.click();
 		flushSync();
 		const row = notices.querySelector<HTMLElement>('.qm-element.open')!;
-		type(row.querySelector<HTMLInputElement>('input[type="text"]')!, 'Legal');
+		typeLeaf(row.querySelector<HTMLElement>('[data-qm-prop="party"]')!, 'Legal');
 		// A richtext cell inside a row inside a variant cell: a leaf at three rungs.
-		expect(row.querySelector('.ProseMirror')).not.toBeNull();
+		expect(row.querySelector('[data-qm-prop="text"] .ProseMirror')).not.toBeNull();
 		expect(doc.getStored('distribution')).toEqual({
 			value: 'embargoed',
 			notices: [{ party: 'Legal' }]
 		});
-		// The row summarizes by its `string` cell once it has one.
+		// The row summarizes by its `party` cell once it has one.
 		expect(summaryTexts(notices)).toEqual(['Legal']);
 	});
 });

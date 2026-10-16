@@ -11,7 +11,7 @@
 
 #align(right, qm.ink(qm.data, "date", "[month repr:long] [day padding:none], [year]"))
 
-// A string left unanswered is `""`: guard its value.
+// A text field left unanswered is `""`: guard its value.
 #if qm.data.recipient != "" [Dear #qm.ink(qm.data, "recipient"),]
 
 #if qm.data.subject != "" [*Re: #qm.ink(qm.data, "subject")*]

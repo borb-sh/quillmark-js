@@ -13,8 +13,9 @@ import {
 	field,
 	mountEditor,
 	mountInner,
+	openGroup,
 	press,
-	type,
+	typeLeaf,
 	unmountAll
 } from '../helpers/surface.svelte.js';
 import { quill, quillFromYaml, example } from '../helpers/fixtures.js';
@@ -57,7 +58,7 @@ describe('the card header', () => {
 
 		const fresh = cards(target).at(-1)!;
 		expect(header(fresh).placeholder).toBe(humanize('section'));
-		type(field(fresh, 'Heading').querySelector('input')!, 'Methods');
+		typeLeaf(field(fresh, 'Heading'), 'Methods');
 		expect(header(fresh).placeholder).toBe('Methods');
 	});
 
@@ -69,7 +70,7 @@ describe('the card header', () => {
 		rename(title, 'Renamed');
 		title.blur();
 		flushSync();
-		type(field(section, 'Heading').querySelector('input')!, 'Methods');
+		typeLeaf(field(section, 'Heading'), 'Methods');
 		expect(title.value).toBe('Renamed');
 	});
 });
@@ -132,7 +133,10 @@ describe('a card rename', () => {
 		const title = header(section);
 
 		rename(title, 'Draft');
-		type(field(section, 'Heading').querySelector('input')!, 'Methods');
+		// A form control's commit is the lane that re-derives: the `numbered` switch.
+		openGroup(section, 'Set in');
+		field(section, 'Numbered').querySelector<HTMLElement>('[role="switch"]')!.click();
+		flushSync();
 		expect(changes.map((c) => c.source)).toEqual(['field']);
 		expect(title.value).toBe('Draft');
 
@@ -166,8 +170,8 @@ describe('the add menu', () => {
 });
 
 // A kind named by a one-line prose field: that lane commits without a re-derive, so the
-// header follows the leaf's own commit. On its own quill, the reference quill naming its
-// untitled kind by a `string`.
+// header follows the leaf's own commit. On its own quill, with one field and nothing
+// else to re-derive it.
 const PERSON = `quill:
   name: person_probe
   version: 1.0.0
@@ -181,8 +185,7 @@ card_kinds:
   person:
     fields:
       name:
-        type: plaintext
-        inline: true
+        type: text
 `;
 
 describe('a header named by an inline prose field', () => {

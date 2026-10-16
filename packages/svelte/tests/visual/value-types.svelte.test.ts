@@ -9,9 +9,16 @@
 // than by a captured callback argument.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
-import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
+import { DocumentReader, type Content, type Quill, type Document } from '@quillmark/wasm';
 import { core, quill } from '../helpers/fixtures.js';
-import { field, mountEditor, summaries, type, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	field,
+	mountEditor,
+	summaries,
+	type,
+	typeLeaf,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -86,12 +93,12 @@ describe('an object field', () => {
 			props.map((p) => p.querySelector('.qm-field-label')?.textContent?.replace(/\s+/g, ' ').trim())
 		).toEqual(['Name', 'Email', 'Reply by', 'Listed', 'Note']);
 
-		type(props[0].querySelector('input')!, 'Ada Lovelace');
+		typeLeaf(props[0], 'Ada Lovelace');
 		expect(read(q, doc, 'contact')).toEqual({ name: 'Ada Lovelace' });
 
 		// The second property commits the object by value, so the first has to ride
 		// along: a commit that carried only the edited key would drop it.
-		type(props[1].querySelector('input')!, 'ada@example.org');
+		typeLeaf(props[1], 'ada@example.org');
 		expect(read(q, doc, 'contact')).toEqual({
 			name: 'Ada Lovelace',
 			email: 'ada@example.org'
@@ -106,7 +113,7 @@ describe('an object field', () => {
 		});
 	});
 
-	it('drops a cleared property rather than committing a hole', () => {
+	it('commits a cleared text property as the empty answer, never a hole', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		const { target } = mountEditor(q, doc);
@@ -114,17 +121,17 @@ describe('an object field', () => {
 		const props = [
 			...field(target, 'Point of contact').querySelectorAll<HTMLElement>('.qm-object-prop')
 		];
-		type(props[0].querySelector('input')!, 'Ada Lovelace');
-		type(props[1].querySelector('input')!, 'ada@example.org');
+		typeLeaf(props[0], 'Ada Lovelace');
+		typeLeaf(props[1], 'ada@example.org');
 		expect(read(q, doc, 'contact')).toEqual({
 			name: 'Ada Lovelace',
 			email: 'ada@example.org'
 		});
 
-		// Cleared to empty: the key goes absent (resolving to its own `default:`)
-		// rather than being committed as `undefined`.
-		type(props[0].querySelector('input')!, '');
-		expect(read(q, doc, 'contact')).toEqual({ email: 'ada@example.org' });
+		// Cleared to empty: a prose leaf's empty answer, committed as `''` and never as
+		// an `undefined` hole carried through `writer.set`.
+		typeLeaf(props[0], '');
+		expect(read(q, doc, 'contact')).toEqual({ name: '', email: 'ada@example.org' });
 	});
 
 	// The content property, which is a leaf and not a line pointing elsewhere: it reads
@@ -141,7 +148,7 @@ describe('an object field', () => {
 		];
 		const leaf = props[4].querySelector<HTMLElement>('.ProseMirror')!;
 		expect(leaf).not.toBeNull();
-		// `plaintext`, so the asterisks are characters: nothing was lowered from them.
+		// `text`, so the asterisks are characters: nothing was lowered from them.
 		expect(leaf.textContent).toBe('ask for *Ada*, not Augusta');
 		expect(leaf.querySelector('em, strong')).toBeNull();
 		// `for` cannot reach a `contenteditable`, so the label names it the other way.
@@ -149,8 +156,8 @@ describe('an object field', () => {
 			props[4].querySelector('.qm-field-label')?.id
 		);
 
-		// The property rests as its literal string, the scalar `plaintext` field's rest
-		// form one key in, and the scalar beside it rides the commit as ever.
+		// The property rests as its literal string, the scalar `text` field's rest form
+		// one key in, and the cell beside it rides the commit as ever.
 		expect(doc.getStored('contact')).toEqual({
 			name: 'Ada Lovelace',
 			note: 'ask for *Ada*, not Augusta'
@@ -188,7 +195,7 @@ describe('an array of objects', () => {
 			props.map((p) => p.querySelector('.qm-field-label')?.textContent?.replace(/\s+/g, ' ').trim())
 		).toEqual(['Note', 'Pages', 'Detail', 'Rationale', 'Passage']);
 
-		type(props[0].querySelector('input')!, 'First cut');
+		typeLeaf(props[0], 'First cut');
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut' }]);
 
 		// The element commits whole, so the second cell has to carry the first with it.
@@ -196,7 +203,7 @@ describe('an array of objects', () => {
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut', pages: 3 }]);
 	});
 
-	it('titles a collapsed row by its first string cell, and opens each row on its own', () => {
+	it('titles a collapsed row by its first text cell, and opens each row on its own', () => {
 		const q = quill();
 		const doc = emptied(q);
 		const { target } = mountEditor(q, doc);
@@ -205,10 +212,7 @@ describe('an array of objects', () => {
 		const add = arr.querySelector<HTMLButtonElement>('.qm-add-el')!;
 		add.click();
 		flushSync();
-		type(
-			arr.querySelector<HTMLElement>('.qm-object-prop')!.querySelector('input')!,
-			'Fig. 2 relabelled'
-		);
+		typeLeaf(arr.querySelector<HTMLElement>('.qm-object-prop')!, 'Fig. 2 relabelled');
 
 		// The second add opens its own row and leaves the first where it stands.
 		add.click();
@@ -239,7 +243,7 @@ describe('an array of objects', () => {
 		const add = arr.querySelector<HTMLButtonElement>('.qm-add-el')!;
 		add.click();
 		flushSync();
-		type(arr.querySelector<HTMLElement>('.qm-object-prop')!.querySelector('input')!, 'Kept');
+		typeLeaf(arr.querySelector<HTMLElement>('.qm-object-prop')!, 'Kept');
 		add.click();
 		flushSync();
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'Kept' }, {}]);
@@ -274,14 +278,16 @@ describe('an array holding a bare value', () => {
 		const doc = loaded('authors: Ada Lovelace');
 		expect(doc.getStored('authors')).toBe('Ada Lovelace');
 		const { target } = mountEditor(q, doc);
-		const inputs = () => [
-			...field(target, 'Authors').querySelectorAll<HTMLInputElement>(
-				'input[aria-label^="Authors "]'
+		const leaves = () => [
+			...field(target, 'Authors').querySelectorAll<HTMLElement>(
+				'.ProseMirror[aria-label^="Authors "]'
 			)
 		];
 
-		expect(inputs().map((i) => i.value)).toEqual(rendered(q, doc, 'authors'));
-		type(inputs()[0], 'Grace Hopper');
+		expect(leaves().map((l) => l.textContent)).toEqual(
+			(rendered(q, doc, 'authors') as Content[]).map((c) => c.text)
+		);
+		typeLeaf(leaves()[0], 'Grace Hopper');
 		expect(doc.getStored('authors')).toEqual(['Grace Hopper']);
 	});
 

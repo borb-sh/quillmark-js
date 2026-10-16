@@ -42,7 +42,7 @@
 		describedBy?: string;
 		/** The boundary's nested content read for this field, which the cells take
 		 * unprefixed: a variant's cell is one key in from the container it rests as, so
-		 * a `plaintext` cell's path is its own name ({@link ObjectField}). */
+		 * a `text` cell's path is its own name ({@link ObjectField}). */
 		contentAt: (path: PathStep[]) => Content | undefined;
 		onCommit: (v: Record<string, unknown> | undefined) => void;
 		optionAllowed?: (value: string) => boolean;

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // A block `richtext` cell on a record row takes the block schema and the whole row, so
-// a list it holds survives an edit, and a `plaintext` cell without `inline` takes the
+// a list it holds survives an edit, and a `multiline: true` `text` cell takes the
 // plain schema and the whole row, so an address keeps its lines. A leaf narrowed to one
 // textblock over content that holds more is read-only and commits nothing, so no
 // keystroke writes the flattening back. The reference quill declares none of these
@@ -36,21 +36,25 @@ main:
         type: object
         properties:
           title:
-            type: string
+            type: text
           details:
             type: richtext
+            multiline: true
           address:
-            type: plaintext
+            type: text
+            multiline: true
       default: []
     notes:
       type: array
       items:
         type: richtext
+        multiline: true
       default: []
     tags:
       type: array
       items:
-        type: plaintext
+        type: text
+        multiline: true
       default: []
 `;
 const probe = () => quillFromYaml(YAML);
@@ -112,7 +116,7 @@ describe('a block richtext cell on a record row', () => {
 	});
 });
 
-describe('a plaintext cell without `inline` on a record row', () => {
+describe('a multiline text cell on a record row', () => {
 	it('draws the lines it holds across the row, and keeps them through an edit', () => {
 		const q = probe();
 		const doc = load();
@@ -175,7 +179,7 @@ describe('a narrowed leaf over structure it cannot hold', () => {
 		expect(mounted.changes).toEqual([]);
 	});
 
-	it('holds a multi-line plaintext element, one textblock whatever it declares', () => {
+	it('holds a multi-line text element, one textblock whatever it declares', () => {
 		const q = probe();
 		const doc = load();
 		const mounted = mountEditor(q, doc);

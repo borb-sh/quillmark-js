@@ -224,7 +224,7 @@ function sinkWithin(itemType: NodeType): Command {
 }
 
 /**
- * The list bindings for a block-schema leaf: `{}` for the inline/plaintext
+ * The list bindings for a block-schema leaf: `{}` for the one-line and plain
  * schemas, which declare no list nodes.
  *
  * `Tab` / `Shift-Tab` hold the list link of the body's Tab chain. Surfaces that own
