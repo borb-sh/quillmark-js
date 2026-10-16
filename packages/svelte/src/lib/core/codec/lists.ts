@@ -17,6 +17,7 @@ import { liftListItem, sinkListItem } from 'prosemirror-schema-list';
 import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import type { Command, Transaction } from 'prosemirror-state';
 import { chainCommands, joinTextblockBackward, joinTextblockForward } from 'prosemirror-commands';
+import { withinNesting } from './nesting.js';
 import { splitTaskItem } from './tasks.js';
 
 /** The caret's enclosing `list_item` when it sits at the very start of that item's
@@ -209,6 +210,19 @@ function backspaceBelow(itemType: NodeType, press: Command): Command {
 	};
 }
 
+/** Tab → `sinkListItem`, claimed and inert where the sink would nest past
+ *  `MAX_NESTING_DEPTH` (`nesting.ts`): a declined Tab is the browser's, which moves the
+ *  focus out of the body. */
+function sinkWithin(itemType: NodeType): Command {
+	const sink = sinkListItem(itemType);
+	return (state, dispatch) => {
+		let sunk: Transaction | undefined;
+		if (!sink(state, (tr) => (sunk = tr))) return false;
+		if (sunk && withinNesting(sunk.doc)) dispatch?.(sunk);
+		return true;
+	};
+}
+
 /**
  * The list bindings for a block-schema leaf: `{}` for the inline/plaintext
  * schemas, which declare no list nodes.
@@ -239,7 +253,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 	if (!itemType || !paragraph) return {};
 	const backspace = chainCommands(liftAtItemStart(itemType), joinOntoList(itemType));
 	return {
-		Tab: sinkListItem(itemType),
+		Tab: sinkWithin(itemType),
 		'Shift-Tab': liftListItem(itemType),
 		Enter: chainCommands(
 			paragraphAboveList(itemType, paragraph),
