@@ -96,8 +96,8 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
-		/** The empty leaf's ghost, a subform cell's, until the leaf's first edit: the
-		 *  `none` an optional cell prints unset. Read per decoration pass. */
+		/** The empty leaf's ghost, a subform cell's: the `none` an optional cell prints
+		 *  unset. Read per decoration pass. */
 		placeholder?: string;
 		onChange: (rt: Content) => void;
 		/** Raw keydown, for a container whose own keys run through this leaf: the
@@ -157,7 +157,7 @@
 	}
 
 	$effect(() => {
-		void [label, labelledBy, describedBy];
+		void [label, labelledBy, describedBy, placeholder];
 		view?.setProps({});
 	});
 
@@ -190,8 +190,7 @@
 						? []
 						: proseLeafPlugins(schema, {
 								inline,
-								placeholder: () => placeholder,
-								placeholderUntilEdit: true
+								placeholder: () => placeholder
 							})
 				});
 			};

@@ -138,6 +138,9 @@ export interface CreateFieldOpts {
 	 * emptied it holds an empty answer, which prints empty. Absent, the placeholder
 	 * returns whenever the leaf is empty. */
 	placeholderUntilEdit?: boolean;
+	/** An edit leaving the leaf empty removes the field: an optional cell (`t?`), whose
+	 * unanswered `none` is what the empty leaf draws and an empty answer would hide. */
+	emptyUnsets?: boolean;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new USV caret after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -280,6 +283,11 @@ function readLeaf(reader: DocumentReader, addr: Addr): Content {
  * leaf (or an array's prose element) seeds from. */
 export function emptyContent(): Content {
 	return { text: '', lines: [{ containers: [], kind: 'para' }], marks: [], islands: [] };
+}
+
+/** Whether `rt` is the empty leaf: {@link emptyContent}, nothing typed and no shape left. */
+export function isEmptyContent(rt: Content): boolean {
+	return contentEqual(rt, emptyContent());
 }
 
 /** Whether ops may commit here: the stored value is a `Content` object, so
@@ -497,6 +505,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// Returns whether anything landed: the caller's change signal, which must not
 	// be a property of which branch the commit took.
 	function commitEdit(oldRt: Content, newRt: Content): boolean {
+		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
+			return commitUnset();
 		if (plaintext) return commitPlain(newRt.text);
 		// The text splice, computed once per keystroke: the gate below, both overwrite
 		// fallbacks, and `lower` all read this one `edit`. The projection is the
@@ -568,6 +578,23 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				code: 'commit-lost',
 				severity: 'error',
 				message: `the typed writer refused the text; the stored value is stale while the editor keeps the edit: ${errorMessage(e)}`,
+				cause: e
+			});
+			return false;
+		}
+	}
+
+	/** An emptied optional leaf's commit: the field removed, back to unanswered. */
+	function commitUnset(): boolean {
+		try {
+			doc.removeField(addr);
+			reconciler.commit(readLeaf(reader, addr));
+			return true;
+		} catch (e) {
+			reportError(opts.onError, {
+				code: 'commit-lost',
+				severity: 'error',
+				message: `the field could not be removed; the stored value is stale while the editor keeps the edit: ${errorMessage(e)}`,
 				cause: e
 			});
 			return false;

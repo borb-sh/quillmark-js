@@ -21,6 +21,7 @@ export {
 	createField,
 	emptyContent,
 	heldAttributes,
+	isEmptyContent,
 	proseAttributes,
 	proseLeafPlugins
 } from './field.js';

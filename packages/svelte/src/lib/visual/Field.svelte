@@ -303,7 +303,7 @@
 					plaintext={field.plaintext}
 					fallback={printed ? (ghost as Content) : undefined}
 					placeholder={none}
-					placeholderUntilEdit
+					emptyUnsets={optional}
 					labelledBy={domIds.label}
 					{describedBy}
 					{leafKey}

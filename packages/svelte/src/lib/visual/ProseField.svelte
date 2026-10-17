@@ -46,6 +46,8 @@
 		placeholder?: string;
 		/** The placeholder goes at the leaf's first edit (`createField`). */
 		placeholderUntilEdit?: boolean;
+		/** An emptied leaf removes the field (`createField`). */
+		emptyUnsets?: boolean;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
 		onFocus?: (addr: Addr) => void;
@@ -74,6 +76,7 @@
 		fallback,
 		placeholder,
 		placeholderUntilEdit,
+		emptyUnsets,
 		leafKey,
 		onFocus,
 		onCaretMove,
@@ -123,6 +126,7 @@
 				fallback,
 				placeholder,
 				placeholderUntilEdit,
+				emptyUnsets,
 				tableStrings: () => t.strings,
 				slashStrings: () => t.strings,
 				onSlash: (next) => {

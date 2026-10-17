@@ -93,6 +93,9 @@ main:
       default: true
     aside:
       type: text?
+    remark:
+      type: richtext?
+      multiline: true
     lines:
       type: array
       items:
@@ -264,13 +267,6 @@ describe('a default that prints', () => {
 		typeLeaf(heading, '');
 		expect(row('heading')).toMatchObject({ source: 'authored', value: { text: '' } });
 		expect(leafGhost(heading)).toBeNull();
-
-		// An optional cell emptied is answered, so `none` goes with the first edit.
-		const ref = field(target, 'Ref');
-		typeLeaf(ref, 'x');
-		typeLeaf(ref, '');
-		expect(row('ref').source).toBe('authored');
-		expect(leafGhost(ref)).toBeNull();
 	});
 
 	it('holds a number as its text, and a blank entry takes the default back', () => {
@@ -573,19 +569,49 @@ describe('an optional cell', () => {
 		expect(leafGhost(cell(field(target, 'Contact'), 'phone'))).toBeNull();
 	});
 
-	it('drops `None` from a prose leaf at its first edit, which answers it', async () => {
+	it('drops `None` from a prose leaf while it holds text', async () => {
 		const { target, editor } = openInner();
 		expect(leafGhost(field(target, 'Aside'))?.dataset.placeholder).toBe(NONE);
 
 		await editor.focusField('main.aside');
 		const view = activeView(editor);
 		view.dispatch(view.state.tr.insertText('x', 1));
-		view.dispatch(view.state.tr.delete(1, 2));
 		flushSync();
 
-		// Emptied, the leaf holds an empty answer, and the boundary says so.
-		expect(row('aside').source).toBe('authored');
+		expect(row('aside')).toMatchObject({ source: 'authored', value: { text: 'x' } });
 		expect(leafGhost(field(target, 'Aside'))).toBeNull();
+	});
+
+	it('returns to unanswered when its prose leaf is emptied, and ghosts `None` again', () => {
+		const target = open();
+		for (const [label, name] of [
+			['Ref', 'ref'],
+			['Remark', 'remark']
+		]) {
+			const scope = field(target, label);
+			typeLeaf(scope, 'x');
+			expect(doc.getStored(name)).not.toBeUndefined();
+			typeLeaf(scope, '');
+			expect(doc.getStored(name)).toBeUndefined();
+			expect(row(name).source).not.toBe('authored');
+			expect(leafGhost(scope)?.dataset.placeholder).toBe(NONE);
+		}
+	});
+
+	it('drops a subform cell’s key when its prose leaf is emptied', () => {
+		const target = open();
+		const phone = cell(field(target, 'Contact'), 'phone');
+		typeLeaf(phone, '555');
+		expect(q.reader(doc).get('contact')).toEqual({ phone: '555' });
+		typeLeaf(phone, '');
+		expect(q.reader(doc).get('contact')).toEqual({});
+		expect(leafGhost(phone)?.dataset.placeholder).toBe(NONE);
+
+		// A required cell emptied keeps its key, holding the empty answer.
+		const name = cell(field(target, 'Contact'), 'name');
+		typeLeaf(name, 'Ada');
+		typeLeaf(name, '');
+		expect(q.reader(doc).get('contact')).toEqual({ name: '' });
 	});
 
 	it('draws an unset `boolean?` as a third state, and a press answers it', () => {

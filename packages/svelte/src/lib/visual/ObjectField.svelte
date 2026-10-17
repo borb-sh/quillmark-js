@@ -55,6 +55,7 @@
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
+	import { isEmptyContent } from '../core/codec/index.js';
 	import { wording } from './strings.js';
 	import { propertyDomIds } from './domid.js';
 	import FieldLabel from './FieldLabel.svelte';
@@ -385,7 +386,8 @@
 						label={named}
 						labelledBy={ids?.label}
 						describedBy={describes}
-						onChange={(rt) => commitProp(key, rt)}
+						onChange={(rt) =>
+							commitProp(key, optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
 						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
 					/>
 				{:else if kind === 'array'}
