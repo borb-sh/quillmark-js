@@ -5,6 +5,16 @@
 
 #let accent = qm.data.at("accent", default: "slate")
 
+// A text value prints with a space on each side, the helper's binding of it, so
+// one set against punctuation drops them. The glyphs keep their spans.
+#let flush(c) = {
+  if type(c) != content or not c.has("children") { return c }
+  let kids = c.children
+  while kids.len() > 0 and kids.first() == [ ] { kids = kids.slice(1) }
+  while kids.len() > 0 and kids.last() == [ ] { kids = kids.slice(0, -1) }
+  kids.sum(default: [])
+}
+
 #show: showcase-page.with(
   // A string, not `data.title`: see `showcase-page` on why the running head takes
   // a flattened projection and the block stays in the flow. The projection is the
@@ -84,9 +94,9 @@
 #let authors = qm.data.at("authors", default: ())
 #let poc = qm.data.at("contact", default: (:))
 #text(size: 9pt)[
-  #if authors.len() > 0 [#qm.region("authors", authors.join(", "))]
+  #if authors.len() > 0 [#qm.region("authors", authors.map(flush).join(", "))]
   #if poc.at("name", default: "") != "" [
-    · #poc.name#if poc.at("email", default: "") != "" [ (#poc.email)]
+    · #flush(poc.name)#if poc.at("email", default: "") != "" [ (#flush(poc.email))]
   ]
   · Issued #shown-date("issued", [—])
   #let revised = qm.ink(qm.data, "revised_at", "[year]-[month]-[day] [hour]:[minute]")
@@ -282,7 +292,7 @@
     let title = if row.held { if "title" in row.value { qm.ink(row.value, "title") } else { row.title } } else { row.title }
     qm.region(row.path)[#(if row.held { "[x]" } else { "[ ]" }) #title]
     if row.held and row.value.severity == "major" [ (major)]
-    if row.held and row.value.note != "" [: #qm.ink(row.value, "note")]
+    if row.held and row.value.note != "" [: #flush(qm.ink(row.value, "note"))]
     [; ]
   }
   #linebreak()
