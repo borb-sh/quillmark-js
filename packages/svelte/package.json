@@ -1,6 +1,6 @@
 {
 	"name": "@quillmark/svelte",
-	"version": "0.21.0",
+	"version": "0.22.0",
 	"description": "Editor, live-preview and source surfaces over a Quillmark WASM session.",
 	"repository": {
 		"type": "git",
@@ -23,7 +23,7 @@
 	"author": "Quillmark Contributors",
 	"type": "module",
 	"engines": {
-		"node": ">=24"
+		"node": ">=22"
 	},
 	"svelte": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -69,7 +69,7 @@
 		"check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
 	},
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.125.0-0",
+		"@quillmark/wasm": ">=0.126.0-0",
 		"svelte": "^5.33.0"
 	},
 	"dependencies": {

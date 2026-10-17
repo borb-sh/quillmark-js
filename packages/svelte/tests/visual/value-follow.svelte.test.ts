@@ -4,7 +4,7 @@
 // replaces its view, so the next keystroke edits that value rather than the one the leaf
 // mounted over, and the hold is judged again of what arrives. Its own commit, echoed
 // back through the same re-derive, replaces nothing. The probe is its own quill: a prose
-// array, a record list with a prose cell, and a string whose commit re-derives.
+// array, a record list with a prose cell, and a number whose commit re-derives.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
@@ -27,7 +27,7 @@ const YAML = `quill:
   name: value_follow
   version: 1.0.0
   backend: typst
-  description: By-value prose leaves, and a string beside them.
+  description: By-value prose leaves, and a number beside them.
 typst:
   plate_file: plate.typ
 main:
@@ -36,6 +36,7 @@ main:
       type: array
       items:
         type: richtext
+        multiline: true
       default: []
     jobs:
       type: array
@@ -43,13 +44,13 @@ main:
         type: object
         properties:
           title:
-            type: string
+            type: text
           summary:
             type: richtext
-            inline: true
+            multiline: false
       default: []
-    author:
-      type: string
+    pages:
+      type: integer
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (): Document =>
@@ -68,9 +69,9 @@ const load = (): Document =>
 	);
 const LIST = '- one\n- two';
 
-/** Commit the string beside the leaves: a revision, and so a re-derive. */
+/** Commit the number beside the leaves: a revision, and so a re-derive. */
 function rederive(m: Mounted): void {
-	type(field(m.target, 'Author').querySelector<HTMLInputElement>('input')!, 'Ann');
+	type(field(m.target, 'Pages').querySelector<HTMLInputElement>('input')!, '7');
 }
 
 const noteLeaf = (m: Mounted): HTMLElement =>

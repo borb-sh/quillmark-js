@@ -2,7 +2,7 @@
  An `array` field → an add/remove repeater. Elements commit by value: every
  edit / add / remove / move rebuilds the whole array and hands it to the parent's typed
  `writer.set(field, wholeArray)` (arrays are not op-addressed). Element control
- by `items.type`: `richtext` / `plaintext` → a prose element
+ by `items.type`: `richtext` / `text` → a prose element
  ({@link ProseValue}), `object` → a summary row that opens onto a subform, or a
  table's row where the array asks for one and the cells are short, everything else →
  a text input. The add chip sits in the label header row (space-between with the field
@@ -71,7 +71,7 @@
 		controlKind,
 		declaredContent,
 		humanize,
-		obliged,
+		literalText,
 		rowSummary,
 		schemaAt,
 		type ArrayLayout
@@ -105,8 +105,6 @@
 		max?: number;
 		/** Accessible-name prefix for the element controls (`label` + 1-based index). */
 		label?: string;
-		/** No-default field → a persistent required `*` on the label. */
-		required?: boolean;
 		/** Schema `description`: the label's help affordance. */
 		description?: string;
 		/** The label's own DOM id. An array is a group (N inputs, no single `for`
@@ -140,7 +138,6 @@
 		layout = 'list',
 		max,
 		label,
-		required,
 		description,
 		labelId,
 		descriptionId,
@@ -648,14 +645,7 @@
 >
 	<div class="qm-array-header">
 		{#if label != null}
-			<FieldLabel
-				{label}
-				id={labelId}
-				{descriptionId}
-				onActivate={focus}
-				{required}
-				{description}
-			/>
+			<FieldLabel {label} id={labelId} {descriptionId} onActivate={focus} {description} />
 		{:else}
 			<span></span>
 		{/if}
@@ -687,8 +677,8 @@
 			<div class="qm-array-table-scroller" style:--table-cols={columns.length}>
 				<!-- The header names the columns, so a cell carries no label of its own: its
 				     accessible name is the row's and the column's composed (`ObjectField`). The
-				     obligation mark and the guidance affordance ride the header, being the
-				     column's rather than any one cell's. -->
+				     guidance affordance rides the header, being the column's rather than any
+				     one cell's. -->
 				<div class="qm-array-table-head">
 					{#each columns as [key, sub] (key)}
 						<div
@@ -700,7 +690,6 @@
 							<FieldLabel
 								label={columnTitle(key, sub)}
 								descriptionId={idBase != null ? propertyDomIds(idBase, key).description : undefined}
-								required={obliged(sub)}
 								description={sub.description}
 							/>
 						</div>
@@ -708,7 +697,11 @@
 					<span class="qm-array-table-head-end"></span>
 				</div>
 				{#each ids as id, k (id)}
-					<div class="qm-array-row qm-array-table-row qm-wash" bind:this={rowEls[id]}>
+					<div
+						class="qm-array-row qm-array-table-row qm-wash"
+						data-qm-index={k}
+						bind:this={rowEls[id]}
+					>
 						<ObjectField
 							bare
 							bind:this={cellEls[id]}
@@ -742,6 +735,7 @@
 						{ open: open.has(id), lifted: drag?.engaged && drag.k === k }
 					]}
 					data-drop={dropSide(k)}
+					data-qm-index={k}
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
 					onkeydown={(e) => onRowKey(e, k)}
@@ -799,13 +793,13 @@
 			bind:this={rowsEl}
 		>
 			{#each ids as id, k (id)}
-				<div class="qm-array-row qm-wash" bind:this={rowEls[id]}>
+				<div class="qm-array-row qm-wash" data-qm-index={k} bind:this={rowEls[id]}>
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
 							content={() => readAt([k])}
 							value={arr[k]}
-							plaintext={items != null && baseType(items) === 'plaintext'}
+							plaintext={items != null && literalText(items)}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
 							onKey={(e) => onElementKey(e, k)}

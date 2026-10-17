@@ -139,6 +139,28 @@ export function type(input: HTMLInputElement, value: string): void {
 	flushSync();
 }
 
+/** The prose leaf `scope` is or holds: what a `text` or `richtext` value mounts. */
+export function leaf(scope: HTMLElement): HTMLElement {
+	const found = scope.matches('.ProseMirror')
+		? scope
+		: scope.querySelector<HTMLElement>('.ProseMirror');
+	if (!found) throw new Error('no prose leaf in scope');
+	return found;
+}
+
+/** The text of the leaf `scope` is or holds. */
+export const leafText = (scope: HTMLElement): string => leaf(scope).textContent ?? '';
+
+/** Replace a leaf's whole text as a hand does: select all, then paste `text` over the
+ *  selection, or Backspace it away for the empty answer. Each step is a DOM event PM
+ *  handles, so the commit is the leaf's own. */
+export function typeLeaf(scope: HTMLElement, text: string): void {
+	const el = leaf(scope);
+	press(el, 'a', { ctrlKey: true });
+	if (text === '') press(el, 'Backspace');
+	else paste(el, text);
+}
+
 export function press(el: HTMLElement, key: string, init: KeyboardEventInit = {}): void {
 	el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }));
 	flushSync();

@@ -60,9 +60,9 @@ export function decode(rt: Content, schema: Schema): PMNode {
 		acc += usvLength(lineTexts[i]) + 1; // +1 for the `\n` boundary
 	}
 	// A mark-free schema (`plaintextSchema`) has nothing to apply them with, and a
-	// plaintext field that acquired one anyway — an older build's popover, a hand-
-	// written document — is exactly the content that must open and then heal on the
-	// next commit, not throw here.
+	// `text` field that acquired one anyway — an older build's popover, a hand-written
+	// document — is exactly the content that must open and then heal on the next
+	// commit, not throw here.
 	const marks = hasMarks(schema) ? rt.marks.filter((m) => m.type !== 'anchor') : [];
 	const cursor: IslandCursor = { i: 0, rt };
 
@@ -90,10 +90,10 @@ export function decode(rt: Content, schema: Schema): PMNode {
 }
 
 /** Whether `rt` decodes under an inline schema with nothing but whitespace dropped:
- *  upstream's `inline` rule, or one plain line and the empty one a trailing `\n`
- *  opens. That newline is the one a YAML `|` scalar keeps in a `plaintext` value,
- *  which upstream refuses (`trailingNewline`) and the inline decode drops. Marks are
- *  the schema's own business (`plaintextSchema` declares none). */
+ *  upstream's one-line rule, or one plain line and the empty one a trailing `\n`
+ *  opens. That newline is the one a YAML `|` scalar keeps in a `text` value, which
+ *  upstream ignores and the inline decode drops. Marks are the schema's own business
+ *  (`plaintextSchema` declares none). */
 export function fitsInline(rt: Content): boolean {
 	if (core().isInline(rt)) return true;
 	const plain = (line: ContentLine): boolean =>

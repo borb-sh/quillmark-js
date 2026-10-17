@@ -5,13 +5,21 @@
 // drives it, and read back through the document rather than off a captured callback.
 //
 // The claims that are the feature: a world's cells appear and retire with the pick,
-// obligation is per world (`lift_on` is required on an embargoed document and exists
+// a cell exists in its own world only (`lift_on` is drawn on an embargoed document and
 // nowhere else), an answer the discriminant strands is kept rather than dropped, and a
 // content cell (`handling`'s two) is a leaf at the depth it sits.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import { core, quill, quillFromYaml } from '../helpers/fixtures.js';
-import { field, mountEditor, pick, trigger, type, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	field,
+	leaf,
+	mountEditor,
+	pick,
+	trigger,
+	typeLeaf,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -20,24 +28,21 @@ afterEach(unmountAll);
 const pickWorld = (target: HTMLElement, text: string | null, name = 'Distribution') =>
 	pick(field(target, name), text);
 
-/** The drawn cells of the live world, label text in declaration order. The marker is
- *  a sibling node inside the label, so the text is normalized rather than compared
- *  raw: what the assertions are about is the name and its obligation, not the
- *  whitespace `FieldLabel`'s markup leaves between the two. */
+/** The drawn cells of the live world, label text in declaration order, normalized
+ *  past the whitespace `FieldLabel`'s markup leaves. */
 function cellLabels(target: HTMLElement, name = 'Distribution'): string[] {
 	return [
 		...field(target, name).querySelectorAll<HTMLElement>('.qm-object-prop .qm-field-label')
 	].map((el) => el.textContent?.replace(/\s+/g, ' ').trim() ?? '');
 }
 
-/** A cell's text input, by the label it sits under. */
-function cellInput(target: HTMLElement, label: string): HTMLInputElement {
+/** A cell's text leaf, by the label it sits under. */
+function cellLeaf(target: HTMLElement, label: string): HTMLElement {
 	const prop = [
 		...field(target, 'Distribution').querySelectorAll<HTMLElement>('.qm-object-prop')
 	].find((p) => p.querySelector('.qm-field-label')?.textContent?.trim().startsWith(label));
-	const input = prop?.querySelector('input');
-	if (!input) throw new Error(`no cell input under ${label}`);
-	return input;
+	if (!prop) throw new Error(`no cell under ${label}`);
+	return leaf(prop);
 }
 
 const stored = (doc: Document) => doc.getStored('distribution');
@@ -54,12 +59,10 @@ describe('a variant enum field', () => {
 		expect(stored(doc)).toBeUndefined();
 		expect(cellLabels(target)).toEqual([]);
 
-		// `lift_on` declares no `default:` and is obliged; `held_by` declares `""` and is
-		// not. The pair is what the axis buys: required *in this world*. `notices` is the
-		// world's third cell, a record list drawn at the next rung and labelled by its
+		// `notices` is the world's third cell, a record list drawn at the next rung and labelled by its
 		// own header row.
 		pickWorld(target, 'embargoed');
-		expect(cellLabels(target)).toEqual(['Lift on *', 'Held by', 'Notices']);
+		expect(cellLabels(target)).toEqual(['Lift on', 'Held by', 'Notices']);
 
 		// One world's cells are not the other's: the flip retires both and brings the
 		// licence in, rather than accumulating a union of every world's fields.
@@ -70,29 +73,20 @@ describe('a variant enum field', () => {
 		expect(cellLabels(target)).toEqual([]);
 	});
 
-	it('names an obliged cell through a real label, and says "required" on the marker', () => {
+	it('names a cell through a real label', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'embargoed');
-		// A cell is named the way every other control on the surface is: a `<label for>`
-		// pointing at it, so the name is the label's own text and there is no second
-		// `aria-label` beside it for an implementation to have to choose between.
-		const input = cellInput(target, 'Lift on');
-		expect(input.getAttribute('aria-label')).toBeNull();
-		const label = target.querySelector<HTMLLabelElement>(`label[for="${input.id}"]`);
-		expect(label?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Lift on *');
-		// The glyph announces the word rather than the character, and it rides inside the
-		// label so it names the control along with the text.
-		expect(label?.querySelector('.qm-field-required')?.getAttribute('aria-label')).toBe('required');
-
-		const unobliged = cellInput(target, 'Held by');
-		expect(
-			target
-				.querySelector<HTMLLabelElement>(`label[for="${unobliged.id}"]`)
-				?.querySelector('.qm-field-required')
-		).toBeNull();
+		// A cell is named the way every other leaf on the surface is: the label beside it,
+		// reached through `aria-labelledby` since `for` cannot name a `contenteditable`, so
+		// the name is the label's own text and there is no second `aria-label` beside it
+		// for an implementation to have to choose between.
+		const cell = cellLeaf(target, 'Lift on');
+		expect(cell.getAttribute('aria-label')).toBeNull();
+		const label = document.getElementById(cell.getAttribute('aria-labelledby') ?? '');
+		expect(label?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Lift on');
 	});
 
 	it('commits a cell into the container, keeping the discriminant beside it', () => {
@@ -103,11 +97,11 @@ describe('a variant enum field', () => {
 		pickWorld(target, 'embargoed');
 		expect(stored(doc)).toEqual({ value: 'embargoed' });
 
-		type(cellInput(target, 'Lift on'), '2027-01-01');
+		typeLeaf(cellLeaf(target, 'Lift on'), '2027-01-01');
 		expect(stored(doc)).toEqual({ value: 'embargoed', lift_on: '2027-01-01' });
 
 		// The container commits by value, so the cell beside it has to ride along.
-		type(cellInput(target, 'Held by'), 'Legal');
+		typeLeaf(cellLeaf(target, 'Held by'), 'Legal');
 		expect(stored(doc)).toEqual({
 			value: 'embargoed',
 			lift_on: '2027-01-01',
@@ -121,7 +115,7 @@ describe('a variant enum field', () => {
 		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'embargoed');
-		type(cellInput(target, 'Lift on'), '2027-01-01');
+		typeLeaf(cellLeaf(target, 'Lift on'), '2027-01-01');
 
 		// Flip away to compare: the boundary carries a stranded answer and warns rather
 		// than dropping it, and the control does the same. Dropping here would spend the
@@ -132,7 +126,7 @@ describe('a variant enum field', () => {
 
 		// And back: the answer is still the document's, so the cell re-draws filled.
 		pickWorld(target, 'embargoed');
-		expect(cellInput(target, 'Lift on').value).toBe('2027-01-01');
+		expect(cellLeaf(target, 'Lift on').textContent).toBe('2027-01-01');
 		expect(stored(doc)).toEqual({ value: 'embargoed', lift_on: '2027-01-01' });
 	});
 
@@ -152,7 +146,7 @@ describe('a variant enum field', () => {
 		// With an answer beside it, clearing is the discriminant's own gesture: it takes
 		// that cell and leaves the answer, for the same reason a flip does.
 		pickWorld(target, 'embargoed');
-		type(cellInput(target, 'Lift on'), '2027-01-01');
+		typeLeaf(cellLeaf(target, 'Lift on'), '2027-01-01');
 		pickWorld(target, null);
 		expect(stored(doc)).toEqual({ lift_on: '2027-01-01' });
 	});
@@ -195,15 +189,13 @@ describe('a variant whose default is the blank', () => {
 		expect(held(doc)).toBeUndefined();
 	});
 
-	it('names its prose cells, marks the obliged one, and mounts a leaf in each', () => {
+	it('names its prose cells and mounts a leaf in each', () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		const { target } = mountEditor(q, doc);
 
 		pickWorld(target, 'CONTROLLED', 'Handling');
-		// Obligation is per world and per cell: `controlled_by` declares no `default:`
-		// and `caveat` declares the blank.
-		expect(cellLabels(target, 'Handling')).toEqual(['Controlled by *', 'Caveat']);
+		expect(cellLabels(target, 'Handling')).toEqual(['Controlled by', 'Caveat']);
 
 		// A content cell is a leaf like any other, at the depth it sits: the cell mounts
 		// the prose leaf its scalar field mounts, named by the label beside it.
@@ -237,7 +229,7 @@ describe('a variant whose default is the blank', () => {
 			...field(target, 'Handling').querySelectorAll<HTMLElement>('.qm-object-prop .ProseMirror')
 		];
 		expect(leaves.map((l) => l.textContent)).toEqual(['SPEC/AA', 'no *markup*, just text']);
-		// `plaintext`, so the asterisks are characters and nothing was lowered from them.
+		// `text`, so the asterisks are characters and nothing was lowered from them.
 		expect(leaves[1].querySelector('em, strong')).toBeNull();
 
 		// The write is the other lane: the container commits whole, and the typed writer
@@ -276,13 +268,15 @@ main:
           variants:
             CUI:
               controlled_by:
-                type: string
+                type: text
                 default: ""
 `;
 	const nested = () => quillFromYaml(NESTED);
 	const header = (doc: Document) => doc.getStored('header');
-	const cell = (target: HTMLElement): HTMLInputElement | null =>
-		field(target, 'Header').querySelector<HTMLInputElement>('[data-qm-prop="controlled_by"] input');
+	const cell = (target: HTMLElement): HTMLElement | null =>
+		field(target, 'Header').querySelector<HTMLElement>(
+			'[data-qm-prop="controlled_by"] .ProseMirror'
+		);
 
 	it('draws the discriminant and the live cells, and commits the container whole', () => {
 		const q = nested();
@@ -302,9 +296,9 @@ main:
 
 		expect(trigger(field(target, 'Header')).textContent?.trim()).toBe('CUI');
 		expect(cellLabels(target, 'Header')).toEqual(['Classification', 'Controlled by']);
-		expect(cell(target)?.value).toBe('SPEC');
+		expect(cell(target)?.textContent).toBe('SPEC');
 
-		type(cell(target)!, 'LEGAL');
+		typeLeaf(cell(target)!, 'LEGAL');
 		expect(header(doc)).toEqual({ classification: { value: 'CUI', controlled_by: 'LEGAL' } });
 	});
 
@@ -318,7 +312,7 @@ main:
 		expect(cell(target)).toBeNull();
 
 		pickWorld(target, 'CUI', 'Header');
-		type(cell(target)!, 'SPEC');
+		typeLeaf(cell(target)!, 'SPEC');
 		expect(header(doc)).toEqual({ classification: { value: 'CUI', controlled_by: 'SPEC' } });
 
 		pickWorld(target, 'U', 'Header');

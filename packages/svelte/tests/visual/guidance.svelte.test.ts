@@ -6,7 +6,14 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { quill, example } from '../helpers/fixtures.js';
-import { field, mountEditor, openGroup, press, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	field,
+	leaf,
+	mountEditor,
+	openGroup,
+	press,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 // A raise reads the trigger's target off its `::after`, which jsdom computes none of and
 // says so on every call: the element's own style stands in.
@@ -28,13 +35,13 @@ const describedText = (control: Element): string[] =>
 		.split(/\s+/)
 		.map((id) => document.getElementById(id)?.textContent ?? '');
 
-function contactName(target: HTMLElement): { input: HTMLInputElement; hint: HTMLElement } {
+function contactName(target: HTMLElement): { input: HTMLElement; hint: HTMLElement } {
 	const contact = field(target, 'Point of contact');
 	const label = [...contact.querySelectorAll<HTMLLabelElement>('.qm-object .qm-field-label')].find(
 		(l) => l.querySelector('span')?.textContent === 'Name'
 	)!;
 	return {
-		input: document.getElementById(label.htmlFor) as HTMLInputElement,
+		input: leaf(label.closest<HTMLElement>('.qm-object-prop')!),
 		hint: hintOf(label.parentElement!)
 	};
 }
@@ -80,8 +87,8 @@ describe('the guidance key', () => {
 	it('reaches a table column’s description from any cell in it', () => {
 		const { target } = mountEditor(quill(), example());
 		const table = field(target, 'Contributors');
-		const cell = table.querySelector<HTMLInputElement>(
-			'input[aria-label="Contributors 2 Name required"]'
+		const cell = table.querySelector<HTMLElement>(
+			'.ProseMirror[aria-label="Contributors 2 Name"]'
 		)!;
 		expect(describedText(cell)).toEqual(['As credited.']);
 

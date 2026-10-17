@@ -77,15 +77,29 @@ export interface Landing {
  * - `{card: i}` → `"cards.<kind>[i].body"`
  * - `{card: i, field}` → `"cards.<kind>[i].<field>"`
  *
+ * `steps` descend from the field to a leaf inside it, the inverse of
+ * {@link nestedAddrForFieldPath}: `{field: 'contact'}` with `['email']` is
+ * `"main.contact.email"`, `{field: 'keywords'}` with `[0]` is `"main.keywords[0]"`. A body
+ * holds no cells, so a field-less address with steps is `undefined`.
+ *
  * `cards[i]` stands in for an unknown or blank kind. The index is the addr's own: no
  * per-kind counting, since `DocPath` addresses cards by document-array index.
  */
-export function fieldPathForAddr(addr: Addr, kinds: readonly string[]): DocPath | undefined {
+export function fieldPathForAddr(
+	addr: Addr,
+	kinds: readonly string[],
+	steps: readonly PathStep[] = []
+): DocPath | undefined {
 	const head = cardHead(addr.card, kinds);
 	if (!head) return undefined;
-	const tail: DocPathSeg =
-		addr.field != null ? { seg: 'field', name: addr.field } : { seg: 'body' };
-	return core().formatDocPath([head, tail]);
+	if (addr.field == null)
+		return steps.length ? undefined : core().formatDocPath([head, { seg: 'body' }]);
+	const segs: DocPathSeg[] = [head, { seg: 'field', name: addr.field }];
+	for (const step of steps)
+		segs.push(
+			typeof step === 'number' ? { seg: 'index', index: step } : { seg: 'field', name: step }
+		);
+	return core().formatDocPath(segs);
 }
 
 /**

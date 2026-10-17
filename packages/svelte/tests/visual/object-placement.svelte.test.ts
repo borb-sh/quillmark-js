@@ -21,23 +21,23 @@ main:
     addressing:
       type: object
       properties:
-        subject: { type: string }
+        subject: { type: text }
         issued: { type: date }
         due: { type: date }
-        office: { type: string }
-        rank: { type: string, ui: { compact: true } }
-        grade: { type: string, ui: { compact: true } }
+        office: { type: text }
+        rank: { type: text, ui: { compact: true } }
+        grade: { type: text, ui: { compact: true } }
         branch:
           type: object
           properties:
-            street: { type: string }
+            street: { type: text }
             opened: { type: date }
     jobs:
       type: array
       items:
         type: object
         properties:
-          title: { type: string }
+          title: { type: text }
           started: { type: date }
       default: []
 `;

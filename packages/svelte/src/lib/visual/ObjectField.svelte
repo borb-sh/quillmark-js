@@ -45,8 +45,8 @@
 		flatObject,
 		humanize,
 		isContainer,
+		literalText,
 		mountKey,
-		obliged,
 		optionalCell,
 		placeFields,
 		printedText,
@@ -55,6 +55,7 @@
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
+	import { isEmptyContent } from '../core/codec/index.js';
 	import { wording } from './strings.js';
 	import { propertyDomIds } from './domid.js';
 	import FieldLabel from './FieldLabel.svelte';
@@ -148,12 +149,6 @@
 	const routed = $derived(splitDeep(diagnostics));
 	const foot = $derived(unrouted(routed, (step) => typeof step === 'string' && has(step)));
 
-	/** Obligation, read off the cell exactly as `fieldModels` reads it off a field
-	 *  ({@link obliged}). `validate` anchors it per leaf, so a property with no
-	 *  `default:` is obliged in its own right and the container around it holds none
-	 *  (VISUAL_EDITOR §"Enum variants"). */
-	const required = obliged;
-
 	const title = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
 	/** What an unset optional cell ghosts, which is what it prints: `none`. An answered
 	 *  cell ghosts nothing, an empty answer printing empty. */
@@ -167,8 +162,7 @@
 	/** The `aria-label` fallback, for a subform mounted without a field's id space:
 	 *  the field's name and the property's, since nothing else names the control. */
 	const fallbackName = (key: string, sub: QuillFieldSchema): string =>
-		`${label != null ? `${label} ` : ''}${title(key, sub)}` +
-		(required(sub) ? ` ${t.strings.fieldRequired}` : '');
+		`${label != null ? `${label} ` : ''}${title(key, sub)}`;
 
 	/** The handles of the cells the DOM cannot answer for, keyed by property name —
 	 *  which is stable, a subform drawing its properties by declaration and never by
@@ -321,7 +315,6 @@
 						id={ids.label}
 						descriptionId={describes}
 						onActivate={labelable ? undefined : () => focusProp(key)}
-						required={required(sub)}
 						description={sub.description}
 					/>
 				{/if}
@@ -387,13 +380,14 @@
 						content={() => contentAt([key])}
 						value={obj[key]}
 						fallback={contentDefault(sub)}
-						plaintext={baseType(sub) === 'plaintext'}
+						plaintext={literalText(sub)}
 						placeholder={noneOf(key, sub)}
 						{block}
 						label={named}
 						labelledBy={ids?.label}
 						describedBy={describes}
-						onChange={(rt) => commitProp(key, rt)}
+						onChange={(rt) =>
+							commitProp(key, optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
 						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
 					/>
 				{:else if kind === 'array'}
@@ -409,7 +403,6 @@
 						layout={arrayLayout(sub)}
 						max={sub.max}
 						label={title(key, sub)}
-						required={required(sub)}
 						description={sub.description}
 						labelId={ids?.label}
 						descriptionId={describes}

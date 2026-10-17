@@ -220,7 +220,7 @@
 		const card = addr.card;
 		return card != null ? { card, field: addr.field } : { field: addr.field };
 	}
-	function handleFocus(addr: Addr): void {
+	function handleFocus(addr: Addr, steps: readonly PathStep[] = []): void {
 		const plain = normalize(addr);
 		activeAddr = plain;
 		activeCardId = cardIdOf(plain);
@@ -228,7 +228,7 @@
 		// to at the offset it still names has to report again.
 		lastCaretField = undefined;
 		lastCaretPos = undefined;
-		const field = pathFor(plain);
+		const field = pathFor(plain, steps);
 		// Both halves or neither: a stale addr names no path and no live card.
 		if (field != null && activeCardId != null)
 			onActiveLeafChange?.({ field, cardId: activeCardId });
@@ -245,11 +245,11 @@
 		return model.cards.map((c) => c.kind);
 	}
 	/**
-	 * A leaf's canonical `DocPath`. `undefined` for an address outside the live card
-	 * array (a stale addr: drop rather than mis-target).
+	 * A leaf's canonical `DocPath`, `steps` down from the field. `undefined` for an
+	 * address outside the live card array (a stale addr: drop rather than mis-target).
 	 */
-	function pathFor(addr: Addr): DocPath | undefined {
-		return fieldPathForAddr(addr, addr.card == null ? NO_KINDS : liveKinds());
+	function pathFor(addr: Addr, steps: readonly PathStep[] = []): DocPath | undefined {
+		return fieldPathForAddr(addr, addr.card == null ? NO_KINDS : liveKinds(), steps);
 	}
 	// The last place reported, so a caret that did not move is not news. A leaf fires
 	// one caret signal per transaction, and a transaction need not have moved the

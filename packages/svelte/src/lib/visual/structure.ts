@@ -19,9 +19,9 @@ import { core } from '../core/lifecycle.js';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
 export type ControlKind =
-	| 'prose' // richtext / plaintext → a codec prose leaf
-	| 'text' // string
-	| 'enum' // string+enum | type:'enum' → select
+	| 'prose' // richtext / text → a codec prose leaf
+	| 'text' // a type this build does not know → a text input
+	| 'enum' // type:'enum' → select
 	| 'variant' // type:'enum' + variants: → select, plus the live world's cells
 	| 'number' // number / integer
 	| 'boolean' // boolean → toggle
@@ -52,14 +52,8 @@ export interface FieldModel {
 	/** Schema `description`: authoring help rendered beside the label,
 	 * undefined when the field declares none. Chrome-only; never gates. */
 	description: string | undefined;
-	/**
-	 * Required-ness: {@link obliged}. Drives a persistent label `*`; a field never
-	 * carries both it and a ghosted `default:`, that default being the whole of what
-	 * retires the obligation. Persistent (schema-derived, survives filling). Label
-	 * chrome only; never gates.
-	 */
-	required: boolean;
-	/** Prose-leaf flags (only meaningful when `control === 'prose'` / array items). */
+	/** Prose-leaf flags (only meaningful when `control === 'prose'` / array items):
+	 * one line (`oneLine`), and the literal codec (`literalText`). */
 	inline: boolean;
 	plaintext: boolean;
 }
@@ -236,6 +230,17 @@ export function baseType(f: QuillFieldSchema): QuillFieldType {
 	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as QuillFieldType;
 }
 
+/** Whether a content field is one line: one paragraph, no container, no island. A `text`
+ *  or `richtext` field is one line unless it declares `multiline: true`. */
+export function oneLine(f: QuillFieldSchema): boolean {
+	return f.multiline !== true;
+}
+
+/** Whether a content field's codec is the literal one, its value text with no marks: `text`. */
+export function literalText(f: QuillFieldSchema): boolean {
+	return baseType(f) === 'text';
+}
+
 /**
  * A scalar `default:` as the text an unset control holds, where it prints: as
  * declared, `undefined` for none, a blank or a non-scalar. A default of spaces prints
@@ -248,7 +253,7 @@ export function printedText(v: unknown): string | undefined {
 
 /**
  * A declared content literal as the `Content` it holds: a `richtext` one's markdown
- * imported, a `plaintext` one's text taken literally, one paragraph whose later lines
+ * imported, a `text` one's text taken literally, one paragraph whose later lines
  * continue it, as the literal codec reads a stored one. What a cell's static
  * `default:` stands in its leaf as, where no resolved row reaches it. `undefined` for
  * a blank or a non-scalar.
@@ -272,26 +277,24 @@ export function declaredContent(v: unknown, markdown: boolean): Content | undefi
 }
 
 /** A field's `{#each}` key: its name and what a mounted leaf reads once, its type and
- *  `inline` and its elements'. A retype or a quill swap that changes any of them under a
- *  name remounts the field, where a kept leaf would commit on the old schema. */
+ *  {@link oneLine} and its elements'. A retype or a quill swap that changes any of them
+ *  under a name remounts the field, where a kept leaf would commit on the old schema. */
 export function mountKey(name: string, f: QuillFieldSchema): string {
-	return `${name}\u0000${f.type}\u0000${f.inline === true}\u0000${f.items?.type ?? ''}\u0000${f.items?.inline === true}`;
+	const items = f.items;
+	return `${name}\u0000${f.type}\u0000${oneLine(f)}\u0000${items?.type ?? ''}\u0000${items ? oneLine(items) : ''}`;
 }
 
-/** Map a field schema to its control (precedence: prose › enum › text › …).
- * An array's element control is this over `items`: a missing `items` is a text
- * element. */
+/** Map a field schema to its control. An array's element control is this over `items`;
+ *  a type this build does not know takes the text input. */
 export function controlKind(f: QuillFieldSchema): ControlKind {
 	switch (baseType(f)) {
 		case 'richtext':
-		case 'plaintext':
+		case 'text':
 			return 'prose';
 		case 'enum':
 			// `variants:` is the one key that changes a field's resting shape (canon
 			// `SCHEMAS.md`): with it the field rests as a container, without it a bare string.
 			return f.variants ? 'variant' : 'enum';
-		case 'string':
-			return 'text';
 		case 'number':
 		case 'integer':
 			return 'number';
@@ -476,13 +479,13 @@ export function addedId(title: string, taken: (id: string) => boolean): string {
 }
 
 /** The `object` a matrix member is, for the schema walk: the declared columns, and an
- *  added item's `title` beside them. Composed here because the boundary serializes the
- *  roster and the columns alone. */
+ *  added item's `title`, a one-line `text` cell, beside them. Composed here because the
+ *  boundary serializes the roster and the columns alone. */
 export function matrixMemberSchema(matrix: QuillFieldSchema, id: string): QuillFieldSchema {
 	const columns = matrix.properties ?? {};
 	return {
 		type: 'object',
-		properties: onRoster(matrix, id) ? columns : { [MATRIX_TITLE]: { type: 'string' }, ...columns }
+		properties: onRoster(matrix, id) ? columns : { [MATRIX_TITLE]: { type: 'text' }, ...columns }
 	};
 }
 
@@ -511,7 +514,7 @@ export function schemaAt(
 /** What an array declaring no `items` holds, the walk's copy of the element control
  *  {@link controlKind} names for one: a text element, so an index into such an array is
  *  a place and not a refusal. */
-const UNDECLARED_ELEMENT: QuillFieldSchema = { type: 'string' };
+const UNDECLARED_ELEMENT: QuillFieldSchema = { type: 'text' };
 
 function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | undefined {
 	switch (controlKind(schema)) {
@@ -542,19 +545,18 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
 // ── Row summaries and layouts ────────────────────────────────────────────────
 
 /** Whether a cell is one line tall by declaration: the shape a table column and a row
- *  summary can hold. A prose cell is one where it declares `inline`, `richtext` or
- *  `plaintext` alike. */
+ *  summary can hold. A prose cell is one where it is {@link oneLine}. */
 export function shortCell(sub: QuillFieldSchema): boolean {
 	const kind = controlKind(sub);
-	if (kind === 'prose') return !!sub.inline;
+	if (kind === 'prose') return oneLine(sub);
 	return (
 		kind === 'text' || kind === 'enum' || kind === 'number' || kind === 'boolean' || kind === 'date'
 	);
 }
 
 /**
- * The first short text cell's words — the first `string`, or inline `richtext` /
- * `plaintext`, in declaration order — read through {@link titleText}; `undefined` where
+ * The first short text cell's words — the first one-line `text` or `richtext`, in
+ * declaration order — read through {@link titleText}; `undefined` where
  * there is no such cell or it is empty. The cell is picked by the schema alone, so an
  * instance is named by one cell whatever the others hold. What names an instance from
  * its own values: a collapsed row, and a card whose kind declares no `title`.
@@ -637,23 +639,6 @@ export function commitDiscriminant(
 	return Object.keys(next).length ? next : undefined;
 }
 
-/**
- * Whether the schema obliges a cell: `default:`'s absence, which is the whole of the
- * obligation (DOCUMENT_MODEL). Exempt are the cells whose absence of one says nothing:
- * a typed dictionary, since a namespace declares no `default:` at all and `validate`
- * anchors obligation on the leaves under it; a matrix, whose blank is nothing held, a
- * whole answer; and an optional cell, which can declare none, its unanswered render
- * being `none`.
- */
-export function obliged(schema: QuillFieldSchema): boolean {
-	return (
-		schema.type !== 'object' &&
-		schema.type !== 'matrix' &&
-		!optionalCell(schema) &&
-		schema.default === undefined
-	);
-}
-
 /** `foo_bar` → `Foo bar`: the label fallback when a field declares no `title`. */
 export function humanize(name: string): string {
 	const spaced = name.replace(/_/g, ' ').trim();
@@ -682,9 +667,8 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 			compact: schema.ui?.compact ?? packsByDefault(control),
 			label: schema.title ?? humanize(name),
 			description: schema.description,
-			required: obliged(schema),
-			inline: !!schema.inline,
-			plaintext: baseType(schema) === 'plaintext'
+			inline: oneLine(schema),
+			plaintext: literalText(schema)
 		};
 	});
 }
@@ -780,10 +764,10 @@ export interface PlacedField {
 /**
  * Whether a field can share a row. `compact` asks; a shape declines when the
  * document sets its height, because a row is as tall as its tallest cell and the cell
- * beside it does not grow in step: an object nests a whole field set, block richtext
- * (`inline` absent) holds paragraphs, and an array holds however many elements the
- * document carries. Any of them stands its neighbour in a column of whitespace. An
- * inline prose leaf is one line tall and packs like any scalar.
+ * beside it does not grow in step: an object nests a whole field set, a multiline prose
+ * leaf holds paragraphs or lines, and an array holds however many elements the
+ * document carries. Any of them stands its neighbour in a column of whitespace. A
+ * one-line prose leaf packs like any scalar.
  *
  * A variant declines for the same reason one step further in: its height is the live
  * world's cell count, so it is set by a pick rather than only by the document, and a

@@ -4,7 +4,7 @@
 // from the declared type once, at mount. A field whose codec the retype changes
 // remounts on the new kind's type, so an edit after it stores what that type stores:
 // a `richtext` leaf a content object whose text keeps the delimiters typed, a
-// `plaintext` one the literal string a saved document reads back unchanged. The probe
+// `text` one the literal string a saved document reads back unchanged. The probe
 // is its own quill: two kinds holding one `note` field each, one codec apiece.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
@@ -25,16 +25,18 @@ typst:
 main:
   fields:
     author:
-      type: string
+      type: text
 card_kinds:
   plainnote:
     fields:
       note:
-        type: plaintext
+        type: text
+        multiline: true
   richnote:
     fields:
       note:
         type: richtext
+        multiline: true
 `;
 const probe = () => quillFromYaml(YAML);
 
@@ -62,7 +64,7 @@ function savedText(q: Quill, doc: Document): string | undefined {
 }
 
 describe('a retype that changes the codec under a field name', () => {
-	it('remounts a plaintext leaf as richtext, which stores the delimiters typed as text', async () => {
+	it('remounts a text leaf as richtext, which stores the delimiters typed as text', async () => {
 		const q = probe();
 		const doc = q.emptyDocument();
 		const { view, errors } = await retypeAndType(q, doc, 'plainnote', 'richnote', 'a *b* c');

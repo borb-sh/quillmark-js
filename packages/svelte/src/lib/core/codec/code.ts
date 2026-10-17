@@ -198,7 +198,7 @@ const belowFinalFence: Command = (state, dispatch) => {
 };
 
 /**
- * The `code_block` link of the body's key chains: `{}` for the inline/plaintext
+ * The `code_block` link of the body's key chains: `{}` for the one-line and plain
  * schemas, which declare no code node.
  *
  * `Enter` is upstream's `newlineInCode`, and it is load-bearing rather than

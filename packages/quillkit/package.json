@@ -1,6 +1,6 @@
 {
 	"name": "quillkit",
-	"version": "0.17.0",
+	"version": "0.18.0",
 	"description": "The quill author's toolchain: start a quiver, gate it, pack it, look at it, ship it. Carries the studio client it serves.",
 	"type": "module",
 	"license": "Apache-2.0",
@@ -22,7 +22,7 @@
 	],
 	"author": "Quillmark Contributors",
 	"engines": {
-		"node": ">=24"
+		"node": ">=22"
 	},
 	"files": [
 		"dist",
@@ -44,7 +44,7 @@
 	"devDependencies": {
 		"@quillmark/quiver": "*",
 		"@quillmark/svelte": "*",
-		"@quillmark/wasm": ">=0.125.0-0",
+		"@quillmark/wasm": ">=0.126.0-0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@types/node": "^24.19.1",
 		"publint": "^0.3.25",

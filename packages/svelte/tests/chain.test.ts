@@ -9,6 +9,8 @@ import { init } from '$lib/core';
 import { loadFixtureTree } from './helpers/fixtures.js';
 
 const core = await init();
+/** `MAJOR.MINOR` of a `MAJOR.MINOR.PATCH` version. */
+const minor = (version: string) => version.split('.').slice(0, 2).join('.');
 
 describe('substrate chain', () => {
 	it('loads the fixture, seeds a document, opens a session', async () => {
@@ -23,9 +25,9 @@ describe('substrate chain', () => {
 		expect(quill.schema.card_kinds).toHaveProperty('section');
 
 		const doc = quill.seedDocument();
-		// Composed from the quill's own metadata; the contract is `name@version`,
+		// Composed from the quill's own metadata; the contract is `name@MAJOR.MINOR`,
 		// not the version the fixture happens to sit at.
-		expect(doc.quillRef).toBe(`${quill.metadata.name}@${quill.metadata.version}`);
+		expect(doc.quillRef).toBe(`${quill.metadata.name}@${minor(quill.metadata.version)}`);
 
 		const engine = new Engine();
 		const session = await engine.open(quill, doc);
@@ -71,7 +73,7 @@ describe('substrate chain', () => {
 		expect(quill.metadata.name).toBe('usaf_memo');
 
 		const doc = quill.seedDocument();
-		expect(doc.quillRef).toBe(`usaf_memo@${quill.metadata.version}`);
+		expect(doc.quillRef).toBe(`usaf_memo@${minor(quill.metadata.version)}`);
 
 		const session = await new Engine().open(quill, doc);
 		expect(session.pageCount).toBeGreaterThan(0);

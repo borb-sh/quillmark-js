@@ -7,12 +7,12 @@
 // three read the schema the quill happens to declare — every field draws, every group
 // sections, in the order the schema gives — and hold whatever it declares next. The
 // last two name shapes, and are meant to fail when the shape or the surface moves:
-// they are what the tier does with `plaintext` and with a variant whose cells are
+// they are what the tier does with `text` and with a variant whose cells are
 // prose, which is most of this quill.
 //
 // jsdom implements no contenteditable, so a cell's keystroke is out of reach here: the
 // read half is asserted on the mounted leaf and the write half through the typed
-// writer, as an array's prose row asserts them (`plaintext-array`).
+// writer, as an array's prose row asserts them (`text-array`).
 import { describe, it, expect, afterEach } from 'vitest';
 import { fieldModels, groupLabel, groupOrder } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
@@ -69,24 +69,19 @@ describe('the shipped quill on the surface', () => {
 		const { target } = mountEditor(q, doc);
 
 		const card = [...target.querySelectorAll<HTMLElement>('.qm-card')][1];
-		// The marker rides inside the label, so the text carries it: three of this kind's
-		// fields declare no `default:` and say so.
 		expect(texts(card, '.qm-field-label')).toEqual(
-			fieldModels(q.schema.card_kinds!.indorsement).map((m) =>
-				m.required ? `${m.label} *` : m.label
-			)
+			fieldModels(q.schema.card_kinds!.indorsement).map((m) => m.label)
 		);
 	});
 
-	it('takes a `plaintext` field as the inline leaf it declares', () => {
-		// Most of this quill is `plaintext` + `inline: true`, and the boundary serves
-		// `inline` at every type — so the leaf is a one-line one and `packable` takes
-		// the `ui.compact` beside it.
+	it('takes a `text` field as the one-line leaf it declares', () => {
+		// Most of this quill is `text` declaring no `multiline`, so the leaf is a
+		// one-line one and `packable` takes the `ui.compact` beside it.
 		const byName = Object.fromEntries(fieldModels(memo().schema.main).map((m) => [m.name, m]));
 		expect(byName.authority_line.control).toBe('prose');
 		expect(byName.authority_line.plaintext).toBe(true);
 		expect(byName.authority_line.inline).toBe(true);
-		expect(byName.tag_line.inline).toBe(true); // a richtext scalar, declared alike
+		expect(byName.tag_line.inline).toBe(true); // a richtext, `multiline: false`
 		expect(byName.dissemination.compact).toBe(true);
 
 		// And on the surface, where a packed field is a `cell` and a declined one — or one
@@ -117,11 +112,11 @@ describe('the shipped quill on the surface', () => {
 		const { target } = mountEditor(q, doc);
 
 		const classification = field(target, 'Classification');
-		// Named and obliged as the schema declares them, and each a `plaintext` leaf, so a
+		// Named as the schema declares them, and each a `text` leaf, so a
 		// CUI document can be finished from this surface.
 		expect(texts(classification, '.qm-object-prop .qm-field-label')).toEqual([
-			'Controlled by *',
-			'Poc *',
+			'Controlled by',
+			'Poc',
 			'Category',
 			'Limited dissemination'
 		]);
@@ -131,7 +126,7 @@ describe('the shipped quill on the surface', () => {
 			'PRVCY',
 			'FEDONLY'
 		]);
-		// Every cell rests as its literal string, which is what a `plaintext` cell's
+		// Every cell rests as its literal string, which is what a `text` cell's
 		// codec commits: the banner reads them as text and the storage says so.
 		expect(doc.getStored('classification')).toEqual({
 			value: 'CUI',

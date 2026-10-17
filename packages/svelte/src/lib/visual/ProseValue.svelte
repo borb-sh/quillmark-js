@@ -1,6 +1,6 @@
 <!--
  A prose leaf the parent commits by value: an element of a `richtext` (fixture
- `keywords`) or `plaintext` (`errata`) array, and a content cell of a subform — an
+ `keywords`) or `text` (`authors`, `errata`) array, and a content cell of a subform — an
  `object`'s property, a variant's cell ({@link ObjectField}). None of them is
  `applyChange`-addressable: `Addr.field` is a flat name, so `keywords[0]` and
  `contact.note` have no op address. So this is not a `createField` leaf: it mounts a
@@ -19,7 +19,7 @@
 
  The content is read, not passed: `reader.getContentAt(addr, path)` decodes through
  the codec the leaf's own declared type names, so what it rests as — the content
- object, a `plaintext` literal, the authored string a transport door left — stops
+ object, a `text` literal, the authored string a transport door left — stops
  being the row's or the cell's business. It is read at mount and again wherever the
  parent's re-derive hands down a `value` that moved, and a read differing from the
  content the leaf last committed or took replaces the view, the gate `createField`
@@ -28,8 +28,8 @@
  it, so the echo replaces nothing and the caret and the history stay.
 
  The schema is the declared type's where the parent has room for it: a subform cell
- declaring no `inline` takes the full row ({@link ObjectField}), a `richtext` one on the
- block schema and a `plaintext` one on the plain schema, paragraphs and hard breaks.
+ declaring `multiline: true` takes the full row ({@link ObjectField}), a `richtext` one
+ on the block schema and a `text` one on the plain schema, paragraphs and hard breaks.
  An array element is one textblock whatever it declares, since Enter there is the
  repeater's. There is no slash menu at either width, and no island view.
 
@@ -80,8 +80,8 @@
 		/** The default an unset leaf holds, where it prints: drawn at the default rung,
 		 * and handed up whole with the first edit in it, as `createField` takes one. */
 		fallback?: Content;
-		/** The mark-free schema (a `plaintext` leaf): literal text, no formatting,
-		 * exactly as the scalar field of that type mounts. */
+		/** The mark-free schema (a `text` leaf): literal text, no formatting, exactly
+		 * as the field of that type mounts. */
 		plaintext?: boolean;
 		/** A multi-block schema, for a cell the parent draws at full width: the block
 		 * schema, or the plain one with `plaintext`. Absent, the leaf is one textblock. */
@@ -96,8 +96,8 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
-		/** The empty leaf's ghost, a subform cell's, until the leaf's first edit: the
-		 *  `none` an optional cell prints unset. Read per decoration pass. */
+		/** The empty leaf's ghost, a subform cell's: the `none` an optional cell prints
+		 *  unset. Read per decoration pass. */
 		placeholder?: string;
 		onChange: (rt: Content) => void;
 		/** Raw keydown, for a container whose own keys run through this leaf: the
@@ -130,9 +130,8 @@
 	/** Take the caret: what a parent placing focus on this leaf calls. The view's
 	 * focus, not the element's: a PM view restores its selection, where a bare DOM
 	 * focus on a contenteditable leaves the caret unplaced. And the reveal beside it,
-	 * since PM's focus prevents the scroll a `string` element's input takes by
-	 * default — an array whose two item types revealed differently is one row of it
-	 * landing off screen. */
+	 * since PM's focus prevents the scroll a form control takes by default — an array
+	 * whose two item types revealed differently is one row of it landing off screen. */
 	export function focus(): void {
 		if (!view) return;
 		view.focus();
@@ -157,11 +156,18 @@
 		view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 	}
 
+	$effect(() => {
+		void [label, labelledBy, describedBy, placeholder];
+		view?.setProps({});
+	});
+
 	function mountView(mount: HTMLDivElement): () => void {
 		return untrack(() => {
 			const inline = !block;
 			const leaf = { inline, plaintext, islands: false };
-			const names = { label, labelledBy, describedBy };
+			// Read per attribute pass, not captured: an element's name carries its index,
+			// which a remove above it moves.
+			const names = () => ({ label, labelledBy, describedBy });
 			const shown = (stored: Content | undefined): Content => stored ?? fallback ?? emptyContent();
 			const stored = content();
 			let seen = value;
@@ -171,8 +177,8 @@
 			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
 			// (`proseAttributes`), so a cell carrying a label element and a row carrying
 			// none cannot name their regions by different rules.
-			const plainNamed = proseAttributes(names) ?? {};
-			const heldNamed = heldAttributes(names, heldId);
+			const plainNamed = () => proseAttributes(names()) ?? {};
+			const heldNamed = () => heldAttributes(names(), heldId);
 			const build = (rt: Content): EditorState => {
 				// The same keymap and plugin stack a `createField` leaf mounts (shared
 				// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
@@ -184,8 +190,7 @@
 						? []
 						: proseLeafPlugins(schema, {
 								inline,
-								placeholder: () => placeholder,
-								placeholderUntilEdit: true
+								placeholder: () => placeholder
 							})
 				});
 			};
@@ -195,11 +200,12 @@
 					state: build(reconciler.last),
 					editable: () => !held,
 					attributes: () => {
-						const named = held ? heldNamed : plainNamed;
+						const named = held ? heldNamed() : plainNamed();
 						return defaulted ? { ...named, 'data-default': '' } : named;
 					},
 					dispatchTransaction(tr) {
 						const next = mounted.state.apply(tr);
+						if (next === mounted.state) return;
 						const edit = tr.docChanged && !held;
 						if (edit) defaulted = false;
 						mounted.updateState(next);
@@ -265,8 +271,8 @@
 </script>
 
 <!-- `.qm-control-box` (controls.css) is the whole box, so an array of `richtext` and
- an array of `string` render rows of equal height, and a subform's prose cell measures
- like the text cell beside it. No floor: the reset in `core/codec/prose.css` makes one
+ an array of `text` render rows of equal height, and a subform's prose cell measures
+ like the form control beside it. No floor: the reset in `core/codec/prose.css` makes one
  line of prose measure one line. Width is the row's or the cell's to give: the leaf
  fills the track it is placed in. -->
 <div class="qm-prose-value qm-control-box qm-focus-ring-within">

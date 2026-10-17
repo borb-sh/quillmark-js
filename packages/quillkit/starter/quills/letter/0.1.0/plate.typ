@@ -4,15 +4,26 @@
 #set text(size: 11pt)
 #set par(justify: true)
 
-// Compute with `qm.data.x`. Print with `qm.ink(..)`, which keeps the printed
-// text click-to-edit in a live preview.
+// Compute with `qm.data.x`, and on a text value, which is content, through
+// `qm.str(qm.data.x)`. Print with `qm.ink(..)`, which keeps the printed text
+// click-to-edit in a live preview.
 #text(size: 16pt, weight: "bold", qm.ink(qm.data, "sender"))
 #line(length: 100%, stroke: 0.5pt)
 
 #align(right, qm.ink(qm.data, "date", "[month repr:long] [day padding:none], [year]"))
 
-// A string left unanswered is `""`: guard its value.
-#if qm.data.recipient != "" [Dear #qm.ink(qm.data, "recipient"),]
+// A text value prints with a space on each side; `flush` drops them, so
+// punctuation after it sits flush.
+#let flush(c) = {
+  if type(c) != content or not c.has("children") { return c }
+  let kids = c.children
+  while kids.len() > 0 and kids.first() == [ ] { kids = kids.slice(1) }
+  while kids.len() > 0 and kids.last() == [ ] { kids = kids.slice(0, -1) }
+  kids.sum(default: [])
+}
+
+// A text field left unanswered is `""`: guard its value.
+#if qm.data.recipient != "" [Dear #flush(qm.ink(qm.data, "recipient")),]
 
 #if qm.data.subject != "" [*Re: #qm.ink(qm.data, "subject")*]
 

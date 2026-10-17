@@ -6,5 +6,5 @@ quill:
 main:
   fields:
     title:
-      type: string
+      type: text
       description: Memo title

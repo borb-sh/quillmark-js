@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-// A `plaintext` field is multi-line unless it declares `inline`: upstream's literal
-// codec reads one line per `\n`, so a leaf narrowed to one textblock would join an
-// address's lines and commit the joined text on the first edit. Without `inline` the
-// leaf runs paragraphs and hard breaks, held over content upstream's `isPlain` refuses;
-// with it, one textblock. Either way it commits the literal string, the rest form a
-// saved document reads back unchanged. The reference quill declares no `plaintext`
-// field without `inline`, so the schema is built here.
+// A `text` field declaring `multiline: true` holds lines: upstream's literal codec
+// reads one line per `\n`, so a leaf narrowed to one textblock would join an address's
+// lines and commit the joined text on the first edit. Multiline, the leaf runs
+// paragraphs and hard breaks, held over content upstream's `isPlain` refuses; one
+// line, one textblock. Either way it commits the literal string, the rest form a saved
+// document reads back unchanged. The reference quill declares no multiline `text` on
+// its main card beside a one-line one, so the schema is built here.
 import { describe, it, expect } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import { Slice } from 'prosemirror-model';
@@ -19,17 +19,17 @@ quill:
   name: plain_probe
   version: 0.1.0
   backend: typst
-  description: A plaintext field without inline and one with it.
+  description: A multiline text field and a one-line one.
 typst:
   plate_file: plate.typ
 main:
   fields:
     address:
-      type: plaintext
+      type: text
+      multiline: true
       default: ""
     line:
-      type: plaintext
-      inline: true
+      type: text
       default: ""
 `;
 
@@ -83,7 +83,7 @@ function paste(view: EditorView, text: string): void {
 	view.dom.dispatchEvent(event);
 }
 
-describe('a plaintext field without `inline`', () => {
+describe('a text field declaring `multiline: true`', () => {
 	it('keeps both lines of an address through an edit', () => {
 		const doc = load();
 		const errors: string[] = [];
@@ -175,7 +175,7 @@ describe('a plaintext field without `inline`', () => {
 	});
 });
 
-describe('a plaintext field declaring `inline`', () => {
+describe('a one-line text field', () => {
 	it('stays one textblock: Enter and Shift-Enter open nothing', () => {
 		const doc = load();
 		const { f, view } = leaf(doc, 'line', true);
@@ -210,24 +210,26 @@ describe('a plaintext field declaring `inline`', () => {
 		doc.free();
 	});
 
+	// The typed writer drops a one-line value's trailing whitespace as it stores it, so
+	// the leaf reads the value without, and an edit rests that.
 	it.each([
-		['trailing spaces', 'one line  '],
-		['leading spaces', '  one line'],
-		['markdown delimiters', 'x *y* z']
-	])('an edit rests %s as the string a saved document reads back', (_, value) => {
+		['trailing spaces', 'one line  ', 'one line'],
+		['leading spaces', '  one line', '  one line'],
+		['markdown delimiters', 'x *y* z', 'x *y* z']
+	])('an edit rests %s as the string a saved document reads back', (_, value, stored) => {
 		const doc = load();
 		q.writer(doc).set('line', value);
 		const { f, view } = leaf(doc, 'line', true);
 		view.dispatch(view.state.tr.insertText('!', 1));
 
-		expect(doc.getStored('line')).toBe(`!${value}`);
-		expect(saved(doc, 'line')).toBe(`!${value}`);
+		expect(doc.getStored('line')).toBe(`!${stored}`);
+		expect(saved(doc, 'line')).toBe(`!${stored}`);
 		f.destroy();
 		doc.free();
 	});
 });
 
-describe('a plaintext field without `inline` over content `isPlain` refuses', () => {
+describe('a multiline text field over content `isPlain` refuses', () => {
 	it('holds, committing nothing, and releases on the re-hydrate that leaves it plain', () => {
 		const doc = load();
 		doc.overwrite({ field: 'address' }, md('- one\n- two'));

@@ -148,6 +148,28 @@ export interface ActiveProse {
 	views: LeafViews;
 }
 
+/**
+ * The steps from a field's control box `root` down to the cell holding `target`, the
+ * reverse of {@link FieldControl.focusPath}: read off the marker each container rung
+ * stamps on the cell it draws, `data-qm-index` on an array's row and `data-qm-prop` on a
+ * key step (an object's property, a variant's cell, a matrix's member and an added
+ * item's title). `[]` for a target on the field's own control.
+ */
+export function stepsTo(target: EventTarget | null, root: Element): PathStep[] {
+	const steps: PathStep[] = [];
+	for (
+		let el = target instanceof Element ? target : null;
+		el && el !== root;
+		el = el.parentElement
+	) {
+		const index = el.getAttribute('data-qm-index');
+		const key = el.getAttribute('data-qm-prop');
+		if (index != null) steps.push(Number(index));
+		else if (key != null) steps.push(key);
+	}
+	return steps.reverse();
+}
+
 /** The by-value lane with a field's key bound: what a leaf under that field announces
  *  itself through, knowing no key of its own. */
 export interface ValueLeafSeat {

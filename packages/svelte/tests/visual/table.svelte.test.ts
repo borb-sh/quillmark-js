@@ -7,7 +7,14 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
 import { quill, example, quillFromYaml } from '../helpers/fixtures.js';
-import { field, mountEditor, press, settle, type, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	field,
+	mountEditor,
+	press,
+	settle,
+	typeLeaf,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -18,10 +25,10 @@ const headers = (t: HTMLElement) =>
 	[...t.querySelectorAll<HTMLElement>('.qm-array-table-head .qm-field-label')].map(
 		(l) => l.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 	);
-// The cell's name is the row's and the column's composed, and `name` is obliged, so the
-// word rides the name the way the `*` rides a label.
+// The cell's name is the row's and the column's composed.
 const nameCell = (t: HTMLElement, k: number) =>
-	t.querySelector<HTMLInputElement>(`input[aria-label="Contributors ${k + 1} Name required"]`)!;
+	t.querySelector<HTMLElement>(`.ProseMirror[aria-label="Contributors ${k + 1} Name"]`)!;
+const nameText = (t: HTMLElement, k: number) => nameCell(t, k).textContent;
 const count = (t: HTMLElement) => t.querySelector('.qm-array-count')?.textContent;
 const addChip = (t: HTMLElement) => t.querySelector<HTMLButtonElement>('.qm-add-el')!;
 
@@ -34,13 +41,12 @@ describe('an array<object> declaring ui.layout: table', () => {
 
 		expect(t.querySelector('.qm-array-table')).not.toBeNull();
 		expect(t.querySelector('.qm-element-summary')).toBeNull();
-		// The obligation mark rides the header: `name` declares no default.
-		expect(headers(t)).toEqual(['Name *', 'Role', 'Since', 'Lead']);
+		expect(headers(t)).toEqual(['Name', 'Role', 'Since', 'Lead']);
 		expect(t.querySelectorAll('.qm-array-table-row')).toHaveLength(2);
 
 		// Each cell is the property's own control, named by the row and the column.
-		expect(nameCell(t, 0).value).toBe('Ada Lovelace');
-		expect(nameCell(t, 1).value).toBe('Grace Hopper');
+		expect(nameText(t, 0)).toBe('Ada Lovelace');
+		expect(nameText(t, 1)).toBe('Grace Hopper');
 		const row = t.querySelector<HTMLElement>('.qm-array-table-row')!;
 		expect(row.querySelector('.qm-select')?.getAttribute('aria-label')).toBe('Contributors 1 Role');
 		expect(row.querySelector('[role="switch"]')).not.toBeNull();
@@ -62,7 +68,7 @@ describe('an array<object> declaring ui.layout: table', () => {
 		).toEqual([false, false, false, true]);
 	});
 
-	it('widens the floor of the column a prose cell wraps in', () => {
+	it('widens the floor of the columns a prose cell wraps in', () => {
 		const q = quillFromYaml(`quill:
   name: prose_table
   version: 1.0.0
@@ -78,10 +84,10 @@ main:
         type: object
         properties:
           who:
-            type: string
+            type: text
           note:
-            type: plaintext
-            inline: true
+            type: richtext
+            multiline: false
           lead:
             type: boolean
       ui:
@@ -89,11 +95,12 @@ main:
 `);
 		const t = field(mountEditor(q, q.seedDocument()).target, 'Crew');
 
+		// A `text` cell is a prose leaf as a `richtext` one is, so both columns wrap.
 		expect(
 			[...t.querySelectorAll('.qm-array-table-col')].map((c) =>
 				['mark', 'prose'].filter((k) => c.classList.contains(k))
 			)
-		).toEqual([[], ['prose'], ['mark']]);
+		).toEqual([['prose'], ['prose'], ['mark']]);
 	});
 
 	it('commits a cell into its row, the array committing whole', () => {
@@ -102,7 +109,7 @@ main:
 		const mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 
-		type(nameCell(t, 1), 'Grace B. Hopper');
+		typeLeaf(nameCell(t, 1), 'Grace B. Hopper');
 		expect(rows(q, doc)[1]).toEqual({ name: 'Grace B. Hopper', role: 'reviewer' });
 		expect(rows(q, doc)[0].name).toBe('Ada Lovelace');
 		expect(mounted.changes.at(-1)?.path).toBe('main.contributors');
@@ -137,16 +144,14 @@ main:
 
 		press(nameCell(t, 0), 'Enter');
 		await settle();
-		type(nameCell(t, 1), 'Adele');
+		typeLeaf(nameCell(t, 1), 'Adele');
 		expect(rows(q, doc)[1]).toEqual({ name: 'Adele' });
 
-		// Cleared but not blurred: the cell declares no `default:`, so the clear drops its
-		// key as it lands, and the row is empty before the Backspace reads it.
+		// Cleared: the cell commits the empty answer as it lands, which is a blank cell,
+		// and the row is empty before the Backspace reads it.
 		const cell = nameCell(t, 1);
-		cell.value = '';
-		cell.dispatchEvent(new Event('input', { bubbles: true }));
-		flushSync();
-		expect(rows(q, doc)[1]).toEqual({});
+		typeLeaf(cell, '');
+		expect(rows(q, doc)[1]).toEqual({ name: '' });
 
 		press(cell, 'Backspace');
 		await settle();
@@ -161,7 +166,7 @@ main:
 		const t = table(mounted.target);
 
 		// Row 1 carries `role: reviewer`, so an empty name cell is not an empty row.
-		type(nameCell(t, 1), '');
+		typeLeaf(nameCell(t, 1), '');
 		press(nameCell(t, 1), 'Backspace');
 		await settle();
 		expect(rows(q, doc)).toHaveLength(2);
@@ -189,7 +194,7 @@ main:
 		first.querySelector<HTMLButtonElement>('.qm-row-btn.qm-remove')!.click();
 		flushSync();
 		expect(rows(q, doc).map((r) => r.name)).toEqual(['Grace Hopper']);
-		expect(nameCell(t, 0).value).toBe('Grace Hopper');
+		expect(nameText(t, 0)).toBe('Grace Hopper');
 		// A pressed remove lands on the row above's: the button is pinned, so the clip
 		// stays where the pointer left it.
 		await settle();

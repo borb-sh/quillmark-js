@@ -10,7 +10,7 @@
 	// component renders standalone too.
 	const t = wording();
 	import Icon from './icons/Icon.svelte';
-	import type { Document, Quill, Addr, Diagnostic } from '@quillmark/wasm';
+	import type { Document, Quill, Addr, Diagnostic, PathStep } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
 	import type { LeafRegistry } from './leaves.js';
 	import type { CardModel, FieldModel } from './structure.js';
@@ -48,7 +48,7 @@
 		kinds: string[];
 		ops: CardOps;
 		enumDisallowed?: 'hide' | 'disable';
-		onFocus?: (addr: Addr) => void;
+		onFocus?: (addr: Addr, steps?: readonly PathStep[]) => void;
 		onCaretMove?: (addr: Addr, pos: number) => void;
 		onChange?: (addr: Addr) => void;
 		onError?: EditorErrorHandler;

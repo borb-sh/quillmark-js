@@ -17,6 +17,7 @@ import { Selection } from 'prosemirror-state';
 import type { Command, EditorState, Transaction } from 'prosemirror-state';
 import { chainCommands, splitBlock } from 'prosemirror-commands';
 import { canJoin, findWrapping } from 'prosemirror-transform';
+import { withinNesting } from './nesting.js';
 import { takesLineBreak } from './schema.js';
 
 /** The head of a textblock: where a shorthand fires, and where a pick lands once its
@@ -82,7 +83,8 @@ function spaceBreaks(tr: Transaction, $from: ResolvedPos, type: NodeType): void 
 
 /** `wrappingInputRule`'s body: wrap the block range at `pos`, then join a preceding
  *  sibling of the same type — the one boundary the wrap itself opens (`lists.ts`
- *  §cleanup: command-local, never a global pass). */
+ *  §cleanup: command-local, never a global pass). False where no wrap fits, or where
+ *  the one that does nests past `MAX_NESTING_DEPTH` (`nesting.ts`). */
 function wrapAt(
 	tr: Transaction,
 	pos: number,
@@ -103,7 +105,7 @@ function wrapAt(
 	) {
 		tr.join(pos - 1);
 	}
-	return true;
+	return withinNesting(tr.doc);
 }
 
 /** `# `: the heading `level` deep. `list_item` is `block+`, so one inside an item is a

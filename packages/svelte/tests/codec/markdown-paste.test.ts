@@ -142,8 +142,8 @@ describe('a block leaf reads markdown text', () => {
 	});
 });
 
-// The reference quill declares no block `richtext` field and no `plaintext` one without
-// `inline`, so the four leaves are built here.
+// The reference quill declares no block `richtext` field beside a `multiline: true`
+// `text` on the main card, so the four leaves are built here.
 describe('only a block leaf reads it', () => {
 	const q = probeQuill(`
 quill:
@@ -157,14 +157,15 @@ main:
   fields:
     notes:
       type: richtext
+      multiline: true
     summary:
       type: richtext
-      inline: true
+      multiline: false
     address:
-      type: plaintext
+      type: text
+      multiline: true
     line:
-      type: plaintext
-      inline: true
+      type: text
 `);
 	const load = (): Document => core.Document.fromMarkdown('~~~\n$quill: paste_probe@0.1.0\n~~~\n');
 	const LIST = '- Purpose\n- Action';
@@ -192,13 +193,13 @@ main:
 		expect(listed(rt)).toBe(false);
 	});
 
-	it('a plaintext field keeps the text, line for line', () => {
+	it('a multiline text field keeps the text, line for line', () => {
 		const rt = pasteInto('address', { plaintext: true });
 		expect(rt.text).toBe(LIST);
 		expect(listed(rt)).toBe(false);
 	});
 
-	it('an inline plaintext field keeps the text', () => {
+	it('a one-line text field keeps the text', () => {
 		const rt = pasteInto('line', { plaintext: true, inline: true });
 		expect(rt.text).toMatch(/^- Purpose/);
 		expect(listed(rt)).toBe(false);
@@ -271,7 +272,7 @@ describe('a URL pasted over a selection links it', () => {
 		expect(rt.text).toBe(`see ${URL}the roster`);
 	});
 
-	it("a plaintext leaf has no link to make, and the URL is the leaf's text", () => {
+	it("a text leaf has no link to make, and the URL is the leaf's text", () => {
 		const doc = plaintextSchema.node('doc', null, [
 			plaintextSchema.node('paragraph', null, plaintextSchema.text('see the roster'))
 		]);

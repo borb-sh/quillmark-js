@@ -85,9 +85,10 @@
 	// ── The errors ──────────────────────────────────────────────────────────────
 	/** The diagnostics of a throw: a failed open or a failed recompile. */
 	let thrown = $state.raw<Diagnostic[]>([]);
-	/** What a surface recovered from, in its own slot so it neither clobbers a compile
-	 *  failure nor is clobbered by the next successful compile. */
-	let recovered = $state.raw<Diagnostic[]>([]);
+	/** What a surface last reported: an edit the store does not hold, a page that would not
+	 *  paint. About neither a field nor a line of source, so it reaches the strip
+	 *  and not the editor, and holds until the next edit lands. */
+	let surfaced = $state.raw<EditorError | undefined>();
 	/** What the last carry stranded. Held for the open and dropped at the first edit:
 	 *  from then on the schema producer speaks for the document's current state. */
 	let carried = $state.raw<Diagnostic[]>([]);
@@ -104,13 +105,20 @@
 	const placed = $derived(thrown.find((d) => d.location));
 	/**
 	 * What the strip over the paint stands for, with the surfaces up, and what it is
-	 * called. Three failures reach it and one is shown: a compile that will not land or an
-	 * open the engine refused — both of which are why the paint does not answer the
-	 * document, and both of which outrank the third — or an emit that would not write the
-	 * file. It names the failure's place where it carried one, else its first note.
+	 * called. Four failures reach it and one is shown, in this order: a compile that will
+	 * not land or an open the engine refused, which are why the paint does not answer the
+	 * document; what a surface reported, an editor the paint may not answer either; an
+	 * emit that would not write the file. `at` is the failure's place where it carried
+	 * one, a surface's error code for a surface.
 	 */
 	const halt = $derived.by(() => {
 		if (!open) return undefined;
+		if (surfaced && !thrown.length)
+			return {
+				said: surfaced.code === 'paint-failed' ? 'Paint failed' : 'Editor error',
+				at: surfaced.code,
+				message: surfaced.message
+			};
 		const set = thrown.length ? thrown : unemitted;
 		if (!set.length) return undefined;
 		const said = thrown.length
@@ -118,7 +126,8 @@
 				? 'Compile failed'
 				: 'Open failed'
 			: 'Download failed';
-		return { said, note: set.find((d) => d.location) ?? set[0]! };
+		const note = set.find((d) => d.location) ?? set[0]!;
+		return { said, at: note.location && placeOf(note.location), message: note.message };
 	});
 
 	/** Whether a repack put the document where it is. An import lands through the same
@@ -132,8 +141,7 @@
 			open ? open.quill.validate(open.doc) : [],
 			open?.session ? open.session.warnings : [],
 			carried,
-			unemitted,
-			recovered
+			unemitted
 		]);
 	}
 
@@ -170,7 +178,7 @@
 		open = undefined;
 		await tick();
 		if (previous) close(previous);
-		recovered = [];
+		surfaced = undefined;
 		unemitted = [];
 		try {
 			const next = await openRef(engine, quiver, ref, carry, examples);
@@ -449,6 +457,7 @@
 		// refusal goes with them, being about the document that was in hand when it ran.
 		if (carried.length) carried = [];
 		if (unemitted.length) unemitted = [];
+		surfaced = undefined;
 		// A structure op happens once per gesture and the stack has already moved, so
 		// it applies at once; prose and field edits arrive per keystroke and debounce.
 		if (change.source === 'structure') void recompileNow();
@@ -478,12 +487,11 @@
 		previewRef?.endFollow();
 	}
 
-	/** Both surfaces report here: a commit the boundary refused, a page the backend
-	 *  would not paint. Neither stops the session, and both belong in the one place
-	 *  studio puts what went wrong. */
+	/** Both surfaces report here, and two codes reach the strip: an edit the store does not
+	 *  hold and a page that would not paint. Every other code leaves the document and the
+	 *  paint as they read, or is drawn on its field already. */
 	function handleSurfaceError(err: EditorError): void {
-		recovered = [{ severity: 'warning', code: err.code, message: err.message }];
-		syncNotes();
+		if (err.code === 'commit-lost' || err.code === 'paint-failed') surfaced = err;
 	}
 
 	onMount(() => {
@@ -639,15 +647,15 @@
 					{#if halt}
 						<!-- A document that reaches no paint is a state of the paint, not a row under
 						     it: the failure at the surface it is about, carrying the place to open
-						     (STUDIO §"The errors"). The band below still lists it, one list being
-						     its job. The label says which it stands over: a stale paint, none, or a
-						     paint that is whole and would not be written out. -->
+						     (STUDIO §"The errors"). The label says which it stands over: a stale
+						     paint, none, a paint an editor error may have left behind the editor, or
+						     a paint that is whole and would not be written out. -->
 						<div class="stalled" data-testid="stalled" role="status">
 							<span class="qm-status qm-status-error">{halt.said}</span>
-							{#if halt.note.location}
-								<span class="qm-readout at">{placeOf(halt.note.location)}</span>
+							{#if halt.at}
+								<span class="qm-readout at">{halt.at}</span>
 							{/if}
-							<span class="what">{halt.note.message}</span>
+							<span class="what">{halt.message}</span>
 						</div>
 					{/if}
 					{#if open.session}

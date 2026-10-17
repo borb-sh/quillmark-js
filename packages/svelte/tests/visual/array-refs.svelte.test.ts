@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The array element refs. `ArrayField` binds its elements' focus handles into a `$state`
 // record, which is what keeps a mount from logging an untracked write per element
-// (the mount `plaintext-array` asserts silent). `$state` proxies deeply, and what goes
+// (the mount `text-array` asserts silent). `$state` proxies deeply, and what goes
 // in is a component instance, so the handle a focus hop calls through is the proxy's:
 // the keyboard paths prove `focus()` still lands through it.
 import { describe, it, expect, afterEach } from 'vitest';
@@ -10,15 +10,15 @@ import { mountEditor, press, settle, unmountAll } from '../helpers/surface.svelt
 
 afterEach(unmountAll);
 
-// The reference quill's `main.authors` is `string[]`, so its elements are `TextField`s:
-// the array control with a component instance behind each row. Located by the
+// The reference quill's `main.authors` is `text[]`, so its elements are `ProseValue`
+// leaves: the array control with a component instance behind each row. Located by the
 // accessible name each element carries (`${label} ${index + 1}`, ArrayField).
 const ELEMENT_LABEL = 'Authors ';
 
-/** The array control's element inputs, in DOM order. */
-function inputs(target: HTMLElement): HTMLInputElement[] {
+/** The array control's element leaves, in DOM order. */
+function inputs(target: HTMLElement): HTMLElement[] {
 	const found = [
-		...target.querySelectorAll<HTMLInputElement>(`input[aria-label^="${ELEMENT_LABEL}"]`)
+		...target.querySelectorAll<HTMLElement>(`.ProseMirror[aria-label^="${ELEMENT_LABEL}"]`)
 	];
 	if (found.length === 0)
 		throw new Error(`fixture drift: no \`${ELEMENT_LABEL.trim()}\` array elements on the quill`);

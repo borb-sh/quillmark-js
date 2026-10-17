@@ -1,6 +1,7 @@
 <!--
- A `string` field → text input. Commits every edit live (on input) via the parent's
- typed `writer.set`, so the preview tracks typing.
+ A text input: the control a field of a type this build does not know falls to.
+ Commits every edit live (on input) via the parent's typed `writer.set`, so the
+ preview tracks typing.
 
  An unset field whose `default:` prints holds that default as its text, at the
  default rung (theme.css): the value it prints, drawn as one and a step off a written

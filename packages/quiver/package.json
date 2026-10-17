@@ -1,6 +1,6 @@
 {
 	"name": "@quillmark/quiver",
-	"version": "0.37.0",
+	"version": "0.38.0",
 	"description": "A quiver of Quillmark quills: load one, pack one, hand out quills.",
 	"type": "module",
 	"license": "Apache-2.0",
@@ -21,7 +21,7 @@
 	],
 	"author": "Quillmark Contributors",
 	"engines": {
-		"node": ">=24"
+		"node": ">=22"
 	},
 	"exports": {
 		".": {
@@ -42,7 +42,7 @@
 		"NOTICE"
 	],
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.125.0-0"
+		"@quillmark/wasm": ">=0.126.0-0"
 	},
 	"dependencies": {
 		"fflate": "^0.8.2",
