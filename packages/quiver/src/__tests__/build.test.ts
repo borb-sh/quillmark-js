@@ -133,6 +133,39 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		expect(Object.keys(bundleFiles)).not.toContain('fonts/font.otf');
 	});
 
+	it('writes a font collection under fonts/, named in quiver.json', async () => {
+		const src = await fresh();
+		const out = await fresh();
+		const collection = (...tail: number[]) =>
+			new Uint8Array([...new TextEncoder().encode('ttcf'), ...tail]);
+
+		await seedSourceQuiver(src, {
+			quills: [
+				{
+					name: 'memo',
+					version: '1.0.0',
+					fonts: [
+						{ path: 'fonts/cjk.ttc', content: collection(1) },
+						{ path: 'fonts/cjk.otc', content: collection(2) }
+					]
+				}
+			]
+		});
+		await buildQuiver(src, out);
+
+		const { quills } = (await indexOf(out)) as {
+			quills: Array<{ bundle: string; fonts: Record<string, string> }>;
+		};
+		const [entry] = quills;
+		expect(Object.keys(entry!.fonts).sort()).toEqual(['fonts/cjk.otc', 'fonts/cjk.ttc']);
+		expect(await readFile(join(out, 'fonts', entry!.fonts['fonts/cjk.ttc']!))).toEqual(
+			Buffer.from(collection(1))
+		);
+		const bundleFiles = unpackFiles(await readFile(join(out, entry!.bundle)));
+		expect(Object.keys(bundleFiles)).not.toContain('fonts/cjk.ttc');
+		expect(Object.keys(bundleFiles)).not.toContain('fonts/cjk.otc');
+	});
+
 	it('refuses a font file that does not open as a font, naming it', async () => {
 		const src = await fresh();
 		const out = await fresh();

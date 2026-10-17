@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A `.ttc` or `.otc` font collection builds under `fonts/`**, named in `quiver.json` as every other font is, where `build` packed it into the quill's bundle and refused one over 16 MiB, the size of a typical CJK collection. (#759)
+
 ## v0.38.0 - 2026-10-17
 
 **The `@quillmark/wasm` peer floor is `>=0.126.0-0`.** A document the engine creates pins `name@MAJOR.MINOR`, which `getQuill` resolves as the series it names. A packed quill spells `text` where it spelled `string` or `plaintext`, `multiline:` where it spelled `inline:` or `ui.multiline`, and `form.yaml` where it carried `form.json`; `sections:` fails its load, and `ui.group` loads with `quill::deprecated_groups`. A Typst plate receives a `text` value as content and reads the string off it through `qm.str(..)`.

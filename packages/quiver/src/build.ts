@@ -26,7 +26,7 @@ export interface BuildOptions {
 const NAME_DIGEST_LENGTH = 32;
 
 /** Font file extensions recognised by the builder (case-insensitive). */
-const FONT_EXT = /\.(ttf|otf|woff|woff2)$/i;
+const FONT_EXT = /\.(ttf|otf|ttc|otc|woff|woff2)$/i;
 
 /** The two trees a build owns beside its output: where a generation is assembled, and
  *  where the one it replaces waits to be deleted. Siblings of outDir, so the swap is a
