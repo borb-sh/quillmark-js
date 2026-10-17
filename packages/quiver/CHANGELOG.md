@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The `@quillmark/wasm` peer floor is `>=0.126.0-0`.** A document the engine creates pins `name@MAJOR.MINOR`, which `getQuill` resolves as the series it names. A packed quill spells `text` where it spelled `string` or `plaintext`, `multiline:` where it spelled `inline:` or `ui.multiline`, `items:` on every array and `form.yaml` where it carried `form.json`; `sections:` fails its load, and `ui.group` loads with `quill::deprecated_groups`. A Typst plate receives a `text` value as content and reads the string off it through `qm.str(..)`.
+**The `@quillmark/wasm` peer floor is `>=0.126.0-0`.** A document the engine creates pins `name@MAJOR.MINOR`, which `getQuill` resolves as the series it names. A packed quill spells `text` where it spelled `string` or `plaintext`, `multiline:` where it spelled `inline:` or `ui.multiline`, and `form.yaml` where it carried `form.json`; `sections:` fails its load, and `ui.group` loads with `quill::deprecated_groups`. A Typst plate receives a `text` value as content and reads the string off it through `qm.str(..)`.
 
 **The `engines` floor is Node 22**, where it was Node 24, so npm on Node 22 resolves the newest release rather than preferring one from before the floor rose. (#766)
 

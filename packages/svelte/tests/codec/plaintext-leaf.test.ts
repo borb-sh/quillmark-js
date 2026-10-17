@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-// A `plaintext` leaf over a field resting as an authored string: the case where the
+// A `text` leaf over a field resting as an authored string: the case where the
 // declared type is the whole difference. The same bytes are markdown under `richtext`
-// and literal text under `plaintext`, so a leaf that picked one codec for both would
-// eat every `*` a plaintext author typed, then commit a delta computed against text
+// and literal text under `text`, so a leaf that picked one codec for both would
+// eat every `*` a `text` author typed, then commit a delta computed against text
 // the document never held.
 //
 // A suite that does not run on the reference quill: that quill declares both
-// types (`subtitle` plaintext, `epigraph` inline richtext) but no two fields differing
+// types (`subtitle` text, `epigraph` one-line richtext) but no two fields differing
 // in nothing else. So the schema is built here and stays minimal: two content fields
 // differing only in declared type, which is the entire variable.
 import { describe, it, expect } from 'vitest';
@@ -55,7 +55,7 @@ const authored = (): Document =>
 		].join('\n')
 	);
 
-describe('a plaintext leaf over an authored string', () => {
+describe('a `text` leaf over an authored string', () => {
 	it('reads the bytes literally, while richtext reads the same bytes as markdown', () => {
 		const doc = authored();
 		expect(typeof doc.getStored('note')).toBe('string');
@@ -108,9 +108,9 @@ describe('a plaintext leaf over an authored string', () => {
 	});
 });
 
-describe('a plaintext leaf carries no marks', () => {
+describe('a `text` leaf carries no marks', () => {
 	// The field's value is literal text, and the boundary refuses to coerce a marked
-	// content back to `plaintext` — the document renders with an error instead. The
+	// content back to `text` — the document renders with an error instead. The
 	// commit path does not catch it (`applyChange` takes the mark op), so the mark must
 	// be unreachable rather than rejected: the leaf mounts a schema declaring no mark
 	// types, which is one mechanism covering every path that could mint one.
@@ -160,7 +160,7 @@ describe('a plaintext leaf carries no marks', () => {
 	});
 
 	it('opens a value that already carries one, and drops it on the next commit', () => {
-		// The state an older build left behind: a strong mark on a plaintext field, which
+		// The state an older build left behind: a strong mark on a `text` field, which
 		// renders as a coercion error. Decode strips it, so the leaf shows the text, and
 		// the first keystroke commits the text back as the literal string.
 		const doc = authored();

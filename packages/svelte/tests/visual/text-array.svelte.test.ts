@@ -29,7 +29,7 @@ const add = (target: HTMLElement) => {
 
 const read = (q: Quill, doc: Document, name: string) => new DocumentReader(q, doc).get(name);
 
-describe('an array of plaintext', () => {
+describe('an array of `text`', () => {
 	it('mounts its seeded string elements as prose rows, verbatim, logging nothing', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -68,7 +68,7 @@ describe('an array of plaintext', () => {
 		expect(rows(target)).toHaveLength(seeded.length + 1);
 		expect(rows(target).at(-1)!.textContent).toBe('');
 
-		// A prose row commits `Content`, and the slot it lands in is a `plaintext`
+		// A prose row commits `Content`, and the slot it lands in is a `text`
 		// one: what rests is the string, so the array stays a string array.
 		const grown = [...seeded, ''];
 		expect(read(q, doc, 'errata')).toEqual(grown);
@@ -118,7 +118,7 @@ describe('an array of plaintext', () => {
 		expect(doc.getStored('errata')).toEqual([seeded[0], '', ...seeded.slice(1)]);
 	});
 
-	// The landing is the row's, not the field's: a `plaintext` element rides the same
+	// The landing is the row's, not the field's: a `text` element rides the same
 	// lowering a `richtext` one does, so the compile answers it cluster-exact and the
 	// element lane carries the offset down (VISUAL_EDITOR.md §Surface).
 	it('lands a caret at the offset the compile resolved, counting by code point', async () => {
