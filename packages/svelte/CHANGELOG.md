@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.22.0 - 2026-10-17
+
 **The `engines` floor is Node 22**, where it was Node 24, so npm on Node 22 resolves the newest release rather than preferring one from before the floor rose. (#766)
 
 **Nesting stops at 12 levels.** Tab on a list item 12 levels deep, counting list items and quotes, moves the focus on out of the editor, as Tab on an item with nothing above it to nest under does, where it drew the 13th level and the edit was lost on commit. `> `, `- ` and `1. ` there stay text, and the `/` menu offers no list or quote. A paste or a drop that would nest past 12 lands nothing.
