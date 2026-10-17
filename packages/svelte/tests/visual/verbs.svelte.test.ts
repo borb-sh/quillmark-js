@@ -190,7 +190,7 @@ describe('a reorder through the card control', () => {
 // them (`session.regions()` names `main.signature_block` beside `main.body`), so a
 // landing that reached content leaves only covered the smaller half of the bridge.
 describe('the landing verbs over a form control', () => {
-	it('focuses a string field, revealing the collapsed group holding it', async () => {
+	it('focuses a text field, revealing the collapsed group holding it', async () => {
 		const q = quill();
 		const { target, editor, errors } = mountEditor(q, example());
 
@@ -205,14 +205,16 @@ describe('the landing verbs over a form control', () => {
 		await tick();
 
 		expect(header?.getAttribute('aria-expanded')).toBe('true');
-		// The input the field's own `<label for>` names, inside the panel the reveal
-		// opened: the same place a click on that label lands, which is the point of the
-		// two reading one function.
+		// The leaf the field's own label names, inside the panel the reveal opened: the
+		// same place a click on that label lands, which is the point of the two reading
+		// one function.
 		const focused = document.activeElement as HTMLElement;
-		expect(focused.tagName).toBe('INPUT');
+		expect(focused.classList.contains('ProseMirror')).toBe(true);
 		const panel = document.getElementById(header!.getAttribute('aria-controls')!);
 		expect(panel?.contains(focused)).toBe(true);
-		expect(panel?.querySelector(`label[for="${focused.id}"]`)).not.toBeNull();
+		const label = document.getElementById(focused.getAttribute('aria-labelledby') ?? '');
+		expect(label?.textContent).toContain('Tracking id');
+		expect(panel?.contains(label)).toBe(true);
 		expect(errors).toHaveLength(0);
 	});
 
@@ -281,7 +283,7 @@ describe('the landing verbs over a form control', () => {
 
 		// A move between two cells of one subform is a move between two leaves.
 		field(target, 'Point of contact')
-			.querySelector<HTMLElement>('[data-qm-prop="name"] input')!
+			.querySelector<HTMLElement>('[data-qm-prop="name"] .ProseMirror')!
 			.focus();
 		await tick();
 		expect(active.at(-1)).toEqual({ field: 'main.contact.name', cardId: 'main' });
@@ -304,7 +306,7 @@ describe('the landing verbs over a form control', () => {
 
 		// A `pos` a control has no coordinate to spend: the field is revealed and
 		// focused, which is the whole of what a click on plate-placed ink can mean.
-		await editor.setCaret({ field: 'main.tracking_id', pos: 3 });
+		await editor.setCaret({ field: 'main.font_size', pos: 3 });
 		await tick();
 
 		expect(document.activeElement?.tagName).toBe('INPUT');
@@ -531,7 +533,7 @@ describe('a card the add strip makes', () => {
 		pick.click();
 		flushSync();
 
-		const heading = field(slots(target)[2], 'Heading').querySelector('input');
+		const heading = field(slots(target)[2], 'Heading').querySelector('.ProseMirror');
 		await vi.waitFor(() => expect(document.activeElement).toBe(heading));
 		// The open menu locks the body's scroll and restores it on a timer that must not
 		// outlive the environment.

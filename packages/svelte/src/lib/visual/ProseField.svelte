@@ -24,8 +24,9 @@
 		plaintext?: boolean;
 		/**
 		 * Draw no box: the card body's leaf, and nothing else. Not `block`, which is a
-		 * different predicate: a `richtext` field without `inline` is block prose and
-		 * still a control in a row of controls, so only the caller knows what is paper.
+		 * different predicate: a `richtext` field declaring `multiline: true` is block
+		 * prose and still a control in a row of controls, so only the caller knows what
+		 * is paper.
 		 */
 		unframed?: boolean;
 		/** Accessible name for a leaf nothing else names: an array element, or the
@@ -45,6 +46,8 @@
 		placeholder?: string;
 		/** The placeholder goes at the leaf's first edit (`createField`). */
 		placeholderUntilEdit?: boolean;
+		/** An emptied leaf removes the field (`createField`). */
+		emptyUnsets?: boolean;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
 		onFocus?: (addr: Addr) => void;
@@ -73,6 +76,7 @@
 		fallback,
 		placeholder,
 		placeholderUntilEdit,
+		emptyUnsets,
 		leafKey,
 		onFocus,
 		onCaretMove,
@@ -122,6 +126,7 @@
 				fallback,
 				placeholder,
 				placeholderUntilEdit,
+				emptyUnsets,
 				tableStrings: () => t.strings,
 				slashStrings: () => t.strings,
 				onSlash: (next) => {
@@ -188,8 +193,8 @@
 	.qm-prose-block :global(.ProseMirror) {
 		min-height: calc(1em * var(--_qm-leading-body));
 	}
-	/* Paper, and the withheld box is what says so. Not `block` alone: `inline` is the
-	 quill's to declare, so a schema omitting it on a richtext field puts a block leaf in
+	/* Paper, and the withheld box is what says so. Not `block` alone: `multiline` is the
+	 quill's to declare, so a schema spelling it on a richtext field puts a block leaf in
 	 a field row, where this rung would break the height agreement above. */
 	.qm-prose-block:not(.qm-control-box) {
 		font-size: var(--_qm-text-paper);

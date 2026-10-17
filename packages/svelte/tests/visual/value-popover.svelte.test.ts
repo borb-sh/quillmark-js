@@ -3,7 +3,7 @@
 // open record row, a field-level subform's cell and a table's cell register no
 // controller, and each announces its views on focus under the field it stands in, so
 // the active-leaf seam hands back the focused one and a mark toggled at its view
-// commits by value, as a keystroke does. A `plaintext` element declares no marks and a
+// commits by value, as a keystroke does. A `text` element declares no marks and a
 // held leaf announces nothing, so neither raises it. A field's own leaf answers through
 // its controller's views. Over every leaf the surface draws the six mark buttons and
 // withholds the anchor's, an anchor drawing nothing until comments do. Mod-K is a press
@@ -34,7 +34,7 @@ const YAML = `quill:
   name: value_popover
   version: 1.0.0
   backend: typst
-  description: By-value prose leaves at every site, a field's own leaf, and a string.
+  description: By-value prose leaves at every site, a field's own leaf, and a number.
 typst:
   plate_file: plate.typ
 main:
@@ -43,11 +43,13 @@ main:
       type: array
       items:
         type: richtext
+        multiline: true
       default: []
     errata:
       type: array
       items:
-        type: plaintext
+        type: text
+        multiline: true
       default: []
     jobs:
       type: array
@@ -55,10 +57,10 @@ main:
         type: object
         properties:
           title:
-            type: string
+            type: text
           summary:
             type: richtext
-            inline: true
+            multiline: false
       default: []
     crew:
       type: array
@@ -66,10 +68,10 @@ main:
         type: object
         properties:
           who:
-            type: string
+            type: text
           note:
             type: richtext
-            inline: true
+            multiline: false
       ui:
         layout: table
       default: []
@@ -77,13 +79,15 @@ main:
       type: object
       properties:
         phone:
-          type: string
+          type: text
         note:
           type: richtext
+          multiline: true
     intro:
       type: richtext
-    author:
-      type: string
+      multiline: true
+    pages:
+      type: integer
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (notes: string[] = ['First note', 'Second note']): Document => {
@@ -158,9 +162,9 @@ const SIX = [
 	DEFAULT_VISUAL_STRINGS.formatLink
 ];
 
-/** Commit the string beside the leaves: a revision, and so a re-derive. */
+/** Commit the number beside the leaves: a revision, and so a re-derive. */
 function rederive(m: Mounted<InnerRef>): void {
-	type(field(m.target, 'Author').querySelector<HTMLInputElement>('input')!, 'Ann');
+	type(field(m.target, 'Pages').querySelector<HTMLInputElement>('input')!, '7');
 }
 
 describe('the formatting popover over a by-value prose leaf', () => {
@@ -266,7 +270,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 		expect(mounted.editor.getActiveLeaf()).toBeUndefined();
 	});
 
-	it('withholds itself over a plaintext element, which declares no marks', async () => {
+	it('withholds itself over a text element, which declares no marks', async () => {
 		const q = probe();
 		const doc = load();
 		const { editor } = mountInner(q, doc);
@@ -345,7 +349,7 @@ describe('the formatting popover over a field’s own leaf', () => {
 		const doc = load();
 		const { editor } = mountInner(q, doc);
 		await land(editor, 'main.notes[0]');
-		await editor.focusField('main.author');
+		await editor.focusField('main.pages');
 		await settle();
 
 		expect(editor.getActiveLeaf()).toBeUndefined();

@@ -3,7 +3,7 @@
 // helpers are unit-tested; the resolve behavior is asserted against the real showcase
 // schema, its values read off the schema rather than restated.
 import { describe, it, expect } from 'vitest';
-import type { Document, ResolvedField, Resolved } from '@quillmark/wasm';
+import type { Content, Document, ResolvedField, Resolved } from '@quillmark/wasm';
 import {
 	provenanceMap,
 	resolvedByCardIndex,
@@ -76,24 +76,29 @@ describe('resolve over the real showcase schema', () => {
 
 	it('reports unset declared defaults as `default`-sourced with the schema value', () => {
 		const main = resolved(quill().seedDocument());
-		for (const name of ['tracking_id', 'font_size', 'accent'])
+		for (const name of ['font_size', 'accent'])
 			expect(main[name]).toMatchObject({ source: 'default', value: declared(name) });
+		// A `text` default resolves as the `Content` it prints.
+		expect(main.tracking_id).toMatchObject({
+			source: 'default',
+			value: { text: declared('tracking_id') }
+		});
 		// The ghost the control shows for each unset field is that resolved default.
-		expect(ghostDefault(main.tracking_id)).toBe(declared('tracking_id'));
+		expect((ghostDefault(main.tracking_id) as Content).text).toBe(declared('tracking_id'));
 	});
 
 	it('flips a field to `authored` (no ghost) once a value is stored, back on clear', () => {
 		const doc = quill().seedDocument();
 		doc.storeField('tracking_id', 'ACME-9');
 		const authored = resolved(doc);
-		expect(authored.tracking_id).toMatchObject({ source: 'authored', value: 'ACME-9' });
+		expect(authored.tracking_id).toMatchObject({ source: 'authored', value: { text: 'ACME-9' } });
 		// An authored field ghosts nothing; the control shows its own value.
 		expect(ghostDefault(authored.tracking_id)).toBeUndefined();
 
 		doc.removeField('tracking_id');
 		const cleared = resolved(doc);
 		expect(cleared.tracking_id.source).toBe('default');
-		expect(ghostDefault(cleared.tracking_id)).toBe(declared('tracking_id'));
+		expect((ghostDefault(cleared.tracking_id) as Content).text).toBe(declared('tracking_id'));
 	});
 
 	it('resolves a variant as a container, so the ghosted member is one cell of it', () => {
@@ -112,16 +117,18 @@ describe('resolve over the real showcase schema', () => {
 		).toBe('');
 	});
 
+	const texts = (rows: unknown) => (rows as Content[]).map((c) => c.text);
+
 	it('reports an array `default:` as one, and ghosts none of it', () => {
 		const doc = example();
 		// The example's answer is authored, not the default beneath it.
-		expect(resolved(doc).authors).toMatchObject({
-			source: 'authored',
-			value: doc.getStored('authors')
-		});
+		const authored = resolved(doc).authors;
+		expect(authored.source).toBe('authored');
+		expect(texts(authored.value)).toEqual(doc.getStored('authors'));
 		doc.removeField('authors');
 		const cleared = resolved(doc);
-		expect(cleared.authors).toMatchObject({ source: 'default', value: declared('authors') });
+		expect(cleared.authors.source).toBe('default');
+		expect(texts(cleared.authors.value)).toEqual(declared('authors'));
 		// A list is not text: the repeater draws its rows and has no placeholder to ghost
 		// into, the same way an object-shaped rung has none.
 		expect(stringifyGhost(ghostDefault(cleared.authors))).toBeUndefined();
@@ -132,11 +139,11 @@ describe('resolve over the real showcase schema', () => {
 		// `contact` declares no literal — a namespace holds none — and one property
 		// declares a `default:`, which is the whole of what lifts the container off
 		// `blank`. The value is composed per cell, so the defaultless three blank-fill
-		// beside it.
+		// beside it, a `text` cell as the empty `Content`.
 		const unset = resolved(doc);
 		expect(unset.contact).toMatchObject({
 			source: 'default',
-			value: { name: '', email: '', reply_by: '', listed: false }
+			value: { name: { text: '' }, email: { text: '' }, reply_by: '', listed: false }
 		});
 		// An object-shaped rung ghosts nothing however it resolves; only text does.
 		expect(stringifyGhost(ghostDefault(unset.contact))).toBeUndefined();
@@ -145,7 +152,12 @@ describe('resolve over the real showcase schema', () => {
 		const authored = resolved(doc);
 		expect(authored.contact).toMatchObject({
 			source: 'authored',
-			value: { name: '', email: 'ada@example.org', reply_by: '', listed: false }
+			value: {
+				name: { text: '' },
+				email: { text: 'ada@example.org' },
+				reply_by: '',
+				listed: false
+			}
 		});
 	});
 });

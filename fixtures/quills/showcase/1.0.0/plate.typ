@@ -5,6 +5,16 @@
 
 #let accent = qm.data.at("accent", default: "slate")
 
+// A text value prints with a space on each side, the helper's binding of it, so
+// one set against punctuation drops them. The glyphs keep their spans.
+#let flush(c) = {
+  if type(c) != content or not c.has("children") { return c }
+  let kids = c.children
+  while kids.len() > 0 and kids.first() == [ ] { kids = kids.slice(1) }
+  while kids.len() > 0 and kids.last() == [ ] { kids = kids.slice(0, -1) }
+  kids.sum(default: [])
+}
+
 #show: showcase-page.with(
   // A string, not `data.title`: see `showcase-page` on why the running head takes
   // a flattened projection and the block stays in the flow. The projection is the
@@ -84,14 +94,15 @@
 #let authors = qm.data.at("authors", default: ())
 #let poc = qm.data.at("contact", default: (:))
 #text(size: 9pt)[
-  #if authors.len() > 0 [#qm.region("authors", authors.join(", "))]
+  #if authors.len() > 0 [#qm.region("authors", authors.map(flush).join(", "))]
   #if poc.at("name", default: "") != "" [
-    · #poc.name#if poc.at("email", default: "") != "" [ (#poc.email)]
+    · #flush(poc.name)#if poc.at("email", default: "") != "" [ (#flush(poc.email))]
   ]
   · Issued #shown-date("issued", [—])
   #let revised = qm.ink(qm.data, "revised_at", "[year]-[month]-[day] [hour]:[minute]")
   #if revised != none [ · Revised #revised]
-  #if qm.data.at("tracking_id", default: "") != "" [ · #qm.region("tracking_id", raw(qm.data.tracking_id))]
+  // A `text` value is content; `raw` takes a `str`, which `qm.str` reads off it.
+  #if qm.data.at("tracking_id", default: "") != "" [ · #qm.region("tracking_id", raw(qm.str(qm.data.tracking_id)))]
   #if qm.data.at("reference", default: none) != none [ · re #qm.data.reference]
   // A property's date is a `datetime` like a card-level one, so the property is
   // addressed the same way rather than placed as the string it used to be.
@@ -136,8 +147,8 @@
   text(size: 9pt, { strong[Keywords: ]; qm.region("keywords", keywords.map(box).join[, ]) })
 }
 
-// `errata` rows are `plaintext`, so each row's markdown delimiters reach the page
-// as the characters they are rather than as the emphasis they would mark.
+// `errata` rows are `text`, so each row's markdown delimiters reach the page as the
+// characters they are rather than as the emphasis they would mark.
 #let errata = qm.data.at("errata", default: ())
 #if errata.len() > 0 {
   v(6pt)
@@ -202,7 +213,7 @@
         inset: (left: 10pt),
         stroke: (left: 2pt + if tone == "warning" { rgb("#b45309") } else { luma(180) }),
         {
-          text(size: 8pt, weight: "bold", upper(card.at("label", default: "Note")))
+          text(size: 8pt, weight: "bold", upper(qm.str(card.at("label", default: "Note"))))
           linebreak()
           card-body
         },
@@ -274,14 +285,14 @@
   // The matrix arrives as the members it holds, each its columns; `roster` is the
   // vocabulary, held or not, then each item the document adds. Each row claims its
   // member's address, its tick, so an unticked box is clickable too. `note` is a
-  // content cell and an added item's `title` a string cell, so their ink keeps their
-  // own addresses inside the claim; `severity` is a scalar read through the loop and
+  // content cell and an added item's `title` a one-line text cell, so their ink keeps
+  // their own addresses inside the claim; `severity` is a scalar read through the loop and
   // reaches the preview through the row.
   Checks: #for row in qm.roster(qm.data, "checks") {
     let title = if row.held { if "title" in row.value { qm.ink(row.value, "title") } else { row.title } } else { row.title }
     qm.region(row.path)[#(if row.held { "[x]" } else { "[ ]" }) #title]
     if row.held and row.value.severity == "major" [ (major)]
-    if row.held and row.value.note != "" [: #qm.ink(row.value, "note")]
+    if row.held and row.value.note != "" [: #flush(qm.ink(row.value, "note"))]
     [; ]
   }
   #linebreak()

@@ -2,7 +2,7 @@
  An `array` field → an add/remove repeater. Elements commit by value: every
  edit / add / remove / move rebuilds the whole array and hands it to the parent's typed
  `writer.set(field, wholeArray)` (arrays are not op-addressed). Element control
- by `items.type`: `richtext` / `plaintext` → a prose element
+ by `items.type`: `richtext` / `text` → a prose element
  ({@link ProseValue}), `object` → a summary row that opens onto a subform, or a
  table's row where the array asks for one and the cells are short, everything else →
  a text input. The add chip sits in the label header row (space-between with the field

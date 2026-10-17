@@ -81,7 +81,7 @@ export function markdownInputRules(schema: Schema): InputRule[] {
 	const m = schema.marks;
 
 	// Inline marks. Non-greedy capture between matching delimiters. Built only where the
-	// schema has the mark: the inline schema omits them, and a plaintext one declares none
+	// schema has the mark: the inline schema omits them, and a `text` one declares none
 	// at all.
 	if (m.strong) rules.push(markInputRule(/\*\*([^*]+)\*\*$/, m.strong, 2));
 	if (m.em) rules.push(markInputRule(/(?:^|[^*])\*([^*]+)\*$/, m.em, 1));

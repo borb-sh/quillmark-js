@@ -8,404 +8,443 @@ typst:
   plate_file: plate.typ
 
 main:
+  ui:
+    # Map form, so a group can override its label; `content` and `layout` take
+    # none and are humanized from the id instead.
+    groups:
+      identity:
+        title: Who and what
+      content: {}
+      layout: {}
+      meta:
+        title: Metadata
+      imprint:
+        title: Print run
   fields:
     colophon:
       type: richtext
-      inline: true
+      multiline: false
       default: ""
-      description: Set in the bundled monospace face at the foot of the last page. The one field outside `sections:`, so it stands above them.
+      description: Set in the bundled monospace face at the foot of the last page. The one field declaring no `ui.group`, so it stands above the groups.
 
-  # `identity`, `meta` and `imprint` override their labels; `content` and
-  # `layout` take none and are humanized from the id instead.
-  sections:
-    identity:
-      title: Who and what
-      fields:
-        title:
-          type: richtext
-          inline: true
-          description: The document's title. Placed in the letterhead and again on the colophon page, so its regions span pages.
+    title:
+      type: richtext
+      multiline: false
+      ui:
+        group: identity
+      description: The document's title. Placed in the letterhead and again on the colophon page, so its regions span pages.
 
-        subtitle:
-          type: plaintext
-          inline: true
-          default: ""
-          ui:
-            compact: true
-          description: Plaintext, so markdown delimiters typed here are the text rather than markup.
+    subtitle:
+      type: text
+      default: ""
+      ui:
+        group: identity
+        compact: true
+      description: Literal text, so markdown delimiters typed here are the text rather than markup.
 
-        authors:
-          type: array
-          items:
-            type: string
-          default:
-            - Anonymous
-          ui:
-            compact: true
-          description: "Strings. Asks for `ui.compact` and is declined: an array grows with the document, and a row is as tall as its tallest cell. The one array declaring a literal `default:`, and a list ghosts nothing — the line prints only while the field is unset."
+    authors:
+      type: array
+      items:
+        type: text
+      default:
+        - Anonymous
+      ui:
+        group: identity
+        compact: true
+      description: "One-line text elements. Asks for `ui.compact` and is declined: an array grows with the document, and a row is as tall as its tallest cell. The one array declaring a literal `default:`, and a list ghosts nothing — the line prints only while the field is unset."
 
-        contact:
-          type: object
-          properties:
-            name:
-              type: string
-              description: Who to write to.
-            email:
-              type: string
-              description: Where to write.
-            reply_by:
-              type: date
-              description: When a reply is wanted.
-            listed:
-              type: boolean
-              default: false
-              description: Print the address in the letterhead.
-            note:
-              type: plaintext
-              inline: true
-              default: ""
-              description: How to reach them, in their own words. The content property, which reads at its codec one key in and mounts the prose leaf a scalar `plaintext` field mounts.
-          title: Point of contact
-          description: "A nested subform, one property per control it draws. A namespace carries no literal of its own — an absent container descends into its cells, so what a blank `contact` renders is what its properties declare. The one field labelled by a `title` rather than by its humanized key."
-
-        signature_block:
-          type: array
-          items:
-            type: string
-          description: Signed by. Placed through the helper's `signature-field`, so its region comes from a widget rather than from glyph spans.
-
-        contributors:
-          type: array
-          max: 3
-          items:
-            type: object
-            properties:
-              name:
-                type: string
-                description: As credited.
-              role:
-                type: enum
-                values:
-                  - author
-                  - reviewer
-                  - editor
-                default: author
-              since:
-                type: date
-                default: ""
-                description: When they joined. Blank to omit.
-              lead:
-                type: boolean
-                default: false
-          default: []
-          ui:
-            layout: table
-          description: "Who worked on it. An `array` of `object` whose every cell is one line tall, asking for `ui.layout: table` on the array's own `ui` and granted it: a column per property under a header, each row carrying its remove alone. Capped at `max: 3`, so the add chip disables at three and the count beside it says why. Every cell is a scalar, so the plate's loop reaches the preview through the array's own region and no row of it is addressable on its own."
-    content:
-      fields:
-        abstract:
-          type: richtext
-          description: The standing summary. Block richtext — no `inline`, so the leaf takes the block floor.
-
-        keywords:
-          type: array
-          items:
-            type: richtext
-            inline: true
-          default: []
-          description: An array whose items are themselves richtext. Each element is tracked as its own region (`main.keywords[0]`); the array itself is named by none.
-
-        errata:
-          type: array
-          items:
-            type: plaintext
-          default: []
-          description: Corrections, verbatim. A `plaintext` item rests as its literal string, so a row is a text input and markdown inside one is text.
-
-        epigraph:
-          type: richtext
-          inline: true
-          default: "*Everything here exists to be tested.*"
-          description: An inline richtext leaf carrying a literal default, so an unset one has a ghost to show.
-
-        appendices:
-          type: array
-          items:
-            type: object
-            properties:
-              title:
-                type: string
-                description: The appendix heading.
-              entries:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    label:
-                      type: plaintext
-                      inline: true
-                      description: What the entry is. The row's one title-bearing cell, and it is inline prose rather than a `string`.
-                    page:
-                      type: integer
-                      default: 0
-                    note:
-                      type: richtext
-                      inline: true
-                      default: ""
-                default: []
-                description: The appendix's entries, a record list one rung further in.
-          default: []
-          description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `title` cell and a collapsed entry by its inline `plaintext` label, the cell a row with no `string` cell reads. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
-    layout:
-      fields:
-        columns:
-          type: integer
-          default: 1
-          ui:
-            compact: true
-          description: How many columns the body is set in.
-
-        font_size:
-          type: number
-          default: 10.5
-          ui:
-            compact: true
-          description: Body text size in points; decimals allowed.
-
-        draft_watermark:
+    contact:
+      type: object
+      properties:
+        name:
+          type: text
+          description: Who to write to.
+        email:
+          type: text
+          description: Where to write.
+        reply_by:
+          type: date
+          description: When a reply is wanted.
+        listed:
           type: boolean
           default: false
-          ui:
-            compact: true
-          description: Stamp DRAFT across the page. Also bound to a checkbox widget, so a boolean reaches the region table.
-
-        accent:
-          type: enum
-          values:
-            - slate
-            - ink
-            - rust
-          default: slate
-          ui:
-            compact: true
-          description: "The rule and heading colour. Every member is a value, so the only way to unset it is the control's own clear affordance — the contrast the field below draws."
-    meta:
-      title: Metadata
-      fields:
-        status:
-          type: enum
-          values:
-            - draft
-            - in_review
-            - approved
-            - final
-            - withdrawn
-          ui:
-            compact: true
-          description: "Where the document is in its life. Which stage this is remains a human's call, so the field declares no `default:` and asks: the one enum carrying a required `*`."
-
-        distribution:
-          type: enum
-          values:
-            - internal
-            - public
-            - embargoed
-          default: internal
-          variants:
-            public:
-              license:
-                type: enum
-                values:
-                  - cc-by
-                  - cc0
-                default: cc-by
-                description: Which licence the public copy carries.
-            embargoed:
-              lift_on:
-                type: string
-                description: When the hold lifts, as the notice words it. A variant carries plain data, so a date is spelled here as a string.
-              held_by:
-                type: string
-                default: ""
-                description: Who to ask about the hold.
-              notices:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    party:
-                      type: string
-                    text:
-                      type: richtext
-                      inline: true
-                      default: ""
-                default: []
-                description: Who was told of the hold, and what they were told. A variant cell holding a record list whose rows carry a `richtext` cell, so a container draws at the one depth a variant reaches and its content cells region under it.
-          description: "Who may have it. A field declaring `variants:`, so it rests as a container (`{value, …the member's fields}`) rather than a bare string. `embargoed` brings three cells into play and obliges one of them, required in that world and silent in every other; `public` brings a licence with a default to ghost; `internal` brings none, so the subform goes. An answer stranded by a flip is kept and warned, never dropped."
-
-        handling:
-          type: enum
-          values:
-            - OPEN
-            - CONTROLLED
-            - CLOSE HOLD
+          description: Print the address in the letterhead.
+        note:
+          type: text
           default: ""
-          variants:
-            CONTROLLED:
-              controlled_by:
-                type: plaintext
-                inline: true
-                description: Who set the marking. Declares no `default:`, so it is required in this world and asked in no other.
-              caveat:
-                type: plaintext
-                inline: true
-                default: ""
-                description: The trailing caveat the marking carries. Blank to omit.
-          description: "How a copy is handled. The variant whose `default:` is the blank, which owns no world: an unset field draws the discriminant alone and ghosts the em dash, where `distribution` ghosts a member and draws its cells. Its cells are prose rather than data, a member is spelled as it is marked rather than as an id humanizes, and a value carries a space."
+          description: How to reach them, in their own words. A content property, which reads at its codec one key in and mounts the prose leaf a card-level `text` field mounts.
+      title: Point of contact
+      ui:
+        group: identity
+      description: "A nested subform, one property per control it draws. A namespace carries no literal of its own — an absent container descends into its cells, so what a blank `contact` renders is what its properties declare. The one field labelled by a `title` rather than by its humanized key."
 
-        issued:
-          type: date
-          default: "2026-01-15"
-          ui:
-            compact: true
-          description: YYYY-MM-DD. A literal default, so the date control has a ghost to show.
+    signature_block:
+      type: array
+      items:
+        type: text
+      ui:
+        group: identity
+      description: Signed by. Placed through the helper's `signature-field`, so its region comes from a widget rather than from glyph spans.
 
-        revised_at:
-          type: datetime
+    contributors:
+      type: array
+      max: 3
+      items:
+        type: object
+        properties:
+          name:
+            type: text
+            description: As credited.
+          role:
+            type: enum
+            values:
+              - author
+              - reviewer
+              - editor
+            default: author
+          since:
+            type: date
+            default: ""
+            description: When they joined. Blank to omit.
+          lead:
+            type: boolean
+            default: false
+      default: []
+      ui:
+        group: identity
+        layout: table
+      description: "Who worked on it. An `array` of `object` whose every cell is one line tall, asking for `ui.layout: table` on the array's own `ui` and granted it: a column per property under a header, each row carrying its remove alone. Capped at `max: 3`, so the add chip disables at three and the count beside it says why. `name` is a content cell and regions through the plate's loop; the scalar cells reach the preview through the array's own region."
+
+    abstract:
+      type: richtext
+      multiline: true
+      ui:
+        group: content
+      description: "The standing summary. Block richtext — `multiline: true`, so the leaf takes the block floor."
+
+    keywords:
+      type: array
+      items:
+        type: richtext
+        multiline: false
+      default: []
+      ui:
+        group: content
+      description: An array whose items are themselves richtext. Each element is tracked as its own region (`main.keywords[0]`); the array itself is named by none.
+
+    errata:
+      type: array
+      items:
+        type: text
+        multiline: true
+      default: []
+      ui:
+        group: content
+      description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text; `multiline: true`, so a row holds lines."
+
+    epigraph:
+      type: richtext
+      multiline: false
+      default: "*Everything here exists to be tested.*"
+      ui:
+        group: content
+      description: A one-line richtext leaf carrying a literal default, so an unset one has a ghost to show.
+
+    appendices:
+      type: array
+      items:
+        type: object
+        properties:
+          title:
+            type: text
+            description: The appendix heading.
+          entries:
+            type: array
+            items:
+              type: object
+              properties:
+                label:
+                  type: text
+                  description: What the entry is. The row's one title-bearing cell.
+                page:
+                  type: integer
+                  default: 0
+                note:
+                  type: richtext
+                  multiline: false
+                  default: ""
+            default: []
+            description: The appendix's entries, a record list one rung further in.
+      default: []
+      ui:
+        group: content
+      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `title` cell and a collapsed entry by its `label`, the first one-line text cell of each. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
+
+    columns:
+      type: integer
+      default: 1
+      ui:
+        group: layout
+        compact: true
+      description: How many columns the body is set in.
+
+    font_size:
+      type: number
+      default: 10.5
+      ui:
+        group: layout
+        compact: true
+      description: Body text size in points; decimals allowed.
+
+    draft_watermark:
+      type: boolean
+      default: false
+      ui:
+        group: layout
+        compact: true
+      description: Stamp DRAFT across the page. Also bound to a checkbox widget, so a boolean reaches the region table.
+
+    accent:
+      type: enum
+      values:
+        - slate
+        - ink
+        - rust
+      default: slate
+      ui:
+        group: layout
+        compact: true
+      description: "The rule and heading colour. Every member is a value, so the only way to unset it is the control's own clear affordance — the contrast the field below draws."
+
+    status:
+      type: enum
+      values:
+        - draft
+        - in_review
+        - approved
+        - final
+        - withdrawn
+      ui:
+        group: meta
+        compact: true
+      description: "Where the document is in its life. Which stage this is remains a human's call, so the field declares no `default:` and asks."
+
+    distribution:
+      type: enum
+      values:
+        - internal
+        - public
+        - embargoed
+      default: internal
+      variants:
+        public:
+          license:
+            type: enum
+            values:
+              - cc-by
+              - cc0
+            default: cc-by
+            description: Which licence the public copy carries.
+        embargoed:
+          lift_on:
+            type: text
+            description: When the hold lifts, as the notice words it. A variant carries plain data, so a date is spelled here as text.
+          held_by:
+            type: text
+            default: ""
+            description: Who to ask about the hold.
+          notices:
+            type: array
+            items:
+              type: object
+              properties:
+                party:
+                  type: text
+                text:
+                  type: richtext
+                  multiline: false
+                  default: ""
+            default: []
+            description: Who was told of the hold, and what they were told. A variant cell holding a record list whose rows carry a `richtext` cell, so a container draws at the one depth a variant reaches and its content cells region under it.
+      ui:
+        group: meta
+      description: "Who may have it. A field declaring `variants:`, so it rests as a container (`{value, …the member's fields}`) rather than a bare string. `embargoed` brings three cells into play and obliges one of them, required in that world and silent in every other; `public` brings a licence with a default to ghost; `internal` brings none, so the subform goes. An answer stranded by a flip is kept and warned, never dropped."
+
+    handling:
+      type: enum
+      values:
+        - OPEN
+        - CONTROLLED
+        - CLOSE HOLD
+      default: ""
+      variants:
+        CONTROLLED:
+          controlled_by:
+            type: text
+            description: Who set the marking. Declares no `default:`, so it is required in this world and asked in no other.
+          caveat:
+            type: text
+            default: ""
+            description: The trailing caveat the marking carries. Blank to omit.
+      ui:
+        group: meta
+      description: "How a copy is handled. The variant whose `default:` is the blank, which owns no world: an unset field draws the discriminant alone and ghosts the em dash, where `distribution` ghosts a member and draws its cells. Its cells are prose rather than data, a member is spelled as it is marked rather than as an id humanizes, and a value carries a space."
+
+    issued:
+      type: date
+      default: "2026-01-15"
+      ui:
+        group: meta
+        compact: true
+      description: YYYY-MM-DD. A literal default, so the date control has a ghost to show.
+
+    revised_at:
+      type: datetime
+      default: ""
+      ui:
+        group: meta
+        compact: true
+      description: When the document was last revised. Blank to omit.
+
+    tracking_id:
+      type: text
+      default: SPEC-0001
+      ui:
+        group: meta
+        compact: true
+      description: A free-text handle. One-line text with no closed domain, which the plate sets as code through `qm.str`.
+
+    reference:
+      type: text?
+      ui:
+        group: meta
+        compact: true
+      description: "What the document answers to. An optional cell: unanswered, a `text?` prints `none` rather than the blank, so it declares no `default:` and ghosts `None`."
+
+    revisions:
+      type: array
+      items:
+        type: object
+        properties:
+          note:
+            type: text
+          pages:
+            type: integer
+          detail:
+            type: text
+            default: ""
+            description: What changed, in the reviser's own words. A content cell, and so a cell of a row the preview can land a click on.
+          rationale:
+            type: richtext
+            multiline: true
+            default: ""
+            description: Why it changed, at whatever length. Block richtext, so the cell holds paragraphs and lists and spans the row under its label; one holding a table or an image is held read-only.
+          passage:
+            type: text
+            multiline: true
+            default: ""
+            description: The changed passage as it now reads, line for line. Multiline text, so the cell holds lines and spans the row too.
+      default: []
+      ui:
+        group: meta
+      description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform. The content cells region — `main.revisions[0].detail` is the fixture's one-rung nested-row address — and the scalar cells beside them reach the preview through the array's own region."
+
+    checks:
+      type: matrix
+      members:
+        spelling: Spelling
+        citations: Citations
+        figures: Figures
+        margins: Margins
+        fonts: Fonts
+        approved: Approved
+      open: true
+      properties:
+        note:
+          type: text
           default: ""
-          ui:
-            compact: true
-          description: When the document was last revised. Blank to omit.
+          description: What was found, in the checker's words.
+        severity:
+          type: enum
+          values:
+            - minor
+            - major
+          default: minor
+      ui:
+        group: meta
+        compact: true
+      description: "The review checklist: a `matrix`, a vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`, and `open: true`, so a document adds its own items beside them, each a snake_case key carrying a `title`. Two columns, one of them prose, unfold under a held member. A member is held by being present, and an unticked one is absent. It declares no `default:`, so it seeds empty. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`, and a member's own address is its tick."
 
-        tracking_id:
-          type: string
-          default: SPEC-0001
-          ui:
-            compact: true
-          description: A free-text handle. A bare string with no closed domain, so a text input.
-
-        reference:
-          type: string?
-          ui:
-            compact: true
-          description: "What the document answers to. An optional cell: unanswered, a `string?` prints `none` rather than the blank, so it declares no `default:`, draws no `*`, and ghosts `None`."
-
-        revisions:
-          type: array
-          items:
-            type: object
-            properties:
-              note:
-                type: string
-              pages:
-                type: integer
-              detail:
-                type: plaintext
-                inline: true
-                default: ""
-                description: What changed, in the reviser's own words. A content cell, and so a cell of a row the preview can land a click on.
-              rationale:
-                type: richtext
-                default: ""
-                description: Why it changed, at whatever length. Block richtext, so the cell holds paragraphs and lists and spans the row under its label; one holding a table or an image is held read-only.
-              passage:
-                type: plaintext
-                default: ""
-                description: The changed passage as it now reads, line for line. Block plaintext, so the cell holds lines and spans the row too.
-          default: []
-          description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform. A row's cells are read through the plate's loop binding, which carries no address, so only the content cells region — `main.revisions[0].detail` is the fixture's one-rung nested-row address, and the scalar cells beside it reach the preview through the array's own region."
-
-        checks:
-          type: matrix
-          members:
-            spelling: Spelling
-            citations: Citations
-            figures: Figures
-            margins: Margins
-            fonts: Fonts
-            approved: Approved
-          open: true
-          properties:
-            note:
-              type: plaintext
-              inline: true
-              default: ""
-              description: What was found, in the checker's words.
-            severity:
-              type: enum
-              values:
-                - minor
-                - major
-              default: minor
-          ui:
-            compact: true
-          description: "The review checklist: a `matrix`, a vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`, and `open: true`, so a document adds its own items beside them, each a snake_case key carrying a `title`. Two columns, one of them prose, unfold under a held member. A member is held by being present, and an unticked one is absent. It declares no `default:`, so it seeds empty. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`, and a member's own address is its tick."
     imprint:
-      title: Print run
-      fields:
-        imprint:
-          type: object
-          properties:
-            printer:
-              type: string
-              default: ""
-              description: Who prints it.
-            copies:
-              type: integer
-              default: 1
-              description: How many to print.
-          ui:
-            layout: flat
-          description: "A flat subform (`ui.layout: flat`) alone in its section: the section is its frame, so the header names it and carries this description, and its properties stand at the section's depth with no rung of their own."
+      type: object
+      properties:
+        printer:
+          type: text
+          default: ""
+          description: Who prints it.
+        copies:
+          type: integer
+          default: 1
+          description: How many to print.
+      ui:
+        group: imprint
+        layout: flat
+      description: "A flat subform (`ui.layout: flat`) alone in its group: the section is its frame, so the header names it and carries this description, and its properties stand at the section's depth with no rung of their own."
 
 card_kinds:
   section:
     description: A titled division of the document. The kind declares no `title`, so each card is named by its own first short text cell, the `heading`.
-    sections:
-      structure:
-        fields:
-          heading:
-            type: string
-            ui:
-              compact: true
-            description: The section's heading, and the card's own title.
-          lead:
-            type: richtext
-            inline: true
-            default: ""
-            description: A standfirst under the heading.
-      style:
-        title: Set in
-        fields:
-          layout:
-            type: enum
-            values:
-              - prose
-              - callout
-              - aside
-            default: prose
-            ui:
-              compact: true
-            description: Run the section as prose, box it as a callout, or set it small in the margin.
-          numbered:
-            type: boolean
-            default: true
-            ui:
-              compact: true
-            description: Number the heading.
-          reviewed_at:
-            type: datetime
-            default: ""
-            ui:
-              compact: true
-            description: When the section was last reviewed, to the minute.
+    ui:
+      groups:
+        structure: {}
+        style:
+          title: Set in
+    fields:
+      heading:
+        type: text
+        ui:
+          group: structure
+          compact: true
+        description: The section's heading, and the card's own title.
+      lead:
+        type: richtext
+        multiline: false
+        default: ""
+        ui:
+          group: structure
+        description: A standfirst under the heading.
+      layout:
+        type: enum
+        values:
+          - prose
+          - callout
+          - aside
+        default: prose
+        ui:
+          group: style
+          compact: true
+        description: Run the section as prose, box it as a callout, or set it small in the margin.
+      numbered:
+        type: boolean
+        default: true
+        ui:
+          group: style
+          compact: true
+        description: Number the heading.
+      reviewed_at:
+        type: datetime
+        default: ""
+        ui:
+          group: style
+          compact: true
+        description: When the section was last reviewed, to the minute.
 
   note:
     title: Marginal note
-    description: A short aside. Its fields sit in no section, so the card renders no accordion.
+    description: A short aside. Its fields are ungrouped, so the card renders no accordion.
     fields:
       label:
-        type: string
+        type: text
         default: Note
         description: The word set in the margin.
       tone:
@@ -427,7 +466,7 @@ card_kinds:
       signature_block:
         type: array
         items:
-          type: string
+          type: text
         description: "Line 1: name as signed. Line 2: role."
       signed_on:
         type: date
@@ -458,6 +497,6 @@ card_kinds:
         description: How the figure sits in the flow. The one variant-bearing enum on a card kind.
       caption:
         type: richtext
-        inline: true
+        multiline: false
         default: ""
         description: Set under the figure.

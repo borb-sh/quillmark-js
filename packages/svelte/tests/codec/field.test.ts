@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-// The standalone prose leaf: a `createField` over a real `showcase` `title` (inline)
+// The standalone prose leaf: a `createField` over a real `showcase` `title` (one line)
 // and body edits via applyChange; the caret survives own-edits through the PM StepMap;
 // an external content change re-hydrates and the leaf's own edit does not; a narrowed
-// field holds over a value upstream's `inline` rule refuses, and releases once it fits.
+// field holds over a value upstream's one-line rule refuses, and releases once it fits.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorView } from 'prosemirror-view';
 import { Selection } from 'prosemirror-state';
@@ -189,7 +189,7 @@ describe('the hold on a narrowed field', () => {
 		field.destroy();
 	});
 
-	it('holds a plaintext(inline) field, whose refusal upstream names not_plain', () => {
+	it('holds a one-line text field, whose refusal upstream names not_plain', () => {
 		const doc = example();
 		doc.overwrite({ field: 'subtitle' }, md(STRUCTURED));
 		expect(
@@ -203,7 +203,7 @@ describe('the hold on a narrowed field', () => {
 		const field = leaf(doc, 'subtitle', holds, true);
 		expect(holds).toEqual([true]);
 		expect(viewOf(field).editable).toBe(false);
-		// A plaintext leaf commits through the typed writer, which would store it joined.
+		// A text leaf commits through the typed writer, which would store it joined.
 		keystroke(viewOf(field));
 		expect(JSON.stringify(doc.getStored('subtitle'))).toBe(before);
 		field.destroy();
@@ -216,8 +216,7 @@ describe('the hold on a narrowed field', () => {
 			quill()
 				.validate(doc)
 				.filter((d) => d.path === 'main.subtitle')
-				.map((d) => [d.code, d.args?.trailingNewline])
-		).toEqual([['validation::not_inline', true]]);
+		).toEqual([]);
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'subtitle', holds, true);
 		expect(holds).toEqual([]);
@@ -226,8 +225,8 @@ describe('the hold on a narrowed field', () => {
 	});
 });
 
-describe('plaintext fields fire no markdown input rules', () => {
-	// A `**x**` rule reaching a plaintext field would apply a strong mark and eat the
+describe('text fields fire no markdown input rules', () => {
+	// A `**x**` rule reaching a text field would apply a strong mark and eat the
 	// delimiters its author is entitled to. `plaintextSchema` declares no mark types, so
 	// the rule is never built (`markdownInputRules` guards each on its type). The rule is
 	// triggered the way a keystroke does: via `handleTextInput` with the char that
@@ -239,13 +238,13 @@ describe('plaintext fields fire no markdown input rules', () => {
 		return view.someProp('handleTextInput', (f) => f(view, pos, pos, '*', () => view.state.tr));
 	}
 
-	it('a plaintext field does NOT fire the strong rule — delimiters and no-marks survive', () => {
+	it('a text field does NOT fire the strong rule — delimiters and no-marks survive', () => {
 		const doc = example();
 		const before = doc.getStored('subtitle') as string;
 		const field = createField({
 			doc,
 			quill: quill(),
-			addr: { field: 'subtitle' }, // `plaintext`, `inline: true`
+			addr: { field: 'subtitle' }, // a one-line `text`
 			container: mount(),
 			plaintext: true,
 			inline: true
@@ -259,7 +258,7 @@ describe('plaintext fields fire no markdown input rules', () => {
 		field.destroy();
 	});
 
-	it('a non-plaintext inline field DOES fire it (proving the schema is what suppresses it)', () => {
+	it('a one-line richtext field DOES fire it (proving the schema is what suppresses it)', () => {
 		const doc = example();
 		const field = createField({
 			doc,

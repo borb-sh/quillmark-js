@@ -4,7 +4,7 @@
 // read-only with the note in its box, and no keystroke or paste commits. The hold is
 // judged of each value the row's re-derive hands down, so a write that brings an
 // island holds the cell and one that takes the last away releases it. The probe is its
-// own quill: a record list with a block prose cell, and a string whose commit
+// own quill: a record list with a block prose cell, and a number whose commit
 // re-derives.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
@@ -28,7 +28,7 @@ const YAML = `quill:
   name: island_cell
   version: 1.0.0
   backend: typst
-  description: A block prose cell on a record row, and a string beside it.
+  description: A block prose cell on a record row, and a number beside it.
 typst:
   plate_file: plate.typ
 main:
@@ -39,12 +39,13 @@ main:
         type: object
         properties:
           title:
-            type: string
+            type: text
           details:
             type: richtext
+            multiline: true
       default: []
-    author:
-      type: string
+    pages:
+      type: integer
 `;
 const probe = () => quillFromYaml(YAML);
 const ISLANDS = '| a | b |\n|---|---|\n| 1 | 2 |\n\nSee ![chart](chart.png) here.';
@@ -56,9 +57,9 @@ const load = (details: string): Document => {
 	return doc;
 };
 
-/** Commit the string beside the rows: a revision, and so a re-derive. */
+/** Commit the number beside the rows: a revision, and so a re-derive. */
 function rederive(m: Mounted): void {
-	type(field(m.target, 'Author').querySelector<HTMLInputElement>('input')!, 'Ann');
+	type(field(m.target, 'Pages').querySelector<HTMLInputElement>('input')!, '7');
 }
 
 /** The open first row's details cell. */

@@ -311,7 +311,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		// spans, so it regions wherever a plate places it, while a scalar's address is the
 		// read path's and the codegen tracks a literal one only (PREVIEW.md §"Click bridge").
 		// The plate loops, so `note` and `pages` reach the preview through the array and
-		// `detail` reaches it as its own row.
+		// `detail` reaches it as its own row; `pages` is the row's one scalar.
 		const session = await open((doc) =>
 			doc.storeField('revisions', [
 				{ note: 'Fig. 2 relabelled', pages: 1, detail: 'The caption named the wrong figure.' },
@@ -321,7 +321,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		const fields = [...new Set(session.regions().map((r) => r.field))];
 		expect(fields).toContain('main.revisions[0].detail');
 		expect(fields).toContain('main.revisions[1].detail');
-		expect(fields).not.toContain('main.revisions[0].note');
+		expect(fields).not.toContain('main.revisions[0].pages');
 
 		for (const cell of ['main.revisions[0].detail', 'main.revisions[1].detail']) {
 			const boxes = boxesForField(cell, session.fieldBoxes(cell), () => session.regions());

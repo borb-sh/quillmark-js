@@ -5,8 +5,8 @@
 //   (a) apply optimistically to the view,
 //   (b) lower the tr to a `ChangeBundle` (or `overwrite` for a field not yet at
 //       content rest, which has nothing to splice),
-//   (c) commit via `doc.applyChange(addr, bundle)`, or a `plaintext` leaf's whole
-//       text through the typed writer,
+//   (c) commit via `doc.applyChange(addr, bundle)`, or a `text` leaf's whole text
+//       through the typed writer,
 //   (d) fire `onChange` when the transaction committed, then `onCaretMove` with
 //       the new USV caret, which a bare selection move fires on its own.
 // On an `applyChange` throw the optimistic PM state stays and the failure reports
@@ -73,17 +73,17 @@ export interface CreateFieldOpts {
 	quill: Quill;
 	addr: Addr;
 	container: HTMLElement;
-	/** Constrained single-textblock schema (a field declaring `inline`). */
+	/** Constrained single-textblock schema (a one-line field). */
 	inline?: boolean;
-	/** A mark-free schema (a `plaintext` field): literal text, no formatting and no
+	/** A mark-free schema (a `text` field): literal text, no formatting and no
 	 *  anchors, in paragraphs and hard breaks or, with `inline`, one textblock. */
 	plaintext?: boolean;
 	/** The id of the note the caller draws inside `container` for a held leaf →
 	 *  `aria-describedby` while it holds. */
 	heldNoteId?: string;
 	/**
-	 * Fired when the leaf holds or releases, and at mount when it mounts held. A leaf
-	 * declaring `inline`, or a `plaintext` one, is held over a value its schema cannot
+	 * Fired when the leaf holds or releases, and at mount when it mounts held. A one-line
+	 * leaf, or a `text` one, is held over a value its schema cannot
 	 * hold (`fitsLeaf`, upstream's `isInline` and `isPlain`): the decode would join lines
 	 * and drop containers and islands for the first commit to store. Any leaf is held
 	 * over an element, which no node holds. A held leaf draws
@@ -138,6 +138,9 @@ export interface CreateFieldOpts {
 	 * emptied it holds an empty answer, which prints empty. Absent, the placeholder
 	 * returns whenever the leaf is empty. */
 	placeholderUntilEdit?: boolean;
+	/** An edit leaving the leaf empty removes the field: an optional cell (`t?`), whose
+	 * unanswered `none` is what the empty leaf draws and an empty answer would hide. */
+	emptyUnsets?: boolean;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new USV caret after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -147,8 +150,8 @@ export interface CreateFieldOpts {
 	 * move, so a host driving a recompile off it recompiles on every arrow key.
 	 *
 	 * Fires for every commit regardless of which branch it took (`applyChange`, the
-	 * first-edit `overwrite`, the fallback `overwrite`, a `plaintext` leaf's typed
-	 * write) and for an anchor mutation,
+	 * first-edit `overwrite`, the fallback `overwrite`, a `text` leaf's typed write)
+	 * and for an anchor mutation,
 	 * which changes no text. A commit that failed outright (`commit-lost`) does not
 	 * fire it: nothing landed.
 	 */
@@ -270,8 +273,8 @@ function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorPos[]> {
  * and the verbatim read cannot answer it alone. A field the editor committed rests
  * as `Content`; a field a markdown parse left rests as the authored string, and
  * what that string means is the declared type's to say: `richtext` is markdown,
- * `plaintext` is literal text, and reading one as the other silently eats every
- * `*` the author typed. */
+ * `text` is literal text, and reading one as the other silently eats every `*` the
+ * author typed. */
 function readLeaf(reader: DocumentReader, addr: Addr): Content {
 	return reader.getContent(addr) ?? emptyContent();
 }
@@ -282,14 +285,19 @@ export function emptyContent(): Content {
 	return { text: '', lines: [{ containers: [], kind: 'para' }], marks: [], islands: [] };
 }
 
+/** Whether `rt` is the empty leaf: {@link emptyContent}, nothing typed and no shape left. */
+export function isEmptyContent(rt: Content): boolean {
+	return contentEqual(rt, emptyContent());
+}
+
 /** Whether ops may commit here: the stored value is a `Content` object, so
  * `applyChange` splices exactly the content the leaf read and PM is showing.
  *
  * The two other rest forms both take `overwrite` instead. An unset field (`undefined`;
  * a default-only richtext field before its first edit) has nothing to splice, and an
  * authored string nothing to lose: content-only marks do not survive markdown, so a
- * string carries no anchors to pay. A body always rests as `Content`. A `plaintext`
- * leaf never asks: it commits through the writer ({@link createField}). */
+ * string carries no anchors to pay. A body always rests as `Content`. A `text` leaf
+ * never asks: it commits through the writer ({@link createField}). */
 function opsCommittable(doc: Document, addr: Addr): boolean {
 	const stored = doc.getStored(addr);
 	return stored !== null && typeof stored === 'object';
@@ -372,7 +380,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 
 	// Judged of the value being mounted rather than read off a diagnostic: a routed set
 	// can predate the value it arrives with, and `validation::not_plain` stands in for
-	// `not_inline` on a `plaintext(inline)` field.
+	// `not_single_line` on a one-line `text` field.
 	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext, islands: true });
 	let held = holds(reconciler.last);
 	const named = proseAttributes(opts) ?? {};
@@ -497,6 +505,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// Returns whether anything landed: the caller's change signal, which must not
 	// be a property of which branch the commit took.
 	function commitEdit(oldRt: Content, newRt: Content): boolean {
+		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
+			return commitUnset();
 		if (plaintext) return commitPlain(newRt.text);
 		// The text splice, computed once per keystroke: the gate below, both overwrite
 		// fallbacks, and `lower` all read this one `edit`. The projection is the
@@ -547,8 +557,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	}
 
 	/**
-	 * A `plaintext` leaf's commit: its whole text through the typed writer, which rests
-	 * the field as that literal string (CODEC §Inline mode). A content object is the
+	 * A `text` leaf's commit: its whole text through the typed writer, which rests the
+	 * field as that literal string (CODEC §Inline mode). A content object is the
 	 * other rest form, and `toMarkdown` emits one as markdown: a break spelled as a
 	 * backslash, a `*` and a trailing space escaped, a blank line doubled, so the value
 	 * reads back changed. The leaf carries no anchors, so the op path has none to keep.
@@ -559,7 +569,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	function commitPlain(text: string): boolean {
 		try {
 			const name = addr.field;
-			if (name === undefined) throw new Error('a plaintext leaf names a field');
+			if (name === undefined) throw new Error('a text leaf names a field');
 			(addr.card === undefined ? writer : writer.card(addr.card)).set(name, text);
 			reconciler.commit(readLeaf(reader, addr));
 			return true;
@@ -568,6 +578,23 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				code: 'commit-lost',
 				severity: 'error',
 				message: `the typed writer refused the text; the stored value is stale while the editor keeps the edit: ${errorMessage(e)}`,
+				cause: e
+			});
+			return false;
+		}
+	}
+
+	/** An emptied optional leaf's commit: the field removed, back to unanswered. */
+	function commitUnset(): boolean {
+		try {
+			doc.removeField(addr);
+			reconciler.commit(readLeaf(reader, addr));
+			return true;
+		} catch (e) {
+			reportError(opts.onError, {
+				code: 'commit-lost',
+				severity: 'error',
+				message: `the field could not be removed; the stored value is stale while the editor keeps the edit: ${errorMessage(e)}`,
 				cause: e
 			});
 			return false;
@@ -645,7 +672,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			return readLeaf(reader, addr);
 		},
 		insertAnchor(id: string, pos: number): void {
-			// A plaintext field carries no marks (§Inline mode), and a held one commits nothing.
+			// A text field carries no marks (§Inline mode), and a held one commits nothing.
 			if (plaintext || held) return;
 			if (heldAnchors().some((a) => a.id === id)) return; // ids are unique + invariant (0.97 policy)
 			// An anchor commits through `applyChange`, so the field is brought to content
@@ -711,7 +738,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * (`islands.ts`), the table paste (`table-paste.ts`), the markdown paste
  * (`markdown-paste.ts`) and the task item's checkbox (`tasks.ts`).
  *
- * Every mark-shaped plugin reads the schema rather than a flag: over either plaintext
+ * Every mark-shaped plugin reads the schema rather than a flag: over either mark-free
  * schema the shorthand rules build nothing (each is guarded on its mark type), the
  * toggles bind no key and a pasted URL stays text, so a `**bold**` keeps the delimiters
  * its author typed without a second rule saying so.
@@ -874,9 +901,9 @@ function ghostPlugin(opts: {
 /**
  * The field's keymap: history, mark toggles, and the body's structural keys; Enter
  * suppressed inline. The toggles are bound per mark type the schema declares, so a
- * plaintext leaf leaves Mod-b/i/u to the browser.
+ * `text` leaf leaves Mod-b/i/u to the browser.
  *
- * Tab forks on the leaf's role, not on the caret's position. An inline/plaintext
+ * Tab forks on the leaf's role, not on the caret's position. A one-line or `text`
  * leaf is a form field: Tab stays unbound, so field navigation is open for a shell
  * keymap (VISUAL_EDITOR §Settled and open). A block-schema body is a document: Tab
  * is structural, a chain each nested surface prepends to (`keymap.ts`). One key

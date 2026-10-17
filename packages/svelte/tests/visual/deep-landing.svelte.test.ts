@@ -90,7 +90,7 @@ describe('a landing at depth', () => {
 		await mounted.editor.focusField('main.contact.email');
 		await settle();
 		const contact = field(mounted.target, 'Point of contact');
-		const email = contact.querySelector('[data-qm-prop="email"] input')!;
+		const email = contact.querySelector('[data-qm-prop="email"] .ProseMirror')!;
 		expect(document.activeElement).toBe(email);
 		// A property under a field-level subform names no row, so the field's box is
 		// what the wash falls to.

@@ -19,9 +19,9 @@ import { core } from '../core/lifecycle.js';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
 export type ControlKind =
-	| 'prose' // richtext / text / plaintext → a codec prose leaf
-	| 'text' // string
-	| 'enum' // string+enum | type:'enum' → select
+	| 'prose' // richtext / text → a codec prose leaf
+	| 'text' // a type this build does not know → a text input
+	| 'enum' // type:'enum' → select
 	| 'variant' // type:'enum' + variants: → select, plus the live world's cells
 	| 'number' // number / integer
 	| 'boolean' // boolean → toggle
@@ -52,7 +52,8 @@ export interface FieldModel {
 	/** Schema `description`: authoring help rendered beside the label,
 	 * undefined when the field declares none. Chrome-only; never gates. */
 	description: string | undefined;
-	/** Prose-leaf flags (only meaningful when `control === 'prose'` / array items). */
+	/** Prose-leaf flags (only meaningful when `control === 'prose'` / array items):
+	 * one line (`oneLine`), and the literal codec (`literalText`). */
 	inline: boolean;
 	plaintext: boolean;
 }
@@ -225,32 +226,19 @@ export function optionalCell(f: QuillFieldSchema): boolean {
 
 /** The type a cell's control reads: the declared one, an optional cell's `?` stripped.
  *  The `?` moves the render floor and nothing else, so every read of a type is this. */
-export function baseType(f: QuillFieldSchema): FieldType {
-	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as FieldType;
+export function baseType(f: QuillFieldSchema): QuillFieldType {
+	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as QuillFieldType;
 }
 
-/** A field type as either schema echo spells it: the pinned boundary's union, plus
- *  `text`, the plain-text type of the echo that carries `multiline` in place of
- *  `inline` and types no `string` or `plaintext`. */
-export type FieldType = QuillFieldType | 'text';
-
-/**
- * Whether a content field is one line: one paragraph, no container, no island. An echo
- * carrying `multiline` (every `richtext`, and a `text` declaring it) or typing the field
- * `text` is one line unless `multiline` is `true`; one carrying neither is one line
- * where `inline` is `true`.
- */
+/** Whether a content field is one line: one paragraph, no container, no island. A `text`
+ *  or `richtext` field is one line unless it declares `multiline: true`. */
 export function oneLine(f: QuillFieldSchema): boolean {
-	const { multiline } = f as { multiline?: boolean };
-	if (typeof multiline === 'boolean' || baseType(f) === 'text') return multiline !== true;
-	return f.inline === true;
+	return f.multiline !== true;
 }
 
-/** Whether a content field's codec is the literal one, its value text with no marks:
- *  `text` and `plaintext`. */
+/** Whether a content field's codec is the literal one, its value text with no marks: `text`. */
 export function literalText(f: QuillFieldSchema): boolean {
-	const type = baseType(f);
-	return type === 'text' || type === 'plaintext';
+	return baseType(f) === 'text';
 }
 
 /**
@@ -265,7 +253,7 @@ export function printedText(v: unknown): string | undefined {
 
 /**
  * A declared content literal as the `Content` it holds: a `richtext` one's markdown
- * imported, a `plaintext` one's text taken literally, one paragraph whose later lines
+ * imported, a `text` one's text taken literally, one paragraph whose later lines
  * continue it, as the literal codec reads a stored one. What a cell's static
  * `default:` stands in its leaf as, where no resolved row reaches it. `undefined` for
  * a blank or a non-scalar.
@@ -296,21 +284,17 @@ export function mountKey(name: string, f: QuillFieldSchema): string {
 	return `${name}\u0000${f.type}\u0000${oneLine(f)}\u0000${items?.type ?? ''}\u0000${items ? oneLine(items) : ''}`;
 }
 
-/** Map a field schema to its control (precedence: prose › enum › text › …).
- * An array's element control is this over `items`: a missing `items` is a text
- * element. */
+/** Map a field schema to its control. An array's element control is this over `items`;
+ *  a type this build does not know takes the text input. */
 export function controlKind(f: QuillFieldSchema): ControlKind {
 	switch (baseType(f)) {
 		case 'richtext':
 		case 'text':
-		case 'plaintext':
 			return 'prose';
 		case 'enum':
 			// `variants:` is the one key that changes a field's resting shape (canon
 			// `SCHEMAS.md`): with it the field rests as a container, without it a bare string.
 			return f.variants ? 'variant' : 'enum';
-		case 'string':
-			return 'text';
 		case 'number':
 		case 'integer':
 			return 'number';
@@ -495,13 +479,13 @@ export function addedId(title: string, taken: (id: string) => boolean): string {
 }
 
 /** The `object` a matrix member is, for the schema walk: the declared columns, and an
- *  added item's `title` beside them. Composed here because the boundary serializes the
- *  roster and the columns alone. */
+ *  added item's `title`, a one-line `text` cell, beside them. Composed here because the
+ *  boundary serializes the roster and the columns alone. */
 export function matrixMemberSchema(matrix: QuillFieldSchema, id: string): QuillFieldSchema {
 	const columns = matrix.properties ?? {};
 	return {
 		type: 'object',
-		properties: onRoster(matrix, id) ? columns : { [MATRIX_TITLE]: { type: 'string' }, ...columns }
+		properties: onRoster(matrix, id) ? columns : { [MATRIX_TITLE]: { type: 'text' }, ...columns }
 	};
 }
 
@@ -530,7 +514,7 @@ export function schemaAt(
 /** What an array declaring no `items` holds, the walk's copy of the element control
  *  {@link controlKind} names for one: a text element, so an index into such an array is
  *  a place and not a refusal. */
-const UNDECLARED_ELEMENT: QuillFieldSchema = { type: 'string' };
+const UNDECLARED_ELEMENT: QuillFieldSchema = { type: 'text' };
 
 function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | undefined {
 	switch (controlKind(schema)) {
@@ -571,8 +555,8 @@ export function shortCell(sub: QuillFieldSchema): boolean {
 }
 
 /**
- * The first short text cell's words — the first `string`, or one-line `text` /
- * `richtext` / `plaintext`, in declaration order — read through {@link titleText}; `undefined` where
+ * The first short text cell's words — the first one-line `text` or `richtext`, in
+ * declaration order — read through {@link titleText}; `undefined` where
  * there is no such cell or it is empty. The cell is picked by the schema alone, so an
  * instance is named by one cell whatever the others hold. What names an instance from
  * its own values: a collapsed row, and a card whose kind declares no `title`.

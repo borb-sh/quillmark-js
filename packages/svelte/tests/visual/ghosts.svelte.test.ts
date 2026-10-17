@@ -20,12 +20,15 @@ import { quillFromYaml } from '../helpers/fixtures.js';
 import {
 	activeView,
 	field,
+	leaf,
+	leafText,
 	mountEditor,
 	mountInner,
 	openList,
 	press,
 	trigger,
 	type,
+	typeLeaf,
 	unmountAll
 } from '../helpers/surface.svelte.js';
 
@@ -43,23 +46,22 @@ typst:
 main:
   fields:
     heading:
-      type: string
+      type: text
     lead:
       type: richtext
-      inline: true
+      multiline: false
     kept:
-      type: string
+      type: text
       default: Kept
     motto:
       type: richtext
-      inline: true
+      multiline: false
       default: "*Always* be testing."
     signed_for:
-      type: plaintext
-      inline: true
+      type: text
       default: ""
     skippable:
-      type: string
+      type: text
       default: ""
     size:
       type: integer?
@@ -80,7 +82,7 @@ main:
       type: date
       default: 2026-01-15
     ref:
-      type: string?
+      type: text?
     level:
       type: enum?
       values: [low, high]
@@ -90,46 +92,46 @@ main:
       type: boolean
       default: true
     aside:
-      type: plaintext?
-      inline: true
+      type: text?
+    remark:
+      type: richtext?
+      multiline: true
     lines:
       type: array
       items:
-        type: plaintext
-        inline: true
+        type: text
       default:
         - First line
     tags:
       type: array
       items:
-        type: string
+        type: text
       default: [alpha, beta]
     contact:
       type: object
       properties:
         name:
-          type: string
+          type: text
         note:
-          type: plaintext
-          inline: true
+          type: text
         motto:
           type: richtext
-          inline: true
+          multiline: false
           default: "*Always* be testing."
         desk:
-          type: string
+          type: text
           default: B-12
         phone:
-          type: string?
+          type: text?
     crew:
       type: array
       items:
         type: object
         properties:
           who:
-            type: string
+            type: text
           tag:
-            type: string
+            type: text
             default: T
       default:
         - who: Ada
@@ -140,7 +142,7 @@ card_kinds:
   entry:
     fields:
       label:
-        type: string
+        type: text
 `;
 
 let q: Quill;
@@ -170,12 +172,13 @@ const answering = (...lines: string[]) =>
 	['~~~', '$quill: ghosts@1.0.0', '$kind: main', ...lines, '~~~', ''].join('\n');
 
 const input = (scope: HTMLElement): HTMLInputElement => scope.querySelector('input')!;
-const inputs = (scope: HTMLElement): HTMLInputElement[] => [...scope.querySelectorAll('input')];
+/** The texts of the prose leaves inside `scope`, in DOM order. */
+const leafTexts = (scope: HTMLElement): string[] =>
+	[...scope.querySelectorAll<HTMLElement>('.ProseMirror')].map((l) => l.textContent ?? '');
 /** The decorated empty paragraph of the prose leaf inside `scope`. */
 const leafGhost = (scope: HTMLElement): HTMLElement | null =>
 	scope.querySelector<HTMLElement>('.ProseMirror .qm-prose-placeholder');
-const editable = (scope: HTMLElement): HTMLElement =>
-	scope.querySelector<HTMLElement>('.ProseMirror')!;
+const editable = leaf;
 /** A subform's cell, by the property it draws. */
 const cell = (scope: HTMLElement, key: string): HTMLElement =>
 	scope.querySelector<HTMLElement>(`[data-qm-prop="${key}"]`)!;
@@ -183,16 +186,16 @@ const cell = (scope: HTMLElement, key: string): HTMLElement =>
 describe('a free-text field where nothing prints', () => {
 	it('draws nothing, at rest and on focus', () => {
 		const target = open();
-		const heading = input(field(target, 'Heading'));
-		expect(heading.placeholder).toBe('');
-		heading.focus();
+		const heading = field(target, 'Heading');
+		expect(leafGhost(heading)).toBeNull();
+		leaf(heading).focus();
 		flushSync();
-		expect(heading.placeholder).toBe('');
+		expect(leafGhost(heading)).toBeNull();
 		expect(leafGhost(field(target, 'Lead'))).toBeNull();
 		// A type-empty default is the skippable marker, and prints nothing either.
 		expect(leafGhost(field(target, 'Signed for'))).toBeNull();
-		expect(input(field(target, 'Skippable')).placeholder).toBe('');
-		expect(input(cell(field(target, 'Contact'), 'name')).placeholder).toBe('');
+		expect(leafGhost(field(target, 'Skippable'))).toBeNull();
+		expect(leafGhost(cell(field(target, 'Contact'), 'name'))).toBeNull();
 		expect(leafGhost(cell(field(target, 'Contact'), 'note'))).toBeNull();
 	});
 });
@@ -200,9 +203,9 @@ describe('a free-text field where nothing prints', () => {
 describe('a default that prints', () => {
 	it('is the text the control holds, where nothing else ghosts', () => {
 		const target = open();
-		const kept = input(field(target, 'Kept'));
-		expect(kept.value).toBe('Kept');
-		expect(kept.placeholder).toBe('');
+		const kept = field(target, 'Kept');
+		expect(leafText(kept)).toBe('Kept');
+		expect(leafGhost(kept)).toBeNull();
 		// A content default resolves as `Content`, and the leaf holds the text it prints.
 		const motto = field(target, 'Motto');
 		expect(editable(motto).textContent).toBe('Always be testing.');
@@ -214,7 +217,7 @@ describe('a default that prints', () => {
 
 	it('is held unwritten, at the default rung, until an edit', () => {
 		const target = open();
-		const kept = input(field(target, 'Kept'));
+		const kept = leaf(field(target, 'Kept'));
 		expect(kept.hasAttribute('data-default')).toBe(true);
 
 		kept.focus();
@@ -228,55 +231,42 @@ describe('a default that prints', () => {
 
 	it('is taken whole by the first edit, and the rung goes with it', () => {
 		const target = open();
-		const kept = input(field(target, 'Kept'));
-		type(kept, 'Kept!');
-		expect(row('kept')).toMatchObject({ source: 'authored', value: 'Kept!' });
-		expect(kept.hasAttribute('data-default')).toBe(false);
+		const kept = field(target, 'Kept');
+		typeLeaf(kept, 'Kept!');
+		expect(row('kept')).toMatchObject({ source: 'authored', value: { text: 'Kept!' } });
+		expect(leaf(kept).hasAttribute('data-default')).toBe(false);
 
 		// A keystroke typed and removed pins the default as authored.
-		type(kept, 'Kept');
-		expect(row('kept')).toMatchObject({ source: 'authored', value: 'Kept' });
+		typeLeaf(kept, 'Kept');
+		expect(row('kept')).toMatchObject({ source: 'authored', value: { text: 'Kept' } });
 	});
 
 	it('emptied, writes the empty answer, which is what prints empty', () => {
 		const target = open();
-		const kept = input(field(target, 'Kept'));
-		type(kept, '');
-		expect(row('kept')).toMatchObject({ source: 'authored', value: '' });
-		expect(kept.value).toBe('');
-		expect(kept.placeholder).toBe('');
+		const kept = field(target, 'Kept');
+		typeLeaf(kept, '');
+		expect(row('kept')).toMatchObject({ source: 'authored', value: { text: '' } });
+		expect(leafText(kept)).toBe('');
+		expect(leafGhost(kept)).toBeNull();
 	});
 
 	it('emptied once written, still writes the empty answer rather than coming back', () => {
 		const target = open();
-		const kept = input(field(target, 'Kept'));
-		type(kept, 'Kept!');
-		type(kept, '');
-		expect(row('kept')).toMatchObject({ source: 'authored', value: '' });
-		expect(kept.value).toBe('');
-		expect(kept.hasAttribute('data-default')).toBe(false);
+		const kept = field(target, 'Kept');
+		typeLeaf(kept, 'Kept!');
+		typeLeaf(kept, '');
+		expect(row('kept')).toMatchObject({ source: 'authored', value: { text: '' } });
+		expect(leafText(kept)).toBe('');
+		expect(leaf(kept).hasAttribute('data-default')).toBe(false);
 	});
 
-	it('leaves a field emptied where nothing prints unanswered', () => {
+	it('writes the empty answer where nothing prints too, which ghosts nothing', () => {
 		const target = open();
-		const heading = input(field(target, 'Heading'));
-		type(heading, 'x');
-		type(heading, '');
-		expect(row('heading').source).toBe('blank');
-		expect(heading.placeholder).toBe('');
-
-		// A type-empty default prints nothing, so emptying returns the field to it.
-		const skippable = input(field(target, 'Skippable'));
-		type(skippable, 'x');
-		type(skippable, '');
-		expect(row('skippable').source).toBe('default');
-
-		// And an optional cell returns to `none`.
-		const ref = input(field(target, 'Ref'));
-		type(ref, 'x');
-		type(ref, '');
-		expect(row('ref').source).not.toBe('authored');
-		expect(ref.placeholder).toBe(NONE);
+		const heading = field(target, 'Heading');
+		typeLeaf(heading, 'x');
+		typeLeaf(heading, '');
+		expect(row('heading')).toMatchObject({ source: 'authored', value: { text: '' } });
+		expect(leafGhost(heading)).toBeNull();
 	});
 
 	it('holds a number as its text, and a blank entry takes the default back', () => {
@@ -310,10 +300,10 @@ describe('a default that prints', () => {
 
 	it('takes a subform cell’s own `default:`, and writes that cell alone', () => {
 		const target = open();
-		const desk = input(cell(field(target, 'Contact'), 'desk'));
-		expect(desk.value).toBe('B-12');
-		expect(desk.hasAttribute('data-default')).toBe(true);
-		type(desk, 'B-14');
+		const desk = cell(field(target, 'Contact'), 'desk');
+		expect(leafText(desk)).toBe('B-12');
+		expect(leaf(desk).hasAttribute('data-default')).toBe(true);
+		typeLeaf(desk, 'B-14');
 		expect(q.reader(doc).get('contact')).toEqual({ desk: 'B-14' });
 	});
 
@@ -403,7 +393,7 @@ describe('a default that prints', () => {
 		const day = segment(target, 'day');
 		day.focus();
 		flushSync();
-		type(input(field(target, 'Kept')), 'Kept!');
+		typeLeaf(field(target, 'Kept'), 'Kept!');
 		day.focus();
 		flushSync();
 		press(day, 'ArrowUp');
@@ -498,16 +488,16 @@ describe('an array’s default', () => {
 	it('draws its elements as rows at the default rung, and writes nothing unasked', () => {
 		const target = open();
 		const tags = field(target, 'Tags');
-		expect(inputs(tags).map((i) => i.value)).toEqual(['alpha', 'beta']);
+		expect(leafTexts(tags)).toEqual(['alpha', 'beta']);
 		expect(rowsBox(tags).hasAttribute('data-default')).toBe(true);
-		expect(editable(field(target, 'Lines')).textContent).toBe('First line');
+		expect(leafText(field(target, 'Lines'))).toBe('First line');
 		expect(row('tags').source).toBe('default');
 	});
 
 	it('is taken whole by an edit in one row', () => {
 		const target = open();
 		const tags = field(target, 'Tags');
-		type(inputs(tags)[1], 'gamma');
+		typeLeaf(tags.querySelectorAll<HTMLElement>('.ProseMirror')[1], 'gamma');
 		expect(q.reader(doc).get('tags')).toEqual(['alpha', 'gamma']);
 		expect(rowsBox(tags).hasAttribute('data-default')).toBe(false);
 	});
@@ -530,17 +520,17 @@ describe('an array’s default', () => {
 	it('is taken whole by Enter in a table row', () => {
 		const target = open();
 		const crew = field(target, 'Crew');
-		press(input(cell(crew, 'who')), 'Enter');
+		press(leaf(cell(crew, 'who')), 'Enter');
 		expect(q.reader(doc).get('crew')).toEqual([{ who: 'Ada', tag: 'X' }, {}]);
 	});
 
 	it('keeps a table row whose default declares a cell beside the caret', () => {
 		const target = open();
 		const crew = field(target, 'Crew');
-		const who = input(cell(crew, 'who'));
-		type(who, '');
-		press(who, 'Backspace');
-		expect(q.reader(doc).get('crew')).toEqual([{ tag: 'X' }]);
+		const who = cell(crew, 'who');
+		typeLeaf(who, '');
+		press(leaf(who), 'Backspace');
+		expect(q.reader(doc).get('crew')).toEqual([{ who: '', tag: 'X' }]);
 	});
 });
 
@@ -548,7 +538,7 @@ describe('an optional cell', () => {
 	it('takes its base type’s control and ghosts `None` at rest', () => {
 		const target = open();
 		const ref = field(target, 'Ref');
-		expect(input(ref).placeholder).toBe(NONE);
+		expect(leafGhost(ref)?.dataset.placeholder).toBe(NONE);
 
 		const size = field(target, 'Size');
 		expect(input(size).getAttribute('inputmode')).toBe('numeric');
@@ -561,37 +551,67 @@ describe('an optional cell', () => {
 		const aside = leafGhost(field(target, 'Aside'));
 		expect(aside?.dataset.placeholder).toBe(NONE);
 
-		expect(input(cell(field(target, 'Contact'), 'phone')).placeholder).toBe(NONE);
+		expect(leafGhost(cell(field(target, 'Contact'), 'phone'))?.dataset.placeholder).toBe(NONE);
 	});
 
 	it('keeps `None` while it holds the focus', () => {
 		const target = open();
-		const ref = input(field(target, 'Ref'));
-		ref.focus();
+		const ref = field(target, 'Ref');
+		leaf(ref).focus();
 		flushSync();
-		expect(ref.placeholder).toBe(NONE);
+		expect(leafGhost(ref)?.dataset.placeholder).toBe(NONE);
 	});
 
 	it('ghosts nothing once answered, an empty answer printing empty', () => {
 		const target = open({}, answering('ref: ""', 'aside: ""', 'contact:', '  phone: ""'));
-		expect(input(field(target, 'Ref')).placeholder).toBe('');
+		expect(leafGhost(field(target, 'Ref'))).toBeNull();
 		expect(leafGhost(field(target, 'Aside'))).toBeNull();
-		expect(input(cell(field(target, 'Contact'), 'phone')).placeholder).toBe('');
+		expect(leafGhost(cell(field(target, 'Contact'), 'phone'))).toBeNull();
 	});
 
-	it('drops `None` from a prose leaf at its first edit, which answers it', async () => {
+	it('drops `None` from a prose leaf while it holds text', async () => {
 		const { target, editor } = openInner();
 		expect(leafGhost(field(target, 'Aside'))?.dataset.placeholder).toBe(NONE);
 
 		await editor.focusField('main.aside');
 		const view = activeView(editor);
 		view.dispatch(view.state.tr.insertText('x', 1));
-		view.dispatch(view.state.tr.delete(1, 2));
 		flushSync();
 
-		// Emptied, the leaf holds an empty answer, and the boundary says so.
-		expect(row('aside').source).toBe('authored');
+		expect(row('aside')).toMatchObject({ source: 'authored', value: { text: 'x' } });
 		expect(leafGhost(field(target, 'Aside'))).toBeNull();
+	});
+
+	it('returns to unanswered when its prose leaf is emptied, and ghosts `None` again', () => {
+		const target = open();
+		for (const [label, name] of [
+			['Ref', 'ref'],
+			['Remark', 'remark']
+		]) {
+			const scope = field(target, label);
+			typeLeaf(scope, 'x');
+			expect(doc.getStored(name)).not.toBeUndefined();
+			typeLeaf(scope, '');
+			expect(doc.getStored(name)).toBeUndefined();
+			expect(row(name).source).not.toBe('authored');
+			expect(leafGhost(scope)?.dataset.placeholder).toBe(NONE);
+		}
+	});
+
+	it('drops a subform cell’s key when its prose leaf is emptied', () => {
+		const target = open();
+		const phone = cell(field(target, 'Contact'), 'phone');
+		typeLeaf(phone, '555');
+		expect(q.reader(doc).get('contact')).toEqual({ phone: '555' });
+		typeLeaf(phone, '');
+		expect(q.reader(doc).get('contact')).toEqual({});
+		expect(leafGhost(phone)?.dataset.placeholder).toBe(NONE);
+
+		// A required cell emptied keeps its key, holding the empty answer.
+		const name = cell(field(target, 'Contact'), 'name');
+		typeLeaf(name, 'Ada');
+		typeLeaf(name, '');
+		expect(q.reader(doc).get('contact')).toEqual({ name: '' });
 	});
 
 	it('draws an unset `boolean?` as a third state, and a press answers it', () => {
@@ -610,7 +630,7 @@ describe('an optional cell', () => {
 
 	it('words its ghost as the consumer does', () => {
 		const target = open({ strings: { optionalGhost: 'Aucun' } });
-		expect(input(field(target, 'Ref')).placeholder).toBe('Aucun');
+		expect(leafGhost(field(target, 'Ref'))?.dataset.placeholder).toBe('Aucun');
 	});
 });
 

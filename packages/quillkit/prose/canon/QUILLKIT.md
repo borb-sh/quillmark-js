@@ -53,7 +53,7 @@ The tarball holds two, and they never meet: the client bundles the copy it was b
 
 **The starter is a collection the suite gates.** Carried as files rather than emitted from strings, so `cli.integration.test.ts` lays it and runs `test` over it: a scaffold that stops rendering fails CI before it fails an author on their first command.
 
-**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `string` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
+**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
 
 **The pins are the client's.** The written `package.json` ranges `@quillmark/quiver` and `@quillmark/wasm` at the versions `carried.json` records and `quillkit` at its own, the versions its client was built against. The ranges also keep npm from preferring an older release whose `engines` admits the running Node over a newer one whose `engines` does not.
 
