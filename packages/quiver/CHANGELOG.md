@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.38.1 - 2026-10-19
+
 **A `.ttc` or `.otc` font collection builds under `fonts/`**, named in `quiver.json` as every other font is, where `build` packed it into the quill's bundle and refused one over 16 MiB, the size of a typical CJK collection. (#759)
 
 ## v0.38.0 - 2026-10-17
