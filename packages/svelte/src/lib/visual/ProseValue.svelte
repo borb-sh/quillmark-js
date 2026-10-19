@@ -60,7 +60,8 @@
 		pmToUsv,
 		usvToPM,
 		valueEqual,
-		type LeafViews
+		type LeafViews,
+		type TextCap
 	} from '../core/codec/index.js';
 	import { valueLeafSeat } from './leaves.js';
 	import { wording } from './strings.js';
@@ -99,6 +100,8 @@
 		/** The empty leaf's ghost, a subform cell's: the `none` an optional cell prints
 		 *  unset. Read per decoration pass. */
 		placeholder?: string;
+		/** The declared `max:`, a character count no edit takes the leaf past. */
+		cap?: TextCap;
 		onChange: (rt: Content) => void;
 		/** Raw keydown, for a container whose own keys run through this leaf: the
 		 * array repeater's Enter/Backspace (`ArrayField`). Fires before the view's own
@@ -115,6 +118,7 @@
 		labelledBy,
 		describedBy,
 		placeholder,
+		cap,
 		onChange,
 		onKey
 	}: Props = $props();
@@ -190,7 +194,8 @@
 						? []
 						: proseLeafPlugins(schema, {
 								inline,
-								placeholder: () => placeholder
+								placeholder: () => placeholder,
+								cap
 							})
 				});
 			};

@@ -40,8 +40,13 @@
 		onActivate?: () => void;
 		/** Schema `description`, or undefined: the affordance renders only when set. */
 		description?: string;
+		/** A capped field's character count, drawn at the row's end. */
+		count?: string;
+		/** The count's own id, for the control's `aria-describedby`. */
+		countId?: string;
 	}
-	let { label, controlId, id, descriptionId, onActivate, description }: Props = $props();
+	let { label, controlId, id, descriptionId, onActivate, description, count, countId }: Props =
+		$props();
 </script>
 
 <div class="qm-field-label-row">
@@ -68,6 +73,9 @@
 		<FieldHint {description} {label} describedBy={descriptionId} />
 		<span class="qm-visually-hidden" id={descriptionId}>{description}</span>
 	{/if}
+	{#if count != null}
+		<span class="qm-field-count" id={countId}>{count}</span>
+	{/if}
 </div>
 
 <style>
@@ -90,6 +98,12 @@
 		line-height: var(--_qm-leading-tight);
 		color: var(--_qm-ink-label);
 		min-width: 0;
+	}
+	.qm-field-count {
+		margin-inline-start: auto;
+		font-size: var(--_qm-text-label);
+		color: var(--_qm-ink-label);
+		font-variant-numeric: tabular-nums;
 	}
 	/* A label that lands focus says so. Only when it has somewhere to land: an
 	   `ObjectField` property's label names a subform, not one control. */

@@ -51,7 +51,8 @@
 		placeFields,
 		printedText,
 		renderedBoolean,
-		shortCell
+		shortCell,
+		textCap
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
@@ -136,6 +137,8 @@
 	}: Props = $props();
 
 	const t = wording();
+	/** A capped prose cell's character count, by property. */
+	const counts: Record<string, number> = $state({});
 	const entries = $derived(Object.entries(properties ?? {}));
 	const obj = $derived((value ?? {}) as Record<string, unknown>);
 	const has = (key: string): boolean => Object.hasOwn(properties ?? {}, key);
@@ -298,6 +301,8 @@
 			     (`packable`). A block prose cell spans it too, and keeps its label row, as
 			     does a placed cell `placeFields` gives the whole row. -->
 			{@const block = kind === 'prose' && !shortCell(sub)}
+			{@const cap = kind === 'prose' ? textCap(sub) : undefined}
+			{@const countId = cap && ids ? `${ids.control}-count` : undefined}
 			<div
 				class={[
 					'qm-object-prop',
@@ -316,6 +321,10 @@
 						descriptionId={describes}
 						onActivate={labelable ? undefined : () => focusProp(key)}
 						description={sub.description}
+						count={cap && counts[key] != null
+							? t.strings.textCount(counts[key], cap.max)
+							: undefined}
+						{countId}
 					/>
 				{/if}
 				{#if kind === 'enum'}
@@ -385,7 +394,8 @@
 						{block}
 						label={named}
 						labelledBy={ids?.label}
-						describedBy={describes}
+						describedBy={countId ? [describes, countId].filter(Boolean).join(' ') : describes}
+						cap={cap && { ...cap, onCount: (n) => (counts[key] = n) }}
 						onChange={(rt) =>
 							commitProp(key, optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
 						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}

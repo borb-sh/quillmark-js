@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.126.2.** `max:` on a `text` or `richtext` field caps its characters: a longer value warns `validation::over_length` and renders, and a `default:` past the cap fails the load. Studio's editor takes no keystroke past the cap.
+
 ## v0.18.0 - 2026-10-17
 
 **The carried `@quillmark/wasm` is 0.126.1, and every quill migrates.** `string` and `plaintext` are `text`, `inline:` and `ui.multiline` are `multiline:`, a PDF-form quill carries `form.yaml`, and a Typst plate computing with a former `string` value reads the string off the content it now receives through `qm.str(..)`; `sections:` fails the load, and `ui.group` loads with `quill::deprecated_groups`, which `quillkit test` does not read. The starter quill spells `text`. A document studio seeds pins `name@MAJOR.MINOR`. quillmark's 0.125 → 0.126 migration guide covers each step. A stored line break in a one-line `text` value renders as a space and warns `validation::line_break_folded`.

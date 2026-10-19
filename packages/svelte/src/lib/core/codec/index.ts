@@ -26,6 +26,8 @@ export {
 	proseLeafPlugins
 } from './field.js';
 export type { CreateFieldOpts, FieldController, LeafViews } from './field.js';
+export { capCount } from './cap.js';
+export type { TextCap } from './cap.js';
 
 // The table island's chrome vocabulary: the visual tier's `strings` set extends it,
 // so the island's wording is overridden beside every other key.
