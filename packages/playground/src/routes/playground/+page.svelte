@@ -62,6 +62,8 @@
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import type {
 		Engine,
 		Quill,
@@ -319,7 +321,7 @@
 		const url = new URL(window.location.href);
 		if (examples) url.searchParams.delete('examples');
 		else url.searchParams.set('examples', 'off');
-		window.history.replaceState(window.history.state, '', url);
+		await goto(url, { shallow: true, replace: true, state: page.state });
 		return open(fixture);
 	}
 

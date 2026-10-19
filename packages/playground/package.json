@@ -9,6 +9,7 @@
 		"node": ">=24"
 	},
 	"scripts": {
+		"prepare": "svelte-kit sync || echo ''",
 		"quiver": "node scripts/build-quiver.mjs",
 		"predev": "npm run quiver -- --drafts",
 		"dev": "vite dev",
