@@ -4,8 +4,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 const lib = fileURLToPath(new URL('./src/lib', import.meta.url));
 
-// A standalone Vitest config — not the SvelteKit `vite.config.ts`, whose
-// `sveltekit()` plugin needs the app's routing context Vitest has no use for.
+// A standalone Vitest config, without the `sveltekit()` plugin, which needs an
+// app's routing context Vitest has no use for.
 // `@quillmark/wasm` ships wasm-bindgen's web target, which Vitest resolves
 // unaided; `tests/setup.ts` awaits the `init()` that instantiates it. It runs
 // under the `node` environment (verified: the Typst backend compiles and renders
@@ -19,8 +19,8 @@ const lib = fileURLToPath(new URL('./src/lib', import.meta.url));
 export default defineConfig({
 	plugins: [svelte({ compilerOptions: { hmr: false } })],
 	// Tests live under `tests/` (not colocated) so `src/lib` stays pure package
-	// source for `svelte-package`; the `$lib` alias mirrors SvelteKit so a test
-	// imports the surface the way a consumer does.
+	// source for `svelte-package`; the `$lib` alias lets a test import the surface
+	// the way a consumer does.
 	// `browser` picks svelte's client build, without which `mount()` resolves to the
 	// server entry and throws. Safe across the whole suite rather than scoped to the
 	// jsdom files: `@quillmark/wasm` declares no `browser` condition, so the one
