@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.18.1 - 2026-10-19
+
 **The carried `@quillmark/wasm` is 0.126.2.** `max:` on a `text` or `richtext` field caps its characters: a longer value warns `validation::over_length` and renders, and a `default:` past the cap fails the load. Studio's editor takes no keystroke past the cap.
 
 ## v0.18.0 - 2026-10-17
