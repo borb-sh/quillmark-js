@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.23.0 - 2026-10-19
+
 **`max:` caps a `text` or `richtext` field's characters in the editor.** A field, an object's property, a variant's cell or an array's element declaring it takes no keystroke past the cap and lands a paste up to it, dropping the rest, so the document never earns `validation::over_length`; a value stored past the cap edits down and grows no further. A labelled field draws its count at the end of its label row (`12 / 40`), which the leaf names as its description. The count is the engine's: Unicode characters of the plain text, a line break as one, trailing line breaks and a one-line `text`'s trailing whitespace as none. `VisualStrings` gains `textCount`, and `createField` and `proseLeafPlugins` take `cap`. The workspace pins `@quillmark/wasm` 0.126.2, the release that declares the cap.
 
 ## v0.22.0 - 2026-10-17
