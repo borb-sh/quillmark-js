@@ -25,6 +25,7 @@
  control's label decorates the same way.
 -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import FieldHint from './FieldHint.svelte';
 
 	interface Props {
@@ -40,8 +41,11 @@
 		onActivate?: () => void;
 		/** Schema `description`, or undefined: the affordance renders only when set. */
 		description?: string;
+		/** What stands at the row's end, pushed off the label: a capped prose field's
+		 * count ({@link TextCount}). */
+		end?: Snippet;
 	}
-	let { label, controlId, id, descriptionId, onActivate, description }: Props = $props();
+	let { label, controlId, id, descriptionId, onActivate, description, end }: Props = $props();
 </script>
 
 <div class="qm-field-label-row">
@@ -68,6 +72,9 @@
 		<FieldHint {description} {label} describedBy={descriptionId} />
 		<span class="qm-visually-hidden" id={descriptionId}>{description}</span>
 	{/if}
+	{#if end}
+		<span class="qm-field-label-end">{@render end()}</span>
+	{/if}
 </div>
 
 <style>
@@ -81,6 +88,11 @@
 		align-items: center;
 		gap: var(--_qm-space);
 		min-width: 0;
+	}
+	.qm-field-label-end {
+		margin-inline-start: auto;
+		display: inline-flex;
+		align-items: center;
 	}
 	.qm-field-label {
 		display: inline-flex;

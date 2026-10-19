@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A capped `text` or `richtext` field counts its characters.** A field declaring `max:` draws `120 / 350` at the end of its label row, the count the engine takes: Unicode scalar values of the plain text, a line break one, trailing line breaks none, a one-line `text` field's trailing whitespace none, richtext markup nothing. It shows always under a cap of a hundred or fewer, from four fifths of a longer one or while the field holds the focus, and always once over, in the danger ink; a screen reader hears the crossing once. Nothing is cut: typing and pasting past the cap stay allowed, as the engine accepts the value and warns. An element of an array whose `items` declare `max:`, and a subform cell declaring one, count at the trailing edge of their own box, the array's header keeping its `2 / 4`. `max:` on any other type draws nothing. `VisualStrings` gains `textCount` and `textOverCap`. (#785)
+
 ## v0.22.0 - 2026-10-17
 
 **The `engines` floor is Node 22**, where it was Node 24, so npm on Node 22 resolves the newest release rather than preferring one from before the floor rose. (#766)

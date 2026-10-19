@@ -382,6 +382,7 @@
 						fallback={contentDefault(sub)}
 						plaintext={literalText(sub)}
 						placeholder={noneOf(key, sub)}
+						max={sub.max}
 						{block}
 						label={named}
 						labelledBy={ids?.label}

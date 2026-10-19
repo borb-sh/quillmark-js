@@ -6,7 +6,14 @@
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { createField, type FieldController, type SlashState } from '../core/codec/index.js';
+	import {
+		createField,
+		plainLength,
+		pmToContent,
+		type FieldController,
+		type LeafViews,
+		type SlashState
+	} from '../core/codec/index.js';
 	import type { LeafRegistry } from './leaves.js';
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
@@ -61,6 +68,11 @@
 		/** The diagnostics routed to this field: each set re-evaluates a hold
 		 *  (`createField`), a re-validation being what follows an external write. */
 		diagnostics?: Diagnostic[];
+		/** The characters the leaf shows (`plainLength`), reported at mount and after
+		 *  every change the view takes: what a capped field's count draws (`Field`). */
+		onCount?: (count: number) => void;
+		/** The leaf took or lost the focus: what shows a long cap's count. */
+		onFocusWithin?: (focused: boolean) => void;
 	}
 
 	let {
@@ -83,7 +95,9 @@
 		onChange,
 		onError,
 		leaves,
-		diagnostics
+		diagnostics,
+		onCount,
+		onFocusWithin
 	}: Props = $props();
 
 	let held = $state(false);
@@ -104,6 +118,14 @@
 	const block = $derived(!inline);
 
 	let controller: FieldController | undefined;
+
+	// Counted off the view rather than the store: a default the leaf holds unset, and
+	// a held leaf's content, are what the reader sees against the cap. A one-line
+	// `text` sheds its trailing whitespace, as the engine counts it.
+	function recount(): void {
+		const view = (controller as (FieldController & LeafViews) | undefined)?.view;
+		if (view) onCount?.(plainLength(pmToContent(view.state.doc), !!(inline && plaintext)));
+	}
 
 	/** What the label's click calls. The controller's focus, not the container's, which
 	 * leaves the PM selection unplaced. */
@@ -134,7 +156,10 @@
 				},
 				onFocus,
 				onCaretMove,
-				onChange,
+				onChange: (at) => {
+					onChange?.(at);
+					recount();
+				},
 				onError,
 				heldNoteId: heldId,
 				onHold: (next) => {
@@ -142,6 +167,7 @@
 				}
 			});
 			controller = mounted;
+			recount();
 			leaves?.registerProse(leafKey, mounted);
 			return () => {
 				leaves?.unregisterProse(leafKey);
@@ -159,12 +185,14 @@
 	});
 	$effect(() => {
 		controller?.setFallback(fallback);
+		recount();
 	});
 
 	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.
 	$effect(() => {
 		void diagnostics;
 		if (inline || plaintext) controller?.applyExternal();
+		recount();
 	});
 </script>
 
@@ -175,6 +203,8 @@
 		{ 'qm-control-box': !unframed, 'qm-focus-ring-within': !unframed, 'qm-prose-block': block }
 	]}
 	data-leaf-key={leafKey}
+	onfocusin={() => onFocusWithin?.(true)}
+	onfocusout={() => onFocusWithin?.(false)}
 >
 	{#if held}
 		<span id={heldId} class="qm-prose-held-note">{t.strings.proseHeld}</span>

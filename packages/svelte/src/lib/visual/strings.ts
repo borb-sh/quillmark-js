@@ -67,6 +67,17 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	 */
 	arrayCount: (count: number, max: number) => string;
 	/**
+	 * The count at the end of a capped `text` or `richtext` field's label row, and at
+	 * the trailing edge of a capped element's or cell's box: `120 / 350`, the same
+	 * grammar as {@link arrayCount}, since a translator spells one separator.
+	 */
+	textCount: (count: number, max: number) => string;
+	/**
+	 * What a screen reader hears once, as a value crosses its cap: the count the
+	 * sighted reader sees turn to danger. The field keeps the text; nothing is cut.
+	 */
+	textOverCap: (count: number, max: number) => string;
+	/**
 	 * A collapsed array element with nothing to summarize itself by: the label and the
 	 * 1-based index, which is what its accessible name already says. Parametric, so
 	 * word order stays the translator's.
@@ -212,6 +223,8 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	arrayDrag: 'Drag to move',
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
+	textCount: (count, max) => `${count} / ${max}`,
+	textOverCap: (count, max) => `Over the limit: ${count} of ${max} characters`,
 	elementUntitled: (label, index) => `${label} ${index}`,
 	enumUnsetTag: 'Default',
 	enumUnsetTagNone: 'Unset',

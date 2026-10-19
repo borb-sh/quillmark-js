@@ -25,6 +25,18 @@ export function usvLength(s: string): number {
 	return n;
 }
 
+/**
+ * The characters a `text` or `richtext` cap (`max:`) measures, as the engine counts
+ * them (canon `SCHEMAS.md` §Cardinality): USVs of the plain text, an island's slot
+ * counting nothing, a line break one, trailing line breaks none. A one-line `text`
+ * value (`oneLine`) also sheds its trailing whitespace. No normalization.
+ */
+export function plainLength(rt: Content, oneLine = false): number {
+	let text = rt.text.split(ISLAND_SLOT).join('');
+	text = oneLine ? text.trimEnd() : text.replace(/[\n\r]+$/, '');
+	return usvLength(text);
+}
+
 /** One `continues`-joined block, pre-nesting: its container path + per-line segments. */
 interface Leaf {
 	line: ContentLine;

@@ -57,6 +57,7 @@
 	import MatrixField from './MatrixField.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
 	import FieldLabel from './FieldLabel.svelte';
+	import TextCount from './TextCount.svelte';
 
 	interface Props {
 		field: FieldModel;
@@ -165,6 +166,19 @@
 	const describedBy = $derived(field.description ? domIds.description : undefined);
 	// Two controls own their label row, the add chip and the held count sharing it.
 	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
+
+	// `max:` is read by the type beside it (canon `SCHEMAS.md` §Cardinality): a prose
+	// field's is a character cap, drawn as a count at the end of its label row; an
+	// array's is an element cap, the repeater's own (`ArrayField`); no other type
+	// carries one.
+	const cap = $derived(field.control === 'prose' ? field.schema.max : undefined);
+	const countId = $derived(`${domIds.control}-count`);
+	let count = $state(0);
+	let proseFocused = $state(false);
+	// The count joins the parked description in what the leaf is described by.
+	const proseDescribedBy = $derived(
+		[describedBy, cap != null ? countId : undefined].filter(Boolean).join(' ') || undefined
+	);
 	const flat = $derived(flatObject(field.schema));
 
 	// A container walks its diagnostics down to the cell each names and draws the rest
@@ -285,7 +299,19 @@
 			descriptionId={domIds.description}
 			{onActivate}
 			description={field.description}
-		/>
+		>
+			{#snippet end()}
+				{#if cap != null}
+					<TextCount {count} max={cap} focused={proseFocused} id={countId} />
+				{/if}
+			{/snippet}
+		</FieldLabel>
+	{:else if cap != null}
+		<!-- A header owns this field's label, so the count takes a row of its own, in
+		     the label row's place. -->
+		<div class="qm-field-count-row">
+			<TextCount {count} max={cap} focused={proseFocused} id={countId} />
+		</div>
 	{/if}
 	<!-- The control and what hangs under it, in one grid cell: the diagnostics stack
 	 inside the control's track rather than claiming a track of their own (the subgrid
@@ -305,7 +331,7 @@
 					placeholder={none}
 					emptyUnsets={optional}
 					labelledBy={domIds.label}
-					{describedBy}
+					describedBy={proseDescribedBy}
 					{leafKey}
 					{onFocus}
 					{onCaretMove}
@@ -313,6 +339,8 @@
 					{onError}
 					{leaves}
 					{diagnostics}
+					onCount={cap != null ? (n) => (count = n) : undefined}
+					onFocusWithin={cap != null ? (f) => (proseFocused = f) : undefined}
 				/>
 			{:else if field.control === 'enum'}
 				<EnumField
@@ -477,6 +505,10 @@
 	/* The stack the control's track holds: the control, and the diagnostics when
 	 there are any. Its gap is the field's own, so a diagnostic sits the same rung
 	 under its control that the control sits under its label. */
+	.qm-field-count-row {
+		display: flex;
+		justify-content: flex-end;
+	}
 	.qm-field-stack {
 		display: flex;
 		flex-direction: column;

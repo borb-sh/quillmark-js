@@ -800,6 +800,7 @@
 							content={() => readAt([k])}
 							value={arr[k]}
 							plaintext={items != null && literalText(items)}
+							max={items?.max}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
 							onKey={(e) => onElementKey(e, k)}

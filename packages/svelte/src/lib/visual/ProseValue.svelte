@@ -53,6 +53,7 @@
 		fitsLeaf,
 		heldAttributes,
 		leafSchema,
+		plainLength,
 		pmToContent,
 		proseAttributes,
 		proseLeafPlugins,
@@ -64,6 +65,7 @@
 	} from '../core/codec/index.js';
 	import { valueLeafSeat } from './leaves.js';
 	import { wording } from './strings.js';
+	import TextCount from './TextCount.svelte';
 	import './controls.css';
 	import type { Content } from '@quillmark/wasm';
 
@@ -99,6 +101,9 @@
 		/** The empty leaf's ghost, a subform cell's: the `none` an optional cell prints
 		 *  unset. Read per decoration pass. */
 		placeholder?: string;
+		/** The declared type's character cap (`max:` on the element's `items` or the
+		 *  cell's own schema): counted at the box's trailing edge ({@link TextCount}). */
+		max?: number;
 		onChange: (rt: Content) => void;
 		/** Raw keydown, for a container whose own keys run through this leaf: the
 		 * array repeater's Enter/Backspace (`ArrayField`). Fires before the view's own
@@ -115,6 +120,7 @@
 		labelledBy,
 		describedBy,
 		placeholder,
+		max,
 		onChange,
 		onKey
 	}: Props = $props();
@@ -123,7 +129,15 @@
 	const seat = valueLeafSeat();
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
+	const countId = `${uid}-count`;
 	let held = $state(false);
+	let count = $state(0);
+	let focused = $state(false);
+	// A one-line `text` sheds its trailing whitespace, as the engine counts it.
+	const oneLine = $derived(plaintext && !block);
+	function recount(rt: Content): void {
+		if (max != null) count = plainLength(rt, oneLine);
+	}
 	let view: EditorView | undefined;
 	/** What the mounted view does with a value the parent's re-derive delivers. */
 	let follow: ((next: unknown) => void) | undefined;
@@ -157,7 +171,7 @@
 	}
 
 	$effect(() => {
-		void [label, labelledBy, describedBy, placeholder];
+		void [label, labelledBy, describedBy, placeholder, max];
 		view?.setProps({});
 	});
 
@@ -167,13 +181,19 @@
 			const leaf = { inline, plaintext, islands: false };
 			// Read per attribute pass, not captured: an element's name carries its index,
 			// which a remove above it moves.
-			const names = () => ({ label, labelledBy, describedBy });
+			const names = () => ({
+				label,
+				labelledBy,
+				describedBy:
+					[describedBy, max != null ? countId : undefined].filter(Boolean).join(' ') || undefined
+			});
 			const shown = (stored: Content | undefined): Content => stored ?? fallback ?? emptyContent();
 			const stored = content();
 			let seen = value;
 			let defaulted = stored === undefined && !!fallback;
 			const reconciler = createReconciler(shown(stored));
 			held = !fitsLeaf(reconciler.last, leaf);
+			recount(reconciler.last);
 			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
 			// (`proseAttributes`), so a cell carrying a label element and a row carrying
 			// none cannot name their regions by different rules.
@@ -210,14 +230,21 @@
 						if (edit) defaulted = false;
 						mounted.updateState(next);
 						if (!edit) return;
-						onChange(pmToContent(next.doc));
+						const rt = pmToContent(next.doc);
+						recount(rt);
+						onChange(rt);
 						// The commit as the store took it, so its echo through the re-derive is no move.
 						seen = value;
 						reconciler.commit(shown(content()));
 					},
 					handleDOMEvents: {
 						focus: () => {
+							focused = true;
 							if (!held) seat?.focus(views);
+							return false;
+						},
+						blur: () => {
+							focused = false;
 							return false;
 						},
 						keydown: (_v, e) => {
@@ -254,6 +281,7 @@
 				const sel = Selection.near(fresh.doc.resolve(usvToPM(buildLineIndex(fresh.doc), caret)));
 				mounted.updateState(fresh.apply(fresh.tr.setSelection(sel)));
 				reconciler.commit(current);
+				recount(current);
 			};
 			return () => {
 				seat?.release(views);
@@ -283,9 +311,20 @@
 	{#if held}
 		<span id={heldId} class="qm-prose-held-note">{t.strings.proseHeld}</span>
 	{/if}
+	<!-- At the box's trailing edge, inside it: a row's slabs and a cell's subgrid
+	     hold one child either way. -->
+	{#if max != null}
+		<span class="qm-prose-value-count">
+			<TextCount {count} {max} {focused} id={countId} />
+		</span>
+	{/if}
 </div>
 
 <style>
+	.qm-prose-value-count {
+		display: flex;
+		justify-content: flex-end;
+	}
 	/* Caret-primary, matching ProseField: the contenteditable's own outline is
 	   dropped and the ring rides the wrapper (`qm-focus-ring-within`,
 	   controls.css), which is where the box is. */
