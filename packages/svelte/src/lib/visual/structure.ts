@@ -15,6 +15,7 @@ import {
 	type ResolvedField,
 	type Resolved
 } from '@quillmark/wasm';
+import type { TextCap } from '../core/codec/index.js';
 import { core } from '../core/lifecycle.js';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
@@ -241,6 +242,12 @@ export function literalText(f: QuillFieldSchema): boolean {
 	return baseType(f) === 'text';
 }
 
+/** The character cap a content field's `max:` declares, `undefined` on any other. */
+export function textCap(f: QuillFieldSchema | undefined): TextCap | undefined {
+	if (f?.max == null || controlKind(f) !== 'prose') return undefined;
+	return { max: f.max, trimEnd: literalText(f) && oneLine(f) };
+}
+
 /**
  * A scalar `default:` as the text an unset control holds, where it prints: as
  * declared, `undefined` for none, a blank or a non-scalar. A default of spaces prints
@@ -276,12 +283,21 @@ export function declaredContent(v: unknown, markdown: boolean): Content | undefi
 	};
 }
 
-/** A field's `{#each}` key: its name and what a mounted leaf reads once, its type and
- *  {@link oneLine} and its elements'. A retype or a quill swap that changes any of them
- *  under a name remounts the field, where a kept leaf would commit on the old schema. */
+/** A field's `{#each}` key: its name and what a mounted leaf reads once, its type,
+ *  {@link oneLine} and `max:`, and its elements'. A retype or a quill swap that changes
+ *  any of them under a name remounts the field, where a kept leaf would commit on the old
+ *  schema. */
 export function mountKey(name: string, f: QuillFieldSchema): string {
 	const items = f.items;
-	return `${name}\u0000${f.type}\u0000${oneLine(f)}\u0000${items?.type ?? ''}\u0000${items ? oneLine(items) : ''}`;
+	return [
+		name,
+		f.type,
+		oneLine(f),
+		f.max ?? '',
+		items?.type ?? '',
+		items ? oneLine(items) : '',
+		items?.max ?? ''
+	].join('\u0000');
 }
 
 /** Map a field schema to its control. An array's element control is this over `items`;

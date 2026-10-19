@@ -67,6 +67,12 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	 */
 	arrayCount: (count: number, max: number) => string;
 	/**
+	 * The count beside the label of a `text` or `richtext` field declaring `max:`, the
+	 * carrier of a keystroke the cap refuses: `12 / 40`. Parametric, so a translator
+	 * spells the separator.
+	 */
+	textCount: (count: number, max: number) => string;
+	/**
 	 * A collapsed array element with nothing to summarize itself by: the label and the
 	 * 1-based index, which is what its accessible name already says. Parametric, so
 	 * word order stays the translator's.
@@ -212,6 +218,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	arrayDrag: 'Drag to move',
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
+	textCount: (count, max) => `${count} / ${max}`,
 	elementUntitled: (label, index) => `${label} ${index}`,
 	enumUnsetTag: 'Default',
 	enumUnsetTagNone: 'Unset',

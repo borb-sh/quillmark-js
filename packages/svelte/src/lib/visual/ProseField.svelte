@@ -6,7 +6,12 @@
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { createField, type FieldController, type SlashState } from '../core/codec/index.js';
+	import {
+		createField,
+		type FieldController,
+		type SlashState,
+		type TextCap
+	} from '../core/codec/index.js';
 	import type { LeafRegistry } from './leaves.js';
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
@@ -48,6 +53,8 @@
 		placeholderUntilEdit?: boolean;
 		/** An emptied leaf removes the field (`createField`). */
 		emptyUnsets?: boolean;
+		/** The declared `max:`, a character count no edit takes the leaf past. */
+		cap?: TextCap;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
 		onFocus?: (addr: Addr) => void;
@@ -77,6 +84,7 @@
 		placeholder,
 		placeholderUntilEdit,
 		emptyUnsets,
+		cap,
 		leafKey,
 		onFocus,
 		onCaretMove,
@@ -127,6 +135,7 @@
 				placeholder,
 				placeholderUntilEdit,
 				emptyUnsets,
+				cap,
 				tableStrings: () => t.strings,
 				slashStrings: () => t.strings,
 				onSlash: (next) => {

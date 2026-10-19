@@ -74,6 +74,7 @@
 		literalText,
 		rowSummary,
 		schemaAt,
+		textCap,
 		type ArrayLayout
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
@@ -800,6 +801,7 @@
 							content={() => readAt([k])}
 							value={arr[k]}
 							plaintext={items != null && literalText(items)}
+							cap={textCap(items)}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
 							onKey={(e) => onElementKey(e, k)}

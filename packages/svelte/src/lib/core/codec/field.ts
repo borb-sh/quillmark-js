@@ -41,6 +41,7 @@ import { reportError, errorMessage } from '../errors.js';
 import { decode, fitsLeaf } from './decode.js';
 import { usvToPM, pmToUsv, buildLineIndex, lineIndexOf, type LineIndex } from './positions.js';
 import { lower, pmToContent, scanContent, scanDoc, contentEdit } from './encode.js';
+import { capPlugin, type TextCap } from './cap.js';
 import { islandPastePlugin } from './islands.js';
 import { anchorsFromContent, type AnchorPos } from './marks.js';
 import { contentEqual, createReconciler, type Reconciler } from './reconcile.js';
@@ -134,6 +135,9 @@ export interface CreateFieldOpts {
 	 * a body's invitation. The initial value; {@link FieldController.setPlaceholder}
 	 * moves it after mount. Empty/absent shows no ghost. */
 	placeholder?: string;
+	/** The schema's `max:` on the field: a character count no edit takes the leaf past
+	 *  (`cap.ts`). */
+	cap?: TextCap;
 	/** The placeholder goes at the leaf's first edit: the edit answers the leaf, and
 	 * emptied it holds an empty answer, which prints empty. Absent, the placeholder
 	 * returns whenever the leaf is empty. */
@@ -494,6 +498,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				// given one later; the plugin draws nothing while the text is empty.
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
+				cap: opts.cap,
 				afterHistory: [anchorPlugin(seededAnchors)]
 			})
 		});
@@ -759,10 +764,18 @@ export function proseLeafPlugins(
 		placeholder?: () => string | undefined;
 		/** {@link CreateFieldOpts.placeholderUntilEdit}. */
 		placeholderUntilEdit?: boolean;
+		/** {@link CreateFieldOpts.cap}. Ahead of every other paste handler, which a paste
+		 *  it cuts never reaches. */
+		cap?: TextCap;
 		afterHistory?: Plugin[];
 	}
 ): Plugin[] {
-	const list: Plugin[] = [history(), ...(opts.afterHistory ?? []), linebreakPlugin(schema)];
+	const list: Plugin[] = [
+		history(),
+		...(opts.cap ? [capPlugin(opts.cap)] : []),
+		...(opts.afterHistory ?? []),
+		linebreakPlugin(schema)
+	];
 	if (opts.slash) list.push(slashPlugin(opts.slash, opts.slashHint));
 	if (!opts.noInputRules) list.push(inputRulesPlugin(schema), undoRuleKeymap());
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));

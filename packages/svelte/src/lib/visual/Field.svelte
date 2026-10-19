@@ -40,6 +40,7 @@
 		printedText,
 		renderedBoolean,
 		stringifyGhost,
+		textCap,
 		titleText
 	} from './structure.js';
 	import { wording } from './strings.js';
@@ -163,6 +164,14 @@
 	// reference must vanish with it: `aria-describedby` pointing at nothing describes
 	// nothing, and silently.
 	const describedBy = $derived(field.description ? domIds.description : undefined);
+	// A capped prose leaf reports its count, and the count describes it too: a keystroke
+	// the cap refuses changes nothing else a reader can perceive.
+	let chars = $state<number>();
+	const cap = $derived(field.control === 'prose' ? textCap(field.schema) : undefined);
+	const countId = $derived(`${domIds.control}-count`);
+	const proseDescribedBy = $derived(
+		cap ? [describedBy, countId].filter(Boolean).join(' ') : describedBy
+	);
 	// Two controls own their label row, the add chip and the held count sharing it.
 	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
 	const flat = $derived(flatObject(field.schema));
@@ -285,6 +294,8 @@
 			descriptionId={domIds.description}
 			{onActivate}
 			description={field.description}
+			count={cap && chars != null ? t.strings.textCount(chars, cap.max) : undefined}
+			{countId}
 		/>
 	{/if}
 	<!-- The control and what hangs under it, in one grid cell: the diagnostics stack
@@ -305,7 +316,8 @@
 					placeholder={none}
 					emptyUnsets={optional}
 					labelledBy={domIds.label}
-					{describedBy}
+					describedBy={proseDescribedBy}
+					cap={cap && { ...cap, onCount: (n) => (chars = n) }}
 					{leafKey}
 					{onFocus}
 					{onCaretMove}
