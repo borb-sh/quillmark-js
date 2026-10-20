@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // A content field's `max:` as a bound no edit crosses: a keystroke at the cap lands
 // nothing, a paste lands what fits, and a value stored past the cap edits down. The
-// count is the engine's, so the leaf refuses exactly what `validation::over_length`
+// count is Quillmark's, so the leaf refuses exactly what `validation::over_length`
 // would warn of.
 import { describe, it, expect } from 'vitest';
 import type { Document } from '@quillmark/wasm';
@@ -81,7 +81,7 @@ function leaf(doc: Document, name: Leaf): FieldController {
 	});
 }
 
-/** The engine's own count for `name`, `undefined` where it warns nothing. */
+/** Quillmark's own count for `name`, `undefined` where it warns nothing. */
 function overLength(doc: Document, name: Leaf): unknown {
 	return q
 		.validate(doc)
@@ -190,7 +190,7 @@ describe('a value stored past the cap', () => {
 	});
 });
 
-describe('the count is the engine’s', () => {
+describe('the count is Quillmark’s', () => {
 	const cases: [Leaf, string][] = [
 		['code', 'abc   def'],
 		['code', '😀👍🏽abcd'],

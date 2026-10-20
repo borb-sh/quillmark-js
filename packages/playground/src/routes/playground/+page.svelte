@@ -27,7 +27,7 @@
 
   The editor needs no session: the shell stands on `doc` and `quill` as soon as the quill
   resolves, and the session opens behind it, once the render build has loaded, over the
-  document as it stands by then. The preview track waits on its own. A document the engine
+  document as it stands by then. The preview track waits on its own. A document Quillmark
   refuses reaches no session either: the band says what refused, the card the refusal
   named draws in its recovery shell, and the edit that retypes or removes it tries the
   open again.
@@ -96,7 +96,7 @@
 	let docHandle: Document | undefined = $state();
 	// Held so the recovery loop can try the open again; the surfaces never read it.
 	let engineHandle: Engine | undefined;
-	// What the engine refused the document with, and why there is no session to paint from.
+	// What Quillmark refused the document with, and why there is no session to paint from.
 	let refused = $state<string | undefined>();
 
 	// Surface handles for the imperative bridge hops.
@@ -282,7 +282,7 @@
 			const artifact = result.artifacts[0];
 			if (!artifact) throw new Error(`${quillHandle?.backendId ?? 'the backend'} emitted no PDF`);
 			// The bytes cross as `Uint8Array<ArrayBufferLike>`, where `BlobPart` takes an
-			// `ArrayBuffer`-backed view alone; the engine's memory is one.
+			// `ArrayBuffer`-backed view alone; Quillmark's memory is one.
 			const url = URL.createObjectURL(
 				new Blob([artifact.bytes as BlobPart], { type: artifact.mimeType })
 			);
@@ -379,7 +379,7 @@
 			created.unshift(doc);
 			// The seed variants. `?foreign` holds a card whose kind the schema cannot
 			// project: `Document.insertCard` is schema-agnostic where the Quill-bound
-			// writer would reject it, and the engine renders past it with a warning, so the
+			// writer would reject it, and Quillmark renders past it with a warning, so the
 			// seed reaches the recovery shell over a preview that leaves the card out.
 			// `?tips` seeds the guidance channel a quill or consumer supplies
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
@@ -460,7 +460,7 @@
 	{:else if status.phase === 'error'}
 		<p data-testid="status" class="qm-status qm-status-error phase">Error: {status.message}</p>
 	{:else if refused}
-		<!-- The paint is what is missing, not the route, so the band names what the engine
+		<!-- The paint is what is missing, not the route, so the band names what Quillmark
 		     would not take. -->
 		<p data-testid="refused" class="qm-status qm-status-error phase">Refused: {refused}</p>
 	{/if}

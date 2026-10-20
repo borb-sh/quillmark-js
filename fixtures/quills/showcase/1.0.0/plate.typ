@@ -177,7 +177,7 @@
 // ── Cards ───────────────────────────────────────────────────────────────────
 // One arm per kind. `Engine.open` refuses a card whose kind the schema does not
 // declare, so only declared kinds reach here; the `$kind` read carries a default
-// regardless, the guard being the plate's rather than the engine's.
+// regardless, the guard being the plate's rather than Quillmark's.
 #{
   let section-no = 0
   for (i, card) in qm.data.at("$cards").enumerate() {

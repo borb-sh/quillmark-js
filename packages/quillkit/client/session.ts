@@ -35,9 +35,9 @@ export interface Opened {
 	 *  backend descriptor: no binary loaded, nothing cloned. */
 	formats: OutputFormat[];
 	doc: Document;
-	/** Absent while the engine refuses this document ({@link openSession}). */
+	/** Absent while Quillmark refuses this document ({@link openSession}). */
 	session?: LiveSession;
-	/** What the engine refused it with at the last attempt; empty while a session
+	/** What Quillmark refused it with at the last attempt; empty while a session
 	 *  stands. */
 	refused: Diagnostic[];
 	carry: Carry;
@@ -99,7 +99,7 @@ export async function openRef(
 }
 
 /**
- * A session over `doc`, or the diagnostics the engine refused it with. The refusal is
+ * A session over `doc`, or the diagnostics Quillmark refused it with. The refusal is
  * returned because it is a state of the document rather than the end of the open: the
  * editor stands on the quill and the document alone, so it draws the card the refusal
  * named, and the edit that answers it calls this again.

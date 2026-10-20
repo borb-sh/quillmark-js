@@ -58,7 +58,7 @@ describe('what a Diagnostic carries', () => {
 		doc.free();
 	});
 
-	it('keeps the parse lane engine text out of `args`, which names the block only', () => {
+	it('keeps the parse lane’s Quillmark text out of `args`, which names the block only', () => {
 		// The permanent fallback arm. `args` names the block and stops there, the failure
 		// being placed on `location` in the document's own coordinates, so the parser's
 		// own sentence is reachable only as `message` and returning `undefined` from a

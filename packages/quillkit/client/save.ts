@@ -10,7 +10,7 @@
  */
 export function save(content: string | Uint8Array, name: string, type: string): void {
 	// Rendered bytes cross the wasm boundary as `Uint8Array<ArrayBufferLike>`, where
-	// `BlobPart` takes an `ArrayBuffer`-backed view alone; the engine's memory is one.
+	// `BlobPart` takes an `ArrayBuffer`-backed view alone; Quillmark's memory is one.
 	const url = URL.createObjectURL(new Blob([content as BlobPart], { type }));
 	const a = document.createElement('a');
 	a.href = url;

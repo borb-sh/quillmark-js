@@ -11,7 +11,7 @@
  (theme.css), and an edit that settles writes it as authored, as `TextField` takes
  its default. A number has no empty answer (canon `SCHEMAS.md` §"Native validation"),
  so a blank entry commits `undefined`, the unset rung: the parent removes the field,
- the engine renders the default, and the input holds it again.
+ Quillmark renders the default, and the input holds it again.
 
  The entry grammar is plain decimal: an optional sign and digits, and for a `number`
  a `.` and an exponent, the form `String()` gives a value too small or large for
