@@ -9,7 +9,7 @@ import { Plugin } from 'prosemirror-state';
 import type { EditorProps } from 'prosemirror-view';
 import type { Content } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
-import { decode } from './decode.js';
+import { decode, fitsLeaf } from './decode.js';
 import { blockSchema } from './schema.js';
 
 /** A line opening a block markdown spells and prose does not: a bullet or an ordered item at
@@ -28,9 +28,10 @@ const BLOCK_HEAD = new RegExp(
 /**
  * A block leaf's markdown paste, consulted after the table paste: ProseMirror hands text
  * over only where the clipboard holds no HTML, whose DOM parse reads the source's own
- * structure, so HTML wins. A paste as plain text keeps the text. An island the parse
- * builds arrives under the id `importMarkdown` minted, which the paste's island pass
- * re-mints where the field holds it (`islands.ts`).
+ * structure, so HTML wins. A paste as plain text keeps the text, and so does a parse
+ * building a construct no leaf edits (`fitsLeaf`). An island the parse builds arrives
+ * under the id `importMarkdown` minted, which the paste's island pass re-mints where the
+ * field holds it (`islands.ts`).
  */
 export function markdownPastePlugin(): Plugin {
 	return new Plugin({
@@ -47,6 +48,7 @@ export function markdownPastePlugin(): Plugin {
 					// Nesting past the store's depth is refused; the literal text holds it.
 					return null;
 				}
+				if (!fitsLeaf(rt, { inline: false, plaintext: false, islands: true })) return null;
 				return new Slice(decode(rt, blockSchema).content, 0, 0);
 			}) as EditorProps['clipboardTextParser']
 		}

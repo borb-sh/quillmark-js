@@ -121,6 +121,17 @@ describe('a block leaf reads markdown text', () => {
 		expect(pasted(text(markdown)).text).toBe(`para\n${markdown}`);
 	});
 
+	// What no leaf edits, no paste mints: the text that would build it is the paste.
+	it.each([
+		['an equation', '- the area\n- $\\pi r^2$'],
+		['a footnote', '- noted[^1]\n\n[^1]: The note.'],
+		['a definition list', '- item\n\nTerm\n: described']
+	])('a draft holding %s stays literal', (_, markdown) => {
+		const rt = pasted(text(markdown));
+		expect(rt.islands).toEqual([]);
+		expect(rt.lines.every((line) => line.kind === 'para' && !line.containers.length)).toBe(true);
+	});
+
 	it('nesting past the store’s depth stays literal', () => {
 		const deep = `${'> '.repeat(101)}x`;
 		expect(pasted(text(deep)).text).toBe(`para\n${deep}`);

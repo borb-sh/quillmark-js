@@ -114,25 +114,48 @@ describe('the hold on a body over what no node holds', () => {
 			onHold: (held) => holds.push(held)
 		});
 
+	/** A body over `markdown` holds, `drawn` asserts what it draws, and a keystroke
+	 *  dispatched on it leaves the stored body as it was. */
+	const held = (markdown: string, drawn: (view: EditorView) => void): void => {
+		const doc = example();
+		doc.overwrite({}, md(markdown));
+		const before = JSON.stringify(doc.main.body);
+		const holds: boolean[] = [];
+		const field = body(doc, holds);
+		const view = viewOf(field);
+		expect(holds).toEqual([true]);
+		expect(view.editable).toBe(false);
+		drawn(view);
+		view.dispatch(view.state.tr.insertText('Z', Selection.atStart(view.state.doc).from));
+		expect(JSON.stringify(doc.main.body)).toBe(before);
+		field.destroy();
+	};
+
 	for (const [name, markdown] of [
 		['an element', 'lead\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
-		['an element beside a task item', '- [x] done\n\n<qm-keep>\n\nkept\n\n</qm-keep>']
+		['an element beside a task item', '- [x] done\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
+		['a definition list', 'lead\n\nTerm\n: one\n: two\n\n  - a list in it']
 	]) {
 		it(`holds over ${name}, drawing its text and committing nothing`, () => {
-			const doc = example();
-			doc.overwrite({}, md(markdown));
-			const before = JSON.stringify(doc.main.body);
-			const holds: boolean[] = [];
-			const field = body(doc, holds);
-			const view = viewOf(field);
-			expect(holds).toEqual([true]);
-			expect(view.editable).toBe(false);
-			expect(view.state.doc.textContent).toBe(doc.main.body.text.replaceAll('\n', ''));
-			view.dispatch(view.state.tr.insertText('Z', Selection.atStart(view.state.doc).from));
-			expect(JSON.stringify(doc.main.body)).toBe(before);
-			field.destroy();
+			held(markdown, (view) =>
+				expect(view.state.doc.textContent).toBe(md(markdown).text.replaceAll('\n', ''))
+			);
 		});
 	}
+
+	it('holds over a footnote, drawing its reference mark with the note as its title', () => {
+		held('Noted[^1] here.\n\n[^1]: The **note**.', (view) => {
+			const mark = view.dom.querySelector('sup[data-qm-island="footnote"]');
+			expect(mark?.getAttribute('title')).toBe('The note.');
+		});
+	});
+
+	it('holds over an equation, drawing its TeX between the dollars that write it', () => {
+		held('Inline $x^2$ here.\n\n$$\\frac{a}{b}$$', (view) => {
+			const drawn = [...view.dom.querySelectorAll('[data-qm-island="math"]')];
+			expect(drawn.map((el) => el.textContent)).toEqual(['$x^2$', '$$\\frac{a}{b}$$']);
+		});
+	});
 });
 
 describe('the hold on a narrowed field', () => {

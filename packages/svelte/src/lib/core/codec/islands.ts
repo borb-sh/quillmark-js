@@ -1,16 +1,29 @@
 // Islands: the `U+FFFC` slot + `ContentIsland` entry ↔ a PM leaf node. Every slot sits
 // in a `para` line; the island's type says which node it is, a `table` a block alone on
-// its line and an `image` inline. The node carries `id`, `islandType` and `props` verbatim.
+// its line and every other type inline. The node carries `id`, `islandType` and `props`
+// verbatim.
 //
 // A props-aware consumer reads the shape straight off the boundary:
-// `ContentIsland.props` is the typed union (`TableProps` for `table`,
-// `ImageProps` for `image`; DOCUMENT_MODEL §Stability seams), so the codec
+// `ContentIsland.props` is the typed union (`TableProps` for `table`, `ImageProps` for
+// `image`, …; DOCUMENT_MODEL §Stability seams), so the codec
 // reads it rather than hand-rolling a shape. `type` is a closed set, so a
 // discriminant check narrows it; `props` still crosses the DOM as opaque JSON,
 // which is what §`tablePropsOfNode` guards.
-import { Fragment, Slice, type Node as PMNode, type NodeSpec } from 'prosemirror-model';
+import {
+	Fragment,
+	Slice,
+	type DOMOutputSpec,
+	type Node as PMNode,
+	type NodeSpec
+} from 'prosemirror-model';
 import { Plugin } from 'prosemirror-state';
-import type { ContentIsland, TableCell, TableProps } from '@quillmark/wasm';
+import type {
+	ContentIsland,
+	FootnoteProps,
+	MathProps,
+	TableCell,
+	TableProps
+} from '@quillmark/wasm';
 import { storableUrl } from './urls.js';
 
 /** The `U+FFFC` object-replacement char that occupies one island slot in `text`. */
@@ -44,27 +57,39 @@ function islandDOM(node: PMNode): Record<string, string> {
 }
 
 /** The island types the content model names, each with whether its markup is a block,
- *  which decides the node its slot decodes to. A `Record` over the boundary's own union,
- *  so a member added upstream is a missing key here rather than a silent refusal at the
- *  one door with no decode behind it. */
-const BLOCK_ISLAND: Record<ContentIsland['type'], boolean> = { table: true, image: false };
+ *  which decides the node its slot decodes to, and whether a leaf edits it. A `Record`
+ *  over the boundary's own union, so a member added upstream is a missing key here
+ *  rather than a silent refusal at the one door with no decode behind it. A footnote and
+ *  an equation are read, not edited (CODEC §Decode): a leaf holding one is held. */
+const ISLANDS: Record<ContentIsland['type'], { block: boolean; edited: boolean }> = {
+	table: { block: true, edited: true },
+	image: { block: false, edited: true },
+	footnote: { block: false, edited: false },
+	math: { block: false, edited: false }
+};
 
 /** Whether an island of `type` is block markup: a `table` stands alone on its line. */
 export function isBlockIsland(type: ContentIsland['type']): boolean {
-	return BLOCK_ISLAND[type];
+	return ISLANDS[type].block;
+}
+
+/** Whether a leaf edits an island of `type`; one holding any other is held (`fitsLeaf`). */
+export function isEditedIsland(type: ContentIsland['type']): boolean {
+	return ISLANDS[type].edited;
 }
 
 /** An island node's attributes off that DOM, or `false` where the id is absent or the
- *  type is one the content vocabulary does not name — a name no read produces and no
- *  write takes, so the element's text arrives as text. A `props` that is not the JSON
- *  written above reads as `null`, and one of the wrong shape is `undefined` at its
- *  reader (§`tablePropsOfNode`): the entry survives as an island of its type rather
- *  than taking the paste down with it. */
+ *  type is one no leaf edits — a name the vocabulary does not hold, or a footnote or an
+ *  equation, which no gesture mints — so the element's text arrives as text. A `props`
+ *  that is not the JSON written above reads as `null`, and one of the wrong shape is
+ *  `undefined` at its reader (§`tablePropsOfNode`): the entry survives as an island of
+ *  its type rather than taking the paste down with it. */
 function islandAttrsFromDOM(el: HTMLElement): IslandNodeAttrs | false {
 	const id = el.getAttribute('data-qm-island-id');
 	// Asserted off an untrusted attribute and checked against the set on the next line.
 	const type = el.getAttribute('data-qm-island') as ContentIsland['type'] | null;
-	if (id == null || type == null || !Object.hasOwn(BLOCK_ISLAND, type)) return false;
+	if (id == null || type == null || !Object.hasOwn(ISLANDS, type) || !isEditedIsland(type))
+		return false;
 	const raw = el.getAttribute('data-qm-island-props');
 	let props: unknown = null;
 	try {
@@ -94,7 +119,8 @@ export const islandBlockSpec: NodeSpec = {
 	toDOM: (node) => ['div', islandDOM(node), `[${node.attrs.islandType || 'island'}]`]
 };
 
-/** Inline island node (an image): a `U+FFFC` slot inside a `para` line. */
+/** Inline island node (an image, a footnote, an equation): a `U+FFFC` slot inside a
+ *  `para` line. */
 export const islandInlineSpec: NodeSpec = {
 	group: 'inline',
 	inline: true,
@@ -102,8 +128,24 @@ export const islandInlineSpec: NodeSpec = {
 	selectable: true,
 	attrs: islandAttrs,
 	parseDOM: [{ tag: 'span[data-qm-island]', getAttrs: (el) => islandAttrsFromDOM(el) }],
-	toDOM: (node) => ['span', islandDOM(node), `[${node.attrs.islandType || 'island'}]`]
+	toDOM: inlineIslandDOM
 };
+
+/** An inline island's DOM: a footnote its reference mark, whose number `prose.css` draws
+ *  in reading order and whose note is its title, an equation its TeX between the dollars
+ *  that write it, and an image its tag. */
+function inlineIslandDOM(node: PMNode): DOMOutputSpec {
+	const attrs = node.attrs as IslandNodeAttrs;
+	const dom = islandDOM(node);
+	const props = attrs.props as Partial<FootnoteProps & MathProps> | null;
+	if (attrs.islandType === 'footnote')
+		return ['sup', typeof props?.text === 'string' ? { ...dom, title: props.text } : dom];
+	if (attrs.islandType === 'math' && typeof props?.tex === 'string') {
+		const fence = props.display ? '$$' : '$';
+		return ['span', dom, `${fence}${props.tex}${fence}`];
+	}
+	return ['span', dom, `[${attrs.islandType || 'island'}]`];
+}
 
 /** A PM island node's attributes: the content entry, spelled the way a node spec
  *  spells it (`islandType`, because `type` on a PM node is the node type). `islandType`
