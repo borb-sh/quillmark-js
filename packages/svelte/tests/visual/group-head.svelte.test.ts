@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// A flat subform (VISUAL_EDITOR §"Structure mirrors the schema"): the reference quill's
-// `imprint`, alone in its group, draws no label and no figure of its own; the section
+// An object alone in its group (VISUAL_EDITOR §"Structure mirrors the schema"): the
+// reference quill's `imprint` draws no label and no figure of its own; the section
 // header names it and carries its description.
 import { describe, it, expect, afterEach } from 'vitest';
 import { quill } from '../helpers/fixtures.js';
@@ -16,7 +16,7 @@ function section(target: HTMLElement): HTMLElement {
 	return header.closest<HTMLElement>('.qm-group')!;
 }
 
-describe('a flat field alone in its group', () => {
+describe('an object alone in its group', () => {
 	it('is named by the section header and draws no label of its own', () => {
 		const q = quill();
 		const mounted = mountEditor(q, q.seedDocument());

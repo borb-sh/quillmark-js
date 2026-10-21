@@ -30,9 +30,8 @@
  member's id. So a cell reads at whatever depth it sits, which nothing here knows.
 
  `bare` is the table's row: the same cells with no labels and no figure of their own,
- laid onto the tracks the table's header names ({@link ArrayField}). `flat` is
- `ui.layout: flat`: the cells keep their labels and lose the figure, standing at the
- depth of whatever holds the subform.
+ laid onto the tracks the table's header names ({@link ArrayField}). `flat` is a
+ panel's object: the cells keep their labels and lose the figure, the panel being it.
 -->
 <script lang="ts">
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
@@ -42,7 +41,6 @@
 		controlKind,
 		declaredContent,
 		fieldModels,
-		flatObject,
 		humanize,
 		isContainer,
 		literalText,
@@ -103,8 +101,8 @@
 		/** A table's row: the cells alone, on the tracks the table's header names, with
 		 * no labels and no vertical of their own. */
 		bare?: boolean;
-		/** `ui.layout: flat`: no vertical and no rung, the properties at the depth of the
-		 * list the subform stands in. */
+		/** A panel's object: no vertical and no rung, the properties at the depth of the
+		 * panel's field list. */
 		flat?: boolean;
 		/** A card-level object, or one nested in it: its properties are placed as a
 		 * card's fields are (`placeFields`), so moving a field into a group leaves its row
@@ -426,7 +424,6 @@
 						bind:this={nestedEls[key]}
 						value={obj[key] as Record<string, unknown> | undefined}
 						properties={sub.properties}
-						flat={flatObject(sub)}
 						{placed}
 						label={ids ? undefined : fallbackName(key, sub)}
 						idBase={ids?.control}

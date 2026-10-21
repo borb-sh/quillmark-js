@@ -4,7 +4,9 @@
 
 ## Unreleased
 
-**A card's top-level `object` draws as a panel.** On a card declaring no `ui.groups`, each top-level object not asking `ui.layout: flat` is an accordion panel, the one-open-at-a-time chrome a `ui.group` gets, its `title` the header, its `description` beside it, and its properties standing flat inside. The card's other fields, a flat object included, stand unframed above the panels, which follow in declaration order; an object inside an object stays a subform, and an `array` of `object` a record list or table. A landing on a property inside a closed panel opens it. A card declaring `ui.groups` draws as before, its objects subforms inside its groups. (#772)
+**A card's top-level `object` draws as a panel.** Each top-level object joining no `ui.group` is an accordion panel, the one-open-at-a-time chrome a `ui.group` gets, its `title` the header, its `description` beside it, and its properties standing flat inside. The card's other ungrouped fields stand unframed above the panels, which follow in declaration order, then each `ui.group`'s panel in registry order; an object inside an object stays a subform, and an `array` of `object` a record list or table. A landing on a property inside a closed panel opens it. (#772)
+
+**`ui.layout: flat` is not honored.** A top-level object is a panel whatever it asks, and a nested one a subform. An object alone in its `ui.group` is still named by the group header, read off the group holding one `object` rather than the flag.
 
 ## v0.23.0 - 2026-10-19
 
