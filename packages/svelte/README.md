@@ -29,8 +29,7 @@ The **consumer** owns the session and the handles, and drives every edit; the su
 import { Engine } from '@quillmark/wasm';
 import { init } from '@quillmark/svelte/core';
 
-// One-time, and the only door to Quill and Document: the artifact exports
-// neither statically.
+// Quill and Document are exported only through init(), which loads the wasm once.
 const { Quill, Document } = await init();
 
 const quill = Quill.fromTree(tree); // tree: Map<string, Uint8Array> of the quill dir

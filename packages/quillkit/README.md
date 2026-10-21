@@ -2,6 +2,8 @@
 
 The quill author's toolchain: one command over the whole loop. Start a quiver, gate it, pack it, look at it, ship it.
 
+A quiver is a collection of quills, and a quill is a document format: the fields a document fills in and the Typst plate that prints them. [Creating Quills](https://quillmark.dev/quills/creating-quills/) walks through the quiver `init` writes, one file at a time, and the [Glossary](https://quillmark.dev/getting-started/glossary/) defines the rest of the terms.
+
 ## Start
 
 ```sh
@@ -84,7 +86,7 @@ npx quillkit studio --templates templates
 
 It shows a quill rather than editing one: no plate editing, no schema editing, no auth, and nothing it holds outlives the tab.
 
-The client renders through the `@quillmark/wasm` it was built against, and the head names it; your `quillkit test` runs whatever your own tree holds, and nothing at runtime reconciles the two. The gate is authoritative, studio is advisory.
+Studio renders through the `@quillmark/wasm` it was built with, and its header names that version. `quillkit test` renders through the one your project installs. Nothing checks that the two match, so when they disagree, trust `quillkit test`: it is what CI runs.
 
 ## Shipping it
 
