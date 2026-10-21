@@ -2,7 +2,7 @@
 // browser resolves nothing, so the siblings are compiled in and their coordinate is for
 // diagnosis rather than resolution: what a consumer holding a tarball nobody can `npm ls`
 // needs in a bug report is which copies are in there. `quillkit init` also reads the file,
-// to range a fresh collection's loader and engine at the versions the client was built
+// to range a fresh collection's loader and wasm at the versions the client was built
 // against.
 //
 // The version as its manifest states it, for all three. Whether a checkout sits ahead of

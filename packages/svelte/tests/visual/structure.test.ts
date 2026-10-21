@@ -203,7 +203,7 @@ describe('variantMember + variantCells', () => {
 		// resolves its `default:`, so hiding that world's cells would print answers the
 		// form never asked for.
 		expect(variantMember(undefined, 'plain')).toBe('plain');
-		// A container carrying answers but no discriminant is unset too, and the engine
+		// A container carrying answers but no discriminant is unset too, and Quillmark
 		// resolves it the same way.
 		expect(variantMember({ note: 'x' }, 'plain')).toBe('plain');
 	});
@@ -861,7 +861,7 @@ describe('the matrix helpers', () => {
 		expect(matrixHeld(true)).toBe(true);
 		expect(matrixHeld({})).toBe(true);
 		expect(matrixHeld({ note: 'x' })).toBe(true);
-		// The scalar spellings the engine coerces to false.
+		// The scalar spellings Quillmark coerces to false.
 		for (const v of [false, 0, 'false', null]) expect(matrixHeld(v), JSON.stringify(v)).toBe(false);
 		// Every other present tick reads held, `1` and `"true"` among them.
 		for (const v of [1, 'true']) expect(matrixHeld(v), JSON.stringify(v)).toBe(true);
@@ -877,7 +877,7 @@ describe('the matrix helpers', () => {
 	it('takes the columns off a member, an added title aside', () => {
 		expect(matrixColumns({ title: 'Wing IG', note: 'x' })).toEqual({ note: 'x' });
 		expect(matrixColumns({ note: 'x' })).toEqual({ note: 'x' });
-		// A stored `held` is the engine's refusal, and no column may be named it.
+		// A stored `held` is Quillmark's refusal, and no column may be named it.
 		expect(matrixColumns({ held: true, note: 'x' })).toEqual({ note: 'x' });
 		expect(matrixColumns(true)).toEqual({});
 		expect(matrixColumns(undefined)).toEqual({});

@@ -23,7 +23,7 @@ npm install --save-dev quillkit @quillmark/quiver @quillmark/wasm
 
 quillkit carries neither of the other two. It resolves both out of your collection's own `node_modules`, so the versions you pin are the format your quiver is packed in and the wasm your gate renders through. The studio client is the one thing it does carry: `studio` and `site` serve it out of the tool's own `dist/client`, so there is nothing to install for it and nothing to keep in step.
 
-That client compiles in its own copies of both libraries and the engine, which your install does not resolve and your lockfile does not record. `dist/client/carried.json` names all three, and each release's notes say the same in one line.
+That client compiles in its own copies of both libraries and the wasm, which your install does not resolve and your lockfile does not record. `dist/client/carried.json` names all three, and each release's notes say the same in one line.
 
 ## The verbs
 

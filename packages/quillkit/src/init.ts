@@ -24,7 +24,7 @@ const BESIDE: Record<string, string> = {
 	'.prettierignore': '# Prettier rewrites a card-yaml `~~~` fence as a backtick fence.\nquills/\n'
 };
 
-/** The versions a fresh collection pins: this tool's, and the loader and engine its client
+/** The versions a fresh collection pins: this tool's, and the loader and wasm its client
  *  was built against. */
 async function versions(): Promise<Record<string, string>> {
 	const own = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));

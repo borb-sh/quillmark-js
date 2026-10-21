@@ -161,7 +161,7 @@ export function ghostDefault(row: ResolvedField | undefined): unknown {
 
 /** A stored `boolean` cell as the render reads it: a boolean, `true` or `false` in any
  * case, or a number by whether it is non-zero; undefined where the render refuses the
- * value. The engine's coercion, restated, so the suite holds it to `reader.resolve()`. */
+ * value. Quillmark's coercion, restated, so the suite holds it to `reader.resolve()`. */
 export function renderedBoolean(value: unknown): boolean | undefined {
 	if (typeof value === 'boolean') return value;
 	if (typeof value === 'number') return value !== 0;
@@ -367,16 +367,16 @@ export function memberValue(map: Record<string, unknown> | undefined, id: string
 
 /**
  * Whether a stored member is held: by being present. A mapping is held whatever it
- * carries, `{}` included, and a bare scalar is the tick itself, read as the engine's
+ * carries, `{}` included, and a bare scalar is the tick itself, read as Quillmark's
  * coercion reads it: `false`, `0`, `"false"` and `null` unheld, every other present
- * scalar held, so a spelling the engine would refuse still draws the tick it claims.
+ * scalar held, so a spelling Quillmark would refuse still draws the tick it claims.
  */
 export function matrixHeld(stored: unknown): boolean {
 	if (typeof stored === 'object' && stored !== null) return true;
 	return tickOf(stored);
 }
 
-/** A tick's scalar reading: absent and the engine's false spellings unheld, the rest held. */
+/** A tick's scalar reading: absent and Quillmark's false spellings unheld, the rest held. */
 function tickOf(v: unknown): boolean {
 	if (v === undefined || v === null) return false;
 	if (typeof v === 'boolean') return v;
@@ -454,7 +454,7 @@ export function matrixDeclares(matrix: QuillFieldSchema, id: string): boolean {
 /**
  * The added items a stored map holds, sorted by id as the plate orders them: on an
  * open matrix, each key off the roster spelled as an id whose mapping carries a
- * `title`. Any other key off the roster is the engine's refusal, drawn nowhere and
+ * `title`. Any other key off the roster is Quillmark's refusal, drawn nowhere and
  * ridden through.
  */
 export function addedItems(

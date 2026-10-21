@@ -14,12 +14,12 @@ npm install @quillmark/svelte
 
 Each subpath is its own module root; a bundler pulls only what the entry you import reaches.
 
-| Import                      | Surface                                                                                                               |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `@quillmark/svelte/core`    | What the surfaces share: the `DocPath`/`Place` address vocabulary, the `EditorError` channel, `init`. Framework-free. |
-| `@quillmark/svelte/preview` | The live preview: `createPreview` + `<Preview>`. Reaches nothing editor-side.                                         |
-| `@quillmark/svelte/visual`  | The federated WYSIWYG: `<VisualEditor>`, the codec's `createField` prose leaf.                                        |
-| `@quillmark/svelte`         | Re-exports `/core`.                                                                                                   |
+| Import                      | Surface                                                                                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `@quillmark/svelte/core`    | What the surfaces share: the `DocPath`/`Place` address vocabulary, the `EditorError` channel, `init`. No UI framework. |
+| `@quillmark/svelte/preview` | The live preview: `createPreview` + `<Preview>`. Reaches nothing editor-side.                                          |
+| `@quillmark/svelte/visual`  | The federated WYSIWYG: `<VisualEditor>`, the codec's `createField` prose leaf.                                         |
+| `@quillmark/svelte`         | Re-exports `/core`.                                                                                                    |
 
 ## Open a session
 

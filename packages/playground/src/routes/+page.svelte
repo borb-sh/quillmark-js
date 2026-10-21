@@ -110,7 +110,7 @@
 					<h2 class="qm-label">01 · Install</h2>
 					<p>
 						<code>@quillmark/svelte</code> provides the surfaces;
-						<code>@quillmark/wasm</code> is the engine they read.
+						<code>@quillmark/wasm</code> is Quillmark itself, which they read.
 					</p>
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 					<pre

@@ -282,7 +282,7 @@
 			const artifact = result.artifacts[0];
 			if (!artifact) throw new Error(`${quillHandle?.backendId ?? 'the backend'} emitted no PDF`);
 			// The bytes cross as `Uint8Array<ArrayBufferLike>`, where `BlobPart` takes an
-			// `ArrayBuffer`-backed view alone; the engine's memory is one.
+			// `ArrayBuffer`-backed view alone; WebAssembly memory is one.
 			const url = URL.createObjectURL(
 				new Blob([artifact.bytes as BlobPart], { type: artifact.mimeType })
 			);

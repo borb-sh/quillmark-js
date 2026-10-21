@@ -14,7 +14,7 @@ const SELECTOR_RE = /^\d+\.\d+(\.\d+)?$/;
 
 /**
  * Whether `name` is a quill name: `[a-z][a-z0-9_]*`, at most 64 characters, the
- * engine's rule. A quiver's own name and every catalog row are held to it.
+ * Quillmark's rule. A quiver's own name and every catalog row are held to it.
  */
 export function isQuillName(name: string): boolean {
 	return NAME_RE.test(name);
