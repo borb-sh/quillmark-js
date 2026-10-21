@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Object panels (VISUAL_EDITOR §"Structure mirrors the schema"): the reference quill's
-// `credits` kind declares no `ui.groups`, so each top-level framed object is a panel,
+// `credits` kind declares no `ui.groups`, so each top-level object is a panel,
 // headed by the object, and everything else stands unframed above them.
 import { describe, it, expect, afterEach } from 'vitest';
 import { quill } from '../helpers/fixtures.js';
@@ -29,7 +29,7 @@ function panel(card: HTMLElement, label: string): HTMLElement {
 }
 
 describe('a card grouped by top-level objects', () => {
-	it('panels each framed object in declaration order, the first open', () => {
+	it('panels each object in declaration order, the first open', () => {
 		const { card } = credits();
 		expect(headers(card).map((h) => h.textContent?.trim())).toEqual(['Publisher', 'Rights']);
 		expect(headers(card).map((h) => h.getAttribute('aria-expanded'))).toEqual(['true', 'false']);
@@ -39,12 +39,11 @@ describe('a card grouped by top-level objects', () => {
 	it('stands its other fields unframed above the panels', () => {
 		const { card } = credits();
 		const groups = card.querySelector('.qm-groups')!;
-		for (const label of ['Edition', 'Printing', 'Translators']) {
+		for (const label of ['Edition', 'Translators']) {
 			const f = field(card, label);
 			expect(groups.contains(f)).toBe(false);
 			expect(f.compareDocumentPosition(groups) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		}
-		expect(field(card, 'Printing').querySelector('.qm-object-flat')).not.toBeNull();
 		expect(field(card, 'Translators').querySelector('.qm-object')).toBeNull();
 	});
 

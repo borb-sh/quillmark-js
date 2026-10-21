@@ -388,8 +388,7 @@ main:
           description: How many to print.
       ui:
         group: imprint
-        layout: flat
-      description: "A flat subform (`ui.layout: flat`) alone in its group: the section is its frame, so the header names it and carries this description, and its properties stand at the section's depth with no rung of their own."
+      description: "An object alone in its group: the section is its frame, so the header names it and carries this description, and its properties stand at the section's depth with no rung of their own."
 
 card_kinds:
   section:
@@ -503,7 +502,7 @@ card_kinds:
 
   credits:
     title: Credits
-    description: "Who made it. The kind that groups by top-level `object` and declares no `ui.groups`, so each framed object draws as a panel of its own in declaration order, and the fields beside them stand unframed above."
+    description: "Who made it. The kind that groups by top-level `object` and declares no `ui.groups`, so each object draws as a panel of its own in declaration order, and the fields beside them, declared first, stand unframed above."
     body:
       enabled: false
     fields:
@@ -511,16 +510,15 @@ card_kinds:
         type: text
         default: ""
         description: Which edition this is. A top-level scalar, so it stands above the panels.
-      printing:
-        type: object
-        properties:
-          run:
-            type: integer
-            default: 1
-            description: How many copies.
-        ui:
-          layout: flat
-        description: "A top-level object asking `ui.layout: flat`, which opts out of the panel: it stands above the panels as a flat subform."
+      translators:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: text
+        default: []
+        description: An `array` of `object`, which stays a record list rather than becoming a panel.
       publisher:
         type: object
         title: Publisher
@@ -552,12 +550,3 @@ card_kinds:
             type: integer
             default: 2026
         description: The second panel, closed while the first is open.
-      translators:
-        type: array
-        items:
-          type: object
-          properties:
-            name:
-              type: text
-        default: []
-        description: An `array` of `object`, which stays a record list rather than becoming a panel.

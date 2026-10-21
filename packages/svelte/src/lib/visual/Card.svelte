@@ -274,9 +274,9 @@
 								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
 								{@const headHint = section.head?.description}
 								<div class={['qm-group', { 'qm-open': isOpen }]}>
-									<!-- A panel's object, or a flat field alone in its section, is named by
-								     the header, which takes its label id and parks its description: the
-								     field draws no label of its own to say the section's name twice. -->
+									<!-- A panel's object, or an object alone in its section, is named by the
+								     header, which takes its label id and parks its description: the field
+								     draws no label of its own to say the section's name twice. -->
 									<div class="qm-group-head">
 										<button
 											type="button"

@@ -33,7 +33,6 @@
 		VARIANT_DISCRIMINANT,
 		arrayLayout,
 		baseType,
-		flatObject,
 		ghostDefault,
 		isContainer,
 		optionalCell,
@@ -175,7 +174,7 @@
 	// Two controls own their label row, the add chip and the held count sharing it.
 	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
 	// A headed object is a panel's, and the panel is its frame.
-	const flat = $derived(headed || flatObject(field.schema));
+	const flat = $derived(headed);
 
 	// A container walks its diagnostics down to the cell each names and draws the rest
 	// at its own foot (`diagnostics.ts`); every other control draws them here, under

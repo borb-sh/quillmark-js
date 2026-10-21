@@ -65,16 +65,10 @@ export interface GroupSection {
 	group: string | undefined;
 	label: string;
 	fields: FieldModel[];
-	/** The field the section's header names in place of a label of its own: the object
-	 * a panel is, or the one field of a group section where that field is
-	 * {@link flatObject}. Its properties draw flat, the panel being their frame. */
+	/** The object the section's header names in place of a label of its own: the
+	 * object a panel is, or a group section's one field where that field is an
+	 * `object`. Its properties draw flat, the panel being their frame. */
 	head?: FieldModel;
-}
-
-/** `ui.layout: flat` on a typed dictionary: no frame of its own, its properties
- *  standing at the depth of the fields around it rather than a rung in. */
-export function flatObject(schema: QuillFieldSchema): boolean {
-	return controlKind(schema) === 'object' && schema.ui?.layout === 'flat';
 }
 
 /**
@@ -734,7 +728,7 @@ export function groupSections(
 	for (const g of order) {
 		const fs = fields.filter((f) => f.group === g);
 		if (fs.length) {
-			const head = fs.length === 1 && flatObject(fs[0].schema) ? fs[0] : undefined;
+			const head = fs.length === 1 && fs[0].control === 'object' ? fs[0] : undefined;
 			sections.push({ group: g, label: labelFor(g), fields: fs, head });
 			emitted.add(g);
 		}
@@ -753,12 +747,12 @@ export function groupSections(
 
 /**
  * Object-panel sections (VISUAL_EDITOR §"Structure mirrors the schema"): every
- * top-level `object` not asking `ui.layout: flat` is a panel of its own, headed by
- * the object, in declaration order; everything else stands in one unframed section
- * above them. The section id is the field name, which a card's keys hold unique.
+ * top-level `object` is a panel of its own, headed by the object, in declaration
+ * order; everything else stands in one unframed section above them. The section id
+ * is the field name, which a card's keys hold unique.
  */
 export function objectSections(fields: FieldModel[]): GroupSection[] {
-	const panel = (f: FieldModel) => f.control === 'object' && !flatObject(f.schema);
+	const panel = (f: FieldModel) => f.control === 'object';
 	const loose = fields.filter((f) => !panel(f));
 	const sections: GroupSection[] = loose.length
 		? [{ group: undefined, label: '', fields: loose }]
@@ -769,14 +763,18 @@ export function objectSections(fields: FieldModel[]): GroupSection[] {
 }
 
 /**
- * A card's sections: a card declaring `ui.groups` keeps the legacy sectioning, its
- * objects subforms inside the groups; any other card panels its top-level objects.
+ * A card's sections: its ungrouped fields' {@link objectSections}, then each legacy
+ * `ui.group` a panel in registry order, the order the loader settles the fields in.
+ * A panel named as a group is keyed off the group's id space, which `.` never joins.
  */
 export function cardSections(cardSchema: QuillCardSchema): GroupSection[] {
 	const fields = fieldModels(cardSchema);
-	return cardSchema.ui?.groups
-		? groupSections(fields, groupOrder(cardSchema), (g) => groupLabel(cardSchema, g))
-		: objectSections(fields);
+	const order = groupOrder(cardSchema);
+	const panels = objectSections(fields.filter((f) => f.group === undefined)).map((s) =>
+		s.head && order.includes(s.head.name) ? { ...s, group: `${s.head.name}.` } : s
+	);
+	const grouped = fields.filter((f) => f.group !== undefined);
+	return [...panels, ...groupSections(grouped, order, (g) => groupLabel(cardSchema, g))];
 }
 
 /**

@@ -460,18 +460,17 @@ describe('initialExpandedGroup', () => {
 });
 
 describe('groupSections', () => {
-	const flat = f({ type: 'object', ui: { group: 'q', layout: 'flat' }, properties: { a: f({}) } });
-	const framed = f({ type: 'object', ui: { group: 'q' }, properties: { a: f({}) } });
+	const quals = f({ type: 'object', ui: { group: 'q' }, properties: { a: f({}) } });
 	const sections = (fields: Record<string, QuillFieldSchema>) =>
 		groupSections(fieldModels({ fields }), ['q'], (g) => g);
 
-	it('heads a group section with its one field where that field is flat', () => {
-		const [section] = sections({ quals: flat });
+	it('heads a group section with its one field where that field is an object', () => {
+		const [section] = sections({ quals });
 		expect(section.head?.name).toBe('quals');
 	});
-	it('heads none where the field is framed or has company', () => {
-		expect(sections({ quals: framed })[0].head).toBeUndefined();
-		expect(sections({ quals: flat, note: f({ ui: { group: 'q' } }) })[0].head).toBeUndefined();
+	it('heads none where the one field is no object or has company', () => {
+		expect(sections({ note: f({ ui: { group: 'q' } }) })[0].head).toBeUndefined();
+		expect(sections({ quals, note: f({ ui: { group: 'q' } }) })[0].head).toBeUndefined();
 	});
 });
 
@@ -481,12 +480,11 @@ describe('objectSections', () => {
 	const sections = (fields: Record<string, QuillFieldSchema>) =>
 		objectSections(fieldModels({ fields }));
 
-	it('panels each framed top-level object, headed by it, after one unframed section', () => {
+	it('panels each top-level object, headed by it, after one unframed section', () => {
 		const out = sections({
 			first: obj({ title: 'First' }),
 			note: f({}),
-			second: obj(),
-			flat: obj({ ui: { layout: 'flat' } }),
+			second: obj({ ui: { layout: 'flat' } }),
 			rows: f({ type: 'array', items: obj() })
 		});
 		expect(out.map((s) => [s.group, s.label, s.head?.name])).toEqual([
@@ -494,7 +492,7 @@ describe('objectSections', () => {
 			['first', 'First', 'first'],
 			['second', 'Second', 'second']
 		]);
-		expect(out[0].fields.map((m) => m.name)).toEqual(['note', 'flat', 'rows']);
+		expect(out[0].fields.map((m) => m.name)).toEqual(['note', 'rows']);
 	});
 	it('draws no unframed section where every field is a panel', () => {
 		expect(sections({ a: obj() }).map((s) => s.group)).toEqual(['a']);
@@ -502,14 +500,32 @@ describe('objectSections', () => {
 });
 
 describe('cardSections', () => {
-	it('keeps the legacy sectioning on a card declaring `ui.groups`', () => {
+	it('panels an ungrouped object beside the groups of a card declaring `ui.groups`', () => {
 		const schema = {
-			fields: { contact: f({ type: 'object', ui: { group: 'g' }, properties: { a: f({}) } }) },
+			fields: {
+				subject: f({}),
+				letterhead: f({ type: 'object', properties: { a: f({}) } }),
+				contact: f({ type: 'object', ui: { group: 'g' }, properties: { a: f({}) } }),
+				phone: f({ ui: { group: 'g' } })
+			},
 			ui: { groups: { g: {} } }
 		} as unknown as Parameters<typeof cardSections>[0];
-		const [section] = cardSections(schema);
-		expect(section.group).toBe('g');
-		expect(section.head).toBeUndefined();
+		expect(cardSections(schema).map((s) => [s.group, s.head?.name])).toEqual([
+			[undefined, undefined],
+			['letterhead', 'letterhead'],
+			['g', undefined]
+		]);
+	});
+	it('keys a panel named as a group apart from the group', () => {
+		const schema = {
+			fields: {
+				g: f({ type: 'object', properties: { a: f({}) } }),
+				phone: f({ ui: { group: 'g' } })
+			},
+			ui: { groups: { g: {} } }
+		} as unknown as Parameters<typeof cardSections>[0];
+		const groups = cardSections(schema).map((s) => s.group);
+		expect(new Set(groups).size).toBe(groups.length);
 	});
 	it('panels top-level objects on a card declaring none', () => {
 		const schema = {
