@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.19.0 - 2026-10-21
+
 **The carried `@quillmark/wasm` is 0.129.0.** A one-line text value prints in a Typst plate with no space at either edge, so the starter letter prints its recipient without the `flush` helper it carried. Markdown spelling a footnote, `$…$` math or a `: ` description renders it, and `ui.layout: flat` loads with `quill::deprecated_flat` and a loose field declared after a top-level object with `quill::field_after_object`, neither of which `quillkit test` reads; quillmark's 0.128 → 0.129 migration guide covers each step. Studio's editor opens a field holding a footnote, an equation or a definition list read-only.
 
 ## v0.18.1 - 2026-10-19
