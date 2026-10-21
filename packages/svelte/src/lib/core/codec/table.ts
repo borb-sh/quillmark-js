@@ -81,15 +81,251 @@ export function normalizeTable(props: TableProps): TableProps {
 	const fit = (cells: TableCell[]): TableCell[] =>
 		Array.from({ length: cols }, (_, c) => cells[c] ?? emptyCell());
 	const widths = Array.from({ length: cols }, (_, c) => props.widths?.[c] ?? null);
-	return {
+	return settleSpans({
 		header: fit(props.header),
 		rows: props.rows.map(fit),
 		aligns: Array.from({ length: cols }, (_, c) => props.aligns[c] ?? 'none'),
 		...(widths.some((w) => w !== null) && { widths }),
 		...(props.align && { align: props.align }),
 		...(props.headless && { headless: true })
+	});
+}
+
+// ── Merged cells ────────────────────────────────────────────────────────────
+
+/** A cell as the span keys see it. */
+type Spanned = TableCell & { colspan?: number; rowspan?: number };
+
+/** The span keys. */
+const SPANS = ['colspan', 'rowspan'] as const;
+
+/** A block of cells, both corners inclusive, in the row space {@link rowCount} names. */
+export interface CellBlock {
+	r0: number;
+	c0: number;
+	r1: number;
+	c1: number;
+}
+
+/** A span key's value where it is in its set, a whole number from 2. */
+function spanOf(cell: TableCell, key: (typeof SPANS)[number]): number | undefined {
+	const n = (cell as Spanned)[key];
+	return Number.isSafeInteger(n) && n! >= 2 ? n : undefined;
+}
+
+/** `cell` without the span keys in their set: what a cell keeps when it stops being a
+ *  span's top-left corner. */
+function unspanned(cell: TableCell): TableCell {
+	const out: Spanned = { ...cell };
+	for (const key of SPANS) if (spanOf(cell, key) !== undefined) delete out[key];
+	return out;
+}
+
+/** `cell` drawn over `colspan` columns and `rowspan` rows, each key absent at 1. */
+export function spanning(cell: TableCell, colspan: number, rowspan: number): TableCell {
+	return {
+		...unspanned(cell),
+		...(colspan > 1 && { colspan }),
+		...(rowspan > 1 && { rowspan })
+	} as TableCell;
+}
+
+/**
+ * The block each position draws in, by row then column: its own cell's for a cell no
+ * span covers, the span's for every cell a span covers, its top-left corner included.
+ * The engine's rule (`island::cell_slots`): a span reaches as far as every cell it would
+ * cover holds no text and no earlier span covers it, stopping at the grid's edge and,
+ * unless the table is `headless`, at the header row's foot, so a span never hides text.
+ */
+export function cellBlocks(props: TableProps): CellBlock[][] {
+	const rows = allRows(props);
+	const blocks: (CellBlock | undefined)[][] = rows.map((row) => row.map(() => undefined));
+	const free = (r: number, c: number) => !blocks[r]?.[c] && rows[r]?.[c]?.text === '';
+	rows.forEach((row, r) =>
+		row.forEach((cell, c) => {
+			if (blocks[r]![c]) return;
+			let c1 = c;
+			while (c1 - c + 1 < (spanOf(cell, 'colspan') ?? 1) && c1 + 1 < row.length && free(r, c1 + 1))
+				c1++;
+			const last = r === 0 && !props.headless ? 0 : rows.length - 1;
+			let r1 = r;
+			const open = (at: number) => {
+				for (let x = c; x <= c1; x++) if (!free(at, x)) return false;
+				return true;
+			};
+			while (r1 - r + 1 < (spanOf(cell, 'rowspan') ?? 1) && r1 < last && open(r1 + 1)) r1++;
+			const block = { r0: r, c0: c, r1, c1 };
+			for (let y = r; y <= r1; y++) for (let x = c; x <= c1; x++) blocks[y]![x] = block;
+		})
+	);
+	return blocks as CellBlock[][];
+}
+
+/** Each span key set to what its cell draws: a corner's to its block, a covered cell's
+ *  and a single cell's absent. A key outside its set rides untouched. */
+function settleSpans(props: TableProps): TableProps {
+	const blocks = cellBlocks(props);
+	const settle = (cells: TableCell[], r: number) =>
+		cells.map((cell, c) => {
+			const block = blocks[r]![c]!;
+			const corner = block.r0 === r && block.c0 === c;
+			const colspan = corner ? block.c1 - block.c0 + 1 : 1;
+			const rowspan = corner ? block.r1 - block.r0 + 1 : 1;
+			const held = (key: (typeof SPANS)[number]) => spanOf(cell, key) ?? 1;
+			return held('colspan') === colspan && held('rowspan') === rowspan
+				? cell
+				: spanning(cell, colspan, rowspan);
+		});
+	return {
+		...props,
+		header: settle(props.header, 0),
+		rows: props.rows.map((row, i) => settle(row, i + 1))
 	};
 }
+
+/** The block a position draws in. */
+export function blockAt(props: TableProps, r: number, c: number): CellBlock {
+	return cellBlocks(props)[r]?.[c] ?? { r0: r, c0: c, r1: r, c1: c };
+}
+
+/** `block` grown until every span it reaches into lies inside it: what a sweep holds
+ *  and a merge acts on, a span being one cell. */
+export function wholeBlock(props: TableProps, block: CellBlock): CellBlock {
+	const blocks = cellBlocks(props);
+	let out = { ...block };
+	for (let grew = true; grew;) {
+		grew = false;
+		for (let r = out.r0; r <= out.r1; r++)
+			for (let c = out.c0; c <= out.c1; c++) {
+				const b = blocks[r]?.[c];
+				if (!b || (b.r0 >= out.r0 && b.c0 >= out.c0 && b.r1 <= out.r1 && b.c1 <= out.c1)) continue;
+				out = {
+					r0: Math.min(out.r0, b.r0),
+					c0: Math.min(out.c0, b.c0),
+					r1: Math.max(out.r1, b.r1),
+					c1: Math.max(out.c1, b.c1)
+				};
+				grew = true;
+			}
+	}
+	return out;
+}
+
+/** The top-left corners of the cells `block` holds, in reading order. */
+function cornersIn(props: TableProps, block: CellBlock): CellBlock[] {
+	const out: CellBlock[] = [];
+	const blocks = cellBlocks(props);
+	for (let r = block.r0; r <= block.r1; r++)
+		for (let c = block.c0; c <= block.c1; c++) {
+			const b = blocks[r]?.[c];
+			if (b && b.r0 === r && b.c0 === c) out.push(b);
+		}
+	return out;
+}
+
+/** Whether `block` can become one cell: it holds two cells or more, and it keeps to one
+ *  side of the header row's foot, a header row spanning no rows. */
+export function canMerge(props: TableProps, block: CellBlock): boolean {
+	const whole = wholeBlock(props, block);
+	if (!props.headless && whole.r0 === 0 && whole.r1 > 0) return false;
+	return cornersIn(props, whole).length > 1;
+}
+
+/** Whether `block` holds a merged cell, which a split returns to single cells. */
+export function holdsMerge(props: TableProps, block: CellBlock): boolean {
+	return cornersIn(props, wholeBlock(props, block)).some((b) => b.r1 > b.r0 || b.c1 > b.c0);
+}
+
+/**
+ * The cells of `block`, grown to the spans it reaches into, as one cell: its top-left
+ * corner, holding every cell's text in reading order a line each, their marks with it,
+ * and spanning the block. Each other cell empties, so the span covers it. A no-op where
+ * {@link canMerge} refuses.
+ */
+export function mergeCells(props: TableProps, block: CellBlock): TableProps {
+	if (!canMerge(props, block)) return normalizeTable(props);
+	const whole = wholeBlock(props, block);
+	let text = '';
+	const marks: TableCell['marks'] = [];
+	for (const b of cornersIn(props, whole)) {
+		const cell = cellAt(props, b.r0, b.c0);
+		if (cell.text === '') continue;
+		if (text !== '') text += '\n';
+		const at = [...text].length;
+		text += cell.text;
+		for (const m of cell.marks) marks.push({ ...m, start: m.start + at, end: m.end + at });
+	}
+	const corner = cellAt(props, whole.r0, whole.c0);
+	const merged = spanning(
+		{ ...corner, text, marks },
+		whole.c1 - whole.c0 + 1,
+		whole.r1 - whole.r0 + 1
+	);
+	const rows = allRows(props).map((row, r) =>
+		row.map((cell, c) => {
+			if (r < whole.r0 || r > whole.r1 || c < whole.c0 || c > whole.c1) return cell;
+			return r === whole.r0 && c === whole.c0 ? merged : emptyCell();
+		})
+	);
+	return fromRows(props, rows);
+}
+
+/** Every merged cell `block` holds back to single cells: the text stays in the top-left
+ *  one and the cells the span covered come back empty. */
+export function splitCells(props: TableProps, block: CellBlock): TableProps {
+	const corners = cornersIn(props, wholeBlock(props, block));
+	const rows = allRows(props).map((row, r) =>
+		row.map((cell, c) => (corners.some((b) => b.r0 === r && b.c0 === c) ? unspanned(cell) : cell))
+	);
+	return fromRows(props, rows);
+}
+
+/**
+ * `after`'s spans carried from `before` across a line op. `rows[i]` is the row of
+ * `before` that row `i` of `after` holds, `-1` for a fresh one, and `cols` the same for
+ * columns. A span keeps the lines of its own that survive, and takes in a fresh line
+ * opened between two of them, so a row inserted inside a merged cell joins it; its text
+ * lands in the top-left of what is left, a deleted corner's included. A span whose
+ * lines a move has parted no longer covers one block, and returns to single cells.
+ */
+function carrySpans(
+	before: TableProps,
+	after: TableProps,
+	rows: number[],
+	cols: number[]
+): TableProps {
+	const grid = allRows(after).map((row) => row.map(unspanned));
+	const blocks = cellBlocks(before);
+	const reach = (map: number[], lo: number, hi: number) => {
+		const held = map.flatMap((was, i) => (was >= lo && was <= hi ? [i] : []));
+		if (!held.length) return undefined;
+		const from = held[0]!;
+		const to = held[held.length - 1]!;
+		for (let i = from; i <= to; i++) if (map[i] !== -1 && (map[i]! < lo || map[i]! > hi)) return;
+		return { from, to };
+	};
+	blocks.forEach((line, r) =>
+		line.forEach((b, c) => {
+			if (b.r0 !== r || b.c0 !== c || (b.r1 === r && b.c1 === c)) return;
+			const down = reach(rows, b.r0, b.r1);
+			const across = reach(cols, b.c0, b.c1);
+			if (!down || !across) return;
+			const at = { r: rows.indexOf(r), c: cols.indexOf(c) };
+			const kept = at.r >= 0 && at.c >= 0;
+			const corner = kept ? grid[at.r]![at.c]! : unspanned(cellAt(before, r, c));
+			if (kept) grid[at.r]![at.c] = emptyCell();
+			grid[down.from]![across.from] = spanning(
+				corner,
+				across.to - across.from + 1,
+				down.to - down.from + 1
+			);
+		})
+	);
+	return fromRows(after, grid);
+}
+
+/** The identity line map over `n` lines. */
+const lines = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
 
 /**
  * The rows as one list, header first: the space a row op works in. `header` is a
@@ -133,10 +369,13 @@ export function withCell(props: TableProps, r: number, c: number, cell: TableCel
 export function insertRow(props: TableProps, r: number): TableProps {
 	const at = Math.max(0, Math.min(r, props.rows.length));
 	const fresh = Array.from({ length: columnCount(props) }, emptyCell);
-	return normalizeTable({
+	const next = normalizeTable({
 		...props,
 		rows: [...props.rows.slice(0, at), fresh, ...props.rows.slice(at)]
 	});
+	const map = lines(rowCount(props));
+	map.splice(at + 1, 0, -1);
+	return carrySpans(props, next, map, lines(columnCount(props)));
 }
 
 /** Drop row `r`, the header included: the row left at index 0 is the header, which is
@@ -145,9 +384,15 @@ export function insertRow(props: TableProps, r: number): TableProps {
 export function deleteRow(props: TableProps, r: number): TableProps {
 	const rows = allRows(props);
 	if (rows.length <= 1 || r < 0 || r >= rows.length) return normalizeTable(props);
-	return fromRows(
+	const map = lines(rows.length).filter((i) => i !== r);
+	return carrySpans(
 		props,
-		rows.filter((_, i) => i !== r)
+		fromRows(
+			props,
+			rows.filter((_, i) => i !== r)
+		),
+		map,
+		lines(columnCount(props))
 	);
 }
 
@@ -155,26 +400,28 @@ export function deleteRow(props: TableProps, r: number): TableProps {
 export function insertColumn(props: TableProps, c: number): TableProps {
 	const at = Math.max(0, Math.min(c + 1, columnCount(props)));
 	const splice = <T>(xs: T[], fresh: T): T[] => [...xs.slice(0, at), fresh, ...xs.slice(at)];
-	return normalizeTable({
+	const next = normalizeTable({
 		...props,
 		header: splice(props.header, emptyCell()),
 		rows: props.rows.map((row) => splice(row, emptyCell())),
 		aligns: splice(props.aligns, 'none'),
 		widths: props.widths && splice(props.widths, null)
 	});
+	return carrySpans(props, next, lines(rowCount(props)), splice(lines(columnCount(props)), -1));
 }
 
 /** Drop column `c`; a no-op at one column (a table has at least one). */
 export function deleteColumn(props: TableProps, c: number): TableProps {
 	if (columnCount(props) <= 1) return normalizeTable(props);
 	const drop = <T>(xs: T[]) => xs.filter((_, i) => i !== c);
-	return normalizeTable({
+	const next = normalizeTable({
 		...props,
 		header: drop(props.header),
 		rows: props.rows.map(drop),
 		aligns: drop(props.aligns),
 		widths: props.widths && drop(props.widths)
 	});
+	return carrySpans(props, next, lines(rowCount(props)), drop(lines(columnCount(props))));
 }
 
 /** One element moved within an array, out of place. The whole of what both move ops
@@ -194,7 +441,12 @@ export function moveRow(props: TableProps, r: number, by: number): TableProps {
 	const rows = allRows(props);
 	const to = Math.max(0, Math.min(r + by, rows.length - 1));
 	if (r === to || r < 0 || r >= rows.length) return normalizeTable(props);
-	return fromRows(props, move(rows, r, to));
+	return carrySpans(
+		props,
+		fromRows(props, move(rows, r, to)),
+		move(lines(rows.length), r, to),
+		lines(columnCount(props))
+	);
 }
 
 /** Column `c` moved by `by` places, clamped. `aligns` and `widths` travel with the
@@ -204,13 +456,14 @@ export function moveColumn(props: TableProps, c: number, by: number): TableProps
 	const to = Math.max(0, Math.min(c + by, columnCount(props) - 1));
 	if (c === to || c < 0 || c >= columnCount(props)) return normalizeTable(props);
 	const shift = <T>(xs: T[]): T[] => move(xs, c, to);
-	return normalizeTable({
+	const next = normalizeTable({
 		...props,
 		header: shift(props.header),
 		rows: props.rows.map(shift),
 		aligns: shift(props.aligns),
 		widths: props.widths && shift(props.widths)
 	});
+	return carrySpans(props, next, lines(rowCount(props)), shift(lines(columnCount(props))));
 }
 
 /**
@@ -352,14 +605,15 @@ export function cellEqual(a: TableCell, b: TableCell): boolean {
 	return a.text === b.text && valueEqual(a.marks, b.marks);
 }
 
-/** Whether two tables have the same rectangle, alignment, header and widths: the
- *  change that forces a rebuild rather than a per-cell reseed. */
+/** Whether two tables have the same rectangle, alignment, header, widths and merged
+ *  cells: the change that forces a rebuild rather than a per-cell reseed. */
 export function shapeEqual(a: TableProps, b: TableProps): boolean {
 	return (
 		a.rows.length === b.rows.length &&
 		a.aligns.length === b.aligns.length &&
 		a.aligns.every((x, i) => x === b.aligns[i]) &&
 		!a.headless === !b.headless &&
-		valueEqual(a.widths, b.widths)
+		valueEqual(a.widths, b.widths) &&
+		valueEqual(cellBlocks(a), cellBlocks(b))
 	);
 }

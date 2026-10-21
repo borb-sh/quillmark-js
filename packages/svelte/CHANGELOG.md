@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Table cells merge across columns and down rows.** Sweep two or more cells and press Merge cells under the block: the cells become one, holding each cell's text a line each, and Split cells returns a merged cell to single cells, its text in the top-left one. A merged cell stores as `colspan` and `rowspan` on its top-left cell, the cells it covers kept empty, which the engine spells as a `qm-cell` pair and draws in the PDF. A row or column inserted inside a merged cell joins it, one deleted shrinks it, and a move that parts it splits it. A table pasted from Word, Docs or a browser keeps its merged cells, where it split them, and a copied block writes them as spanning cells. `TableChromeStrings` gains `tableMergeCells` and `tableSplitCells`. (#792)
+
 ## v0.23.0 - 2026-10-19
 
 **`max:` caps a `text` or `richtext` field's characters in the editor.** A field, an object's property, a variant's cell or an array's element declaring it takes no keystroke past the cap and lands a paste up to it, dropping the rest, so the document never earns `validation::over_length`; a value stored past the cap edits down and grows no further. A labelled field draws its count at the end of its label row (`12 / 40`), which the leaf names as its description. The count is the engine's: Unicode characters of the plain text, a line break as one, trailing line breaks and a one-line `text`'s trailing whitespace as none. `VisualStrings` gains `textCount`, and `createField` and `proseLeafPlugins` take `cap`. The workspace pins `@quillmark/wasm` 0.126.2, the release that declares the cap.

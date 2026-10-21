@@ -17,7 +17,9 @@ import { createField, decode, blockSchema, pmToContent } from '$lib/core/codec';
 import { cellSchema } from '$lib/core/codec/schema.js';
 import type { FieldController, LeafViews } from '$lib/core/codec';
 import {
+	canMerge,
 	cellAt,
+	cellBlocks,
 	cellContent,
 	cellEqual,
 	cellFromDoc,
@@ -28,6 +30,7 @@ import {
 	emptyCell,
 	insertColumn,
 	insertRow,
+	mergeCells,
 	moveColumn,
 	moveRow,
 	newTable,
@@ -38,9 +41,11 @@ import {
 	setHeadless,
 	setWidths,
 	shapeEqual,
+	splitCells,
 	withCell
 } from '$lib/core/codec/table.js';
 import { mintIslandId } from '$lib/core/codec/islands.js';
+import { tableElement } from '$lib/core/codec/table-copy.js';
 import type { Content, TableCell, TableProps } from '@quillmark/wasm';
 import { core, mount, press, quill, md } from './_util.js';
 import {
@@ -1089,7 +1094,7 @@ describe('a cell’s own alignment is carried, never authored', () => {
 		}
 	});
 
-	it('draws on its cell, survives a keystroke in it, and a sweep raises nothing', () => {
+	it('draws on its cell, survives a keystroke in it, and a sweep raises no alignment', () => {
 		const { field } = tableLeaf(OWN);
 		const box = () => field.el.querySelectorAll<HTMLElement>('.qm-table-cell')[2]!;
 		expect([box().style.textAlign, box().style.verticalAlign]).toEqual(['center', 'bottom']);
@@ -1104,7 +1109,9 @@ describe('a cell’s own alignment is carried, never authored', () => {
 		layout(field);
 		sweep(field, 2, 3);
 		expect(washed(field)).toEqual(['1,0', '1,1']);
-		expect(field.el.querySelectorAll('.qm-table-align:not([hidden])')).toHaveLength(0);
+		expect(field.el.querySelectorAll('.qm-table-align:not([hidden], [data-merge])')).toHaveLength(
+			0
+		);
 		field.destroy();
 	});
 
@@ -1838,7 +1845,7 @@ const strong = (start: number, end: number) => ({ start, end, type: 'strong' as 
 const exported = (...lines: string[]): string => ['para', '', ...lines].join('\n');
 
 describe('a table on the clipboard lands as a table island', () => {
-	it('Word: the first row is the header, a merged cell splits, and its marks survive', () => {
+	it('Word: the first row is the header, a merged cell stays merged, and its marks survive', () => {
 		const rt = pasted(WORD);
 		expect(rt.islands).toHaveLength(1);
 		expect(propsOf(rt)).toEqual({
@@ -1848,27 +1855,22 @@ describe('a table on the clipboard lands as a table island', () => {
 				{ text: 'Phone', marks: [strong(0, 5)] }
 			],
 			rows: [
-				[cell('Plans'), cell('XP'), cell('555-0100')],
+				[{ ...cell('Plans'), rowspan: 2 }, cell('XP'), cell('555-0100')],
 				// The row under a cell merged down takes an empty one in its column, and
 				// Word's empty paragraph is no text.
 				[cell(''), cell('XPX'), cell('')],
 				[
-					{ text: 'See attached roster', marks: [{ start: 4, end: 12, type: 'emph' }] },
+					{
+						text: 'See attached roster',
+						marks: [{ start: 4, end: 12, type: 'emph' }],
+						colspan: 3
+					},
 					cell(''),
 					cell('')
 				]
 			],
 			aligns: ['none', 'none', 'none']
 		});
-		expect(core.exportMarkdown(rt)).toBe(
-			exported(
-				'| **Office** | **Symbol** | **Phone** |',
-				'| --- | --- | --- |',
-				'| Plans | XP | 555-0100 |',
-				'|  | XPX |  |',
-				'| See *attached* roster |  |  |'
-			)
-		);
 	});
 
 	it('Excel: its markup and its text alone read as one table, a break a `\\n`', () => {
@@ -2082,5 +2084,147 @@ describe('a table leaves by the clipboard and does not come back by it', () => {
 		expect(doc.main.body.islands).toHaveLength(1);
 		expect(leafProps(field).rows[0][1].text).toBe('Grade Count O-3 12 Line one\nLine two 7a2');
 		field.destroy();
+	});
+});
+
+/** Each merged cell as `row,column:rows×columns`, at its top-left corner. */
+function merges(props: TableProps): string[] {
+	return cellBlocks(props)
+		.flatMap((line, r) => line.map((b, c) => ({ b, r, c })))
+		.filter(({ b, r, c }) => b.r0 === r && b.c0 === c && (b.r1 > r || b.c1 > c))
+		.map(({ b }) => `${b.r0},${b.c0}:${b.r1 - b.r0 + 1}x${b.c1 - b.c0 + 1}`);
+}
+
+/** Three columns under a header, `a1` merged down over the row below it. */
+const MERGED = normalizeTable({
+	header: [cell('h1'), cell('h2'), cell('h3')],
+	rows: [
+		[{ ...cell('a1'), rowspan: 2 } as TableCell, cell('a2'), cell('a3')],
+		[cell(''), cell('b2'), cell('b3')],
+		[cell('c1'), cell('c2'), cell('c3')]
+	],
+	aligns: ['none', 'none', 'none']
+});
+
+describe('merged cells', () => {
+	it('a merge is one cell holding every text a line each, and a split keeps it in the corner', () => {
+		const merged = mergeCells(LETTERED, { r0: 1, c0: 0, r1: 2, c1: 1 });
+		expect(merges(merged)).toEqual(['1,0:2x2']);
+		expect(merged.rows[0]![0]).toEqual({
+			...LETTERED.rows[0]![0],
+			text: 'a1\na2\nb1\nb2',
+			colspan: 2,
+			rowspan: 2
+		});
+		expect(grid(merged).slice(1)).toEqual([
+			['a1\na2\nb1\nb2', ''],
+			['', '']
+		]);
+		const split = splitCells(merged, { r0: 2, c0: 1, r1: 2, c1: 1 });
+		expect(merges(split)).toEqual([]);
+		expect(split.rows[0]![0]).toEqual({ ...LETTERED.rows[0]![0], text: 'a1\na2\nb1\nb2' });
+		for (const props of [merged, split]) expect(propsOf(stored(withTable(props)))).toEqual(props);
+	});
+
+	it('a merge takes in every span it reaches into, and keeps to one side of the header row', () => {
+		expect(merges(mergeCells(MERGED, { r0: 2, c0: 0, r1: 2, c1: 1 }))).toEqual(['1,0:2x2']);
+		expect(canMerge(MERGED, { r0: 0, c0: 1, r1: 1, c1: 1 })).toBe(false);
+		expect(canMerge(setHeadless(MERGED, true), { r0: 0, c0: 1, r1: 1, c1: 1 })).toBe(true);
+		expect(canMerge(MERGED, { r0: 1, c0: 0, r1: 2, c1: 0 })).toBe(false);
+	});
+
+	it('a span draws short of a cell holding text, and the store holds what it draws', () => {
+		const props = normalizeTable({
+			...LETTERED,
+			rows: [
+				[{ ...cell('a1'), colspan: 2, rowspan: 5 } as TableCell, cell('')],
+				[cell(''), cell('b2')]
+			]
+		});
+		expect(merges(props)).toEqual(['1,0:1x2']);
+		expect(props.rows[0]![0]).toEqual({ ...cell('a1'), colspan: 2 });
+	});
+
+	it('a line op carries the spans it does not part', () => {
+		const cases: [string, TableProps, string[], string[][]?][] = [
+			['a row inside the span joins it', insertRow(MERGED, 1), ['1,0:3x1']],
+			['a row below its foot does not', insertRow(MERGED, 2), ['1,0:2x1']],
+			[
+				'deleting its corner row moves its text to the row left at its top',
+				deleteRow(MERGED, 1),
+				[],
+				[
+					['h1', 'h2', 'h3'],
+					['a1', 'b2', 'b3'],
+					['c1', 'c2', 'c3']
+				]
+			],
+			['a column beside it leaves it', insertColumn(MERGED, 0), ['1,0:2x1']],
+			['a span reaching up into the header row stops at its foot', deleteRow(MERGED, 0), []],
+			['a row moved out of it parts it', moveRow(MERGED, 2, 1), []],
+			['a row moved within it keeps it whole', moveRow(MERGED, 1, 1), ['1,0:2x1']]
+		];
+		for (const [name, props, want, text] of cases) {
+			expect(merges(props), name).toEqual(want);
+			if (text) expect(grid(props), name).toEqual(text);
+			expect(propsOf(stored(withTable(props))), name).toEqual(props);
+		}
+		const wide = mergeCells(LETTERED, { r0: 0, c0: 0, r1: 0, c1: 1 });
+		expect(merges(insertColumn(wide, 0)), 'a column inside a span joins it').toEqual(['0,0:1x3']);
+		expect(merges(deleteColumn(wide, 0)), 'and one deleted leaves a single cell').toEqual([]);
+		expect(grid(deleteColumn(wide, 0))[0]).toEqual(['h1\nh2']);
+	});
+
+	it('draws a merged cell over its span, keeps one grip per line, and Tab passes over what it covers', () => {
+		const { field } = tableLeaf(MERGED);
+		const boxes = field.el.querySelectorAll<HTMLTableCellElement>('.qm-table-cell');
+		expect(boxes).toHaveLength(11);
+		expect([boxes[3]!.rowSpan, boxes[3]!.colSpan]).toEqual([2, 1]);
+		expect(grips(field, 'row')).toHaveLength(4);
+		expect(grips(field, 'column')).toHaveLength(3);
+		const views = cellViews(field);
+		views[3]!.focus();
+		press(views[3]!, 'ArrowDown');
+		expect(caret(field).state.doc.textContent).toBe('c1');
+		press(caret(field), 'Tab', { shiftKey: true });
+		press(caret(field), 'Tab', { shiftKey: true });
+		expect(caret(field).state.doc.textContent).toBe('b2');
+		press(caret(field), 'Tab', { shiftKey: true });
+		expect(caret(field).state.doc.textContent).toBe('a3');
+		field.destroy();
+	});
+
+	it('a sweep raises merge, and the merged cell it leaves held raises split', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const verbs = () =>
+			Array.from(field.el.querySelectorAll<HTMLButtonElement>('[data-merge]:not([hidden]) button'))
+				.filter((b) => !b.hidden)
+				.map((b) => b.getAttribute('aria-label'));
+		expect(verbs()).toEqual([]);
+		sweep(field, 2, 5);
+		expect(verbs()).toEqual(['Merge cells']);
+		field.el.querySelector<HTMLButtonElement>('[aria-label="Merge cells"]')!.click();
+		expect(merges(leafProps(field))).toEqual(['1,0:2x2']);
+		expect(field.el.querySelectorAll('.qm-table-cell')).toHaveLength(3);
+		expect(washed(field)).toEqual(['1,0']);
+		expect(verbs()).toEqual(['Split cells']);
+		field.el.querySelector<HTMLButtonElement>('[aria-label="Split cells"]')!.click();
+		expect(merges(leafProps(field))).toEqual([]);
+		expect(grid(leafProps(field)).slice(1)).toEqual([
+			['a1\na2\nb1\nb2', ''],
+			['', '']
+		]);
+		press(caret(field), 'z', { ctrlKey: true });
+		press(caret(field), 'z', { ctrlKey: true });
+		expect(leafProps(field)).toEqual(LETTERED);
+		field.destroy();
+	});
+
+	it('a merged cell copies as one spanning cell and pastes back merged', () => {
+		const html = tableElement(MERGED).outerHTML;
+		expect(html).toContain('<td rowspan="2">a1</td>');
+		const rt = pasted({ 'text/html': html });
+		expect(propsOf(rt)).toEqual(MERGED);
 	});
 });

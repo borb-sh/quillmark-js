@@ -681,6 +681,9 @@ li.ProseMirror-selectednode::after {
 	color: var(--_qm-ink);
 	cursor: pointer;
 }
+.qm-table-align-option[hidden] {
+	display: none;
+}
 .qm-table-align-option:hover {
 	background: var(--_qm-surface-hover);
 }

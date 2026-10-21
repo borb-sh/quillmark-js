@@ -11,7 +11,7 @@ import type { TableCell, TableProps } from '@quillmark/wasm';
 import { usvLength } from './decode.js';
 import { pmToContent } from './encode.js';
 import { blockSchema } from './schema.js';
-import { emptyCell, normalizeTable } from './table.js';
+import { emptyCell, normalizeTable, spanning } from './table.js';
 
 const schemaRules = DOMParser.fromSchema(blockSchema).rules;
 
@@ -44,8 +44,9 @@ function cellFromDOM(el: HTMLElement): TableCell {
 /**
  * A `<table>` as table props, or `null` where it holds no cell. Rows run in the order the
  * DOM's `rows` gives them, a `<thead>`'s first, and the first is the header. A merged
- * cell splits: its content in the first slot it covers and an empty cell in each other,
- * so the cells beside and under it keep their columns.
+ * cell stays merged: its content and its span in the first slot it covers and an empty
+ * cell in each other, so the cells beside and under it keep their columns, and the span
+ * draws as far as `normalizeTable` lets it.
  */
 function tableFromDOM(table: HTMLTableElement): TableProps | null {
 	const rows = Array.from(table.rows);
@@ -58,7 +59,7 @@ function tableFromDOM(table: HTMLTableElement): TableProps | null {
 			const down = Math.min(td.rowSpan || rows.length, rows.length - r);
 			for (let dr = 0; dr < down; dr++)
 				for (let dc = 0; dc < across; dc++)
-					grid[r + dr][c + dc] = dr || dc ? emptyCell() : cellFromDOM(td);
+					grid[r + dr][c + dc] = dr || dc ? emptyCell() : spanning(cellFromDOM(td), across, down);
 			c += across;
 		}
 	});

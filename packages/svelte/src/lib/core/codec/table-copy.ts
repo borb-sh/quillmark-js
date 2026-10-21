@@ -9,7 +9,7 @@ import type { TableCell, TableProps } from '@quillmark/wasm';
 import { decode } from './decode.js';
 import { tablePropsOfNode } from './islands.js';
 import { blockSchema, cellSchema } from './schema.js';
-import { cellAt, cellContent, columnCount, rowCount } from './table.js';
+import { cellAt, cellBlocks, cellContent, columnCount, rowCount } from './table.js';
 
 /** A block of cells, both corners inclusive, in the row space `table.ts` names. */
 export interface CellRange {
@@ -28,7 +28,7 @@ const whole = (props: TableProps): CellRange => ({
 
 const cellSerializer = DOMSerializer.fromSchema(cellSchema);
 
-function cellDOM(tag: 'th' | 'td', cell: TableCell): HTMLElement {
+function cellDOM(tag: 'th' | 'td', cell: TableCell): HTMLTableCellElement {
 	const dom = document.createElement(tag);
 	const paragraph = decode(cellContent(cell), cellSchema).firstChild;
 	if (paragraph) dom.append(cellSerializer.serializeFragment(paragraph.content));
@@ -36,17 +36,28 @@ function cellDOM(tag: 'th' | 'td', cell: TableCell): HTMLElement {
 }
 
 /** The cells of `range` as a `<table>`, the header row in a `<thead>` where the range
- *  holds it and the table has one. The cells carry their marks and breaks, and nothing
- *  of the table's layout. */
+ *  holds it and the table has one. The cells carry their marks and breaks and a merged
+ *  cell its span, clipped to the range, and nothing of the table's layout. */
 export function tableElement(props: TableProps, range = whole(props)): HTMLTableElement {
 	const table = document.createElement('table');
+	const blocks = cellBlocks(props);
 	let body: HTMLTableSectionElement | undefined;
 	for (let r = range.r0; r <= range.r1; r++) {
 		const head = r === 0 && !props.headless;
 		const section = head ? table.createTHead() : (body ??= table.createTBody());
 		const tr = section.insertRow();
-		for (let c = range.c0; c <= range.c1; c++)
-			tr.append(cellDOM(head ? 'th' : 'td', cellAt(props, r, c)));
+		for (let c = range.c0; c <= range.c1; c++) {
+			const block = blocks[r]![c]!;
+			const r0 = Math.max(block.r0, range.r0);
+			const c0 = Math.max(block.c0, range.c0);
+			if (r0 !== r || c0 !== c) continue;
+			const dom = cellDOM(head ? 'th' : 'td', cellAt(props, block.r0, block.c0));
+			const across = Math.min(block.c1, range.c1) - c + 1;
+			const down = Math.min(block.r1, range.r1) - r + 1;
+			if (across > 1) dom.colSpan = across;
+			if (down > 1) dom.rowSpan = down;
+			tr.append(dom);
+		}
 	}
 	return table;
 }
