@@ -765,14 +765,16 @@ export function objectSections(fields: FieldModel[]): GroupSection[] {
 /**
  * A card's sections: its ungrouped fields' {@link objectSections}, then each legacy
  * `ui.group` a panel in registry order, the order the loader settles the fields in.
+ * A panel named as a group is keyed off the group's id space, which `.` never joins.
  */
 export function cardSections(cardSchema: QuillCardSchema): GroupSection[] {
 	const fields = fieldModels(cardSchema);
+	const order = groupOrder(cardSchema);
+	const panels = objectSections(fields.filter((f) => f.group === undefined)).map((s) =>
+		s.head && order.includes(s.head.name) ? { ...s, group: `${s.head.name}.` } : s
+	);
 	const grouped = fields.filter((f) => f.group !== undefined);
-	return [
-		...objectSections(fields.filter((f) => f.group === undefined)),
-		...groupSections(grouped, groupOrder(cardSchema), (g) => groupLabel(cardSchema, g))
-	];
+	return [...panels, ...groupSections(grouped, order, (g) => groupLabel(cardSchema, g))];
 }
 
 /**

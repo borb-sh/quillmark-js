@@ -516,6 +516,17 @@ describe('cardSections', () => {
 			['g', undefined]
 		]);
 	});
+	it('keys a panel named as a group apart from the group', () => {
+		const schema = {
+			fields: {
+				g: f({ type: 'object', properties: { a: f({}) } }),
+				phone: f({ ui: { group: 'g' } })
+			},
+			ui: { groups: { g: {} } }
+		} as unknown as Parameters<typeof cardSections>[0];
+		const groups = cardSections(schema).map((s) => s.group);
+		expect(new Set(groups).size).toBe(groups.length);
+	});
 	it('panels top-level objects on a card declaring none', () => {
 		const schema = {
 			fields: { contact: f({ type: 'object', properties: { a: f({}) } }) }
