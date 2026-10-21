@@ -87,7 +87,8 @@ export interface CreateFieldOpts {
 	 * leaf, or a `text` one, is held over a value its schema cannot
 	 * hold (`fitsLeaf`, upstream's `isInline` and `isPlain`): the decode would join lines
 	 * and drop containers and islands for the first commit to store. Any leaf is held
-	 * over an element, which no node holds. A held leaf draws
+	 * over what is read and not edited: an element, a definition list, a footnote and an
+	 * equation (CODEC §Decode). A held leaf draws
 	 * its content on the block schema, read-only, and commits nothing. Judged of the value
 	 * each mount and re-hydrate reads, so {@link FieldController.applyExternal} is what
 	 * re-evaluates it.

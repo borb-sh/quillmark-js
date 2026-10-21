@@ -162,6 +162,21 @@ li.ProseMirror-selectednode::after {
 	pointer-events: none;
 }
 
+/* A footnote and an equation are read, not edited (CODEC §Decode), and draw as what
+   their markdown writes: a footnote its reference mark, numbered in reading order off a
+   counter each leaf resets, its note the marker's title (`islands.ts`); an equation its
+   TeX between its dollars, in the code face. */
+.ProseMirror {
+	counter-reset: qm-footnote;
+}
+.ProseMirror sup[data-qm-island='footnote']::after {
+	counter-increment: qm-footnote;
+	content: counter(qm-footnote);
+}
+.ProseMirror [data-qm-island='math'] {
+	font-family: var(--_qm-font-mono);
+}
+
 /* A link takes the surface's ink (the UA's blue is the `#8cf` defect again) and a
    dotted underline. Dotted rather than solid because `underline` is a mark in the
    same schema, and a solid rule renders an authored `<u>` and a link identically in a

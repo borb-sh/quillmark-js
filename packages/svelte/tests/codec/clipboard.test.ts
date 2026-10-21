@@ -201,6 +201,19 @@ describe('what the parse rules refuse', () => {
 		expect(parse(html).toString()).toBe('doc(paragraph("keep me"))');
 	});
 
+	// A footnote and an equation are in the vocabulary and read, not edited: no gesture
+	// mints one, so the element's text is what arrives.
+	it.each([
+		[
+			'an equation',
+			'<p><span data-qm-island="math" data-qm-island-id="isl-0">$x$</span></p>',
+			'$x$'
+		],
+		['a footnote', '<p>a<sup data-qm-island="footnote" data-qm-island-id="isl-0"></sup></p>', 'a']
+	])('%s mints no island, and its text stands', (_name, html, text) => {
+		expect(parse(html).toString()).toBe(`doc(paragraph("${text}"))`);
+	});
+
 	// CommonMark admits no line ending in a link destination, so the authored lane
 	// refuses one at `MarkOp.add` AND at `overwrite`: a field whose two commit lanes
 	// both throw stops persisting for the session, since the PM doc still holds the

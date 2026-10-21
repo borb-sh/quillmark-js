@@ -9,7 +9,7 @@
 // code point so an astral char is one unit, never a surrogate half.
 import { DOMSerializer, type Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
 import type { Content, ContentContainer, ContentLine, ContentMark } from '@quillmark/wasm';
-import { ISLAND_SLOT, isBlockIsland, type IslandNodeAttrs } from './islands.js';
+import { ISLAND_SLOT, isBlockIsland, isEditedIsland, type IslandNodeAttrs } from './islands.js';
 import { descriptorOf, markKey, pmMarkFromContent } from './marks.js';
 import { core } from '../lifecycle.js';
 import { hasMarks, isBlockSchema, isInlineSchema, takesLineBreak } from './schema.js';
@@ -116,7 +116,8 @@ export function fitsPlain(rt: Content): boolean {
 
 /** Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed
  *  and {@link fitsPlain} plain, past which the decode drops what the first commit would
- *  store; on the block schema anything but an element ({@link editable}),
+ *  store; on the block schema anything but a construct read and not edited — an element,
+ *  a definition list ({@link editable}), a footnote or an equation (`isEditedIsland`) —
  *  and an island where the leaf mounts no island view (`islands`), which draws as its
  *  placeholder tag, an atom a keystroke deletes unseen. What a leaf held over the rest
  *  reads. */
@@ -126,12 +127,15 @@ export function fitsLeaf(
 ): boolean {
 	if (leaf.inline) return fitsInline(rt);
 	if (leaf.plaintext) return fitsPlain(rt);
-	return (leaf.islands || rt.islands.length === 0) && rt.lines.every(editable);
+	if (!leaf.islands && rt.islands.length) return false;
+	return rt.islands.every((isl) => isEditedIsland(isl.type)) && rt.lines.every(editable);
 }
 
-/** Whether every container on `line` is one the block schema edits: an element decodes
- *  to no node, so the first commit would drop it. */
+/** Whether the block schema edits `line`'s kind and every container on it: a term draws
+ *  as a paragraph and an element and a description as the blocks they wrap, so the first
+ *  commit would drop each. */
 function editable(line: ContentLine): boolean {
+	if (line.kind === 'term') return false;
 	return line.containers.every((c) => c.container === 'quote' || c.container === 'list_item');
 }
 
@@ -234,9 +238,9 @@ function groupBlocks(
 			i = j;
 			continue;
 		}
-		if (here.container === 'element') {
-			// No node holds an element, and a leaf holding one is held (`fitsLeaf`), so
-			// what it wraps draws in place, read-only.
+		if (here.container === 'element' || here.container === 'description') {
+			// No node holds an element or a description, and a leaf holding one is held
+			// (`fitsLeaf`), so what it wraps draws in place, read-only.
 			const key = containerKey(here);
 			let j = i + 1;
 			while (j < leaves.length) {
@@ -294,7 +298,7 @@ function instanceOf(c: ContentContainer): number {
 
 /** Identity of a container for run gathering: its name, its `instance` and an element's
  * attributes, NUL-joined as `markKey` joins a mark's. `list_item` carries its own run
- * rule, so the quote and the element are what key here. */
+ * rule, so the rest are what key here. */
 function containerKey(c: ContentContainer): string {
 	const attrs = c.container === 'element' ? JSON.stringify(c.attrs) : '';
 	return `${c.container}\u0000${instanceOf(c)}\u0000${attrs}`;
@@ -315,13 +319,15 @@ function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: Isla
 			return schema.nodes.code_block.create({ lang: line.attrs?.lang ?? null }, content);
 		}
 		case 'para':
+		case 'term':
 		case 'heading': {
-			if (line.kind === 'para' && blockIslandLine(leaf, cursor))
+			if (line.kind !== 'heading' && blockIslandLine(leaf, cursor))
 				return schema.nodes.island_block.create(islandAttrs(cursor)!);
 			// Inline content, the segment boundary a `hard_break` in a paragraph and a space
 			// in a heading, which takes none (`schema.ts` §`takesLineBreak`). A stored heading
 			// carries no continuation — the store clears one after a block of a single line —
-			// so the space is what keeps a hand-built content decodable.
+			// so the space is what keeps a hand-built content decodable. A term draws as a
+			// paragraph, read-only (`fitsLeaf`).
 			const type = line.kind === 'heading' ? schema.nodes.heading : schema.nodes.paragraph;
 			const inline: PMNode[] = [];
 			leaf.segments.forEach((seg, idx) => {
