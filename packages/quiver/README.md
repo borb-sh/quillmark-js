@@ -37,7 +37,7 @@ const root = dirname(createRequire(import.meta.url).resolve('@org/my-quiver/Quiv
 const quiver = await fromDir(root);
 const engine = new Engine();
 
-const { Document } = await init(); // the gate is the only door to Document
+const { Document } = await init(); // Document is exported only through init()
 const doc = Document.fromMarkdown(markdownString);
 const quill = await quiver.getQuill(doc.quillRef);
 const result = await engine.render(quill, doc, { format: 'pdf' });
@@ -82,7 +82,7 @@ import { Quiver } from '@quillmark/quiver';
 const quiver = await Quiver.fromBuiltUrl('/quivers/my-quiver/');
 const engine = new Engine();
 
-const { Document } = await init(); // the gate is the only door to Document
+const { Document } = await init(); // Document is exported only through init()
 const doc = Document.fromMarkdown(markdownString);
 const quill = await quiver.getQuill(doc.quillRef);
 const result = await engine.render(quill, doc, { format: 'pdf' });
