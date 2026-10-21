@@ -250,6 +250,15 @@
         linebreak()
       }
       text(size: 9pt)[Date: #shown-date(path + "signed_on", box(width: 90pt, line(length: 100%)))]
+    } else if kind == "credits" {
+      // A group is data: each object panel is one dictionary under the card.
+      let publisher = card.at("publisher", default: (:))
+      let rights = card.at("rights", default: (:))
+      v(6pt)
+      text(size: 8.5pt)[
+        #card.at("edition", default: "") #publisher.at("name", default: "")
+        © #str(rights.at("year", default: 2026)) #rights.at("holder", default: "")
+      ]
     }
   }
 }

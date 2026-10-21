@@ -500,3 +500,64 @@ card_kinds:
         multiline: false
         default: ""
         description: Set under the figure.
+
+  credits:
+    title: Credits
+    description: "Who made it. The kind that groups by top-level `object` and declares no `ui.groups`, so each framed object draws as a panel of its own in declaration order, and the fields beside them stand unframed above."
+    body:
+      enabled: false
+    fields:
+      edition:
+        type: text
+        default: ""
+        description: Which edition this is. A top-level scalar, so it stands above the panels.
+      printing:
+        type: object
+        properties:
+          run:
+            type: integer
+            default: 1
+            description: How many copies.
+        ui:
+          layout: flat
+        description: "A top-level object asking `ui.layout: flat`, which opts out of the panel: it stands above the panels as a flat subform."
+      publisher:
+        type: object
+        title: Publisher
+        description: Who published it. A top-level object, so a panel, headed by its `title` and carrying this description beside the header.
+        properties:
+          name:
+            type: text
+            default: ""
+            description: As imprinted.
+          address:
+            type: object
+            properties:
+              city:
+                type: text
+                default: ""
+              country:
+                type: text
+                default: ""
+            description: An object inside the panel's object, which draws as the nested subform it would anywhere. There is never a panel inside a panel.
+      rights:
+        type: object
+        title: Rights
+        properties:
+          holder:
+            type: text
+            default: ""
+            description: Who holds the copyright.
+          year:
+            type: integer
+            default: 2026
+        description: The second panel, closed while the first is open.
+      translators:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: text
+        default: []
+        description: An `array` of `object`, which stays a record list rather than becoming a panel.

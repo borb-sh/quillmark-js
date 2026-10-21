@@ -1,5 +1,6 @@
 <!--
- One card block, its fields grouped by `ui.group`/`ui.compact`. `main` is headerless
+ One card block, its top-level objects (or legacy `ui.group`s) drawn as panels and its
+ fields packed by `ui.compact`. `main` is headerless
  and takes no controls. Every prose leaf takes a parent-built live address, so a card
  reorder re-targets its commits without a remount.
 -->
@@ -273,9 +274,9 @@
 								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
 								{@const headHint = section.head?.description}
 								<div class={['qm-group', { 'qm-open': isOpen }]}>
-									<!-- A flat field alone in its section is named by the header, which
-								     takes its label id and parks its description: the field draws no
-								     label of its own to say the section's name twice. -->
+									<!-- A panel's object, or a flat field alone in its section, is named by
+								     the header, which takes its label id and parks its description: the
+								     field draws no label of its own to say the section's name twice. -->
 									<div class="qm-group-head">
 										<button
 											type="button"

@@ -11,6 +11,8 @@ import {
 	groupOrder,
 	groupLabel,
 	groupSections,
+	objectSections,
+	cardSections,
 	initialExpandedGroup,
 	placeFields,
 	titleText,
@@ -470,6 +472,50 @@ describe('groupSections', () => {
 	it('heads none where the field is framed or has company', () => {
 		expect(sections({ quals: framed })[0].head).toBeUndefined();
 		expect(sections({ quals: flat, note: f({ ui: { group: 'q' } }) })[0].head).toBeUndefined();
+	});
+});
+
+describe('objectSections', () => {
+	const obj = (extra: Partial<QuillFieldSchema> = {}) =>
+		f({ type: 'object', properties: { a: f({}) }, ...extra });
+	const sections = (fields: Record<string, QuillFieldSchema>) =>
+		objectSections(fieldModels({ fields }));
+
+	it('panels each framed top-level object, headed by it, after one unframed section', () => {
+		const out = sections({
+			first: obj({ title: 'First' }),
+			note: f({}),
+			second: obj(),
+			flat: obj({ ui: { layout: 'flat' } }),
+			rows: f({ type: 'array', items: obj() })
+		});
+		expect(out.map((s) => [s.group, s.label, s.head?.name])).toEqual([
+			[undefined, '', undefined],
+			['first', 'First', 'first'],
+			['second', 'Second', 'second']
+		]);
+		expect(out[0].fields.map((m) => m.name)).toEqual(['note', 'flat', 'rows']);
+	});
+	it('draws no unframed section where every field is a panel', () => {
+		expect(sections({ a: obj() }).map((s) => s.group)).toEqual(['a']);
+	});
+});
+
+describe('cardSections', () => {
+	it('keeps the legacy sectioning on a card declaring `ui.groups`', () => {
+		const schema = {
+			fields: { contact: f({ type: 'object', ui: { group: 'g' }, properties: { a: f({}) } }) },
+			ui: { groups: { g: {} } }
+		} as unknown as Parameters<typeof cardSections>[0];
+		const [section] = cardSections(schema);
+		expect(section.group).toBe('g');
+		expect(section.head).toBeUndefined();
+	});
+	it('panels top-level objects on a card declaring none', () => {
+		const schema = {
+			fields: { contact: f({ type: 'object', properties: { a: f({}) } }) }
+		} as unknown as Parameters<typeof cardSections>[0];
+		expect(cardSections(schema).map((s) => s.head?.name)).toEqual(['contact']);
 	});
 });
 

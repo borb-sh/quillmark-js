@@ -111,13 +111,25 @@ export const mountInner = (q: Quill, doc: Document, extra: Partial<VisualEditorP
 export const activeView = (editor: InnerRef): EditorView => editor.getActiveLeaf()!.views.view;
 
 /** A field by the text of its own label: the first label inside the field's box, which
- *  for a control that owns its label row (an array, a matrix) is that row's. */
+ *  for a control that owns its label row (an array, a matrix) is that row's, else the
+ *  header of the panel it heads. */
 export function field(target: HTMLElement, label: string): HTMLElement {
-	const match = [...target.querySelectorAll<HTMLElement>('.qm-field')].find(
-		(f) => f.querySelector('.qm-field-label span')?.textContent === label
-	);
+	const match =
+		[...target.querySelectorAll<HTMLElement>('.qm-field')].find(
+			(f) => f.querySelector('.qm-field-label span')?.textContent === label
+		) ?? headed(target, label);
 	if (!match) throw new Error(`no field labelled ${label}`);
 	return match;
+}
+
+/** The field a panel header names in place of a label of its own: a header carries an
+ *  id only where it heads one. */
+function headed(target: HTMLElement, label: string): HTMLElement | undefined {
+	const header = [...target.querySelectorAll<HTMLElement>('.qm-group-header')].find(
+		(h) => h.id && h.textContent?.trim() === label
+	);
+	const panel = header && document.getElementById(header.getAttribute('aria-controls')!);
+	return panel?.querySelector<HTMLElement>('.qm-field') ?? undefined;
 }
 
 /** Open the group section whose header reads `label`, as a press does. */

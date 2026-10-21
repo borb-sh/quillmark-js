@@ -59,13 +59,15 @@ export interface FieldModel {
 	plaintext: boolean;
 }
 
-/** A `ui.group` section: its label and the fields (declaration order) inside it. */
+/** A panel section, a top-level `object`'s or a legacy `ui.group`'s: its label and the
+ *  fields (declaration order) inside it. */
 export interface GroupSection {
 	group: string | undefined;
 	label: string;
 	fields: FieldModel[];
-	/** The field the section's header names in place of a label of its own: the one
-	 * field of a group section, where that field is {@link flatObject}. */
+	/** The field the section's header names in place of a label of its own: the object
+	 * a panel is, or the one field of a group section where that field is
+	 * {@link flatObject}. Its properties draw flat, the panel being their frame. */
 	head?: FieldModel;
 }
 
@@ -747,6 +749,34 @@ export function groupSections(
 		emitted.add(f.group);
 	}
 	return sections;
+}
+
+/**
+ * Object-panel sections (VISUAL_EDITOR §"Structure mirrors the schema"): every
+ * top-level `object` not asking `ui.layout: flat` is a panel of its own, headed by
+ * the object, in declaration order; everything else stands in one unframed section
+ * above them. The section id is the field name, which a card's keys hold unique.
+ */
+export function objectSections(fields: FieldModel[]): GroupSection[] {
+	const panel = (f: FieldModel) => f.control === 'object' && !flatObject(f.schema);
+	const loose = fields.filter((f) => !panel(f));
+	const sections: GroupSection[] = loose.length
+		? [{ group: undefined, label: '', fields: loose }]
+		: [];
+	for (const f of fields)
+		if (panel(f)) sections.push({ group: f.name, label: f.label, fields: [f], head: f });
+	return sections;
+}
+
+/**
+ * A card's sections: a card declaring `ui.groups` keeps the legacy sectioning, its
+ * objects subforms inside the groups; any other card panels its top-level objects.
+ */
+export function cardSections(cardSchema: QuillCardSchema): GroupSection[] {
+	const fields = fieldModels(cardSchema);
+	return cardSchema.ui?.groups
+		? groupSections(fields, groupOrder(cardSchema), (g) => groupLabel(cardSchema, g))
+		: objectSections(fields);
 }
 
 /**
