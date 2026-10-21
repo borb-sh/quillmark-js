@@ -174,7 +174,7 @@ describe('nearestAddrForFieldPath', () => {
 	});
 
 	it('does not read an index under a root as a field', () => {
-		// Unmintable for a document — Quillmark emits a field segment before any index
+		// Unmintable for a document — the engine emits a field segment before any index
 		// — and the two segments name nothing, so it drops instead of landing on a body.
 		expect(nearestAddrForFieldPath('main[0]')).toBeUndefined();
 		expect(nearestAddrForFieldPath('cards.indorsement[1][0]')).toBeUndefined();

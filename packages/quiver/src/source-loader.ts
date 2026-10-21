@@ -48,7 +48,7 @@ function refuseUnnamedQuill(quillName: string, quiverName: string): void {
  * Refuse a `Quill.yaml` whose `quill.name` or `quill.version` disagrees with the
  * path it sits at: the catalog serves the path, and a document saved from the quill
  * names what `Quill.yaml` says. A canonical version has one spelling, so the declared
- * one is compared as written. A field absent or not a string is Quillmark's to report
+ * one is compared as written. A field absent or not a string is the engine's to report
  * when the quill loads.
  */
 function refuseMisplacedQuill(

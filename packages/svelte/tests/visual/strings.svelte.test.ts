@@ -105,7 +105,7 @@ describe('formatDiagnostic', () => {
 
 	it('renders the formatted text and never the hint beside it', () => {
 		// `hint` is the tail of the message it accompanies (the boundary asserts it),
-		// so a surface rendering both shows one re-worded sentence with Quillmark's
+		// so a surface rendering both shows one re-worded sentence with the engine's
 		// English under it.
 		const hint = 'Either provide a value of type `richtext` or change the schema.';
 		const { target } = open({

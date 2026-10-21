@@ -59,7 +59,7 @@ describe('the recovery shell', () => {
 		const doc = withForeignCard(q);
 		const engine = new Engine();
 
-		// Quillmark renders past the card and warns: its payload reaches no page.
+		// The engine renders past the card and warns: its payload reaches no page.
 		expect(q.validate(doc).map((d) => d.code)).toContain('validation::unknown_card');
 
 		const { target } = mountEditor(q, doc);

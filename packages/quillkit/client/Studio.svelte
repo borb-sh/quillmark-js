@@ -17,7 +17,7 @@
     editor caret  ─► onCaretMove(at)  ─► preview.focusPosition(at)
     editor focus  ─► onActiveLeafChange ─► preview.endFollow()
 
-  A document Quillmark refuses reaches no session, and the editor needs none: it mounts
+  A document the engine refuses reaches no session, and the editor needs none: it mounts
   on the quill and the document alone, drawing the card the refusal named, while the
   preview says what refused. The edit that answers it tries the open again.
 
@@ -106,7 +106,7 @@
 	/**
 	 * What the strip over the paint stands for, with the surfaces up, and what it is
 	 * called. Four failures reach it and one is shown, in this order: a compile that will
-	 * not land or an open Quillmark refused, which are why the paint does not answer the
+	 * not land or an open the engine refused, which are why the paint does not answer the
 	 * document; what a surface reported, an editor the paint may not answer either; an
 	 * emit that would not write the file. `at` is the failure's place where it carried
 	 * one, a surface's error code for a surface.
@@ -189,7 +189,7 @@
 			thrown = next.refused;
 			carried = next.carry.stranded;
 			// Failed with the surfaces up: the head says the state, and the strip over the
-			// preview says what Quillmark would not take.
+			// preview says what the engine would not take.
 			phase = next.session
 				? { kind: 'ready' }
 				: { kind: 'failed', message: next.refused[0].message };

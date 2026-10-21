@@ -118,7 +118,7 @@ describe('the quill-name charset', () => {
 		expect([...catalog.keys()]).toEqual(['my_quill2']);
 	});
 
-	it('refuses a name Quillmark refuses', async () => {
+	it('refuses a name the engine refuses', async () => {
 		const root = await temp.dir();
 		await buildMinimalQuiver(root, { quills: [{ name: 'My-Memo', version: '1.0.0' }] });
 

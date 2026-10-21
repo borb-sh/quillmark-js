@@ -46,7 +46,7 @@ describe('a boolean field', () => {
 	});
 
 	// The render reads a stored boolean cell more widely than YAML does, so the switch is
-	// held to Quillmark's own reading, `reader.resolve()`, at a field and at a subform
+	// held to the engine's own reading, `reader.resolve()`, at a field and at a subform
 	// cell. A value the render refuses draws as an absent one, here the `false` default.
 	it.each(['true', '"False"', '"TRUE"', '0', '-1', 'yes', '" true"'])(
 		'draws %s as the render reads it',

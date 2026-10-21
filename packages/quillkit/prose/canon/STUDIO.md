@@ -116,7 +116,7 @@ What crosses is the document, as its canonical markdown, landed through the boun
 
 **Showing what stranded is the point**, so those diagnostics reach the controls they name rather than being swallowed as a load warning. They describe the document as it *arrived*, so they are dropped at the first edit and the schema producer speaks for it from then on.
 
-**A card kind the schema stopped declaring strands nothing.** Conform keeps the card whole and emits no `conform::*` diagnostic, so nothing reaches a control; `quill.validate` warns `validation::unknown_card` and Quillmark renders past it. The document lands, and the editor draws that card in its recovery shell — the one surface it is reachable from — so what it costs is the card's ink.
+**A card kind the schema stopped declaring strands nothing.** Conform keeps the card whole and emits no `conform::*` diagnostic, so nothing reaches a control; `quill.validate` warns `validation::unknown_card` and the engine renders past it. The document lands, and the editor draws that card in its recovery shell — the one surface it is reachable from — so what it costs is the card's ink.
 
 Two edges the loop turns on. A ref that went away under the author (a version directory renamed) leaves the document nothing to land in, so whatever the catalog now holds is seeded instead. And a quill the quiver will not **materialize** — a `Quill.yaml` mid-edit — leaves nothing to stand a surface on: the document waits it out as text, the panes go empty, the errors say why, and the next repack that resolves gets it back. A plate that will not compile is not that edge. The quill materializes and the document lands, so the surfaces stand and the line to open is carried where the paint would be.
 

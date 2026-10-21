@@ -96,6 +96,6 @@ export type { QuiverErrorCode } from './errors.js';
 export type { BuildOptions } from './build.js';
 export { isDraft } from './semver.js';
 
-// The canonical types (`Quill`, `Document`, `RenderResult`, …) are not
+// The canonical types (`Quill`, `Document`, `Engine`, `RenderResult`, …) are not
 // re-exported: import them straight from the `@quillmark/wasm` peer dependency,
 // which is their single source of truth.

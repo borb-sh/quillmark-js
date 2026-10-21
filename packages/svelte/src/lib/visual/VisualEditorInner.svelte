@@ -325,9 +325,9 @@
 		try {
 			if (value === undefined) {
 				// The unset rung (VISUAL_EDITOR §"The commitment ladder"): removing the field
-				// leaves Quillmark's authored › `default:` › blank-fill resolve to render the
+				// leaves the engine's authored › `default:` › blank-fill resolve to render the
 				// default, where writing one bakes a snapshot the schema cannot track (canon
-				// SCHEMAS.md: Quillmark never writes a default; the editor writes one only
+				// SCHEMAS.md: the engine never writes a default; the editor writes one only
 				// as the edit that takes it). Removal writes no value, so there is
 				// nothing for a schema to conform and the lane is the quill-free one.
 				if (isMain) {

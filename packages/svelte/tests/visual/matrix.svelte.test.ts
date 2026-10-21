@@ -154,7 +154,7 @@ describe('a matrix field', () => {
 		const m = matrix(mounted.target);
 		expect(tick(m, 'Fonts').checked).toBe(true);
 		expect(tick(m, 'Margins').checked).toBe(true);
-		// The stored `held` is Quillmark's refusal, drawn under the member it names.
+		// The stored `held` is the engine's refusal, drawn under the member it names.
 		expect(member(m, 'Margins').querySelector('.qm-diag-line')).not.toBeNull();
 
 		// The member's next edit writes it back without it.
@@ -273,7 +273,7 @@ describe('an open matrix', () => {
 		expect(document.activeElement).toBe(addBox(m));
 	});
 
-	it("draws Quillmark's refusal of an emptied title under its item", () => {
+	it("draws the engine's refusal of an emptied title under its item", () => {
 		const q = quill();
 		const doc = q.seedDocument();
 		doc.storeField('checks', { kerning: { title: 'Kerning' } });

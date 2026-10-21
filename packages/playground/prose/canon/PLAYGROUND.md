@@ -53,7 +53,7 @@ What is in the list is the **pack's call**, not the route's. `usaf_memo` is held
 
 Two branches are not a schema's to declare — a guidance channel a consumer supplies, and a card whose kind the schema cannot project — and those are **query flags on `/playground`**, read once per open and applied to the opened document: `?tips`, `?foreign`. They carry no chrome, because the only reader is a hand driving the harness, and a switch for one would be a control on the landing page for everyone else.
 
-`?foreign` draws the recovery shell: Quillmark renders past a kind the schema does not declare and warns `validation::unknown_card`, so the preview leaves the card out and the shell is the one surface that reaches it. The retype it offers puts the card on the page.
+`?foreign` draws the recovery shell: the engine renders past a kind the schema does not declare and warns `validation::unknown_card`, so the preview leaves the card out and the shell is the one surface that reaches it. The retype it offers puts the card on the page.
 
 ## Quiver, not bundler
 

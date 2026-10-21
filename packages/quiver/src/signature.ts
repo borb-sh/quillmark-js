@@ -10,7 +10,7 @@ const opens = (bytes: Uint8Array, magic: string): boolean =>
 
 /**
  * TrueType, OpenType or a collection of either; WOFF or WOFF2 where `path` names one.
- * Quillmark parses sfnt alone, so a `.ttf` holding WOFF bytes is refused.
+ * The engine parses sfnt alone, so a `.ttf` holding WOFF bytes is refused.
  */
 export const isFont = (bytes: Uint8Array, path: string): boolean =>
 	(/\.woff2?$/i.test(path) ? WOFF : SFNT).some((magic) => opens(bytes, magic));

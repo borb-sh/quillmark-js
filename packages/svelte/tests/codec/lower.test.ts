@@ -317,7 +317,7 @@ describe('identity anchor round-trip (op-based, survives edits)', () => {
 			});
 		}
 
-		it('agreement is silent: a projection matching Quillmark’s rebase emits no anchor op', () => {
+		it('agreement is silent: a projection matching the engine’s rebase emits no anchor op', () => {
 			const { bundle } = commit(anchorRt, 6, -1, (s) =>
 				s.tr.insertText('X', usvToPM(buildLineIndex(s.doc), 6))
 			);
