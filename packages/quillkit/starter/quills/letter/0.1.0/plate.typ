@@ -12,18 +12,8 @@
 
 #align(right, qm.ink(qm.data, "date", "[month repr:long] [day padding:none], [year]"))
 
-// A text value prints with a space on each side; `flush` drops them, so
-// punctuation after it sits flush.
-#let flush(c) = {
-  if type(c) != content or not c.has("children") { return c }
-  let kids = c.children
-  while kids.len() > 0 and kids.first() == [ ] { kids = kids.slice(1) }
-  while kids.len() > 0 and kids.last() == [ ] { kids = kids.slice(0, -1) }
-  kids.sum(default: [])
-}
-
 // A text field left unanswered is `""`: guard its value.
-#if qm.data.recipient != "" [Dear #flush(qm.ink(qm.data, "recipient")),]
+#if qm.data.recipient != "" [Dear #qm.ink(qm.data, "recipient"),]
 
 #if qm.data.subject != "" [*Re: #qm.ink(qm.data, "subject")*]
 
