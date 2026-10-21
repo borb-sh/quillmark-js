@@ -54,10 +54,7 @@
 		isContainer,
 		shortCell,
 		schemaAt,
-		fieldModels,
-		groupOrder,
-		groupSections,
-		groupLabel,
+		cardSections,
 		cardTitle,
 		kindTitle,
 		fieldValues,
@@ -632,14 +629,11 @@
 			payloadItems: readonly PayloadItem[];
 			ext?: Record<string, unknown>;
 		},
-		cardSchema: Parameters<typeof fieldModels>[0] | undefined,
+		cardSchema: Parameters<typeof cardSections>[0] | undefined,
 		rows: ResolvedCardRows
 	): CardModel {
 		const values = fieldValues(card.payloadItems);
-		const fields = cardSchema ? fieldModels(cardSchema) : [];
-		const sections = cardSchema
-			? groupSections(fields, groupOrder(cardSchema), (g) => groupLabel(cardSchema, g))
-			: [];
+		const sections = cardSchema ? cardSections(cardSchema) : [];
 		const extEditor = card.ext?.editor as { title?: string } | undefined;
 		const hasBody = bodyEnabled(cardSchema);
 		return {

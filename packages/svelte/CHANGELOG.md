@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A card's top-level `object` draws as a panel.** On a card declaring no `ui.groups`, each top-level object not asking `ui.layout: flat` is an accordion panel, the one-open-at-a-time chrome a `ui.group` gets, its `title` the header, its `description` beside it, and its properties standing flat inside. The card's other fields, a flat object included, stand unframed above the panels, which follow in declaration order; an object inside an object stays a subform, and an `array` of `object` a record list or table. A landing on a property inside a closed panel opens it. A card declaring `ui.groups` draws as before, its objects subforms inside its groups. (#772)
+
 ## v0.23.0 - 2026-10-19
 
 **`max:` caps a `text` or `richtext` field's characters in the editor.** A field, an object's property, a variant's cell or an array's element declaring it takes no keystroke past the cap and lands a paste up to it, dropping the rest, so the document never earns `validation::over_length`; a value stored past the cap edits down and grows no further. A labelled field draws its count at the end of its label row (`12 / 40`), which the leaf names as its description. The count is the engine's: Unicode characters of the plain text, a line break as one, trailing line breaks and a one-line `text`'s trailing whitespace as none. `VisualStrings` gains `textCount`, and `createField` and `proseLeafPlugins` take `cap`. The workspace pins `@quillmark/wasm` 0.126.2, the release that declares the cap.
