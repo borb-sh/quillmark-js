@@ -1,4 +1,4 @@
-// `@quillmark/svelte` root: the framework-free substrate.
+// `@quillmark/svelte` root: the substrate, free of any UI framework.
 //
 // The headline surfaces mount from their own subpaths (`@quillmark/svelte/preview`,
 // `/visual`) so a bundler pulls only what an entry reaches; the root

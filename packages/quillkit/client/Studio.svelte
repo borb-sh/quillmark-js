@@ -59,7 +59,7 @@
 	const REPACKED = 'studio:quiver-repacked';
 	/** One apply per settled burst of keystrokes. A structure op skips it. */
 	const RECOMPILE_MS = 120;
-	/** The engine compiled into this bundle, one of the three the build stamps. */
+	/** The wasm compiled into this bundle, one of the three the build stamps. */
 	const WASM = __CARRIED__['@quillmark/wasm'];
 
 	type Phase =
@@ -540,7 +540,7 @@
 <div class="qm-workspace">
 	<header class="qm-bar head">
 		<span class="mark">quillmark<span class="slash">/</span>studio</span>
-		<!-- The engine that painted what is on screen. A client renders through the wasm
+		<!-- The wasm release that painted what is on screen. A client renders through the wasm
 		     it was built with while the author's gate runs whatever they installed, and
 		     nothing at runtime reconciles the two, so the version is stated rather than
 		     left to `npm ls` — which the reader of a client served from elsewhere cannot

@@ -356,7 +356,7 @@ describe('loadBuiltQuiver — a host answering with something else', () => {
 		expect([...tree.keys()].filter((p) => /^\d\./.test(p))).toHaveLength(signatures.length);
 	});
 
-	// The engine parses sfnt alone; a WOFF under `.ttf` would reach Typst and be substituted.
+	// Quillmark parses sfnt alone; a WOFF under `.ttf` would reach Typst and be substituted.
 	it('a .ttf holding WOFF bytes → transport_error naming it', async () => {
 		const artifact = makeArtifact('sample', [
 			{ name: 'memo', version: '1.0.0', fonts: { 'a.ttf': [fontKey(1), enc.encode('wOF2rest')] } }

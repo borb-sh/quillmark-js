@@ -170,7 +170,7 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
  *
  * - **`validation::enum_violation`, `type_mismatch`, `format_violation`**: the
  *   constraint re-words from the quill's schema at `path`, the offending value from
- *   `args` (`value` / `sourceToken` / `actual`, the engine testifying to what it
+ *   `args` (`value` / `sourceToken` / `actual`, Quillmark testifying to what it
  *   saw) and never from the document at `path`: validation runs post-coercion, so
  *   the validator read a value the document does not hold and a sentence built from
  *   `path` names a spelling the user never typed.
@@ -178,7 +178,7 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
  *   refused value being in neither document (unchanged on throw) nor schema.
  * - **`parse::yaml_error_with_location`, `invalid_structure`**: does not re-word. No
  *   `path`; `args` names the block (`blockIndex`) and `location` places the failure in
- *   the document's own coordinates, engine prose riding under no key: the parser's own
+ *   the document's own coordinates, Quillmark prose riding under no key: the parser's own
  *   text, its column and its caret snippet exist only inside `message`.
  * - **`LiveSession.warnings`**: does not re-word. Backend text, an external feed.
  *

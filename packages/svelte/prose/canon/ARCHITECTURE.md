@@ -4,13 +4,13 @@
 
 ## TL;DR
 
-What `@quillmark/svelte` is: the VisualEditor and Preview surfaces, the shared document/engine substrate beneath them, the data flow between them, and the package's public API. `src/lib/` → `svelte-package` → `dist/` is the published tarball; the app that mounts it is a sibling package.
+What `@quillmark/svelte` is: the VisualEditor and Preview surfaces, the shared document/WASM substrate beneath them, the data flow between them, and the package's public API. `src/lib/` → `svelte-package` → `dist/` is the published tarball; the app that mounts it is a sibling package.
 
 ## Core vs chrome
 
 TS-first, zero `.js`. Two layers:
 
-- **Vanilla TS core**: no framework: the `@quillmark/wasm` boundary, document model, codec, ProseMirror integration, and the preview paint loop. Pure `.ts`; ships framework-free `.d.ts`.
+- **Vanilla TS core**: no UI framework: the `@quillmark/wasm` boundary, document model, codec, ProseMirror integration, and the preview paint loop. Pure `.ts`; ships `.d.ts` that depend on no UI framework.
 - **Svelte + bits-ui chrome**: `.svelte` components (`<script lang="ts">`) for toolbars, the schema-driven metadata form, and the split-pane shell; `.svelte.ts` modules for shared reactive logic.
 
 The heavy machinery (ProseMirror, canvas paint) is already framework-agnostic, so the core carries the substance and the chrome stays thin. Svelte earns its place in the stateful UI; a vanilla-core consumer wraps a mount API in a few lines.
@@ -40,7 +40,7 @@ Runes mode makes `export let`, `$:` and `$$props` compile errors. The rest still
 
 **The name is the binding, not the substance.** The headline surfaces are Svelte components, so the package says so: a host reads its framework off the specifier rather than off a README. That the vanilla-TS cores carry the substance is unchanged (§Core vs chrome), and `/core` stays framework-free under a framework-named package deliberately. The name draws the line at the door instead of leaving it implicit, which is what makes a second binding a re-export of `/core` rather than a rewrite, and what keeps the reserved `@quillmark/preview` promotion neutral: the paint loop it would carry reaches no Svelte and no editor-side code today.
 
-Subpaths, not separate packages, because the thing a split would buy (a preview-only consumer not pulling ProseMirror) is a dependency-graph concern that subpath entries already solve: each subpath is its own module root, so a bundler pulls only what the imported entry reaches. The one thing separate packages add, independent versioning, is a cost here: the surfaces share a substrate (Document model, engine boundary, `ContentHit`/`ChangeSet` types) and co-evolve, so a per-package version matrix is tax with no payer.
+Subpaths, not separate packages, because the thing a split would buy (a preview-only consumer not pulling ProseMirror) is a dependency-graph concern that subpath entries already solve: each subpath is its own module root, so a bundler pulls only what the imported entry reaches. The one thing separate packages add, independent versioning, is a cost here: the surfaces share a substrate (Document model, `@quillmark/wasm` boundary, `ContentHit`/`ChangeSet` types) and co-evolve, so a per-package version matrix is tax with no payer.
 
 **What the surfaces share, `/core` declares, and nothing more.** Two vocabularies are named there rather than per subpath, because more than one surface speaks each: the address grammar (`DocPath`, and the `Place` a caret move and a `focusPosition` both take) and the error channel (`EditorError` and the `onError` every surface accepts). Either one declared inside `/preview` or `/visual` forces the other subpath to import across a boundary the package keeps closed, or to declare its own structurally identical copy, which is drift with nothing to catch it. `/core` is the module both already import. The `@quillmark/wasm` API is not re-exported: the handles and boundary types are imported from the peer dependency directly, by package code and consumers alike, so every symbol has one import path and the peer stays the single source of truth (`check:deps`).
 
