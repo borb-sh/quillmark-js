@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.19.1 - 2026-10-22
+
 **Studio links to a template.** `?template=army_memo` opens the template whose file is `army_memo.md` in the quill its `$quill` names, and the address bar carries the template opened, by its file less the `.md`, beside the quill, so a link sent from studio opens that starter. Picking a quill, importing a document or turning examples on or off takes the template out of the address bar; an edit leaves it, and a reload reopens the template. A name the manifest does not list opens what `?quill=` asks for and is taken out of the address bar.
 
 ## v0.19.0 - 2026-10-21
