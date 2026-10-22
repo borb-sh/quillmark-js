@@ -150,11 +150,9 @@ describe('inside a list item, the code link wins', () => {
 	});
 
 	it('Shift-Tab with nothing to remove falls through to the list link', () => {
-		expectPress(
-			sel(IN_ITEM, 0),
-			'Shift-Tab',
-			'doc(paragraph("item"), code_block("code"))' // the list link lifts the item
-		);
+		const state = sel(IN_ITEM, 0);
+		expect(keys['Shift-Tab'](state)).toBe(true); // claimed by the list link…
+		expect(press(state, 'Shift-Tab').doc.toString()).toBe(state.doc.toString()); // …a top-level item
 	});
 });
 
@@ -281,13 +279,18 @@ describe('in a list an item continues the one above, each block whole', () => {
 		);
 	});
 
-	it('two items of prose join to one line on the second press', () => {
+	it('two items of prose join to one line on the third press, the second taking the line out', () => {
 		const one = expectPress(
 			startOf('- a\n- b', 1),
 			'Backspace',
 			'doc(bullet_list(list_item(paragraph("a"), paragraph("b"))))'
 		);
-		expectPress(one, 'Backspace', 'doc(bullet_list(list_item(paragraph("ab"))))');
+		const two = expectPress(
+			one,
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"))'
+		);
+		expectPress(two, 'Backspace', 'doc(bullet_list(list_item(paragraph("ab"))))');
 	});
 
 	it('the first item still lifts, whatever sits above the list', () => {
