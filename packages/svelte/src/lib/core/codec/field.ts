@@ -50,6 +50,7 @@ import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
+import { listPastePlugin } from './list-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
 import { nestingPlugin } from './nesting.js';
 import { tablePastePlugin } from './table-paste.js';
@@ -792,6 +793,7 @@ export function proseLeafPlugins(
 			tablePastePlugin(),
 			tableCopyPlugin(),
 			markdownPastePlugin(),
+			listPastePlugin(),
 			taskPlugin(),
 			nestingPlugin()
 		);

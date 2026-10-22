@@ -209,21 +209,32 @@ describe('a name is offered only where its command would run', () => {
 		field.destroy();
 	});
 
-	it("drops the lists at an item's head, where `- ` declines and Tab owns the nesting", () => {
+	it("offers the other kind at an item's head, where the pick retypes the item's list", () => {
 		const { field, view, state } = leaf('- alpha');
 		typeAt(field, view, 0, '/');
 		expect(state()?.items).not.toContain('list');
-		expect(state()?.items).not.toContain('numbered-list');
+		expect(state()?.items).toContain('numbered-list');
 		// The item holds every other shape the content does, and `# ` / `> ` fire there.
 		expect(state()?.items).toContain('heading');
 		expect(state()?.items).toContain('quote');
 		field.destroy();
 	});
 
-	it("drops them inside an item's first block too, where the pick would wrap the item's own text", () => {
+	it("offers the same inside an item's first block, where a wrap would nest the item's own text", () => {
 		const { field, view, state } = leaf('- alpha beta');
 		typeAt(field, view, 6, '/');
-		expect(state()?.items).toEqual(['table']);
+		expect(state()?.items).toEqual(['numbered-list', 'table']);
+		field.destroy();
+	});
+
+	it('a retyping pick turns the whole list and consumes the run', () => {
+		const { field, view } = leaf('- alpha\n- beta');
+		field.setCaret(0);
+		type(view, '/numbered');
+		field.slashPick('numbered-list');
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("alpha")), list_item(paragraph("beta"))))'
+		);
 		field.destroy();
 	});
 

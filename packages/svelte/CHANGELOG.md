@@ -4,6 +4,18 @@
 
 ## Unreleased
 
+**An item's number is its position, and no keystroke writes one.** Backspace at the head of a later item takes its marker off and keeps its text as an unnumbered line under the item above, where it lifted the item out and split the list, stamping a `start` on the items after it; a nested first item's text joins the item it is nested in. The items below close up, so Enter then Backspace in the middle of a list is the list it was, where it left `1, 3, 4`. An empty item is spent, the caret at the end of the line above. Backspace on a top-level first item still lifts it out, and the next item counts from the list's `start`, where it kept its old number. Shift-Tab out of a top-level item still splits the list, and the tail counts from its own `start`.
+
+**Enter on an empty middle item keeps an unnumbered line under the item above**, where it split the list and restarted the tail at 1; Enter on an empty unnumbered line gives it a marker back as the next item, or leaves the list below the last one.
+
+**Delete at the end of an item joins the next item's line onto it**, its nested list staying under the joined line, where it lifted the next item out of the list. Delete at the end of the line above a list joins the first item's line onto it.
+
+**Tab on a list's first item does nothing**, where the focus left the editor.
+
+**`- ` and `N. ` at the head of an item retype the whole list.** `1. ` numbers a bulleted list and `- ` bullets a numbered one, where both stayed text; `N. ` on a first item sets where the list counts from, back to 1 included, and on a later item is consumed where it is the number the item shows. The `/` menu offers the other kind of list in an item's first block, and the pick retypes the list.
+
+**A pasted list takes the numbering of where it lands** (#807). A list pasted on an empty item joins that list as its next items, in its kind, where it nested under the empty item, and a list pasted on the empty line under a list of its kind joins it. A list pasted on a line of its own keeps the `start` it was copied with; items copied from inside a list count from 1, where they kept the list's `start`.
+
 ## v0.24.0 - 2026-10-21
 
 **The `@quillmark/wasm` peer floor is `>=0.129.0-0`.** A footnote, an equation and a definition list, which markdown spells and 0.129.0 imports, open read-only: a body or a block field holding one is held under its note and commits nothing, so a stored row holding one keeps it. A footnote draws as its reference mark, numbered in reading order with its note as the mark's title, an equation as its TeX between its dollars, and a term and its descriptions as paragraphs. A markdown paste that would build one lands as its text, and an equation copied in the editor pastes as its TeX and a footnote as nothing.
