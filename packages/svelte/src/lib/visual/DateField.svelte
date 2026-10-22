@@ -1,7 +1,7 @@
 <!--
  A `date` (or `datetime`) field → a styled segmented date field on bits-ui. The
- stored value is a string, `YYYY-MM-DD` or `today`; a cleared control commits as the
- focus leaves it, the blank `""` over a `default:`, which stays blank, and `undefined`
+ stored value is a string, `YYYY-MM-DD` or `today`; a cleared control commits as its
+ last segment empties, the blank `""` over a `default:`, which stays blank, and `undefined`
  (the unset rung) where nothing is declared, the parent removing the field. The value-object a date field lowers to is a render-time
  concern: the editor only sees the stored string.
 
@@ -48,12 +48,14 @@
  A segment edit that leaves a segment empty empties the primitive's value, which is
  held rather than committed while the focus stays inside: the first Backspace through
  a date writes nothing unset, and the empty segment shows its hint, not the default's
- digits beside the ones still standing. Leaving settles it: blank where every segment
- is empty, otherwise the stored date back. A field storing no date puts its segments
- back by remounting the primitive, which re-reads an unchanged empty value as nothing
- to sync.
+ digits beside the ones still standing. The keystroke that empties the last segment
+ writes the blank at once, so the render follows the clear without waiting on the
+ focus. Leaving with a segment filled puts the stored date back; a field storing no
+ date puts its segments back by remounting the primitive, which re-reads an unchanged
+ empty value as nothing to sync.
 -->
 <script lang="ts">
+	import { flushSync } from 'svelte';
 	import { DateField as BitsDateField } from 'bits-ui';
 	import { getLocalTimeZone, parseDate, today, type DateValue } from '@internationalized/date';
 	import Icon from './icons/Icon.svelte';
@@ -164,18 +166,28 @@
 	function enter(e: FocusEvent): void {
 		if (!within(e) && value == null && fallbackDate) seat = true;
 	}
+	const filled = (): boolean =>
+		[...(wrapEl?.querySelectorAll('[data-segment]') ?? [])].some(
+			(s) => s.getAttribute('data-segment') !== 'literal' && !s.hasAttribute('data-ghosted')
+		);
+	/** Every segment empty: the blank, written at once. */
+	function clear(): void {
+		const blank = fallbackDate ? '' : undefined;
+		if (value !== blank) onCommit(blank);
+	}
 	function leave(e: FocusEvent): void {
 		if (within(e)) return;
 		seat = false;
 		if (!held) return;
 		held = false;
-		const filled = [...(wrapEl?.querySelectorAll('[data-segment]') ?? [])].some(
-			(s) => s.getAttribute('data-segment') !== 'literal' && !s.hasAttribute('data-ghosted')
-		);
-		const blank = fallbackDate ? '' : undefined;
-		if (!filled) {
-			if (value !== blank) onCommit(blank);
-		} else if (!value) generation++;
+		if (!filled()) clear();
+		else if (!value) generation++;
+	}
+	/** The keystroke that empties the last segment, after the primitive has drawn it. */
+	function settle(): void {
+		if (!held) return;
+		flushSync();
+		if (!filled()) clear();
 	}
 
 	// What one segment prints, and which rung it takes.
@@ -249,6 +261,7 @@
 				aria-describedby={describedBy}
 				data-ghosted={ghost ? '' : undefined}
 				data-default={seated || follows ? '' : undefined}
+				onkeydown={settle}
 			>
 				{#snippet children({ segments })}
 					<!-- Keyed by index: `part` repeats (the `literal` separators between

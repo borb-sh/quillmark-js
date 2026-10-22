@@ -422,7 +422,32 @@ describe('a default that prints', () => {
 		expect(segment(target, 'month').textContent?.trim()).toBe('01');
 	});
 
-	it('writes the blank as the focus leaves a date with every segment empty', () => {
+	it('writes the blank as the last segment of a date empties, under the focus', () => {
+		const target = open({}, answering('dated: 2026-11-14'));
+		for (const [part, presses] of [
+			['month', 2],
+			['day', 2],
+			['year', 3]
+		] as const) {
+			const seg = segment(target, part);
+			seg.focus();
+			flushSync();
+			for (let i = 0; i < presses; i++) press(seg, 'Backspace');
+		}
+		expect(q.reader(doc).get('dated')).toBe('2026-01-14');
+
+		press(segment(target, 'year'), 'Backspace');
+		// Blank over the default, which an unset would have printed.
+		expect(row('dated')).toMatchObject({ source: 'authored', value: '' });
+		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
+
+		segment(target, 'year').blur();
+		flushSync();
+		expect(row('dated')).toMatchObject({ source: 'authored', value: '' });
+		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
+	});
+
+	it('puts back a segment typed into a date it just blanked as the focus leaves', () => {
 		const target = open({}, answering('dated: 2026-11-14'));
 		for (const [part, presses] of [
 			['month', 2],
@@ -434,12 +459,15 @@ describe('a default that prints', () => {
 			flushSync();
 			for (let i = 0; i < presses; i++) press(seg, 'Backspace');
 		}
-		expect(q.reader(doc).get('dated')).toBe('2026-01-14');
-
-		segment(target, 'year').blur();
+		expect(q.reader(doc).get('dated')).toBe('');
+		const month = segment(target, 'month');
+		month.focus();
 		flushSync();
-		// Blank over the default, which an unset would have printed.
-		expect(row('dated')).toMatchObject({ source: 'authored', value: '' });
+		press(month, '1');
+
+		month.blur();
+		flushSync();
+		expect(q.reader(doc).get('dated')).toBe('');
 		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
 	});
 
