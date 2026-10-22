@@ -7,11 +7,10 @@
 // joined).
 //
 // An item's number is its position: no edit writes `start`. Taking a marker off keeps
-// the text where it stands, a continuation of the item above, so the list never splits
-// under a writer's keystroke and the items below close up by position. `start` is
-// what a writer typed (`N. `, `blocks.ts`) or what arrived with a whole list, and the
-// one split left, Shift-Tab out of a top-level item, counts the tail from its own
-// `start` again.
+// the text where it stands, a continuation of the item above, so the items below close
+// up by position. `start` is what a writer typed (`N. `, `blocks.ts`) or what arrived
+// with a whole list. The one split left is Backspace at the head of a top-level
+// continuation line, which takes the line out to full width; the tail counts from 1.
 //
 // Cleanup is command-local, never a global pass: a command joins the boundary it opens
 // and `sinkListItem` reuses the previous item's nested list, so no mutation strands a
@@ -20,11 +19,12 @@
 // upstream normalizer keeps it (`tests/codec/list-shapes.test.ts`), and fusing
 // renumbers an imported `1, 2, 1` in a region no edit touched. Reads preserve it; only
 // an edit normalizes.
+import { NodeRange } from 'prosemirror-model';
 import type { Node as PMNode, NodeType, ResolvedPos, Schema } from 'prosemirror-model';
 import { liftListItem, sinkListItem } from 'prosemirror-schema-list';
 import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import type { Command, Transaction } from 'prosemirror-state';
-import { canJoin } from 'prosemirror-transform';
+import { canJoin, liftTarget } from 'prosemirror-transform';
 import { chainCommands, joinTextblockBackward, joinTextblockForward } from 'prosemirror-commands';
 import { withinNesting } from './nesting.js';
 import { splitTaskItem } from './tasks.js';
@@ -154,6 +154,70 @@ function markerOff(itemType: NodeType, keepEmpty = false): Command {
 			tr.setSelection(TextSelection.create(tr.doc, into + 1));
 		}
 		dispatch?.(tr.scrollIntoView());
+		return true;
+	};
+}
+
+/**
+ * Backspace at the head of a continuation line in a top-level item → the line out of
+ * the list to full width, with the item's blocks after it: the second rung of the
+ * marker coming off, the line losing its indent as it lost its number. The list splits
+ * there and the tail counts from 1, a number that names its position in the list it now
+ * is. The press after is the ordinary join onto the list's last line
+ * ({@link joinOntoList}).
+ *
+ * Declines where a sub-list stands below the line in its item, which the line cannot
+ * leave without orphaning, and in a nested item, whose continuation lines keep the
+ * ordinary join: there the next rung out is still inside the list.
+ */
+function lineOut(itemType: NodeType): Command {
+	return (state, dispatch) => {
+		const { $from, empty } = state.selection;
+		if (!empty || !$from.parent.isTextblock || $from.parentOffset !== 0) return false;
+		if ($from.depth < 3) return false;
+		const item = $from.node(-1);
+		if (item.type !== itemType || $from.index(-1) === 0) return false;
+		if ($from.node(-3).type === itemType) return false;
+		for (let i = $from.index(-1) + 1; i < item.childCount; i++)
+			if (item.child(i).firstChild?.type === itemType) return false;
+		const range = new NodeRange(
+			$from.doc.resolve($from.before()),
+			$from.doc.resolve($from.end(-1)),
+			$from.depth - 1
+		);
+		const target = liftTarget(range);
+		if (target == null) return false;
+		if (!dispatch) return true;
+		const tr = state.tr.lift(range, target);
+		const $at = tr.doc.resolve(tr.mapping.map($from.before()));
+		const tail = $at.parent.maybeChild($at.index() + item.childCount - $from.index(-1));
+		if (tail?.firstChild?.type === itemType && tail.attrs.start != null && tail.attrs.start !== 1)
+			tr.setNodeMarkup($at.posAtIndex($at.index() + item.childCount - $from.index(-1)), null, {
+				...tail.attrs,
+				start: 1
+			});
+		dispatch(tr.scrollIntoView());
+		return true;
+	};
+}
+
+/**
+ * Shift-Tab → `liftListItem` in a nested list, the item up one level. A top-level item
+ * has no level above it inside the list: the key is claimed and does nothing, as Tab is
+ * on a first item, so a press too many while backing out of a sub-list renumbers
+ * nothing. Leaving the list is Backspace's, one rung a press. Outside every item the
+ * key declines and stays the body's keyboard exit.
+ */
+function outdent(itemType: NodeType): Command {
+	const lift = liftListItem(itemType);
+	return (state, dispatch) => {
+		const { $from, $to } = state.selection;
+		const range = $from.blockRange(
+			$to,
+			(node) => node.childCount > 0 && node.firstChild!.type === itemType
+		);
+		if (!range) return false;
+		if (range.$from.node(range.depth - 1).type === itemType) return lift(state, dispatch);
 		return true;
 	};
 }
@@ -354,8 +418,10 @@ function sinkWithin(itemType: NodeType): Command {
  * non-empty item, and on an empty last item it either splits the wrapping item (a
  * nested one, so Enter lifts exactly one level) or bails so the last link lifts a
  * top-level one out to a paragraph. `Backspace` takes an item's marker off at its
- * start, and joins a block onto the list it stands after. `Delete` is the marker off
- * at the seam below with the two lines joined. An empty line is neither key's here:
+ * start, a top-level continuation line out to full width, and joins a block onto the
+ * list it stands after. `Delete` is the marker off at the seam below with the two lines
+ * joined, never the line out: a forward delete edits the line after the caret, not its
+ * indent. An empty line is neither key's here:
  * the block link takes it ahead of this chain (`blocks.ts`), the caret's own line
  * being a nearer fact than the boundary under it.
  */
@@ -366,7 +432,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 	const backspace = chainCommands(markerOff(itemType), joinOntoList(itemType));
 	return {
 		Tab: sinkWithin(itemType),
-		'Shift-Tab': liftListItem(itemType),
+		'Shift-Tab': outdent(itemType),
 		Enter: chainCommands(
 			paragraphAboveList(itemType, paragraph),
 			continueAbove(itemType),
@@ -374,7 +440,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 			splitTaskItem(itemType),
 			liftListItem(itemType)
 		),
-		Backspace: backspace,
+		Backspace: chainCommands(markerOff(itemType), lineOut(itemType), joinOntoList(itemType)),
 		Delete: deleteBelow(itemType, backspace)
 	};
 }

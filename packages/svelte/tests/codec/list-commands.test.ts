@@ -74,11 +74,26 @@ describe('Tab / Shift-Tab change nesting depth', () => {
 		);
 	});
 
-	it('Shift-Tab on a top-level item lifts it out to a paragraph', () => {
-		expectPress(
-			startOf('- a\n- b', 1),
-			'Shift-Tab',
-			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"))'
+	it('Shift-Tab on a top-level item is claimed and does nothing — no level above it', () => {
+		for (const [markdown, index] of [
+			['1. a\n2. b\n3. c', 1],
+			['1. a\n2. b', 0]
+		] as const) {
+			const state = startOf(markdown, index);
+			expect(keys['Shift-Tab'](state), markdown).toBe(true);
+			expect(press(state, 'Shift-Tab').doc.toString(), markdown).toBe(state.doc.toString());
+		}
+	});
+
+	it('Shift-Tab on a top-level continuation line does nothing, the item above keeping its marker', () => {
+		const state = atBlock(docOf(ul(li(p('a'), p('b')), li(p('c')))), 1);
+		expect(press(state, 'Shift-Tab').doc.toString()).toBe(state.doc.toString());
+	});
+
+	it('Shift-Tab pressed once too many out of a sub-list stops at the top level', () => {
+		const once = press(startOf('1. a\n    1. b\n2. c', 1), 'Shift-Tab');
+		expect(press(once, 'Shift-Tab').doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("a")), list_item(paragraph("b")), list_item(paragraph("c"))))'
 		);
 	});
 
@@ -230,11 +245,16 @@ describe('Backspace takes an item’s marker off', () => {
 		expect(one.doc.child(0).attrs.start).toBe(1);
 		expect(one.selection.$from.parent.textContent).toBe('b');
 		expect(one.selection.$from.parentOffset).toBe(0);
-		// The press after joins the line onto the one above.
-		expectPress(
+		// The press after takes the line out to full width, and the one after that joins it.
+		const two = expectPress(
 			one,
 			'Backspace',
-			'doc(ordered_list(list_item(paragraph("ab")), list_item(paragraph("c"))))'
+			'doc(ordered_list(list_item(paragraph("a"))), paragraph("b"), ordered_list(list_item(paragraph("c"))))'
+		);
+		expectPress(
+			two,
+			'Backspace',
+			'doc(ordered_list(list_item(paragraph("ab"))), ordered_list(list_item(paragraph("c"))))'
 		);
 	});
 
@@ -284,8 +304,42 @@ describe('Backspace takes an item’s marker off', () => {
 		expect(press(press(state, 'Enter'), 'Backspace').doc.toString()).toBe(state.doc.toString());
 	});
 
-	it('at a later block of a multi-paragraph item, declines to the base keymap', () => {
-		expect(run(atBlock(docOf(ul(li(p('a'), p('b')))), 1), keys['Backspace'])).toBe(null);
+	it('at a top-level continuation line, takes it out to full width', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a'), p('b')))), 1),
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"))'
+		);
+	});
+
+	it('a line taken out splits the list, and the tail counts from 1', () => {
+		const one = press(startOf('3. a\n4. b\n5. c', 1), 'Backspace');
+		const two = press(one, 'Backspace');
+		expect(two.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("a"))), paragraph("b"), ordered_list(list_item(paragraph("c"))))'
+		);
+		expect(two.doc.child(0).attrs.start).toBe(3);
+		expect(two.doc.child(2).attrs.start).toBe(1);
+		expect(two.selection.$from.parent.textContent).toBe('b');
+		expect(two.selection.$from.parentOffset).toBe(0);
+	});
+
+	it('a line taken out brings the item’s lines after it', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a'), p('b'), p('c')), li(p('d')))), 1),
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"), paragraph("c"), bullet_list(list_item(paragraph("d"))))'
+		);
+	});
+
+	it('a line with a sub-list below it in its item stays, the press the ordinary join', () => {
+		expect(run(startOf('1. a\n\n    b\n\n    1. x', 1), keys['Backspace'])).toBe(null);
+	});
+
+	it('a nested continuation line keeps the ordinary join', () => {
+		expect(run(atBlock(docOf(ul(li(p('a'), ul(li(p('b'), p('c')))))), 2), keys['Backspace'])).toBe(
+			null
+		);
 	});
 });
 
