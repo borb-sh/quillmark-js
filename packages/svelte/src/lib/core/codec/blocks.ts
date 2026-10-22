@@ -16,6 +16,7 @@ import type { Attrs, Node as PMNode, NodeType, ResolvedPos, Schema } from 'prose
 import { Selection } from 'prosemirror-state';
 import type { Command, EditorState, Transaction } from 'prosemirror-state';
 import { chainCommands, splitBlock } from 'prosemirror-commands';
+import { sinkListItem } from 'prosemirror-schema-list';
 import { canJoin, findWrapping } from 'prosemirror-transform';
 import { withinNesting } from './nesting.js';
 import { takesLineBreak } from './schema.js';
@@ -34,12 +35,9 @@ function fits($from: ResolvedPos, type: NodeType): boolean {
 }
 
 /**
- * The head of an item that already exists: where a list shorthand is the text an author
- * typed rather than a shorthand at all.
- *
- * Firing there wraps the item's own paragraph in a fresh list, minting an item whose
- * only content is another item — a level with nothing on it. Tab is the indent gesture
- * and lands the shape a nesting is supposed to have, under the previous sibling. A
+ * The first block of an item that already exists: where a list gesture retypes the
+ * item's list rather than wrapping the block, which would mint an item whose only
+ * content is another item, a level with nothing on it. Tab is the indent gesture. A
  * later block of the item is not this case: wrapping a continuation paragraph is how a
  * sub-list opens under text.
  */
@@ -167,14 +165,63 @@ export function wrapInQuote(): Command {
 }
 
 /** `- ` / `1. `. `joinBefore` is the shorthand's ordinal test: `2. ` continues the list
- *  above where `7. ` opens one. */
+ *  above where `7. ` opens one. At the head of an item the shorthand is the item's
+ *  (§`listAtItem`), `N. ` reading as the number the writer wants the list to count
+ *  from. */
 export function wrapInList(
 	ordered: boolean,
 	attrs: Attrs | null = null,
 	joinBefore?: (node: PMNode) => boolean
 ): Command {
-	return (state, dispatch) =>
-		atHead(state) && wrapBlock(state, dispatch, ordered, attrs, joinBefore);
+	return (state, dispatch) => {
+		if (!atHead(state)) return false;
+		const { $from } = state.selection;
+		if (openingAnItem($from, state.schema.nodes.list_item))
+			return listAtItem(ordered, (attrs?.start as number | undefined) ?? null)(state, dispatch);
+		return wrapBlock(state, dispatch, ordered, attrs, joinBefore);
+	};
+}
+
+/**
+ * A list gesture in an item's first block. On a list's first item it retypes the list,
+ * every item with it: a list is one kind, and that item is where a writer changes it.
+ * `number` is the shorthand's `N`, the list's `start`, the one door back to 1 for a list
+ * that arrived counting from elsewhere. On a later item, a list of the other kind is a
+ * sub-list: the item sinks under the one above, as Tab sinks it, into a list of that
+ * kind — `- ` in a new numbered paragraph is its first lettered subparagraph, never the
+ * whole memo turned to bullets. A sub-list already standing there of that kind takes the
+ * item as its next. A gesture that changes nothing declines, the shorthand staying text
+ * and a pick going unoffered.
+ */
+function listAtItem(ordered: boolean, number: number | null): Command {
+	return (state, dispatch) => {
+		const { $from } = state.selection;
+		const type = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
+		const item = state.schema.nodes.list_item;
+		if (!type || !item || $from.depth < 2) return false;
+		const list = $from.node(-2);
+		if ($from.index(-2) === 0) {
+			const start = number ?? (list.type === type ? list.attrs.start : 1);
+			if (list.type === type && (!ordered || start === list.attrs.start)) return false;
+			dispatch?.(state.tr.setNodeMarkup($from.before(-2), type, ordered ? { start } : null));
+			return true;
+		}
+		if (list.type === type) return false;
+		let sunk: Transaction | undefined;
+		if (!sinkListItem(item)(state, (tr) => (sunk = tr)) || !sunk) return false;
+		const tr = sunk;
+		const $at = tr.doc.resolve(tr.mapping.map($from.pos));
+		const nested = $at.node(-2);
+		if (nested.childCount === 1 && nested.type !== type) {
+			const at = $at.before(-2);
+			tr.setNodeMarkup(at, type, ordered ? { start: number ?? 1 } : null);
+			const before = tr.doc.resolve(at).nodeBefore;
+			if (before?.type === type && canJoin(tr.doc, at)) tr.join(at);
+		}
+		if (!withinNesting(tr.doc)) return false;
+		dispatch?.(tr.scrollIntoView());
+		return true;
+	};
 }
 
 /**
@@ -184,7 +231,8 @@ export function wrapInList(
  * At the end of a non-empty block it opens a fresh empty item below it, Enter then `- `
  * as one gesture. Anywhere else it wraps the whole block, the smaller surprise: a writer
  * who meant to split presses Enter first. It passes no `joinBefore`, so it continues
- * whatever list is above.
+ * whatever list is above. In an item's first block it is the shorthand's item gesture
+ * (§`listAtItem`), offered only where that changes something.
  */
 export function pickList(ordered: boolean): Command {
 	return (state, dispatch) => {
@@ -215,7 +263,8 @@ function wrapBlock(
 	const { paragraph, list_item: item } = state.schema.nodes;
 	const list = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
 	const { $from } = state.selection;
-	if (!list || !paragraph || openingAnItem($from, item)) return false;
+	if (!list || !paragraph) return false;
+	if (openingAnItem($from, item)) return listAtItem(ordered, null)(state, dispatch);
 	const pos = $from.start();
 	const tr = state.tr;
 	// A paragraph item wherever this fires: `# ` inside the item is the gesture that

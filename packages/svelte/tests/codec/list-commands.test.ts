@@ -40,8 +40,14 @@ const ul = (...items: PMNode[]) => n.bullet_list.create(null, items);
 const docOf = (...blocks: PMNode[]) => n.doc.create(null, blocks);
 
 describe('Tab / Shift-Tab change nesting depth', () => {
-	it('Tab is inert on the first item at a level — nothing to sink under', () => {
-		expect(run(startOf('- a\n- b', 0), keys['Tab'])).toBe(null);
+	it('Tab on the first item at a level is claimed and does nothing — nothing to sink under', () => {
+		for (const [markdown, index] of [
+			['- a\n- b', 0],
+			['- a\n    - b', 1]
+		] as const) {
+			const state = startOf(markdown, index);
+			expect(press(state, 'Tab').doc.toString(), markdown).toBe(state.doc.toString());
+		}
 	});
 
 	it('Tab sinks from mid-text too — the caret’s offset is not the axis', () => {
@@ -157,7 +163,47 @@ describe('Enter', () => {
 	});
 });
 
-describe('Backspace', () => {
+describe('Enter on an empty line inside a list', () => {
+	it('on an empty MIDDLE item, takes the marker off and keeps the line under the item above', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a')), li(p()), li(p('c')))), 1),
+			'Enter',
+			'doc(bullet_list(list_item(paragraph("a"), paragraph), list_item(paragraph("c"))))'
+		);
+	});
+
+	it('the numbers below close up: nothing splits the list', () => {
+		const next = press(press(after('1. a\n2. b\n3. c', 'a'), 'Enter'), 'Enter');
+		expect(next.doc.childCount).toBe(1);
+		expect(next.doc.child(0).childCount).toBe(3);
+	});
+
+	it('on an empty continuation line, puts the marker back on as the next item', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a'), p()), li(p('c')))), 1),
+			'Enter',
+			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph), list_item(paragraph("c"))))'
+		);
+	});
+
+	it('on an empty continuation line of the last item, leaves the list, the item keeping its marker', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a')), li(p('b'), p()))), 2),
+			'Enter',
+			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("b"))), paragraph)'
+		);
+	});
+
+	it('a continuation line typed in, Enter at its end opens the next item', () => {
+		expectPress(
+			atBlockEnd(docOf(ul(li(p('a'), p('cont')), li(p('c')))), 1),
+			'Enter',
+			'doc(bullet_list(list_item(paragraph("a"), paragraph("cont")), list_item(paragraph), list_item(paragraph("c"))))'
+		);
+	});
+});
+
+describe('Backspace takes an item’s marker off', () => {
 	it('at the start of the first item, lifts out of the list', () => {
 		expectPress(
 			startOf('- a\n- b', 0),
@@ -166,50 +212,76 @@ describe('Backspace', () => {
 		);
 	});
 
+	it('the first item lifted, the next counts from the list’s start', () => {
+		const next = press(startOf('1. a\n2. b', 0), 'Backspace');
+		expect(next.doc.child(1).attrs.start).toBe(1);
+	});
+
 	it('mid-text, declines the key so the browser deletes a character', () => {
 		expect(run(after('- ab', 'a'), keys['Backspace'])).toBe(null);
 	});
 
-	it('at the start of a later item, lifts it out and splits the list around it', () => {
+	it('at the start of a later item, its text stays under the item above', () => {
 		const one = expectPress(
-			startOf('- a\n- b\n- c', 1),
+			startOf('1. a\n2. b\n3. c', 1),
 			'Backspace',
-			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"), bullet_list(list_item(paragraph("c"))))'
+			'doc(ordered_list(list_item(paragraph("a"), paragraph("b")), list_item(paragraph("c"))))'
 		);
-		// The press after joins the paragraph onto the list's last line.
+		expect(one.doc.child(0).attrs.start).toBe(1);
+		expect(one.selection.$from.parent.textContent).toBe('b');
+		expect(one.selection.$from.parentOffset).toBe(0);
+		// The press after joins the line onto the one above.
 		expectPress(
 			one,
 			'Backspace',
-			'doc(bullet_list(list_item(paragraph("ab"))), bullet_list(list_item(paragraph("c"))))'
+			'doc(ordered_list(list_item(paragraph("ab")), list_item(paragraph("c"))))'
 		);
 	});
 
-	it('the items past a lifted one keep their numbers', () => {
-		const next = expectPress(
-			startOf('3. a\n4. b\n5. c', 1),
+	it('an item’s other blocks come with it, its nested list among them', () => {
+		expectPress(
+			startOf('1. a\n2. b\n    1. x\n3. c', 1),
 			'Backspace',
-			'doc(ordered_list(list_item(paragraph("a"))), paragraph("b"), ordered_list(list_item(paragraph("c"))))'
+			'doc(ordered_list(list_item(paragraph("a"), paragraph("b"), ordered_list(list_item(paragraph("x")))), list_item(paragraph("c"))))'
 		);
-		expect(next.doc.child(0).attrs.start).toBe(3);
-		expect(next.doc.child(2).attrs.start).toBe(5);
 	});
 
-	it('the items past a lifted one keep their numbers past a list it held', () => {
-		for (const nested of ['1. x\n    2. y', '- x\n    - y']) {
-			const next = press(startOf(`1. a\n2. b\n    ${nested}\n3. c`, 1), 'Backspace');
-			expect(next.doc.child(1).textContent).toBe('b');
-			expect(next.doc.child(2).attrs.start ?? 1, nested).toBe(1);
-			expect(next.doc.child(3).type.name).toBe('ordered_list');
-			expect(next.doc.child(3).attrs.start, nested).toBe(3);
-		}
-	});
-
-	it('a nested later item lifts one level', () => {
+	it('a nested later item continues its nested sibling', () => {
 		expectPress(
 			startOf('- a\n    - b\n    - c', 2),
 			'Backspace',
-			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("b")))), list_item(paragraph("c"))))'
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("b"), paragraph("c"))))))'
 		);
+	});
+
+	it('a nested first item continues the item it is nested in, ahead of the rest of its list', () => {
+		expectPress(
+			startOf('- a\n    - b\n    - c', 1),
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a"), paragraph("b"), bullet_list(list_item(paragraph("c"))))))'
+		);
+	});
+
+	it('a nested first item’s own nested list joins the rest of its list', () => {
+		expectPress(
+			startOf('- a\n    - b\n        - x\n    - c', 1),
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a"), paragraph("b"), bullet_list(list_item(paragraph("x")), list_item(paragraph("c"))))))'
+		);
+	});
+
+	it('an empty item is spent, the caret at the end of the line above', () => {
+		const next = expectPress(
+			atBlock(docOf(ul(li(p('a')), li(p()), li(p('c')))), 1),
+			'Backspace',
+			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("c"))))'
+		);
+		expect(next.selection.from).toBe(4);
+	});
+
+	it('Enter then Backspace is the list it was', () => {
+		const state = after('1. a\n2. b\n3. c', 'a');
+		expect(press(press(state, 'Enter'), 'Backspace').doc.toString()).toBe(state.doc.toString());
 	});
 
 	it('at a later block of a multi-paragraph item, declines to the base keymap', () => {
@@ -217,62 +289,64 @@ describe('Backspace', () => {
 	});
 });
 
-// One seam, one edit, whichever side a writer approaches it from: each case states its
-// document once and presses both keys at it — Delete at the end of the block above,
-// Backspace at the head of the block below.
-function seam(doc: PMNode, above: number, below: number, expected: string): void {
-	expectPress(atBlockEnd(doc, above), 'Delete', expected);
-	expectPress(atBlock(doc, below), 'Backspace', expected);
-}
-
-describe('Delete is Backspace at the seam below', () => {
-	it('lifts the item below out of the list', () => {
-		seam(
-			decode(md('- a\n- b'), blockSchema),
-			0,
-			1,
-			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"))'
+describe('Delete joins the line below onto the caret’s', () => {
+	it('the item below joins, the list closing up', () => {
+		expectPress(
+			endOf('1. a\n2. b\n3. c', 0),
+			'Delete',
+			'doc(ordered_list(list_item(paragraph("ab")), list_item(paragraph("c"))))'
 		);
 	});
 
-	it('the items past the lifted one keep their numbers', () => {
-		seam(
-			decode(md('1. a\n2. b\n3. c'), blockSchema),
-			0,
-			1,
-			'doc(ordered_list(list_item(paragraph("a"))), paragraph("b"), ordered_list(list_item(paragraph("c"))))'
+	it('a nested first item below joins, the rest of its list staying nested', () => {
+		expectPress(
+			endOf('- a\n    - b\n    - c', 0),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("ab"), bullet_list(list_item(paragraph("c"))))))'
 		);
 	});
 
-	it('lifts a nested first item, where the item below is not a sibling', () => {
-		seam(
-			decode(md('- a\n    - b'), blockSchema),
-			0,
-			1,
-			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("b"))))'
-		);
-	});
-
-	it('joins a block after the list onto the list’s last line', () => {
-		seam(
-			docOf(ul(li(p('a'), p('cont'))), p('b')),
-			1,
-			2,
-			'doc(bullet_list(list_item(paragraph("a"), paragraph("contb"))))'
+	it('the item below keeps its nested list under the joined line', () => {
+		expectPress(
+			endOf('1. a\n2. b\n    1. x\n3. c', 0),
+			'Delete',
+			'doc(ordered_list(list_item(paragraph("ab"), ordered_list(list_item(paragraph("x")))), list_item(paragraph("c"))))'
 		);
 	});
 
 	it('reaches the item below at a shallower level than the caret’s', () => {
-		seam(
-			decode(md('- a\n    - b\n- c'), blockSchema),
-			1,
-			2,
-			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("b"))))), paragraph("c"))'
+		expectPress(
+			endOf('- a\n    - b\n- c', 1),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("bc"))))))'
+		);
+	});
+
+	it('joins a list’s first line onto the line above it', () => {
+		expectPress(
+			endOf('head\n\n- a\n- b', 0),
+			'Delete',
+			'doc(paragraph("heada"), bullet_list(list_item(paragraph("b"))))'
+		);
+	});
+
+	it('joins a block after the list onto the list’s last line', () => {
+		expectPress(
+			atBlockEnd(docOf(ul(li(p('a'), p('cont'))), p('b')), 1),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("a"), paragraph("contb"))))'
+		);
+	});
+
+	it('spends an empty item below, joining nothing past it', () => {
+		expectPress(
+			atBlockEnd(docOf(ul(li(p('a')), li(p()), li(p('c')))), 0),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("c"))))'
 		);
 	});
 
 	it('spends an empty item rather than unmarking the one below it', () => {
-		// Delete's one exception to the reflection: Backspace at `c` still lifts it.
 		expectPress(
 			atBlockEnd(docOf(ul(li(p('a')), li(p()), li(p('c')))), 1),
 			'Delete',
@@ -290,7 +364,16 @@ describe('Delete is Backspace at the seam below', () => {
 		expect(next.selection.$from.parent.type.name).toBe('code_block');
 	});
 
-	it('leaves the caret where the key was pressed, merging and lifting alike', () => {
+	it('takes only the marker off a fence below: a fence takes no prose line', () => {
+		const fence = n.code_block.create(null, blockSchema.text('code'));
+		expectPress(
+			atBlockEnd(docOf(ul(li(p('a')), li(fence))), 0),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("a"), code_block("code"))))'
+		);
+	});
+
+	it('leaves the caret where the key was pressed', () => {
 		for (const markdown of ['- a\n- b', '- a\n    - b']) {
 			const state = endOf(markdown, 0);
 			expect(press(state, 'Delete').selection.from, markdown).toBe(state.selection.from);
@@ -305,12 +388,16 @@ describe('Delete is Backspace at the seam below', () => {
 		expect(run(atBlockEnd(docOf(ul(li(p('a'), p('b')))), 0), keys['Delete'])).toBe(null);
 	});
 
-	it('declines outside a list, the leading edge staying the base keymap’s', () => {
-		expect(run(endOf('head\n\n- a', 0), keys['Delete'])).toBe(null);
+	it('declines between two blocks outside every list', () => {
+		expect(run(endOf('head\n\ntail', 0), keys['Delete'])).toBe(null);
 	});
 
 	it('at the last item’s end, joins the line below onto it', () => {
-		seam(docOf(ul(li(p('a'))), p('tail')), 0, 1, 'doc(bullet_list(list_item(paragraph("atail"))))');
+		expectPress(
+			atBlockEnd(docOf(ul(li(p('a'))), p('tail')), 0),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("atail"))))'
+		);
 	});
 });
 
