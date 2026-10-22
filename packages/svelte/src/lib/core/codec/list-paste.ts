@@ -32,18 +32,22 @@ function fromOne(content: Fragment, depth: number): Fragment {
 export function listPastePlugin(): Plugin {
 	return new Plugin({
 		props: {
-			// A copy whose items begin past an ordered list's first item is a run out of
-			// it, and goes out counting from 1. A copy from the first item keeps the list's
-			// `start`, however the selection ends. The copy is the selection's own slice,
-			// its leading edge the caret's ancestors from the top, so the list the run
-			// spans stands `depth` levels down it.
+			// A copy whose leading edge stands past an ordered list's first item is a run
+			// out of it, and goes out counting from 1; one from the first item keeps the
+			// list's `start`, however the selection ends. The copy is the selection's own
+			// slice, its leading edge the caret's ancestors from the top, so the list at
+			// depth `d` stands `d` levels down it.
 			transformCopied(slice, view) {
-				const { $from, to } = view.state.selection;
-				const depth = $from.sharedDepth(to);
-				const list = $from.node(depth);
-				if (list.type.name !== 'ordered_list' || $from.index(depth) === 0) return slice;
-				if (list.attrs.start === 1 || depth === 0) return slice;
-				return new Slice(fromOne(slice.content, depth), slice.openStart, slice.openEnd);
+				const { $from } = view.state.selection;
+				let content = slice.content;
+				for (let d = 1; d < $from.depth; d++) {
+					const list = $from.node(d);
+					if (list.type.name === 'ordered_list' && $from.index(d) > 0 && list.attrs.start !== 1)
+						content = fromOne(content, d);
+				}
+				return content === slice.content
+					? slice
+					: new Slice(content, slice.openStart, slice.openEnd);
 			},
 			// Into an empty item, a list is its items: they join the list the caret is in,
 			// where a whole list would nest under the empty item as its only content.
@@ -66,7 +70,7 @@ export function listPastePlugin(): Plugin {
 				const { $from, empty } = view.state.selection;
 				if (!list || !empty || !$from.parent.isTextblock || $from.parent.content.size !== 0)
 					return false;
-				if ($from.node(-1).type.spec.code) return false;
+				if ($from.parent.type.spec.code) return false;
 				const above = view.state.doc.resolve($from.before()).nodeBefore;
 				if (!isList(above) || above.type !== list.type) return false;
 				const end = $from.before() - 1;

@@ -209,7 +209,7 @@ describe('a name is offered only where its command would run', () => {
 		field.destroy();
 	});
 
-	it("offers the other kind at an item's head, where the pick retypes the item's list", () => {
+	it("offers the other kind at a first item's head, where the pick retypes the list", () => {
 		const { field, view, state } = leaf('- alpha');
 		typeAt(field, view, 0, '/');
 		expect(state()?.items).not.toContain('list');
@@ -227,13 +227,24 @@ describe('a name is offered only where its command would run', () => {
 		field.destroy();
 	});
 
-	it('a retyping pick turns the whole list and consumes the run', () => {
+	it('a retyping pick on a first item turns the whole list and consumes the run', () => {
 		const { field, view } = leaf('- alpha\n- beta');
 		field.setCaret(0);
 		type(view, '/numbered');
 		field.slashPick('numbered-list');
 		expect(view.state.doc.toString()).toBe(
 			'doc(ordered_list(list_item(paragraph("alpha")), list_item(paragraph("beta"))))'
+		);
+		field.destroy();
+	});
+
+	it('`subparagraph` in a later numbered item opens a sub-list, leaving the numbers as they are', () => {
+		const { field, view } = leaf('1. alpha\n2. beta');
+		field.setCaret(6);
+		type(view, '/sub');
+		field.slashPick('subparagraph');
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("alpha"), bullet_list(list_item(paragraph("beta"))))))'
 		);
 		field.destroy();
 	});

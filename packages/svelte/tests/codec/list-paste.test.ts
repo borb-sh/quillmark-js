@@ -90,6 +90,27 @@ describe('a list on a line of its own', () => {
 		expect(state.doc.child(1).attrs.start).toBe(1);
 	});
 
+	it('a run that runs on past the list still counts from 1', () => {
+		const state = pasted(
+			'intro',
+			lineUnder,
+			copy('5. a\n6. b\n7. c\n\ntail', (view) => [at(view, 'b', true), at(view, 'tail')])
+		);
+		expect(state.doc.child(1).type.name).toBe('ordered_list');
+		expect(state.doc.child(1).attrs.start).toBe(1);
+	});
+
+	it('a selection inside a later item copies no number from the list', () => {
+		const state = pasted(
+			'intro',
+			lineUnder,
+			copy('5. a\n6. b\n\n   bb', (view) => [at(view, 'b', true), at(view, 'bb')])
+		);
+		const list = state.doc.child(1);
+		expect(list.type.name).toBe('ordered_list');
+		expect(list.attrs.start).toBe(1);
+	});
+
 	it('a run of bullets stays bullets', () => {
 		const state = pasted('intro', lineUnder, copy('- a\n- b\n- c', run));
 		expect(state.doc.child(1).type.name).toBe('bullet_list');

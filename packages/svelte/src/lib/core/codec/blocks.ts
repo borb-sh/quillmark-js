@@ -16,6 +16,7 @@ import type { Attrs, Node as PMNode, NodeType, ResolvedPos, Schema } from 'prose
 import { Selection } from 'prosemirror-state';
 import type { Command, EditorState, Transaction } from 'prosemirror-state';
 import { chainCommands, splitBlock } from 'prosemirror-commands';
+import { sinkListItem } from 'prosemirror-schema-list';
 import { canJoin, findWrapping } from 'prosemirror-transform';
 import { withinNesting } from './nesting.js';
 import { takesLineBreak } from './schema.js';
@@ -164,9 +165,9 @@ export function wrapInQuote(): Command {
 }
 
 /** `- ` / `1. `. `joinBefore` is the shorthand's ordinal test: `2. ` continues the list
- *  above where `7. ` opens one. At the head of an item the shorthand retypes the item's
- *  list instead (§`retypeList`), `N. ` reading as the number the writer wants that item
- *  to show. */
+ *  above where `7. ` opens one. At the head of an item the shorthand is the item's
+ *  (§`listAtItem`), `N. ` reading as the number the writer wants the list to count
+ *  from. */
 export function wrapInList(
 	ordered: boolean,
 	attrs: Attrs | null = null,
@@ -176,44 +177,49 @@ export function wrapInList(
 		if (!atHead(state)) return false;
 		const { $from } = state.selection;
 		if (openingAnItem($from, state.schema.nodes.list_item))
-			return retypeList(
-				ordered,
-				(attrs?.start as number | undefined) ?? null,
-				true
-			)(state, dispatch);
+			return listAtItem(ordered, (attrs?.start as number | undefined) ?? null)(state, dispatch);
 		return wrapBlock(state, dispatch, ordered, attrs, joinBefore);
 	};
 }
 
 /**
- * The list around the caret's item, as the other kind, every item in it with it: a list
- * is one kind, and retyping one item would cut the list in three. `number` is the
- * shorthand's `N`: on a first item it is the list's `start`, the one door back to 1 for
- * a list that arrived counting from elsewhere. On a later item it says nothing new
- * where it is the number the item already shows, which a writer retyping what they see
- * means, and otherwise declines, the text staying text: a number a writer types midway
- * is not a reason to renumber every item above it.
- *
- * `same` is the shorthand's: a marker retyped as the one already drawn is consumed as
- * nothing, where a pick offers no command that changes nothing (§`slashItems`).
+ * A list gesture in an item's first block. On a list's first item it retypes the list,
+ * every item with it: a list is one kind, and that item is where a writer changes it.
+ * `number` is the shorthand's `N`, the list's `start`, the one door back to 1 for a list
+ * that arrived counting from elsewhere. On a later item, a list of the other kind is a
+ * sub-list: the item sinks under the one above, as Tab sinks it, into a list of that
+ * kind — `- ` in a new numbered paragraph is its first lettered subparagraph, never the
+ * whole memo turned to bullets. A sub-list already standing there of that kind takes the
+ * item as its next. A gesture that changes nothing declines, the shorthand staying text
+ * and a pick going unoffered.
  */
-function retypeList(ordered: boolean, number: number | null, same: boolean): Command {
+function listAtItem(ordered: boolean, number: number | null): Command {
 	return (state, dispatch) => {
 		const { $from } = state.selection;
 		const type = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
-		if (!type || $from.depth < 2) return false;
+		const item = state.schema.nodes.list_item;
+		if (!type || !item || $from.depth < 2) return false;
 		const list = $from.node(-2);
-		const index = $from.index(-2);
-		let start = list.type === type ? list.attrs.start : 1;
-		if (ordered && number !== null) {
-			if (index === 0) start = number;
-			else if (list.type === type && number !== list.attrs.start + index) return false;
+		if ($from.index(-2) === 0) {
+			const start = number ?? (list.type === type ? list.attrs.start : 1);
+			if (list.type === type && (!ordered || start === list.attrs.start)) return false;
+			dispatch?.(state.tr.setNodeMarkup($from.before(-2), type, ordered ? { start } : null));
+			return true;
 		}
-		const changed = list.type !== type || (ordered && start !== list.attrs.start);
-		if (!changed && !same) return false;
-		const tr = state.tr;
-		if (changed) tr.setNodeMarkup($from.before(-2), type, ordered ? { start } : null);
-		dispatch?.(tr);
+		if (list.type === type) return false;
+		let sunk: Transaction | undefined;
+		if (!sinkListItem(item)(state, (tr) => (sunk = tr)) || !sunk) return false;
+		const tr = sunk;
+		const $at = tr.doc.resolve(tr.mapping.map($from.pos));
+		const nested = $at.node(-2);
+		if (nested.childCount === 1 && nested.type !== type) {
+			const at = $at.before(-2);
+			tr.setNodeMarkup(at, type, ordered ? { start: number ?? 1 } : null);
+			const before = tr.doc.resolve(at).nodeBefore;
+			if (before?.type === type && canJoin(tr.doc, at)) tr.join(at);
+		}
+		if (!withinNesting(tr.doc)) return false;
+		dispatch?.(tr.scrollIntoView());
 		return true;
 	};
 }
@@ -225,8 +231,8 @@ function retypeList(ordered: boolean, number: number | null, same: boolean): Com
  * At the end of a non-empty block it opens a fresh empty item below it, Enter then `- `
  * as one gesture. Anywhere else it wraps the whole block, the smaller surprise: a writer
  * who meant to split presses Enter first. It passes no `joinBefore`, so it continues
- * whatever list is above. In an item's first block it retypes the item's list, and is
- * offered only where that changes the kind.
+ * whatever list is above. In an item's first block it is the shorthand's item gesture
+ * (§`listAtItem`), offered only where that changes something.
  */
 export function pickList(ordered: boolean): Command {
 	return (state, dispatch) => {
@@ -258,7 +264,7 @@ function wrapBlock(
 	const list = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
 	const { $from } = state.selection;
 	if (!list || !paragraph) return false;
-	if (openingAnItem($from, item)) return retypeList(ordered, null, false)(state, dispatch);
+	if (openingAnItem($from, item)) return listAtItem(ordered, null)(state, dispatch);
 	const pos = $from.start();
 	const tr = state.tr;
 	// A paragraph item wherever this fires: `# ` inside the item is the gesture that
