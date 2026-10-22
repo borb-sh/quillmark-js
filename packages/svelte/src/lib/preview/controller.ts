@@ -1,13 +1,15 @@
-// `createPreview` wires paint.ts + bridge.ts over one `LiveSession` and
-// `opts.container`, and is the only thing that composes them: the paint loop
+// `createPreview` wires paint.ts, bridge.ts and viewport.ts over one `LiveSession`
+// and `opts.container`, and is the only thing that composes them: the paint loop
 // owns the page slots; the bridge attaches its own listeners to those same
-// slots. A pure view: never calls `session.apply`, never mutates the session;
-// the consumer drives edits and hands the resulting `ChangeSet` to `refresh`.
+// slots; the viewport sets the one scale they are drawn at. A pure view: never calls
+// `session.apply`, never mutates the session; the consumer drives edits and hands the
+// resulting `ChangeSet` to `refresh`.
 import type { LiveSession, ChangeSet } from '@quillmark/wasm';
 import type { DocPath, Landing, Place } from '../core/address.js';
 import { reportError, errorMessage, type EditorErrorHandler } from '../core/errors.js';
 import { createPaintLoop, type PaintLoop } from './paint.js';
 import { createBridge, type BridgeController, type HeldTrip } from './bridge.js';
+import { createViewport } from './viewport.js';
 import { mergePreviewStrings, type PreviewStringsInput } from './strings.js';
 
 export interface PreviewOptions {
@@ -22,8 +24,8 @@ export interface PreviewOptions {
 	/** A page paint the backend refused ({@link EditorErrorHandler}). The preview
 	 *  shows its error message state either way; this routes it to an app's sink. */
 	onError?: EditorErrorHandler;
-	/** The three message-state strings, keyed and partial: unset keys take the
-	 *  package's English. */
+	/** The surface's strings, keyed and partial: unset keys take the package's
+	 *  English. */
 	strings?: PreviewStringsInput;
 }
 
@@ -59,8 +61,12 @@ export interface PreviewController {
 	 * own next caret.
 	 */
 	endFollow(): void;
-	/** Fold a density multiplier into every future paint (crispness, not layout). */
-	setZoom(scale: number): void;
+	/**
+	 * Draw every page at `zoom`, a fraction of actual size (`1` is 100%), held between
+	 * the pane's floor and 200%; `undefined` is the default, the widest page fitting the
+	 * pane's width up to 125%. The reader's own gestures move the same zoom.
+	 */
+	setZoom(zoom: number | undefined): void;
 	destroy(): void;
 }
 
@@ -150,7 +156,11 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		}
 	}
 
+	// Built before the first bridge, so its ResizeObserver is the earlier one and a pane
+	// shown again re-fits before the bridge runs the trip it held at the old scale.
+	const viewport = createViewport(container, paintLoop.slots, paintLoop.setScale, t.resetZoom);
 	render(session.pageCount, []);
+	viewport.update();
 
 	// The last place the editor put the caret, re-located after every recompile and
 	// dropped on a focus change or a discrete hop. `session.locate` answers against the
@@ -164,6 +174,8 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 	return {
 		refresh(change) {
 			render(change.pageCount, change.dirtyPages);
+			// The default fits the widest page, which a recompile can move.
+			viewport.update();
 			// Guarded like any other caret hop, so a caret already clear of the fold
 			// leaves a pane the user scrolled where they left it.
 			if (followed) bridge?.focusPosition(followed.field, followed.pos);
@@ -183,11 +195,12 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		endFollow() {
 			followed = undefined;
 		},
-		setZoom(scale) {
-			paintLoop.setDensityZoom(scale);
+		setZoom(zoom) {
+			viewport.setZoom(zoom);
 		},
 		destroy() {
 			detach();
+			viewport.destroy();
 			paintLoop.destroy();
 			hideMessage();
 			container.classList.remove(CONTAINER_CLASS);

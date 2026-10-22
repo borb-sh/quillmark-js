@@ -20,6 +20,12 @@
 
 **A pasted list takes the numbering of where it lands** (#807). A list pasted on an empty item joins that list as its next items, in its kind, where it nested under the empty item, and a list pasted on the empty line under a list of its kind joins it. A list pasted on a line of its own keeps the `start` it was copied with; a copy starting past an ordered list's first item counts from 1, where it kept the list's `start`.
 
+**The preview zooms, at one scale for every page.** Every page is drawn at one zoom, where each page was as wide as the pane, so a landscape page came out smaller than a portrait one beside it. The default fits the widest page to the pane's width, capped at 125% of actual size, so a portrait memo in a split pane draws as it did. Ctrl/⌘-wheel, a trackpad or touch pinch, and Mod `+`/`−`/`0` zoom about the pointer, from the floor where the whole page fills 90% of the pane to 200%; the keys step through fixed levels and a continuous gesture holds at 100% as it passes. While zoomed, the pane's corner shows the percentage, and a click on it resets. A resized pane re-fits about the line at its top, and the caret follow scrolls sideways on a page wider than the pane.
+
+**`setZoom(zoom)` sets that zoom**, a fraction of actual size with `undefined` the default fit, where it multiplied the raster's density and left the layout alone.
+
+**The preview's root is a flex column with a stable scrollbar gutter, `touch-action: pan-x pan-y`, and `tabindex="0"`** where the host set none, and a page wider than the pane scrolls sideways inside it.
+
 ## v0.24.0 - 2026-10-21
 
 **The `@quillmark/wasm` peer floor is `>=0.129.0-0`.** A footnote, an equation and a definition list, which markdown spells and 0.129.0 imports, open read-only: a body or a block field holding one is held under its note and commits nothing, so a stored row holding one keeps it. A footnote draws as its reference mark, numbered in reading order with its note as the mark's title, an equation as its TeX between its dollars, and a term and its descriptions as paragraphs. A markdown paste that would build one lands as its text, and an equation copied in the editor pastes as its TeX and a footnote as nothing.
