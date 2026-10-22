@@ -33,6 +33,10 @@ const CORNER_REACH_PX = 64;
 /** What a wheel delta multiplies the zoom by, per unit of each `deltaMode`: a mouse
  *  notch is about 100 px or 3 lines, which this lands near a fifth either way. */
 const WHEEL_RATE = [0.0025, 0.08, 0.25] as const;
+/** The pixel delta under which a ctrl-wheel event is a pinch rather than a notch, and the
+ *  rate that inverts the pinch's encoding. */
+const PINCH_DELTA = 50;
+const PINCH_RATE = 0.01;
 
 /** Safari's trackpad pinch: not a wheel event there, and not in the DOM lib. */
 interface GestureEvent extends UIEvent {
@@ -71,9 +75,9 @@ export function createViewport(
 		const style = getComputedStyle(container);
 		const width = container.clientWidth - px(style.paddingLeft) - px(style.paddingRight);
 		const height = container.clientHeight - px(style.paddingTop) - px(style.paddingBottom);
-		// A pane the shell has hidden measures 0×0, which is no width to fit: the scale
-		// it was hidden at stands, so a return to the same box re-rasters nothing.
-		return width > 0 ? { width, height: Math.max(height, 0) } : undefined;
+		// A pane the shell has hidden measures 0×0, which is no box to fit: the scale it
+		// was hidden at stands, so a return to the same box re-rasters nothing.
+		return width > 0 && height > 0 ? { width, height } : undefined;
 	}
 
 	// What the pages are drawn at, the zoom held against this pane's floor, and the floor.
@@ -98,14 +102,20 @@ export function createViewport(
 		const pct = `${Math.round(b.current * 100)}%`;
 		pill.textContent = pct;
 		pill.setAttribute('aria-label', `${pct}, ${resetLabel}`);
-		if (!dock.isConnected) container.appendChild(dock);
+		if (dock.isConnected) return;
+		container.appendChild(dock);
+		wake();
 	}
 
+	// A pill under the pointer stays: hidden, it lets the click through to the page.
 	let idle: ReturnType<typeof setTimeout> | undefined;
 	function wake(): void {
 		delete pill.dataset.idle;
 		clearTimeout(idle);
-		idle = setTimeout(() => (pill.dataset.idle = ''), IDLE_MS);
+		idle = setTimeout(() => {
+			if (pill.matches(':hover')) wake();
+			else pill.dataset.idle = '';
+		}, IDLE_MS);
 	}
 
 	// The page under `y`, or the nearest one: the point a zoom holds still is a fraction
@@ -115,16 +125,32 @@ export function createViewport(
 		return slots.at(-1)?.el;
 	}
 
-	function zoomTo(next: number | undefined, x: number, y: number, settle?: number): void {
+	// Run `act`, then scroll so the point at `x`, `y` is over the same place on its page.
+	function holding(x: number, y: number, act: () => void): void {
 		const page = pageAt(y);
 		const before = page?.getBoundingClientRect();
-		zoom = next;
-		apply(settle);
-		if (zoom !== undefined) wake();
+		act();
 		if (!page || !before?.width || !before.height) return;
 		const after = page.getBoundingClientRect();
 		container.scrollLeft += after.left + ((x - before.left) / before.width) * after.width - x;
 		container.scrollTop += after.top + ((y - before.top) / before.height) * after.height - y;
+	}
+
+	function zoomTo(next: number | undefined, x: number, y: number, settle?: number): void {
+		holding(x, y, () => {
+			zoom = next;
+			apply(settle);
+		});
+		if (zoom !== undefined) wake();
+	}
+
+	// A re-fit holds the line at the pane's top edge, so a dragged divider leaves the
+	// reader where they were. The desk turns the browser's own scroll anchoring off
+	// (`Preview.svelte`), which would correct the same move a second time.
+	function refit(): void {
+		if (!container.scrollTop && !container.scrollLeft) return apply();
+		const r = container.getBoundingClientRect();
+		holding(r.left + r.width / 2, r.top, () => apply());
 	}
 
 	function centre(): { x: number; y: number } {
@@ -161,18 +187,22 @@ export function createViewport(
 		zoomTo(run.shown, x, y, SETTLE_MS);
 	}
 
-	// Ctrl-wheel is a mouse's zoom, and the trackpad pinch Chromium and Firefox send.
+	// Ctrl-wheel is a mouse's zoom, and the trackpad pinch Chromium and Firefox send as
+	// `deltaY = -100 ln(scale)`, in deltas smaller than a notch's: those track the fingers.
 	function onWheel(e: WheelEvent): void {
 		if (!(e.ctrlKey || e.metaKey)) return;
 		e.preventDefault();
-		const factor = Math.exp(-e.deltaY * WHEEL_RATE[e.deltaMode]);
+		const pinched = e.deltaMode === 0 && Math.abs(e.deltaY) < PINCH_DELTA;
+		const factor = Math.exp(-e.deltaY * (pinched ? PINCH_RATE : WHEEL_RATE[e.deltaMode]));
 		glideTo((g) => g.raw * factor, e.clientX, e.clientY);
 	}
 
 	// The keys reach the pane under the pointer as well as the focused one: a click on a
 	// page lands its caret in the editor, taking the focus with it.
+	// The first pane to take a key claims it, so two previews never both step, and a key
+	// a host's own handler took is left to it.
 	function onKeyDown(e: KeyboardEvent): void {
-		if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+		if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || e.isComposing) return;
 		if (!pointer && !container.contains(document.activeElement)) return;
 		const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' || e.key === '_' ? -1 : 0;
 		if ((!dir && e.key !== '0') || !bounds()) return;
@@ -213,10 +243,11 @@ export function createViewport(
 	}
 	function onGestureChange(e: Event): void {
 		e.preventDefault();
-		if (gesture === undefined) return;
+		if (gesture === undefined || pinch) return;
 		const { scale, clientX, clientY } = e as GestureEvent;
 		const start = gesture;
-		glideTo(() => start * scale, clientX, clientY);
+		const at = Number.isFinite(clientX + clientY) ? { x: clientX, y: clientY } : anchor();
+		glideTo(() => start * scale, at.x, at.y);
 	}
 	function onGestureEnd(e: Event): void {
 		e.preventDefault();
@@ -253,18 +284,17 @@ export function createViewport(
 	// The pane's box moving: a dragged divider, a resized window, a hidden track shown.
 	// Guarded for jsdom, which ships no ResizeObserver.
 	const resizeObserver =
-		typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => apply());
+		typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => refit());
 	resizeObserver?.observe(container);
 
 	apply();
 
 	return {
-		update() {
-			apply();
-		},
+		update: refit,
 		setZoom(next) {
-			if (bounds()) step(() => next);
-			else zoom = next;
+			const valid = next !== undefined && Number.isFinite(next) && next > 0 ? next : undefined;
+			if (bounds()) step(() => valid);
+			else zoom = valid;
 		},
 		destroy() {
 			for (const [target, type, fn] of listeners) target.removeEventListener(type, fn);

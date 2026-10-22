@@ -96,7 +96,7 @@ export function createPaintLoop(
 		// host (`core/theme.css`).
 		el.className = 'qm-page-slot';
 		// The page's index, in the DOM. `pageByEl` is this module's and a consumer
-		// drawing an overlay of its own needs the number: position among siblings is
+		// drawing an overlay of its own needs the number: position among the slots is
 		// the only handle without it, which is right today and is not a contract.
 		el.dataset.page = String(page);
 		// `flex: none` under the flex column `Preview.svelte` lays the desk out as, which
@@ -113,7 +113,10 @@ export function createPaintLoop(
 		});
 		sizeSlot(el, size);
 		if (page > 0) el.style.marginTop = PAGE_GAP;
-		container.appendChild(el);
+		// After the last slot rather than at the end: the zoom pill's dock is a child too.
+		const last = slots.at(-1)?.el;
+		if (last) last.after(el);
+		else container.prepend(el);
 		pageByEl.set(el, page);
 		observer.observe(el);
 		return { page, size, el };

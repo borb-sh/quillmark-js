@@ -2,7 +2,7 @@
 // One scale for every page, and the pill standing exactly while the zoom is not the
 // default. jsdom lays out nothing, so the pane's box is stubbed and the scale is read
 // back off the slots' widths.
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished } from 'vitest';
 import { createPreview, type PreviewController } from '$lib/preview/controller';
 import type { LiveSession } from '@quillmark/wasm';
 import { FakeIO, mockSession, stubPaintGlobals } from '../helpers/session.js';
@@ -87,5 +87,43 @@ describe('the preview zoom', () => {
 		container.dispatchEvent(zoom);
 		expect(zoom.defaultPrevented).toBe(true);
 		expect(widths()[1]).toBeGreaterThan(fit[1]);
+	});
+
+	it('lets one pane claim a key when two could take it', () => {
+		const other = document.createElement('div');
+		Object.defineProperty(other, 'clientWidth', { value: 480, configurable: true });
+		Object.defineProperty(other, 'clientHeight', { value: 720, configurable: true });
+		document.body.appendChild(other);
+		const second = createPreview(mixed(), { container: other });
+		onTestFinished(() => {
+			second.destroy();
+			other.remove();
+		});
+		container.focus();
+		other.dispatchEvent(new PointerEvent('pointermove', { clientX: 10, clientY: 10 }));
+
+		zoomKey('=');
+		const zoomed = [container, other].filter((el) => el.querySelector('.qm-preview-zoom'));
+		expect(zoomed).toHaveLength(1);
+	});
+
+	it('holds a zoom set while hidden for the box it comes back to', () => {
+		Object.defineProperty(container, 'clientWidth', { value: 0, configurable: true });
+		preview.setZoom(1);
+		expect(pill()).toBeNull();
+
+		Object.defineProperty(container, 'clientWidth', { value: 480, configurable: true });
+		preview.refresh({ pageCount: 3, dirtyPages: [] });
+		expect(pill()?.textContent).toBe('100%');
+	});
+
+	it('leaves the keys and the container as it found them once destroyed', () => {
+		preview.destroy();
+		expect(container.hasAttribute('tabindex')).toBe(false);
+		container.focus();
+		const key = new KeyboardEvent('keydown', { key: '=', ctrlKey: true, cancelable: true });
+		window.dispatchEvent(key);
+		expect(key.defaultPrevented).toBe(false);
+		preview = createPreview(mixed(), { container });
 	});
 });

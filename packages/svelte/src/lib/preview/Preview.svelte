@@ -100,6 +100,8 @@
 	   A flex column, so the zoom pill's dock can take the space under pages shorter than
 	   the pane and stand at its corner (viewport.ts). The gutter is reserved, so a
 	   scrollbar arriving with a taller zoom narrows nothing the default fits against.
+	   Scroll anchoring is off because the viewport holds the reader's place itself, on
+	   every zoom and re-fit, and the browser's correction would land on top of it.
 	   `touch-action` leaves a pinch to the viewport, which zooms the pages rather than
 	   the host's page.
 
@@ -118,6 +120,7 @@
 		height: 100%;
 		overflow: auto;
 		scrollbar-gutter: stable;
+		overflow-anchor: none;
 		touch-action: pan-x pan-y;
 		padding: var(--_qm-space-4);
 		background: var(--_qm-surface-sunken);
@@ -130,35 +133,50 @@
 		flex: none;
 		position: sticky;
 		bottom: 0;
-		left: 0;
+		inset-inline-start: 0;
 		height: 0;
 		margin-top: auto;
 	}
 
 	/* Floats over the desk, so it lifts the way a floating surface does (ARCHITECTURE
-	   §Styling), and says only the zoom: the label never changes. */
+	   §Styling), and says only the zoom: the label never changes. Tabular figures and a
+	   floor as wide as `100%`, so a third digit never shifts its edge. It arrives at once and leaves on the reveal, so a glance at
+	   it after a gesture still finds it. */
 	:global(:where(.qm-preview-zoom)) {
 		position: absolute;
-		right: 0;
+		inset-inline-end: 0;
 		bottom: 0;
-		padding: var(--_qm-space-half) var(--_qm-space-2);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: calc(4ch + 2 * var(--_qm-space-2));
+		min-height: var(--_qm-tap-min);
+		padding: 0 var(--_qm-space-2);
 		border: var(--_qm-border-width) solid var(--_qm-border);
 		border-radius: var(--_qm-radius-pill);
 		background: var(--_qm-surface-popover);
 		backdrop-filter: blur(var(--_qm-blur));
+		box-shadow: var(--_qm-lift);
 		color: var(--_qm-ink-label);
 		font-family: var(--_qm-font);
 		font-size: var(--_qm-text-label);
 		font-variant-numeric: tabular-nums;
 		cursor: pointer;
-		transition: opacity var(--_qm-duration-slow) var(--_qm-ease-reverse);
+		user-select: none;
+		transition:
+			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	:global(:where(.qm-preview-zoom:hover)) {
 		color: var(--_qm-ink);
 	}
+	:global(:where(.qm-preview-zoom:active)) {
+		background: var(--_qm-surface-hover);
+	}
 	:global(:where(.qm-preview-zoom[data-idle])) {
 		opacity: 0;
 		pointer-events: none;
+		transition: opacity var(--_qm-reveal);
 	}
 	:global(:where(.qm-preview-zoom:focus-visible)) {
 		opacity: 1;
@@ -167,7 +185,7 @@
 		outline-offset: var(--_qm-ring-offset);
 	}
 	@media (prefers-reduced-motion: reduce) {
-		:global(:where(.qm-preview-zoom)) {
+		:global(:where(.qm-preview-zoom, .qm-preview-zoom[data-idle])) {
 			transition: none;
 		}
 	}

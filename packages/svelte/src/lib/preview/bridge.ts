@@ -151,6 +151,9 @@ export function createBridge(
 	// and this one moves the container's box, and one forced layout serves the whole hop.
 	function centre(target: DOMRect, port: DOMRect): void {
 		container.scrollTop += target.top + target.height / 2 - (port.top + port.height / 2);
+		reveal(target, port);
+	}
+	function reveal(target: DOMRect, port: DOMRect): void {
 		if (target.left < port.left) container.scrollLeft += target.left - port.left;
 		else if (target.right > port.right) container.scrollLeft += target.right - port.right;
 	}
@@ -206,9 +209,11 @@ export function createBridge(
 		// the pane only when the caret has left the fold. Centring unconditionally
 		// takes the scrollport back from the user on every one of them, including
 		// the ones that changed nothing about where the caret already was.
+		// Across, a page zoomed wider than the pane has a caret to keep in view too, and
+		// the least trip does it without moving the line the reader is on.
 		const target = measure(slot, rectToPercent(region.rect, slot.size));
-		if (clearOfTheFold(target, port)) return;
-		centre(target, port);
+		if (clearOfTheFold(target, port)) reveal(target, port);
+		else centre(target, port);
 	}
 
 	return {

@@ -32,6 +32,7 @@ function setBox(el: HTMLElement, width: number, height: number): void {
 	el.getBoundingClientRect = () =>
 		({ left: 0, top: 0, right: width, bottom: height, width, height }) as DOMRect;
 	Object.defineProperty(el, 'clientWidth', { value: width, configurable: true });
+	Object.defineProperty(el, 'clientHeight', { value: height, configurable: true });
 	for (const ro of ros) ro.report();
 }
 /** The rAF `scheduleRepaint` coalesces into. */

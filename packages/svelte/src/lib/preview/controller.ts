@@ -1,8 +1,9 @@
 // `createPreview` wires paint.ts, bridge.ts and viewport.ts over one `LiveSession`
 // and `opts.container`, and is the only thing that composes them: the paint loop
 // owns the page slots; the bridge attaches its own listeners to those same
-// slots; the viewport sets the one scale they are drawn at. A pure view: never calls `session.apply`, never mutates the session;
-// the consumer drives edits and hands the resulting `ChangeSet` to `refresh`.
+// slots; the viewport sets the one scale they are drawn at. A pure view: never calls
+// `session.apply`, never mutates the session; the consumer drives edits and hands the
+// resulting `ChangeSet` to `refresh`.
 import type { LiveSession, ChangeSet } from '@quillmark/wasm';
 import type { DocPath, Landing, Place } from '../core/address.js';
 import { reportError, errorMessage, type EditorErrorHandler } from '../core/errors.js';
@@ -155,8 +156,11 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		}
 	}
 
-	render(session.pageCount, []);
+	// Built before the first bridge, so its ResizeObserver is the earlier one and a pane
+	// shown again re-fits before the bridge runs the trip it held at the old scale.
 	const viewport = createViewport(container, paintLoop.slots, paintLoop.setScale, t.resetZoom);
+	render(session.pageCount, []);
+	viewport.update();
 
 	// The last place the editor put the caret, re-located after every recompile and
 	// dropped on a focus change or a discrete hop. `session.locate` answers against the

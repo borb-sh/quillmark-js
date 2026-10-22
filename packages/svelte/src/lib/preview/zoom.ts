@@ -18,8 +18,8 @@ export const MAX_ZOOM = 2;
  *  gesture zooms out: the whole page in view with a thin margin, and never a stamp. */
 const FLOOR_FILL = 0.9;
 
-/** What `Mod +` and `Mod −` step through: the levels a browser's own zoom keys land on,
- *  so a step lands somewhere a reader has been before. */
+/** What `Mod +` and `Mod −` step through: a subset of the levels a browser's own zoom
+ *  keys land on, so a step lands somewhere a reader has been before. */
 export const STEPS = [0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const;
 
 /** How far past 100% a continuous gesture carries before it leaves it. */
