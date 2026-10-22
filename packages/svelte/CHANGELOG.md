@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A date cleared segment by segment writes its blank as the last segment empties**, so the preview follows the clear at once, where it wrote nothing until the caret left the field. A segment emptied while others stand still holds until the caret leaves.
+
 **An item's number is its position, and no keystroke writes one.** Backspace at the head of a later item takes its marker off and keeps its text as an unnumbered line under the item above, where it lifted the item out and split the list, stamping a `start` on the items after it; a nested first item's text joins the item it is nested in. The items below close up, so Enter then Backspace in the middle of a list is the list it was, where it left `1, 3, 4`. An empty item is spent, the caret at the end of what stands above it. Backspace on a top-level first item still lifts it out, and the next item counts from the list's `start`, where it kept its old number.
 
 **Leaving a list is Backspace's, one rung a press, and Shift-Tab stops at the top level.** Backspace at the head of an unnumbered line under a top-level item takes it out of the list as a full-width paragraph, with the item's lines after it, where it joined the line onto the one above; the list splits there and the items after it count from 1. The press after is the join. A line with a sub-list below it in its item, and a line in a nested item, keep the join. Shift-Tab on a top-level item, or on a line under one, does nothing, where it lifted the whole item out of the list and restarted the items after it at 1.
