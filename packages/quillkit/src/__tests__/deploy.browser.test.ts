@@ -185,6 +185,17 @@ const SURVEY = `(async () => {
 	};
 })()`;
 
+/** The address bar once a template's document is on screen, the editor mounted over it. */
+const LANDED = `(async () => {
+	const deadline = Date.now() + 30000;
+	for (;;) {
+		if (document.querySelector('.qm-pane') && location.search.includes('template='))
+			return location.search;
+		if (Date.now() > deadline) return location.search;
+		await new Promise((wake) => setTimeout(wake, 50));
+	}
+})()`;
+
 interface Survey {
 	booted: boolean;
 	quiverResolved: boolean;
@@ -212,8 +223,15 @@ let server: Server;
 let first: string;
 /** Opened by a link naming `first` by its name alone. */
 let wide: Survey;
-/** Opened by a link naming a ref the quiver does not hold. */
+/** Opened by a link naming a ref the quiver does not hold, and a template the manifest
+ *  does not list. */
 let narrow: Survey;
+/** A template a link names, by its file less the `.md`, and the quill its `$quill` names,
+ *  canonical: one whose quill is not the one the quiver opens first, so what opens it is
+ *  the template and not the fallback. */
+let starter: { name: string; ref: string };
+/** The address bar after a link naming `starter`. */
+let landed: string;
 
 beforeAll(async () => {
 	expect(
@@ -230,17 +248,30 @@ beforeAll(async () => {
 		collection,
 		'--out',
 		site,
+		'--drafts',
 		'--templates',
 		join(collection, 'templates')
 	]);
 	const { quills } = JSON.parse(await readFile(join(site, 'quiver', 'quiver.json'), 'utf8'));
 	first = `${quills[0].name}@${quills[0].version}`;
+	const manifest: { file: string }[] = JSON.parse(
+		await readFile(join(site, 'templates', 'templates.json'), 'utf8')
+	);
+	for (const { file } of manifest) {
+		const named = /^\$quill:\s*([a-z0-9_]+)/m.exec(
+			await readFile(join(site, 'templates', file), 'utf8')
+		);
+		const quill = quills.find((q: { name: string }) => q.name === named?.[1]);
+		if (quill && quill.name !== quills[0].name)
+			starter ??= { name: file.replace(/\.md$/, ''), ref: `${quill.name}@${quill.version}` };
+	}
 
 	server = createStaticServer([{ prefix: PREFIX, root: site }]);
 	const url = `http://127.0.0.1:${await listen(server, 0, '127.0.0.1')}${PREFIX}/`;
-	[wide, narrow] = await Promise.all([
+	[wide, narrow, landed] = await Promise.all([
 		load<Survey>(`${url}?quill=${quills[0].name}`, SURVEY, WIDE),
-		load<Survey>(`${url}?quill=nope@9.9.9`, SURVEY, NARROW)
+		load<Survey>(`${url}?quill=nope@9.9.9&template=nope`, SURVEY, NARROW),
+		load<string>(`${url}?template=${starter.name}`, LANDED, WIDE)
 	]);
 }, LOAD_MS);
 
@@ -319,10 +350,16 @@ describe('the built client, served under a subpath', () => {
 		}
 	});
 
-	// A ref the quiver does not hold opens the catalog's first, the address bar corrected
-	// to it.
+	// A ref the quiver does not hold opens the catalog's first, and a template the
+	// manifest does not list opens nothing, the address bar corrected to what is on screen.
 	it('opens the quill a link names, and says which one is on screen', () => {
 		expect(wide.search).toBe(`?quill=${first}`);
 		expect(narrow.search).toBe(`?quill=${first}`);
+	});
+
+	it('opens the template a link names, in the quill it names', () => {
+		const said = new URLSearchParams(landed);
+		expect(said.get('template')).toBe(starter.name);
+		expect(said.get('quill')).toBe(starter.ref);
 	});
 });

@@ -29,6 +29,13 @@ export async function listTemplates(): Promise<Template[]> {
 	);
 }
 
+/** What a link names a template by: its file, less the `.md`. A manifest's names are
+ *  prose (`Army Memo`) and may repeat, where two entries naming one file are one
+ *  document, so the file is the name that is already unique and already reads as a slug. */
+export function linkName(template: Template): string {
+	return template.file.replace(/\.md$/, '');
+}
+
 /** A template's markdown. */
 export async function readTemplate(template: Template): Promise<string> {
 	const at = new URL(template.file, base());
