@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio links to a template.** `?template=army_memo` opens the template whose file is `army_memo.md` in the quill its `$quill` names, and the address bar carries the template opened, by its file less the `.md`, beside the quill, so a link sent from studio opens that starter. Picking a quill, importing a document or turning examples on or off takes the template out of the address bar; an edit leaves it, and a reload reopens the template. A name the manifest does not list opens what `?quill=` asks for and is taken out of the address bar.
+
 ## v0.19.0 - 2026-10-21
 
 **The carried `@quillmark/wasm` is 0.129.0, and an acroform quill migrates.** An acroform quill's field spec is `Form.yaml`, and one holding `form.yaml` fails to open as `acroform::legacy_form_yaml`; a field `rect` with no width or height, or wholly off its page, fails as `acroform::invalid_field_rect`, and an `option:` naming no value of its enum as `acroform::invalid_option`. A quill whose `requires` floor is above the running release fails to load as `quill::requires_unmet`, where it failed as `quill::engine_too_old`. A one-line text value prints in a Typst plate with no space at either edge, so the starter letter prints its recipient without the `flush` helper it carried. Markdown spelling a footnote, `$…$` math or a `: ` description renders it, where it printed as text, and `ui.layout: flat` loads with `quill::deprecated_flat` and a loose field declared after a top-level object with `quill::field_after_object`, neither of which `quillkit test` reads. quillmark's migration guides from 0.126 → 0.127 to 0.128 → 0.129 cover each step. Studio's editor opens a field holding a footnote, an equation or a definition list read-only.
