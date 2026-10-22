@@ -132,8 +132,9 @@ main:
 `;
 	function marked(extra = {}) {
 		const q = quillFromYaml(MARKED);
-		const { target } = mountEditor(q, q.seedDocument(), extra);
-		return { target, card: target.querySelector<HTMLElement>('.qm-card')! };
+		const mounted = mountEditor(q, q.seedDocument(), extra);
+		const { target } = mounted;
+		return { mounted, target, card: target.querySelector<HTMLElement>('.qm-card')! };
 	}
 
 	it('is a panel of its own, headed by the field, in declaration order', () => {
@@ -155,6 +156,33 @@ main:
 
 		pick(classification, 'CUI');
 		expect(classification.querySelector('[data-qm-prop="controlled_by"]')).not.toBeNull();
+	});
+
+	it('opens its closed panel for a landing on a live cell', async () => {
+		const { mounted, card } = marked();
+		pick(panel(card, 'Classification'), 'CUI');
+		openGroup(card, 'Addressing');
+		const classification = panel(card, 'Classification');
+		expect(classification.querySelector<HTMLElement>('.qm-group-panel')?.inert).toBe(true);
+
+		await mounted.editor.focusField('main.classification.controlled_by');
+		await settle();
+		expect(classification.querySelector<HTMLElement>('.qm-group-panel')?.inert).toBe(false);
+		expect(
+			classification
+				.querySelector('[data-qm-prop="controlled_by"]')
+				?.contains(document.activeElement)
+		).toBe(true);
+	});
+
+	it('panels on a card kind too', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const at = doc.cards.findIndex((c) => c.kind === 'figure');
+		const { target } = mountEditor(q, doc);
+		const figure = target.querySelectorAll<HTMLElement>('.qm-card')[at + 1];
+		expect(headers(figure).map((h) => h.textContent?.trim())).toEqual(['Placement']);
+		expect(figure.querySelector('.qm-groups')!.contains(field(figure, 'Caption'))).toBe(false);
 	});
 
 	it('keeps the enum policy on its discriminant', () => {

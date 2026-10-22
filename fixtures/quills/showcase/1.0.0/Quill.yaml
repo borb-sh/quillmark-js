@@ -478,6 +478,11 @@ card_kinds:
     title: Figure
     description: A placed figure.
     fields:
+      caption:
+        type: richtext
+        multiline: false
+        default: ""
+        description: Set under the figure.
       placement:
         type: enum
         values:
@@ -494,11 +499,6 @@ card_kinds:
               default: end
               description: Which margin the figure floats to.
         description: How the figure sits in the flow. The one variant-bearing enum on a card kind.
-      caption:
-        type: richtext
-        multiline: false
-        default: ""
-        description: Set under the figure.
 
   credits:
     title: Credits

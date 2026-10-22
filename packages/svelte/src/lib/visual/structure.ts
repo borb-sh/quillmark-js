@@ -59,15 +59,15 @@ export interface FieldModel {
 	plaintext: boolean;
 }
 
-/** A panel section, a top-level `object`'s or a legacy `ui.group`'s: its label and the
- *  fields (declaration order) inside it. */
+/** A panel section, a top-level `object`'s or variant-bearing `enum`'s or a legacy
+ *  `ui.group`'s: its label and the fields (declaration order) inside it. */
 export interface GroupSection {
 	group: string | undefined;
 	label: string;
 	fields: FieldModel[];
-	/** The object the section's header names in place of a label of its own: the
-	 * object a panel is, or a group section's one field where that field is an
-	 * `object`. Its properties draw flat, the panel being their frame. */
+	/** The field the section's header names in place of a label of its own: the
+	 * object or variant enum a panel is, or a group section's one field where that
+	 * field is either. An object's properties draw flat, the panel being their frame. */
 	head?: FieldModel;
 }
 
@@ -711,6 +711,9 @@ export function groupLabel(cardSchema: QuillCardSchema, group: string): string {
 	return cardSchema.ui?.groups?.[group]?.title ?? humanize(group);
 }
 
+/** A field its header can name: an `object` or a variant-bearing `enum`, each a container. */
+const panelControl = (f: FieldModel) => f.control === 'object' || f.control === 'variant';
+
 /**
  * Sort field models into ordered group sections. Declared groups first (in
  * `order`), each carrying its fields in declaration order; then any remaining
@@ -728,7 +731,7 @@ export function groupSections(
 	for (const g of order) {
 		const fs = fields.filter((f) => f.group === g);
 		if (fs.length) {
-			const head = fs.length === 1 && fs[0].control === 'object' ? fs[0] : undefined;
+			const head = fs.length === 1 && panelControl(fs[0]) ? fs[0] : undefined;
 			sections.push({ group: g, label: labelFor(g), fields: fs, head });
 			emitted.add(g);
 		}
@@ -752,13 +755,12 @@ export function groupSections(
  * them. The section id is the field name, which a card's keys hold unique.
  */
 export function objectSections(fields: FieldModel[]): GroupSection[] {
-	const panel = (f: FieldModel) => f.control === 'object' || f.control === 'variant';
-	const loose = fields.filter((f) => !panel(f));
+	const loose = fields.filter((f) => !panelControl(f));
 	const sections: GroupSection[] = loose.length
 		? [{ group: undefined, label: '', fields: loose }]
 		: [];
 	for (const f of fields)
-		if (panel(f)) sections.push({ group: f.name, label: f.label, fields: [f], head: f });
+		if (panelControl(f)) sections.push({ group: f.name, label: f.label, fields: [f], head: f });
 	return sections;
 }
 
