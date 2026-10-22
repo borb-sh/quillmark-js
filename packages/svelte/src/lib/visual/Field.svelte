@@ -348,6 +348,7 @@
 					label={field.label}
 					id={domIds.control}
 					labelledBy={domIds.label}
+					headedBy={headed ? domIds.label : undefined}
 					{describedBy}
 					{contentAt}
 					onCommit={onCommitScalar}

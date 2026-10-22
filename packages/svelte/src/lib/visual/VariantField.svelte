@@ -39,6 +39,8 @@
 		 * element. The cells are named by their own composed labels. */
 		id?: string;
 		labelledBy?: string;
+		/** The panel header naming the discriminant, where the field draws no label. */
+		headedBy?: string;
 		describedBy?: string;
 		/** The boundary's nested content read for this field, which the cells take
 		 * unprefixed: a variant's cell is one key in from the container it rests as, so
@@ -59,6 +61,7 @@
 		label,
 		id,
 		labelledBy,
+		headedBy,
 		describedBy,
 		contentAt,
 		onCommit,
@@ -118,6 +121,7 @@
 		fallback={ghostMember}
 		blankTitle={schema.ui?.blank_title}
 		{id}
+		labelledBy={headedBy}
 		{describedBy}
 		onCommit={(v) => onCommit(commitDiscriminant(value, v))}
 		{optionAllowed}

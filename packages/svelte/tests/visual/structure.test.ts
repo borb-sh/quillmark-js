@@ -497,6 +497,19 @@ describe('objectSections', () => {
 	it('draws no unframed section where every field is a panel', () => {
 		expect(sections({ a: obj() }).map((s) => s.group)).toEqual(['a']);
 	});
+	it('panels a variant-bearing enum, headed by it, and leaves a plain enum unframed', () => {
+		const out = sections({
+			level: f({ type: 'enum', values: ['A', 'B'] }),
+			marking: f({ type: 'enum', values: ['A', 'B'], variants: { A: { note: f({}) } } }),
+			box: obj()
+		});
+		expect(out.map((s) => [s.group, s.head?.name])).toEqual([
+			[undefined, undefined],
+			['marking', 'marking'],
+			['box', 'box']
+		]);
+		expect(out[0].fields.map((m) => m.name)).toEqual(['level']);
+	});
 });
 
 describe('cardSections', () => {

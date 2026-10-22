@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A card's top-level variant-bearing `enum` draws as a panel**, as a top-level `object` does: its header names the discriminant, which takes the header for its accessible name, and the live world's cells stand inside the panel. A variant enum in a `ui.group` or inside an object draws as before.
+
 ## v0.24.0 - 2026-10-21
 
 **The `@quillmark/wasm` peer floor is `>=0.129.0-0`.** A footnote, an equation and a definition list, which markdown spells and 0.129.0 imports, open read-only: a body or a block field holding one is held under its note and commits nothing, so a stored row holding one keeps it. A footnote draws as its reference mark, numbered in reading order with its note as the mark's title, an equation as its TeX between its dollars, and a term and its descriptions as paragraphs. A markdown paste that would build one lands as its text, and an equation copied in the editor pastes as its TeX and a footnote as nothing.

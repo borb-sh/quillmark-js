@@ -3,8 +3,17 @@
 // `credits` kind declares no `ui.groups`, so each top-level object is a panel,
 // headed by the object, and everything else stands unframed above them.
 import { describe, it, expect, afterEach } from 'vitest';
-import { quill } from '../helpers/fixtures.js';
-import { field, mountEditor, openGroup, settle, unmountAll } from '../helpers/surface.svelte.js';
+import { quill, quillFromYaml } from '../helpers/fixtures.js';
+import {
+	field,
+	mountEditor,
+	openGroup,
+	openList,
+	pick,
+	settle,
+	trigger,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -90,5 +99,70 @@ describe('a card grouped by top-level objects', () => {
 		expect(
 			headers(target.querySelector('.qm-card')!).map((h) => h.textContent?.trim())
 		).not.toContain('Point of contact');
+	});
+});
+
+describe('a card-level variant enum', () => {
+	const MARKED = `quill:
+  name: marked
+  version: 1.0.0
+  backend: typst
+  description: A variant enum beside an object, neither in a group.
+typst:
+  plate_file: plate.typ
+main:
+  fields:
+    subject:
+      type: text
+    classification:
+      type: enum
+      values: [UNCLASSIFIED, CUI, SECRET]
+      default: ""
+      description: The banner.
+      variants:
+        CUI:
+          controlled_by:
+            type: text
+            default: ""
+    addressing:
+      type: object
+      properties:
+        memo_for:
+          type: text
+`;
+	function marked(extra = {}) {
+		const q = quillFromYaml(MARKED);
+		const { target } = mountEditor(q, q.seedDocument(), extra);
+		return { target, card: target.querySelector<HTMLElement>('.qm-card')! };
+	}
+
+	it('is a panel of its own, headed by the field, in declaration order', () => {
+		const { card } = marked();
+		expect(headers(card).map((h) => h.textContent?.trim())).toEqual([
+			'Classification',
+			'Addressing'
+		]);
+		expect(card.querySelector('.qm-groups')!.contains(field(card, 'Subject'))).toBe(false);
+	});
+
+	it('names its discriminant by the header and draws its world inside the panel', () => {
+		const { card } = marked();
+		const classification = panel(card, 'Classification');
+		const header = classification.querySelector<HTMLElement>('.qm-group-header')!;
+		expect(classification.querySelector('.qm-field-label')).toBeNull();
+		expect(trigger(classification).getAttribute('aria-labelledby')).toBe(header.id);
+		expect(trigger(classification).hasAttribute('aria-label')).toBe(false);
+
+		pick(classification, 'CUI');
+		expect(classification.querySelector('[data-qm-prop="controlled_by"]')).not.toBeNull();
+	});
+
+	it('keeps the enum policy on its discriminant', () => {
+		const { card } = marked({ enumOptionAllowed: (_: unknown, v: string) => v !== 'SECRET' });
+		openList(panel(card, 'Classification'));
+		const secret = [...document.querySelectorAll<HTMLElement>('.qm-select-item')].find(
+			(el) => el.textContent?.trim() === 'SECRET'
+		);
+		expect(secret?.hasAttribute('data-disabled')).toBe(true);
 	});
 });

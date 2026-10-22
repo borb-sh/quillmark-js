@@ -747,12 +747,12 @@ export function groupSections(
 
 /**
  * Object-panel sections (VISUAL_EDITOR §"Structure mirrors the schema"): every
- * top-level `object` is a panel of its own, headed by the object, in declaration
- * order; everything else stands in one unframed section above them. The section id
- * is the field name, which a card's keys hold unique.
+ * top-level `object` and variant-bearing `enum` is a panel of its own, headed by the
+ * field, in declaration order; everything else stands in one unframed section above
+ * them. The section id is the field name, which a card's keys hold unique.
  */
 export function objectSections(fields: FieldModel[]): GroupSection[] {
-	const panel = (f: FieldModel) => f.control === 'object';
+	const panel = (f: FieldModel) => f.control === 'object' || f.control === 'variant';
 	const loose = fields.filter((f) => !panel(f));
 	const sections: GroupSection[] = loose.length
 		? [{ group: undefined, label: '', fields: loose }]

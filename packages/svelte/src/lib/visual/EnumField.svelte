@@ -39,6 +39,8 @@
 		/** `<label for>` target. Set → the label names this trigger, so `aria-label`
 		 * comes off: two names is where implementations disagree about which wins. */
 		id?: string;
+		/** The element naming a trigger no `<label for>` reaches: a panel's header. */
+		labelledBy?: string;
 		/** The parked `description` (FieldLabel): announced after the name. */
 		describedBy?: string;
 		onCommit: (v: string | undefined) => void;
@@ -56,6 +58,7 @@
 		optional = false,
 		label,
 		id,
+		labelledBy,
 		describedBy,
 		onCommit,
 		optionAllowed,
@@ -111,7 +114,8 @@
 		<Select.Trigger
 			class="qm-select qm-control-box qm-focus-ring"
 			{id}
-			aria-label={id ? undefined : label}
+			aria-label={id || labelledBy ? undefined : label}
+			aria-labelledby={labelledBy}
 			aria-describedby={describedBy}
 			data-ghosted={unset ? (ghostsMember ? 'default' : '') : undefined}
 		>
