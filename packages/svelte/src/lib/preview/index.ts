@@ -17,7 +17,7 @@ export { createPreview } from './controller.js';
 export type { PreviewOptions, PreviewController } from './controller.js';
 export { default as Preview } from './Preview.svelte';
 
-// What the preview says when there is nothing to paint. Keyed and partial; the
+// What the preview says: its message states and the zoom pill's name. Keyed and partial; the
 // English is exported so a consumer composes against it rather than restating it.
 // The merge is the surface's own: a consumer hands `strings` to a prop, never
 // merges one.

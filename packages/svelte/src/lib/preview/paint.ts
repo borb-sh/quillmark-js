@@ -4,10 +4,10 @@
 // pages, per the paint contract). Builds the per-page slot elements bridge.ts
 // attaches its own listeners to; owns `pageSize` caching and
 // slot-count reconciliation across an `apply` (`ChangeSet.pageCount` can differ
-// from the previous compile; pages can be added or removed). A canvas fills its
-// slot, so its ink stays on the box the click and scroll geometry measure; a
-// ResizeObserver plus a DPR media-query listener repaint mounted pages when the
-// container's CSS width or `devicePixelRatio` changes, so the raster stays sharp.
+// from the previous compile; pages can be added or removed). Every slot is drawn at
+// the one scale `setScale` hands it, and a canvas fills its slot, so its ink stays on
+// the box the click and scroll geometry measure; a scale change and a DPR
+// media-query listener repaint mounted pages, so the raster stays sharp.
 import type { LiveSession, PageSize } from '@quillmark/wasm';
 
 /** One page's DOM slot: the box bridge.ts measures against, plus its cached geometry. */
@@ -22,8 +22,12 @@ export interface PaintLoop {
 	readonly slots: readonly PageSlot[];
 	/** Reconcile slot count to `pageCount`, re-cache geometry, repaint mounted `dirtyPages`. */
 	refresh(dirtyPages: readonly number[], pageCount: number): void;
-	/** Fold a density multiplier into every future paint; repaints mounted pages now. */
-	setDensityZoom(zoom: number): void;
+	/**
+	 * Draw every page at `scale` CSS px per PDF pt and repaint the mounted ones: on the
+	 * next frame, or once `settle` has passed without another call, which is what a
+	 * gesture asks for, the stretched raster standing in until it rests.
+	 */
+	setScale(scale: number, settle?: number): void;
 	destroy(): void;
 }
 
@@ -56,8 +60,12 @@ export function createPaintLoop(
 	const slots: PageSlot[] = [];
 	const pageByEl = new Map<Element, number>();
 	const canvases = new Map<number, HTMLCanvasElement>();
+	// The raster scale each mounted canvas was last painted at, so a repaint skips one
+	// already sharp at the scale it would take.
+	const rastered = new Map<number, number>();
 	const visible = new Set<number>();
-	let zoom = 1;
+	// Unset until the pane has had a box to fit: a slot fills the pane's width meanwhile.
+	let scale: number | undefined;
 
 	const observer = new IntersectionObserver(
 		(entries) => {
@@ -91,13 +99,19 @@ export function createPaintLoop(
 		// drawing an overlay of its own needs the number: position among siblings is
 		// the only handle without it, which is right today and is not a contract.
 		el.dataset.page = String(page);
+		// `flex: none` under the flex column `Preview.svelte` lays the desk out as, which
+		// would otherwise shrink a page to fit the pane; auto inline margins centre a page
+		// narrower than the pane and resolve to zero on one wider, so it overflows to the
+		// scrollable side.
 		Object.assign(el.style, {
 			position: 'relative',
 			boxSizing: 'border-box',
-			width: '100%',
+			flex: 'none',
+			marginInline: 'auto',
 			aspectRatio: `${size.widthPt} / ${size.heightPt}`,
 			background: 'var(--_qm-surface)'
 		});
+		sizeSlot(el, size);
 		if (page > 0) el.style.marginTop = PAGE_GAP;
 		container.appendChild(el);
 		pageByEl.set(el, page);
@@ -105,8 +119,18 @@ export function createPaintLoop(
 		return { page, size, el };
 	}
 
+	function sizeSlot(el: HTMLElement, size: PageSize): void {
+		el.style.width = scale === undefined ? '100%' : `${size.widthPt * scale}px`;
+	}
+
+	// Device px per PDF pt: the layout scale, else the slot's own width, times density.
+	function rasterScale(slot: PageSlot): number {
+		const layoutScale = scale ?? (slot.el.clientWidth || slot.size.widthPt) / slot.size.widthPt;
+		return layoutScale * Math.max(window.devicePixelRatio || 1, MIN_DENSITY);
+	}
+
 	// Rasterize `slot` into its canvas (creating the canvas if this is its first
-	// paint since mounting), at the slot's own current CSS width.
+	// paint since mounting).
 	function paintSlot(slot: PageSlot): void {
 		let canvas = canvases.get(slot.page);
 		if (!canvas) {
@@ -128,10 +152,10 @@ export function createPaintLoop(
 			slot.el.insertBefore(canvas, slot.el.firstChild);
 			canvases.set(slot.page, canvas);
 		}
-		const layoutScale = (slot.el.clientWidth || slot.size.widthPt) / slot.size.widthPt;
-		const densityScale = Math.max(window.devicePixelRatio || 1, MIN_DENSITY) * zoom;
+		const at = rasterScale(slot);
 		try {
-			session.paint(ctx, slot.page, layoutScale * densityScale);
+			session.paint(ctx, slot.page, at);
+			rastered.set(slot.page, at);
 		} catch (err) {
 			// A paint that throws must not abort the band loop; `updateBand` runs in
 			// the IntersectionObserver callback and sweeps every entry, so an
@@ -148,6 +172,7 @@ export function createPaintLoop(
 		if (!canvas) return;
 		canvas.remove();
 		canvases.delete(page);
+		rastered.delete(page);
 	}
 
 	// Mount pages newly inside [min(visible)-margin, max(visible)+margin], unmount
@@ -195,6 +220,7 @@ export function createPaintLoop(
 			// can change a page's dimensions without changing the count, and every
 			// %-space click/scroll transform assumes box shape matches PageSize.
 			slots[i].el.style.aspectRatio = `${size.widthPt} / ${size.heightPt}`;
+			sizeSlot(slots[i].el, size);
 		}
 	}
 
@@ -203,67 +229,50 @@ export function createPaintLoop(
 	// `pageCount` gate, since `pageSize` throws for a page the count excludes.
 
 	// ── Keep mounted rasters sharp ──────────────────────────────────────────────
-	// A canvas stretches with its slot, so a page that stays mounted while the
-	// container's CSS width or `devicePixelRatio` shifts keeps its place and goes
-	// soft. Two observers repaint mounted pages from their current box; canvases
-	// are `position:absolute`, so a repaint can't feed back into layout (and thus
-	// can't re-trigger the resize observer).
+	// A canvas stretches with its slot, so a page that stays mounted while the scale
+	// or `devicePixelRatio` shifts keeps its place and goes soft. Both repaint mounted
+	// pages; canvases are `position:absolute`, so a repaint can't feed back into
+	// layout.
 
-	// Repaint mounted pages (all, or a given subset) from their live geometry: the
-	// one path resize, DPR, and zoom share; each `paintSlot` re-reads the slot's
-	// current `clientWidth`. A no-op for an unmounted page.
-	function repaint(pages?: Iterable<number>): void {
-		for (const page of pages ?? canvases.keys()) {
+	// Repaint mounted pages whose raster scale moved. A no-op for an unmounted page.
+	function repaint(): void {
+		for (const page of canvases.keys()) {
 			const slot = slots[page];
-			if (slot && canvases.has(page)) paintSlot(slot);
+			if (slot && rastered.get(page) !== rasterScale(slot)) paintSlot(slot);
 		}
 	}
 
-	// Coalesce a burst of observer callbacks into one repaint on the next frame.
-	// `force` (a DPR change) bypasses the width guard, since a DPR change moves no
-	// CSS-px width; a plain resize repaints only when the width actually moved, so
-	// a height-only or no-op tick costs nothing.
+	// One repaint for a burst: on the next frame, or once `settle` passes with no later
+	// call, a settle superseding a frame not yet run.
 	let rafId = 0;
-	let lastWidth = container.clientWidth;
-	let forcePending = false;
-	function scheduleRepaint(force: boolean): void {
-		if (force) forcePending = true;
+	let settleId: ReturnType<typeof setTimeout> | undefined;
+	function scheduleRepaint(settle = 0): void {
+		clearTimeout(settleId);
+		settleId = undefined;
+		if (settle > 0) {
+			cancelAnimationFrame(rafId);
+			rafId = 0;
+			settleId = setTimeout(() => {
+				settleId = undefined;
+				repaint();
+			}, settle);
+			return;
+		}
 		if (rafId) return;
 		rafId = requestAnimationFrame(() => {
 			rafId = 0;
-			const width = container.clientWidth;
-			// A pane the shell has hidden reports a 0×0 box, which is a width to paint
-			// nothing at rather than a width that moved: `paintSlot` would take its
-			// `clientWidth || widthPt` fallback and freeze every mounted canvas at the 1×
-			// raster. The last real width and any pending force are held instead — the
-			// observer fires again when the pane has a box, and a return at that same
-			// width needs no raster, the pixels being the ones it was hidden with.
-			if (width === 0) return;
-			const forced = forcePending;
-			forcePending = false;
-			if (!forced && width === lastWidth) return;
-			lastWidth = width;
 			repaint();
 		});
 	}
 
-	// Container CSS-width changes (drag the pane wider, resize the window). Guarded
-	// for jsdom, which ships no ResizeObserver; the unit suite drives no resize, so
-	// skipping it there is correct; a real browser takes the observed path.
-	const resizeObserver =
-		typeof ResizeObserver === 'undefined'
-			? undefined
-			: new ResizeObserver(() => scheduleRepaint(false));
-	resizeObserver?.observe(container);
-
 	// `devicePixelRatio` changes (window dragged to a different-DPI monitor, browser
-	// zoom) leave CSS-px width untouched, so the ResizeObserver never sees them;
-	// watch DPR directly. A `(resolution: …dppx)` query pins the current ratio and
+	// zoom) leave the scale untouched, so `setScale` never hears of them; watch DPR
+	// directly. A `(resolution: …dppx)` query pins the current ratio and
 	// is therefore one-shot: re-arm it against the new ratio on each change. Guarded
 	// for environments (jsdom) without `matchMedia`.
 	let dprQuery: MediaQueryList | undefined;
 	function onDprChange(): void {
-		scheduleRepaint(true);
+		scheduleRepaint();
 		armDprListener();
 	}
 	function armDprListener(): void {
@@ -289,13 +298,15 @@ export function createPaintLoop(
 				if (slot && canvases.has(page)) paintSlot(slot);
 			}
 		},
-		setDensityZoom(z) {
-			zoom = z;
-			repaint();
+		setScale(next, settle) {
+			if (next === scale) return;
+			scale = next;
+			for (const slot of slots) sizeSlot(slot.el, slot.size);
+			scheduleRepaint(settle);
 		},
 		destroy() {
 			if (rafId) cancelAnimationFrame(rafId);
-			resizeObserver?.disconnect();
+			clearTimeout(settleId);
 			dprQuery?.removeEventListener('change', onDprChange);
 			observer.disconnect();
 			for (const page of [...canvases.keys()]) unmountPage(page);

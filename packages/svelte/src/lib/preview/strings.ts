@@ -1,5 +1,6 @@
 // Every word the preview says: the surface is a canvas, and its only prose is the
-// message states that stand in when there is nothing to paint.
+// message states that stand in when there is nothing to paint, and the name a screen
+// reader gives the zoom pill.
 //
 // Separate from the visual surface's set rather than pooled with it: `/preview`
 // reaches `/core` and nothing editor-side, which is what lets it promote to its own
@@ -16,12 +17,15 @@ export interface PreviewStrings {
 	renderFailed: string;
 	/** A compile with zero pages: recoverable, and the commonest state of a fresh seed. */
 	noPages: string;
+	/** The zoom pill's action, after the percentage it shows. */
+	resetZoom: string;
 }
 
 /** The package's English. Every key, so the merge below is total. */
 export const DEFAULT_PREVIEW_STRINGS: PreviewStrings = {
 	renderFailed: 'Preview failed to render.',
-	noPages: 'No pages to preview.'
+	noPages: 'No pages to preview.',
+	resetZoom: 'reset zoom'
 };
 
 /** A consumer's wording: any subset, the rest the package's. */
