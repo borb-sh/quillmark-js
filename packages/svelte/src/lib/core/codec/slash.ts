@@ -70,7 +70,8 @@ export const DEFAULT_SLASH_STRINGS: SlashStrings = {
  * by, each asked whether it would fire here. A row that declines when picked is worse
  * than an absent one, and asking the command rather than restating its guards is what
  * keeps the menu from drifting off what a pick does. So the offers narrow as the caret
- * moves: the lists and the island alone mid-paragraph, no list at an item's head.
+ * moves: the lists and the island alone mid-paragraph, and at an item's head only the
+ * list of the other kind, which retypes the item's list.
  *
  * `state` is the state a pick leaves behind — the run already consumed — since that is
  * the caret every command answers for (`blocks.ts`).

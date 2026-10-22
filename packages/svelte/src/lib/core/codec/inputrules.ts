@@ -10,8 +10,9 @@
 // another gesture owns — never on how a quill renders it. What a quill typesets is not
 // knowable here (a quill this build has not seen is the open-sets case, CODEC §"Open
 // sets"), and a construct that arrives through `importMarkdown` must stay authorable or
-// a document opens carrying a shape the editor refuses to make. So one guard survives:
-// `- ` / `1. ` at the head of an existing item, where Tab owns the nesting.
+// a document opens carrying a shape the editor refuses to make. So one rule answers
+// otherwise: `- ` / `1. ` at the head of an existing item retypes the item's list, where
+// a wrap would nest and Tab owns the nesting.
 import { InputRule, inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
@@ -92,8 +93,8 @@ export function markdownInputRules(schema: Schema): InputRule[] {
 	// schema without the node declines rather than being guarded here.
 	rules.push(blockRule(/^(#{1,6})\s$/, (match) => toHeading(match[1].length)));
 	rules.push(blockRule(/^---$/, insertDivider));
-	// `- ` / `1. ` at the start of a block, here or nested inside an item — but not at
-	// the start of an item's own first block, where the command declines.
+	// `- ` / `1. ` at the start of a block, here or nested inside an item; at the start
+	// of an item's own first block the command retypes the item's list instead.
 	rules.push(blockRule(/^\s*([-+*])\s$/, () => wrapInList(false)));
 	rules.push(
 		blockRule(/^(\d+)\.\s$/, (match) =>

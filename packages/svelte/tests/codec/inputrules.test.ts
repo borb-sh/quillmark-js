@@ -181,29 +181,107 @@ describe('the list shorthands stay literal past the head of a block', () => {
 	});
 });
 
-// A list shorthand at the head of an item that already exists is the text an author
-// typed: firing there mints an item whose only content is another item, and Tab is the
-// gesture that nests (under the previous sibling, which is the shape a nesting has).
-describe('the list shorthands decline at the head of an existing item', () => {
-	/** A view over `- alpha`, caret at the item's own start. */
-	function itemView(): EditorView {
+// A list shorthand at the head of an item that already exists is the item's: wrapping
+// there would mint an item whose only content is another item. On a first item it
+// retypes the list; on a later one the other kind sinks it into a sub-list, under the
+// previous sibling, which is the shape a nesting has.
+describe('the list shorthands at the head of an existing item', () => {
+	/** A view over `markdown`'s list, typed, caret at the head of item `index`. */
+	function itemView(lines: string[], index = 0): EditorView {
 		const view = mountView();
-		type(view, '- alpha');
-		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3)));
+		lines.forEach((line, i) => {
+			if (i) view.dispatch(view.state.tr.split(view.state.selection.from, 2));
+			type(view, line);
+		});
+		let at = -1;
+		let seen = 0;
+		view.state.doc.descendants((node, pos) => {
+			if (node.type.name === 'paragraph' && seen++ === index) at = pos + 1;
+			return at < 0;
+		});
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
 		return view;
 	}
 
-	it('`- ` stays literal', () => {
-		const view = itemView();
-		type(view, '- ');
-		expect(view.state.doc.toString()).toBe('doc(bullet_list(list_item(paragraph("- alpha"))))');
+	it('`1. ` on a first item numbers a bulleted list, every item with it', () => {
+		const view = itemView(['- alpha', 'beta'], 0);
+		type(view, '1. ');
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("alpha")), list_item(paragraph("beta"))))'
+		);
 		view.destroy();
 	});
 
-	it('`1. ` stays literal', () => {
-		const view = itemView();
+	it('`- ` on a first item bullets a numbered list', () => {
+		const view = itemView(['1. alpha', 'beta'], 0);
+		type(view, '- ');
+		expect(view.state.doc.toString()).toBe(
+			'doc(bullet_list(list_item(paragraph("alpha")), list_item(paragraph("beta"))))'
+		);
+		view.destroy();
+	});
+
+	it('another number on a later numbered item stays literal: it renumbers nothing above', () => {
+		const view = itemView(['1. alpha', 'beta'], 1);
+		type(view, '7. ');
+		expect(view.state.doc.child(0).attrs.start).toBe(1);
+		expect(view.state.doc.child(0).child(1).textContent).toBe('7. beta');
+		view.destroy();
+	});
+
+	it('`N. ` on a first item sets where the list counts from, back to 1 included', () => {
+		const view = itemView(['7. alpha', 'beta']);
 		type(view, '1. ');
-		expect(view.state.doc.toString()).toBe('doc(bullet_list(list_item(paragraph("1. alpha"))))');
+		expect(view.state.doc.child(0).attrs.start).toBe(1);
+		expect(view.state.doc.textContent).toBe('alphabeta');
+		view.destroy();
+	});
+
+	it('the marker a list already has stays text', () => {
+		for (const [lines, typed, index] of [
+			[['- alpha', 'beta'], '- ', 1],
+			[['1. alpha', 'beta'], '2. ', 1],
+			[['1. alpha'], '1. ', 0]
+		] as const) {
+			const view = itemView([...lines], index);
+			type(view, typed);
+			expect(view.state.doc.textContent, typed).toContain(`${typed}`);
+			view.destroy();
+		}
+	});
+
+	it('the other kind on a later item opens a sub-list under the item above', () => {
+		const view = itemView(['1. alpha', 'beta'], 1);
+		type(view, '- ');
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("alpha"), bullet_list(list_item(paragraph("beta"))))))'
+		);
+		expect(representable(view.state)).toBe(true);
+		view.destroy();
+	});
+
+	it('a later sub-item joins the sub-list of its kind standing above it', () => {
+		const view = itemView(['1. alpha', 'beta', 'gamma'], 1);
+		type(view, '- ');
+		let gamma = -1;
+		view.state.doc.descendants((node, pos) => {
+			if (node.isText && node.text === 'gamma') gamma = pos;
+			return gamma < 0;
+		});
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, gamma)));
+		type(view, '- ');
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("alpha"), bullet_list(list_item(paragraph("beta")), list_item(paragraph("gamma"))))))'
+		);
+		view.destroy();
+	});
+
+	it('`N. ` on a later bulleted item opens a numbered sub-list counting from N', () => {
+		const view = itemView(['- alpha', 'beta'], 1);
+		type(view, '3. ');
+		const sub = view.state.doc.child(0).child(0).child(1);
+		expect(sub.type.name).toBe('ordered_list');
+		expect(sub.attrs.start).toBe(3);
 		view.destroy();
 	});
 
@@ -244,7 +322,7 @@ describe('the list shorthands decline at the head of an existing item', () => {
 	// in is a container the content holds, which is the whole of why the guard stops at
 	// the list rules.
 	it('`> ` fires, a quote inside an item being a shape the content holds', () => {
-		const view = itemView();
+		const view = itemView(['- alpha']);
 		type(view, '> ');
 		expect(view.state.doc.toString()).toBe(
 			'doc(bullet_list(list_item(blockquote(paragraph("alpha")))))'

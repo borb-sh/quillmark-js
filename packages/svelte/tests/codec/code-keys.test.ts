@@ -262,30 +262,20 @@ describe('the edge rule declines where a join retypes nothing', () => {
 	});
 });
 
-// A press at a later item's start is the list link's merge, which declines across this
-// same edge (`lists.ts`): the base keymap merges the items instead, each block whole.
-describe('in a list an item lifts, then joins each block whole', () => {
+// A press at a later item's start takes its marker off (`lists.ts`): the item's blocks
+// join the item above whole, a fence beside prose among them, and nothing retypes.
+describe('in a list an item continues the one above, each block whole', () => {
 	it('an item of prose after an item that is a fence', () => {
-		const one = expectPress(
-			startOf('- ```\n  code\n  ```\n- b', 1),
-			'Backspace',
-			'doc(bullet_list(list_item(code_block("code"))), paragraph("b"))'
-		);
 		expectPress(
-			one,
+			startOf('- ```\n  code\n  ```\n- b', 1),
 			'Backspace',
 			'doc(bullet_list(list_item(code_block("code"), paragraph("b"))))'
 		);
 	});
 
 	it('an item that is a fence after an item of prose', () => {
-		const one = expectPress(
-			startOf('- a\n- ```\n  code\n  ```', 1),
-			'Backspace',
-			'doc(bullet_list(list_item(paragraph("a"))), code_block("code"))'
-		);
 		expectPress(
-			one,
+			startOf('- a\n- ```\n  code\n  ```', 1),
 			'Backspace',
 			'doc(bullet_list(list_item(paragraph("a"), code_block("code"))))'
 		);
@@ -295,7 +285,7 @@ describe('in a list an item lifts, then joins each block whole', () => {
 		const one = expectPress(
 			startOf('- a\n- b', 1),
 			'Backspace',
-			'doc(bullet_list(list_item(paragraph("a"))), paragraph("b"))'
+			'doc(bullet_list(list_item(paragraph("a"), paragraph("b"))))'
 		);
 		expectPress(one, 'Backspace', 'doc(bullet_list(list_item(paragraph("ab"))))');
 	});
