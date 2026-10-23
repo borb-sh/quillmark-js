@@ -1,8 +1,7 @@
 // Two lists of one kind that an edit leaves touching are one list. Each command that
 // opens such a seam joins it in its own transaction (`lists.ts` §cleanup), so the items
-// below count on from the items above, as a run of numbered lines does in Docs and
-// Notion. A seam no edit opened, two lists that arrived touching, is the boundary
-// `Content` marks, and stays.
+// below count on from the items above. A seam no edit opened, two lists that arrived
+// touching, is the boundary `Content` marks, and stays.
 import type { Node as PMNode } from 'prosemirror-model';
 import type { Transaction } from 'prosemirror-state';
 import { canJoin } from 'prosemirror-transform';
