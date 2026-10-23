@@ -78,3 +78,7 @@ export { inputRulesPlugin } from './inputrules.js';
 // (`bodyKeymap`); the suite drives both it and the list link directly.
 export { bodyKeymap } from './keymap.js';
 export { listKeymap } from './lists.js';
+
+// The list toggle the keymap binds to Mod-Shift-7/8, and the selection toolbar's list
+// buttons run (`visual/FormatPopover.svelte`).
+export { toggleList } from './list-toggle.js';

@@ -120,6 +120,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	formatStrikethrough: string;
 	formatCode: string;
 	formatLink: string;
+	formatNumberedList: string;
+	formatBulletedList: string;
 	/** The anchor button's accessible name. The popover withholds the button, so
 	 *  nothing draws this or the title below. */
 	formatAnchor: string;
@@ -194,14 +196,17 @@ export type FormatDiagnostic = (d: Diagnostic) => string | undefined;
 
 /**
  * A `Mod` chord as the writer's platform prints it: `⌘B` on Apple's, `Ctrl+B`
- * elsewhere. The platform test is the one `prosemirror-keymap` resolves `Mod` by, so a
- * tooltip names the chord the keymap binds.
+ * elsewhere, and `Shift-7` as `⇧⌘7` or `Ctrl+Shift+7`. The platform test is the one
+ * `prosemirror-keymap` resolves `Mod` by, so a tooltip names the chord the keymap binds.
  */
 export function chord(
 	key: string,
 	platform = typeof navigator === 'undefined' ? '' : navigator.platform
 ): string {
-	return /Mac|iP(hone|[oa]d)/.test(platform) ? `⌘${key}` : `Ctrl+${key}`;
+	const shift = key.startsWith('Shift-');
+	const bare = shift ? key.slice('Shift-'.length) : key;
+	if (/Mac|iP(hone|[oa]d)/.test(platform)) return `${shift ? '⇧' : ''}⌘${bare}`;
+	return `Ctrl+${shift ? 'Shift+' : ''}${bare}`;
 }
 
 /** The package's English. Every key, so the merge below is total. */
@@ -236,6 +241,8 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	formatStrikethrough: 'Strikethrough',
 	formatCode: 'Code',
 	formatLink: `Link (${chord('K')})`,
+	formatNumberedList: `Numbered list (${chord('Shift-7')})`,
+	formatBulletedList: `Bulleted list (${chord('Shift-8')})`,
 	formatAnchor: 'Anchor',
 	formatAnchorTitle: 'Anchor — an identity handle over the selection',
 	linkPlaceholder: 'https://…',

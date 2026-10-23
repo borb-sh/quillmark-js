@@ -12,7 +12,7 @@
 // that are about the body rather than about any block in it, and the Backspace and
 // Delete that are about the caret's own line, outermost of the leaf's key chains
 // (`keymap.ts`).
-import type { Attrs, Node as PMNode, NodeType, ResolvedPos, Schema } from 'prosemirror-model';
+import type { Attrs, NodeType, ResolvedPos, Schema } from 'prosemirror-model';
 import { Selection } from 'prosemirror-state';
 import type { Command, EditorState, Transaction } from 'prosemirror-state';
 import { chainCommands, splitBlock } from 'prosemirror-commands';
@@ -20,6 +20,7 @@ import { sinkListItem } from 'prosemirror-schema-list';
 import { canJoin, findWrapping } from 'prosemirror-transform';
 import { withinNesting } from './nesting.js';
 import { takesLineBreak } from './schema.js';
+import { joinLists } from './touching.js';
 
 /** The head of a textblock: where a shorthand fires, and where a pick lands once its
  *  run is consumed. */
@@ -79,30 +80,20 @@ function spaceBreaks(tr: Transaction, $from: ResolvedPos, type: NodeType): void 
 	});
 }
 
-/** `wrappingInputRule`'s body: wrap the block range at `pos`, then join a preceding
- *  sibling of the same type — the one boundary the wrap itself opens (`lists.ts`
- *  §cleanup: command-local, never a global pass). False where no wrap fits, or where
- *  the one that does nests past `MAX_NESTING_DEPTH` (`nesting.ts`). */
-function wrapAt(
-	tr: Transaction,
-	pos: number,
-	type: NodeType,
-	attrs: Attrs | null,
-	joinBefore?: (node: PMNode) => boolean
-): boolean {
+/** `wrappingInputRule`'s body: wrap the block range at `pos`, then join a sibling of
+ *  the same type — the boundaries the wrap itself opens (`lists.ts` §cleanup:
+ *  command-local, never a global pass). A list joins on both sides (`touching.ts`), a
+ *  quote the one above. False where no wrap fits, or where the one that does nests past
+ *  `MAX_NESTING_DEPTH` (`nesting.ts`). */
+function wrapAt(tr: Transaction, pos: number, type: NodeType, attrs: Attrs | null): boolean {
 	const range = tr.doc.resolve(pos).blockRange();
 	const wrapping = range && findWrapping(range, type, attrs);
 	if (!range || !wrapping) return false;
 	tr.wrap(range, wrapping);
-	const before = tr.doc.resolve(pos - 1).nodeBefore;
-	if (
-		before &&
-		before.type === type &&
-		canJoin(tr.doc, pos - 1) &&
-		(!joinBefore || joinBefore(before))
-	) {
-		tr.join(pos - 1);
-	}
+	const wrapped = tr.doc.nodeAt(range.start);
+	if (wrapped) joinLists(tr, range.start + wrapped.nodeSize);
+	const before = tr.doc.resolve(range.start).nodeBefore;
+	if (before && before.type === type && canJoin(tr.doc, range.start)) tr.join(range.start);
 	return withinNesting(tr.doc);
 }
 
@@ -164,15 +155,11 @@ export function wrapInQuote(): Command {
 	};
 }
 
-/** `- ` / `1. `. `joinBefore` is the shorthand's ordinal test: `2. ` continues the list
- *  above where `7. ` opens one. At the head of an item the shorthand is the item's
- *  (§`listAtItem`), `N. ` reading as the number the writer wants the list to count
- *  from, and a marker the item already shows is taken as typed and changes nothing. */
-export function wrapInList(
-	ordered: boolean,
-	attrs: Attrs | null = null,
-	joinBefore?: (node: PMNode) => boolean
-): Command {
+/** `- ` / `1. `. Beside a list of its kind the line joins it, whatever `N` is typed: a
+ *  number comes from position. Elsewhere `N. ` is the number the new list counts from,
+ *  and at the head of an item the shorthand is the item's (§`listAtItem`), `N` reading
+ *  the same way; a marker the item already shows is taken as typed and changes nothing. */
+export function wrapInList(ordered: boolean, attrs: Attrs | null = null): Command {
 	return (state, dispatch) => {
 		if (!atHead(state)) return false;
 		const { $from } = state.selection;
@@ -182,7 +169,7 @@ export function wrapInList(
 				(attrs?.start as number | undefined) ?? null,
 				true
 			)(state, dispatch);
-		return wrapBlock(state, dispatch, ordered, attrs, joinBefore);
+		return wrapBlock(state, dispatch, ordered, attrs);
 	};
 }
 
@@ -262,9 +249,8 @@ function listAtItem(ordered: boolean, number: number | null, take = false): Comm
  *
  * At the end of a non-empty block it opens a fresh empty item below it, Enter then `- `
  * as one gesture. Anywhere else it wraps the whole block, the smaller surprise: a writer
- * who meant to split presses Enter first. It passes no `joinBefore`, so it continues
- * whatever list is above. In an item's first block it is the shorthand's item gesture
- * (§`listAtItem`), offered only where that changes something.
+ * who meant to split presses Enter first. In an item's first block it is the shorthand's
+ * item gesture (§`listAtItem`), offered only where that changes something.
  */
 export function pickList(ordered: boolean): Command {
 	return (state, dispatch) => {
@@ -311,13 +297,13 @@ export function pickSubList(): Command {
 }
 
 /** Wrap the caret's whole block in a list, wherever in the block the caret sits: the
- *  wrap opens at the block's head, so it joins the list above as the shorthand's does. */
+ *  wrap opens at the block's head, so it joins the lists beside it as the shorthand's
+ *  does. */
 function wrapBlock(
 	state: EditorState,
 	dispatch: ((tr: Transaction) => void) | undefined,
 	ordered: boolean,
-	attrs: Attrs | null,
-	joinBefore?: (node: PMNode) => boolean
+	attrs: Attrs | null
 ): boolean {
 	const { paragraph, list_item: item } = state.schema.nodes;
 	const list = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
@@ -330,7 +316,7 @@ function wrapBlock(
 	// mints `list_item > heading`, and a wrap keeping the heading is a second door onto
 	// that shape. Positions survive the retype — same content, same size.
 	if ($from.parent.type !== paragraph) tr.setBlockType(pos, pos, paragraph);
-	if (!wrapAt(tr, pos, list, attrs, joinBefore)) return false;
+	if (!wrapAt(tr, pos, list, attrs)) return false;
 	dispatch?.(tr);
 	return true;
 }
@@ -454,7 +440,8 @@ const splitAcrossBlocks: Command = (state, dispatch) => {
  * are the whole of what holds them, and the key is whichever link answers a construct
  * with nothing in it. An empty fence is not that case — the doc spares it, and it
  * carries no text to lose. Declines with nothing after it too: a line with no next
- * line is Backspace's.
+ * line is Backspace's. The line was the one thing between two lists of a kind, they
+ * are one list after it.
  */
 const takeEmptyLine: Command = (state, dispatch) => {
 	const { $from, empty } = state.selection;
@@ -462,7 +449,11 @@ const takeEmptyLine: Command = (state, dispatch) => {
 	const index = $from.index(-1);
 	if (!$from.node(-1).canReplace(index, index + 1)) return false;
 	if (!Selection.findFrom(state.doc.resolve($from.after()), 1)) return false;
-	dispatch?.(state.tr.delete($from.before(), $from.after()).scrollIntoView());
+	if (dispatch) {
+		const tr = state.tr.delete($from.before(), $from.after());
+		joinLists(tr, $from.before());
+		dispatch(tr.scrollIntoView());
+	}
 	return true;
 };
 

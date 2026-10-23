@@ -153,6 +153,11 @@ async function surface(): Promise<HTMLElement | null> {
 }
 const labels = (popover: HTMLElement): (string | null)[] =>
 	[...popover.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
+/** The list toggles, after the marks, over a leaf that holds lists. */
+const LISTS = [
+	DEFAULT_VISUAL_STRINGS.formatNumberedList,
+	DEFAULT_VISUAL_STRINGS.formatBulletedList
+];
 const SIX = [
 	DEFAULT_VISUAL_STRINGS.formatBold,
 	DEFAULT_VISUAL_STRINGS.formatEmphasis,
@@ -320,8 +325,25 @@ describe('the formatting popover over a field’s own leaf', () => {
 
 		expect(editor.getActiveLeaf()?.views.view.dom).toBe(intro);
 		const popover = await surface();
-		expect(labels(popover!)).toEqual(SIX);
+		expect(labels(popover!)).toEqual([...SIX, ...LISTS]);
 		expect(labels(popover!)).not.toContain(DEFAULT_VISUAL_STRINGS.formatAnchor);
+	});
+
+	it('numbers the selected line, and the list lands in the store', async () => {
+		const q = probe();
+		const doc = load();
+		const { editor } = mountInner(q, doc);
+		const intro = await land(editor, 'main.intro');
+		select(intro, 0, 3);
+		(await surface())!
+			.querySelector<HTMLButtonElement>(
+				`[aria-label="${DEFAULT_VISUAL_STRINGS.formatNumberedList}"]`
+			)!
+			.click();
+		flushSync();
+		expect(intro.querySelector('ol > li')?.textContent).toBe('Intro words');
+		expect(q.reader(doc).getContentAt({ field: 'intro' }, [])?.lines[0].containers).toHaveLength(1);
+		expect(document.activeElement).toBe(intro);
 	});
 
 	it('rises over a keyboard selection once it stands still, and lowers at once', async () => {

@@ -125,15 +125,7 @@ export function markdownInputRules(schema: Schema): InputRule[] {
 	// `- ` / `1. ` / `1) ` at the start of a block, here or nested inside an item; at the
 	// start of an item's own first block the command retypes the item's list instead.
 	rules.push(blockRule(/^\s*([-+*])\s$/, () => wrapInList(false)));
-	rules.push(
-		blockRule(/^(\d+)[.)]\s$/, (match) =>
-			wrapInList(
-				true,
-				{ start: +match[1] },
-				(node) => node.childCount + (node.attrs.start as number) === +match[1]
-			)
-		)
-	);
+	rules.push(blockRule(/^(\d+)[.)]\s$/, (match) => wrapInList(true, { start: +match[1] })));
 	rules.push(blockRule(/^(?:[a-z]\.|\((?:\d+|[a-z])\))\s$/, takeNestedMarker));
 	rules.push(blockRule(/^\s*>\s$/, wrapInQuote));
 	return rules;

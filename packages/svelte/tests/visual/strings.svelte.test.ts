@@ -40,6 +40,11 @@ describe('chord', () => {
 		for (const platform of ['Win32', 'Linux x86_64', ''])
 			expect(chord('K', platform), platform).toBe('Ctrl+K');
 	});
+
+	it('spells Shift in the order each platform prints it', () => {
+		expect(chord('Shift-7', 'MacIntel')).toBe('⇧⌘7');
+		expect(chord('Shift-7', 'Win32')).toBe('Ctrl+Shift+7');
+	});
 });
 
 describe('strings on the mounted surface', () => {
