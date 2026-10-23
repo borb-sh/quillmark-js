@@ -46,11 +46,63 @@ describe('mark input rules fire with exact positions', () => {
 		['a **b**', 'doc(paragraph("a ", strong("b")))'],
 		['x ~~y~~', 'doc(paragraph("x ", strike("y")))'],
 		['x `y`', 'doc(paragraph("x ", code("y")))'],
-		['a *b* c', 'doc(paragraph("a ", em("b"), " c"))']
+		['a *b* c', 'doc(paragraph("a ", em("b"), " c"))'],
+		['a _em_', 'doc(paragraph("a ", em("em")))'],
+		['_em_', 'doc(paragraph(em("em")))'],
+		['a __b__', 'doc(paragraph("a ", strong("b")))'],
+		['snake_case_name', 'doc(paragraph("snake_case_name"))'],
+		['dunder__init__', 'doc(paragraph("dunder__init__"))']
 	])('%s', (typed, shape) => {
 		const view = mountView();
 		type(view, typed);
 		expect(view.state.doc.toString()).toBe(shape);
+		view.destroy();
+	});
+});
+
+// A typed URL links on the space that closes it, as a paste over a selection does.
+describe('a typed URL links on the space after it', () => {
+	const href = (view: EditorView): string[] => {
+		const out: string[] = [];
+		view.state.doc.descendants((node) => {
+			for (const mark of node.marks) if (mark.type.name === 'link') out.push(mark.attrs.href);
+		});
+		return out;
+	};
+
+	it.each([
+		['see https://example.com/a?b=1 ', 'https://example.com/a?b=1', 'https://example.com/a?b=1'],
+		['www.example.com. ', 'www.example.com', 'https://www.example.com'],
+		['(mailto:x@y.z) ', null, null],
+		['(https://example.com) ', 'https://example.com', 'https://example.com']
+	])('%s', (typed, text, link) => {
+		const view = mountView();
+		type(view, typed);
+		expect(view.state.doc.textContent).toBe(typed);
+		expect(href(view)).toEqual(link ? [link] : []);
+		if (text) {
+			let linked = '';
+			view.state.doc.descendants((node) => {
+				if (node.marks.some((m) => m.type.name === 'link')) linked += node.text;
+			});
+			expect(linked).toBe(text);
+		}
+		view.destroy();
+	});
+
+	it('a scheme nothing follows stays text', () => {
+		const view = mountView();
+		type(view, 'javascript://x ');
+		expect(href(view)).toEqual([]);
+		view.destroy();
+	});
+
+	it('inside code it stays text', () => {
+		const view = mountView();
+		type(view, '`https://example.com` ');
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 20)));
+		type(view, ' ');
+		expect(href(view)).toEqual([]);
 		view.destroy();
 	});
 });
@@ -173,11 +225,27 @@ describe('the ` ``` ` fence shorthand', () => {
 describe('the list shorthands stay literal past the head of a block', () => {
 	it.each([
 		['alpha - ', 'doc(paragraph("alpha - "))'],
-		['alpha 1. ', 'doc(paragraph("alpha 1. "))']
+		['alpha 1. ', 'doc(paragraph("alpha 1. "))'],
+		['alpha 1) ', 'doc(paragraph("alpha 1) "))']
 	])('%s', (typed, shape) => {
 		const view = mountView();
 		type(view, typed);
 		expect(view.state.doc.toString()).toBe(shape);
+		view.destroy();
+	});
+});
+
+describe('`1) ` numbers a block as `1. ` does', () => {
+	it.each([
+		['1) ', 1],
+		['3) ', 3]
+	])('%s', (typed, start) => {
+		const view = mountView();
+		type(view, typed + 'a');
+		const list = view.state.doc.firstChild!;
+		expect(list.type.name).toBe('ordered_list');
+		expect(list.attrs.start).toBe(start);
+		expect(list.textContent).toBe('a');
 		view.destroy();
 	});
 });
@@ -439,12 +507,23 @@ describe('Backspace right after a shorthand takes it back', () => {
 		return new EditorView(document.createElement('div'), { state });
 	}
 
-	it.each(['# ', '- ', '1. ', '> ', '---', 'a **b**', 'a ~~b~~'])('%s', (typed) => {
+	it.each(['# ', '- ', '1. ', '1) ', '> ', '---', 'a **b**', 'a __b__', 'a _b_', 'a ~~b~~'])(
+		'%s',
+		(typed) => {
+			const view = leafView();
+			type(view, typed);
+			expect(view.state.doc.toString()).not.toBe(`doc(paragraph("${typed}"))`);
+			press(view, 'Backspace');
+			expect(view.state.doc.toString()).toBe(`doc(paragraph("${typed}"))`);
+			view.destroy();
+		}
+	);
+
+	it('a typed URL, the space kept', () => {
 		const view = leafView();
-		type(view, typed);
-		expect(view.state.doc.toString()).not.toBe(`doc(paragraph("${typed}"))`);
+		type(view, 'https://example.com ');
 		press(view, 'Backspace');
-		expect(view.state.doc.toString()).toBe(`doc(paragraph("${typed}"))`);
+		expect(view.state.doc.toString()).toBe('doc(paragraph("https://example.com "))');
 		view.destroy();
 	});
 

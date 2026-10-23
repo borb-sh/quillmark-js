@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+**List items and their unnumbered lines are spaced as paragraphs are**, where a run of items was drawn tight and a line under an item had a gap above it and none below, so it read as the start of the next item. A sub-list stands off its item's text by the same gap.
+
+**Tab stays in a body.** On a block standing right after a list, Tab moves it into the list's last item, after what that item holds, so a paragraph lands as the item's unnumbered line; elsewhere Tab and Shift-Tab do nothing, where they left the editor and carried the next keystrokes into whatever control took the focus. Escape gives the focus up, so Escape then Tab is the way out. A one-line or `text` field keeps Tab as field navigation.
+
+**`_em_`, `__strong__` and `1) ` are shorthands**, as `*em*`, `**strong**` and `1. ` are. An underscore pair opens only past a word, so `snake_case_name` stays text.
+
+**A typed URL links on the space after it**, a bare `www.` read as `https://`, as a URL pasted over a selection links it. Backspace on the press after takes the link back.
+
+**An edit that moves a block is an undo step of its own**, an Enter, a join, a wrap or a lift, with the typing after it, where a burst of typing around one undid as one step.
+
 **A date cleared segment by segment writes its blank as the last segment empties**, so the preview follows the clear at once, where it wrote nothing until the caret left the field. A segment emptied while others stand still holds until the caret leaves.
 
 **An item's number is its position, and no keystroke writes one.** Backspace at the head of a later item takes its marker off and keeps its text as an unnumbered line under the item above, where it lifted the item out and split the list, stamping a `start` on the items after it; a nested first item's text joins the item it is nested in. The items below close up, so Enter then Backspace in the middle of a list is the list it was, where it left `1, 3, 4`. An empty item is spent, the caret at the end of what stands above it. Backspace on a top-level first item still lifts it out, and the next item counts from the list's `start`, where it kept its old number.

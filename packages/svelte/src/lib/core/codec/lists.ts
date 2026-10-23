@@ -190,7 +190,7 @@ function lineOut(itemType: NodeType): Command {
  * has no level above it inside the list: the key is claimed and does nothing, as Tab is
  * on a first item, so a press too many while backing out of a sub-list renumbers
  * nothing. Leaving the list is Backspace's, one rung a press. Outside every item the
- * key declines and stays the body's keyboard exit.
+ * key declines.
  */
 function outdent(itemType: NodeType): Command {
 	const lift = liftListItem(itemType);
@@ -393,10 +393,8 @@ function sinkLine(itemType: NodeType): Command {
 }
 
 /** Tab → `sinkListItem`, declined where the sink would nest past `MAX_NESTING_DEPTH`
- *  (`nesting.ts`), so Tab there leaves the body. On a first item, with nothing above to
- *  sink under, the key is claimed and does nothing: a writer indenting a list's first
- *  line is still writing the list, and the focus leaving it mid-list is a keystroke
- *  lost. Outside every item Tab stays the body's keyboard exit. */
+ *  (`nesting.ts`). On a first item, with nothing above to sink under, the key is claimed
+ *  and does nothing: a writer indenting a list's first line is still writing the list. */
 function sinkWithin(itemType: NodeType): Command {
 	const sink = sinkListItem(itemType);
 	return (state, dispatch) => {
@@ -412,16 +410,42 @@ function sinkWithin(itemType: NodeType): Command {
 }
 
 /**
+ * Tab on a block standing right after a list, outside every item → the block moves into
+ * the list's last item, after what that item holds: one step in, under the item above,
+ * as Tab nests an item. The block keeps its kind, so a paragraph lands as the item's
+ * unnumbered line. Declined past `MAX_NESTING_DEPTH`, and over a selection that leaves
+ * the block.
+ */
+function sinkIntoList(itemType: NodeType): Command {
+	return (state, dispatch) => {
+		const { $from, $to } = state.selection;
+		if (!$from.parent.isTextblock || !$from.sameParent($to) || $from.depth < 1) return false;
+		if ($from.node(-1).type === itemType) return false;
+		const list = $from.index(-1) > 0 ? $from.node(-1).child($from.index(-1) - 1) : null;
+		if (!list || list.firstChild?.type !== itemType) return false;
+		const block = $from.parent;
+		const start = $from.before();
+		const into = start - 2;
+		const tr = state.tr.delete(start, start + block.nodeSize).insert(into, block);
+		if (!withinNesting(tr.doc)) return false;
+		const shift = into - start;
+		tr.setSelection(
+			TextSelection.create(tr.doc, state.selection.anchor + shift, state.selection.head + shift)
+		);
+		dispatch?.(tr.scrollIntoView());
+		return true;
+	};
+}
+
+/**
  * The list bindings for a block-schema leaf: `{}` for the one-line and plain
  * schemas, which declare no list nodes.
  *
  * `Tab` / `Shift-Tab` hold the list link of the body's Tab chain. Surfaces that own
  * Tab more locally under the same rule (`prose/canon/VISUAL_EDITOR.md` §Chrome)
  * prepend a link ahead of these in `keymap.ts`: a `code_block` takes literal
- * indentation (`code.ts`), an island takes cell traversal once added. Outside all
- * of them every link returns false and the key is not swallowed: Tab keeps its
- * default meaning, which is the body's only keyboard exit and the open seam for a
- * shell structural keymap (VISUAL_EDITOR §Settled and open).
+ * indentation (`code.ts`). Where every link declines, the body holds the key
+ * (`keymap.ts`).
  *
  * `Tab` sinks an unnumbered line alone into a sub-list, and any other line its whole
  * item.
@@ -446,7 +470,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 	if (!itemType || !paragraph) return {};
 	const backspace = chainCommands(markerOff(itemType), joinOntoList(itemType));
 	return {
-		Tab: chainCommands(sinkLine(itemType), sinkWithin(itemType)),
+		Tab: chainCommands(sinkLine(itemType), sinkWithin(itemType), sinkIntoList(itemType)),
 		'Shift-Tab': outdent(itemType),
 		Enter: chainCommands(
 			lineAbove(itemType, paragraph),

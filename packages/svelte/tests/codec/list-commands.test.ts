@@ -143,10 +143,41 @@ describe('Tab / Shift-Tab change nesting depth', () => {
 		);
 	});
 
-	it('Tab outside a list declines the key, leaving it to the shell', () => {
+	it('Tab outside a list, with no list before it, declines the key', () => {
 		const state = after('plain text', 'plain');
 		expect(run(state, keys['Tab'])).toBe(null);
 		expect(run(state, keys['Shift-Tab'])).toBe(null);
+	});
+
+	it('Tab on a paragraph after a list moves it into the last item as its unnumbered line', () => {
+		const next = expectPress(
+			after('1. a\n2. b\n\ncd', 'c'),
+			'Tab',
+			'doc(ordered_list(list_item(paragraph("a")), list_item(paragraph("b"), paragraph("cd"))))'
+		);
+		expect(next.selection.$from.parent.textContent).toBe('cd');
+		expect(next.selection.$from.parentOffset).toBe(1);
+	});
+
+	it('Tab lands the block after what the last item holds, a sub-list included', () => {
+		expectPress(
+			startOf('1. a\n    1. b\n\nc', 2),
+			'Tab',
+			'doc(ordered_list(list_item(paragraph("a"), ordered_list(list_item(paragraph("b"))), paragraph("c"))))'
+		);
+	});
+
+	it('Tab moves a block after a list inside a quote, the quote kept', () => {
+		expectPress(
+			startOf('> - a\n>\n> b', 1),
+			'Tab',
+			'doc(blockquote(bullet_list(list_item(paragraph("a"), paragraph("b")))))'
+		);
+	});
+
+	it('Tab declines on a block a paragraph stands between it and the list', () => {
+		const state = startOf('- a\n\nb\n\nc', 2);
+		expect(run(state, keys['Tab'])).toBe(null);
 	});
 });
 

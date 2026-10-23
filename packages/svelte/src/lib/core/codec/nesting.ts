@@ -34,7 +34,7 @@ export function withinNesting(doc: PMNode): boolean {
 /** Whether a step of `tr` can move a block under another container: any replace but
  *  inline content inside one textblock, which is every keystroke's. Mark and attribute
  *  steps move no node. */
-function mayNest(tr: Transaction): boolean {
+export function mayNest(tr: Transaction): boolean {
 	return tr.steps.some((step, i) => {
 		if (step instanceof ReplaceAroundStep) return true;
 		if (!(step instanceof ReplaceStep)) return false;

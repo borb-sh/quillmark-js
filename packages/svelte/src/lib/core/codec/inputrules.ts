@@ -1,6 +1,7 @@
-// Input rules: the markdown-shorthand plugin the codec owns (`**`→strong, `*`→em,
-// `~~`→strike, `` ` ``→code, `# `→heading, `- `/`1. `→lists, `> `→blockquote,
-// `---`→divider), and the fence, which fires on Enter rather than as typed.
+// Input rules: the markdown-shorthand plugin the codec owns (`**`/`__`→strong,
+// `*`/`_`→em, `~~`→strike, `` ` ``→code, `# `→heading, `- `/`1. `/`1) `→lists,
+// `> `→blockquote, `---`→divider, a typed URL→link), and the fence, which fires on Enter
+// rather than as typed.
 // Mark rules are hand-rolled (prosemirror-inputrules ships only node rules); every
 // block rule is one regexp over a command in `blocks.ts`, which is the slash menu's
 // implementation too. These produce transactions the codec already lowers: they add no
@@ -18,6 +19,7 @@ import { InputRule, inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
 import type { Command, EditorState, Plugin, Transaction } from 'prosemirror-state';
+import { rendersHref } from './urls.js';
 import {
 	consuming,
 	insertDivider,
@@ -66,6 +68,28 @@ function markInputRule(regexp: RegExp, markType: MarkType, delimLen: number): In
 	);
 }
 
+/** A typed URL, closed by the space after it: a scheme `rendersHref` follows, or a bare
+ *  `www.`, less the punctuation around it. */
+const TYPED_URL = /(?:^|[\s(["'])((?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s.]\S*?)([.,;:!?)\]'"]*)\s$/i;
+
+/** The link a typed URL takes, as a paste over a selection does (`link-paste.ts`): the
+ *  URL's own text, with a bare `www.` read as `https://`. The space that closed it is
+ *  typed after the link. Declined over a span already linked or set as code. */
+function autolinkRule(link: MarkType, code: MarkType | undefined): InputRule {
+	return new InputRule(
+		TYPED_URL,
+		(state: EditorState, match: RegExpMatchArray, start: number, end: number) => {
+			const [whole, url, trail] = match as unknown as [string, string, string];
+			const from = start + whole.length - 1 - trail.length - url.length;
+			const to = from + url.length;
+			const href = /^www\./i.test(url) ? `https://${url}` : url;
+			if (!rendersHref(href) || state.doc.rangeHasMark(from, to, link)) return null;
+			if (code && state.doc.rangeHasMark(from, to, code)) return null;
+			return state.tr.addMark(from, to, link.create({ href })).insertText(whole.slice(-1), end);
+		}
+	);
+}
+
 /** A block shorthand: the regexp that fires it, and the command it runs in the match's
  *  place. Every one is `^`-anchored, so the command's own head-of-a-textblock guard is
  *  the same position the regexp already stands at. The caret it places is scrolled to
@@ -85,21 +109,24 @@ export function markdownInputRules(schema: Schema): InputRule[] {
 
 	// Inline marks. Non-greedy capture between matching delimiters. Built only where the
 	// schema has the mark: the inline schema omits them, and a `text` one declares none
-	// at all.
+	// at all. An underscore pair opens only past a word, so `snake_case_name` stays text.
 	if (m.strong) rules.push(markInputRule(/\*\*([^*]+)\*\*$/, m.strong, 2));
+	if (m.strong) rules.push(markInputRule(/(?:^|[^\w])__([^_]+)__$/, m.strong, 2));
 	if (m.em) rules.push(markInputRule(/(?:^|[^*])\*([^*]+)\*$/, m.em, 1));
+	if (m.em) rules.push(markInputRule(/(?:^|[^\w])_([^_]+)_$/, m.em, 1));
 	if (m.strike) rules.push(markInputRule(/~~([^~]+)~~$/, m.strike, 2));
 	if (m.code) rules.push(markInputRule(/`([^`]+)`$/, m.code, 1));
+	if (m.link) rules.push(autolinkRule(m.link, m.code));
 
 	// Block shorthands. Each command answers for the schema it is run against, so a
 	// schema without the node declines rather than being guarded here.
 	rules.push(blockRule(/^(#{1,6})\s$/, (match) => toHeading(match[1].length)));
 	rules.push(blockRule(/^---$/, insertDivider));
-	// `- ` / `1. ` at the start of a block, here or nested inside an item; at the start
-	// of an item's own first block the command retypes the item's list instead.
+	// `- ` / `1. ` / `1) ` at the start of a block, here or nested inside an item; at the
+	// start of an item's own first block the command retypes the item's list instead.
 	rules.push(blockRule(/^\s*([-+*])\s$/, () => wrapInList(false)));
 	rules.push(
-		blockRule(/^(\d+)\.\s$/, (match) =>
+		blockRule(/^(\d+)[.)]\s$/, (match) =>
 			wrapInList(
 				true,
 				{ start: +match[1] },

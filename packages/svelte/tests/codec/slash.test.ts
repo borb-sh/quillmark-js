@@ -392,11 +392,15 @@ describe('the query filters, and a miss draws nothing', () => {
 		expect(state()?.items).toEqual([]);
 		// A surface only a keyboard can reach is worse than no surface: the run is live
 		// and undrawn, so it claims none of the keys it claims over offers.
-		for (const key of ['ArrowDown', 'ArrowUp', 'Escape']) {
+		for (const key of ['ArrowDown', 'ArrowUp']) {
 			expect(
 				view.someProp('handleKeyDown', (f) => f(view, new KeyboardEvent('keydown', { key })))
 			).toBeFalsy();
 		}
+		view.focus();
+		press(view, 'Escape');
+		expect(view.hasFocus()).toBe(false);
+		view.focus();
 		press(view, 'Enter');
 		// Enter split the paragraph rather than inserting: no offer, no pick.
 		expect(field.getContent().islands).toHaveLength(0);
@@ -654,12 +658,13 @@ describe('the menu does not disturb the body it sits in', () => {
 		field.destroy();
 	});
 
-	it('Escape with no menu open is not swallowed', () => {
-		const { view } = leaf('para');
-		const handled = view.someProp('handleKeyDown', (f) =>
-			f(view, new KeyboardEvent('keydown', { key: 'Escape' }))
-		);
-		expect(handled).toBeFalsy();
+	it('Escape with no menu open gives the focus up', () => {
+		const { field, view } = leaf('para');
+		view.focus();
+		press(view, 'Escape');
+		expect(view.hasFocus()).toBe(false);
+		expect(field.getContent().lines).toHaveLength(1);
+		field.destroy();
 	});
 
 	it("a leaf given no `onSlash` mounts no trigger, so the keys stay the body's", () => {
