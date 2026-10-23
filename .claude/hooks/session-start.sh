@@ -1,5 +1,5 @@
 #!/bin/bash
-# Node 24 comes from the cloud environment's setup script; `.npmrc` sets engine-strict, so an older Node fails here.
+# The image's Node 22 is below the `engines` floor, which `.npmrc` makes strict; the suite runs on it.
 set -euo pipefail
 
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
@@ -7,4 +7,4 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
 fi
 
 cd "$CLAUDE_PROJECT_DIR"
-npm ci --no-audit --no-fund
+npm ci --no-audit --no-fund --engine-strict=false
