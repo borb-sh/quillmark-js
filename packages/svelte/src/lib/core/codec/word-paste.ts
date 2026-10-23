@@ -8,9 +8,10 @@ import { Plugin } from 'prosemirror-state';
 /** A Word list paragraph's style: the list it is in, and its level from 1. */
 const MSO_LIST = /mso-list:\s*(l\d+)\s+level(\d+)\s+(lfo\d+)/i;
 
-/** A numbered marker: digits, or letters, closed by `.` or `)`, or in parentheses. Every
- *  other marker is a bullet, Word's `·`, `o` and `§` among them. */
-const ORDINAL = /^\(?(\d+|[a-z]+)[.)]$/i;
+/** A numbered marker: digits, or letters, closed by `.` or `)`, or in parentheses, and a
+ *  legal outline's `1.2.` whose last part is the item's own. Every other marker is a
+ *  bullet, Word's `·`, `o` and `§` among them. */
+const ORDINAL = /^\(?(?:\d+\.)*(\d+|[a-z]+)[.)]$/i;
 
 interface Open {
 	level: number;

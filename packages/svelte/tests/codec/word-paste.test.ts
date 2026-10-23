@@ -90,6 +90,12 @@ describe('wordLists', () => {
 		expect(wordLists(item('Alpha', '3.'))).toContain('<ol start="3">');
 	});
 
+	it('reads a legal outline’s marker by its last part', () => {
+		const html = wordLists(item('Alpha', '2.') + item('Bravo', '2.3.', 2));
+		expect(html).toContain('<ol start="2">');
+		expect(html).toContain('<ol start="3">');
+	});
+
 	it('leaves HTML with no Word list as it came', () => {
 		const html = '<p>Alpha</p><ol><li>Bravo</li></ol>';
 		expect(wordLists(html)).toBe(html);
