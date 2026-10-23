@@ -12,7 +12,8 @@
 // sets"), and a construct that arrives through `importMarkdown` must stay authorable or
 // a document opens carrying a shape the editor refuses to make. So one rule answers
 // otherwise: `- ` / `1. ` at the head of an existing item retypes the item's list, where
-// a wrap would nest and Tab owns the nesting.
+// a wrap would nest and Tab owns the nesting. A marker the item already shows, and `a. `,
+// `(1) `, `(a) ` in a nested item, are taken as typed and change nothing.
 import { InputRule, inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
@@ -20,6 +21,7 @@ import type { Command, EditorState, Plugin, Transaction } from 'prosemirror-stat
 import {
 	consuming,
 	insertDivider,
+	takeNestedMarker,
 	toCodeBlock,
 	toHeading,
 	wrapInList,
@@ -105,6 +107,7 @@ export function markdownInputRules(schema: Schema): InputRule[] {
 			)
 		)
 	);
+	rules.push(blockRule(/^(?:[a-z]\.|\((?:\d+|[a-z])\))\s$/, takeNestedMarker));
 	rules.push(blockRule(/^\s*>\s$/, wrapInQuote));
 	return rules;
 }

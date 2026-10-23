@@ -18,6 +18,14 @@
 
 **`- ` and `N. ` at the head of an item are the item's**, where both stayed text. On a list's first item they retype the whole list, `1. ` numbering bullets and `- ` bulleting numbers, and `N. ` sets where the list counts from, back to 1 included. On a later item the other kind opens a sub-list under the item above, as Tab does, so `- ` in a new numbered paragraph starts its lettered subparagraphs. The `/` menu offers the other kind in an item's first block, and `subparagraph` there opens the sub-list.
 
+**Enter at the head of a list's first item opens a new empty first item** (#820), where a list that opened the body, or stood under a rule or an island, took a plain paragraph above it. Enter on that empty item lifts it out to the paragraph above the list, so a title is still two presses away.
+
+**A marker the item already shows is taken as typed** (#821). `2. ` typed at the head of the second item of a numbered list, any `N. ` on a later item, `- ` on a bulleted item, and `a. `, `(1) ` or `(a) ` at the head of a nested item are consumed and change nothing, where they stayed text and the item read `2. 2. Second`. Backspace on the press after gives the text back.
+
+**Tab on an unnumbered line sinks that line alone** (#822), the first item of a sub-list under the item, where it sank the whole item, numbered line included. **Enter at the head of an unnumbered line holding text opens an empty unnumbered line above it**, where it turned the line's text into the next item.
+
+**`subparagraph` is offered only where it nests a line under an item** (#826), where outside every item it opened a top-level bullet list.
+
 **A pasted list takes the numbering of where it lands** (#807). A list pasted on an empty item joins that list as its next items, in its kind, where it nested under the empty item, and a list pasted on the empty line under a list of its kind joins it. A list pasted on a line of its own keeps the `start` it was copied with; a copy starting past an ordered list's first item counts from 1, where it kept the list's `start`.
 
 **The preview zooms, at one scale for every page.** Every page is drawn at one zoom, where each page was as wide as the pane, so a landscape page came out smaller than a portrait one beside it. The default fits the widest page to the pane's width, capped at 125% of actual size, so a portrait memo in a split pane draws as it did. Ctrl/⌘-wheel, a trackpad or touch pinch, and Mod `+`/`−`/`0` zoom about the pointer, from the floor where the whole page fills 90% of the pane to 200%; the keys step through fixed levels and a continuous gesture holds at 100% as it passes. While zoomed, the pane's corner shows the percentage, and a click on it resets. A resized pane re-fits about the line at its top, and the caret follow scrolls sideways on a page wider than the pane.
