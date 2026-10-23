@@ -57,11 +57,19 @@ describe('the toggle makes every line of a selection the kind', () => {
 		);
 	});
 
-	it('retypes a list of the other kind whole, and wraps the plain lines beside it', () => {
+	it('retypes a whole list of the other kind, and wraps the plain lines beside it', () => {
+		expectPress(
+			lines('Alpha\n\n- Bravo\n- Charlie', 0, 2),
+			NUMBER,
+			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo")), list_item(paragraph("Charlie"))))'
+		);
+	});
+
+	it('splits the selected items out of a list of the other kind, and no more', () => {
 		expectPress(
 			lines('Alpha\n\n- Bravo\n- Charlie', 0, 1),
 			NUMBER,
-			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo")), list_item(paragraph("Charlie"))))'
+			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo"))), bullet_list(list_item(paragraph("Charlie"))))'
 		);
 	});
 
@@ -193,6 +201,33 @@ describe('a line under an item, its marker not its own', () => {
 });
 
 describe('the other kind', () => {
+	it('bullets one numbered item as a list between two, the tail counting from 1', () => {
+		const next = expectPress(
+			lines('3. Alpha\n4. Bravo\n5. Charlie', 1),
+			BULLET,
+			'doc(ordered_list(list_item(paragraph("Alpha"))), bullet_list(list_item(paragraph("Bravo"))), ordered_list(list_item(paragraph("Charlie"))))'
+		);
+		const lists: number[] = [];
+		next.doc.forEach((n) => n.attrs.start != null && lists.push(n.attrs.start));
+		expect(lists).toEqual([3, 1]);
+	});
+
+	it('numbers the head of a bullet list, the rest staying bullets', () => {
+		expectPress(
+			lines('- Alpha\n- Bravo\n- Charlie', 0, 1),
+			NUMBER,
+			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo"))), bullet_list(list_item(paragraph("Charlie"))))'
+		);
+	});
+
+	it('joins a split-out item to the list of its kind above', () => {
+		expectPress(
+			lines('1. Alpha\n\nBravo\n\n- Charlie\n- Delta', 1, 2),
+			NUMBER,
+			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo")), list_item(paragraph("Charlie"))), bullet_list(list_item(paragraph("Delta"))))'
+		);
+	});
+
 	it('a sub-list of the other kind under a selected item is retyped with it', () => {
 		expectPress(
 			lines('1. Alpha\n    - Bravo', 0, 1),

@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**Numbering or bulleting a selection inside a list of the other kind splits that list** (`Mod-Shift-7`, `Mod-Shift-8`, the toolbar buttons), as Google Docs and Notion do, where it retyped the whole list. The selected items become a list of the kind, joining one of that kind they touch, and the items after them count from 1.
+
+**A list copied out of desktop Word or Outlook pastes as a list**, nested by level, where each item landed as a paragraph reading `1.      Alpha`. `1.`, `a.`, `(1)` and `(a)` markers number their level, and Word's bullet glyphs bullet it.
+
 ## v0.25.0 - 2026-10-23
 
 **`Mod-Shift-7` and `Mod-Shift-8` number or bullet every line of the selection, and the selection toolbar has a button for each** (#818). A run of paragraphs becomes one list, one item a line, a list of the other kind is retyped whole, and the new items join a list of their kind they touch. An unnumbered line under an item becomes the first item of a sub-list of the kind under it, the item keeping its number. Where every selected line already carries the kind, the markers come off instead: the items lift out to full-width paragraphs and the items after them count from 1, and in a sub-list they stay as unnumbered lines under the parent item. A fence is left where it stands. The new strings are `formatNumberedList` and `formatBulletedList`.
