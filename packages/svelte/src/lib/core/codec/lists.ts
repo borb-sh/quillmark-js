@@ -447,8 +447,8 @@ function sinkIntoList(itemType: NodeType): Command {
  * indentation (`code.ts`). Where every link declines, the body holds the key
  * (`keymap.ts`).
  *
- * `Tab` sinks an unnumbered line alone into a sub-list, and any other line its whole
- * item.
+ * `Tab` sinks an unnumbered line alone into a sub-list, any other line its whole item,
+ * and a block right after a list into the list's last item.
  *
  * `Enter` is a chain in precedence order: the empty line above an unnumbered one, the
  * marker off an empty middle item and back on an empty continuation line, then `splitListItem`
