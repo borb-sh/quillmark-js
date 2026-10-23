@@ -39,10 +39,10 @@
  one gesture the row keeps never needs a scroll to reach.
 
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
- caret there, Backspace on an empty element removes it and hands focus back up the
- list, Alt+↑/↓ anywhere in an `object` row of the list moves it, the nearest row
- answering and never the record around a nested one, and is the twin of the handle's
- drag. A move is one splice of the ids
+ caret there, a paste of several lines into a prose row opens a row per line,
+ Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
+ anywhere in an `object` row of the list moves it, the nearest row answering and never
+ the record around a nested one, and is the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
@@ -306,6 +306,22 @@
 		// a collapsed empty summary would make adding one a two-press gesture.
 		if (control === 'object' && !table) open.add(id);
 		void focusAfterFlush(id, column);
+	}
+	/** Element `k` as `row` and `below` as new elements after it, one commit: a paste of
+	 *  several lines into a row, each line past the first a row as Enter would open it.
+	 *  The caret ends where the paste does, at the end of the last. */
+	function spill(k: number, row: Content, below: Content[]): void {
+		const at = k + 1;
+		const fresh = seq.take(below.length);
+		ids = [...ids.slice(0, at), ...fresh, ...ids.slice(at)];
+		const next = arr.slice();
+		next[k] = row;
+		next.splice(at, 0, ...below);
+		onCommit(next);
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			els[fresh.at(-1)!]?.setCaret?.(Number.MAX_SAFE_INTEGER);
+		})();
 	}
 	function add(): void {
 		insertAfter(ids.length - 1);
@@ -804,6 +820,10 @@
 							cap={textCap(items)}
 							label={rowName(k)}
 							onChange={(rt) => commitElement(k, rt)}
+							lines={{
+								room: () => (max == null ? Infinity : max - arr.length),
+								onLines: (rt, below) => spill(k, rt, below)
+							}}
 							onKey={(e) => onElementKey(e, k)}
 						/>
 					{:else}

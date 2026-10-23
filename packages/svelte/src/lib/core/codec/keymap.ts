@@ -33,6 +33,7 @@ import { blockKeymap } from './blocks.js';
 import { breakKeymap } from './breaks.js';
 import { codeKeymap } from './code.js';
 import { listKeymap } from './lists.js';
+import { listMoveKeymap } from './list-move.js';
 import { slashKeymap } from './slash.js';
 
 /** One chain per key, the maps taken in precedence order: on a key several bind, an
@@ -66,6 +67,7 @@ export function bodyKeymap(schema: Schema, slash?: boolean): Record<string, Comm
 		codeKeymap(schema),
 		breakKeymap(schema),
 		listKeymap(schema),
+		listMoveKeymap(schema),
 		atomKeymap(schema)
 	);
 }

@@ -155,3 +155,114 @@ describe('a list pasted into a list joins its count', () => {
 		expect(state.doc.child(1).type.name).toBe('ordered_list');
 	});
 });
+
+/** The caret at the head of the line holding `text`. */
+const headOf = (text: string) => (view: EditorView) =>
+	view.dispatch(
+		view.state.tr.setSelection(TextSelection.create(view.state.doc, at(view, text, true)))
+	);
+/** The caret at the end of the line holding `text`. */
+const endOf = (text: string) => (view: EditorView) =>
+	view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at(view, text))));
+const ABCD = '1. Alpha\n2. Bravo\n3. Charlie\n4. Delta';
+
+describe('text from inside one line pastes as text', () => {
+	const harl = () => copy(ABCD, (view) => [at(view, 'harl', true), at(view, 'harl')]);
+
+	it('at the head of an item, it joins that item’s line', () => {
+		const state = pasted(ABCD, headOf('Bravo'), harl());
+		expect(state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("harlBravo")), list_item(paragraph("Charlie")), list_item(paragraph("Delta"))))'
+		);
+		expect(representable(state)).toBe(true);
+	});
+
+	it('at the head of a paragraph, the paragraph stays one', () => {
+		const state = pasted('Para\n\nmore', headOf('Para'), harl());
+		expect(state.doc.toString()).toBe('doc(paragraph("harlPara"), paragraph("more"))');
+	});
+
+	it('a numbered item’s text at the head of a bullet keeps the bullet', () => {
+		const alpha = copy('1. Alpha', (view) => [at(view, 'Alpha', true), at(view, 'Alpha')]);
+		const state = pasted('- one\n- two', headOf('two'), alpha);
+		expect(state.doc.toString()).toBe(
+			'doc(bullet_list(list_item(paragraph("one")), list_item(paragraph("Alphatwo"))))'
+		);
+	});
+
+	it('a heading’s text does not make the line a heading', () => {
+		const head = copy('# Head', (view) => [at(view, 'Head', true), at(view, 'Head')]);
+		expect(pasted('Para', headOf('Para'), head).doc.toString()).toBe('doc(paragraph("HeadPara"))');
+	});
+
+	// A web page's copy states no open depth, so its item is read whole.
+	it('an item copied off a web page is still an item', () => {
+		const state = pasted('intro', lineUnder, { 'text/html': '<ol><li>One</li></ol>' });
+		expect(state.doc.child(1).type.name).toBe('ordered_list');
+	});
+});
+
+describe('items pasted at the head of an item are its list’s', () => {
+	it('a whole item copied with its line end lands above the item, in the same list', () => {
+		const charlie = copy(ABCD, (view) => [at(view, 'Charlie', true), at(view, 'Delta', true)]);
+		const state = pasted(ABCD, headOf('Alpha'), charlie);
+		expect(state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("Charlie")), list_item(paragraph("Alpha")), list_item(paragraph("Bravo")), list_item(paragraph("Charlie")), list_item(paragraph("Delta"))))'
+		);
+		expect(representable(state)).toBe(true);
+	});
+
+	it('a line end then a line, as a word processor pastes them: nothing nests', () => {
+		const tail = copy(ABCD, (view) => [at(view, 'Bravo'), at(view, 'Charlie')]);
+		const state = pasted(ABCD, headOf('Alpha'), tail);
+		expect(state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph), list_item(paragraph("CharlieAlpha")), list_item(paragraph("Bravo")), list_item(paragraph("Charlie")), list_item(paragraph("Delta"))))'
+		);
+	});
+});
+
+describe('paragraphs pasted into an item’s line are items', () => {
+	const three = '<p>one</p><p>two</p><p>three</p>';
+	const items = (...texts: string[]) =>
+		texts.map((text) => `list_item(paragraph${text ? `("${text}")` : ''})`).join(', ');
+
+	it('at the end of an item, each paragraph after the first is the next item', () => {
+		const sources: Record<string, string>[] = [
+			{ 'text/html': three },
+			{ 'text/plain': 'one\ntwo\nthree' }
+		];
+		for (const data of sources) {
+			const state = pasted(ABCD, endOf('Bravo'), data);
+			expect(state.doc.toString()).toBe(
+				`doc(ordered_list(${items('Alpha', 'Bravoone', 'two', 'three', 'Charlie', 'Delta')}))`
+			);
+			expect(representable(state)).toBe(true);
+		}
+	});
+
+	it('into an empty item, the first fills it', () => {
+		const state = pasted('1. x\n2. y', emptyItemAfter('y'), { 'text/html': three });
+		expect(state.doc.toString()).toBe(
+			`doc(ordered_list(${items('x', 'y', 'one', 'two', 'three')}))`
+		);
+	});
+
+	it('mid-line, the line’s tail ends the last', () => {
+		const state = pasted('1. Bravo', (view) => endOf('Bra')(view), { 'text/html': three });
+		expect(state.doc.toString()).toBe(`doc(ordered_list(${items('Braone', 'two', 'threevo')}))`);
+	});
+
+	it('a task’s new siblings are tasks, unchecked', () => {
+		const state = pasted('- [x] done', endOf('done'), { 'text/html': three });
+		const list = state.doc.child(0);
+		expect(list.childCount).toBe(3);
+		expect([0, 1, 2].map((i) => list.child(i).attrs.checked)).toEqual([true, false, false]);
+	});
+
+	it('into an unnumbered line under an item, they stay unnumbered lines', () => {
+		const state = pasted('1. Alpha\n\n   more', endOf('more'), { 'text/html': three });
+		expect(state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("Alpha"), paragraph("moreone"), paragraph("two"), paragraph("three"))))'
+		);
+	});
+});
