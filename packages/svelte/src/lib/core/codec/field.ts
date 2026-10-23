@@ -48,8 +48,9 @@ import { contentEqual, createReconciler, type Reconciler } from './reconcile.js'
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
-import { blockSchema, isBlockSchema, leafSchema, plainSchema } from './schema.js';
+import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
+import { linePastePlugin } from './line-paste.js';
 import { listPastePlugin } from './list-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
 import { nestingPlugin } from './nesting.js';
@@ -745,7 +746,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * that links a selection (`link-paste.ts`), and last the ones that answer to a block
  * leaf's own shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass
  * (`islands.ts`), the table paste (`table-paste.ts`), the markdown paste
- * (`markdown-paste.ts`) and the task item's checkbox (`tasks.ts`).
+ * (`markdown-paste.ts`) and the task item's checkbox (`tasks.ts`). A one-line leaf's
+ * paste joins its lines (`line-paste.ts`).
  *
  * Every mark-shaped plugin reads the schema rather than a flag: over either mark-free
  * schema the shorthand rules build nothing (each is guarded on its mark type), the
@@ -801,6 +803,7 @@ export function proseLeafPlugins(
 			nestingPlugin()
 		);
 	if (schema === plainSchema) list.push(plainClipboardPlugin());
+	if (isInlineSchema(schema)) list.push(linePastePlugin());
 	if (opts.placeholder) list.push(ghostPlugin(opts));
 	return list;
 }

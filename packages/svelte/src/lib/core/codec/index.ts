@@ -27,6 +27,7 @@ export {
 } from './field.js';
 export type { CreateFieldOpts, FieldController, LeafViews } from './field.js';
 export { capCount } from './cap.js';
+export { joinLines, pastedLines } from './line-paste.js';
 export type { TextCap } from './cap.js';
 
 // The table island's chrome vocabulary: the visual tier's `strings` set extends it,

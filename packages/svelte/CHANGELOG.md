@@ -38,6 +38,18 @@
 
 **A pasted list takes the numbering of where it lands** (#807). A list pasted on an empty item joins that list as its next items, in its kind, where it nested under the empty item, and a list pasted on the empty line under a list of its kind joins it. A list pasted on a line of its own keeps the `start` it was copied with; a copy starting past an ordered list's first item counts from 1, where it kept the list's `start`.
 
+**Text copied from inside one line pastes as text**, so a word taken out of a numbered paragraph and pasted at the head of another line joins that line, where the line became an empty item holding a nested list, or a plain paragraph became a one-item list (#813). A heading's or a fence's text no longer retypes the line it lands at the head of either. An item copied off a web page still lands as an item.
+
+**Items pasted into an item's line are its list's**, so a whole item cut with its line end and pasted at the head of another lands above it in the same list, where it nested a list under an empty item (#815).
+
+**Alt+↑/↓ in a list moves the item** past the one beside it, its sub-items with it, and a selection across items moves them together, the binding array rows and table lines move on. At the list's edge the key does nothing (#815).
+
+**Paragraphs pasted into an item's first line are items**, each numbered as a word processor numbers them, where every paragraph after the first was an unnumbered line under the one item (#819). A task's new siblings are unchecked tasks. Pasted into an unnumbered line under an item, they stay unnumbered lines.
+
+**A plain-text list marked with `•`, `a.`, `(1)` or `(a)` pastes as a list**, a memo's `1.`, `a.`, `(1)`, `(a)` outline nesting by its markers whether or not it is indented, where the lines landed as text with the marker in it or folded into the line above (#825). A capital's initial, as in `J. Doe`, stays text.
+
+**A one-line field joins the lines of a paste with a space**, where it kept the first line and dropped the rest (#814). In an array of one-line rows, each line past the first is a row of its own below, up to the array's `max:`, the last row taking what is left.
+
 **The preview zooms, at one scale for every page.** Every page is drawn at one zoom, where each page was as wide as the pane, so a landscape page came out smaller than a portrait one beside it. The default fits the widest page to the pane's width, capped at 125% of actual size, so a portrait memo in a split pane draws as it did. Ctrl/⌘-wheel, a trackpad or touch pinch, and Mod `+`/`−`/`0` zoom about the pointer, from the floor where the whole page fills 90% of the pane to 200%; the keys step through fixed levels and a continuous gesture holds at 100% as it passes. While zoomed, the pane's corner shows the percentage, and a click on it resets. A resized pane re-fits about the line at its top, and the caret follow scrolls sideways on a page wider than the pane.
 
 **`setZoom(zoom)` sets that zoom**, a fraction of actual size with `undefined` the default fit, where it multiplied the raster's density and left the layout alone.
