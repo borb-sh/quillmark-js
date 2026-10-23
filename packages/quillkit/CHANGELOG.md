@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio's editor writes lists as Google Docs and Notion do, and its preview zooms.** The client compiles `@quillmark/svelte` in, so its 0.25.0 is what an author here works in: list items spaced as paragraphs are; Enter, Tab and a typed marker acting on the line a writer means; `Mod-Shift-7`/`Mod-Shift-8` and two toolbar buttons numbering or bulleting a selection; two lists of a kind an edit leaves touching counting as one; text copied from inside a line pasting as text; Alt+↑/↓ moving an item; and several pasted lines joined in a one-line field, or a row each in an array of them. Tab and Shift-Tab stay in a body, and Escape leaves it. The preview draws every page at one zoom.
+
 ## v0.19.1 - 2026-10-22
 
 **Studio links to a template.** `?template=army_memo` opens the template whose file is `army_memo.md` in the quill its `$quill` names, and the address bar carries the template opened, by its file less the `.md`, beside the quill, so a link sent from studio opens that starter. Picking a quill, importing a document or turning examples on or off takes the template out of the address bar; an edit leaves it, and a reload reopens the template. A name the manifest does not list opens what `?quill=` asks for and is taken out of the address bar.
