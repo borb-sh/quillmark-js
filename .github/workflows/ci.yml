@@ -1,7 +1,7 @@
 # The gate in two jobs that run at once, each a run of the root's verbs and neither naming a
 # package: `check` is every verb but the suites, `test` is the suites. Each builds for itself,
 # since the suites spawn and read built artifacts too. One test loads the built client in a
-# browser (CLAUDE.md §Verification), which the runner image's Google Chrome answers; nothing
+# browser (TESTING.md §Assertions), which the runner image's Google Chrome answers; nothing
 # here installs one. A third job, `floor`, holds the library's `svelte` peer floor.
 name: CI
 

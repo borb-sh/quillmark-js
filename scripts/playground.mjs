@@ -14,7 +14,7 @@
 // parsed — is invisible to that package's suite by construction. This is where one is
 // asked: a real browser over a page built the way a consumer's is, answering an
 // expression the author writes, printed as JSON. What the answer may then be committed
-// as is CLAUDE.md §Verification's two shapes; what it is for here is finding out.
+// as is one of the two shapes in TESTING.md §Assertions; what it is for here is finding out.
 //
 //   node scripts/playground.mjs                       # serve, and hold the port
 //   node scripts/playground.mjs --probe '<expr>'      # serve, ask, print, stop

@@ -5,7 +5,7 @@
 //
 // The workspace's, not one package's: quillkit's suite loads a laid site with it and
 // `scripts/playground.mjs` loads a served playground with it, which is how a CSS fact in
-// `@quillmark/svelte` is asked of a browser at all (CLAUDE.md §Verification).
+// `@quillmark/svelte` is asked of a browser at all (TESTING.md §Assertions).
 
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';

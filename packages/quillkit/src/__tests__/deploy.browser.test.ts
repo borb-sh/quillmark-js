@@ -7,7 +7,7 @@
  * whose assets 404 or whose panes stand past the viewport passes all of them. The dev
  * server exhibits neither: it tree-shakes nothing and serves at a root.
  *
- * What it may assert is CLAUDE.md §Verification's: presence against absence, and a
+ * What it may assert is what TESTING.md §Assertions allows: presence against absence, and a
  * relation no dial owns.
  *
  * It runs against `dist/`, so it needs the package built, both halves.
