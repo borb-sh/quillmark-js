@@ -53,6 +53,7 @@ import { linkPastePlugin } from './link-paste.js';
 import { linePastePlugin } from './line-paste.js';
 import { listPastePlugin } from './list-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
+import { wordPastePlugin } from './word-paste.js';
 import { nestingPlugin } from './nesting.js';
 import { undoStepPlugin } from './undo.js';
 import { tablePastePlugin } from './table-paste.js';
@@ -798,6 +799,7 @@ export function proseLeafPlugins(
 			tablePastePlugin(),
 			tableCopyPlugin(),
 			markdownPastePlugin(),
+			wordPastePlugin(),
 			listPastePlugin(),
 			taskPlugin(),
 			nestingPlugin()

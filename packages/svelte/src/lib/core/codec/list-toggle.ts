@@ -10,10 +10,11 @@
 // Otherwise each line becomes the kind: a run of plain lines is wrapped, one item a
 // line, and a run of continuation lines the same way where it stands, the first items
 // of a sub-list under their item, as `- ` or `1. ` at a continuation's head opens one
-// (`blocks.ts` §`openingAnItem`); a list of the other kind is retyped whole, a list
-// being one kind (`blocks.ts` §`listAtItem`); a line already in the kind stays. What it
-// wraps or retypes joins the lists of its kind it leaves touching (`touching.ts`), so
-// the lines of one selection count as one list.
+// (`blocks.ts` §`openingAnItem`); the selected items of a list of the other kind split
+// out of it as a list of the kind, a list being one kind (`blocks.ts` §`listAtItem`),
+// its tail counting from 1 as `unlist` leaves one; a line already in the kind stays.
+// What it wraps or retypes joins the lists of its kind it leaves touching
+// (`touching.ts`), so the lines of one selection count as one list.
 import { Fragment, NodeRange, Slice } from 'prosemirror-model';
 import type { Node as PMNode, NodeType, ResolvedPos } from 'prosemirror-model';
 import { wrapRangeInList } from 'prosemirror-schema-list';
@@ -133,6 +134,22 @@ function unlist(tr: Transaction, type: NodeType, itemType: NodeType): boolean {
 	}
 }
 
+/** Items `first` to `last` of the list at `pos` split out as a list of their own,
+ *  the tail after them counting from 1. Returns where that list stands. */
+function splitOut(tr: Transaction, pos: number, first: number, last: number): number {
+	const list = tr.doc.nodeAt(pos)!;
+	const $inside = tr.doc.resolve(pos + 1);
+	if (last + 1 < list.childCount) {
+		tr.split($inside.posAtIndex(last + 1));
+		const tail = tr.doc.resolve(pos + 1).posAtIndex(last + 1) + 1;
+		if (list.attrs.start != null && list.attrs.start !== 1)
+			tr.setNodeMarkup(tail, null, { ...list.attrs, start: 1 });
+	}
+	if (first === 0) return pos;
+	tr.split($inside.posAtIndex(first));
+	return $inside.posAtIndex(first) + 1;
+}
+
 /** Make every line the kind, and join what that leaves touching. */
 function relist(
 	tr: Transaction,
@@ -142,15 +159,17 @@ function relist(
 ): boolean {
 	const changed: { pos: number; step: number }[] = [];
 	const runs: { from: number; to: number; depth: number }[] = [];
+	const others = new Map<number, { first: number; last: number }>();
 	for (const line of lines) {
 		const { $at, item } = line;
 		if (line.covered) continue;
 		if (line.opens) {
+			if ($at.node(item - 1).type === type) continue;
 			const pos = $at.before(item - 1);
-			if ($at.node(item - 1).type !== type && !changed.some((c) => c.pos === pos)) {
-				tr.setNodeMarkup(pos, type, type.name === 'ordered_list' ? { start: 1 } : null);
-				changed.push({ pos, step: tr.steps.length });
-			}
+			const index = $at.index(item - 1);
+			const span = others.get(pos);
+			if (span) span.last = index;
+			else others.set(pos, { first: index, last: index });
 			continue;
 		}
 		const end = line.pos + $at.parent.nodeSize;
@@ -163,6 +182,11 @@ function relist(
 		const range = new NodeRange(tr.doc.resolve(run.from), tr.doc.resolve(run.to), run.depth);
 		if (!wrapRangeInList(tr, range, type)) return false;
 		changed.push({ pos: run.from, step: tr.steps.length });
+	}
+	for (const [pos, span] of [...others].reverse()) {
+		const at = splitOut(tr, tr.mapping.map(pos), span.first, span.last);
+		tr.setNodeMarkup(at, type, type.name === 'ordered_list' ? { start: 1 } : null);
+		changed.push({ pos: at, step: tr.steps.length });
 	}
 	const seams: number[] = [];
 	for (const { pos, step } of changed) {
