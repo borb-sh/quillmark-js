@@ -1,6 +1,6 @@
 {
 	"name": "quillkit",
-	"version": "0.19.1",
+	"version": "0.19.2",
 	"description": "The quill author's toolchain: start a quiver, gate it, pack it, look at it, ship it. Carries the studio client it serves.",
 	"type": "module",
 	"license": "Apache-2.0",
