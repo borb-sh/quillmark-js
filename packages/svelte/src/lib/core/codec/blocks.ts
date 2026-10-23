@@ -292,9 +292,9 @@ function itemDepth($pos: ResolvedPos, item: NodeType): number {
 
 /**
  * The bullet pick where it puts a line under an item one level deeper than the caret
- * stood, and nowhere else: the pick a subparagraph names, inside an item. Outside every
- * item the bullet it would mint stands at the first level, which no quill draws as a
- * subparagraph, and on a list's first item the bullet pick retypes the list instead.
+ * stood, and nowhere else: the pick a subparagraph names. Outside every item the bullet
+ * it would mint stands at the first level, and on a list's first item the bullet pick
+ * retypes the list instead.
  */
 export function pickSubList(): Command {
 	const pick = pickList(false);
