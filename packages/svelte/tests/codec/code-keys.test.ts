@@ -10,7 +10,6 @@ import { describe, it, expect } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
 import { blockSchema, bodyKeymap, decode } from '$lib/core/codec';
-import { baseKeymap } from 'prosemirror-commands';
 import { md, startOf, endOf, run, shape, keyDriver } from './_util.js';
 
 const keys = bodyKeymap(blockSchema);
@@ -100,10 +99,9 @@ describe('Shift-Tab outdents', () => {
 		);
 	});
 
-	it('declines when no covered line is indented — the key is not swallowed', () => {
+	it('changes nothing when no covered line is indented', () => {
 		const state = sel(FENCE, 1);
-		expect(run(state, keys['Shift-Tab'])).toBe(null);
-		expect('Shift-Tab' in baseKeymap).toBe(false); // …so it reaches the browser: the leaf's exit
+		expect(press(state, 'Shift-Tab').doc.eq(state.doc)).toBe(true);
 	});
 
 	it('outdents only the lines it covers', () => {
