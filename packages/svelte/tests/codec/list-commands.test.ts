@@ -105,6 +105,44 @@ describe('Tab / Shift-Tab change nesting depth', () => {
 		);
 	});
 
+	it('Tab on an unnumbered line makes that line alone the first item of a sub-list', () => {
+		const next = expectPress(
+			atBlock(docOf(ul(li(p('a')), li(p('b'), p('cont')))), 2),
+			'Tab',
+			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("b"), bullet_list(list_item(paragraph("cont"))))))'
+		);
+		expect(next.selection.$from.parent.textContent).toBe('cont');
+	});
+
+	it('Tab on an unnumbered line under a numbered item opens a numbered sub-list', () => {
+		expectPress(
+			startOf('1. a\n\n   cont\n2. b', 1),
+			'Tab',
+			'doc(ordered_list(list_item(paragraph("a"), ordered_list(list_item(paragraph("cont")))), list_item(paragraph("b"))))'
+		);
+	});
+
+	it('Tab on an unnumbered line joins the sub-list of its kind standing right above or below it', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a'), ul(li(p('x'))), p('cont')))), 2),
+			'Tab',
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("x")), list_item(paragraph("cont"))))))'
+		);
+		expectPress(
+			atBlock(docOf(ul(li(p('a'), p('cont'), ul(li(p('y')))))), 1),
+			'Tab',
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("cont")), list_item(paragraph("y"))))))'
+		);
+	});
+
+	it('Tab on an unnumbered line leaves the item’s other lines where they stand', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a'), p('one'), p('two')))), 1),
+			'Tab',
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("one"))), paragraph("two"))))'
+		);
+	});
+
 	it('Tab outside a list, with no list before it, declines the key', () => {
 		const state = after('plain text', 'plain');
 		expect(run(state, keys['Tab'])).toBe(null);
@@ -168,23 +206,28 @@ describe('Enter', () => {
 		);
 	});
 
-	it('at the start of a list that opens the document, opens a paragraph above it', () => {
+	it('at the start of a list that opens the document, opens a new first item', () => {
 		expectPress(
-			startOf('- a\n- b', 0),
+			startOf('1. a\n2. b', 0),
 			'Enter',
-			'doc(paragraph, bullet_list(list_item(paragraph("a")), list_item(paragraph("b"))))'
+			'doc(ordered_list(list_item(paragraph), list_item(paragraph("a")), list_item(paragraph("b"))))'
 		);
 	});
 
-	it('the escape-above gesture keeps the caret with the text it pushed down', () => {
+	it('at the start of an item, keeps the caret with the text it pushed down', () => {
 		const next = press(startOf('- a', 0), 'Enter');
 		expect(next.doc.textBetween(next.selection.from, next.doc.content.size)).toBe('a');
 	});
 
-	// The gesture answers on exactly the shapes where a caret cannot already go, a
-	// rule and an island being atoms; everywhere else Enter is the ordinary split,
-	// so the key means one thing at every item a writer can escape by pressing Up.
-	it('declines where the block above the list already takes a caret', () => {
+	it('on an empty first item, lifts it out to a paragraph above the list', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p()), li(p('a')))), 0),
+			'Enter',
+			'doc(paragraph, bullet_list(list_item(paragraph("a"))))'
+		);
+	});
+
+	it('at the start of a first item under the block above, opens a new first item', () => {
 		expectPress(
 			startOf('intro\n\n- a\n- b', 1),
 			'Enter',
@@ -192,7 +235,7 @@ describe('Enter', () => {
 		);
 	});
 
-	it('declines under a quote, whose last paragraph is a caret position', () => {
+	it('at the start of a first item under a quote, opens a new first item', () => {
 		expectPress(
 			startOf('> quoted\n\n- a', 1),
 			'Enter',
@@ -238,6 +281,16 @@ describe('Enter on an empty line inside a list', () => {
 			'Enter',
 			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("b"))), paragraph)'
 		);
+	});
+
+	it('at the head of an unnumbered line holding text, opens an empty unnumbered line above it', () => {
+		const next = expectPress(
+			atBlock(docOf(ul(li(p('a'), p('cont')), li(p('c')))), 1),
+			'Enter',
+			'doc(bullet_list(list_item(paragraph("a"), paragraph, paragraph("cont")), list_item(paragraph("c"))))'
+		);
+		expect(next.selection.$from.parent.textContent).toBe('cont');
+		expect(next.selection.$from.parentOffset).toBe(0);
 	});
 
 	it('a continuation line typed in, Enter at its end opens the next item', () => {

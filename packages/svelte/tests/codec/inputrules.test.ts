@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { EditorState, TextSelection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import { undoInputRule } from 'prosemirror-inputrules';
 import {
 	blockSchema,
 	createField,
@@ -252,7 +253,8 @@ describe('`1) ` numbers a block as `1. ` does', () => {
 // A list shorthand at the head of an item that already exists is the item's: wrapping
 // there would mint an item whose only content is another item. On a first item it
 // retypes the list; on a later one the other kind sinks it into a sub-list, under the
-// previous sibling, which is the shape a nesting has.
+// previous sibling, which is the shape a nesting has. A marker the item already shows
+// is taken as typed.
 describe('the list shorthands at the head of an existing item', () => {
 	/** A view over `markdown`'s list, typed, caret at the head of item `index`. */
 	function itemView(lines: string[], index = 0): EditorView {
@@ -289,11 +291,26 @@ describe('the list shorthands at the head of an existing item', () => {
 		view.destroy();
 	});
 
-	it('another number on a later numbered item stays literal: it renumbers nothing above', () => {
+	it('a number on a later numbered item is taken as typed: it renumbers nothing', () => {
 		const view = itemView(['1. alpha', 'beta'], 1);
 		type(view, '7. ');
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("alpha")), list_item(paragraph("beta"))))'
+		);
 		expect(view.state.doc.child(0).attrs.start).toBe(1);
-		expect(view.state.doc.child(0).child(1).textContent).toBe('7. beta');
+		view.destroy();
+	});
+
+	it('numbers typed down a list read as the list they spell, not "2. 2. Second"', () => {
+		const view = mountView();
+		type(view, '1. First');
+		view.dispatch(view.state.tr.split(view.state.selection.from, 2));
+		type(view, '2. Second');
+		view.dispatch(view.state.tr.split(view.state.selection.from, 2));
+		type(view, '3. Third');
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("First")), list_item(paragraph("Second")), list_item(paragraph("Third"))))'
+		);
 		view.destroy();
 	});
 
@@ -305,16 +322,50 @@ describe('the list shorthands at the head of an existing item', () => {
 		view.destroy();
 	});
 
-	it('the marker a list already has stays text', () => {
+	it('the marker a list already has is taken as typed, changing nothing', () => {
 		for (const [lines, typed, index] of [
 			[['- alpha', 'beta'], '- ', 1],
 			[['1. alpha', 'beta'], '2. ', 1],
-			[['1. alpha'], '1. ', 0]
+			[['1. alpha'], '1. ', 0],
+			[['- alpha'], '- ', 0]
 		] as const) {
 			const view = itemView([...lines], index);
+			const before = view.state.doc.toString();
 			type(view, typed);
-			expect(view.state.doc.textContent, typed).toContain(`${typed}`);
+			expect(view.state.doc.toString(), typed).toBe(before);
 			view.destroy();
+		}
+	});
+
+	it('the press after gives the marker back as text', () => {
+		const view = itemView(['1. alpha', 'beta'], 1);
+		type(view, '2. ');
+		undoInputRule(view.state, view.dispatch);
+		expect(view.state.doc.child(0).child(1).textContent).toBe('2. beta');
+		view.destroy();
+	});
+
+	it('`a. `, `(1) ` and `(a) ` in a nested item are taken as typed', () => {
+		for (const typed of ['a. ', '(1) ', '(a) ', 'b. ']) {
+			const view = itemView(['1. alpha', 'beta'], 1);
+			type(view, '- ');
+			const before = view.state.doc.toString();
+			type(view, typed);
+			expect(view.state.doc.toString(), typed).toBe(before);
+			view.destroy();
+		}
+	});
+
+	it('`a. ` and `(1) ` stay text on a top-level item and outside a list', () => {
+		for (const typed of ['a. ', '(1) ']) {
+			const item = itemView(['1. alpha', 'beta'], 1);
+			type(item, typed);
+			expect(item.state.doc.child(0).child(1).textContent, typed).toBe(`${typed}beta`);
+			item.destroy();
+			const plain = mountView();
+			type(plain, `${typed}x`);
+			expect(plain.state.doc.toString(), typed).toBe(`doc(paragraph("${typed}x"))`);
+			plain.destroy();
 		}
 	});
 
