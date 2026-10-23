@@ -1,8 +1,8 @@
 // List editing: the body leaf's structural commands, over
 // `prosemirror-schema-list` primitives. Indent/outdent on Tab, and the three
 // structural keys lists redefine: Enter (split, take the marker off an empty middle
-// item, give an empty continuation line one, open a paragraph where nothing above the
-// list takes a caret), Backspace (take an item's marker off, or join a block onto the
+// item, give an empty continuation line one, open an empty line above an unnumbered
+// one), Backspace (take an item's marker off, or join a block onto the
 // list above it) and Delete (the marker off at the seam below, and the two lines
 // joined).
 //
@@ -25,7 +25,7 @@ import type { Node as PMNode, NodeType, ResolvedPos, Schema } from 'prosemirror-
 import { liftListItem, sinkListItem } from 'prosemirror-schema-list';
 import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import type { Command, Transaction } from 'prosemirror-state';
-import { canJoin, liftTarget } from 'prosemirror-transform';
+import { canJoin, findWrapping, liftTarget } from 'prosemirror-transform';
 import { chainCommands, joinTextblockBackward, joinTextblockForward } from 'prosemirror-commands';
 import { withinNesting } from './nesting.js';
 import { toggleList } from './list-toggle.js';
@@ -54,10 +54,9 @@ function atItemStart(
 
 /**
  * The textblock at the end of `node`: `node` itself where it is one, else its last
- * descendant that is — the block a caret above a boundary lands in, and the block a
- * join across one reaches, `joinTextblockBackward` walking to the same one. `null` on
- * an atom (an island, a rule), which `prosemirror-gapcursor` declines to sit beside
- * too, its `closedBefore` asking this question from the other side.
+ * descendant that is — the block a join across a boundary reaches,
+ * `joinTextblockBackward` walking to the same one. `null` on an atom (an island, a
+ * rule), which holds no line to join onto.
  */
 function lastBlockIn(node: PMNode | null | undefined): PMNode | null {
 	let last = node ?? null;
@@ -66,36 +65,21 @@ function lastBlockIn(node: PMNode | null | undefined): PMNode | null {
 }
 
 /**
- * Whether a caret already fits immediately above the list at `pos`. The node ending
- * there answers for its last child, so a quote counts through its final paragraph; a
- * list opening its parent has no node there at all.
+ * Enter at the head of an unnumbered line that holds text → an empty unnumbered line
+ * above it, the caret staying with the text it pushed down: the split a numbered line
+ * makes at its head, kept to the line. `splitListItem` would split the item there
+ * instead, turning the line's text into the next item and leaving the empty line
+ * behind under the marker it had.
  */
-function writableAbove(doc: PMNode, pos: number): boolean {
-	return !!lastBlockIn(doc.resolve(pos).nodeBefore);
-}
-
-/**
- * Enter at the very start of a top-level list's first item, where nothing above the
- * list takes a caret → an empty paragraph above it, caret staying with the text it
- * pushed down. A list under an island or a rule has nowhere above to write and
- * nothing else that opens one; a list that opens the body is the block link's, which
- * answers the same fact for every block ahead of this chain (`blocks.ts`). Where a
- * caret already fits above, the key is the conventional split instead, at every item
- * alike: an escape a writer reaches by pressing Up needs no key of its own.
- *
- * Also only where the list itself is not inside an item: in a nested list this
- * pushes an empty paragraph into the parent item (`list_item` is `block+`, so the
- * shape is representable and wrong), where the conventional split (an empty item
- * above) is what the next link does. An empty first item falls through to that same
- * link, which exits the list instead.
- */
-function paragraphAboveList(itemType: NodeType, paragraph: NodeType): Command {
+function lineAbove(itemType: NodeType, paragraph: NodeType): Command {
 	return (state, dispatch) => {
-		const at = atItemStart(state, itemType);
-		if (!at || at.nested || at.itemIndex !== 0) return false;
-		if (state.selection.$from.parent.content.size === 0) return false;
-		if (writableAbove(state.doc, at.listPos)) return false;
-		if (dispatch) dispatch(state.tr.insert(at.listPos, paragraph.create()).scrollIntoView());
+		const { $from, empty } = state.selection;
+		if (!empty || !$from.parent.isTextblock || $from.parentOffset !== 0) return false;
+		if ($from.depth < 2 || $from.parent.content.size === 0) return false;
+		const index = $from.index(-1);
+		if ($from.node(-1).type !== itemType || index === 0) return false;
+		if (!$from.node(-1).canReplaceWith(index, index, paragraph)) return false;
+		dispatch?.(state.tr.insert($from.before(), paragraph.create()).scrollIntoView());
 		return true;
 	};
 }
@@ -209,7 +193,7 @@ function lineOut(itemType: NodeType): Command {
  * has no level above it inside the list: the key is claimed and does nothing, as Tab is
  * on a first item, so a press too many while backing out of a sub-list renumbers
  * nothing. Leaving the list is Backspace's, one rung a press. Outside every item the
- * key declines and stays the body's keyboard exit.
+ * key declines.
  */
 function outdent(itemType: NodeType): Command {
 	const lift = liftListItem(itemType);
@@ -425,11 +409,37 @@ function keepCaret(
 	return (tr) => dispatch(tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(pressed))));
 }
 
+/**
+ * Tab on an unnumbered line, a block of an item past its first → that line alone the
+ * first item of a sub-list of its list's kind, as `- ` or `1. ` typed at its head makes
+ * it. `sinkListItem` would sink the whole item, its numbered line with it. A sub-list of
+ * that kind standing right above or below the line in its item takes it in, the wrap
+ * joining the boundaries it opens (§cleanup). Declined past `MAX_NESTING_DEPTH`, as
+ * every sink is.
+ */
+function sinkLine(itemType: NodeType): Command {
+	return (state, dispatch) => {
+		const { $from, $to } = state.selection;
+		if (!$from.sameParent($to) || !$from.parent.isTextblock || $from.depth < 3) return false;
+		if ($from.node(-1).type !== itemType || $from.index(-1) === 0) return false;
+		const list = $from.node(-2).type;
+		const range = $from.blockRange($to);
+		const wrapping = range && findWrapping(range, list);
+		if (!range || !wrapping) return false;
+		const at = $from.before();
+		const tr = state.tr.wrap(range, wrapping);
+		const end = at + $from.parent.nodeSize + 4;
+		if (tr.doc.resolve(end).nodeAfter?.type === list && canJoin(tr.doc, end)) tr.join(end);
+		if (tr.doc.resolve(at).nodeBefore?.type === list && canJoin(tr.doc, at)) tr.join(at);
+		if (!withinNesting(tr.doc)) return false;
+		dispatch?.(tr.scrollIntoView());
+		return true;
+	};
+}
+
 /** Tab → `sinkListItem`, declined where the sink would nest past `MAX_NESTING_DEPTH`
- *  (`nesting.ts`), so Tab there leaves the body. On a first item, with nothing above to
- *  sink under, the key is claimed and does nothing: a writer indenting a list's first
- *  line is still writing the list, and the focus leaving it mid-list is a keystroke
- *  lost. Outside every item Tab stays the body's keyboard exit. */
+ *  (`nesting.ts`). On a first item, with nothing above to sink under, the key is claimed
+ *  and does nothing: a writer indenting a list's first line is still writing the list. */
 function sinkWithin(itemType: NodeType): Command {
 	const sink = sinkListItem(itemType);
 	return (state, dispatch) => {
@@ -445,22 +455,51 @@ function sinkWithin(itemType: NodeType): Command {
 }
 
 /**
+ * Tab on a block standing right after a list, outside every item → the block moves into
+ * the list's last item, after what that item holds: one step in, under the item above,
+ * as Tab nests an item. The block keeps its kind, so a paragraph lands as the item's
+ * unnumbered line. Declined past `MAX_NESTING_DEPTH`, and over a selection that leaves
+ * the block.
+ */
+function sinkIntoList(itemType: NodeType): Command {
+	return (state, dispatch) => {
+		const { $from, $to } = state.selection;
+		if (!$from.parent.isTextblock || !$from.sameParent($to) || $from.depth < 1) return false;
+		if ($from.node(-1).type === itemType) return false;
+		const list = $from.index(-1) > 0 ? $from.node(-1).child($from.index(-1) - 1) : null;
+		if (!list || list.firstChild?.type !== itemType) return false;
+		const block = $from.parent;
+		const start = $from.before();
+		const into = start - 2;
+		const tr = state.tr.delete(start, start + block.nodeSize).insert(into, block);
+		if (!withinNesting(tr.doc)) return false;
+		const shift = into - start;
+		tr.setSelection(
+			TextSelection.create(tr.doc, state.selection.anchor + shift, state.selection.head + shift)
+		);
+		dispatch?.(tr.scrollIntoView());
+		return true;
+	};
+}
+
+/**
  * The list bindings for a block-schema leaf: `{}` for the one-line and plain
  * schemas, which declare no list nodes.
  *
  * `Tab` / `Shift-Tab` hold the list link of the body's Tab chain. Surfaces that own
  * Tab more locally under the same rule (`prose/canon/VISUAL_EDITOR.md` §Chrome)
  * prepend a link ahead of these in `keymap.ts`: a `code_block` takes literal
- * indentation (`code.ts`), an island takes cell traversal once added. Outside all
- * of them every link returns false and the key is not swallowed: Tab keeps its
- * default meaning, which is the body's only keyboard exit and the open seam for a
- * shell structural keymap (VISUAL_EDITOR §Settled and open).
+ * indentation (`code.ts`). Where every link declines, the body holds the key
+ * (`keymap.ts`).
  *
  * `Mod-Shift-7` / `Mod-Shift-8` are the list toggle (`list-toggle.ts`), numbering or
  * bulleting the selection's lines or taking their markers off.
  *
- * `Enter` is a chain in precedence order: the escape-above gesture, the marker off an
- * empty middle item and back on an empty continuation line, then `splitListItem`
+ * `Tab` sinks an unnumbered line alone into a sub-list, any other line its whole item,
+ * and a block right after a list into the list's last item.
+ *
+ * `Enter` is a chain in precedence order: the empty line above an unnumbered one, the
+ * marker off an empty middle item and back on an empty continuation line, then `splitListItem`
  * (`splitTaskItem`, which leaves a task item's new half an open task), then
  * `liftListItem`. The split link carries two behaviors of its own: it splits a
  * non-empty item, and on an empty last item it either splits the wrapping item (a
@@ -482,10 +521,10 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 	return {
 		'Mod-Shift-7': toggleList(true),
 		'Mod-Shift-8': toggleList(false),
-		Tab: sinkWithin(itemType),
+		Tab: chainCommands(sinkLine(itemType), sinkWithin(itemType), sinkIntoList(itemType)),
 		'Shift-Tab': outdent(itemType),
 		Enter: chainCommands(
-			paragraphAboveList(itemType, paragraph),
+			lineAbove(itemType, paragraph),
 			continueAbove(itemType),
 			markerOn(itemType),
 			splitTaskItem(itemType),

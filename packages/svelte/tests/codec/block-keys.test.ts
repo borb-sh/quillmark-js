@@ -42,14 +42,6 @@ describe('a first block a gap cursor declines gets a paragraph above it', () => 
 		expectPress(startOf('> quoted', 0), 'Enter', 'doc(paragraph, blockquote(paragraph("quoted")))');
 	});
 
-	it('a list that opens the body', () => {
-		expectPress(
-			startOf('- a\n- b', 0),
-			'Enter',
-			'doc(paragraph, bullet_list(list_item(paragraph("a")), list_item(paragraph("b"))))'
-		);
-	});
-
 	it('a fence in an item that opens the body', () => {
 		expectPress(
 			startOf('- ```\n  code\n  ```', 0),
@@ -106,11 +98,26 @@ describe('everywhere else the key keeps its meaning', () => {
 		);
 	});
 
-	it('a list under a rule is still the list link', () => {
+	it('a list that opens the body takes a new first item, as every item does', () => {
+		const one = expectPress(
+			startOf('1. a\n2. b', 0),
+			'Enter',
+			'doc(ordered_list(list_item(paragraph), list_item(paragraph("a")), list_item(paragraph("b"))))'
+		);
+		expect(one.selection.$from.parent.textContent).toBe('a');
+		// The empty item's own Enter lifts it out: the paragraph a title takes.
+		expectPress(
+			atBlock(one.doc, 0),
+			'Enter',
+			'doc(paragraph, ordered_list(list_item(paragraph("a")), list_item(paragraph("b"))))'
+		);
+	});
+
+	it('a list under a rule takes a new first item too', () => {
 		expectPress(
 			at('---\n\n- a', 0, 0),
 			'Enter',
-			'doc(horizontal_rule, paragraph, bullet_list(list_item(paragraph("a"))))'
+			'doc(horizontal_rule, bullet_list(list_item(paragraph), list_item(paragraph("a"))))'
 		);
 	});
 });

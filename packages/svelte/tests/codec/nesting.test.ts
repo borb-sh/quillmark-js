@@ -74,7 +74,7 @@ describe('Tab', () => {
 		expect(apply(atLast(doc), tab)).toEqual({ handled: false, next: null });
 	});
 
-	it('leaves the key to the browser in a mounted body at the bound', () => {
+	it('holds the key in a mounted body at the bound, the doc unchanged', () => {
 		const doc = docOf(inItems(MAX_NESTING_DEPTH - 1, siblings));
 		const state = EditorState.create({
 			doc,
@@ -83,7 +83,7 @@ describe('Tab', () => {
 		});
 		const view = new EditorView(document.createElement('div'), { state });
 		const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-		expect(view.someProp('handleKeyDown', (f) => f(view, event))).toBeFalsy();
+		expect(view.someProp('handleKeyDown', (f) => f(view, event))).toBe(true);
 		expect(view.state.doc.eq(doc)).toBe(true);
 		view.destroy();
 	});
