@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.26.0 - 2026-10-23
+
 **Numbering or bulleting a selection inside a list of the other kind splits that list** (`Mod-Shift-7`, `Mod-Shift-8`, the toolbar buttons), as Google Docs and Notion do, where it retyped the whole list. The selected items become a list of the kind, joining one of that kind they touch, and the items after them count from 1.
 
 **A list copied out of desktop Word or Outlook pastes as a list**, nested by level, where each item landed as a paragraph reading `1.      Alpha`. `1.`, `a.`, `(1)` and `(a)` markers number their level, and Word's bullet glyphs bullet it.
