@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio's editor splits a list to number a selection, and pastes a Word list as a list.** The client compiles `@quillmark/svelte` 0.26.0 in: `Mod-Shift-7`/`Mod-Shift-8` and the toolbar buttons on a selection inside a list of the other kind split the selected items out, where they retyped the whole list, and a list copied out of desktop Word or Outlook pastes nested by level, where each item landed as a paragraph.
+
 ## v0.19.2 - 2026-10-23
 
 **Studio's editor writes lists as Google Docs and Notion do, and its preview zooms.** The client compiles `@quillmark/svelte` in, so its 0.25.0 is what an author here works in: list items spaced as paragraphs are; Enter, Tab and a typed marker acting on the line a writer means; `Mod-Shift-7`/`Mod-Shift-8` and two toolbar buttons numbering or bulleting a selection; two lists of a kind an edit leaves touching counting as one; text copied from inside a line pasting as text; Alt+↑/↓ moving an item; and several pasted lines joined in a one-line field, or a row each in an array of them. Tab and Shift-Tab stay in a body, and Escape leaves it. The preview draws every page at one zoom.
