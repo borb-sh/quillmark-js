@@ -112,7 +112,7 @@ describe('a block richtext cell on a record row', () => {
 		press(leaf, 'Enter');
 		expect(mounted.changes.at(-1)?.path).toBe('main.jobs');
 		const details = (doc.getStored('jobs') as Array<{ details: Content }>)[0].details;
-		expect(listItems(details)).toEqual(['Analyzed patterns', 'Building pipelines']);
+		expect(listItems(details)).toEqual(['', 'Analyzed patterns', 'Building pipelines']);
 	});
 });
 

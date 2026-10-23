@@ -29,7 +29,7 @@ import {
 } from 'prosemirror-state';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { rangeAnchor, type RangeAnchor } from './anchor.js';
-import { consuming, pickList, toCodeBlock, toHeading, wrapInQuote } from './blocks.js';
+import { consuming, pickList, pickSubList, toCodeBlock, toHeading, wrapInQuote } from './blocks.js';
 import { mintIslandId } from './islands.js';
 import { newTable } from './table.js';
 
@@ -391,8 +391,8 @@ const SLASH_COMMANDS: Record<string, Command> = {
 	heading: toHeading(1),
 	list: pickList(false),
 	'numbered-list': pickList(true),
-	// A memo letters a bullet as a subparagraph, and that is the word its writer reaches for.
-	subparagraph: pickList(false),
+	// A memo letters a bullet under an item as a subparagraph, the word its writer has.
+	subparagraph: pickSubList(),
 	quote: wrapInQuote(),
 	code: toCodeBlock(),
 	// The one command no shorthand reaches: a pipe row is not a prefix a rule can fire on.

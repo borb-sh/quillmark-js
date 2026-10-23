@@ -54,6 +54,7 @@ import { linePastePlugin } from './line-paste.js';
 import { listPastePlugin } from './list-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
 import { nestingPlugin } from './nesting.js';
+import { undoStepPlugin } from './undo.js';
 import { tablePastePlugin } from './table-paste.js';
 import { tableCopyPlugin } from './table-copy.js';
 import { taskPlugin } from './tasks.js';
@@ -736,7 +737,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 /**
  * The prose-leaf plugin stack (VISUAL_EDITOR §Surface): shared by
  * {@link createField} and the by-value editor (`ProseValue`), so the two
- * never fork the keymap/plugin ordering. History first, then any leaf-specific
+ * never fork the keymap/plugin ordering. History first, with the plugin that starts an
+ * undo step at each block-moving edit (`undo.ts`), then any leaf-specific
  * plugins (`afterHistory`: the addressed leaf passes its anchor-position plugin;
  * a by-value leaf passes none), then {@link linebreakPlugin}, which normalizes what
  * the rest of the stack leaves, then the markdown-shorthand input rules and the
@@ -776,6 +778,7 @@ export function proseLeafPlugins(
 ): Plugin[] {
 	const list: Plugin[] = [
 		history(),
+		undoStepPlugin(),
 		...(opts.cap ? [capPlugin(opts.cap)] : []),
 		...(opts.afterHistory ?? []),
 		linebreakPlugin(schema)
