@@ -146,6 +146,52 @@ describe('the toggle takes the marker off where every line already carries it', 
 	});
 });
 
+describe('a line under an item, its marker not its own', () => {
+	const UNDER = '1. Alpha\n\n   Line\n\n2. Bravo';
+
+	it('opens a sub-list of the kind under its item, the item keeping its marker', () => {
+		expectPress(
+			lines(UNDER, 1),
+			NUMBER,
+			'doc(ordered_list(list_item(paragraph("Alpha"), ordered_list(list_item(paragraph("Line")))), list_item(paragraph("Bravo"))))'
+		);
+		expectPress(
+			lines(UNDER, 1),
+			BULLET,
+			'doc(ordered_list(list_item(paragraph("Alpha"), bullet_list(list_item(paragraph("Line")))), list_item(paragraph("Bravo"))))'
+		);
+	});
+
+	it('the press after takes it back to a line under its item', () => {
+		const state = lines(UNDER, 1);
+		expect(press(press(state, NUMBER), NUMBER).doc.toString()).toBe(state.doc.toString());
+	});
+
+	it('joins a sub-list of the kind standing under it', () => {
+		expectPress(
+			lines('1. Alpha\n\n   Line\n\n   - Sub', 1),
+			BULLET,
+			'doc(ordered_list(list_item(paragraph("Alpha"), bullet_list(list_item(paragraph("Line")), list_item(paragraph("Sub"))))))'
+		);
+	});
+
+	it('goes with its item where the item’s first line is selected too', () => {
+		expectPress(
+			lines(UNDER, 0, 2),
+			NUMBER,
+			'doc(paragraph("Alpha"), paragraph("Line"), paragraph("Bravo"))'
+		);
+	});
+
+	it('beside a marked line, is the line the toggle numbers, and nothing comes off', () => {
+		expectPress(
+			lines(UNDER, 1, 2),
+			NUMBER,
+			'doc(ordered_list(list_item(paragraph("Alpha"), ordered_list(list_item(paragraph("Line")))), list_item(paragraph("Bravo"))))'
+		);
+	});
+});
+
 describe('the other kind', () => {
 	it('a sub-list of the other kind under a selected item is retyped with it', () => {
 		expectPress(
