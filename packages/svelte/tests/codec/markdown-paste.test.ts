@@ -97,6 +97,29 @@ describe('a block leaf reads markdown text', () => {
 		expect(core.exportMarkdown(pasted(text(markdown), ''))).toBe(core.exportMarkdown(md(markdown)));
 	});
 
+	// A list typed in an email or a memo draft, marked as markdown does not mark one.
+	it('lettered lines nest under the number above them', () => {
+		const rt = pasted(text('1. Alpha\n2. Bravo\n   a. sub'), '');
+		expect(core.exportMarkdown(rt)).toBe(core.exportMarkdown(md('1. Alpha\n2. Bravo\n   1. sub')));
+	});
+
+	it('a memo’s unindented outline nests by its markers: `1.`, `a.`, `(1)`, `(a)`', () => {
+		const rt = pasted(text('1. A\na. sub\n(1) deep\n(a) deeper\nb. sub2\n2. B'), '');
+		expect(rt.text).toBe('A\nsub\ndeep\ndeeper\nsub2\nB');
+		expect(rt.lines.map((line) => line.containers.length)).toEqual([1, 2, 3, 4, 2, 1]);
+	});
+
+	it('bullet characters are bullets', () => {
+		const rt = pasted(text('• first point\n•\tsecond'), '');
+		expect(core.exportMarkdown(rt)).toBe(core.exportMarkdown(md('- first point\n- second')));
+	});
+
+	it('a list counting from past its first marker keeps its count', () => {
+		const rt = pasted(text('Intro\n(3) three\n(4) four'), '');
+		expect(rt.text).toBe('Intro\nthree\nfour');
+		expect(rt.lines.map((line) => line.containers.length)).toEqual([0, 1, 1]);
+	});
+
 	it('a pipe table lands as an island, under an id the paste pass mints past the field’s', () => {
 		const rt = pasted(
 			text('| a | b |\n|---|---|\n| 1 | 2 |'),
@@ -116,7 +139,9 @@ describe('a block leaf reads markdown text', () => {
 		['a `#` with no space after it', '#1 priority\nfor the wing'],
 		['a decimal at a line head', 'Budget\n1.5 million'],
 		['a rule of dashes', 'Respectfully,\n---\nJ. Doe'],
-		['a `**` at a line head', '**Note** the date\nand the time']
+		['a `**` at a line head', '**Note** the date\nand the time'],
+		['a capital’s initial at a line head', 'Signed\nA. Smith'],
+		['an abbreviation at a line head', 'Bring the roster\ni.e. the one signed']
 	])('%s stays literal', (_, markdown) => {
 		expect(pasted(text(markdown)).text).toBe(`para\n${markdown}`);
 	});
@@ -181,12 +206,16 @@ main:
 	const load = (): Document => core.Document.fromMarkdown('~~~\n$quill: paste_probe@0.1.0\n~~~\n');
 	const LIST = '- Purpose\n- Action';
 
-	function pasteInto(field: string, opts: { inline?: boolean; plaintext?: boolean }) {
+	function pasteInto(
+		field: string,
+		opts: { inline?: boolean; plaintext?: boolean },
+		data: Clipboard = text(LIST)
+	) {
 		const doc = load();
 		const f = createField({ doc, quill: q, addr: { field }, container: mount(), ...opts });
 		const view: EditorView = viewOf(f);
 		view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)));
-		view.dom.dispatchEvent(pasteEvent(text(LIST)));
+		view.dom.dispatchEvent(pasteEvent(data));
 		f.destroy();
 		return q.reader(doc).getContent(field)!;
 	}
@@ -198,9 +227,9 @@ main:
 		expect(rt.lines.every((line) => line.containers.length === 1)).toBe(true);
 	});
 
-	it('an inline richtext field keeps the text', () => {
+	it('an inline richtext field keeps the text, its lines joined', () => {
 		const rt = pasteInto('summary', { inline: true });
-		expect(rt.text).toMatch(/^- Purpose/);
+		expect(rt.text).toBe('- Purpose - Action');
 		expect(listed(rt)).toBe(false);
 	});
 
@@ -210,10 +239,22 @@ main:
 		expect(listed(rt)).toBe(false);
 	});
 
-	it('a one-line text field keeps the text', () => {
+	it('a one-line text field keeps the text, its lines joined', () => {
 		const rt = pasteInto('line', { plaintext: true, inline: true });
-		expect(rt.text).toMatch(/^- Purpose/);
+		expect(rt.text).toBe('- Purpose - Action');
 		expect(listed(rt)).toBe(false);
+	});
+
+	it('a one-line field joins pasted paragraphs, keeping their marks', () => {
+		const rt = pasteInto(
+			'summary',
+			{ inline: true },
+			{
+				'text/html': '<p>Plans</p><p><b>Programs</b></p><p></p><p>Logistics</p>'
+			}
+		);
+		expect(rt.text).toBe('Plans Programs Logistics');
+		expect(rt.marks).toEqual([{ start: 6, end: 14, type: 'strong' }]);
 	});
 });
 

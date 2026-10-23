@@ -118,6 +118,25 @@ describe('an array of `text`', () => {
 		expect(doc.getStored('errata')).toEqual([seeded[0], '', ...seeded.slice(1)]);
 	});
 
+	it('takes a paste of several lines as a row per line', () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('errata', ['']);
+		const { target } = mountEditor(q, doc);
+
+		const event = new Event('paste', { bubbles: true, cancelable: true });
+		Object.defineProperty(event, 'clipboardData', {
+			value: {
+				getData: (type: string) => (type === 'text/plain' ? 'one\ntwo\n\nthree' : ''),
+				setData: () => {}
+			}
+		});
+		rows(target)[0].dispatchEvent(event);
+		flushSync();
+		expect(doc.getStored('errata')).toEqual(['one', 'two', 'three']);
+		expect(rows(target).map((r) => r.textContent)).toEqual(['one', 'two', 'three']);
+	});
+
 	// The landing is the row's, not the field's: a `text` element rides the same
 	// lowering a `richtext` one does, so the compile answers it cluster-exact and the
 	// element lane carries the offset down (VISUAL_EDITOR.md §Surface).
