@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.19.3 - 2026-10-23
+
 **Studio's editor splits a list to number a selection, and pastes a Word list as a list.** The client compiles `@quillmark/svelte` 0.26.0 in: `Mod-Shift-7`/`Mod-Shift-8` and the toolbar buttons on a selection inside a list of the other kind split the selected items out, where they retyped the whole list, and a list copied out of desktop Word or Outlook pastes nested by level, where each item landed as a paragraph.
 
 ## v0.19.2 - 2026-10-23
