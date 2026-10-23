@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.25.0 - 2026-10-23
+
 **`Mod-Shift-7` and `Mod-Shift-8` number or bullet every line of the selection, and the selection toolbar has a button for each** (#818). A run of paragraphs becomes one list, one item a line, a list of the other kind is retyped whole, and the new items join a list of their kind they touch. An unnumbered line under an item becomes the first item of a sub-list of the kind under it, the item keeping its number. Where every selected line already carries the kind, the markers come off instead: the items lift out to full-width paragraphs and the items after them count from 1, and in a sub-list they stay as unnumbered lines under the parent item. A fence is left where it stands. The new strings are `formatNumberedList` and `formatBulletedList`.
 
 **Two lists of one kind that an edit leaves touching are one list** (#816), so the items below count on where they restarted at 1. Taking the line between two lists by Backspace, Delete or a selection's delete joins them, and so does numbering the line above or below a list, by shorthand or `/` pick, whatever `N. ` is typed: `N` is where a list counts from only where it touches no list of its kind. Two lists that arrive touching from markdown stay two.
