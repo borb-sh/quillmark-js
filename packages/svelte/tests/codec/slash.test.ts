@@ -103,15 +103,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 	it('offers the turns a shorthand mints, and the table no shorthand reaches', () => {
 		const { field, view, state } = leaf('');
 		typeAt(field, view, 0, '/');
-		expect(state()?.items).toEqual([
-			'heading',
-			'list',
-			'numbered-list',
-			'subparagraph',
-			'quote',
-			'code',
-			'table'
-		]);
+		expect(state()?.items).toEqual(['heading', 'list', 'numbered-list', 'quote', 'code', 'table']);
 		field.destroy();
 	});
 
@@ -205,7 +197,7 @@ describe('a name is offered only where its command would run', () => {
 	it("offers the lists and the island past a block's head, the rest turning the block", () => {
 		const { field, view, state } = leaf('para');
 		typeAt(field, view, 4, ' /');
-		expect(state()?.items).toEqual(['list', 'numbered-list', 'subparagraph', 'table']);
+		expect(state()?.items).toEqual(['list', 'numbered-list', 'table']);
 		field.destroy();
 	});
 
@@ -338,21 +330,31 @@ describe('a list pick runs at any caret in the block', () => {
 	});
 });
 
-describe('`subparagraph` is a second name for `list`', () => {
-	it('completes on its own prefix, the word a memo writer has for a bullet', () => {
-		const { field, view, state } = leaf('');
+describe('`subparagraph` is the bullet pick under an item', () => {
+	it('is offered nowhere outside an item, where its bullet stands at the first level', () => {
+		for (const markdown of ['', 'alpha']) {
+			const { field, view, state } = leaf(markdown);
+			typeAt(field, view, markdown.length, '/sub');
+			expect(state()?.items ?? [], markdown).not.toContain('subparagraph');
+			field.destroy();
+		}
+	});
+
+	it("is not offered at a first item's head, where the bullet pick retypes the list", () => {
+		const { field, view, state } = leaf('1. alpha');
 		typeAt(field, view, 0, '/sub');
-		expect(state()?.items).toEqual(['subparagraph']);
+		expect(state()?.items ?? []).not.toContain('subparagraph');
 		field.destroy();
 	});
 
-	it('mints the bullet item `/list` does', () => {
-		const { field, view } = leaf('alpha');
-		typeAt(field, view, 0, '/subparagraph');
+	it("at the end of an item's line, opens a sub-list under it", () => {
+		const { field, view, state } = leaf('1. alpha');
+		typeAt(field, view, 5, ' /sub');
+		expect(state()?.items).toEqual(['subparagraph']);
 		press(view, 'Enter');
-		expect(field.getContent().lines[0].containers).toEqual([
-			{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }
-		]);
+		expect(view.state.doc.toString()).toBe(
+			'doc(ordered_list(list_item(paragraph("alpha "), bullet_list(list_item(paragraph)))))'
+		);
 		field.destroy();
 	});
 });
@@ -390,11 +392,15 @@ describe('the query filters, and a miss draws nothing', () => {
 		expect(state()?.items).toEqual([]);
 		// A surface only a keyboard can reach is worse than no surface: the run is live
 		// and undrawn, so it claims none of the keys it claims over offers.
-		for (const key of ['ArrowDown', 'ArrowUp', 'Escape']) {
+		for (const key of ['ArrowDown', 'ArrowUp']) {
 			expect(
 				view.someProp('handleKeyDown', (f) => f(view, new KeyboardEvent('keydown', { key })))
 			).toBeFalsy();
 		}
+		view.focus();
+		press(view, 'Escape');
+		expect(view.hasFocus()).toBe(false);
+		view.focus();
 		press(view, 'Enter');
 		// Enter split the paragraph rather than inserting: no offer, no pick.
 		expect(field.getContent().islands).toHaveLength(0);
@@ -652,12 +658,13 @@ describe('the menu does not disturb the body it sits in', () => {
 		field.destroy();
 	});
 
-	it('Escape with no menu open is not swallowed', () => {
-		const { view } = leaf('para');
-		const handled = view.someProp('handleKeyDown', (f) =>
-			f(view, new KeyboardEvent('keydown', { key: 'Escape' }))
-		);
-		expect(handled).toBeFalsy();
+	it('Escape with no menu open gives the focus up', () => {
+		const { field, view } = leaf('para');
+		view.focus();
+		press(view, 'Escape');
+		expect(view.hasFocus()).toBe(false);
+		expect(field.getContent().lines).toHaveLength(1);
+		field.destroy();
 	});
 
 	it("a leaf given no `onSlash` mounts no trigger, so the keys stay the body's", () => {

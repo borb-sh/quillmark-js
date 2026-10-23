@@ -158,14 +158,36 @@ export function wrapInQuote(): Command {
 /** `- ` / `1. `. Beside a list of its kind the line joins it, whatever `N` is typed: a
  *  number comes from position. Elsewhere `N. ` is the number the new list counts from,
  *  and at the head of an item the shorthand is the item's (§`listAtItem`), `N` reading
- *  the same way. */
+ *  the same way; a marker the item already shows is taken as typed and changes nothing. */
 export function wrapInList(ordered: boolean, attrs: Attrs | null = null): Command {
 	return (state, dispatch) => {
 		if (!atHead(state)) return false;
 		const { $from } = state.selection;
 		if (openingAnItem($from, state.schema.nodes.list_item))
-			return listAtItem(ordered, (attrs?.start as number | undefined) ?? null)(state, dispatch);
+			return listAtItem(
+				ordered,
+				(attrs?.start as number | undefined) ?? null,
+				true
+			)(state, dispatch);
 		return wrapBlock(state, dispatch, ordered, attrs);
+	};
+}
+
+/**
+ * `a. `, `(1) `, `(a) `: the markers a nested level draws, typed at the head of a nested
+ * item's first line, where the item already is the thing typed. Taken as typed and
+ * changing nothing, as `N. ` on an item of a numbered list is: the marker comes from the
+ * item's position and the quill's style for its depth, never from the text. Anywhere
+ * else these stay text, being no markdown list marker.
+ */
+export function takeNestedMarker(): Command {
+	return (state, dispatch) => {
+		const item = state.schema.nodes.list_item;
+		const { $from } = state.selection;
+		if (!atHead(state) || !openingAnItem($from, item) || $from.depth < 3) return false;
+		if ($from.node(-3).type !== item) return false;
+		dispatch?.(state.tr);
+		return true;
 	};
 }
 
@@ -177,23 +199,33 @@ export function wrapInList(ordered: boolean, attrs: Attrs | null = null): Comman
  * sub-list: the item sinks under the one above, as Tab sinks it, into a list of that
  * kind — `- ` in a new numbered paragraph is its first lettered subparagraph, never the
  * whole memo turned to bullets. A sub-list already standing there of that kind takes the
- * item as its next. A gesture that changes nothing declines, the shorthand staying text
- * and a pick going unoffered.
+ * item as its next.
+ *
+ * A gesture that changes nothing — the kind the item's list already is, and on a first
+ * item the number it already counts from — goes unoffered as a pick. As a shorthand
+ * (`take`) it is claimed and changes nothing, so the run is consumed: a writer typing
+ * `2. Second` into the second item meant the number the item already shows, and an item
+ * reading `2. 2. Second` is the one outcome no writer typed for. Backspace on the press
+ * after gives the text back.
  */
-function listAtItem(ordered: boolean, number: number | null): Command {
+function listAtItem(ordered: boolean, number: number | null, take = false): Command {
 	return (state, dispatch) => {
 		const { $from } = state.selection;
 		const type = state.schema.nodes[ordered ? 'ordered_list' : 'bullet_list'];
 		const item = state.schema.nodes.list_item;
 		if (!type || !item || $from.depth < 2) return false;
 		const list = $from.node(-2);
+		const unchanged = () => {
+			if (take) dispatch?.(state.tr);
+			return take;
+		};
 		if ($from.index(-2) === 0) {
 			const start = number ?? (list.type === type ? list.attrs.start : 1);
-			if (list.type === type && (!ordered || start === list.attrs.start)) return false;
+			if (list.type === type && (!ordered || start === list.attrs.start)) return unchanged();
 			dispatch?.(state.tr.setNodeMarkup($from.before(-2), type, ordered ? { start } : null));
 			return true;
 		}
-		if (list.type === type) return false;
+		if (list.type === type) return unchanged();
 		let sunk: Transaction | undefined;
 		if (!sinkListItem(item)(state, (tr) => (sunk = tr)) || !sunk) return false;
 		const tr = sunk;
@@ -233,6 +265,33 @@ export function pickList(ordered: boolean): Command {
 		const tr = state.tr.insert(at, paragraph.create());
 		if (!wrapAt(tr, at + 1, list, null)) return false;
 		dispatch?.(tr.setSelection(Selection.near(tr.doc.resolve(at + 1))));
+		return true;
+	};
+}
+
+/** How many items the caret stands in. */
+function itemDepth($pos: ResolvedPos, item: NodeType): number {
+	let n = 0;
+	for (let depth = $pos.depth; depth > 0; depth--) if ($pos.node(depth).type === item) n++;
+	return n;
+}
+
+/**
+ * The bullet pick where it puts a line under an item one level deeper than the caret
+ * stood, and nowhere else: the pick a subparagraph names. Outside every item the bullet
+ * it would mint stands at the first level, and on a list's first item the bullet pick
+ * retypes the list instead.
+ */
+export function pickSubList(): Command {
+	const pick = pickList(false);
+	return (state, dispatch) => {
+		const item = state.schema.nodes.list_item;
+		const depth = item ? itemDepth(state.selection.$from, item) : 0;
+		if (!depth) return false;
+		let picked: Transaction | undefined;
+		if (!pick(state, (tr) => (picked = tr)) || !picked) return false;
+		if (itemDepth(picked.selection.$from, item) <= depth) return false;
+		dispatch?.(picked);
 		return true;
 	};
 }
@@ -299,22 +358,24 @@ function atBodyStart($from: ResolvedPos): boolean {
  * Enter at the very start of a body whose first block takes no caret above it → an
  * empty paragraph there, the caret staying with the text it pushed down.
  *
- * A code block, a quote and a list are the blocks `prosemirror-gapcursor` declines
- * to sit beside, and nothing else mints a block above one: three keystrokes on an
- * empty body (` ``` `, `> `, `- `) put one first, and a document carrying one there
- * can never be given a title. The argument is `paragraphAboveList`'s, about the
- * block rather than about lists, so this link comes first and that one holds the
- * position it alone reaches, a list under an island or a rule.
+ * A code block and a quote are blocks `prosemirror-gapcursor` declines to sit beside,
+ * and nothing else mints a block above one: two keystrokes on an empty body (` ``` `,
+ * `> `) put one first, and a document carrying one there could never be given a title.
  *
  * Declines wherever the first block is a plain textblock, whose Enter-split already
- * leaves a paragraph above, and on an empty one, which the links after it answer.
+ * leaves a paragraph above, and on an empty one, which the links after it answer. An
+ * item's first line of prose declines too: Enter at its head is the list's new first
+ * item, as at every item, and the empty item's own Enter lifts it out to the paragraph a
+ * title takes. A fence opening that item is the fence case and takes the paragraph.
  */
 const paragraphAtBodyStart: Command = (state, dispatch) => {
-	const paragraph = state.schema.nodes.paragraph;
+	const { paragraph, list_item: item } = state.schema.nodes;
 	const { $from, empty } = state.selection;
 	if (!paragraph || !empty || !atBodyStart($from)) return false;
 	if ($from.parent.content.size === 0) return false;
 	if ($from.depth === 1 && $from.parent.isTextblock && !$from.parent.type.spec.code) return false;
+	if (item && $from.depth >= 2 && $from.node(-1).type === item && !$from.parent.type.spec.code)
+		return false;
 	dispatch?.(state.tr.insert(0, paragraph.create()).scrollIntoView());
 	return true;
 };

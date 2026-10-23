@@ -6,8 +6,9 @@
 // Precedence is inner surface first: the `code_block` link, then the list links, then
 // the block-atom link, which is about a neighbour rather than about the surface the
 // caret is in and so answers last. Each link declines outside its surface, so the
-// first link that claims the key gets it; and where none does, the key is not
-// swallowed at all and leaves the body a keyboard exit.
+// first link that claims the key gets it. Where none does, Tab and Shift-Tab are still
+// the body's: a writer presses Tab to indent, and a Tab that left would carry the next
+// keystrokes into whatever control took the focus. Escape is the way out instead.
 //
 // The block link is the exception to that order and comes ahead of them all: it is
 // about the body itself — the one position no surface owns, its very start — or about
@@ -48,6 +49,22 @@ function chainKeymaps(...maps: Record<string, Command>[]): Record<string, Comman
 	return out;
 }
 
+/** The last link of a document body: Tab and Shift-Tab held wherever no surface took
+ *  them, and Escape giving the focus up, so the browser's next Tab leaves from the body.
+ *  `{}` over `plainSchema`, a form field whose Tab is field navigation. */
+function exitKeymap(schema: Schema): Record<string, Command> {
+	if (!schema.nodes.list_item) return {};
+	return {
+		Tab: () => true,
+		'Shift-Tab': () => true,
+		Escape: (_state, _dispatch, view) => {
+			if (!view) return false;
+			(view.dom as HTMLElement).blur();
+			return true;
+		}
+	};
+}
+
 /** A multi-block leaf's structural keys, each link binding only what its schema
  * declares: over `plainSchema`, which holds neither lists nor code blocks nor islands,
  * the block link and the break link alone. The argument list is the precedence order
@@ -66,6 +83,7 @@ export function bodyKeymap(schema: Schema, slash?: boolean): Record<string, Comm
 		codeKeymap(schema),
 		breakKeymap(schema),
 		listKeymap(schema),
-		atomKeymap(schema)
+		atomKeymap(schema),
+		exitKeymap(schema)
 	);
 }
