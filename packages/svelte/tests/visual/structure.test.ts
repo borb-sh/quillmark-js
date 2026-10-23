@@ -587,7 +587,7 @@ describe('bodyEnabled', () => {
 // as the synthetic cases above assume. It asserts contracts, never the fixture's
 // inventory: a count, a group list or a field's copy pinned here fails on every
 // edit to the reference quill, and the failure is answered by pasting the new
-// value (CLAUDE.md §Verification).
+// value (TESTING.md §Assertions).
 describe('against the real showcase schema', () => {
 	const main = () => quill().schema.main;
 

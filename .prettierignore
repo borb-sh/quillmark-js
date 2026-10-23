@@ -9,11 +9,6 @@ package-lock.json
 fixtures/
 packages/quillkit/starter/
 
-# Claude Code tooling — agent config and skills copied from the sibling quillmark
-# checkout (hand-formatted prose). Never shipped, not package source, so it stays
-# out of the prettier gate like `prose/`.
-.claude/
-
 # Build output, in every package.
 **/dist/
 **/build/
