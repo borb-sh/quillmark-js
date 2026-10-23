@@ -12,7 +12,10 @@
  (`ProseValue`). This component never touches the content. The keymap mirror
  (Mod-b/i/u) lives in the codec's keymap (field.ts); this is the pointer
  affordance for all six marks. Mod-K is this surface's own key, the prompt it raises
- being this surface's: a document `keydown` the leaf's keymap left unclaimed.
+ being this surface's: a document `keydown` the leaf's keymap left unclaimed. Over a
+ leaf that holds lists, two more buttons number or bullet every selected line, or take
+ the marker off where every one carries it: the codec's `toggleList`, whose keys
+ (Mod-Shift-7/8) the leaf's keymap binds.
 
  Selection observation. The view's `dispatchTransaction` is the leaf's
  (read-only), so there is no hook to observe transactions from outside.
@@ -72,7 +75,7 @@
 	import { Popover } from 'bits-ui';
 	import Icon from './icons/Icon.svelte';
 	import type { IconName } from './icons/nodes.js';
-	import { hasMarks, rangeAnchor, type RangeAnchor } from '../core/codec/index.js';
+	import { hasMarks, rangeAnchor, toggleList, type RangeAnchor } from '../core/codec/index.js';
 	import type { ActiveProse } from './leaves.js';
 	import { clearLink, hrefInSelection, normalizeHref, setLink } from './links.js';
 	import { spacePx } from '../core/rungs.js';
@@ -96,7 +99,15 @@
 		{ name: 'link', icon: 'link', title: t.strings.formatLink }
 	]);
 
+	const LISTS: { ordered: boolean; icon: IconName; title: string }[] = $derived([
+		{ ordered: true, icon: 'list-ordered', title: t.strings.formatNumberedList },
+		{ ordered: false, icon: 'list', title: t.strings.formatBulletedList }
+	]);
+
 	let open = $state(false);
+	/** Whether the leaf under the selection holds lists: a body does, a one-line field
+	 *  and a table cell do not. */
+	let listable = $state(false);
 	/** A pointer is down outside this surface: the selection is still being made. */
 	let pressed = false;
 	let linkPromptOpen = $state(false);
@@ -161,6 +172,7 @@
 			return;
 		}
 		portalTarget = view.dom.closest<HTMLElement>('[data-qm-root]') ?? undefined;
+		listable = !!view.state.schema.nodes.list_item;
 		const { from, to } = view.state.selection;
 		anchor = rangeAnchor(view, from, to);
 		open = true;
@@ -264,6 +276,14 @@
 			return;
 		}
 		toggleMark(type)(view.state, view.dispatch);
+		view.focus();
+		sync();
+	}
+
+	function toggleLines(ordered: boolean): void {
+		const view = activeLeafView();
+		if (!view) return;
+		toggleList(ordered)(view.state, view.dispatch);
 		view.focus();
 		sync();
 	}
@@ -421,6 +441,19 @@
 										onclick={() => toggle(m.name)}><Icon name={m.icon} /></button
 									>
 								{/each}
+								{#if listable}
+									<span class="qm-format-divider" aria-hidden="true"></span>
+									{#each LISTS as l (l.icon)}
+										<button
+											type="button"
+											class="qm-icon-btn qm-mark-btn qm-focus-ring"
+											title={l.title}
+											aria-label={l.title}
+											onmousedown={keepFocus}
+											onclick={() => toggleLines(l.ordered)}><Icon name={l.icon} /></button
+										>
+									{/each}
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -452,6 +485,12 @@
 
 	 No state for a mark the selection already carries: a run may carry one over part of
 	 itself, which a two-state button has no third face for. */
+	.qm-format-divider {
+		align-self: stretch;
+		width: 1px;
+		margin: var(--_qm-space-half) 0;
+		background: var(--_qm-rule);
+	}
 	.qm-mark-btn {
 		padding: var(--_qm-space) var(--_qm-space-2);
 		color: var(--_qm-ink);

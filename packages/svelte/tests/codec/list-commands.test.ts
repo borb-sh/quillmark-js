@@ -245,17 +245,20 @@ describe('Backspace takes an item’s marker off', () => {
 		expect(one.doc.child(0).attrs.start).toBe(1);
 		expect(one.selection.$from.parent.textContent).toBe('b');
 		expect(one.selection.$from.parentOffset).toBe(0);
-		// The press after takes the line out to full width, and the one after that joins it.
+		// The press after takes the line out to full width, and the one after that joins it,
+		// the list it split off joining back as it goes.
 		const two = expectPress(
 			one,
 			'Backspace',
 			'doc(ordered_list(list_item(paragraph("a"))), paragraph("b"), ordered_list(list_item(paragraph("c"))))'
 		);
-		expectPress(
+		const three = expectPress(
 			two,
 			'Backspace',
-			'doc(ordered_list(list_item(paragraph("ab"))), ordered_list(list_item(paragraph("c"))))'
+			'doc(ordered_list(list_item(paragraph("ab")), list_item(paragraph("c"))))'
 		);
+		expect(three.selection.$from.parent.textContent).toBe('ab');
+		expect(three.selection.$from.parentOffset).toBe(1);
 	});
 
 	it('an item’s other blocks come with it, its nested list among them', () => {

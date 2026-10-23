@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**`Mod-Shift-7` and `Mod-Shift-8` number or bullet every line of the selection, and the selection toolbar has a button for each** (#818). A run of paragraphs becomes one list, one item a line, a list of the other kind is retyped whole, and the new items join a list of their kind they touch. Where every selected line already carries the kind, the markers come off instead: the items lift out to full-width paragraphs and the items after them count from 1, and in a sub-list they stay as unnumbered lines under the parent item. A fence is left where it stands. The new strings are `formatNumberedList` and `formatBulletedList`.
+
+**Two lists of one kind that an edit leaves touching are one list** (#816), so the items below count on where they restarted at 1. Taking the line between two lists by Backspace, Delete or a selection's delete joins them, and so does numbering the line above or below a list, by shorthand or `/` pick, whatever `N. ` is typed: `N` is where a list counts from only where it touches no list of its kind. Two lists that arrive touching from markdown stay two.
+
 **A date cleared segment by segment writes its blank as the last segment empties**, so the preview follows the clear at once, where it wrote nothing until the caret left the field. A segment emptied while others stand still holds until the caret leaves.
 
 **An item's number is its position, and no keystroke writes one.** Backspace at the head of a later item takes its marker off and keeps its text as an unnumbered line under the item above, where it lifted the item out and split the list, stamping a `start` on the items after it; a nested first item's text joins the item it is nested in. The items below close up, so Enter then Backspace in the middle of a list is the list it was, where it left `1, 3, 4`. An empty item is spent, the caret at the end of what stands above it. Backspace on a top-level first item still lifts it out, and the next item counts from the list's `start`, where it kept its old number.

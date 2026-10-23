@@ -14,7 +14,8 @@
 //
 // Cleanup is command-local, never a global pass: a command joins the boundary it opens
 // and `sinkListItem` reuses the previous item's nested list, so no mutation strands a
-// node. A whole-doc normalizer would instead fuse adjacent same-type lists, and that
+// node, and two lists of a kind a command leaves touching it joins (`touching.ts`). A
+// whole-doc normalizer would instead fuse every adjacent same-type pair, and that
 // boundary is load-bearing: `Container.instance` is how `Content` marks one, the
 // upstream normalizer keeps it (`tests/codec/list-shapes.test.ts`), and fusing
 // renumbers an imported `1, 2, 1` in a region no edit touched. Reads preserve it; only
@@ -27,7 +28,9 @@ import type { Command, Transaction } from 'prosemirror-state';
 import { canJoin, liftTarget } from 'prosemirror-transform';
 import { chainCommands, joinTextblockBackward, joinTextblockForward } from 'prosemirror-commands';
 import { withinNesting } from './nesting.js';
+import { toggleList } from './list-toggle.js';
 import { splitTaskItem } from './tasks.js';
+import { joinAll, joinLists, touching } from './touching.js';
 
 /** The caret's enclosing `list_item` when it sits at the very start of that item's
  * first block: the position both structural keys branch on. `null` otherwise
@@ -280,6 +283,9 @@ function markerOn(itemType: NodeType): Command {
  * line on, and the join would retype one side's whole text as the other's (`code.ts`,
  * which refuses the same join between siblings). The block moves into the list's last
  * item whole instead, a block of that item under its first.
+ *
+ * Either way the block was what stood between the list and the one below it, and two
+ * lists of a kind it leaves touching join (`touching.ts`).
  */
 function joinOntoList(itemType: NodeType): Command {
 	return (state, dispatch, view) => {
@@ -289,15 +295,54 @@ function joinOntoList(itemType: NodeType): Command {
 		if (before?.firstChild?.type !== itemType) return false;
 		const into = lastBlockIn(before);
 		if (!into) return false;
+		const listPos = $from.before() - before.nodeSize;
+		const joinBelow = (tr: Transaction): Transaction => {
+			joinLists(tr, listPos + tr.doc.nodeAt(listPos)!.nodeSize);
+			return tr;
+		};
 		if (!!into.type.spec.code === !!$from.parent.type.spec.code)
-			return joinTextblockBackward(state, dispatch, view);
+			return joinTextblockBackward(state, dispatch && ((tr) => dispatch(joinBelow(tr))), view);
 		if (dispatch) {
 			const at = $from.before() - 2;
 			const tr = state.tr.delete($from.before(), $from.after()).insert(at, $from.parent);
-			dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 1)).scrollIntoView());
+			tr.setSelection(TextSelection.create(tr.doc, at + 1));
+			dispatch(joinBelow(tr).scrollIntoView());
 		}
 		return true;
 	};
+}
+
+/**
+ * Backspace or Delete over a selection that spans blocks → the base keymap's delete, and
+ * the two lists of a kind it leaves touching joined: a selection taking the paragraph
+ * between two lists takes the restart with it. A seam that touched before the delete
+ * is one no edit opened, and stays. Declines wherever the delete opens no seam, the base
+ * keymap's answer standing.
+ */
+const deleteAcross: Command = (state, dispatch) => {
+	const { $from, $to, empty } = state.selection;
+	if (empty || $from.sameParent($to)) return false;
+	const tr = state.tr.deleteSelection();
+	const kept = new Set<number>();
+	for (const $end of [$from, $to])
+		for (const seam of seamsAround($end))
+			if (touching(state.doc, seam)) kept.add(tr.mapping.map(seam));
+	const opened = seamsAround(tr.doc.resolve(tr.mapping.map($from.pos))).filter(
+		(seam) => !kept.has(seam) && touching(tr.doc, seam)
+	);
+	if (!opened.length) return false;
+	joinAll(tr, opened);
+	dispatch?.(tr.scrollIntoView());
+	return true;
+};
+
+/** The boundaries of every node around `$pos`, and `$pos` itself: where a delete ending
+ *  there can leave two blocks meeting. */
+function seamsAround($pos: ResolvedPos): number[] {
+	const seams = [$pos.pos];
+	for (let depth = $pos.depth; depth > 0; depth--)
+		seams.push($pos.before(depth), $pos.after(depth));
+	return seams;
 }
 
 /** Whether the caret sits inside a `list_item` at any depth: a quote's paragraph
@@ -411,6 +456,9 @@ function sinkWithin(itemType: NodeType): Command {
  * default meaning, which is the body's only keyboard exit and the open seam for a
  * shell structural keymap (VISUAL_EDITOR §Settled and open).
  *
+ * `Mod-Shift-7` / `Mod-Shift-8` are the list toggle (`list-toggle.ts`), numbering or
+ * bulleting the selection's lines or taking their markers off.
+ *
  * `Enter` is a chain in precedence order: the escape-above gesture, the marker off an
  * empty middle item and back on an empty continuation line, then `splitListItem`
  * (`splitTaskItem`, which leaves a task item's new half an open task), then
@@ -419,7 +467,8 @@ function sinkWithin(itemType: NodeType): Command {
  * nested one, so Enter lifts exactly one level) or bails so the last link lifts a
  * top-level one out to a paragraph. `Backspace` takes an item's marker off at its
  * start, a top-level continuation line out to full width, and joins a block onto the
- * list it stands after. `Delete` is the marker off at the seam below with the two lines
+ * list it stands after, and both keys over a selection spanning blocks join the lists
+ * the delete leaves touching. `Delete` is the marker off at the seam below with the two lines
  * joined, never the line out: a forward delete edits the line after the caret, not its
  * indent. An empty line is neither key's here:
  * the block link takes it ahead of this chain (`blocks.ts`), the caret's own line
@@ -431,6 +480,8 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 	if (!itemType || !paragraph) return {};
 	const backspace = chainCommands(markerOff(itemType), joinOntoList(itemType));
 	return {
+		'Mod-Shift-7': toggleList(true),
+		'Mod-Shift-8': toggleList(false),
 		Tab: sinkWithin(itemType),
 		'Shift-Tab': outdent(itemType),
 		Enter: chainCommands(
@@ -440,7 +491,12 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 			splitTaskItem(itemType),
 			liftListItem(itemType)
 		),
-		Backspace: chainCommands(markerOff(itemType), lineOut(itemType), joinOntoList(itemType)),
-		Delete: deleteBelow(itemType, backspace)
+		Backspace: chainCommands(
+			deleteAcross,
+			markerOff(itemType),
+			lineOut(itemType),
+			joinOntoList(itemType)
+		),
+		Delete: chainCommands(deleteAcross, deleteBelow(itemType, backspace))
 	};
 }

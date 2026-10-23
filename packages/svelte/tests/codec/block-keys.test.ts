@@ -153,11 +153,20 @@ describe('Enter over a selection spanning two textblocks', () => {
 });
 
 describe('Delete on an empty line takes the line', () => {
-	it('the line between two lists goes, and both lists stand', () => {
+	it('the line between two lists goes, and the two are one list', () => {
 		expectPress(
 			atBlock(docOf(ul(li(p('a'))), p(), ul(li(p('b')))), 1),
 			'Delete',
-			'doc(bullet_list(list_item(paragraph("a"))), bullet_list(list_item(paragraph("b"))))'
+			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("b"))))'
+		);
+	});
+
+	it('the line between lists of two kinds goes, and both lists stand', () => {
+		const ol = (...items: PMNode[]) => n.ordered_list.create(null, items);
+		expectPress(
+			atBlock(docOf(ul(li(p('a'))), p(), ol(li(p('b')))), 1),
+			'Delete',
+			'doc(bullet_list(list_item(paragraph("a"))), ordered_list(list_item(paragraph("b"))))'
 		);
 	});
 
