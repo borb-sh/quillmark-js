@@ -89,6 +89,50 @@ describe('the preview zoom', () => {
 		expect(widths()[1]).toBeGreaterThan(fit[1]);
 	});
 
+	describe('under two fingers', () => {
+		let top = 0;
+		beforeEach(() => {
+			top = 0;
+			Object.defineProperty(container, 'scrollTop', {
+				get: () => top,
+				set: (v: number) => (top = Math.round(v)),
+				configurable: true
+			});
+			// Each page laid out down the pane at its drawn width, moved by the scroll.
+			container.querySelectorAll<HTMLElement>('.qm-page-slot').forEach((el, i) => {
+				el.getBoundingClientRect = () => {
+					const width = parseFloat(el.style.width);
+					return new DOMRect(0, i * 1000 - top, width, width * 1.3);
+				};
+			});
+		});
+		const touch = (type: string, ...at: Array<[number, number]>): Event => {
+			const e = new Event(type, { cancelable: true });
+			const target = container.querySelector('.qm-page-slot');
+			const touches = at.map(([clientX, clientY]) => ({ clientX, clientY, target }));
+			Object.defineProperty(e, 'touches', { value: touches });
+			container.dispatchEvent(e);
+			return e;
+		};
+
+		it('pans with a drag that does not spread, a step under a pixel at a time', () => {
+			touch('touchstart', [100, 300], [200, 300]);
+			for (let y = 299.6; y >= 260; y -= 0.4) {
+				expect(touch('touchmove', [100, y], [200, y]).defaultPrevented).toBe(true);
+			}
+			expect(top).toBe(40);
+			expect(pill()).toBeNull();
+		});
+
+		it('zooms once the fingers part', () => {
+			const fit = widths();
+			touch('touchstart', [100, 300], [200, 300]);
+			touch('touchmove', [80, 300], [220, 300]);
+			touch('touchmove', [60, 300], [240, 300]);
+			expect(widths()[1]).toBeGreaterThan(fit[1]);
+		});
+	});
+
 	it('leaves the zoom keys to the browser over a pane without the focus', () => {
 		container.dispatchEvent(new PointerEvent('pointermove', { clientX: 10, clientY: 10 }));
 		zoomKey('=');
