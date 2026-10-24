@@ -215,10 +215,10 @@ export function createViewport(
 
 	// A two-finger pinch on a touch screen. The browser's own page zoom is held off by the
 	// desk's `touch-action`, and cancelling the move stops the pan a second finger would
-	// otherwise start: the pinch pans itself, holding the point it began
-	// under, as a fraction of its page, under the fingers' midpoint. Placed afresh on each
-	// move rather than stepped, since the scroll offsets round. The spread zooms only once
-	// it has moved past `PINCH_SLOP`, so a two-finger drag pans and leaves the fit alone.
+	// otherwise start: the pinch pans itself, holding the point it began under, as a
+	// fraction of its page, under the fingers' midpoint. Placed afresh on each move rather
+	// than stepped, since the scroll offsets round. The spread zooms only once it has
+	// moved past `PINCH_SLOP`, so a two-finger drag pans and leaves the fit alone.
 	interface Pinch {
 		spread: number;
 		raw: number;
