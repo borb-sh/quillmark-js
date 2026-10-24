@@ -89,22 +89,12 @@ describe('the preview zoom', () => {
 		expect(widths()[1]).toBeGreaterThan(fit[1]);
 	});
 
-	it('lets one pane claim a key when two could take it', () => {
-		const other = document.createElement('div');
-		Object.defineProperty(other, 'clientWidth', { value: 480, configurable: true });
-		Object.defineProperty(other, 'clientHeight', { value: 720, configurable: true });
-		document.body.appendChild(other);
-		const second = createPreview(mixed(), { container: other });
-		onTestFinished(() => {
-			second.destroy();
-			other.remove();
-		});
-		container.focus();
-		other.dispatchEvent(new PointerEvent('pointermove', { clientX: 10, clientY: 10 }));
-
-		zoomKey('=');
-		const zoomed = [container, other].filter((el) => el.querySelector('.qm-preview-zoom'));
-		expect(zoomed).toHaveLength(1);
+	it('leaves the zoom keys to the browser over a pane without the focus', () => {
+		container.dispatchEvent(new PointerEvent('pointermove', { clientX: 10, clientY: 10 }));
+		const key = new KeyboardEvent('keydown', { key: '=', ctrlKey: true, cancelable: true });
+		window.dispatchEvent(key);
+		expect(key.defaultPrevented).toBe(false);
+		expect(pill()).toBeNull();
 	});
 
 	it('holds a zoom set while hidden for the box it comes back to', () => {
