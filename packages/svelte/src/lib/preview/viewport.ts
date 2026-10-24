@@ -212,22 +212,30 @@ export function createViewport(
 
 	// A two-finger pinch on a touch screen. The browser's own page zoom is held off by the
 	// desk's `touch-action` and by cancelling the move, which also stops the pan a second
-	// finger would otherwise start.
-	let pinch: { spread: number; raw: number } | undefined;
+	// finger would otherwise start: the pinch pans itself, so the pages follow the
+	// fingers' midpoint as well as their spread.
+	let pinch: { spread: number; raw: number; mid: { x: number; y: number } } | undefined;
 	const spread = (t: TouchList): number =>
 		Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+	const midpoint = (t: TouchList): { x: number; y: number } => ({
+		x: (t[0].clientX + t[1].clientX) / 2,
+		y: (t[0].clientY + t[1].clientY) / 2
+	});
 	function onTouchStart(e: TouchEvent): void {
 		if (e.touches.length !== 2) return;
 		const b = bounds();
-		if (b) pinch = { spread: spread(e.touches), raw: from(b).raw };
+		if (b) pinch = { spread: spread(e.touches), raw: from(b).raw, mid: midpoint(e.touches) };
 	}
 	function onTouchMove(e: TouchEvent): void {
 		if (!pinch || e.touches.length !== 2) return;
 		e.preventDefault();
-		const [a, b] = [e.touches[0], e.touches[1]];
+		const mid = midpoint(e.touches);
+		container.scrollLeft += pinch.mid.x - mid.x;
+		container.scrollTop += pinch.mid.y - mid.y;
+		pinch.mid = mid;
 		const ratio = spread(e.touches) / pinch.spread;
 		const start = pinch.raw;
-		glideTo(() => start * ratio, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+		glideTo(() => start * ratio, mid.x, mid.y);
 	}
 	function onTouchEnd(e: TouchEvent): void {
 		if (e.touches.length < 2) pinch = undefined;

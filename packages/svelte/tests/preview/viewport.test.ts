@@ -89,6 +89,29 @@ describe('the preview zoom', () => {
 		expect(widths()[1]).toBeGreaterThan(fit[1]);
 	});
 
+	it('pans with a two-finger drag that does not spread', () => {
+		let top = 0;
+		Object.defineProperty(container, 'scrollTop', {
+			get: () => top,
+			set: (v: number) => (top = v),
+			configurable: true
+		});
+		const touch = (type: string, y: number): Event => {
+			const e = new Event(type, { cancelable: true });
+			const touches = [
+				{ clientX: 100, clientY: y },
+				{ clientX: 200, clientY: y }
+			];
+			Object.defineProperty(e, 'touches', { value: touches });
+			container.dispatchEvent(e);
+			return e;
+		};
+		touch('touchstart', 300);
+		const move = touch('touchmove', 260);
+		expect(move.defaultPrevented).toBe(true);
+		expect(top).toBe(40);
+	});
+
 	it('lets one pane claim a key when two could take it', () => {
 		const other = document.createElement('div');
 		Object.defineProperty(other, 'clientWidth', { value: 480, configurable: true });
