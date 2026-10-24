@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A host that drops its `doc` and `quill` together unmounts the editor cleanly**, where a document with a subform prose cell (an `object` field's `text` or `richtext` property) threw `Cannot read properties of null (reading 'schema')` from the cell's teardown and left the host's page half-rendered.
+
 ## v0.26.1 - 2026-10-24
 
 **A two-finger touch gesture on the preview pans as well as zooms**, the pages following the fingers' midpoint, where a pinch held the point between the fingers still and a two-finger drag moved nothing.
