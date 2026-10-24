@@ -15,6 +15,7 @@
 	import type { LeafRegistry } from './leaves.js';
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
+	import { fontRegistry } from './fonts.js';
 	import './controls.css';
 	import type { Document, Quill, Addr, Content, Diagnostic } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
@@ -101,6 +102,7 @@
 	// Handed to the codec as a getter: the island chrome redraws on each render, so a
 	// locale swap reaches a mounted table without remounting the leaf and losing the caret.
 	const t = wording();
+	const registry = fontRegistry();
 
 	/** Pushed by the leaf's trigger plugin: the menu is the leaf's surface rather than
 	 * the shell's (VISUAL_EDITOR §Chrome). A constrained leaf never receives one, the
@@ -138,6 +140,7 @@
 				cap,
 				tableStrings: () => t.strings,
 				slashStrings: () => t.strings,
+				fontFamilies: () => registry.families,
 				onSlash: (next) => {
 					slash = next;
 				},

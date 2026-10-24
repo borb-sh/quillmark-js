@@ -3,7 +3,7 @@
 // `VisualEditorInner` (the editor, which mounts once per key). A component cannot
 // export a type without a module script, and a type imported across the two would
 // make the pair circular, so the shape lives beside them instead.
-import type { Document, Quill, Addr, Diagnostic } from '@quillmark/wasm';
+import type { Document, Quill, Addr, Diagnostic, FontFace } from '@quillmark/wasm';
 import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
@@ -19,6 +19,14 @@ export interface VisualEditorProps {
 	 * `.toTree()`. The editor frees nothing it is passed.
 	 */
 	quill: Quill;
+	/**
+	 * The font registry: the faces a render of `quill` sets type in,
+	 * `engine.fontFaces(quill)`. The formatting popover offers their families, a run set
+	 * in one draws in its face, and a paste keeps a family they hold. Absent, the popover
+	 * offers sizes alone, and a run a document already sets in a family draws in the
+	 * surface's own face.
+	 */
+	fonts?: readonly FontFace[];
 	/**
 	 * The active leaf: its canonical `DocPath` and the session key of the card holding
 	 * it, which is what a host tracking the active card keeps across a reorder

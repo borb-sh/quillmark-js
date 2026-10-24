@@ -129,10 +129,16 @@ async function land(editor: InnerRef, path: string): Promise<HTMLElement> {
 
 /** Select `[from, to)` of the leaf's first line as a pointer does: a press, the DOM
  *  range and the `selectionchange` both the view and the popover read it through, and the
- *  release. `pointer: false` is the keyboard's selection, the range with no press. */
-function select(leaf: HTMLElement, from: number, to: number, pointer = true): void {
+ *  release. `pointer: false` is the keyboard's selection, the range with no press. `text`
+ *  is the node the offsets count in, the line's first by default. */
+function select(
+	leaf: HTMLElement,
+	from: number,
+	to: number,
+	pointer = true,
+	text: Node = leaf.querySelector('p')!.firstChild!
+): void {
 	if (pointer) leaf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-	const text = leaf.querySelector('p')!.firstChild!;
 	const range = document.createRange();
 	range.setStart(text, from);
 	range.setEnd(text, to);
@@ -166,6 +172,9 @@ const SIX = [
 	DEFAULT_VISUAL_STRINGS.formatCode,
 	DEFAULT_VISUAL_STRINGS.formatLink
 ];
+/** The font menus' triggers, last: the family's only over a registry. */
+const SIZE = [DEFAULT_VISUAL_STRINGS.formatSize];
+const FONT = [DEFAULT_VISUAL_STRINGS.formatFont, DEFAULT_VISUAL_STRINGS.formatSize];
 
 /** Commit the number beside the leaves: a revision, and so a re-derive. */
 function rederive(m: Mounted<InnerRef>): void {
@@ -214,7 +223,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 
 		const popover = await surface();
 		expect(popover).not.toBeNull();
-		expect(labels(popover!)).toEqual(SIX);
+		expect(labels(popover!)).toEqual([...SIX, ...SIZE]);
 		popover!
 			.querySelector<HTMLButtonElement>(`[aria-label="${DEFAULT_VISUAL_STRINGS.formatBold}"]`)!
 			.click();
@@ -325,8 +334,25 @@ describe('the formatting popover over a field’s own leaf', () => {
 
 		expect(editor.getActiveLeaf()?.views.view.dom).toBe(intro);
 		const popover = await surface();
-		expect(labels(popover!)).toEqual([...SIX, ...LISTS]);
+		expect(labels(popover!)).toEqual([...SIX, ...LISTS, ...SIZE]);
 		expect(labels(popover!)).not.toContain(DEFAULT_VISUAL_STRINGS.formatAnchor);
+	});
+
+	it('draws the family menu over a registry, each menu showing what the selection is in', async () => {
+		const q = probe();
+		const doc = load();
+		q.writer(doc).set('intro', '<qm-font family="Carlito">Intro</qm-font> words');
+		const fonts = [
+			{ family: 'Carlito', weight: 400, style: 'normal' as const, index: 0, data: new Uint8Array() }
+		];
+		const { editor } = mountInner(q, doc, { fonts });
+		const intro = await land(editor, 'main.intro');
+		select(intro, 0, 3, true, intro.querySelector('[data-qm-font-family]')!.firstChild!);
+
+		const popover = await surface();
+		expect(labels(popover!)).toEqual([...SIX, ...LISTS, ...FONT]);
+		const shown = [...popover!.querySelectorAll('.qm-format-menu-shown')].map((s) => s.textContent);
+		expect(shown).toEqual(['Carlito', DEFAULT_VISUAL_STRINGS.formatSizeNormal]);
 	});
 
 	it('numbers the selected line, and the list lands in the store', async () => {
