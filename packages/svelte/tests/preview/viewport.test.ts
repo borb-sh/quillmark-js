@@ -2,7 +2,7 @@
 // One scale for every page, and the pill standing exactly while the zoom is not the
 // default. jsdom lays out nothing, so the pane's box is stubbed and the scale is read
 // back off the slots' widths.
-import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { createPreview, type PreviewController } from '$lib/preview/controller';
 import type { LiveSession } from '@quillmark/wasm';
 import { FakeIO, mockSession, stubPaintGlobals } from '../helpers/session.js';
@@ -91,9 +91,7 @@ describe('the preview zoom', () => {
 
 	it('leaves the zoom keys to the browser over a pane without the focus', () => {
 		container.dispatchEvent(new PointerEvent('pointermove', { clientX: 10, clientY: 10 }));
-		const key = new KeyboardEvent('keydown', { key: '=', ctrlKey: true, cancelable: true });
-		window.dispatchEvent(key);
-		expect(key.defaultPrevented).toBe(false);
+		zoomKey('=');
 		expect(pill()).toBeNull();
 	});
 
