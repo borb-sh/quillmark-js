@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.26.1 - 2026-10-24
+
 **A two-finger touch gesture on the preview pans as well as zooms**, the pages following the fingers' midpoint, where a pinch held the point between the fingers still and a two-finger drag moved nothing.
 
 **`Mod +`/`−`/`0` zoom the preview only while it holds the focus**, where they also zoomed it with the pointer merely over it and took the browser's own zoom keys from a writer typing in the editor.
