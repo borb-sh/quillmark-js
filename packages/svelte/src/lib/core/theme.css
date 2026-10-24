@@ -391,6 +391,15 @@
 	   a rung of hierarchy, and clear of the title rung, which one 9/8 step lands on
 	   exactly. */
 	--_qm-text-paper: calc(var(--_qm-text-body) * 16 / 15);
+	/* A font run's size steps (`codec/fonts.ts`): the helper's `qm.font-steps` defaults,
+	   in `em` of the text around the run as the render sets them, and the factor back
+	   out of each for what a run holds at the size around it. Off the ramp, being the
+	   document's steps rather than the chrome's; a plate setting its own prints at
+	   those, and the leaf draws these. */
+	--_qm-text-step-small: 0.85em;
+	--_qm-text-step-large: 1.2em;
+	--_qm-text-unstep-small: calc(1em / 0.85);
+	--_qm-text-unstep-large: calc(1em / 1.2);
 	/* Two weights over the regular, and only one of them is chrome. `mid` names
 	   everything the surface names — a card title, a section header, a field
 	   label, a nested property — so a stack of them reads as one register and

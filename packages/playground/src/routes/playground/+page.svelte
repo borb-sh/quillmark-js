@@ -71,6 +71,7 @@
 		LiveSession,
 		ChangeSet,
 		Diagnostic,
+		FontFace,
 		OutputFormat
 	} from '@quillmark/wasm';
 	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
@@ -96,6 +97,9 @@
 	let docHandle: Document | undefined = $state();
 	// Held so the recovery loop can try the open again; the surfaces never read it.
 	let engineHandle: Engine | undefined;
+	// The faces a render of the quill sets type in: the editor's font registry, read once
+	// the backend has loaded.
+	let fonts = $state<FontFace[]>([]);
 	// What the engine refused the document with, and why there is no session to paint from.
 	let refused = $state<string | undefined>();
 
@@ -208,6 +212,8 @@
 		let opened: LiveSession;
 		try {
 			await engine.load(quill);
+			if (mine !== generation) return;
+			fonts = await engine.fontFaces(quill);
 			if (mine !== generation) return;
 			missed = false;
 			opened = await engine.open(quill, doc);
@@ -408,6 +414,7 @@
 			// build; the session follows behind it.
 			VisualEditor = visual.VisualEditor;
 			formats = emits;
+			fonts = [];
 			engineHandle = engine;
 			quillHandle = quill;
 			docHandle = doc;
@@ -606,6 +613,7 @@
 						bind:this={editorRef}
 						doc={docHandle}
 						quill={quillHandle}
+						{fonts}
 						onActiveLeafChange={handleActiveLeaf}
 						onCaretMove={handleCaretMove}
 						onChange={handleChange}

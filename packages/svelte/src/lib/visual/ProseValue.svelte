@@ -70,6 +70,7 @@
 	} from '../core/codec/index.js';
 	import { valueLeafSeat } from './leaves.js';
 	import { wording } from './strings.js';
+	import { fontRegistry } from './fonts.js';
 	import './controls.css';
 	import type { Content } from '@quillmark/wasm';
 
@@ -134,6 +135,7 @@
 	}: Props = $props();
 
 	const t = wording();
+	const registry = fontRegistry();
 	const seat = valueLeafSeat();
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
@@ -213,7 +215,8 @@
 						: proseLeafPlugins(schema, {
 								inline,
 								placeholder: () => placeholder,
-								cap
+								cap,
+								fontFamilies: () => registry.families
 							})
 				});
 			};

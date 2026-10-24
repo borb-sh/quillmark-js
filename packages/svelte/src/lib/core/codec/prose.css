@@ -152,6 +152,26 @@ li.ProseMirror-selectednode::after {
 	font-size: inherit;
 }
 
+/* A font run (`fonts.ts`): the family draws in the registry face registered under its
+   alias, the surface's own face standing in where none is, and a step at the helper's
+   default (theme.css). A code span and an equation inside a sized run keep the size
+   around it, as the Typst lowering sets neither inside one. */
+.ProseMirror [data-qm-font-family] {
+	font-family: var(--_qm-run-font), var(--_qm-font);
+}
+.ProseMirror [data-qm-font-size='small'] {
+	font-size: var(--_qm-text-step-small);
+}
+.ProseMirror [data-qm-font-size='large'] {
+	font-size: var(--_qm-text-step-large);
+}
+.ProseMirror [data-qm-font-size='small'] :is(code, [data-qm-island='math']) {
+	font-size: var(--_qm-text-unstep-small);
+}
+.ProseMirror [data-qm-font-size='large'] :is(code, [data-qm-island='math']) {
+	font-size: var(--_qm-text-unstep-large);
+}
+
 /* A fence's language at the label rung in its top corner, read off the `data-lang` the
    node writes (`schema.ts`). Generated content, so it is never text the caret reaches
    or a copy takes; the code's lines wrap around it. Read-only: the language is changed

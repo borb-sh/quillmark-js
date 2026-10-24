@@ -82,3 +82,16 @@ export { listKeymap } from './lists.js';
 // The list toggle the keymap binds to Mod-Shift-7/8, and the selection toolbar's list
 // buttons run (`visual/FormatPopover.svelte`).
 export { toggleList } from './list-toggle.js';
+
+// Font runs: what the popover's font menus read off the selection and the commands they
+// run (`visual/FormatPopover.svelte`), and the family a registry face registers under
+// (`visual/fonts.ts`).
+export {
+	cssString,
+	fontAlias,
+	selectionFamily,
+	selectionStep,
+	setFontFamily,
+	setFontStep
+} from './fonts.js';
+export type { FontStep } from './fonts.js';

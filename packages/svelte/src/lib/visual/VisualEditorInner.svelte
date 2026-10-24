@@ -46,6 +46,7 @@
 	} from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
 	import { mergeStrings, setWording } from './strings.js';
+	import { registerFaces, registryFamilies, setFontRegistry } from './fonts.js';
 	import type { CardId, ChangeSource } from './signals.js';
 	import type { FieldController, LeafViews } from '../core/codec/index.js';
 	import {
@@ -93,6 +94,7 @@
 	let {
 		doc,
 		quill,
+		fonts,
 		onActiveLeafChange,
 		onCaretMove,
 		onChange,
@@ -118,6 +120,16 @@
 			return formatDiagnostic;
 		}
 	});
+
+	// The font registry, published to the tree as the wording is, and its faces held in
+	// the document's font set for as long as this mount draws them.
+	const families = $derived(registryFamilies(fonts ?? []));
+	setFontRegistry({
+		get families() {
+			return families;
+		}
+	});
+	$effect(() => registerFaces(fonts ?? []));
 
 	// ── Reactivity + session identity ───────────────────────────────────────────
 	let revision = $state(0);

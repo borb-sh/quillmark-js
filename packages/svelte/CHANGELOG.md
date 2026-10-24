@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A writer sets a selection's font family and size from the selection toolbar**, which carries a family menu and a Small, Normal, Large menu, over the `font_family` and `font_size` marks `@quillmark/wasm` 0.131.0 adds. The families are the new `fonts` prop, the faces a render of the quill sets type in (`engine.fontFaces(quill)`); without it the toolbar offers sizes alone. A marked run draws in its real face, registered with the document's font set, and at the size step's `em`. A paste keeps a family the registry holds and drops an absolute size. The new strings are `formatFont`, `formatFontDefault`, `formatFontMissing`, `formatSize`, `formatSizeSmall`, `formatSizeNormal`, `formatSizeLarge` and `formatFontMixed`.
+
 ## v0.26.0 - 2026-10-23
 
 **Numbering or bulleting a selection inside a list of the other kind splits that list** (`Mod-Shift-7`, `Mod-Shift-8`, the toolbar buttons), as Google Docs and Notion do, where it retyped the whole list. The selected items become a list of the kind, joining one of that kind they touch, and the items after them count from 1.
