@@ -200,13 +200,12 @@ export function createViewport(
 		glideTo((g) => g.raw * factor, e.clientX, e.clientY);
 	}
 
-	// The keys reach the pane under the pointer as well as the focused one: a click on a
-	// page lands its caret in the editor, taking the focus with it.
-	// The first pane to take a key claims it, so two previews never both step, and a key
-	// a host's own handler took is left to it.
+	// The keys are the focused pane's alone: elsewhere they are the browser's own zoom,
+	// the pointer over the pane notwithstanding. A key a host's own handler took is left
+	// to it.
 	function onKeyDown(e: KeyboardEvent): void {
 		if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || e.isComposing) return;
-		if (!pointer && !container.contains(document.activeElement)) return;
+		if (!container.contains(document.activeElement)) return;
 		const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' || e.key === '_' ? -1 : 0;
 		if ((!dir && e.key !== '0') || !bounds()) return;
 		e.preventDefault();

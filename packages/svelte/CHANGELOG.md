@@ -6,6 +6,8 @@
 
 **A two-finger touch gesture on the preview pans as well as zooms**, the pages following the fingers' midpoint, where a pinch held the point between the fingers still and a two-finger drag moved nothing.
 
+**`Mod +`/`−`/`0` zoom the preview only while it holds the focus**, where they also zoomed it with the pointer merely over it and took the browser's own zoom keys from a writer typing in the editor.
+
 ## v0.26.0 - 2026-10-23
 
 **Numbering or bulleting a selection inside a list of the other kind splits that list** (`Mod-Shift-7`, `Mod-Shift-8`, the toolbar buttons), as Google Docs and Notion do, where it retyped the whole list. The selected items become a list of the kind, joining one of that kind they touch, and the items after them count from 1.
