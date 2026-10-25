@@ -6,6 +6,16 @@
 
 **A writer sets a selection's font family from the selection toolbar**, over the `font_family` mark `@quillmark/wasm` 0.131.0 adds. The menu lists the new `fonts` prop, the faces a render of the quill sets type in (`engine.fontFaces(quill)`), so a writer picks only families the preview sets; without it the toolbar offers none. Families overlap as the store's do, and the leaf draws on each character the family the render sets: a family set inside another nests in it, and removing it shows the outer one again. A marked run draws in its real face, registered with the document's font set, and a run in a family the registry lacks takes a danger tint and shows in the menu as unavailable. A paste keeps a family the registry holds. The new strings are `formatFont`, `formatFontDefault`, `formatFontMissing`, `formatFontRemove` and `formatFontMixed`.
 
+## v0.26.2 - 2026-10-24
+
+**A host that drops its `doc` and `quill` together unmounts the editor cleanly**, where a document with a subform prose cell (an `object` field's `text` or `richtext` property) threw `Cannot read properties of null (reading 'schema')` from the cell's teardown and left the host's page half-rendered.
+
+## v0.26.1 - 2026-10-24
+
+**A two-finger touch gesture on the preview pans as well as zooms**, the pages following the fingers' midpoint, where a pinch held the point between the fingers still and a two-finger drag moved nothing.
+
+**`Mod +`/`−`/`0` zoom the preview only while it holds the focus**, where they also zoomed it with the pointer merely over it and took the browser's own zoom keys from a writer typing in the editor.
+
 ## v0.26.0 - 2026-10-23
 
 **Numbering or bulleting a selection inside a list of the other kind splits that list** (`Mod-Shift-7`, `Mod-Shift-8`, the toolbar buttons), as Google Docs and Notion do, where it retyped the whole list. The selected items become a list of the kind, joining one of that kind they touch, and the items after them count from 1.

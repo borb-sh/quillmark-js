@@ -172,8 +172,14 @@
 		view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 	}
 
+	/** What the view draws from the props. The effect below writes it and the view reads
+	 * it, never the props: ProseMirror's `destroy` redraws the decorations and attributes
+	 * once more, and a prop read there re-derives the card over handles the host has
+	 * already released. */
+	let drawn = untrack(() => ({ label, labelledBy, describedBy, placeholder }));
+
 	$effect(() => {
-		void [label, labelledBy, describedBy, placeholder];
+		drawn = { label, labelledBy, describedBy, placeholder };
 		view?.setProps({});
 	});
 
@@ -183,7 +189,7 @@
 			const leaf = { inline, plaintext, islands: false };
 			// Read per attribute pass, not captured: an element's name carries its index,
 			// which a remove above it moves.
-			const names = () => ({ label, labelledBy, describedBy });
+			const names = () => drawn;
 			const shown = (stored: Content | undefined): Content => stored ?? fallback ?? emptyContent();
 			const stored = content();
 			let seen = value;
@@ -214,7 +220,7 @@
 						? []
 						: proseLeafPlugins(schema, {
 								inline,
-								placeholder: () => placeholder,
+								placeholder: () => drawn.placeholder,
 								cap,
 								fonts
 							})

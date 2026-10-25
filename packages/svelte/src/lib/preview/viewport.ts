@@ -37,6 +37,9 @@ const WHEEL_RATE = [0.0025, 0.08, 0.25] as const;
  *  rate that inverts the pinch's encoding. */
 const PINCH_DELTA = 50;
 const PINCH_RATE = 0.01;
+/** How far, as a log of the spread's ratio, two fingers part or close before a touch
+ *  pinch zooms rather than only pans. */
+const PINCH_SLOP = 0.04;
 
 /** Safari's trackpad pinch: not a wheel event there, and not in the DOM lib. */
 interface GestureEvent extends UIEvent {
@@ -197,13 +200,12 @@ export function createViewport(
 		glideTo((g) => g.raw * factor, e.clientX, e.clientY);
 	}
 
-	// The keys reach the pane under the pointer as well as the focused one: a click on a
-	// page lands its caret in the editor, taking the focus with it.
-	// The first pane to take a key claims it, so two previews never both step, and a key
-	// a host's own handler took is left to it.
+	// The keys are the focused pane's alone: elsewhere they are the browser's own zoom,
+	// the pointer over the pane notwithstanding. A key a host's own handler took is left
+	// to it.
 	function onKeyDown(e: KeyboardEvent): void {
 		if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || e.isComposing) return;
-		if (!pointer && !container.contains(document.activeElement)) return;
+		if (!container.contains(document.activeElement)) return;
 		const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' || e.key === '_' ? -1 : 0;
 		if ((!dir && e.key !== '0') || !bounds()) return;
 		e.preventDefault();
@@ -211,26 +213,65 @@ export function createViewport(
 	}
 
 	// A two-finger pinch on a touch screen. The browser's own page zoom is held off by the
-	// desk's `touch-action` and by cancelling the move, which also stops the pan a second
-	// finger would otherwise start.
-	let pinch: { spread: number; raw: number } | undefined;
-	const spread = (t: TouchList): number =>
-		Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-	function onTouchStart(e: TouchEvent): void {
-		if (e.touches.length !== 2) return;
+	// desk's `touch-action`, and cancelling the move stops the pan a second finger would
+	// otherwise start: the pinch pans itself, holding the point it began under, as a
+	// fraction of its page, under the fingers' midpoint. Placed afresh on each move rather
+	// than stepped, since the scroll offsets round. The spread zooms only once it has
+	// moved past `PINCH_SLOP`, so a two-finger drag pans and leaves the fit alone.
+	interface Pinch {
+		spread: number;
+		raw: number;
+		zooming: boolean;
+		page: HTMLElement;
+		fx: number;
+		fy: number;
+	}
+	let pinch: Pinch | undefined;
+	// The fingers on this pane, not one resting on the editor beside it.
+	const fingers = (e: TouchEvent): Touch[] =>
+		[...e.touches].filter((t) => t.target instanceof Node && container.contains(t.target));
+	const spread = ([a, b]: Touch[]): number =>
+		Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+	const midpoint = ([a, b]: Touch[]): { x: number; y: number } => ({
+		x: (a.clientX + b.clientX) / 2,
+		y: (a.clientY + b.clientY) / 2
+	});
+	function grip(at: { x: number; y: number }): Pick<Pinch, 'page' | 'fx' | 'fy'> | undefined {
+		const page = pageAt(at.y);
+		const r = page?.getBoundingClientRect();
+		if (!page || !r?.width || !r.height) return undefined;
+		return { page, fx: (at.x - r.left) / r.width, fy: (at.y - r.top) / r.height };
+	}
+	// A finger landing or lifting starts the pinch over with the two that remain.
+	function onTouches(e: TouchEvent): void {
+		pinch = undefined;
+		const t = fingers(e);
 		const b = bounds();
-		if (b) pinch = { spread: spread(e.touches), raw: from(b).raw };
+		const held = t.length === 2 && b ? grip(midpoint(t)) : undefined;
+		if (held) pinch = { spread: spread(t), raw: from(b!).raw, zooming: false, ...held };
 	}
 	function onTouchMove(e: TouchEvent): void {
-		if (!pinch || e.touches.length !== 2) return;
+		const t = fingers(e);
+		if (!pinch || t.length !== 2) return;
 		e.preventDefault();
-		const [a, b] = [e.touches[0], e.touches[1]];
-		const ratio = spread(e.touches) / pinch.spread;
-		const start = pinch.raw;
-		glideTo(() => start * ratio, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
-	}
-	function onTouchEnd(e: TouchEvent): void {
-		if (e.touches.length < 2) pinch = undefined;
+		const mid = midpoint(t);
+		const ratio = spread(t) / pinch.spread;
+		if (pinch.zooming) {
+			const start = pinch.raw;
+			glideTo(() => start * ratio, mid.x, mid.y);
+		} else if (Math.abs(Math.log(ratio)) >= PINCH_SLOP) {
+			pinch.zooming = true;
+			pinch.spread = spread(t);
+		}
+		// A move the browser is already scrolling cannot be cancelled: its pan stands, and
+		// the pinch holds whatever is under the fingers now.
+		if (!e.cancelable) {
+			Object.assign(pinch, grip(mid));
+			return;
+		}
+		const r = pinch.page.getBoundingClientRect();
+		container.scrollLeft += r.left + pinch.fx * r.width - mid.x;
+		container.scrollTop += r.top + pinch.fy * r.height - mid.y;
 	}
 
 	// Safari's trackpad pinch. iOS sends these beside the touches, which are the ones read
@@ -268,10 +309,10 @@ export function createViewport(
 	const listeners: Array<[EventTarget, string, EventListener, AddEventListenerOptions?]> = [
 		[container, 'wheel', onWheel as EventListener, { passive: false }],
 		[window, 'keydown', onKeyDown as EventListener],
-		[container, 'touchstart', onTouchStart as EventListener, { passive: true }],
+		[container, 'touchstart', onTouches as EventListener, { passive: true }],
 		[container, 'touchmove', onTouchMove as EventListener, { passive: false }],
-		[container, 'touchend', onTouchEnd as EventListener],
-		[container, 'touchcancel', onTouchEnd as EventListener],
+		[container, 'touchend', onTouches as EventListener],
+		[container, 'touchcancel', onTouches as EventListener],
 		[container, 'gesturestart', onGestureStart],
 		[container, 'gesturechange', onGestureChange],
 		[container, 'gestureend', onGestureEnd],
