@@ -158,10 +158,10 @@ export function createViewport(
 	// A re-fit holds the line at the pane's top edge, so a dragged divider leaves the
 	// reader where they were. The desk turns the browser's own scroll anchoring off
 	// (`Preview.svelte`), which would correct the same move a second time.
-	function refit(): void {
-		if (!container.scrollTop && !container.scrollLeft) return apply();
+	function refit(settle?: number): void {
+		if (!container.scrollTop && !container.scrollLeft) return apply(settle);
 		const r = container.getBoundingClientRect();
-		holding(r.left + r.width / 2, r.top, () => apply());
+		holding(r.left + r.width / 2, r.top, () => apply(settle));
 	}
 
 	function centre(): { x: number; y: number } {
@@ -331,16 +331,17 @@ export function createViewport(
 	];
 	for (const [target, type, fn, opts] of listeners) target.addEventListener(type, fn, opts);
 
-	// The pane's box moving: a dragged divider, a resized window, a hidden track shown.
-	// Guarded for jsdom, which ships no ResizeObserver.
+	// The pane's box moving: a dragged divider, a resized window, a hidden track shown. A
+	// drag is a gesture, so its pages re-raster once it rests. Guarded for jsdom, which
+	// ships no ResizeObserver.
 	const resizeObserver =
-		typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => refit());
+		typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => refit(SETTLE_MS));
 	resizeObserver?.observe(container);
 
 	apply();
 
 	return {
-		update: refit,
+		update: () => refit(),
 		setZoom(next) {
 			const valid = next !== undefined && Number.isFinite(next) && next > 0 ? next : undefined;
 			if (bounds()) step(() => valid);
