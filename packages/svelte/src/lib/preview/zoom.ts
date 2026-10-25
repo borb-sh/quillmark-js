@@ -52,15 +52,23 @@ export function clampZoom(zoom: number, floor: number): number {
 	return Math.min(MAX_ZOOM, Math.max(floor, zoom));
 }
 
-/** The next level in `dir` from `zoom`, skipping levels under `floor`. From between two
- *  levels the first press lands on the nearer one in that direction; past the last level
- *  above the floor, the floor. Half a percent of slack, so a zoom shown as a level is at
- *  it. */
-export function stepZoom(zoom: number, dir: 1 | -1, floor: number): number {
+/** The levels a step lands on: `STEPS` with `fit` among them, which takes the
+ *  place of any level within {@link DETENT} of it, since fit is the one that follows the
+ *  pane. */
+function stops(fit: number): number[] {
+	return [...STEPS.filter((s) => Math.abs(s - fit) > DETENT), fit].sort((a, b) => a - b);
+}
+
+/** The next level in `dir` from `zoom`, `fit` among them, skipping levels under `floor`.
+ *  From between two levels the first press lands on the nearer one in that direction;
+ *  past the last level above the floor, the floor. Half a percent of slack, so a zoom
+ *  shown as a level is at it. */
+export function stepZoom(zoom: number, dir: 1 | -1, floor: number, fit: number): number {
+	const levels = stops(fit);
 	const next =
 		dir > 0
-			? STEPS.find((s) => s > zoom + 0.005)
-			: [...STEPS].reverse().find((s) => s < zoom - 0.005 && s >= floor);
+			? levels.find((s) => s > zoom + 0.005)
+			: levels.reverse().find((s) => s < zoom - 0.005 && s >= floor);
 	return clampZoom(next ?? (dir > 0 ? MAX_ZOOM : floor), floor);
 }
 
@@ -75,12 +83,17 @@ export interface Glide {
 	shown: number;
 }
 
-/** One event of a continuous gesture, carrying the run to `raw`: held at 100% when it
- *  crosses or lands within {@link DETENT} of it, so one wheel notch across actual size
- *  stops there. */
-export function glide(run: Glide, raw: number, floor: number): Glide {
+/** One event of a continuous gesture, carrying the run to `raw`: held at `fit` or 100%
+ *  when it crosses or lands within {@link DETENT} of one, so one wheel notch across
+ *  either stops there, at the first it meets. 100% gives way to a `fit` within the
+ *  detent of it: two holds that close would pin the run between them. */
+export function glide(run: Glide, raw: number, floor: number, fit: number): Glide {
+	const holds = Math.abs(fit - 1) > DETENT ? [fit, 1] : [fit];
 	let next = clampZoom(raw, floor);
-	if ((run.shown - 1) * (next - 1) < 0) next = 1;
-	const shown = Math.abs(next - 1) <= DETENT ? 1 : next;
+	const crossed = holds
+		.filter((t) => (run.shown - t) * (next - t) < 0)
+		.sort((a, b) => Math.abs(a - run.shown) - Math.abs(b - run.shown));
+	if (crossed.length) next = crossed[0];
+	const shown = holds.find((t) => Math.abs(next - t) <= DETENT) ?? next;
 	return { raw: next, shown: clampZoom(shown, floor) };
 }

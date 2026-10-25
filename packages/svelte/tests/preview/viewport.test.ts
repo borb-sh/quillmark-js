@@ -89,6 +89,25 @@ describe('the preview zoom', () => {
 		expect(widths()[1]).toBeGreaterThan(fit[1]);
 	});
 
+	it('is the default again once a step lands back on the fit', () => {
+		const fit = widths();
+		container.focus();
+		zoomKey('=');
+		zoomKey('-');
+		expect(pill()).toBeNull();
+		expect(widths()).toEqual(fit);
+	});
+
+	it('is the default again once a wheel crosses the fit', () => {
+		const fit = widths();
+		preview.setZoom(1);
+		container.dispatchEvent(
+			new WheelEvent('wheel', { deltaY: 1000, ctrlKey: true, cancelable: true })
+		);
+		expect(pill()).toBeNull();
+		expect(widths()).toEqual(fit);
+	});
+
 	describe('under two fingers', () => {
 		let top = 0;
 		beforeEach(() => {

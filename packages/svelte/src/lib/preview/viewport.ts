@@ -50,6 +50,12 @@ interface GestureEvent extends UIEvent {
 
 const px = (value: string): number => parseFloat(value) || 0;
 
+interface Bounds {
+	current: number;
+	floor: number;
+	fit: number;
+}
+
 export function createViewport(
 	container: HTMLElement,
 	slots: readonly PageSlot[],
@@ -83,14 +89,16 @@ export function createViewport(
 		return width > 0 && height > 0 ? { width, height } : undefined;
 	}
 
-	// What the pages are drawn at, the zoom held against this pane's floor, and the floor.
-	function bounds(): { current: number; floor: number } | undefined {
+	// What the pages are drawn at, the zoom held against this pane's floor, the floor, and
+	// the default fit.
+	function bounds(): Bounds | undefined {
 		const box = pane();
 		if (!box || !slots.length) return undefined;
 		const sizes = slots.map((s) => s.size);
 		const floor = floorZoom(sizes, box);
-		const current = zoom === undefined ? fitZoom(sizes, box) : clampZoom(zoom, floor);
-		return { current, floor };
+		const fit = fitZoom(sizes, box);
+		const current = zoom === undefined ? fit : clampZoom(zoom, floor);
+		return { current, floor, fit };
 	}
 
 	function apply(settle?: number): void {
@@ -163,14 +171,15 @@ export function createViewport(
 	// The pointer while it is over the pane, else the pane's centre.
 	const anchor = (): { x: number; y: number } => pointer ?? centre();
 
-	function step(
-		next: (b: { current: number; floor: number }) => number | undefined,
-		at = anchor()
-	): void {
+	// A zoom landing on the fit is the default again, and follows the pane from there.
+	const settled = (next: number | undefined, b: Bounds): number | undefined =>
+		next === b.fit ? undefined : next;
+
+	function step(next: (b: Bounds) => number | undefined, at = anchor()): void {
 		const b = bounds();
 		if (!b) return;
 		run = undefined;
-		zoomTo(next(b), at.x, at.y);
+		zoomTo(settled(next(b), b), at.x, at.y);
 	}
 
 	// About the pane's centre, the pointer being on the pill.
@@ -186,8 +195,8 @@ export function createViewport(
 		const b = bounds();
 		if (!b) return;
 		const start = from(b);
-		run = glide(start, raw(start), b.floor);
-		zoomTo(run.shown, x, y, SETTLE_MS);
+		run = glide(start, raw(start), b.floor, b.fit);
+		zoomTo(settled(run.shown, b), x, y, SETTLE_MS);
 	}
 
 	// Ctrl-wheel is a mouse's zoom, and the trackpad pinch Chromium and Firefox send as
@@ -209,7 +218,7 @@ export function createViewport(
 		const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' || e.key === '_' ? -1 : 0;
 		if ((!dir && e.key !== '0') || !bounds()) return;
 		e.preventDefault();
-		step((b) => (dir ? stepZoom(b.current, dir, b.floor) : undefined));
+		step((b) => (dir ? stepZoom(b.current, dir, b.floor, b.fit) : undefined));
 	}
 
 	// A two-finger pinch on a touch screen. The browser's own page zoom is held off by the
