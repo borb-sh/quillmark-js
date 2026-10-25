@@ -1,40 +1,43 @@
 /**
- * The bin, as an author reaches it: `dist/bin/quillkit.js` spawned against a collection.
+ * The bin, as an author reaches it: `dist/bin/quillkit.js` spawned in a quiver.
  *
  * Every other test in this package imports `src/`, which is what makes this one worth
  * its seconds: what an author reaches is a linked bin, and nothing that imports a module
- * proves one works. It pins the two resolutions the tool is built on (the packer and the
- * engine, each out of the collection's own tree), the client it carries instead, and a
- * real render of every quill's seed and example, that last being what a gate for quills is.
+ * proves one works. It pins what the tool carries (the packer, the engine and both clients,
+ * resolved out of its own dependencies and nothing beside the quiver) and a real render of
+ * every quill's seed and example, that last being what a gate for quills is.
  *
- * It runs against `dist/`, so it needs the package built: both halves, since the verbs
- * that serve reach for the client. The root `npm run build` does that in an order `tsc`
- * here depends on, which is what CI runs before it tests.
+ * It runs against `dist/`, so it needs the package built: every half, since the verbs that
+ * serve reach for a client. The root `npm run build` does that in an order `tsc` here
+ * depends on, which is what CI runs before it tests.
  */
 
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, sep } from 'node:path';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { APP_JSON, APP_YAML } from '../app-files.js';
+import { TARGETS } from '../deploy.js';
 import { scratch } from './helpers/collection.js';
 
 const run = promisify(execFile);
 
 /** The bin as npm links it, not the TypeScript behind it. */
 const BIN = fileURLToPath(new URL('../../dist/bin/quillkit.js', import.meta.url));
-/** The tarball's `dist`, both halves: the compiled tool and the built client. */
-const DIST = fileURLToPath(new URL('../../dist/', import.meta.url));
-/** The client's half of it, which is a browser program. */
-const CLIENT = `client${sep}`;
+const MANIFEST = fileURLToPath(new URL('../../package.json', import.meta.url));
 
 /** A real Typst backend load and one page compiled. */
 const RENDER_MS = 120_000;
 
 const temp = scratch('quillkit-cli-');
-afterEach(() => temp.cleanup());
+const children: ChildProcess[] = [];
+afterEach(async () => {
+	for (const child of children.splice(0)) child.kill('SIGTERM');
+	await temp.cleanup();
+});
 
 beforeAll(() => {
 	expect(
@@ -43,51 +46,58 @@ beforeAll(() => {
 	).toBe(true);
 });
 
+/** A verb that fails, as its rejection: the message carries stderr, `stdout` the rest. */
+async function refused(args: string[], cwd: string): Promise<Error & { stdout?: string }> {
+	return run(process.execPath, [BIN, ...args], { cwd }).then(
+		() => new Error(`quillkit ${args.join(' ')} succeeded`),
+		(err: Error) => err
+	);
+}
+
+/** A verb that serves, started, and the front door it prints. */
+async function serving(args: string[], cwd: string): Promise<URL> {
+	const child = spawn(process.execPath, [BIN, ...args, '--port', '0'], {
+		cwd,
+		stdio: ['ignore', 'pipe', 'pipe']
+	});
+	children.push(child);
+	return new Promise<URL>((ok, no) => {
+		let out = '';
+		const timer = setTimeout(() => no(new Error(`no address in: ${out}`)), 45_000);
+		const read = (chunk: Buffer) => {
+			out += chunk.toString();
+			const match = /http:\/\/\S+/.exec(out);
+			if (match) {
+				clearTimeout(timer);
+				ok(new URL(match[0]));
+			}
+		};
+		child.stdout.on('data', read);
+		child.stderr.on('data', (chunk: Buffer) => (out += chunk.toString()));
+		child.on('exit', (code) => no(new Error(`exited ${code}: ${out}`)));
+		child.on('error', no);
+	});
+}
+
 describe('quillkit test', () => {
 	it(
-		'gates the reference quiver and its templates end-to-end',
+		'gates the reference quiver end-to-end',
 		async () => {
 			// A non-zero exit rejects, carrying the gate's own output as the failure.
-			const { stdout } = await run(
-				process.execPath,
-				[BIN, 'test', '--templates', 'templates', '--drafts'],
-				{ cwd: await temp.collection() }
-			);
+			const { stdout } = await run(process.execPath, [BIN, 'test', '--drafts'], {
+				cwd: await temp.collection()
+			});
 
 			expect(stdout).toContain('pass  showcase@1.0.0 (seed, example)');
 			expect(stdout).toContain('pass  usaf_memo@0.0.0 (seed, example)');
-			expect(stdout).toContain('pass  showcase.md (showcase@1.0.0)');
-			expect(stdout).toContain('pass  usaf_memo.md (usaf_memo@0.0.0)');
-			expect(stdout).toContain('4/4 passed');
+			expect(stdout).toContain('2/2 passed');
 		},
 		RENDER_MS
 	);
 
-	it('names the install when the collection has no engine or loader', async () => {
-		await expect(run(process.execPath, [BIN, 'test'], { cwd: await temp.dir() })).rejects.toThrow(
-			/npm install --save-dev @quillmark\/wasm/
-		);
+	it('refuses a directory holding no quiver', async () => {
+		expect((await refused(['test'], await temp.dir())).message).toMatch(/Quiver\.yaml/);
 	});
-
-	it(
-		'fails on a broken quillkit.config.js, saying what broke',
-		async () => {
-			// The arm `loadEngine`'s own suite cannot reach: a verb that exits non-zero, and
-			// the cause printed under the error.
-			const source = await temp.collection();
-			await writeFile(join(source, 'quillkit.config.js'), "throw new Error('config is broken');");
-
-			const failure = await run(process.execPath, [BIN, 'test'], { cwd: source }).then(
-				() => new Error('the gate ran to a verdict on a config that throws'),
-				(err: Error) => err
-			);
-
-			expect(failure.message).toContain('Cannot load quillkit.config.js');
-			expect(failure.message).toContain('config is broken');
-			expect(failure.message).not.toContain('pass  ');
-		},
-		RENDER_MS
-	);
 
 	it(
 		'fails a quill whose example will not open, and passes the rest',
@@ -97,12 +107,7 @@ describe('quillkit test', () => {
 			const md = await readFile(example, 'utf8');
 			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1.0\n'));
 
-			const failure: Error & { stdout?: string } = await run(process.execPath, [BIN, 'test'], {
-				cwd: source
-			}).then(
-				() => new Error('the gate passed a quill whose example names a selector'),
-				(err: Error) => err
-			);
+			const failure = await refused(['test'], source);
 
 			// A `FAIL` line is the gate's stderr, which the rejection's message carries.
 			expect(failure.message).toContain('FAIL  showcase@1.0.0');
@@ -112,63 +117,40 @@ describe('quillkit test', () => {
 	);
 
 	it(
-		'renders every listed template in the quill it names, failing one that warns, names no quill held, or names a draft',
+		'gates the app App.yaml describes, failing a pin to a draft without --drafts',
 		async () => {
 			const source = await temp.collection();
-			const templates = join(source, 'templates');
-			const showcase = await readFile(join(templates, 'showcase.md'), 'utf8');
-			const selector = showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@1.0\n');
-			expect(selector).not.toBe(showcase);
-			const added = {
-				'selector.md': selector,
-				'stray.md': showcase.replace('\n$kind: main\n', '\n$kind: main\nstray: kept\n'),
-				'elsewhere.md': showcase.replace('$quill: showcase@1.0.0\n', '$quill: showcase@9.0\n')
-			};
-			const manifest = join(templates, 'templates.json');
-			const listed = JSON.parse(await readFile(manifest, 'utf8'));
-			for (const [file, md] of Object.entries(added)) {
-				await writeFile(join(templates, file), md);
-				listed.push({ name: file, file });
-			}
-			await writeFile(manifest, JSON.stringify(listed));
+			await writeFile(join(source, APP_YAML), 'quills: [showcase, usaf_memo]\n');
 
-			// No `--drafts`, so `usaf_memo.md`, naming the draft `usaf_memo@0.0.0`, is refused.
-			const failure: Error & { stdout?: string } = await run(
-				process.execPath,
-				[BIN, 'test', '--templates', templates],
-				{ cwd: source }
-			).then(
-				() => new Error('the gate passed a template carrying a warning'),
-				(err: Error) => err
-			);
+			const failure = await refused(['test'], source);
+			expect(failure.message).toMatch(new RegExp(`FAIL {2}${APP_YAML} — .*--drafts`));
 
-			expect(failure.stdout).toContain('pass  showcase.md (showcase@1.0.0)');
-			expect(failure.stdout).toContain('pass  selector.md (showcase@1.0.0)');
-			expect(failure.message).toMatch(/FAIL {2}stray\.md — .*\(validation::unknown_field\)/);
-			expect(failure.message).toMatch(/FAIL {2}elsewhere\.md — .*showcase@9/);
-			expect(failure.message).toMatch(/FAIL {2}usaf_memo\.md — .*--drafts/);
-			const passed = failure.stdout!.match(/^pass {2}/gm)!.length;
-			expect(failure.stdout).toContain(`${passed}/${passed + 3} passed`);
+			const { stdout } = await run(process.execPath, [BIN, 'test', '--drafts'], { cwd: source });
+			expect(stdout).toContain(`pass  ${APP_YAML} (showcase@1.0.0, usaf_memo@0.0.0)`);
 		},
 		RENDER_MS
 	);
 });
 
-describe('quillkit init', () => {
+describe('quillkit new', () => {
 	it(
-		'lays a quiver the gate passes, pinned to what the client carries',
+		'lays a quiver that needs only quillkit, passes the gate and builds into an app',
 		async () => {
 			const at = join(await temp.dir(), 'fresh');
-			await run(process.execPath, [BIN, 'init', at]);
-			await temp.peers(at);
+			await run(process.execPath, [BIN, 'new', at]);
+
+			const pkg = JSON.parse(await readFile(join(at, 'package.json'), 'utf8'));
+			const own = JSON.parse(await readFile(MANIFEST, 'utf8'));
+			expect(Object.keys(pkg.devDependencies)).toEqual([own.name]);
+			expect(pkg.dependencies).toBeUndefined();
+			expect(Object.values(pkg.scripts).join('\n')).toMatch(/quillkit build app/);
 
 			const { stdout } = await run(process.execPath, [BIN, 'test'], { cwd: at });
 			expect(stdout).toContain('pass  letter@0.1.0 (seed, example)');
 
-			const carried = JSON.parse(await readFile(join(DIST, 'client', 'carried.json'), 'utf8'));
-			const pkg = JSON.parse(await readFile(join(at, 'package.json'), 'utf8'));
-			expect(pkg.devDependencies['@quillmark/wasm']).toBe(`^${carried['@quillmark/wasm']}`);
-			expect(pkg.devDependencies['@quillmark/quiver']).toBe(`^${carried['@quillmark/quiver']}`);
+			await run(process.execPath, [BIN, 'build', 'app'], { cwd: at });
+			const app = JSON.parse(await readFile(join(at, 'dist', APP_JSON), 'utf8'));
+			expect(app.quills.map((q: { ref: string }) => q.ref)).toEqual(['letter@0.1.0']);
 		},
 		RENDER_MS
 	);
@@ -176,129 +158,132 @@ describe('quillkit init', () => {
 	it('refuses a directory that already holds a quiver, before writing anything', async () => {
 		const at = await temp.dir();
 		await writeFile(join(at, 'Quiver.yaml'), 'name: mine\n');
-		await expect(run(process.execPath, [BIN, 'init'], { cwd: at })).rejects.toThrow(
-			/Quiver\.yaml already exists/
-		);
+		expect((await refused(['new'], at)).message).toMatch(/Quiver\.yaml already exists/);
 		expect(await readdir(at)).toEqual(['Quiver.yaml']);
 	});
 
 	it('prints usage rather than laying a quiver under a flag', async () => {
 		const at = await temp.dir();
-		await expect(
-			run(process.execPath, [BIN, 'init', '--quiver', 'x'], { cwd: at })
-		).rejects.toThrow(/Usage:/);
+		expect((await refused(['new', '--quiver', 'x'], at)).message).toMatch(/Usage:/);
 		expect(await readdir(at)).toEqual([]);
 	});
 });
 
 describe('quillkit build', () => {
-	it('packs a collection into the directory it was pointed at', async () => {
-		const out = join(await temp.dir(), 'dist');
-		const { stdout } = await run(process.execPath, [BIN, 'build', '--out', out], {
-			cwd: await temp.collection()
-		});
+	it('lays each target into dist/ by default, and where --out points', async () => {
+		const source = await temp.collection();
+		await run(process.execPath, [BIN, 'build', 'quiver'], { cwd: source });
+		expect(existsSync(join(source, 'dist', 'quiver', 'quiver.json'))).toBe(true);
 
-		expect(stdout).toContain('quillkit build:');
-		expect(existsSync(join(out, 'quiver.json'))).toBe(true);
+		const out = join(await temp.dir(), 'site');
+		const { stdout } = await run(process.execPath, [BIN, 'build', 'studio', '--out', out], {
+			cwd: source
+		});
+		expect(stdout).toContain(`quillkit build studio: ${out}`);
+		expect(existsSync(join(out, 'index.html'))).toBe(true);
+		expect(existsSync(join(out, 'quiver', 'quiver.json'))).toBe(true);
+	}, 60_000);
+
+	it('names every target when given none, or one it does not have', async () => {
+		const source = await temp.collection();
+		for (const args of [['build'], ['build', 'site'], ['preview']]) {
+			const { message } = await refused(args, source);
+			for (const target of TARGETS) expect(message, args.join(' ')).toContain(target);
+		}
+		expect(existsSync(join(source, 'dist'))).toBe(false);
+	});
+});
+
+describe('quillkit dev', () => {
+	it('serves studio by default: the client at the root and the drafts packed beneath it', async () => {
+		const url = await serving(['dev'], await temp.collection());
+
+		const index = await fetch(url);
+		expect(index.status).toBe(200);
+		expect(index.headers.get('content-type')).toContain('text/html');
+		expect(await fetch(new URL(APP_JSON, url)).then((r) => r.status)).toBe(404);
+
+		const catalog = await fetch(new URL('quiver/quiver.json', url));
+		expect(catalog.status).toBe(200);
+		const { quills } = (await catalog.json()) as { quills: { version: string }[] };
+		// The fixture's `usaf_memo` is `0.0.0`, under quiver's floor.
+		expect(quills.map((q) => q.version)).toContain('0.0.0');
+	}, 60_000);
+
+	it('serves the app over the same quiver, with the app.json the quiver resolves to', async () => {
+		const url = await serving(['dev', 'app'], await temp.collection());
+
+		expect((await fetch(url)).status).toBe(200);
+		const app = await fetch(new URL(APP_JSON, url));
+		expect(app.status).toBe(200);
+		const { quills } = (await app.json()) as { quills: { ref: string }[] };
+		const catalog = (await fetch(new URL('quiver/quiver.json', url)).then((r) => r.json())) as {
+			quills: { name: string; version: string }[];
+		};
+		for (const { ref } of quills)
+			expect(catalog.quills.map((q) => `${q.name}@${q.version}`)).toContain(ref);
 	}, 60_000);
 });
 
-describe('quillkit studio', () => {
-	it('packs, serves the client at the root and the quiver and templates beneath it', async () => {
+describe('quillkit preview', () => {
+	it('serves a build as a static host does', async () => {
 		const source = await temp.collection();
-		const child = spawn(
-			process.execPath,
-			[BIN, 'studio', '--quiver', source, '--port', '0', '--templates', join(source, 'templates')],
-			{ stdio: ['ignore', 'pipe', 'pipe'] }
-		);
+		await run(process.execPath, [BIN, 'build', 'app', '--drafts'], { cwd: source });
+		const url = await serving(['preview', 'app'], source);
 
-		try {
-			const url = await new Promise<string>((ok, no) => {
-				let out = '';
-				const timer = setTimeout(() => no(new Error(`no address in: ${out}`)), 45_000);
-				child.stdout.on('data', (chunk: Buffer) => {
-					out += chunk.toString();
-					const match = /http:\/\/\S+/.exec(out);
-					if (match) {
-						clearTimeout(timer);
-						ok(match[0]);
-					}
-				});
-				child.on('error', no);
-			});
+		const index = await fetch(url);
+		expect(index.status).toBe(200);
+		const asset = /assets\/[^"]+\.js/.exec(await index.text())?.[0];
+		expect(asset).toBeDefined();
 
-			const index = await fetch(url);
-			expect(index.status).toBe(200);
-			expect(index.headers.get('content-type')).toContain('text/html');
-
-			const catalog = await fetch(new URL('quiver/quiver.json', url));
-			expect(catalog.status).toBe(200);
-			expect(await catalog.json()).toHaveProperty('quills');
-
-			const listed = await fetch(new URL('templates/templates.json', url));
-			expect(listed.status).toBe(200);
-			const [{ file }] = (await listed.json()) as Array<{ file: string }>;
-			const template = await fetch(new URL(`templates/${file}`, url));
-			expect(template.status).toBe(200);
-			expect(template.headers.get('content-type')).toContain('text/markdown');
-		} finally {
-			child.kill('SIGTERM');
-		}
+		const hashed = await fetch(new URL(asset!, url));
+		expect(hashed.headers.get('cache-control')).toMatch(/immutable/);
+		const catalog = await fetch(new URL('quiver/quiver.json', url));
+		expect(catalog.headers.get('cache-control')).not.toMatch(/immutable|max-age=[1-9]/);
+		expect((await fetch(new URL('nope.html', url))).status).toBe(404);
 	}, 60_000);
+
+	it('refuses a directory holding no build of the target', async () => {
+		const source = await temp.collection();
+		await run(process.execPath, [BIN, 'build', 'studio'], { cwd: source });
+		expect((await refused(['preview', 'app'], source)).message).toMatch(
+			/holds no app build: run `quillkit build app`/
+		);
+	});
 });
 
 describe('how a flag is spelled', () => {
 	it('reads a value joined by an equals sign', async () => {
-		// A verb reading only `--quiver <dir>` takes `--quiver=<dir>` for a directory it was
-		// never given and runs against the working one, which is a verdict about the wrong
-		// tree. The bare collection is what makes that visible: it names the missing packer,
-		// where the working directory resolves one.
-		const bare = await temp.dir();
-		await expect(
-			run(process.execPath, [BIN, 'site', `--quiver=${bare}`, `--out=${join(bare, 'site')}`])
-		).rejects.toThrow(/npm install --save-dev @quillmark\/quiver/);
-	});
+		const source = await temp.collection();
+		const out = join(await temp.dir(), 'joined');
+		await run(process.execPath, [BIN, 'build', 'quiver', `--out=${out}`], { cwd: source });
+		expect(existsSync(join(out, 'quiver', 'quiver.json'))).toBe(true);
+	}, 60_000);
 
-	it('refuses a flag given no value', async () => {
-		// Read as absent, `--templates` with nothing after it gates no template and passes.
-		await expect(
-			run(process.execPath, [BIN, 'test', '--templates'], { cwd: await temp.dir() })
-		).rejects.toThrow(/--templates takes a value/);
+	it('refuses a flag given no value, and one the verb does not take', async () => {
+		const source = await temp.collection();
+		expect((await refused(['build', 'quiver', '--out'], source)).message).toMatch(
+			/--out takes a value/
+		);
+		// The quiver is the working directory: a `--quiver` read as absent would gate the
+		// wrong tree.
+		for (const args of [
+			['test', '--quiver', '.'],
+			['build', 'app', '--templates', 't'],
+			['dev', '--drafts']
+		])
+			expect((await refused(args, source)).message, args.join(' ')).toMatch(/takes no --/);
 	});
 });
 
 describe('the bin without a verb', () => {
 	it('prints usage and fails', async () => {
-		await expect(run(process.execPath, [BIN])).rejects.toThrow(/Usage:/);
+		expect((await refused([], await temp.dir())).message).toMatch(/Usage:/);
 	});
 
 	it('prints usage for a name the verb table inherits', async () => {
 		// `toString` is on every object, so a dispatch reading the prototype chain calls it
 		// and dies of a TypeError where an author is owed the usage line.
-		await expect(run(process.execPath, [BIN, 'toString'])).rejects.toThrow(/Usage:/);
-	});
-});
-
-describe('what the tool loads', () => {
-	it('names the wasm artifact in no specifier of its own', async () => {
-		// The engine is the collection's, reached by a resolved path at runtime, so the
-		// artifact is in this process only when `test` puts it there. A static specifier
-		// would put it in every verb's, which is what the single-copy rule forbids.
-		// Prose naming it is not one.
-		//
-		// The tool's half of `dist` alone. The client beside it bundles the artifact on
-		// purpose, that copy running in a browser tab in a process this one never
-		// shares, so scanning it would answer about the wrong process.
-		const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/g;
-		const files = (await readdir(DIST, { recursive: true })).filter(
-			(f) => f.endsWith('.js') && !f.startsWith(CLIENT)
-		);
-		expect(files.length).toBeGreaterThan(0);
-
-		for (const file of files) {
-			const text = await readFile(join(DIST, file), 'utf8');
-			const specifiers = [...text.matchAll(SPECIFIER)].map((m) => m[1]);
-			expect(specifiers, `${file} reaches the wasm artifact`).not.toContain('@quillmark/wasm');
-		}
+		expect((await refused(['toString'], await temp.dir())).message).toMatch(/Usage:/);
 	});
 });

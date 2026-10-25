@@ -1,8 +1,9 @@
 /**
- * The static server `studio` serves the loop over. It composes its roots rather than
- * copying one into another: the client out of this package, the packed quiver out of
- * the tree the packer swaps. A repack replaces a directory the server reads per
- * request, so nothing here is told a pack happened.
+ * The static server `dev` serves the loop over and `preview` serves a deploy with. It
+ * composes its roots rather than copying one into another: the client out of this package,
+ * the packed quiver out of the tree the packer swaps, an app's staged files beside them. A
+ * repack replaces a directory the server reads per request, so nothing here is told a pack
+ * happened.
  *
  * Two things a general-purpose static server gets wrong for this, which is why this one
  * is written rather than borrowed: `.wasm` must be served as `application/wasm`, and a
@@ -15,10 +16,11 @@ import { extname, resolve } from 'node:path';
 import { within } from './paths.js';
 
 /**
- * What the roots hold: the client `vite build` emits, a packed quiver's `quiver.json`
- * and bundles, and a collection's templates. Fonts carry no type because they carry no extension either,
- * being dehydrated into `fonts/<sha256>`; anything unlisted falls back to
- * `application/octet-stream`, which is right for opaque bytes.
+ * What the roots hold: the clients `vite build` emits, a packed quiver's `quiver.json` and
+ * bundles, and an app's `app.json` and the author's files `app.css` names. A packed font
+ * carries no type because it carries no extension either, being dehydrated into
+ * `fonts/<sha256>`; anything unlisted falls back to `application/octet-stream`, which is
+ * right for opaque bytes.
  *
  * `.wasm` is the one that is not a nicety: `@quillmark/wasm` ships wasm-bindgen's web
  * target, which instantiates by streaming, and `WebAssembly.instantiateStreaming`
@@ -27,26 +29,56 @@ import { within } from './paths.js';
 const TYPES: Record<string, string> = {
 	'.css': 'text/css; charset=utf-8',
 	'.html': 'text/html; charset=utf-8',
+	'.gif': 'image/gif',
 	'.ico': 'image/x-icon',
+	'.jpeg': 'image/jpeg',
+	'.jpg': 'image/jpeg',
 	'.js': 'text/javascript; charset=utf-8',
 	'.json': 'application/json; charset=utf-8',
-	'.md': 'text/markdown; charset=utf-8',
+	'.otf': 'font/otf',
 	'.png': 'image/png',
 	'.svg': 'image/svg+xml',
+	'.ttf': 'font/ttf',
 	'.wasm': 'application/wasm',
+	'.webp': 'image/webp',
+	'.woff': 'font/woff',
+	'.woff2': 'font/woff2',
 	'.zip': 'application/zip'
 };
 
 export interface Mount {
-	/** URL prefix, leading slash and no trailing one. `''` is the root mount. */
+	/** URL prefix, leading slash and no trailing one. `''` is the root mount. Two mounts may
+	 *  share one, and the first listed that holds the file answers. */
 	prefix: string;
 	root: string;
 }
 
-/** A file a request may have, and its length off the stat that found it. */
+/**
+ * What a response says about caching. `none` is the loop: an author repacks under it, and a
+ * cache would answer about the last generation. `host` is the four rules a deploy's host
+ * owes it (QUILLKIT §"The deploy layout"), so a preview caches as the host will.
+ */
+export type Caching = 'none' | 'host';
+
+export interface ServeOptions {
+	caching?: Caching;
+	/** Answer any origin, so a client of its own on another port reads a dev quiver. */
+	cors?: boolean;
+}
+
+/** A file a request may have, its length off the stat that found it, and the path it was
+ *  asked for by. */
 export interface Served {
 	at: string;
 	size: number;
+	path: string;
+}
+
+/** What `host` caching answers for a path: the client's hash-named bundle forever, and
+ *  everything else revalidated, `quiver/quiver.json` above all. */
+function cacheFor(caching: Caching, path: string): string {
+	if (caching === 'none') return 'no-store';
+	return path.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
 }
 
 /**
@@ -54,7 +86,8 @@ export interface Served {
  * so the longest-prefix order and each root are settled once rather than per request.
  */
 export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
-	// Longest prefix first, so `/quiver/…` reaches the pack rather than the client.
+	// Longest prefix first, so `/quiver/…` reaches the pack rather than the client. The sort
+	// is stable, so mounts sharing a prefix keep the order they were listed in.
 	const ordered = [...mounts]
 		.sort((a, b) => b.prefix.length - a.prefix.length)
 		.map((m) => ({ prefix: m.prefix, root: resolve(m.root) }));
@@ -69,31 +102,31 @@ export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
 		}
 		if (path.includes('\0')) return null;
 
-		const mount = ordered.find(
-			(m) => m.prefix === '' || path === m.prefix || path.startsWith(`${m.prefix}/`)
-		);
-		if (mount === undefined) return null;
+		for (const mount of ordered) {
+			if (mount.prefix !== '' && path !== mount.prefix && !path.startsWith(`${mount.prefix}/`))
+				continue;
+			const rest = path.slice(mount.prefix.length).replace(/^\/+/, '');
+			// One screen, no router: the root is the client's `index.html` and nothing else
+			// falls back to it, so a missing asset is a 404 rather than a page.
+			const at = resolve(mount.root, rest === '' ? 'index.html' : rest);
 
-		const rest = path.slice(mount.prefix.length).replace(/^\/+/, '');
-		// One screen, no router: the root is the client's `index.html` and nothing else
-		// falls back to it, so a missing asset is a 404 rather than a page.
-		const at = resolve(mount.root, rest === '' ? 'index.html' : rest);
+			// The escape refusal, checked on the resolved path: `%2e%2e`, a doubled separator
+			// and a plain `..` all collapse into one answer here, where a check against the
+			// request text would have to anticipate each spelling.
+			if (!within(mount.root, at)) return null;
 
-		// The escape refusal, checked on the resolved path: `%2e%2e`, a doubled separator
-		// and a plain `..` all collapse into one answer here, where a check against the
-		// request text would have to anticipate each spelling.
-		if (!within(mount.root, at)) return null;
-
-		// One stat answers all three questions the response has: is it there, is it a
-		// file, how long is it. A second would read a tree a repack swaps under the
-		// server, and the length it read would not be the body's.
-		let stats;
-		try {
-			stats = statSync(at);
-		} catch {
-			return null;
+			// One stat answers all three questions the response has: is it there, is it a
+			// file, how long is it. A second would read a tree a repack swaps under the
+			// server, and the length it read would not be the body's.
+			let stats;
+			try {
+				stats = statSync(at);
+			} catch {
+				continue;
+			}
+			if (stats.isFile()) return { at, size: stats.size, path };
 		}
-		return stats.isFile() ? { at, size: stats.size } : null;
+		return null;
 	};
 }
 
@@ -102,12 +135,11 @@ export function fileFor(mounts: Mount[], url: string): string | null {
 	return fileResolver(mounts)(url)?.at ?? null;
 }
 
-/**
- * A server over `mounts`. Nothing is cached: this is a loop an author repacks under,
- * and a dev server that answered from a cache would be answering about the last
- * generation.
- */
-export function createStaticServer(mounts: Mount[]): Server {
+/** A server over `mounts`, caching as `caching` says. */
+export function createStaticServer(
+	mounts: Mount[],
+	{ caching = 'none', cors = false }: ServeOptions = {}
+): Server {
 	const resolveFile = fileResolver(mounts);
 
 	return createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -125,7 +157,8 @@ export function createStaticServer(mounts: Mount[]): Server {
 		res.writeHead(200, {
 			'content-type': TYPES[extname(found.at).toLowerCase()] ?? 'application/octet-stream',
 			'content-length': found.size,
-			'cache-control': 'no-store'
+			'cache-control': cacheFor(caching, found.path),
+			...(cors ? { 'access-control-allow-origin': '*' } : {})
 		});
 		if (req.method === 'HEAD') {
 			res.end();
@@ -135,7 +168,7 @@ export function createStaticServer(mounts: Mount[]): Server {
 		const stream = createReadStream(found.at);
 		// A repack removes the file between the stat and the open, and a `ReadStream`
 		// that errors with nothing listening throws out of the event loop and takes the
-		// studio down mid-session. The head is already written, so the answer is a
+		// loop down mid-session. The head is already written, so the answer is a
 		// destroyed response rather than a status: a body short of the length it
 		// declared has to be a read a client can tell from a whole one.
 		stream.on('error', () => res.destroy());

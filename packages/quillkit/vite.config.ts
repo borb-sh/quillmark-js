@@ -1,4 +1,3 @@
-import { cp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from '@quillmark/quiver/node';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
@@ -9,7 +8,7 @@ import { carried } from '../../scripts/carried.mjs';
 // the bin's; the two share a manifest and a `dist`, and meet nowhere else: the tool
 // serves these bytes to a tab and imports none of them.
 //
-// The pack, as this repository serves the client over it. `quillkit studio` is the
+// The pack, as this repository serves the client over it. `quillkit dev` is the
 // loop an author runs and this is not a second copy of it: the pack is `build`, which
 // lands a generation whole, and what is left here is the two things a dev server adds
 // and a bin has no use for: the first pack before the server exists, and a repack
@@ -26,13 +25,9 @@ const DIST = fileURLToPath(new URL('dist/client', import.meta.url));
  *  pack is the step every browser consumer of a quiver performs. */
 const SOURCE = fileURLToPath(new URL('../../fixtures', import.meta.url));
 /** Vite's verbatim-copy tree, which is the dev server's alone: the built client
- *  carries no quiver, and `quillkit site` lays one beside it. Generated, and
+ *  carries no quiver, and `quillkit build studio` lays one beside it. Generated, and
  *  gitignored. */
 const OUT = fileURLToPath(new URL('client/public/quiver', import.meta.url));
-/** The fixture's templates and their manifest, laid beside the pack where `--templates`
- *  lays a collection's. Generated, and gitignored. */
-const TEMPLATES = fileURLToPath(new URL('../../fixtures/templates', import.meta.url));
-const TEMPLATES_OUT = fileURLToPath(new URL('client/public/templates', import.meta.url));
 /** One repack per settled burst: an editor's save arrives as several watcher events. */
 const SETTLE_MS = 80;
 /** The dev-only signal that a repack landed. The client answers it by minting a
@@ -57,11 +52,7 @@ function quiverSource(): Plugin {
 	// overlapping packs would race over one tree. Both arms chain, so a pack queues onto
 	// a settled promise whichever way the last one went; a rejected link would answer
 	// every later pack with the first failure instead of running it.
-	const run = async (): Promise<void> => {
-		await build(SOURCE, OUT);
-		await rm(TEMPLATES_OUT, { recursive: true, force: true });
-		await cp(TEMPLATES, TEMPLATES_OUT, { recursive: true });
-	};
+	const run = (): Promise<void> => build(SOURCE, OUT);
 	let queue: Promise<void> = Promise.resolve();
 	const pack = (): Promise<void> => (queue = queue.then(run, run));
 

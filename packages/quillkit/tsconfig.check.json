@@ -3,7 +3,7 @@
 // against that same config left every test file unchecked, and a boundary rename in
 // `@quillmark/quiver` or `@quillmark/wasm` would land in a test with nothing to catch it.
 //
-// The two configs come in with it. Both run in Node, both reach the packer, and
+// The three configs come in with it. Both run in Node, both reach the packer, and
 // `svelte-check` reads neither: the client's program is `tsconfig.client.json`.
 {
 	"extends": "./tsconfig.json",
@@ -13,6 +13,6 @@
 		// files beside it come into the program.
 		"rootDir": "."
 	},
-	"include": ["src", "vitest.config.ts", "vite.config.ts"],
+	"include": ["src", "vitest.config.ts", "vite.config.ts", "vite.app.config.ts"],
 	"exclude": []
 }

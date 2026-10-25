@@ -92,6 +92,12 @@ const SCOPES = [
 		prefix: '--st-',
 		derivation: 'packages/quillkit/client/studio.css',
 		doc: 'ARCHITECTURE §Styling'
+	},
+	{
+		dir: 'packages/quillkit/app',
+		prefix: '--app-',
+		derivation: 'packages/quillkit/app/chrome.css',
+		doc: 'ARCHITECTURE §Styling'
 	}
 ];
 
@@ -306,11 +312,12 @@ function* selectorsOf(root) {
 // ── The bundle half ─────────────────────────────────────────────────────────────
 
 if (process.argv.includes('--built')) {
-	/** The built consumers in this workspace: what `quillkit studio` serves, what
-	 *  `quillkit site` lays into a deploy, and what Pages holds. A third-party consumer takes
-	 *  the package the same way. CI names the site laid from the tarball as an argument. */
+	/** The built consumers in this workspace: the studio and app clients quillkit lays into
+	 *  a deploy, and what Pages holds. A third-party consumer takes the package the same way.
+	 *  CI names the deploys laid from the tarball as arguments. */
 	const bundles = [
 		join(ROOT, 'packages/quillkit/dist/client'),
+		join(ROOT, 'packages/quillkit/dist/app'),
 		join(ROOT, 'packages/playground/build'),
 		...process.argv.slice(process.argv.indexOf('--built') + 1).map((a) => resolve(a))
 	];
