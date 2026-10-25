@@ -137,6 +137,13 @@ describe('a continuous gesture', () => {
 		}
 	});
 
+	it('holds a fit across the same share of a gesture whatever its size', () => {
+		const held = (fit: number): boolean[] =>
+			[1.01, 1.02, 1.03, 1.05, 1.08].map((r) => glide(at(fit), fit * r, 0, fit).shown === fit);
+		expect(held(0.42)).toEqual(held(1.2));
+		expect(held(0.6)).toEqual(held(1.2));
+	});
+
 	it('holds between the floor and the ceiling', () => {
 		expect(glide(at(1.5), 10, 0, onLevel).shown).toBe(MAX_ZOOM);
 		expect(glide(at(0.7), 0.1, 0.6, onLevel).shown).toBe(0.6);

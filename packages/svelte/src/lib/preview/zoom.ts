@@ -22,8 +22,11 @@ const FLOOR_FILL = 0.9;
  *  keys land on, so a step lands somewhere a reader has been before. */
 export const STEPS = [0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const;
 
-/** How far past 100% a continuous gesture carries before it leaves it. */
+/** How far, as a log of the zoom's ratio to a hold, a continuous gesture carries past it
+ *  before it leaves it: a ratio, so a hold is as wide at a phone's fit as at 100%. */
 const DETENT = 0.04;
+
+const near = (zoom: number, hold: number): boolean => Math.abs(Math.log(zoom / hold)) <= DETENT;
 
 /** The pane's content box, in CSS px. */
 export interface Pane {
@@ -56,7 +59,7 @@ export function clampZoom(zoom: number, floor: number): number {
  *  place of any level within {@link DETENT} of it, since fit is the one that follows the
  *  pane. */
 function stops(fit: number): number[] {
-	return [...STEPS.filter((s) => Math.abs(s - fit) > DETENT), fit].sort((a, b) => a - b);
+	return [...STEPS.filter((s) => !near(s, fit)), fit].sort((a, b) => a - b);
 }
 
 /** The next level in `dir` from `zoom`, `fit` among them, skipping levels under `floor`.
@@ -88,12 +91,12 @@ export interface Glide {
  *  either stops there, at the first it meets. 100% gives way to a `fit` within the
  *  detent of it: two holds that close would pin the run between them. */
 export function glide(run: Glide, raw: number, floor: number, fit: number): Glide {
-	const holds = Math.abs(fit - 1) > DETENT ? [fit, 1] : [fit];
+	const holds = near(fit, 1) ? [fit] : [fit, 1];
 	let next = clampZoom(raw, floor);
 	const crossed = holds
 		.filter((t) => (run.shown - t) * (next - t) < 0)
 		.sort((a, b) => Math.abs(a - run.shown) - Math.abs(b - run.shown));
 	if (crossed.length) next = crossed[0];
-	const shown = holds.find((t) => Math.abs(next - t) <= DETENT) ?? next;
+	const shown = holds.find((t) => near(next, t)) ?? next;
 	return { raw: next, shown: clampZoom(shown, floor) };
 }
