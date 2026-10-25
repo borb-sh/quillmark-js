@@ -152,24 +152,15 @@ li.ProseMirror-selectednode::after {
 	font-size: inherit;
 }
 
-/* A font run (`fonts.ts`): the family draws in the registry face registered under its
-   alias, the surface's own face standing in where none is, and a step at the helper's
-   default (theme.css). A code span and an equation inside a sized run keep the size
-   around it, as the Typst lowering sets neither inside one. */
+/* A font run (`fonts.ts`): the innermost span's family draws in the registry face
+   registered under its alias, the surface's own face standing in where none is, as the
+   render sets a family it lacks in the surrounding font. A family the registry lacks
+   takes the danger tint besides, the leaf's word that the preview cannot set it. */
 .ProseMirror [data-qm-font-family] {
 	font-family: var(--_qm-run-font), var(--_qm-font);
 }
-.ProseMirror [data-qm-font-size='small'] {
-	font-size: var(--_qm-text-step-small);
-}
-.ProseMirror [data-qm-font-size='large'] {
-	font-size: var(--_qm-text-step-large);
-}
-.ProseMirror [data-qm-font-size='small'] :is(code, [data-qm-island='math']) {
-	font-size: var(--_qm-text-unstep-small);
-}
-.ProseMirror [data-qm-font-size='large'] :is(code, [data-qm-island='math']) {
-	font-size: var(--_qm-text-unstep-large);
+.ProseMirror .qm-font-missing {
+	background: var(--_qm-danger-tint);
 }
 
 /* A fence's language at the label rung in its top corner, read off the `data-lang` the

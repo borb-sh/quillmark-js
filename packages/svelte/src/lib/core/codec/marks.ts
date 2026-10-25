@@ -1,5 +1,5 @@
 // Mark algebra: two content classes to two PM mechanisms.
-//   formatting (strong/emph/underline/strike/code/link/font_family/font_size) ↔ PM marks
+//   formatting (strong/emph/underline/strike/code/link/font_family) ↔ PM marks
 //   identity   (anchor{id}, zero-width)                  ↔ decorations (see field.ts)
 // This module owns the type-name translation and the descriptor keying the mark
 // diff groups by; the anchor↔decoration bridge is field.ts, the mark ops are
@@ -21,8 +21,6 @@ export function pmMarkFromContent(schema: Schema, m: ContentMark): Mark | null {
 			return schema.marks.link.create({ href: m.attrs.url });
 		case 'font_family':
 			return schema.marks.font_family.create({ name: m.attrs.name });
-		case 'font_size':
-			return schema.marks.font_size.create({ step: m.attrs.step });
 		case 'strong':
 		case 'underline':
 		case 'strike':
@@ -38,8 +36,8 @@ export function pmMarkFromContent(schema: Schema, m: ContentMark): Mark | null {
 /**
  * A content mark descriptor from a PM mark (range-free): the `{ type, … }` half
  * of a `ContentMark` / `MarkOp`. `em` collapses to `emph` and a link's `href` rides
- * out as the `url` its payload spells; a font mark's attribute is its payload's own;
- * the other four are their own content name, which is what the cast claims.
+ * out as the `url` its payload spells; a family's `name` is its payload's own; the
+ * other four are their own content name, which is what the cast claims.
  */
 export function contentDescriptorFromPM(mark: Mark): ContentMarkKind {
 	const name = mark.type.name;
@@ -47,8 +45,6 @@ export function contentDescriptorFromPM(mark: Mark): ContentMarkKind {
 	if (name === 'link') return { type: 'link', attrs: { url: mark.attrs.href as string } };
 	if (name === 'font_family')
 		return { type: 'font_family', attrs: { name: mark.attrs.name as string } };
-	if (name === 'font_size')
-		return { type: 'font_size', attrs: { step: mark.attrs.step as 'small' | 'large' } };
 	return { type: name as 'strong' | 'underline' | 'strike' | 'code' };
 }
 

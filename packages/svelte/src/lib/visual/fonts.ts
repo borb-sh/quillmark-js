@@ -1,15 +1,16 @@
 // The font registry the editor offers and draws in: the faces a render of the quill
-// sets type in (`engine.fontFaces(quill)`), handed over as the `fonts` prop. Two reads
-// come off it. The family menu lists its families, and the paste pass keeps a family it
-// holds (`core/codec/font-paste.ts`). Each face registers with the document's font set
-// under the alias the leaf draws a family's run in (`core/codec/fonts.ts`), so a marked
-// run shows its real face and a writer sees where it starts and ends.
+// sets type in (`engine.fontFaces(quill)`), handed over as the `fonts` prop. Three reads
+// come off it. The family menu lists its families, the paste pass keeps a family it holds
+// (`core/codec/font-paste.ts`), and a leaf marks a run set in a family it lacks
+// (`core/codec/fonts.ts`). Each face registers with the document's font set under the
+// alias the leaf draws a family's run in, so a marked run shows its real face and a
+// writer sees where it starts and ends.
 //
 // The families reach the tree through context, as the wording does: the popover and
 // every leaf want them, and nothing between the root and those reads them.
 import { getContext, setContext } from 'svelte';
 import type { FontFace as QuillFontFace } from '@quillmark/wasm';
-import { fontAlias } from '../core/codec/index.js';
+import { fontAlias, type FontRegistry } from '../core/codec/index.js';
 
 /** Each family once, in its first face's spelling, in the registry's order. */
 export function registryFamilies(faces: readonly QuillFontFace[]): string[] {
@@ -76,17 +77,12 @@ export function registerFaces(faces: readonly QuillFontFace[]): () => void {
 
 const KEY = Symbol('qm.fonts');
 
-/** The registry's families as the tree reads them: a getter, so a host handing over a
- *  new registry reaches the mounted menu and leaves. */
-export interface FontRegistry {
-	readonly families: readonly string[];
-}
-
 export function setFontRegistry(registry: FontRegistry): void {
 	setContext(KEY, registry);
 }
 
-/** The registry under a mounted editor; an empty one off-tree. */
-export function fontRegistry(): FontRegistry {
-	return getContext<FontRegistry>(KEY) ?? { families: [] };
+/** The registry under a mounted editor; `undefined` off-tree, where a leaf keeps no
+ *  pasted family and marks no run. */
+export function fontRegistry(): FontRegistry | undefined {
+	return getContext<FontRegistry | undefined>(KEY);
 }

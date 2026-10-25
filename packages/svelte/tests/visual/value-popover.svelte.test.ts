@@ -172,9 +172,8 @@ const SIX = [
 	DEFAULT_VISUAL_STRINGS.formatCode,
 	DEFAULT_VISUAL_STRINGS.formatLink
 ];
-/** The font menus' triggers, last: the family's only over a registry. */
-const SIZE = [DEFAULT_VISUAL_STRINGS.formatSize];
-const FONT = [DEFAULT_VISUAL_STRINGS.formatFont, DEFAULT_VISUAL_STRINGS.formatSize];
+/** The family menu's trigger, last, and only over a registry. */
+const FONT = [DEFAULT_VISUAL_STRINGS.formatFont];
 
 /** Commit the number beside the leaves: a revision, and so a re-derive. */
 function rederive(m: Mounted<InnerRef>): void {
@@ -223,7 +222,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 
 		const popover = await surface();
 		expect(popover).not.toBeNull();
-		expect(labels(popover!)).toEqual([...SIX, ...SIZE]);
+		expect(labels(popover!)).toEqual(SIX);
 		popover!
 			.querySelector<HTMLButtonElement>(`[aria-label="${DEFAULT_VISUAL_STRINGS.formatBold}"]`)!
 			.click();
@@ -334,25 +333,37 @@ describe('the formatting popover over a field’s own leaf', () => {
 
 		expect(editor.getActiveLeaf()?.views.view.dom).toBe(intro);
 		const popover = await surface();
-		expect(labels(popover!)).toEqual([...SIX, ...LISTS, ...SIZE]);
+		expect(labels(popover!)).toEqual([...SIX, ...LISTS]);
 		expect(labels(popover!)).not.toContain(DEFAULT_VISUAL_STRINGS.formatAnchor);
 	});
 
-	it('draws the family menu over a registry, each menu showing what the selection is in', async () => {
+	/** The family menu over `intro`'s first run, the registry holding Carlito alone. */
+	async function familyShown(intro: string): Promise<(string | null)[]> {
 		const q = probe();
 		const doc = load();
-		q.writer(doc).set('intro', '<qm-font family="Carlito">Intro</qm-font> words');
+		q.writer(doc).set('intro', intro);
 		const fonts = [
 			{ family: 'Carlito', weight: 400, style: 'normal' as const, index: 0, data: new Uint8Array() }
 		];
 		const { editor } = mountInner(q, doc, { fonts });
-		const intro = await land(editor, 'main.intro');
-		select(intro, 0, 3, true, intro.querySelector('[data-qm-font-family]')!.firstChild!);
-
+		const leaf = await land(editor, 'main.intro');
+		const run = leaf.querySelector('[data-qm-font-family]')!;
+		select(leaf, 0, 3, true, document.createTreeWalker(run, NodeFilter.SHOW_TEXT).nextNode()!);
 		const popover = await surface();
 		expect(labels(popover!)).toEqual([...SIX, ...LISTS, ...FONT]);
-		const shown = [...popover!.querySelectorAll('.qm-format-menu-shown')].map((s) => s.textContent);
-		expect(shown).toEqual(['Carlito', DEFAULT_VISUAL_STRINGS.formatSizeNormal]);
+		return [...popover!.querySelectorAll('.qm-format-menu-shown')].map((s) => s.textContent);
+	}
+
+	it('draws the family menu over a registry, showing the family the selection is in', async () => {
+		expect(await familyShown('<qm-font family="Carlito">Intro</qm-font> words')).toEqual([
+			'Carlito'
+		]);
+	});
+
+	it('shows a family the registry lacks as unavailable', async () => {
+		expect(await familyShown('<qm-font family="Gone">Intro</qm-font> words')).toEqual([
+			DEFAULT_VISUAL_STRINGS.formatFontMissing('Gone')
+		]);
 	});
 
 	it('numbers the selected line, and the list lands in the store', async () => {

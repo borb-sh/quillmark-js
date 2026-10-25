@@ -1,6 +1,6 @@
 <!--
- One of the formatting popover's font menus (FormatPopover): a trigger showing what
- the selection is set in, and the list of what a pick sets it to. Driven controlled, as
+ The formatting popover's family menu (FormatPopover): a trigger showing what the
+ selection is set in, and the list of what a pick sets it to. Driven controlled, as
  EnumField is: the selection is the value, and a pick is a command the popover runs at
  the leaf, never a value this component keeps.
 
@@ -27,7 +27,7 @@
 	interface Props {
 		/** The accessible name and hover title. */
 		label: string;
-		/** The selected row, `undefined` over a selection set in more than one value. */
+		/** The row in force, `undefined` where none is. */
 		value: string | undefined;
 		/** What the closed trigger shows. */
 		shown: string;

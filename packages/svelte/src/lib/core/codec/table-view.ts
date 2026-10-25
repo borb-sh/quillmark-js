@@ -35,7 +35,7 @@ import type { TableCell, TableProps } from '@quillmark/wasm';
 import { decode } from './decode.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
-import { fontPastePlugin } from './font-paste.js';
+import { fontPlugins, type FontRegistry } from './fonts.js';
 import { tablePropsOfNode } from './islands.js';
 import { tableElement, tableText } from './table-copy.js';
 import { breakKeymap } from './breaks.js';
@@ -135,8 +135,8 @@ export interface TableViewDeps {
 	 *  is a cell's line box too. `undefined` where the derivation is out of reach (jsdom),
 	 *  which is PM's 5px default. */
 	clearance: number | undefined;
-	/** The font registry's families, read at a paste: a pasted run keeps one it holds. */
-	fontFamilies: () => readonly string[];
+	/** The font registry a cell's font passes read (`fonts.ts`). */
+	fonts: FontRegistry | undefined;
 }
 
 /** The grip's glyph, as the path data a DOM node can carry — this chrome's own set rather
@@ -232,15 +232,14 @@ function chromeButton(className: string, label: string, run: () => void): HTMLBu
 	return btn;
 }
 
-/** A cell's plugin stack: marks, the markdown shorthands, a pasted URL's link and a
- *  pasted run's family, and nothing that belongs to the field (history, anchors, the
- *  ghost). */
-function cellPlugins(keys: Record<string, Command>, families: () => readonly string[]) {
+/** A cell's plugin stack: marks, the markdown shorthands, a pasted URL's link, the font
+ *  passes, and nothing that belongs to the field (history, anchors, the ghost). */
+function cellPlugins(keys: Record<string, Command>, fonts: FontRegistry | undefined) {
 	return [
 		inputRulesPlugin(cellSchema),
 		undoRuleKeymap(),
 		linkPastePlugin(cellSchema.marks.link),
-		fontPastePlugin(families),
+		...fontPlugins(cellSchema, fonts),
 		keymap(keys),
 		keymap(baseKeymap)
 	];
@@ -481,7 +480,7 @@ class TableIslandView implements NodeView {
 			const head = mounted.view.state.selection.head;
 			const fresh = EditorState.create({
 				doc: decode(cellContent(stored), cellSchema),
-				plugins: cellPlugins(this.cellKeys(mounted.r, mounted.c), this.deps.fontFamilies)
+				plugins: cellPlugins(this.cellKeys(mounted.r, mounted.c), this.deps.fonts)
 			});
 			mounted.view.updateState(fresh);
 			mounted.shown = stored;
@@ -1481,7 +1480,7 @@ class TableIslandView implements NodeView {
 		const view: EditorView = new EditorView(host, {
 			state: EditorState.create({
 				doc: decode(cellContent(seed), cellSchema),
-				plugins: cellPlugins(this.cellKeys(r, c), this.deps.fontFamilies)
+				plugins: cellPlugins(this.cellKeys(r, c), this.deps.fonts)
 			}),
 			attributes: { 'aria-label': name, class: 'qm-table-cell-editor' },
 			// A cell is one of the leaf's lines, so a reveal here keeps the leaf's

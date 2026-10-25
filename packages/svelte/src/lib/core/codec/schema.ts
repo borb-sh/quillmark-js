@@ -18,7 +18,7 @@
 // marks, a `<table>` being the block leaf's clipboard parser's (`table-paste.ts`).
 import { Schema } from 'prosemirror-model';
 import type { MarkSpec, NodeSpec, NodeType, TagParseRule } from 'prosemirror-model';
-import { cssString, fontAlias, isFontStep } from './fonts.js';
+import { cssString, fontAlias } from './fonts.js';
 import { islandBlockSpec, islandInlineSpec } from './islands.js';
 import { taskBody, taskChecked, taskDOM } from './tasks.js';
 import { rendersHref, storableUrl } from './urls.js';
@@ -81,14 +81,15 @@ const marks: Record<string, MarkSpec> = {
 		],
 		toDOM: () => ['s', 0]
 	},
-	// A font run's family and step (`fonts.ts`). Ahead of `code`, so a code span inside a
-	// run renders inside its span and keeps the code face, as Typst keeps `raw`'s. Each
-	// excludes its own type, PM's default, which is the store's one family and one step
-	// per position. The family draws in the face registered under its alias, falling to
-	// the surface's own where none is (`prose.css`); a paste reaches this spelling only
-	// through `font-paste.ts`, which checks the family against the registry.
+	// A font run's family (`fonts.ts`). Ahead of `code`, so a code span inside a run
+	// renders inside its span and keeps the code face, as Typst keeps `raw`'s. It excludes
+	// nothing, its own type included, so families overlap as the store's do and the
+	// innermost span draws. The family draws in the face registered under its alias,
+	// falling to the surface's own where none is (`prose.css`); a paste reaches this
+	// spelling only through `font-paste.ts`, which checks the family against the registry.
 	font_family: {
 		attrs: { name: {} },
+		excludes: '',
 		parseDOM: [
 			{
 				tag: 'span[data-qm-font-family]',
@@ -106,19 +107,6 @@ const marks: Record<string, MarkSpec> = {
 				0
 			];
 		}
-	},
-	font_size: {
-		attrs: { step: {} },
-		parseDOM: [
-			{
-				tag: 'span[data-qm-font-size]',
-				getAttrs: (el) => {
-					const step = el.getAttribute('data-qm-font-size');
-					return isFontStep(step) ? { step } : false;
-				}
-			}
-		],
-		toDOM: (mark) => ['span', { 'data-qm-font-size': mark.attrs.step as string }, 0]
 	},
 	code: { parseDOM: [{ tag: 'code' }], toDOM: () => ['code', 0] },
 	link: {

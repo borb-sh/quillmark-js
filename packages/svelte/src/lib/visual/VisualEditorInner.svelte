@@ -18,7 +18,7 @@
  once per derive.
 -->
 <script lang="ts">
-	import { onDestroy, tick } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { DropdownMenu } from 'bits-ui';
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
@@ -122,14 +122,22 @@
 	});
 
 	// The font registry, published to the tree as the wording is, and its faces held in
-	// the document's font set for as long as this mount draws them.
-	const families = $derived(registryFamilies(fonts ?? []));
+	// the document's font set for as long as this mount draws them. A leaf reads the
+	// families outside any effect, so it is told when they change.
+	const families = $derived(fonts && registryFamilies(fonts));
+	const fontWatchers = new Set<() => void>();
 	setFontRegistry({
-		get families() {
-			return families;
+		families: () => families,
+		watch(fn) {
+			fontWatchers.add(fn);
+			return () => fontWatchers.delete(fn);
 		}
 	});
 	$effect(() => registerFaces(fonts ?? []));
+	$effect(() => {
+		void families;
+		untrack(() => fontWatchers.forEach((fn) => fn()));
+	});
 
 	// ── Reactivity + session identity ───────────────────────────────────────────
 	let revision = $state(0);

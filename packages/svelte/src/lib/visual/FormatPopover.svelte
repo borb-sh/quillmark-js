@@ -15,11 +15,11 @@
  being this surface's: a document `keydown` the leaf's keymap left unclaimed. Over a
  leaf that holds lists, two more buttons number or bullet every selected line, or take
  the marker off where every one carries it: the codec's `toggleList`, whose keys
- (Mod-Shift-7/8) the leaf's keymap binds. Over a leaf whose schema holds the font marks,
- two menus set the selection's family, out of the registry the editor was handed
- (`fonts.ts`), and its size step (FormatMenu). Each shows what the whole selection is
- set in, or that it is set in more than one; a family the registry does not hold shows
- as itself and is not offered.
+ (Mod-Shift-7/8) the leaf's keymap binds. Over a leaf whose schema holds the font mark, a
+ menu sets the selection's family out of the registry the editor was handed (`fonts.ts`,
+ FormatMenu), or takes the families it draws in off. It shows what the whole selection is
+ set in, or that it is set in more than one; a family the registry does not hold shows as
+ unavailable and is not offered.
 
  Selection observation. The view's `dispatchTransaction` is the leaf's
  (read-only), so there is no hook to observe transactions from outside.
@@ -84,12 +84,10 @@
 		fontAlias,
 		hasMarks,
 		rangeAnchor,
+		removeFontFamily,
 		selectionFamily,
-		selectionStep,
 		setFontFamily,
-		setFontStep,
 		toggleList,
-		type FontStep,
 		type RangeAnchor
 	} from '../core/codec/index.js';
 	import type { ActiveProse } from './leaves.js';
@@ -123,20 +121,18 @@
 	]);
 
 	const registry = fontRegistry();
-	/** The font menus' rows taking a run's family or step off: the surrounding one. */
-	const DEFAULT_FAMILY = '__qm_default__';
-	const NORMAL = 'normal';
+	/** The family menu's row taking the families the selection draws in off. */
+	const REMOVE_FAMILY = '__qm_remove__';
 
 	let open = $state(false);
-	/** The view the surface was raised over. A font menu takes the focus, and a cell view
-	 *  without it is no longer the leaf's `focusedView`. */
+	/** The view the surface was raised over. The family menu takes the focus, and a cell
+	 *  view without it is no longer the leaf's `focusedView`. */
 	let surfaceView: EditorView | undefined;
-	/** Whether the leaf under the selection holds the font marks: a `text` leaf does not. */
+	/** Whether the leaf under the selection holds the font mark: a `text` leaf does not. */
 	let fontable = $state(false);
-	/** What the whole selection is set in: a family or a step, `null` for the surrounding
-	 *  one, `undefined` for more than one. */
+	/** The family the whole selection is set in, `null` for none, `undefined` for more
+	 *  than one. */
 	let family = $state<string | null | undefined>(null);
-	let step = $state<FontStep | null | undefined>(null);
 	/** Whether the leaf under the selection holds lists: a body does, a one-line field
 	 *  and a table cell do not. */
 	let listable = $state(false);
@@ -208,7 +204,6 @@
 		surfaceView = view;
 		fontable = !!view.state.schema.marks.font_family;
 		family = selectionFamily(view.state);
-		step = selectionStep(view.state);
 		const { from, to } = view.state.selection;
 		anchor = rangeAnchor(view, from, to);
 		open = true;
@@ -250,14 +245,14 @@
 		});
 	}
 
-	/** Whether `node` is in an open font menu's list (FormatMenu). */
+	/** Whether `node` is in the open family menu's list (FormatMenu). */
 	function inMenu(node: EventTarget | null): boolean {
 		return node instanceof Element && !!node.closest('[data-qm-format-menu]');
 	}
 
 	function onPointerDown(e: PointerEvent): void {
 		// A press on the surface is not a selection gesture, and lowering it here would
-		// take the button out from under the pointer before its click. A font menu's
+		// take the button out from under the pointer before its click. The family menu's
 		// list is the surface's too, though it portals out of it.
 		if (contentEl?.contains(e.target as Node) || inMenu(e.target)) return;
 		pressed = true;
@@ -378,40 +373,36 @@
 		closePrompt(clearLink);
 	}
 
+	const families = $derived(registry?.families() ?? []);
 	/** The registry's spelling of the family the selection is set in, where it holds it:
 	 *  the engine matches a family lowercased, so a run naming `carlito` is the registry's
 	 *  `Carlito`. */
 	const heldFamily = $derived(
 		typeof family === 'string'
-			? registry.families.find((f) => f.toLowerCase() === family?.toLowerCase())
+			? families.find((f) => f.toLowerCase() === family?.toLowerCase())
 			: undefined
 	);
 	const familyItems = $derived([
-		{ value: DEFAULT_FAMILY, label: t.strings.formatFontDefault },
-		...registry.families.map((f) => ({
+		...families.map((f) => ({
 			value: f,
 			label: f,
 			face: `${cssString(fontAlias(f))}, var(--_qm-font)`
 		})),
 		...(typeof family === 'string' && !heldFamily
 			? [{ value: family, label: t.strings.formatFontMissing(family), disabled: true }]
-			: [])
+			: []),
+		...(family === null ? [] : [{ value: REMOVE_FAMILY, label: t.strings.formatFontRemove }])
 	]);
 	/** A registry to pick from, or a selection set in some family to take off. */
-	const familyOffered = $derived(fontable && (registry.families.length > 0 || family !== null));
-	const sizeItems = $derived([
-		{ value: 'small', label: t.strings.formatSizeSmall },
-		{ value: NORMAL, label: t.strings.formatSizeNormal },
-		{ value: 'large', label: t.strings.formatSizeLarge }
-	]);
+	const familyOffered = $derived(fontable && (families.length > 0 || family !== null));
 
-	/** Run a font menu's pick at the view the surface stands over. */
+	/** Run a family pick at the view the surface stands over. */
 	function setFont(cmd: Command): void {
 		const view = surfaceView && !surfaceView.isDestroyed ? surfaceView : activeLeafView();
 		if (view) cmd(view.state, view.dispatch);
 	}
 
-	/** A font menu closed: the leaf takes the focus back, and the surface reads the
+	/** The family menu closed: the leaf takes the focus back, and the surface reads the
 	 *  selection the pick left. */
 	function closeMenu(): void {
 		const view = surfaceView && !surfaceView.isDestroyed ? surfaceView : activeLeafView();
@@ -540,30 +531,20 @@
 										>
 									{/each}
 								{/if}
-								{#if fontable}
+								{#if familyOffered}
 									<span class="qm-format-divider" aria-hidden="true"></span>
-									{#if familyOffered}
-										<FormatMenu
-											label={t.strings.formatFont}
-											value={family === null ? DEFAULT_FAMILY : (heldFamily ?? family)}
-											shown={family === undefined
-												? t.strings.formatFontMixed
-												: (family ?? t.strings.formatFontDefault)}
-											items={familyItems}
-											{portalTarget}
-											onPick={(v) => setFont(setFontFamily(v === DEFAULT_FAMILY ? null : v))}
-											onClose={closeMenu}
-										/>
-									{/if}
 									<FormatMenu
-										label={t.strings.formatSize}
-										value={step === null ? NORMAL : step}
-										shown={step === undefined
+										label={t.strings.formatFont}
+										value={family === null ? undefined : (heldFamily ?? family)}
+										shown={family === undefined
 											? t.strings.formatFontMixed
-											: (sizeItems.find((i) => i.value === (step ?? NORMAL))?.label ?? '')}
-										items={sizeItems}
+											: family === null
+												? t.strings.formatFontDefault
+												: (heldFamily ?? t.strings.formatFontMissing(family))}
+										items={familyItems}
 										{portalTarget}
-										onPick={(v) => setFont(setFontStep(v === NORMAL ? null : (v as FontStep)))}
+										onPick={(v) =>
+											setFont(v === REMOVE_FAMILY ? removeFontFamily : setFontFamily(v))}
 										onClose={closeMenu}
 									/>
 								{/if}

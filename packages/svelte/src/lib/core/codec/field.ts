@@ -50,7 +50,7 @@ import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
-import { fontPastePlugin } from './font-paste.js';
+import { fontPlugins, type FontRegistry } from './fonts.js';
 import { linePastePlugin } from './line-paste.js';
 import { listPastePlugin } from './list-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
@@ -119,9 +119,10 @@ export interface CreateFieldOpts {
 	/** The slash surface's wording, read per decoration pass. Absent leaves the
 	 *  package's English; read only beside {@link onSlash}, the hint being the menu's. */
 	slashStrings?: () => SlashStrings;
-	/** The font registry's families, read at a paste: a pasted run keeps a family they
-	 *  hold (`font-paste.ts`). Absent, a pasted run keeps none. */
-	fontFamilies?: () => readonly string[];
+	/** The font registry: a pasted run keeps a family it holds (`font-paste.ts`), and a
+	 *  run set in a family it lacks is marked as one the render cannot set (`fonts.ts`).
+	 *  Absent, a pasted run keeps no family and no run is marked. */
+	fonts?: FontRegistry;
 	/** Accessible name → `aria-label` on the `contenteditable`. For a leaf nothing
 	 * else names: an array element (the field label plus its 1-based index), the
 	 * card body (no visible label at all). A leaf with a field label takes
@@ -438,7 +439,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 						// follow a caret clicked straight into a table.
 						onCellFocus: () => opts.onFocus?.(addr),
 						clearance,
-						fontFamilies: opts.fontFamilies ?? (() => [])
+						fonts: opts.fonts
 					})
 				}
 			: undefined,
@@ -509,7 +510,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
 				cap: opts.cap,
-				fontFamilies: opts.fontFamilies,
+				fonts: opts.fonts,
 				afterHistory: [anchorPlugin(seededAnchors)]
 			})
 		});
@@ -780,8 +781,8 @@ export function proseLeafPlugins(
 		/** {@link CreateFieldOpts.cap}. Ahead of every other paste handler, which a paste
 		 *  it cuts never reaches. */
 		cap?: TextCap;
-		/** {@link CreateFieldOpts.fontFamilies}. */
-		fontFamilies?: () => readonly string[];
+		/** {@link CreateFieldOpts.fonts}. */
+		fonts?: FontRegistry;
 		afterHistory?: Plugin[];
 	}
 ): Plugin[] {
@@ -797,7 +798,7 @@ export function proseLeafPlugins(
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));
 	if (schema.marks.link) list.push(linkPastePlugin(schema.marks.link));
-	if (schema.marks.font_family && opts.fontFamilies) list.push(fontPastePlugin(opts.fontFamilies));
+	list.push(...fontPlugins(schema, opts.fonts));
 	// Each answers to something only the block schema holds: any other leaf is
 	// textblocks alone, with no island and no gap to put a cursor in.
 	if (isBlockSchema(schema))

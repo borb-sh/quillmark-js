@@ -135,7 +135,7 @@
 	}: Props = $props();
 
 	const t = wording();
-	const registry = fontRegistry();
+	const fonts = fontRegistry();
 	const seat = valueLeafSeat();
 	const uid = $props.id();
 	const heldId = `${uid}-held`;
@@ -216,7 +216,7 @@
 								inline,
 								placeholder: () => placeholder,
 								cap,
-								fontFamilies: () => registry.families
+								fonts
 							})
 				});
 			};

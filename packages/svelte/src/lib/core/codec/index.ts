@@ -83,15 +83,8 @@ export { listKeymap } from './lists.js';
 // buttons run (`visual/FormatPopover.svelte`).
 export { toggleList } from './list-toggle.js';
 
-// Font runs: what the popover's font menus read off the selection and the commands they
-// run (`visual/FormatPopover.svelte`), and the family a registry face registers under
-// (`visual/fonts.ts`).
-export {
-	cssString,
-	fontAlias,
-	selectionFamily,
-	selectionStep,
-	setFontFamily,
-	setFontStep
-} from './fonts.js';
-export type { FontStep } from './fonts.js';
+// Font runs: what the popover's family menu reads off the selection and the commands it
+// runs (`visual/FormatPopover.svelte`), the family a registry face registers under, and
+// the registry a leaf reads (`visual/fonts.ts`).
+export { cssString, fontAlias, removeFontFamily, selectionFamily, setFontFamily } from './fonts.js';
+export type { FontRegistry } from './fonts.js';

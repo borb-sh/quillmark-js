@@ -124,18 +124,15 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	formatBulletedList: string;
 	/** The family menu's accessible name. */
 	formatFont: string;
-	/** The family menu's row taking a run's family off: the surrounding family. */
+	/** What the family menu shows over a selection set in no family. */
 	formatFontDefault: string;
 	/** A family the selection is set in and the registry does not hold, drawn as the
 	 *  menu's current value and not offered as a pick. */
 	formatFontMissing: (family: string) => string;
-	/** The size menu's accessible name. */
-	formatSize: string;
-	formatSizeSmall: string;
-	/** The size menu's row taking a run's step off: the surrounding size. */
-	formatSizeNormal: string;
-	formatSizeLarge: string;
-	/** What either menu shows over a selection set in more than one value. */
+	/** The family menu's row taking the families the selection draws in off, uncovering
+	 *  any they sat in. */
+	formatFontRemove: string;
+	/** What the family menu shows over a selection set in more than one family. */
 	formatFontMixed: string;
 	/** The anchor button's accessible name. The popover withholds the button, so
 	 *  nothing draws this or the title below. */
@@ -261,10 +258,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	formatFont: 'Font',
 	formatFontDefault: 'Default font',
 	formatFontMissing: (family) => `${family} (not available)`,
-	formatSize: 'Size',
-	formatSizeSmall: 'Small',
-	formatSizeNormal: 'Normal',
-	formatSizeLarge: 'Large',
+	formatFontRemove: 'Remove font',
 	formatFontMixed: 'Mixed',
 	formatAnchor: 'Anchor',
 	formatAnchorTitle: 'Anchor — an identity handle over the selection',
