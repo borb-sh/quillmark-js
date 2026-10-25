@@ -1,23 +1,28 @@
 #!/usr/bin/env node
 /**
  * The quill author's toolchain, one bin over the whole lifecycle: verbs are its steps and a
- * verb's argument is a target, `quiver`, `studio` or `app` (QUILLKIT §"Verbs and targets").
- * `usage()` below is the spelling of every verb and its flags. The quiver is the working
- * directory.
+ * verb's argument is a target, `quiver`, `studio` or `app`, studio where none is named
+ * (QUILLKIT §"Verbs and targets"). `usage()` below is the spelling of every verb and its
+ * flags. The quiver is the working directory.
  */
 
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { build as pack, fromDir } from '@quillmark/quiver/node';
 import { APP_JSON, prepareApp, writeApp } from '../app-files.js';
 import { CLIENTS, assertClient, layOut, targetOf, type Target } from '../deploy.js';
 import { gate, message } from '../gate.js';
-import { layStarter } from '../new.js';
+import { layStarter } from '../init.js';
 import { createStaticServer, listen, type Mount } from '../serve.js';
 import { serialize, watchCollection } from '../watch.js';
 
 const HOST = 'localhost';
-const PORTS = { dev: 5174, preview: 4174 };
+/** The live loop's port, and a built deploy's beside it, so both can run at once. */
+const PORTS = { live: 5174, built: 4174 };
+
+/** The short spelling of each flag that has one. */
+const SHORT: Record<string, string> = { '-o': '--out', '-p': '--port', '-D': '--drafts' };
 
 interface Spec {
 	/** Flags taking a value, spelled `--name value` or `--name=value`. */
@@ -45,12 +50,13 @@ function parse(verb: string, args: string[], { values = [], switches = [], words
 			continue;
 		}
 		const eq = arg.indexOf('=');
-		const name = eq === -1 ? arg : arg.slice(0, eq);
+		const said = eq === -1 ? arg : arg.slice(0, eq);
+		const name = SHORT[said] ?? said;
 		if (switches.includes(name) && eq === -1) {
 			out.switches.add(name);
 			continue;
 		}
-		if (!values.includes(name)) throw new Usage(`quillkit ${verb} takes no ${name}`);
+		if (!values.includes(name)) throw new Usage(`quillkit ${verb} takes no ${said}`);
 		const value = eq === -1 ? args[++i] : arg.slice(eq + 1);
 		if (value === undefined || value === '' || value.startsWith('-'))
 			throw new Usage(`${name} takes a value`);
@@ -75,50 +81,90 @@ function portOf(args: Args, fallback: number): number {
 const frontDoor = (target: Target, port: number): string =>
 	`http://${HOST}:${port}/${target === 'quiver' ? 'quiver/' : ''}`;
 
+/** `url` in the platform's browser. Best effort: a machine with no opener, a CI runner
+ *  above all, serves on and says where. */
+function openBrowser(url: string): void {
+	const [command, args] =
+		process.platform === 'darwin'
+			? ['open', [url]]
+			: process.platform === 'win32'
+				? ['cmd', ['/c', 'start', '""', url]]
+				: ['xdg-open', [url]];
+	try {
+		const child = spawn(command, args, { stdio: 'ignore', detached: true });
+		child.on('error', () => console.error(`  no browser opener here: open ${url} yourself.`));
+		child.unref();
+	} catch {
+		console.error(`  no browser opener here: open ${url} yourself.`);
+	}
+}
+
 // ---------------------------------------------------------------------------
-// new
+// init
 // ---------------------------------------------------------------------------
 
-/** A new quiver in the named directory, else the working one: one quill that passes `test`
- *  and opens in `dev`. It refuses a directory that already holds a quiver rather than
+/** A new quiver in the named directory, else the working one: one quill that passes `check`
+ *  and opens in `serve`. It refuses a directory that already holds a quiver rather than
  *  merging into it. */
-async function create(args: string[]): Promise<void> {
-	const dir = parse('new', args, { words: 1 }).words[0] ?? '.';
+async function init(args: string[]): Promise<void> {
+	const dir = parse('init', args, { words: 1 }).words[0] ?? '.';
 	const { at, wrotePackage, install } = await layStarter(dir);
 	const steps = [
 		...(resolve(dir) === resolve('.') ? [] : [`cd ${JSON.stringify(dir)}`]),
 		wrotePackage ? 'npm install' : `npm install --save-dev ${install}`,
-		'npx quillkit dev'
+		'npx quillkit serve --open'
 	];
-	console.log(`quillkit new: ${at}`);
+	console.log(`quillkit init: ${at}`);
 	console.log('  quills/letter/0.1.0/ is the quill: Quill.yaml, plate.typ, example.md.');
 	console.log(`\nNext:\n${steps.map((s) => `  ${s}`).join('\n')}`);
 }
 
 // ---------------------------------------------------------------------------
-// test
+// check
 // ---------------------------------------------------------------------------
 
-async function test(args: string[]): Promise<void> {
-	const { switches } = parse('test', args, { switches: ['--drafts'], words: 0 });
+async function check(args: string[]): Promise<void> {
+	const { switches } = parse('check', args, { switches: ['--drafts'], words: 0 });
 	const { pass, fail } = await gate(resolve('.'), { drafts: switches.has('--drafts') });
 	console.log(`\n${pass}/${pass + fail} passed`);
 	if (fail > 0) process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
-// dev
+// build
 // ---------------------------------------------------------------------------
+
+async function build(args: string[]): Promise<void> {
+	const parsed = parse('build', args, { values: ['--out'], switches: ['--drafts'], words: 1 });
+	const target = targetOf(parsed.words[0], 'build');
+	const { at, warnings } = await layOut({
+		target,
+		root: resolve('.'),
+		out: parsed.values.get('--out') ?? 'dist',
+		drafts: parsed.switches.has('--drafts')
+	});
+	for (const said of warnings) console.error(`warn  ${said}`);
+	console.log(`quillkit build ${target}: ${at}`);
+}
+
+// ---------------------------------------------------------------------------
+// serve
+// ---------------------------------------------------------------------------
+
+/** Either half of `serve`, by whether `--built` is among its arguments. */
+async function serve(args: string[]): Promise<void> {
+	return args.includes('--built') ? serveBuilt(args) : serveLive(args);
+}
 
 /**
  * The local loop: pack the quiver into a served tree, serve the target's client over it,
  * and repack when the source changes. It always packs the drafts, being the author looking
  * at their own quiver (QUILLKIT §"The local loop").
  */
-async function dev(args: string[]): Promise<void> {
-	const parsed = parse('dev', args, { values: ['--port'], words: 1 });
-	const target = parsed.words[0] === undefined ? 'studio' : targetOf(parsed.words[0], 'dev');
-	const port = portOf(parsed, PORTS.dev);
+async function serveLive(args: string[]): Promise<void> {
+	const parsed = parse('serve', args, { values: ['--port'], switches: ['--open'], words: 1 });
+	const target = targetOf(parsed.words[0], 'serve');
+	const port = portOf(parsed, PORTS.live);
 	const root = resolve('.');
 	// Under the quiver's `node_modules`, which is both out of the way and already excluded
 	// from the watch.
@@ -162,34 +208,15 @@ async function dev(args: string[]): Promise<void> {
 			process.exit(0);
 		});
 
-	console.log(`quillkit dev ${target}: ${frontDoor(target, bound)}`);
+	const url = frontDoor(target, bound);
+	console.log(`quillkit serve ${target}: ${url}`);
 	console.log(`  quiver: ${root}`);
 	console.log('  reload the page to pick up a repack.');
+	if (parsed.switches.has('--open')) openBrowser(url);
 }
 
-// ---------------------------------------------------------------------------
-// build
-// ---------------------------------------------------------------------------
-
-async function build(args: string[]): Promise<void> {
-	const parsed = parse('build', args, { values: ['--out'], switches: ['--drafts'], words: 1 });
-	const target = targetOf(parsed.words[0], 'build');
-	const { at, warnings } = await layOut({
-		target,
-		root: resolve('.'),
-		out: parsed.values.get('--out') ?? 'dist',
-		drafts: parsed.switches.has('--drafts')
-	});
-	for (const said of warnings) console.error(`warn  ${said}`);
-	console.log(`quillkit build ${target}: ${at}`);
-}
-
-// ---------------------------------------------------------------------------
-// preview
-// ---------------------------------------------------------------------------
-
-/** What a target's build leaves at a deploy's root, which is how `preview` tells one from
- *  another. */
+/** What a target's build leaves at a deploy's root, which is how `serve --built` tells one
+ *  from another. */
 const BUILT: Record<Target, (dir: string) => boolean> = {
 	quiver: (dir) => existsSync(join(dir, 'quiver', 'quiver.json')),
 	studio: (dir) => existsSync(join(dir, 'index.html')) && !existsSync(join(dir, APP_JSON)),
@@ -198,10 +225,14 @@ const BUILT: Record<Target, (dir: string) => boolean> = {
 
 /** A built deploy, served as a static host serves it: at the root, a missing path a 404, and
  *  the host's cache rules on every response (QUILLKIT §"The deploy layout"). */
-async function preview(args: string[]): Promise<void> {
-	const parsed = parse('preview', args, { values: ['--out', '--port'], words: 1 });
-	const target = targetOf(parsed.words[0], 'preview');
-	const port = portOf(parsed, PORTS.preview);
+async function serveBuilt(args: string[]): Promise<void> {
+	const parsed = parse('serve --built', args, {
+		values: ['--out', '--port'],
+		switches: ['--built', '--open'],
+		words: 1
+	});
+	const target = targetOf(parsed.words[0], 'serve --built');
+	const port = portOf(parsed, PORTS.built);
 	const dir = resolve(parsed.values.get('--out') ?? 'dist');
 	if (!BUILT[target](dir))
 		throw new Error(`${dir} holds no ${target} build: run \`quillkit build ${target}\` first`);
@@ -210,8 +241,10 @@ async function preview(args: string[]): Promise<void> {
 		port,
 		HOST
 	);
-	console.log(`quillkit preview ${target}: ${frontDoor(target, bound)}`);
+	const url = frontDoor(target, bound);
+	console.log(`quillkit serve --built ${target}: ${url}`);
 	console.log(`  serving: ${dir}`);
+	if (parsed.switches.has('--open')) openBrowser(url);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,22 +255,18 @@ function usage(): void {
 	console.error(
 		[
 			'Usage:',
-			'  quillkit new     [<dir>]',
-			'  quillkit test    [--drafts]',
-			'  quillkit dev     [quiver|studio|app] [--port <n>]',
-			'  quillkit build   quiver|studio|app [--out <dir>] [--drafts]',
-			'  quillkit preview quiver|studio|app [--out <dir>] [--port <n>]'
+			'  quillkit init  [<dir>]',
+			'  quillkit check [-D|--drafts]',
+			'  quillkit build [quiver|studio|app] [-o|--out <dir>] [-D|--drafts]',
+			'  quillkit serve [quiver|studio|app] [-p|--port <n>] [--open]',
+			'  quillkit serve --built [quiver|studio|app] [-o|--out <dir>] [-p|--port <n>] [--open]',
+			'',
+			'The target is studio where none is named.'
 		].join('\n')
 	);
 }
 
-const VERBS: Record<string, (args: string[]) => Promise<void>> = {
-	new: create,
-	test,
-	dev,
-	build,
-	preview
-};
+const VERBS: Record<string, (args: string[]) => Promise<void>> = { init, check, build, serve };
 
 const [verb, ...rest] = process.argv.slice(2);
 

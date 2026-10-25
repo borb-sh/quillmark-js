@@ -1,5 +1,5 @@
 /**
- * `new`: a quiver from nothing (QUILLKIT §"Where a quiver comes from"). The quills come out
+ * `init`: a quiver from nothing (QUILLKIT §"Where a quiver comes from"). The quills come out
  * of the tarball's `starter/`; the files that name versions are written here.
  */
 
@@ -38,7 +38,7 @@ export async function layStarter(dir: string): Promise<Laid> {
 	const laid = await readdir(STARTER);
 	for (const entry of laid) {
 		const path = join(at, entry);
-		if (existsSync(path)) throw new Error(`${path} already exists: new lays a new quiver`);
+		if (existsSync(path)) throw new Error(`${path} already exists: init lays a new quiver`);
 	}
 
 	const own = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
@@ -56,7 +56,11 @@ export async function layStarter(dir: string): Promise<Laid> {
 			name: packageName(at),
 			version: '0.1.0',
 			private: true,
-			scripts: { dev: 'quillkit dev', test: 'quillkit test', build: 'quillkit build app' },
+			scripts: {
+				serve: 'quillkit serve --open',
+				test: 'quillkit check',
+				build: 'quillkit build app'
+			},
 			devDependencies: { quillkit: range }
 		};
 		await writeFile(manifest, `${JSON.stringify(pkg, null, '\t')}\n`);

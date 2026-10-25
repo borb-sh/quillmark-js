@@ -2,18 +2,18 @@
 
 The quill author's toolchain: one command over a quiver's whole life. Start one, gate it, look at it, and build it into a studio for its authors or a standalone app for the people filling its forms in.
 
-A quiver is a collection of quills, and a quill is a document format: the fields a document fills in and the Typst plate that prints them. [Creating Quills](https://quillmark.dev/quills/creating-quills/) walks through the quiver `new` writes, one file at a time, and the [Glossary](https://quillmark.dev/getting-started/glossary/) defines the rest of the terms.
+A quiver is a collection of quills, and a quill is a document format: the fields a document fills in and the Typst plate that prints them. [Creating Quills](https://quillmark.dev/quills/creating-quills/) walks through the quiver `init` writes, one file at a time, and the [Glossary](https://quillmark.dev/getting-started/glossary/) defines the rest of the terms.
 
 ## Start
 
 ```sh
-npx quillkit@latest new my-quiver
+npx quillkit@latest init my-quiver
 cd my-quiver
 npm install
-npx quillkit dev
+npx quillkit serve --open
 ```
 
-`new` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`, `example.md`), and a `package.json` whose one devDependency is quillkit. The quill passes `quillkit test` as laid; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
+`init` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`, `example.md`), and a `package.json` whose one devDependency is quillkit. The quill passes `quillkit check` as laid; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
 
 `@latest` names the release outright. An unversioned `npx quillkit` takes the newest release whose `engines` admits the running Node.
 
@@ -23,30 +23,37 @@ npx quillkit dev
 npm install --save-dev quillkit
 ```
 
-That is the whole install. quillkit carries `@quillmark/quiver` and `@quillmark/wasm` at exact versions, and both of its clients are built against those same two, so what `test` renders, what `dev` shows and what a deploy serves are one release. Upgrading quillkit upgrades all of it. `dist/client/carried.json` names the versions, and each release's notes say the same in one line.
+That is the whole install. quillkit carries `@quillmark/quiver` and `@quillmark/wasm` at exact versions, and both of its clients are built against those same two, so what `check` renders, what `serve` shows and what a deploy serves are one release. Upgrading quillkit upgrades all of it. `dist/client/carried.json` names the versions, and each release's notes say the same in one line.
 
 ## The verbs
 
-Every verb runs over the quiver in the working directory. A verb's argument is a target: `quiver` (the packed quiver alone), `studio` (where you and your co-authors judge the quills) or `app` (what the people filling your forms in use).
+Every verb runs over the quiver in the working directory. A verb's argument is a target: `studio` (where you and your co-authors judge the quills, and the target when none is named), `app` (what the people filling your forms in use) or `quiver` (the packed quiver alone).
 
-| Verb                        | What it does                                                                     |
-| --------------------------- | -------------------------------------------------------------------------------- |
-| `quillkit new [<dir>]`      | lay a new quiver holding one starter quill                                       |
-| `quillkit test`             | the gate: every quill's seed and example render, and `App.yaml` resolves         |
-| `quillkit dev [target]`     | pack, serve the target over the pack, repack on save; `studio` when none is said |
-| `quillkit build <target>`   | lay the target's deploy into `dist/`                                             |
-| `quillkit preview <target>` | serve a built deploy the way a static host will                                  |
+| Verb                              | What it does                                                             |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `quillkit init [<dir>]`           | lay a new quiver holding one starter quill                               |
+| `quillkit check`                  | the gate: every quill's seed and example render, and `App.yaml` resolves |
+| `quillkit serve [target]`         | pack, serve the target over the pack, repack on save                     |
+| `quillkit build [target]`         | lay the target's deploy into `dist/`                                     |
+| `quillkit serve --built [target]` | serve a built deploy the way a static host will                          |
 
-The flags are `--drafts` (`test`, `build`: admit versions below `0.1.0`), `--port <n>` (`dev`, `preview`) and `--out <dir>` (`build`, `preview`: the deploy directory, `dist` by default). A verb refuses a flag it does not take. `build` and `preview` named no target refuse and list the three.
+| Flag                | Verbs                    |                                                   |
+| ------------------- | ------------------------ | ------------------------------------------------- |
+| `-D`, `--drafts`    | `check`, `build`         | admit versions below `0.1.0`; `serve` always does |
+| `-o`, `--out <dir>` | `build`, `serve --built` | the deploy directory, `dist` by default           |
+| `-p`, `--port <n>`  | `serve`                  | `5174` live, `4174` built                         |
+| `--open`            | `serve`                  | open the page in your browser                     |
+
+A verb refuses a flag it does not take.
 
 ## Gating
 
-`test` is what you are **blocked on**: it runs in CI and fails the build.
+`check` is what you are **blocked on**: it runs in CI and fails the build.
 
 ```jsonc
 // package.json
 {
-	"scripts": { "test": "quillkit test" }
+	"scripts": { "test": "quillkit check" }
 }
 ```
 
@@ -58,20 +65,20 @@ On vitest, jest or `node:test`, spawn the bin rather than rebuilding the loop ag
 import { execFileSync } from 'node:child_process';
 
 it('gates the quiver', () => {
-	execFileSync('quillkit', ['test'], { stdio: 'inherit' });
+	execFileSync('quillkit', ['check'], { stdio: 'inherit' });
 });
 ```
 
 ## Looking at it
 
-`dev` is what you **look at**: it packs your quiver, drafts included, serves a client over it, and repacks whenever you save. Reload the page to pick up a repack.
+`serve` is what you **look at**: it packs your quiver, drafts included, serves a client over it, and repacks whenever you save. Reload the page to pick up a repack.
 
 ```sh
-npx quillkit dev        # studio
-npx quillkit dev app    # the app, with your App.yaml and app.css
+npx quillkit serve --open      # studio
+npx quillkit serve app --open  # the app, with your App.yaml and app.css
 ```
 
-**Studio** is for authors. Pick a quill, edit, watch it paint, read the errors: `quillkit test` answers _does it work_, studio answers _what is it like to use_. The address bar names what is on screen (`?quill=showcase@1.0.0`), so a link goes to a quill; `?quill=showcase` and `?quill=showcase@1.0` resolve the way `getQuill` resolves them. **Edit source** is the document's canonical markdown, out and back in, and **Download PDF** is the page itself, rendered from the compile the preview is painting. Nothing it holds outlives the tab.
+**Studio** is for authors. Pick a quill, edit, watch it paint, read the errors: `quillkit check` answers _does it work_, studio answers _what is it like to use_. The address bar names what is on screen (`?quill=showcase@1.0.0`), so a link goes to a quill; `?quill=showcase` and `?quill=showcase@1.0` resolve the way `getQuill` resolves them. **Edit source** is the document's canonical markdown, out and back in, and **Download PDF** is the page itself, rendered from the compile the preview is painting. Nothing it holds outlives the tab.
 
 **The app** is for the people filling your forms in, and names no quill, version or file. One quill opens its form; several open a card for each. The form stands beside the page it prints, with a Form/Page switch on a phone, and **Download PDF** waits for the page to catch up with the last keystroke and refuses a page that does not render. **My documents** keeps every document a reader starts, in their browser only, to reopen, download as `.md` or delete; a reload reopens the one that was open.
 
@@ -112,8 +119,8 @@ What it may aim at is the theming contract: the `--qm-*` dials, `.qm-editor`, `.
 `build` writes the arrangement a static host serves into `dist/`:
 
 ```sh
-npx quillkit test && npx quillkit build app
-npx quillkit preview app
+npx quillkit check && npx quillkit build app
+npx quillkit serve --built app
 ```
 
 | Path                           | Target       |                                                 |
@@ -127,7 +134,7 @@ npx quillkit preview app
 
 **`--drafts` packs the versions below `0.1.0` too.** Without it `build` takes quiver's draft floor, as a deployment should; with it a studio deploy is a preview of the quiver as it stands, prototypes included.
 
-Each client resolves its quiver against `document.baseURI` and its assets relatively, so one build serves a root, a subpath and a preview URL with no rebuild, and a `?quill=` link needs no rewrite rule. `preview` serves `dist/` with the cache headers below, so a deploy is looked at under the rules it will meet.
+**No base path to configure.** Each client resolves its assets, its quiver, `app.json` and `app.css` relative to the page's own address, and the app keeps its documents per address, so one build serves a root, a subpath (`https://you.github.io/forms/`) and a preview URL with no rebuild, and a `?quill=` link needs no rewrite rule. Serve a subpath with its trailing `/`, which every static host redirects a directory to. `serve --built` serves `dist/` with the cache headers below, so a deploy is looked at under the rules it will meet.
 
 ### What a host owes it
 
@@ -147,7 +154,7 @@ On Vercel, a `vercel.json` at the repository root is the whole of it — a missi
 ```json
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"buildCommand": "quillkit test && quillkit build app",
+	"buildCommand": "quillkit check && quillkit build app",
 	"outputDirectory": "dist",
 	"headers": [
 		{
@@ -180,7 +187,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npx quillkit test
+      - run: npx quillkit check
       - run: npx quillkit build app
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -205,7 +212,7 @@ Keep the deploy in your own repository, as above: nothing outside it then holds 
 
 ```yaml
 - run: npm install --no-save quillkit
-- run: npx quillkit test
+- run: npx quillkit check
 - run: npx quillkit build app
 ```
 

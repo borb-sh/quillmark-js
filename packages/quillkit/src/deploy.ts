@@ -22,11 +22,14 @@ export const CLIENTS: Record<Target, string | undefined> = {
 	app: APP
 };
 
-/** `word` as a target, or a refusal naming them all. */
+/** What every verb takes where no target is named. */
+export const DEFAULT_TARGET: Target = 'studio';
+
+/** `word` as a target, the default where there is none, or a refusal naming them all. */
 export function targetOf(word: string | undefined, verb: string): Target {
-	if (word !== undefined && (TARGETS as readonly string[]).includes(word)) return word as Target;
-	const said = word === undefined ? 'needs a target' : `has no target "${word}"`;
-	throw new Error(`quillkit ${verb} ${said}: ${TARGETS.join(', ')}`);
+	if (word === undefined) return DEFAULT_TARGET;
+	if ((TARGETS as readonly string[]).includes(word)) return word as Target;
+	throw new Error(`quillkit ${verb} has no target "${word}": ${TARGETS.join(', ')}`);
 }
 
 export interface LayOptions {

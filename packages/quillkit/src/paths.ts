@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 export const STUDIO = fileURLToPath(new URL('../dist/client/', import.meta.url));
 export const APP = fileURLToPath(new URL('../dist/app/', import.meta.url));
 
-/** The quiver `new` copies. Anchored as the clients are. */
+/** The quiver `init` copies. Anchored as the clients are. */
 export const STARTER = fileURLToPath(new URL('../starter/', import.meta.url));
 
 /** True when `at` is `abs` or an ancestor of it. */

@@ -1,5 +1,5 @@
 /**
- * The static server `dev` serves the loop over and `preview` serves a deploy with. It
+ * The static server `serve` runs the loop over and `serve --built` serves a deploy with. It
  * composes its roots rather than copying one into another: the client out of this package,
  * the packed quiver out of the tree the packer swaps, an app's staged files beside them. A
  * repack replaces a directory the server reads per request, so nothing here is told a pack
@@ -56,7 +56,7 @@ export interface Mount {
 /**
  * What a response says about caching. `none` is the loop: an author repacks under it, and a
  * cache would answer about the last generation. `host` is the four rules a deploy's host
- * owes it (QUILLKIT §"The deploy layout"), so a preview caches as the host will.
+ * owes it (QUILLKIT §"The deploy layout"), so a built deploy served locally caches as the host will.
  */
 export type Caching = 'none' | 'host';
 

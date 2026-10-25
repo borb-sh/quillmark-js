@@ -4,9 +4,9 @@
 
 ## TL;DR
 
-The surface a quill author looks at their quiver through: pick a quill, edit, watch it paint, read the errors. `quillkit test` answers *does it work*; studio answers *what is it like to use*, which is where most of what makes a quill good or bad lives. This doc is its shape: what it is a client of, the repack loop the document survives, and the endorsed look it is drawn with.
+The surface a quill author looks at their quiver through: pick a quill, edit, watch it paint, read the errors. `quillkit check` answers *does it work*; studio answers *what is it like to use*, which is where most of what makes a quill good or bad lives. This doc is its shape: what it is a client of, the repack loop the document survives, and the endorsed look it is drawn with.
 
-Two readers, one client. The author works mid-edit, locally, against files on disk, and the loop below is theirs. A deployed quiver is frozen at a commit, so the reader who arrives at a URL (a reviewer following a branch, someone evaluating a quiver) gets the picker, the surfaces and the errors over one built quiver, with nothing to repack. One client rather than two: it is the same client `npx quillkit dev` over a working tree serves.
+Two readers, one client. The author works mid-edit, locally, against files on disk, and the loop below is theirs. A deployed quiver is frozen at a commit, so the reader who arrives at a URL (a reviewer following a branch, someone evaluating a quiver) gets the picker, the surfaces and the errors over one built quiver, with nothing to repack. One client rather than two: it is the same client `npx quillkit serve` over a working tree serves.
 
 What the two readers do not share is what they arrive knowing, and that is answered by two lines in the head rather than by a second client. The author typed the verb and reads past both; the reader followed a link, and is owed a page that says what it is and a document that can leave it.
 
@@ -14,7 +14,7 @@ What the two readers do not share is what they arrive knowing, and that is answe
 
 ## Looked at, not blocked on
 
-Studio is reached for when someone wants to see the thing; the gate is `quillkit test` (QUILLKIT §"Blocked on, looked at"). Nothing fails a build on studio's verdict, which is what lets it be an app at all: its chrome, its weight and its wasm are its own problem.
+Studio is reached for when someone wants to see the thing; the gate is `quillkit check` (QUILLKIT §"Blocked on, looked at"). Nothing fails a build on studio's verdict, which is what lets it be an app at all: its chrome, its weight and its wasm are its own problem.
 
 ## Why it is not the playground
 
@@ -43,7 +43,7 @@ The panel behind the source control is mounted only while open, for the same rea
 
 ## A client, and what serves it
 
-A browser cannot read the source layout, so studio ends at a built artifact behind a base URL, consumed with `Quiver.fromBuiltUrl`. Packing, watching and serving are `quillkit dev`'s, and none of it is here: `client/` is the client those verbs lay over a pack, and that is the whole of it.
+A browser cannot read the source layout, so studio ends at a built artifact behind a base URL, consumed with `Quiver.fromBuiltUrl`. Packing, watching and serving are `quillkit serve`'s, and none of it is here: `client/` is the client those verbs lay over a pack, and that is the whole of it.
 
 **Shipped inside the tool, and nothing in it is importable.** `vite build` lands the client at `dist/client`, beside the compiled bin under the one `dist` the tarball carries, with wasm and both libraries bundled in. quillkit is a **bundled terminal**: no importable entry, so `check:deps` asks it for no peer range, and its runtime dependencies are the wasm and the quiver its clients were built with, pinned exactly (QUILLKIT §"One pin"), so the bin and the bundles are one release. An importable entry would put studio's wasm in an importer's process, which is the thing the artifact's single-copy rule exists to prevent; the one wasm here runs in a browser tab, in a process nothing else shares.
 
@@ -53,11 +53,11 @@ A browser cannot read the source layout, so studio ends at a built artifact behi
 
 **The client** is an ordinary quiver consumer: `fromBuiltUrl(base)`, a picker over `quillNames()` and `versionsOf()` (both sync, so it needs no loading state), `getQuill(ref)`, then the surfaces over one `LiveSession`. The picker offers only what varies: an axis holding one value is printed rather than selected, since a working tree is usually one quill at one version and a control that cannot be used is chrome competing with the surface. The fact stays either way, an author having to know what they are looking at. The quill it holds is **borrowed** (cached per canonical ref for the quiver's lifetime and handed to every caller), so studio frees the session and the document and nothing else. It rewrites no quill bytes, so it needs no quill of its own.
 
-**One wasm, and the head says which.** The client bundles the release quillkit pins, and `quillkit test` renders through that same release out of quillkit's own install, so the page studio paints and the verdict the gate gives come from one version. The version is stated so the reader who cannot run `npm ls` is told what painted the page.
+**One wasm, and the head says which.** The client bundles the release quillkit pins, and `quillkit check` renders through that same release out of quillkit's own install, so the page studio paints and the verdict the gate gives come from one version. The version is stated so the reader who cannot run `npm ls` is told what painted the page.
 
 **And the bundle names the rest of what it carries.** A browser resolves nothing, so both siblings are compiled in too, and no manifest in a consumer's tree records which copies. The build stamps all three (`scripts/carried.mjs`), each at the version its manifest states: `__CARRIED__` for the running client, and `dist/client/carried.json` for a consumer reading the tarball without running it. A release's notes open with that file rendered out of the packed tarball, so the coordinate is minted once. A label rather than a claim about a working tree — nobody installs the contents of a bundle, so the coordinate is for diagnosis (and the seed of `init`'s ranges, QUILLKIT §"Where a quiver comes from"), and `release.yml` builds from the commit it tags, so a released tarball's manifests and its bytes agree by construction.
 
-**The client ships built and runs unbuilt.** The tarball carries what `vite build` produced; locally it is an ordinary Vite dev server, with HMR on its own chrome. That is the whole of what the dev server buys over `quillkit dev`, and the pack it serves is the same `build` the tool calls, so the loop is not written twice. An author who cannot run a bundler is the reason for the first, and the reason the wasm is bundled with it.
+**The client ships built and runs unbuilt.** The tarball carries what `vite build` produced; locally it is an ordinary Vite dev server, with HMR on its own chrome. That is the whole of what the dev server buys over `quillkit serve`, and the pack it serves is the same `build` the tool calls, so the loop is not written twice. An author who cannot run a bundler is the reason for the first, and the reason the wasm is bundled with it.
 
 **The bridge is studio's own; the shell's shape is not.** The caret bridge and the debounced recompile are consumer-layer by design, and a shared component wiring them would contradict the reason the wiring is the consumer's. The shape of the screen goes the other way: the pinned bands, the row a band puts its parts on, and the split's tracks and its breakpoint are the preset's classes on studio's own elements (THEMING §"The shell"). What studio writes is what a band is made of, which is where the look diverges: the mark's treatment, the head's depth and full-bleed rule, the seam the mounts meet at, and the depth of the switch band above them. A rule studio writes because the preset picked the playground's answer is the promotion coming apart, not a divergence.
 
@@ -73,9 +73,9 @@ Studio holds one document and it starts as the quill's own: while **Examples** i
 
 **What the blank hides, and the toggle that shows it.** The failures that only a long list or a wrapping value reveal are invisible on the seed, a document with no answer in it but a kind's `seed:`. **Examples** in the head is on until the author turns it off, since the page worth judging is the fullest one, and the example is that page as the quill's author wrote it: a whole document, where a per-field value could only illustrate one cell. Toggled either way it reopens the quill, discarding the document in hand: there is nothing to fill around, and a written example is an answer like any other. An example that will not open, a parse failure or a `$quill` other than the quill's bare name, lands in the notes and the seed stands in. A repack or an import lands as it stands.
 
-Off is the other half of the page — the ghosts and the defaults an unanswered field shows — which is why it is a toggle rather than the boot. `quillkit test` renders both halves: the seed of every quill, and its example where it ships one.
+Off is the other half of the page — the ghosts and the defaults an unanswered field shows — which is why it is a toggle rather than the boot. `quillkit check` renders both halves: the seed of every quill, and its example where it ships one.
 
-**The toggle outlives the tab, and the document does not.** It stands in the browser's storage, one key, absent being on. Which way an author judges a quill is their habit across every quill and every launch: a URL param would go with each `quillkit dev`, and a link to a studio on the author's own machine has no reader to carry it to. It holds no document, so what the tab rule protects holds: nothing stale lands on a field. Storage a private window refuses reads as on.
+**The toggle outlives the tab, and the document does not.** It stands in the browser's storage, one key, absent being on. Which way an author judges a quill is their habit across every quill and every launch: a URL param would go with each `quillkit serve`, and a link to a studio on the author's own machine has no reader to carry it to. It holds no document, so what the tab rule protects holds: nothing stale lands on a field. Storage a private window refuses reads as on.
 
 ## The document has doors
 
@@ -131,7 +131,7 @@ A throw is unwrapped rather than reported as one line: a `QuillmarkError` carrie
 
 **A diagnostic is shown where it is about, and nowhere else.** There is no list. An address is written in one of two spaces, and each has a surface: `path` is the document's, and the editor routes a diagnostic to its control by it; `location` is the quill's source — a file, a line and a column, which a compile failure carries and nothing the schema says does — and the strip over the paint names it, which is what an author opens their other editor at.
 
-What that costs is the third shape. A diagnostic carrying neither address reaches nothing, and studio does not show it. A quill emitting one has a problem worth knowing about, and studio is not where it is found; `quillkit test` is blocked on and is where a quill's own faults are answered for.
+What that costs is the third shape. A diagnostic carrying neither address reaches nothing, and studio does not show it. A quill emitting one has a problem worth knowing about, and studio is not where it is found; `quillkit check` is blocked on and is where a quill's own faults are answered for.
 
 **A document that will not compile is a state of the paint.** The session is transactional, so the last good paint stays on screen and stops answering the document. A failed **open** is the same state with nothing under it, and takes the same register: the failure at the surface it is about, carrying the place to open. The paint stays whole underneath where there is one, being the only evidence of what the plate did before it stopped compiling, and the strip is laid over rather than stacked above, so breaking a plate and fixing it do not resize what is being judged.
 
@@ -141,7 +141,7 @@ What that costs is the third shape. A diagnostic carrying neither address reache
 
 ## Not
 
-A Typst IDE: studio shows a quill, it does not edit the plate or the schema. Not a CMS: no auth, no persistence, no multi-doc management, matching the playground's own limit — a document leaves as a file the reader keeps, which is the converse of studio keeping it; the app keeps a reader's documents in their browser, and studio does not borrow that. Not a gate: `quillkit test` is blocked on, studio is looked at, and `quillkit dev` gates nothing. Not a tool: the client carries no verb, so every door onto it is one the bin beside it opens.
+A Typst IDE: studio shows a quill, it does not edit the plate or the schema. Not a CMS: no auth, no persistence, no multi-doc management, matching the playground's own limit — a document leaves as a file the reader keeps, which is the converse of studio keeping it; the app keeps a reader's documents in their browser, and studio does not borrow that. Not a gate: `quillkit check` is blocked on, studio is looked at, and `quillkit serve` gates nothing. Not a tool: the client carries no verb, so every door onto it is one the bin beside it opens.
 
 ## The door rule, for what comes next
 

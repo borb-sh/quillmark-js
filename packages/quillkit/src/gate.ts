@@ -1,11 +1,11 @@
 /**
- * `test`, the gate: every quill's seed renders, and so does its root `example.md` where it
+ * `check`, the gate: every quill's seed renders, and so does its root `example.md` where it
  * ships one, through the wasm this package carries, which is the wasm every deployed client
  * renders through (QUILLKIT §"One pin"). With an `App.yaml` beside the quiver, the app it
  * describes resolves too.
  *
  * The only door onto the verdict, so an author on vitest, jest or another runner spawns
- * the bin (`execFileSync('quillkit', ['test'])`) rather than rebuilding the loop.
+ * the bin (`execFileSync('quillkit', ['check'])`) rather than rebuilding the loop.
  */
 
 import { existsSync } from 'node:fs';
@@ -26,7 +26,7 @@ export function message(err: unknown): string {
 }
 
 export async function gate(root: string, { drafts }: { drafts: boolean }): Promise<Verdict> {
-	// Loaded here rather than at the top of the bin: `test` is the verb that renders.
+	// Loaded here rather than at the top of the bin: `check` is the verb that renders.
 	const { init, Engine } = await import('@quillmark/wasm');
 	const { formatDiagnostic } = await init();
 	const engine = new Engine();

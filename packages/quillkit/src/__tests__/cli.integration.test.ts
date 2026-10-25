@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { APP_JSON, APP_YAML } from '../app-files.js';
-import { TARGETS } from '../deploy.js';
+import { DEFAULT_TARGET, TARGETS } from '../deploy.js';
 import { scratch } from './helpers/collection.js';
 
 const run = promisify(execFile);
@@ -55,9 +55,10 @@ async function refused(args: string[], cwd: string): Promise<Error & { stdout?: 
 }
 
 /** A verb that serves, started, and the front door it prints. */
-async function serving(args: string[], cwd: string): Promise<URL> {
-	const child = spawn(process.execPath, [BIN, ...args, '--port', '0'], {
+async function serving(args: string[], cwd: string, env: NodeJS.ProcessEnv = {}): Promise<URL> {
+	const child = spawn(process.execPath, [BIN, ...args, '-p', '0'], {
 		cwd,
+		env: { ...process.env, ...env },
 		stdio: ['ignore', 'pipe', 'pipe']
 	});
 	children.push(child);
@@ -79,12 +80,12 @@ async function serving(args: string[], cwd: string): Promise<URL> {
 	});
 }
 
-describe('quillkit test', () => {
+describe('quillkit check', () => {
 	it(
 		'gates the reference quiver end-to-end',
 		async () => {
 			// A non-zero exit rejects, carrying the gate's own output as the failure.
-			const { stdout } = await run(process.execPath, [BIN, 'test', '--drafts'], {
+			const { stdout } = await run(process.execPath, [BIN, 'check', '--drafts'], {
 				cwd: await temp.collection()
 			});
 
@@ -96,7 +97,7 @@ describe('quillkit test', () => {
 	);
 
 	it('refuses a directory holding no quiver', async () => {
-		expect((await refused(['test'], await temp.dir())).message).toMatch(/Quiver\.yaml/);
+		expect((await refused(['check'], await temp.dir())).message).toMatch(/Quiver\.yaml/);
 	});
 
 	it(
@@ -107,7 +108,7 @@ describe('quillkit test', () => {
 			const md = await readFile(example, 'utf8');
 			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1.0\n'));
 
-			const failure = await refused(['test'], source);
+			const failure = await refused(['check'], source);
 
 			// A `FAIL` line is the gate's stderr, which the rejection's message carries.
 			expect(failure.message).toContain('FAIL  showcase@1.0.0');
@@ -122,22 +123,22 @@ describe('quillkit test', () => {
 			const source = await temp.collection();
 			await writeFile(join(source, APP_YAML), 'quills: [showcase, usaf_memo]\n');
 
-			const failure = await refused(['test'], source);
+			const failure = await refused(['check'], source);
 			expect(failure.message).toMatch(new RegExp(`FAIL {2}${APP_YAML} — .*--drafts`));
 
-			const { stdout } = await run(process.execPath, [BIN, 'test', '--drafts'], { cwd: source });
+			const { stdout } = await run(process.execPath, [BIN, 'check', '-D'], { cwd: source });
 			expect(stdout).toContain(`pass  ${APP_YAML} (showcase@1.0.0, usaf_memo@0.0.0)`);
 		},
 		RENDER_MS
 	);
 });
 
-describe('quillkit new', () => {
+describe('quillkit init', () => {
 	it(
 		'lays a quiver that needs only quillkit, passes the gate and builds into an app',
 		async () => {
 			const at = join(await temp.dir(), 'fresh');
-			await run(process.execPath, [BIN, 'new', at]);
+			await run(process.execPath, [BIN, 'init', at]);
 
 			const pkg = JSON.parse(await readFile(join(at, 'package.json'), 'utf8'));
 			const own = JSON.parse(await readFile(MANIFEST, 'utf8'));
@@ -145,7 +146,7 @@ describe('quillkit new', () => {
 			expect(pkg.dependencies).toBeUndefined();
 			expect(Object.values(pkg.scripts).join('\n')).toMatch(/quillkit build app/);
 
-			const { stdout } = await run(process.execPath, [BIN, 'test'], { cwd: at });
+			const { stdout } = await run(process.execPath, [BIN, 'check'], { cwd: at });
 			expect(stdout).toContain('pass  letter@0.1.0 (seed, example)');
 
 			await run(process.execPath, [BIN, 'build', 'app'], { cwd: at });
@@ -158,35 +159,37 @@ describe('quillkit new', () => {
 	it('refuses a directory that already holds a quiver, before writing anything', async () => {
 		const at = await temp.dir();
 		await writeFile(join(at, 'Quiver.yaml'), 'name: mine\n');
-		expect((await refused(['new'], at)).message).toMatch(/Quiver\.yaml already exists/);
+		expect((await refused(['init'], at)).message).toMatch(/Quiver\.yaml already exists/);
 		expect(await readdir(at)).toEqual(['Quiver.yaml']);
 	});
 
 	it('prints usage rather than laying a quiver under a flag', async () => {
 		const at = await temp.dir();
-		expect((await refused(['new', '--quiver', 'x'], at)).message).toMatch(/Usage:/);
+		expect((await refused(['init', '--quiver', 'x'], at)).message).toMatch(/Usage:/);
 		expect(await readdir(at)).toEqual([]);
 	});
 });
 
 describe('quillkit build', () => {
-	it('lays each target into dist/ by default, and where --out points', async () => {
+	it('lays studio into dist/ where no target is named, and each target where -o points', async () => {
 		const source = await temp.collection();
-		await run(process.execPath, [BIN, 'build', 'quiver'], { cwd: source });
-		expect(existsSync(join(source, 'dist', 'quiver', 'quiver.json'))).toBe(true);
+		const { stdout } = await run(process.execPath, [BIN, 'build'], { cwd: source });
+		expect(stdout).toContain(`quillkit build ${DEFAULT_TARGET}:`);
+		expect(existsSync(join(source, 'dist', 'index.html'))).toBe(true);
 
-		const out = join(await temp.dir(), 'site');
-		const { stdout } = await run(process.execPath, [BIN, 'build', 'studio', '--out', out], {
-			cwd: source
-		});
-		expect(stdout).toContain(`quillkit build studio: ${out}`);
-		expect(existsSync(join(out, 'index.html'))).toBe(true);
+		const out = join(await temp.dir(), 'pack');
+		await run(process.execPath, [BIN, 'build', 'quiver', '-o', out], { cwd: source });
 		expect(existsSync(join(out, 'quiver', 'quiver.json'))).toBe(true);
+		expect(existsSync(join(out, 'index.html'))).toBe(false);
 	}, 60_000);
 
-	it('names every target when given none, or one it does not have', async () => {
+	it('names every target when given one it does not have', async () => {
 		const source = await temp.collection();
-		for (const args of [['build'], ['build', 'site'], ['preview']]) {
+		for (const args of [
+			['build', 'site'],
+			['serve', 'site'],
+			['serve', '--built', 'site']
+		]) {
 			const { message } = await refused(args, source);
 			for (const target of TARGETS) expect(message, args.join(' ')).toContain(target);
 		}
@@ -194,9 +197,9 @@ describe('quillkit build', () => {
 	});
 });
 
-describe('quillkit dev', () => {
+describe('quillkit serve', () => {
 	it('serves studio by default: the client at the root and the drafts packed beneath it', async () => {
-		const url = await serving(['dev'], await temp.collection());
+		const url = await serving(['serve'], await temp.collection());
 
 		const index = await fetch(url);
 		expect(index.status).toBe(200);
@@ -211,7 +214,7 @@ describe('quillkit dev', () => {
 	}, 60_000);
 
 	it('serves the app over the same quiver, with the app.json the quiver resolves to', async () => {
-		const url = await serving(['dev', 'app'], await temp.collection());
+		const url = await serving(['serve', 'app'], await temp.collection());
 
 		expect((await fetch(url)).status).toBe(200);
 		const app = await fetch(new URL(APP_JSON, url));
@@ -223,13 +226,19 @@ describe('quillkit dev', () => {
 		for (const { ref } of quills)
 			expect(catalog.quills.map((q) => `${q.name}@${q.version}`)).toContain(ref);
 	}, 60_000);
+
+	it('serves on where --open finds no browser to open', async () => {
+		// An empty PATH is a machine with no opener, which is a CI runner's case.
+		const url = await serving(['serve', '--open'], await temp.collection(), { PATH: '' });
+		expect((await fetch(url)).status).toBe(200);
+	}, 60_000);
 });
 
-describe('quillkit preview', () => {
+describe('quillkit serve --built', () => {
 	it('serves a build as a static host does', async () => {
 		const source = await temp.collection();
-		await run(process.execPath, [BIN, 'build', 'app', '--drafts'], { cwd: source });
-		const url = await serving(['preview', 'app'], source);
+		await run(process.execPath, [BIN, 'build', 'app', '-D'], { cwd: source });
+		const url = await serving(['serve', '--built', 'app'], source);
 
 		const index = await fetch(url);
 		expect(index.status).toBe(200);
@@ -245,8 +254,8 @@ describe('quillkit preview', () => {
 
 	it('refuses a directory holding no build of the target', async () => {
 		const source = await temp.collection();
-		await run(process.execPath, [BIN, 'build', 'studio'], { cwd: source });
-		expect((await refused(['preview', 'app'], source)).message).toMatch(
+		await run(process.execPath, [BIN, 'build'], { cwd: source });
+		expect((await refused(['serve', '--built', 'app'], source)).message).toMatch(
 			/holds no app build: run `quillkit build app`/
 		);
 	});
@@ -262,17 +271,20 @@ describe('how a flag is spelled', () => {
 
 	it('refuses a flag given no value, and one the verb does not take', async () => {
 		const source = await temp.collection();
-		expect((await refused(['build', 'quiver', '--out'], source)).message).toMatch(
-			/--out takes a value/
-		);
+		for (const flag of ['--out', '-o'])
+			expect((await refused(['build', 'quiver', flag], source)).message).toMatch(
+				/--out takes a value/
+			);
 		// The quiver is the working directory: a `--quiver` read as absent would gate the
 		// wrong tree.
 		for (const args of [
-			['test', '--quiver', '.'],
-			['build', 'app', '--templates', 't'],
-			['dev', '--drafts']
+			['check', '--quiver', '.'],
+			['build', 'app', '--port', '1'],
+			['serve', '-D'],
+			['serve', '-o', 'dist'],
+			['serve', '--built', '--drafts']
 		])
-			expect((await refused(args, source)).message, args.join(' ')).toMatch(/takes no --/);
+			expect((await refused(args, source)).message, args.join(' ')).toMatch(/takes no -/);
 	});
 });
 

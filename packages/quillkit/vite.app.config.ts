@@ -6,7 +6,7 @@ import { carried } from '../../scripts/carried.mjs';
 // The app client, built: `app/` is its browser tree, landing at `dist/app` beside studio's
 // `dist/client`. The two clients share the modules they have in common by relative import
 // and nothing else, so each bundle carries only what its own graph reaches. There is no dev
-// server here: `quillkit dev app` serves this build over a packed quiver.
+// server here: `quillkit serve app` serves this build over a packed quiver.
 
 const ROOT = fileURLToPath(new URL('app', import.meta.url));
 const DIST = fileURLToPath(new URL('dist/app', import.meta.url));

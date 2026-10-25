@@ -8,11 +8,11 @@
 
 **A document reopens on the version it was made on.** Each `build app` records the versions it ships in `app-lock.json` beside `App.yaml`, to be committed; a version a later build no longer ships stays openable while the quiver holds it, and offers Update to the latest form with the document's markdown offered first.
 
-**The verbs are `new`, `test`, `dev`, `build` and `preview`, and each runs over the quiver in the working directory.** `init` is `new`; `studio` is `dev`, which serves studio unless named another target; `site` is `build studio`; `build` with no target refuses where it packed the quiver, and `build quiver` lays the pack at `dist/quiver`. `preview` serves a build with the cache headers a host owes it. `--quiver`, `--host` and `--templates` are gone, and a verb refuses a flag it does not take.
+**The verbs are `init`, `check`, `build` and `serve`, each over the quiver in the working directory and each taking a target, `studio` where none is named.** `test` is `check`. `studio` is `serve`, which repacks on save and always packs drafts, and `serve --built` serves a built deploy with the cache headers a host owes it. `site` is `build`, which lays studio, the app or the quiver alone into `dist/`. `-D`, `-o` and `-p` spell `--drafts`, `--out` and `--port`, and `serve --open` opens the page in the platform's browser. `--quiver`, `--host` and `--templates` are gone, and a verb refuses a flag it does not take.
 
-**quillkit carries `@quillmark/quiver` and `@quillmark/wasm`.** Both are exact dependencies, the versions both clients are built against, so a quiver installs quillkit alone and the gate renders through the wasm a deploy serves; `new` writes a `package.json` naming quillkit and nothing else. A quiver's own `@quillmark/*` install is not read, and neither is `quillkit.config.js`, so a custom `engine` export no longer reaches the gate.
+**quillkit carries `@quillmark/quiver` and `@quillmark/wasm`.** Both are exact dependencies, the versions both clients are built against, so a quiver installs quillkit alone and the gate renders through the wasm a deploy serves; `init` writes a `package.json` naming quillkit and nothing else. A quiver's own `@quillmark/*` install is not read, and neither is `quillkit.config.js`, so a custom `engine` export no longer reaches the gate.
 
-**Templates are gone.** Studio draws no template picker and reads no `?template=`, `test` and `build` take no `--templates`, and a deploy lays no `templates/`. A quill's filled page is its `example.md`.
+**Templates are gone.** Studio draws no template picker and reads no `?template=`, `check` and `build` take no `--templates`, and a deploy lays no `templates/`. A quill's filled page is its `example.md`.
 
 ## v0.19.3 - 2026-10-23
 

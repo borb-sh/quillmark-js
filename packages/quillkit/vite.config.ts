@@ -8,7 +8,7 @@ import { carried } from '../../scripts/carried.mjs';
 // the bin's; the two share a manifest and a `dist`, and meet nowhere else: the tool
 // serves these bytes to a tab and imports none of them.
 //
-// The pack, as this repository serves the client over it. `quillkit dev` is the
+// The pack, as this repository serves the client over it. `quillkit serve` is the
 // loop an author runs and this is not a second copy of it: the pack is `build`, which
 // lands a generation whole, and what is left here is the two things a dev server adds
 // and a bin has no use for: the first pack before the server exists, and a repack

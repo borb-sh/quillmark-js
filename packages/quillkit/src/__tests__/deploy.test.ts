@@ -16,7 +16,15 @@ import { join } from 'node:path';
 import { parse } from 'yaml';
 import { APP_JSON, APP_LOCK, RESERVED } from '../app-files.js';
 import { APP, STUDIO } from '../paths.js';
-import { CLIENTS, TARGETS, assertClient, assertSafeOut, layOut, targetOf } from '../deploy.js';
+import {
+	CLIENTS,
+	DEFAULT_TARGET,
+	TARGETS,
+	assertClient,
+	assertSafeOut,
+	layOut,
+	targetOf
+} from '../deploy.js';
 import { scratch } from './helpers/collection.js';
 
 const temp = scratch('quillkit-deploy-');
@@ -88,17 +96,17 @@ describe('the targets', () => {
 		expect(await refs(true)).toContain('usaf_memo@0.0.0');
 	});
 
-	it('names every target when asked for none, or for one it does not have', () => {
-		for (const word of [undefined, 'site']) {
-			const refused = (() => {
-				try {
-					targetOf(word, 'build');
-				} catch (err) {
-					return (err as Error).message;
-				}
-			})();
-			for (const target of TARGETS) expect(refused).toContain(target);
-		}
+	it('takes the default where no target is named, and names every target for one it does not have', () => {
+		expect(targetOf(undefined, 'build')).toBe(DEFAULT_TARGET);
+		expect(TARGETS).toContain(DEFAULT_TARGET);
+		const refused = (() => {
+			try {
+				targetOf('site', 'build');
+			} catch (err) {
+				return (err as Error).message;
+			}
+		})();
+		for (const target of TARGETS) expect(refused).toContain(target);
 	});
 });
 

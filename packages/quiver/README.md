@@ -178,6 +178,6 @@ npm install --save-dev quillkit
 ```jsonc
 // package.json
 {
-	"scripts": { "test": "quillkit test" }
+	"scripts": { "test": "quillkit check" }
 }
 ```
