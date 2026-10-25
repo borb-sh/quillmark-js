@@ -34,20 +34,29 @@ jobs:
       - run: npm run build
       - run: npm run check:bundle
       - run: npm run check:pack
-      # The deploy, laid from the tarball rather than the worktree: a `files` field that stopped
-      # shipping the client passes every verb above and fails in a consumer's deploy. `npm pack`
-      # runs `prepack`, so this is the published artifact.
+      # The deploys, laid from the tarball rather than the worktree: a `files` field that stopped
+      # shipping a client passes every verb above and fails in a consumer's deploy. `npm pack`
+      # runs `prepack`, so this is the published artifact. Its dependencies resolve out of the
+      # workspace's install, which is the quiver this commit builds rather than the last one
+      # published under its version.
       - name: Deploy layout, from the tarball
         run: |
           mkdir -p "$RUNNER_TEMP/pack" "$RUNNER_TEMP/tool"
           npm pack ./packages/quillkit --pack-destination "$RUNNER_TEMP/pack" >/dev/null
           tar -xzf "$RUNNER_TEMP"/pack/*.tgz -C "$RUNNER_TEMP/tool" --strip-components=1
-          node "$RUNNER_TEMP/tool/dist/bin/quillkit.js" site --quiver fixtures --out "$RUNNER_TEMP/site"
-          test -f "$RUNNER_TEMP/site/index.html" \
-            || { echo "::error::the tarball laid no client at the site root"; exit 1; }
-          test -f "$RUNNER_TEMP/site/quiver/quiver.json" \
-            || { echo "::error::the tarball laid no quiver under the site"; exit 1; }
-          node scripts/check-style.mjs --built "$RUNNER_TEMP/site"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/tool/node_modules"
+          cd fixtures
+          for target in studio app; do
+            node "$RUNNER_TEMP/tool/dist/bin/quillkit.js" build "$target" --drafts --out "$RUNNER_TEMP/$target"
+            test -f "$RUNNER_TEMP/$target/index.html" \
+              || { echo "::error::the tarball laid no $target client at the deploy root"; exit 1; }
+            test -f "$RUNNER_TEMP/$target/quiver/quiver.json" \
+              || { echo "::error::the tarball laid no quiver under the $target deploy"; exit 1; }
+          done
+          test -f "$RUNNER_TEMP/app/app.json" \
+            || { echo "::error::the tarball laid no app.json beside the app"; exit 1; }
+          cd "$GITHUB_WORKSPACE"
+          node scripts/check-style.mjs --built "$RUNNER_TEMP/studio" "$RUNNER_TEMP/app"
 
   test:
     runs-on: ubuntu-latest
