@@ -2,16 +2,16 @@
 
 The JavaScript tier downstream of the [`@quillmark/wasm`](https://github.com/borb-sh/quillmark) artifact.
 
-| Package                                |                                                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| [`@quillmark/svelte`](packages/svelte) | Editing, live-preview and source surfaces over a session.                                                     |
-| [`@quillmark/quiver`](packages/quiver) | Collections of quills, resolved and loaded.                                                                   |
-| [`quillkit`](packages/quillkit)        | The quill author's toolchain: one bin over start, gate, pack, look at, ship, and the studio client it serves. |
-| [`playground`](packages/playground)    | The app that composes them, for a developer reading the library; deployed as the Pages site.                  |
+| Package                                |                                                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [`@quillmark/svelte`](packages/svelte) | Editing, live-preview and source surfaces over a session.                                                                   |
+| [`@quillmark/quiver`](packages/quiver) | Collections of quills, resolved and loaded.                                                                                 |
+| [`quillkit`](packages/quillkit)        | The quill author's toolchain: one bin over start, gate, look at, build and preview, and the studio and app clients it lays. |
+| [`playground`](packages/playground)    | The app that composes them, for a developer reading the library; deployed as the Pages site.                                |
 
-A quill author types one name, `quillkit`, and pins two: the tool resolves the loader and the engine out of the collection's own `node_modules`, so the versions a collection depends on decide what packs it and what renders it. The client it draws with is the tool's own, carried rather than resolved, since no version an author pins makes a client more theirs.
+A quill author types one name, `quillkit`, and pins one: the tool carries the loader and the engine at exact versions, and its clients are built against the same two, so what the gate renders and what a deploy serves are one release.
 
-A package whose JS a consumer imports peers `@quillmark/wasm` and never depends on it, so the consumer supplies the one copy whose linear memory the handles index into; a bundled terminal, imported by nobody, contains it instead. `check:deps` holds the peer half and the rest of the graph (`scripts/check-deps.mjs`); what a terminal's manifest may hold is review's.
+A package whose JS a consumer imports peers `@quillmark/wasm` and never depends on it, so the consumer supplies the one copy whose linear memory the handles index into; a bundled terminal, imported by nobody, contains it instead, and pins it exactly. `check:deps` holds both halves and the rest of the graph (`scripts/check-deps.mjs`).
 
 ## Development
 
@@ -20,7 +20,7 @@ npm install                # one install, every package
 npm run dev                # the playground at :5173
 npm run dev:studio         # the studio client at :5173
 npm run build              # quiver → svelte → quillkit and the playground, in that order
-npm run site               # the fixture quiver as a deploy serves it, into ./site
+npm run site               # the fixture quiver's studio as a deploy serves it, into ./site
 npm test                   # every package's suite
 npm run check              # types, per package
 npm run lint               # prettier, over the repo
@@ -39,4 +39,4 @@ Everything runs against the one reference quill, [`fixtures/quills/showcase/1.0.
 
 ## Canon
 
-The settled systems, per tier: [`svelte`'s](packages/svelte/prose/canon/INDEX.md), [`quiver`'s](packages/quiver/prose/canon/INDEX.md), [`quillkit`'s](packages/quillkit/prose/canon/INDEX.md) (the tool and the studio client both), [the playground's](packages/playground/prose/canon/INDEX.md). Work that is not settled lives in GitHub issues.
+The settled systems, per tier: [`svelte`'s](packages/svelte/prose/canon/INDEX.md), [`quiver`'s](packages/quiver/prose/canon/INDEX.md), [`quillkit`'s](packages/quillkit/prose/canon/INDEX.md) (the tool and both clients), [the playground's](packages/playground/prose/canon/INDEX.md). Work that is not settled lives in GitHub issues.
