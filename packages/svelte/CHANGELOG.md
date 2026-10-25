@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+**Zooming the preview stops at the pane-width fit as it stops at 100%, and landing there is the default again**: Ctrl/⌘-wheel and pinch hold at it, `Mod +`/`−` step to it, and from there the page follows a dragged divider and the zoom pill goes, where zooming back past the fit left the page at a fixed size the divider no longer moved.
+
+**A pinch or wheel leaving a zoom it held moves on from it smoothly**, where the page jumped by the stretch the hold had absorbed.
+
+**Dragging the divider beside the preview re-rasters its pages once the drag rests**, where every mounted page re-rastered on every frame of the drag.
+
+**The preview's zoom pill stays on a touch screen while the zoom is not the fit**, where it faded and no touch brought it back.
+
 **A card's box names its kind.** `data-qm-card` carries the card's kind, `main` for the main card, where it was a bare marker, and THEMING.md promises it as the one schema-named hook a stylesheet may aim at: `[data-qm-card='indorsement']` lands on every indorsement the editor draws. `[data-qm-card]` still matches every card. No hook names a field or a property, and `data-qm-prop` stays the surface's own.
 
 **The preset's shell computes at specificity zero.** `.qm-workspace`, `.qm-bar`, `.qm-split`, `.qm-switch` and `.qm-frame` are drawn inside `:where()`, so a host's rule on the same element wins in any sheet order, where one of equal specificity lost to a preset sheet landing after it. A `.qm-control` in the switch band still centres.

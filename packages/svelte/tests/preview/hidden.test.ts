@@ -4,7 +4,7 @@
 // to a tab switch would repaint the whole document on every one. Hiding is what the loop
 // sees as an empty visible set, so these drive that transition directly — the observer is
 // the only thing that reports it, and jsdom has none.
-import { describe, it, expect, beforeAll, beforeEach, onTestFinished } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, onTestFinished, vi } from 'vitest';
 import { createPreview } from '$lib/preview/controller';
 import type { LiveSession, FieldRegion } from '@quillmark/wasm';
 import { FakeIO, change, mockSession, stubPaintGlobals } from '../helpers/session.js';
@@ -126,8 +126,32 @@ describe('a preview hidden by the narrow shell', () => {
 
 		// A pane that comes back to another box is the case a repaint is for.
 		setBox(container, 900, 800);
-		await frame();
-		expect(painted).toEqual([0, 1]);
+		await vi.waitFor(() => expect(painted).toEqual([0, 1]));
+
+		preview.destroy();
+	});
+
+	// A dragged divider is a run of boxes a frame apart: the stretched canvases stand in
+	// until it rests, where a raster per frame would paint every mounted page each one.
+	it('re-rasters a dragged pane once, when the drag rests', async () => {
+		const painted: number[] = [];
+		const session = {
+			...mockSession(2),
+			paint: (_ctx: unknown, page: number) => {
+				painted.push(page);
+			}
+		} as unknown as LiveSession;
+		setBox(container, 600, 800);
+		const preview = createPreview(session, { container });
+		FakeIO.last!.report(true);
+
+		painted.length = 0;
+		for (const width of [590, 580, 570]) {
+			setBox(container, width, 800);
+			await frame();
+		}
+		expect(painted).toEqual([]);
+		await vi.waitFor(() => expect(painted).toEqual([0, 1]));
 
 		preview.destroy();
 	});
