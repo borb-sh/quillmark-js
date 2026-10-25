@@ -1,0 +1,69 @@
+/* An app's own chrome: the band that names it, the line that signs it, and the one
+   action it exists for. The shell gives a band its row; these give the app's bands their
+   look, for a host whose page is one form rather than a workroom. quillkit's app client
+   wears them, and an author's `app.css` restyles them (THEMING §"The app chrome").
+
+   Specificity zero throughout, as the shell's: a rule of the host's own on the same
+   element wins at any specificity and in any sheet order. `check:style` holds the rank.
+   This file mints nothing. */
+
+/* The head: the plate the title stands on, a hairline under it, and the ink everything on
+   it takes, so a host recolouring the band recolours its name with it. */
+:where(.qm-app-header) {
+	padding: var(--qmh-space-2) var(--qmh-space-4);
+	color: var(--qmh-ink);
+	background: var(--qmh-surface);
+	border-block-end: var(--qmh-border-width) solid var(--qmh-border);
+}
+
+/* What the app is called. Display type rather than chrome type: it is the one line on
+   the screen a reader reads as a name. */
+:where(.qm-app-title) {
+	margin: 0;
+	font-size: var(--qmh-text-title);
+	font-weight: var(--qmh-weight-strong);
+	line-height: var(--qmh-leading-tight);
+	color: inherit;
+	overflow-wrap: anywhere;
+}
+
+/* The foot: a line of meta type under a hairline, its links in the line's own ink. */
+:where(.qm-app-footer) {
+	padding: var(--qmh-space-2) var(--qmh-space-4);
+	border-block-start: var(--qmh-border-width) solid var(--qmh-border);
+	font-size: var(--qmh-text-meta);
+	line-height: var(--qmh-leading-tight);
+	color: var(--qmh-ink-meta);
+}
+
+:where(.qm-app-footer a) {
+	color: inherit;
+}
+
+/* The primary action: the one control on the screen that wears the accent, at the touch
+   floor, since it is the press the whole page leads to. */
+:where(.qm-app-primary) {
+	font: inherit;
+	font-size: var(--qmh-text-label);
+	font-weight: var(--qmh-weight-strong);
+	line-height: var(--qmh-leading-tight);
+	min-height: var(--qmh-tap);
+	padding: var(--qmh-space-2) var(--qmh-space-4);
+	color: var(--qmh-on-accent);
+	background: var(--qmh-accent);
+	border: var(--qmh-border-width) solid var(--qmh-accent);
+	border-radius: var(--qmh-radius-inner);
+	cursor: pointer;
+	transition: background-color var(--qmh-duration) var(--qmh-ease-reverse);
+}
+
+:where(.qm-app-primary:hover) {
+	background: var(--qmh-accent-hover);
+}
+
+:where(.qm-app-primary:disabled) {
+	color: var(--qmh-ink-meta);
+	background: var(--qmh-surface-hover);
+	border-color: var(--qmh-border);
+	cursor: default;
+}

@@ -1,0 +1,147 @@
+/* The shell: the screen an app mounting two surfaces over one session is, drawn once
+   (THEMING §"The shell, if you are building a tool"). `recipes.css` dresses the page a
+   surface sits on; this is what it is mounted in, a tool where `.qm-page` is a document.
+
+   Every selector here computes at specificity zero, as the surfaces' own do: a host's
+   rule on the same element wins whatever order the sheets land in, and an app whose
+   stylesheet someone else writes (quillkit's app client, under an author's `app.css`)
+   needs no knowledge of which of these the client happened to set. `check:style` holds
+   the rank. This file mints nothing. */
+
+/* Pinned to the viewport rather than sized to it: a page-height box still leaves the
+   root scroller counting the overflow its panes clip, and a wheel over the chrome drags
+   the whole app off the top. Three bands (a head, the body, an optional foot), and the
+   body takes what is left and may shrink below its content, so the panes in it own
+   their overflow and hold still while their contents move.
+
+   The one column is stated for the same reason the rows are: an implicit track is `auto`,
+   which is sized by what a band holds, and a `.qm-split` under one contributes its items'
+   max-content through its `fr` tracks. The shell would take the width of the widest thing
+   mounted in it instead of the viewport's, and every band would be that wide with the
+   second pane past the edge. A host holding its content to a maximum never sees it; one
+   spending the whole screen sees it on the first surface it mounts. */
+:where(.qm-workspace) {
+	position: fixed;
+	inset: 0;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: auto minmax(0, 1fr) auto;
+	overflow: hidden;
+}
+
+/* A gesture past the end of a pane chains out to the viewport and bounces the empty
+   document, which is the last way a pinned shell moves. Conditioned on the workspace, so
+   a host's other routes keep a page's own feel. */
+:where(html:has(.qm-workspace)) {
+	overscroll-behavior: none;
+}
+
+/* A band's line: the row a head or a foot puts its parts on, wrapping, centred. That is
+   the whole of it. What a band is made of is the host's: the rule under it, the gutter
+   beside it, and the depth of it, because where a band ends and how tall it stands are
+   page-shell decisions: a site holding its content to a maximum runs the rule past it at
+   its own rhythm, and a one-screen tool has no maximum to hold to. */
+:where(.qm-bar) {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--qmh-space-2) var(--qmh-space-4);
+}
+
+/* Two even tracks for two surfaces, and no resizer, since a divider that can be dragged
+   is a control competing with what it divides. Each track may shrink below its content,
+   which is what lets the frame in it clip rather than grow.
+
+   The gap is the endorsed default and not a fact about splitting: two surfaces standing
+   apart on a page read as two things, which is what a host showing its instruments wants.
+   A host that spends the whole screen on the mounts closes it to nothing and carries a
+   hairline on one pane instead: one property, and the tracks are untouched. */
+:where(.qm-split) {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr);
+	gap: var(--qmh-space-4);
+	min-height: 0;
+}
+
+/* The band that switches them, and nothing at the widths where both tracks are showing
+   and there is nothing to switch. Where it stands is the host's, like any other band; what
+   goes in it is a pair of `.qm-control`s, which already carry the on-state a pressed
+   control takes. Its visibility is the preset's because the threshold is: a host hiding
+   its own tab row writes this file's number a second time, which is the one thing the
+   single source is for. */
+:where(.qm-switch) {
+	display: none;
+}
+
+/* One mount at a time under the threshold, rather than two of them abreast. Half a narrow
+   viewport is under the width either surface reads at, so the split stops being one and
+   the tracks become views of the same room: the host says which with `data-qm-show`, and
+   the attribute names the track rather than what is in it, so nothing here knows an editor
+   from a preview. No attribute is the first track.
+
+   The other track is `display: none` and not a clip, which is the whole of the hiding: it
+   leaves the tab order, hit-testing and the accessibility tree in one property, so the
+   pane needs no `inert` and the host needs no breakpoint in JS. Both stay mounted (a
+   preview binds its handle once, an editor holds a caret, a history and a scroll), so
+   the switch is presentational, never conditional. A pane hidden this way keeps the
+   pixels it had: the paint loop's band sweep no-ops on an empty visible set, and its
+   resize observer holds the last real width rather than rastering at the 0×0 box a hidden
+   pane reports, so what comes back at the width it left needs no paint at all. The
+   preview's caret follow spans the same window — a trip asked for against a pane with no
+   box is held and run when it has one (`preview/bridge.ts`), the pane opening at the
+   caret rather than several edits behind it.
+
+   Height is the second clause because a landscape phone passes the first one: it clears
+   the width with room for two tracks and has no body left to put them in. A desktop window
+   that short wants one mount for the same reason. */
+@media (width < 50rem), (height < 30rem) {
+	:where(.qm-switch) {
+		display: flex;
+		gap: var(--qmh-space);
+	}
+
+	/* Even halves of the band, at the height a thumb needs. The floor is the recipe's and
+	   not the host's, because the band exists only at the sizes where the pointer is a
+	   finger: a host is free to stand the band deeper, and has nothing to gain from
+	   standing it shallower than the thing it is tapping. */
+	:where(.qm-switch > *) {
+		flex: 1 1 0;
+		min-height: var(--qmh-tap);
+	}
+
+	:where(.qm-split) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	:where(.qm-split:not([data-qm-show='2']) > :nth-child(2)),
+	:where(.qm-split[data-qm-show='2'] > :nth-child(1)) {
+		display: none;
+	}
+}
+
+/* The mounting site: an edge, a corner, and the clip that holds a surface to them, which
+   is all a surface painting its own column needs. No tone and no gutter: those are the
+   surface's own (THEMING §"Drop it in"). `border-box`, so a stated height is the height
+   it draws.
+
+   Positioned, because a clip reaches only what it is the containing block for: a
+   surface's out-of-flow parts (a parked description, an overlay) resolve against the
+   nearest positioned ancestor, and with none between them and the document they land at
+   their static position unclipped, leaving the page to scroll past its own foot by
+   however far the frame's contents run over.
+
+   The two minimums are what let a frame in a track clip rather than push: a grid or flex
+   item floors at its content, so a mount that paints wider than its column widens the
+   column instead. They ride the frame rather than the split's children, which keeps every
+   rule in this file landing where the host put a class. Outside a track they are the
+   initial value and do nothing. */
+:where(.qm-frame) {
+	box-sizing: border-box;
+	position: relative;
+	min-width: 0;
+	min-height: 0;
+	border: var(--qmh-border-width) solid var(--qmh-border);
+	border-radius: var(--qmh-radius);
+	overflow: hidden;
+}

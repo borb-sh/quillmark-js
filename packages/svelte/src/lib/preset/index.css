@@ -3,8 +3,11 @@
    the surface barrels pull `core/theme.css` and never this, because this
    styles the document and nothing may put that in a consumer's page uninvited.
 
-   Two files because one of them is exempt: `scale.css` is where the literals are
-   minted, `recipes.css` is held to reading them. */
+   `scale.css` is where the literals are minted and is exempt; the rest are held to
+   reading them. `recipes.css` ranks at ordinary specificity, `shell.css` and `app.css`
+   at zero. */
 
 @import './scale.css';
 @import './recipes.css';
+@import './shell.css';
+@import './app.css';

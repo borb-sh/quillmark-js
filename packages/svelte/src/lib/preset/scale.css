@@ -18,7 +18,7 @@
    could not be both.
 
    Literals live here and nowhere else in the preset: `check:style` runs its axes over
-   `recipes.css` beside it, with this file exempt as the place the defaults are minted.
+   the sheets beside it, with this file exempt as the place the defaults are minted.
 
    The poles fall back to the system colours, so a host that turns no dial still lands
    where its own unstyled text does — `Canvas` being the plane the UA would have
@@ -47,6 +47,14 @@
 	/* The edge that says "engaged" where the hairline says "edge": a pressed switch,
 	   the underline under a link. */
 	--qmh-border-strong: color-mix(in oklab, var(--qmh-surface), var(--qmh-ink) 40%);
+
+	/* The one hue a host's page spends on purpose: the primary action wears it. The
+	   figures are the surfaces' own default for the same dial, so a page that turns no
+	   dial and a card's focus ring agree; the ink on it is the plate's, the pole the
+	   accent's default contrasts against in both schemes. */
+	--qmh-accent: var(--qm-accent, light-dark(#71717a, #a1a1aa));
+	--qmh-on-accent: var(--qmh-surface);
+	--qmh-accent-hover: color-mix(in oklab, var(--qmh-accent), var(--qmh-ink) 15%);
 
 	/* The hue a host spends on a failure. The figures are the surfaces' own, so a
 	   page's status line and a card's diagnostic carry one colour meaning error.
@@ -92,6 +100,7 @@
 	   surfaces' ramp, which is chrome inside a card, and a page's body text is a
 	   different job at a different size. A host that wants them locked sets both. */
 	--qmh-text: 1rem;
+	--qmh-text-title: 1.125rem;
 	--qmh-text-label: 0.8125rem;
 	--qmh-text-meta: 0.6875rem;
 	--qmh-weight-strong: 600;

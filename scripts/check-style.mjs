@@ -26,7 +26,8 @@
 //     a host's rule wins whatever order a bundler emits the sheets in (THEMING §"Your CSS
 //     beats ours"). The same rank holds over the contract classes wherever a component
 //     draws one, Svelte's scoping class otherwise outranking the bare class a consumer is
-//     told to write.
+//     told to write, and over the preset's shell and app chrome, whose sheets are listed
+//     as `zero` on their scope.
 //   · Every `--qm-*` dial a surface consumes is documented in THEMING.md, and every
 //     `.qm-*` class the doc promises is carried by something in `src/` — the halves a
 //     consumer is hurt by. The reverse halves warn, so prose may run ahead of code.
@@ -75,7 +76,8 @@ const SCOPES = [
 		prefix: '--qmh-',
 		derivation: 'packages/svelte/src/lib/preset/scale.css',
 		doc: 'THEMING §"Match ours"',
-		census: true
+		census: true,
+		zero: ['packages/svelte/src/lib/preset/shell.css', 'packages/svelte/src/lib/preset/app.css']
 	},
 	{
 		dir: 'packages/playground/src/routes',
@@ -427,9 +429,17 @@ for (const scope of SCOPES) {
 		});
 
 		// ── Rank ────────────────────────────────────────────────────────────────────
-		// The surfaces alone: an app's own page ranks by ordinary precedence, and the preset's
-		// classes land on a consumer's DOM where a rule of their own is aimed rather than
-		// incidental.
+		// The surfaces, and the preset sheets drawn at zero: an app's own page ranks by
+		// ordinary precedence, and the preset's recipes land on a consumer's DOM where a rule
+		// of their own is aimed rather than incidental.
+		if (scope.zero?.includes(rel)) {
+			for (const { sel, line } of selectorsOf(root))
+				if (weighs(sel))
+					errors.push(
+						`${rel}:${at(line)}: \`${sel}\` weighs outside \`:where()\` — this sheet ranks at zero (THEMING §"The shell, if you are building a tool")`
+					);
+			continue;
+		}
 		if (!scope.surface) continue;
 		if (/@layer\b/.test(region.css))
 			errors.push(
