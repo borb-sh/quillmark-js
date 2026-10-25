@@ -8,6 +8,10 @@
 
 **A pinch or wheel leaving a zoom it held moves on from it smoothly**, where the page jumped by the stretch the hold had absorbed.
 
+**Dragging the divider beside the preview re-rasters its pages once the drag rests**, where every mounted page re-rastered on every frame of the drag.
+
+**The preview's zoom pill stays on a touch screen while the zoom is not the fit**, where it faded and no touch brought it back.
+
 ## v0.26.2 - 2026-10-24
 
 **A host that drops its `doc` and `quill` together unmounts the editor cleanly**, where a document with a subform prose cell (an `object` field's `text` or `richtext` property) threw `Cannot read properties of null (reading 'schema')` from the cell's teardown and left the host's page half-rendered.

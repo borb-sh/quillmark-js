@@ -178,6 +178,14 @@
 		pointer-events: none;
 		transition: opacity var(--_qm-reveal);
 	}
+	/* A screen with no hover has no pointer to bring it back, and the pill is the way back
+	   to the fit there, so it stays. */
+	@media (hover: none) {
+		:global(:where(.qm-preview-zoom[data-idle])) {
+			opacity: 1;
+			pointer-events: auto;
+		}
+	}
 	:global(:where(.qm-preview-zoom:focus-visible)) {
 		opacity: 1;
 		pointer-events: auto;
