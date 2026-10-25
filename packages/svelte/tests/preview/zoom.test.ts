@@ -97,7 +97,7 @@ describe('stepping', () => {
 });
 
 describe('a continuous gesture', () => {
-	const at = (z: number): Glide => ({ raw: z, shown: z });
+	const at = (z: number): Glide => ({ raw: z, shown: z, slack: 0 });
 
 	it('stops at 100% when one event crosses it, from either side', () => {
 		expect(glide(at(0.8), 1.3, 0, onLevel).shown).toBe(1);
@@ -125,6 +125,27 @@ describe('a continuous gesture', () => {
 		const fit = (STEPS[1] + STEPS[2]) / 2;
 		expect(glide(at(STEPS[0]), MAX_ZOOM, 0, fit).shown).toBe(fit);
 		expect(glide(at(MAX_ZOOM), STEPS[0], 0, fit).shown).toBe(1);
+	});
+
+	it('leaves a hold without a jump, moving no more than an event asks', () => {
+		const rate = 1.01;
+		for (const fit of [onLevel, 0.6]) {
+			let run = at(fit);
+			for (let i = 0; i < 30; i++) {
+				const next = glide(run, run.raw * rate, 0, fit);
+				expect(next.shown / run.shown).toBeLessThanOrEqual(rate + 1e-9);
+				run = next;
+			}
+			expect(run.shown).toBeGreaterThan(fit);
+		}
+	});
+
+	it('turns back out of a hold as soon as the gesture reverses', () => {
+		let run = at(1);
+		for (let i = 0; i < 3; i++) run = glide(run, run.raw * 1.01, 0, onLevel);
+		expect(run.shown).toBe(1);
+		run = glide(run, run.raw / 1.01, 0, onLevel);
+		expect(run.shown).toBe(1);
 	});
 
 	it('holds a fit beside 100% in its place, and leaves it either way', () => {

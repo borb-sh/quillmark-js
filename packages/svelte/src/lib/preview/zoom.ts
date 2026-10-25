@@ -76,27 +76,35 @@ export function stepZoom(zoom: number, dir: 1 | -1, floor: number, fit: number):
 }
 
 /**
- * A continuous gesture's run: where it would be unsnapped (`raw`), and what it shows.
- * The run carries `raw` across events, so the detent at 100% holds a slow gesture
- * rather than stopping it: a trackpad's small deltas accumulate past the detent, where
- * snapping the shown value alone would pin every later event back to it.
+ * A continuous gesture's run: the zoom its events have asked for (`raw`), what it shows,
+ * and, while it shows a hold, how far past the hold the events have carried (`slack`, a
+ * log of the ratio). The run moves `shown` by each event's ratio rather than snapping
+ * `raw`, so a trackpad's small deltas carry it out of a hold as smoothly as they carried
+ * it in.
  */
 export interface Glide {
 	raw: number;
 	shown: number;
+	slack: number;
 }
 
-/** One event of a continuous gesture, carrying the run to `raw`: held at `fit` or 100%
- *  when it crosses or lands within {@link DETENT} of one, so one wheel notch across
- *  either stops there, at the first it meets. 100% gives way to a `fit` within the
- *  detent of it: two holds that close would pin the run between them. */
+/** One event of a continuous gesture, carrying the run to `raw`. It stops at `fit` or
+ *  100% when it crosses one, at the first it meets, so one wheel notch across either
+ *  stops there; it leaves a hold once carried {@link DETENT} past, moving on from the
+ *  hold rather than jumping to where the events would have put it. 100% gives way to a
+ *  `fit` within the detent of it: two holds that close would pin the run between them. */
 export function glide(run: Glide, raw: number, floor: number, fit: number): Glide {
 	const holds = near(fit, 1) ? [fit] : [fit, 1];
-	let next = clampZoom(raw, floor);
+	const step = Math.log(raw / run.raw);
+	let next: number;
+	if (holds.includes(run.shown)) {
+		const slack = run.slack + step;
+		if (Math.abs(slack) <= DETENT) return { raw, shown: run.shown, slack };
+		next = run.shown * Math.exp(slack - Math.sign(slack) * DETENT);
+	} else next = run.shown * Math.exp(step);
+	next = clampZoom(next, floor);
 	const crossed = holds
 		.filter((t) => (run.shown - t) * (next - t) < 0)
 		.sort((a, b) => Math.abs(a - run.shown) - Math.abs(b - run.shown));
-	if (crossed.length) next = crossed[0];
-	const shown = holds.find((t) => near(next, t)) ?? next;
-	return { raw: next, shown: clampZoom(shown, floor) };
+	return { raw, shown: crossed[0] ?? next, slack: 0 };
 }

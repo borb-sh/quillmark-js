@@ -188,7 +188,7 @@ export function createViewport(
 	// The raw zoom a gesture starting now carries from: the run's own while it is still
 	// the one on screen.
 	function from(b: { current: number }): Glide {
-		return run && run.shown === b.current ? run : { raw: b.current, shown: b.current };
+		return run && run.shown === b.current ? run : { raw: b.current, shown: b.current, slack: 0 };
 	}
 
 	function glideTo(raw: (from: Glide) => number, x: number, y: number): void {
