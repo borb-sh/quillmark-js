@@ -1074,6 +1074,9 @@
 		padding: var(--_qm-space-5);
 		background: var(--_qm-surface-sunken);
 		color: var(--_qm-ink);
+		/* The ground between two cards, which the add strip fills (`.qm-add-card`). Declared
+		   once on the root so a pane moves the seam and its gutter together. */
+		--seam: var(--_qm-space-4);
 	}
 	/* Opt-in, and the four popovers are the reason: each resolves its portal target with
 	   `closest('[data-qm-root]')`, which is this element, so an `overflow` here clips the
@@ -1093,14 +1096,16 @@
 	   the stack overflows and scrolls rather than squashing.
 
 	   A pane is where the host has already framed the surface, so the ground needs less
-	   of itself to read as ground: the frame is what the stack would otherwise meet. The
-	   inset steps in from the page form's to half a rung under the seam the add strip
-	   holds between cards, and the width it gives back goes to what is written. */
+	   of itself to read as ground: the frame is what the stack would otherwise meet. So
+	   the ground is one width there, the seam between cards and the gutter round the
+	   stack alike, half a rung under the page form's seam, and the width it gives back
+	   goes to what is written. */
 	:global(:where(.qm-editor.qm-pane)) {
 		height: 100%;
 		overflow: auto;
 		overscroll-behavior: contain;
-		padding: calc(var(--_qm-space-3) + var(--_qm-space-half));
+		--seam: calc(var(--_qm-space-3) + var(--_qm-space-half));
+		padding: var(--seam);
 		padding-block-end: var(--_qm-tail);
 	}
 	/* The stack's one gapless seam, which `TipsCard` draws and this holds the two
@@ -1148,7 +1153,7 @@
 	 land.
 
 	 No inset of its own: the pill and the gap are the same rectangle, and a bare strip is
-	 a band of gutter, so its height is a rhythm rung. The press floor the box gives up is
+	 a band of gutter, so its height is the seam. The press floor the box gives up is
 	 `.qm-tap-floor`'s (controls.css); what it overhangs is the card's own inset above and
 	 below, which holds no target, so the floor costs a neighbour nothing.
 
@@ -1164,7 +1169,7 @@
 		align-items: center;
 		justify-content: center;
 		width: 100%;
-		height: var(--_qm-space-4);
+		height: var(--seam);
 		color: var(--_qm-ink-label);
 		opacity: 0;
 		transition:
