@@ -154,9 +154,10 @@
 	--_qm-surface-band: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%);
 	/* The one rung whose arms are not a single ratio: a stroke is read against what it
 	   separates, and the mix that reads as a hairline on the dark default draws the
-	   light card's verticals and rules heavier than the type beside them. The light arm is
-	   calibrated rather than derived, which makes this the one rung under the poles
-	   that reads the declared scheme rather than only the colours it resolves to. */
+	   light card's verticals and rules heavier than the type beside them. The light
+	   arm is calibrated rather than derived, which makes this the one rung under the
+	   poles that reads the declared scheme rather than only the colours it resolves
+	   to. */
 	--_qm-border: light-dark(
 		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%),
 		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 17%)
@@ -296,17 +297,17 @@
 
 	/* ── Geometry ──────────────────────────────────────────────────────────*/
 	/* One stroke width for every edge the chrome draws and every rule it ranks
-	   with: a control's, a floating surface's, the two closing a card's payload. A threshold
-	   rather than a rhythm choice, like the tap floor: a hairline is a hairline at
-	   any `--qm-space`, so neither derives from a dial. Both exist as rungs because
+	   with: a control's, a floating surface's, the two closing a card's payload. A
+	   threshold rather than a rhythm choice, like the tap floor: a hairline is a
+	   hairline at any `--qm-space`, so neither derives from a dial. Both exist as rungs because
 	   `check:style`'s border-width axis can only hold a stroke against a token. */
 	--_qm-border-width: 1px;
 	/* Half a step over it, for the verticals alone — a section's, a subform's, a
 	   blockquote's. What a vertical states is depth, and depth is the one thing a
-	   reader has to find in a dense card; the strokes that rank two or edge a floating
-	   surface stay at the hairline, so the ladder is what carries the extra weight. Half,
-	   because a whole step reads as a different kind of line rather than the same
-	   one doing more work. */
+	   reader has to find in a dense card; the strokes that rank two or edge a
+	   floating surface stay at the hairline, so the ladder is what carries the extra
+	   weight. Half, because a whole step reads as a different kind of line rather
+	   than the same one doing more work. */
 	--_qm-vertical-width: 1.5px;
 	--_qm-radius: var(--qm-radius, 8px);
 	/* The interior corner, and half is the relationship rather than the number: a

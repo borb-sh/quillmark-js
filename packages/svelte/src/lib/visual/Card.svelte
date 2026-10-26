@@ -430,12 +430,11 @@
 <style>
 	/* An island: the card is the base plane and the column behind it the sunken one, and
 	 the step between the two tones is the whole of its edge (ARCHITECTURE §"A plane is a
-	 tone"). The block half is the same rung as the
-	 gap: the payload stands that far off the card's edge and off the body below it. The
-	 header insets itself to the section-heading column (`.qm-card-header`). The inline
-	 half stands a step tighter than the nesting rung the verticals inside keep: this
-	 edge closes the block rather than nesting one, and the rules it holds run that much
-	 further for it. */
+	 tone"). The block half is the same rung as the gap: the payload stands that far off
+	 the card's edge and off the body below it. The header insets itself to the
+	 section-heading column (`.qm-card-header`). The inline half stands a step tighter
+	 than the nesting rung the verticals inside keep: this edge closes the block rather
+	 than nesting one, and the rules it holds run that much further for it. */
 	.qm-card {
 		border-radius: var(--_qm-radius);
 		padding: var(--_qm-space-3) var(--_qm-space-2);

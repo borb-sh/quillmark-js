@@ -1057,7 +1057,8 @@
 	   than as more card (ARCHITECTURE §Styling). The inset is the widest rung on the
 	   ramp, which is what gives the ground enough of itself to read as ground: at a
 	   narrower one the stack meets whatever frames the surface and the islands are
-	   back to being one block clipped at its edges. */
+	   back to being one block clipped at its edges. That is the page form; a pane's
+	   frame is the host's, and it spends less (`.qm-pane` below). */
 	:global(:where(.qm-editor)) {
 		box-sizing: border-box;
 		display: flex;
