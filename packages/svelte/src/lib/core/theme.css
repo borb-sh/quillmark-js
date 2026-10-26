@@ -115,33 +115,33 @@
 	   light, and the base plane — a card, the preview's paper — is the pole
 	   itself.
 
-	   Two planes sink. `sunken` is the ground — the column behind the cards, the
-	   desk behind the sheets — and lifting the plane above it takes very little
-	   at the light pole. `well` is the hole cut into a card: a field, the one
-	   native select, neither of which draws an edge, so the step is the whole of
-	   what says a value is typed there. The order at the
-	   light pole is card, ground, well; at the dark pole the two sink to within
-	   a channel of each other, which is where a card with little light left to
-	   give up leaves them.
+	   One plane sinks, in two roles. `well` is the hole cut into a card: a field,
+	   the one native select, neither of which draws an edge, so the step is the
+	   whole of what says a value is typed there. `sunken` is the ground — the
+	   column behind the cards, the desk behind the sheets — and it is the same
+	   tone: a card draws no edge either, so the step off the ground is the whole
+	   of where one card stops and the next starts, and the well's step is one
+	   that carries that at the light pole. The order is card, then ground
+	   and well together, at both poles.
 
-	   How far each sinks is a function of the card's own L, not of the scheme the
+	   How far it sinks is a function of the card's own L, not of the scheme the
 	   host declared: a dark surface has to spend more of what little it has
 	   before the card above it reads as lifted, so the two calibrated distances
-	   — 0.0214 off white, 0.0553 off the dark default — interpolate linearly
+	   — 0.04 off white, 0.0547 off the dark default — interpolate linearly
 	   between. A card pinned at neither pole takes a proportionate step whatever
 	   `color-scheme` says, which is the half of the derivation that reads a
 	   colour rather than a declaration.
 
-	   Both sink by subtraction where every other rung mixes: a mix toward black
+	   It sinks by subtraction where every other rung mixes: a mix toward black
 	   is a ratio, so it scales what it takes and pulls the result toward
 	   neutral, and a ground is a fixed distance. `a b` pass through, so the
 	   plane keeps the pole's hue and a turned `--qm-bg` tints it. The defaults
-	   land within a channel of `#f7f8f9` and `#1a1a1b`. Below L ≈ 0.065 the
-	   ground clamps to black, which is where a near-black card leaves no room
+	   land within a channel of `#f2f2f2` and `#1a1a1c`. Below L ≈ 0.06 the
+	   plane clamps to black, which is where a near-black card leaves no room
 	   for a ground of its own. */
 	--_qm-surface: var(--_qm-bg);
-	--_qm-surface-sunken: oklab(from var(--_qm-bg) calc(l - (0.0214 + 0.0467 * (1 - l))) a b);
 	--_qm-surface-well: oklab(from var(--_qm-bg) calc(l - (0.04 + 0.0202 * (1 - l))) a b);
+	--_qm-surface-sunken: var(--_qm-surface-well);
 	/* `raised` is the same ramp spelled as a mix, its step 0.08 × (1 − l): the light
 	   arm is zero, a white card having nowhere further to go, so a floating surface
 	   separates on its hairline and `--_qm-lift` there and the step joins them in
@@ -154,16 +154,17 @@
 	--_qm-surface-band: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%);
 	/* The one rung whose arms are not a single ratio: a stroke is read against what it
 	   separates, and the mix that reads as a hairline on the dark default draws the
-	   light card in a line heavier than the type it frames. The light arm is
-	   calibrated rather than derived, which makes this the one rung under the poles
-	   that reads the declared scheme rather than only the colours it resolves to. */
+	   light card's verticals and rules heavier than the type beside them. The light
+	   arm is calibrated rather than derived, which makes this the one rung under the
+	   poles that reads the declared scheme rather than only the colours it resolves
+	   to. */
 	--_qm-border: light-dark(
 		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%),
 		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 17%)
 	);
 	/* A stroke ruled through content rather than round it: a table's frame and every
-	   line between its cells. The light arm of `border` is a card's edge against the
-	   ground, and drawn between lines of type it vanishes, so a grid takes one ratio at
+	   line between its cells. The light arm of `border` is a stroke standing clear of
+	   type, and drawn between lines of it it vanishes, so a grid takes one ratio at
 	   both poles, which lands within a few points of `border` in dark. */
 	--_qm-rule: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 14%);
 	/* Three rungs, and nothing under the last: a step below `label` lands under 3:1 on
@@ -259,7 +260,7 @@
 	   only up to the point where it is assembled. One width: focus is the only
 	   state that draws a ring anywhere, so there is no held-back tier under it.
 	   Sub-pixel, because at two it reads as a second border on a card whose every
-	   other edge is a hairline. */
+	   other stroke is a hairline. */
 	--_qm-ring-width: 1.5px;
 	/* Every ring the surface draws, focus and selection alike, which is why the name
 	   carries neither. Assembled here because the parts spelled out at a use site pass
@@ -296,17 +297,17 @@
 
 	/* ── Geometry ──────────────────────────────────────────────────────────*/
 	/* One stroke width for every edge the chrome draws and every rule it ranks
-	   with: a card's, a control's, the two closing a card's payload. A threshold
-	   rather than a rhythm choice, like the tap floor: a hairline is a hairline at
-	   any `--qm-space`, so neither derives from a dial. Both exist as rungs because
+	   with: a control's, a floating surface's, the two closing a card's payload. A
+	   threshold rather than a rhythm choice, like the tap floor: a hairline is a
+	   hairline at any `--qm-space`, so neither derives from a dial. Both exist as rungs because
 	   `check:style`'s border-width axis can only hold a stroke against a token. */
 	--_qm-border-width: 1px;
 	/* Half a step over it, for the verticals alone — a section's, a subform's, a
 	   blockquote's. What a vertical states is depth, and depth is the one thing a
-	   reader has to find in a dense card; the strokes that close a block or rank two
-	   stay at the hairline, so the ladder is what carries the extra weight. Half,
-	   because a whole step reads as a different kind of line rather than the same
-	   one doing more work. */
+	   reader has to find in a dense card; the strokes that rank two or edge a
+	   floating surface stay at the hairline, so the ladder is what carries the extra
+	   weight. Half, because a whole step reads as a different kind of line rather
+	   than the same one doing more work. */
 	--_qm-vertical-width: 1.5px;
 	--_qm-radius: var(--qm-radius, 8px);
 	/* The interior corner, and half is the relationship rather than the number: a

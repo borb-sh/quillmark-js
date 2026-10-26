@@ -1057,7 +1057,8 @@
 	   than as more card (ARCHITECTURE §Styling). The inset is the widest rung on the
 	   ramp, which is what gives the ground enough of itself to read as ground: at a
 	   narrower one the stack meets whatever frames the surface and the islands are
-	   back to being one block clipped at its edges. */
+	   back to being one block clipped at its edges. That is the page form; a pane's
+	   frame is the host's, and it spends less (`.qm-pane` below). */
 	:global(:where(.qm-editor)) {
 		box-sizing: border-box;
 		display: flex;
@@ -1090,11 +1091,18 @@
 	   `.qm-pane` claims (THEMING §"Drop it in"), and it resolves to `auto` on a mounting
 	   site with no height of its own, which is the page form kept. The cards do not
 	   shrink to fit: a flex item's automatic minimum floors each at its own height, so
-	   the stack overflows and scrolls rather than squashing. */
+	   the stack overflows and scrolls rather than squashing.
+
+	   A pane is where the host has already framed the surface, so the ground needs less
+	   of itself to read as ground: the frame is what the stack would otherwise meet. So
+	   the gutter steps in to the seam the add strip holds between cards, the ground
+	   being one width all round the stack, and the width it gives back goes to what is
+	   written. */
 	:global(:where(.qm-editor.qm-pane)) {
 		height: 100%;
 		overflow: auto;
 		overscroll-behavior: contain;
+		padding: var(--_qm-space-4);
 		padding-block-end: var(--_qm-tail);
 	}
 	/* The stack's one gapless seam, which `TipsCard` draws and this holds the two
