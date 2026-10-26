@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.20.0 - 2026-10-26
+
 **quillkit builds a quiver into a standalone app.** `app` is a target beside `studio` and `quiver`: a form for the people filling a quiver's forms in, beside the page it prints, with a Download PDF press that waits for the page to catch up and refuses a page that does not render. One quill opens its form and several open a card each; a phone shows one pane at a time under a Form/Page switch. My documents keeps every document a reader starts in their browser, keyed by the app's address, to reopen, download as `.md` or delete, and a reload reopens the one that was open. The app opens every quill in the quiver at its latest version, and the rest is found by name beside `Quiver.yaml`: `App.yaml` names the app's `title` and `description` and refuses any other key, `app.css` is linked last and its `url()` files are copied into the deploy, and `icon.svg` or `icon.png` is its icon. `build app` warns on a selector the theming contract does not promise and on a quill declaring no `license`.
 
 **A document reopens on the version it was made on.** A version a later release no longer opens by default stays openable while the quiver holds it, and offers Update to the latest form with the document's markdown offered first.
