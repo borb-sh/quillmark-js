@@ -146,9 +146,7 @@
 	}
 
 	.panel::backdrop {
-		/* mint: a scrim is a tone between two planes, and the host scale carries no
-		   opacity rung — the recede ladder is the package's own. */
-		background: color-mix(in srgb, var(--qmh-page) 80%, transparent);
+		background: var(--qmh-scrim);
 	}
 
 	.plate {

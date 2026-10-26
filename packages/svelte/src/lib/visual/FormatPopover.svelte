@@ -487,7 +487,7 @@
 	 itself, which a two-state button has no third face for. */
 	.qm-format-divider {
 		align-self: stretch;
-		width: 1px;
+		width: var(--_qm-border-width);
 		margin: var(--_qm-space-half) 0;
 		background: var(--_qm-rule);
 	}
@@ -495,10 +495,12 @@
 		padding: var(--_qm-space) var(--_qm-space-2);
 		color: var(--_qm-ink);
 	}
+	/* Stretched, so the prompt's buttons stand the input's box line and the face is one
+	   row height rather than a box between two shorter buttons. */
 	.qm-link-prompt {
 		display: flex;
 		gap: var(--_qm-space);
-		align-items: center;
+		align-items: stretch;
 	}
 	/* The box's recipe without `.qm-input`, which adds the `width: 100%` that would
 	   stretch this to the popover. The fill is the box's own rung and there is no

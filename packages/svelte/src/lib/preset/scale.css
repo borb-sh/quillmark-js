@@ -1,13 +1,13 @@
 /* The host's derivation: the same public dials in, a closed `--qmh-*` scale for the
    page around the surfaces out. `core/theme.css` is the same shape one level down
    (dials in, `--_qm-*` out), and the two are calibrated against each other: the
-   figures here are the figures there (the ground step's ramp, 8% hover, the
-   ring's width, the status hue at both poles) and the
+   figures here are the figures there (the poles, the ground step's ramp, 8% hover, the
+   label ink's 35%, the ring's width, the status hue at both poles) and the
    dial means the same plane in both, so a host plate and a card on it land on the same
    tone at both poles and a host page meets an editor's own column exactly. The border
-   and ink rungs are each calibrated for their own plane rather than shared: a page's
-   chrome is read at one size against one ground, a card's interior at several against
-   the rungs under it, so the mixes are not the same figure. The well
+   is calibrated for its own plane rather than shared: a page's controls are boxed and
+   read against one ground, a card's strokes at several weights against the rungs
+   under it, so the mixes are not the same figure. The well
    under the ground has no counterpart here: a host's own controls are boxed and carry a
    hairline, so nothing on a page needs the step an edgeless field does.
 
@@ -20,9 +20,8 @@
    Literals live here and nowhere else in the preset: `check:style` runs its axes over
    the sheets beside it, with this file exempt as the place the defaults are minted.
 
-   The poles fall back to the system colours, so a host that turns no dial still lands
-   where its own unstyled text does — `Canvas` being the plane the UA would have
-   painted a page with, which is what a plate should be. The dials sit in front, so
+   The poles fall back to the surfaces' own pair, so a host that turns no dial lands on
+   the plane an editor mounted in it paints at both poles. The dials sit in front, so
    `--qm-bg`/`--qm-fg` on an ancestor retunes page and surface together. */
 
 :root {
@@ -32,21 +31,20 @@
 	   the page sinks from it by the same ramp. That is what puts a host page and
 	   an editor's own column on one tone rather than a plane apart. Planes step by
 	   light and everything else by ink, which is the package's own split
-	   (ARCHITECTURE §Styling); the figures are its figures. `Canvas` flips with the
-	   declared scheme on its own, so the ramp reads whichever plane it resolved to
-	   rather than trusting an arm to match. */
-	--qmh-surface: var(--qm-bg, Canvas);
+	   (ARCHITECTURE §Styling); the figures are its figures. */
+	--qmh-surface: var(--qm-bg, light-dark(#fff, #272729));
 	--qmh-page: oklab(from var(--qmh-surface) calc(l - (0.04 + 0.0202 * (1 - l))) a b);
-	--qmh-ink: var(--qm-fg, CanvasText);
+	--qmh-ink: var(--qm-fg, light-dark(#1c1c1c, #d7dadc));
 	/* One step off the ink and no second: a page's chrome type is small, tracked and
 	   uppercase, so a rung below this reads under 4.5:1 against the plate and the
 	   label and status lines that would take it are text (WCAG 1.4.3). */
-	--qmh-ink-meta: color-mix(in oklab, var(--qmh-ink), var(--qmh-surface) 45%);
+	--qmh-ink-meta: color-mix(in oklab, var(--qmh-ink), var(--qmh-surface) 35%);
 	--qmh-surface-hover: color-mix(in oklab, var(--qmh-surface), var(--qmh-ink) 8%);
 	--qmh-border: color-mix(in oklab, var(--qmh-surface), var(--qmh-ink) 17%);
 	/* The edge that says "engaged" where the hairline says "edge": a pressed switch,
-	   the underline under a link. */
-	--qmh-border-strong: color-mix(in oklab, var(--qmh-surface), var(--qmh-ink) 40%);
+	   the underline under a link. Half way to the ink, which clears WCAG 1.4.11's 3:1
+	   against the page and the plate at both poles. */
+	--qmh-border-strong: color-mix(in oklab, var(--qmh-surface), var(--qmh-ink) 50%);
 
 	/* The one hue a host's page spends on purpose: the primary action wears it. The
 	   figures are the surfaces' own default for the same dial, so a page that turns no
@@ -62,6 +60,9 @@
 	   on a dark page. The dial sits in front of the pair, as every pole's does, so
 	   a host that turns one owns both schemes. */
 	--qmh-alert: var(--qm-danger, light-dark(#9e1518, #f9786c));
+	/* What a modal's backdrop lays over the page: the ground held translucent, so the
+	   page recedes under the dialog without a second tone to read. */
+	--qmh-scrim: color-mix(in srgb, var(--qmh-page) 80%, transparent);
 
 	/* ── Rhythm ──────────────────────────────────────────────────────────────── */
 	/* One base and its multiples, the same four steps the surfaces derive. A host
