@@ -441,28 +441,25 @@
 		width: var(--_qm-glyph-control);
 		height: var(--_qm-glyph-control);
 	}
-	/* The box: a well, edged, since a mark this small has no plane under it to step off
-	 by tone alone; held, it takes the accent the switch's track takes when checked. */
+	/* The box is the switch's track (`BooleanField.svelte`): a fill and nothing else,
+	 which held swaps for the accent, so the surface's two marks for one boolean decode
+	 alike. */
 	.qm-tick-input {
 		appearance: none;
 		margin: 0;
 		width: 100%;
 		height: 100%;
-		border: var(--_qm-border-width) solid var(--_qm-border);
+		border: none;
 		border-radius: calc(var(--_qm-radius-inner) / 2);
-		background: var(--_qm-surface-well);
+		background: var(--_qm-surface-hover);
 		cursor: pointer;
-		transition:
-			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
-			border-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-tick-input:checked,
 	.qm-tick-fixed {
 		background: var(--_qm-accent);
-		border-color: var(--_qm-accent);
 	}
 	.qm-tick-fixed {
-		box-sizing: border-box;
 		cursor: default;
 	}
 	/* The mark rides over the input and takes no press of its own; it is drawn by the
@@ -546,7 +543,6 @@
 	}
 	.qm-matrix-roster[data-default] :is(.qm-tick-input:checked, .qm-tick-fixed) {
 		background: var(--_qm-accent-default);
-		border-color: var(--_qm-accent-default);
 	}
 	.qm-matrix-roster[data-default] :global(.qm-toggle[data-state='checked']) {
 		background: var(--_qm-accent-default);
