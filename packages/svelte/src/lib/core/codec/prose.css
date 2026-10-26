@@ -661,8 +661,10 @@ li.ProseMirror-selectednode::after {
    absent otherwise (`table-view.ts` §`alignCluster`), so the reveal is `hidden` rather
    than the band's opacity. It floats over content it did not choose, so the edge and
    `--_qm-lift` separate it and the raised rung joins them in dark (ARCHITECTURE
-   §Styling). The pressed toggle takes the selected grip's tint and accent: it names the
-   held column's alignment the way the grip names the held line. */
+   §Styling). Its geometry is the format popover's, a row of toggles held one rung in
+   from a surface at the card's radius, so the two floating rows of glyphs are one
+   height and one shape. The pressed toggle takes the selected grip's tint and accent:
+   it names the held column's alignment the way the grip names the held line. */
 .qm-table-align {
 	position: absolute;
 	z-index: 2;
@@ -671,8 +673,10 @@ li.ProseMirror-selectednode::after {
 	width: max-content;
 	margin-inline: auto;
 	display: flex;
+	gap: var(--_qm-space-half);
+	padding: var(--_qm-space);
 	border: var(--_qm-border-width) solid var(--_qm-border);
-	border-radius: var(--_qm-radius-inner);
+	border-radius: var(--_qm-radius);
 	background: var(--_qm-surface-raised);
 	box-shadow: var(--_qm-lift);
 }

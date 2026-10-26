@@ -10,6 +10,8 @@
 
 **A card's text stands on one column at both ends.** The body's lines and the un-schemable card's note start where the title and the field labels do, where the body stood 2.5px further in and the note 5.5px further out, and the body gains 5px of measure. The tips slip starts on that column too and ends where a card's delete glyph does, where it stood a further 10.5px in, and takes the card's own corners, so the pair has the silhouette every card has. The un-schemable card's type picker draws its value in the surface's ink rather than the browser's.
 
+**Floating surfaces share one inset and one radius.** The enum listbox, the card stack's kind menu and the slash menu hold their items 4px in from the surface's edge, where they held them 2px in, so a highlighted item's corners run concentric with the surface's. The table's alignment cluster takes the format popover's geometry, the card's radius and a 4px inset, and stands 34px tall where it stood 26px. The format popover's link prompt stands its buttons at the input's height, so switching to it no longer gives the row two heights.
+
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
 **An open matrix's add box stands in the roster's columns**: its plus where a tick stands and its words where a title starts, where both sat 8px further in, and a press on the plus lands in the box. An added item's remove is the minus an array row's is, where it was a cross, and rests at the muted rung on a touch screen as an array row's does.
