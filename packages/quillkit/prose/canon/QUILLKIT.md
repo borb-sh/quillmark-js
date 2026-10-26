@@ -42,7 +42,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **The gate loads and renders.** `fromDir`, then compile and render every quill's seed, `quill.seedDocument()`: one card per kind, every field absent and every body empty, so what the gate proves is that the plate renders the blank a reader starts from. The core is instantiated before the first render, so a setup fault fails the verb rather than printing as the first quill's.
 
-**What an author wrote is held to every diagnostic.** A quill's `example.md` fails on any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is the author's own to fix. The seed is the schema's, and answers for its render alone. The compile's own warnings are the plate's, and the quill's load warnings its schema's: both print under the quill's `pass` line, once each, and fail it only under `--strict`.
+**What an author wrote is held to every diagnostic.** A quill's `example.md` fails on any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is the author's own to fix. The seed is the schema's, and answers for its render alone. The render's own warnings, the compile's among them, are the plate's, and the quill's load warnings its schema's: both print under the quill's `pass` line, once each, and fail it only under `--strict`.
 
 **A failure prints as the CLI prints it.** Every diagnostic on a failure prints whole beneath the `FAIL` line, through the wasm's `formatDiagnostic`: severity, message, code, `file:line:col`, path and hint, so the gate an author is blocked on says no less than `quillmark render` does.
 

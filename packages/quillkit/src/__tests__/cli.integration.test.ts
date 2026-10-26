@@ -153,7 +153,9 @@ describe('quillkit check, on what a quill says', () => {
 		async () => {
 			const at = await starter(['#upper(datetime.today())']);
 			const failure = await refused(['check'], at);
-			expect(failure.message).toMatch(/FAIL {2}letter@0\.1\.0 — seed does not render\n.*\(\S+\)/);
+			expect(failure.message).toMatch(
+				/FAIL {2}letter@0\.1\.0 — seed does not render\n.*\(typst::\w+\)/
+			);
 			expect(failure.message).toMatch(/plate\.typ:2:\d+/);
 		},
 		RENDER_MS

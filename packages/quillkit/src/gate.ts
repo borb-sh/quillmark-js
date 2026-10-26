@@ -114,7 +114,12 @@ export async function gate(
 				const docs: [string, Document][] = [['seed', seed]];
 				const said: Diagnostic[] = [...quill.warnings, ...seed.warnings];
 				try {
-					const example = quill.exampleDocument();
+					let example: Document | undefined;
+					try {
+						example = quill.exampleDocument();
+					} catch (err) {
+						throw new Error('example does not open', { cause: err });
+					}
 					if (example) {
 						docs.push(['example', example]);
 						assertClean(quill, example, 'example');
