@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-// Font runs (`codec/fonts.ts`): `font_family` marks overlap as the store's do and the
-// leaf draws the family the render sets on each character, the popover's commands set a
-// family as the winner over the selection and take the winner off, a run set in a family
-// the registry lacks is marked, and a paste keeps a family the registry holds and
-// nothing else of a run's face (`font-paste.ts`).
+// Font runs (`codec/fonts.ts`): one `font_family` mark per character as the store keeps
+// them, the popover's commands set a family over the selection in place of the one it
+// was set in and take it off, a run set in a family the registry lacks is marked, and a
+// paste keeps a family the registry holds and nothing else of a run's face
+// (`font-paste.ts`).
 import { describe, it, expect } from 'vitest';
 import { TextSelection } from 'prosemirror-state';
 import type { Content, ContentMark } from '@quillmark/wasm';
@@ -64,105 +64,71 @@ function selectText(view: ReturnType<typeof leaf>['view'], from: number, to: num
 function drawn(view: ReturnType<typeof leaf>['view']): string {
 	const out: string[] = [];
 	view.state.doc.firstChild!.forEach((node) => {
-		const win = node.marks.findLast((m) => m.type.name === 'font_family');
+		const win = node.marks.find((m) => m.type.name === 'font_family');
 		for (const ch of node.text ?? '') out.push(`${ch}:${win?.attrs.name ?? '-'}`);
 	});
 	return out.join(' ');
 }
 
 describe('font runs through the codec', () => {
-	it('decode → pmToContent is the identity over nested families, the inner one last', () => {
+	it('decode → pmToContent is the identity over nested pairs, which import flat', () => {
 		const rt = normalize(
-			md('<qm-font family="Arimo">ab<qm-font family="Carlito">cd</qm-font>ef</qm-font>')
+			md('<qm-span family="Arimo">ab<qm-span family="Carlito">cd</qm-span>ef</qm-span>')
 		);
+		expect(fontMarks(rt)).toEqual([
+			family('Arimo', 0, 2),
+			family('Carlito', 2, 4),
+			family('Arimo', 4, 6)
+		]);
 		const pm = decode(rt, blockSchema);
-		const inner = pm.firstChild!.child(1).marks.map((m) => m.attrs.name);
-		expect(inner).toEqual(['Arimo', 'Carlito']);
+		pm.firstChild!.forEach((node) =>
+			expect(node.marks.filter((m) => m.type.name === 'font_family')).toHaveLength(1)
+		);
 		expect(contentEqual(normalize(pmToContent(pm)), rt)).toBe(true);
 	});
 
-	it('draws the family that ranks first: the later start, then the shorter mark', () => {
-		const crossing = { ...md('abcdef'), marks: [family('Arimo', 0, 4), family('Carlito', 2, 6)] };
-		const { field, view } = leaf(crossing);
-		expect(drawn(view)).toBe('a:Arimo b:Arimo c:Carlito d:Carlito e:Carlito f:Carlito');
-		field.destroy();
-		const sameStart = leaf(
-			'<qm-font family="Arimo"><qm-font family="Carlito">abc</qm-font>def</qm-font>'
+	it('draws one family per character', () => {
+		const { field, view } = leaf(
+			'<qm-span family="Arimo">ab<qm-span family="Carlito">cd</qm-span></qm-span>e'
 		);
-		expect(drawn(sameStart.view)).toBe('a:Carlito b:Carlito c:Carlito d:Arimo e:Arimo f:Arimo');
-		sameStart.field.destroy();
-	});
-
-	it('follows the render when an edit moves the winner outside the edit', () => {
-		const { field, view, stored } = leaf(
-			'<qm-font family="Arimo">ab<qm-font family="Carlito">cde</qm-font></qm-font><qm-font family="Carlito">fgh</qm-font>'
-		);
-		view.dispatch(view.state.tr.delete(1, 3));
-		expect(fontMarks(stored())).toEqual([family('Arimo', 0, 3), family('Carlito', 0, 6)]);
-		expect(drawn(view)).toBe('c:Arimo d:Arimo e:Arimo f:Carlito g:Carlito h:Carlito');
+		expect(drawn(view)).toBe('a:Arimo b:Arimo c:Carlito d:Carlito e:-');
 		field.destroy();
 	});
 
-	it('sets a family over part of a run inside it, leaving the run whole', () => {
-		const { field, view, stored } = leaf('<qm-font family="Carlito">abcdef</qm-font>');
+	it('sets a family over part of a run, replacing the run’s family there', () => {
+		const { field, view, stored } = leaf('<qm-span family="Carlito">abcdef</qm-span>');
 		selectText(view, 2, 4);
 		expect(setFontFamily('Roboto')(view.state, view.dispatch)).toBe(true);
-		const nested = '<qm-font family="Carlito">ab<qm-font family="Roboto">cd</qm-font>ef</qm-font>';
-		expect(contentEqual(stored(), normalize(md(nested)))).toBe(true);
+		const flat =
+			'<qm-span family="Carlito">ab</qm-span><qm-span family="Roboto">cd</qm-span><qm-span family="Carlito">ef</qm-span>';
+		expect(contentEqual(stored(), normalize(md(flat)))).toBe(true);
+		expect(drawn(view)).toBe('a:Carlito b:Carlito c:Roboto d:Roboto e:Carlito f:Carlito');
 		field.destroy();
 	});
 
-	it('takes a family outranking the new one off the selection', () => {
+	it('joins a run a selection extends into one', () => {
 		const { field, view, stored } = leaf(
-			'<qm-font family="Carlito">ab<qm-font family="Roboto">cd</qm-font>ef</qm-font>'
+			'ab<qm-span family="Carlito">cd</qm-span><qm-span family="Arimo">ef</qm-span>'
 		);
-		selectText(view, 1, 3);
-		setFontFamily('Arimo')(view.state, view.dispatch);
-		expect(fontMarks(stored())).toEqual([
-			family('Carlito', 0, 6),
-			family('Arimo', 1, 3),
-			family('Roboto', 3, 4)
-		]);
-		expect(drawn(view)).toBe('a:Carlito b:Arimo c:Arimo d:Roboto e:Carlito f:Carlito');
+		selectText(view, 0, 3);
+		setFontFamily('Carlito')(view.state, view.dispatch);
+		expect(fontMarks(stored())).toEqual([family('Carlito', 0, 4), family('Arimo', 4, 6)]);
 		field.destroy();
 	});
 
-	it('keeps the run a selection extends in its family, and a family set inside it', () => {
-		const extended = leaf(
-			'ab<qm-font family="Carlito">cd<qm-font family="Arimo">ef</qm-font>gh</qm-font>'
+	it('takes every family off a selection, leaving it in none', () => {
+		const { field, view, stored } = leaf(
+			'<qm-span family="Carlito">ab</qm-span><qm-span family="Roboto">cd</qm-span><qm-span family="Carlito">ef</qm-span>'
 		);
-		selectText(extended.view, 0, 4);
-		setFontFamily('Arimo')(extended.view.state, extended.view.dispatch);
-		expect(drawn(extended.view)).toBe(
-			'a:Arimo b:Arimo c:Arimo d:Arimo e:Arimo f:Arimo g:Carlito h:Carlito'
-		);
-		extended.field.destroy();
-		const inner = leaf(
-			'ab<qm-font family="Arimo">c<qm-font family="Carlito">d</qm-font>ef</qm-font>'
-		);
-		selectText(inner.view, 0, 2);
-		setFontFamily('Arimo')(inner.view.state, inner.view.dispatch);
-		expect(fontMarks(inner.stored())).toEqual([family('Arimo', 0, 6), family('Carlito', 3, 4)]);
-		inner.field.destroy();
-	});
-
-	it('takes the families a selection draws in off it, so one they sat in shows again', () => {
-		const NESTED = '<qm-font family="Carlito">ab<qm-font family="Roboto">cd</qm-font>ef</qm-font>';
-		const inner = leaf(NESTED);
-		selectText(inner.view, 2, 4);
-		expect(removeFontFamily(inner.view.state, inner.view.dispatch)).toBe(true);
-		expect(fontMarks(inner.stored())).toEqual([family('Carlito', 0, 6)]);
-		inner.field.destroy();
-		const whole = leaf(NESTED);
-		selectText(whole.view, 1, 5);
-		removeFontFamily(whole.view.state, whole.view.dispatch);
-		expect(fontMarks(whole.stored())).toEqual([family('Carlito', 0, 1), family('Carlito', 5, 6)]);
-		whole.field.destroy();
+		selectText(view, 1, 5);
+		expect(removeFontFamily(view.state, view.dispatch)).toBe(true);
+		expect(fontMarks(stored())).toEqual([family('Carlito', 0, 1), family('Carlito', 5, 6)]);
+		field.destroy();
 	});
 
 	it('reads the selection as one family, none, or more than one', () => {
 		const { field, view } = leaf(
-			'<qm-font family="Carlito">a<qm-font family="Roboto">b</qm-font></qm-font>cd'
+			'<qm-span family="Carlito">a</qm-span><qm-span family="Roboto">b</qm-span>cd'
 		);
 		selectText(view, 1, 2);
 		expect(selectionFamily(view.state)).toBe('Roboto');
@@ -185,7 +151,7 @@ describe('font runs through the codec', () => {
 describe('a run in a family the registry lacks', () => {
 	const marked = (view: ReturnType<typeof leaf>['view']) =>
 		[...view.dom.querySelectorAll('.qm-font-missing')].map((el) => el.textContent);
-	const DOC = '<qm-font family="carlito">ab</qm-font> <qm-font family="Gone">cd</qm-font>';
+	const DOC = '<qm-span family="carlito">ab</qm-span> <qm-span family="Gone">cd</qm-span>';
 
 	it('is marked, a family matching lowercased being held', () => {
 		const { field, view } = leaf(DOC, registry(['Carlito']).fonts);
@@ -260,11 +226,11 @@ describe('a pasted run’s face', () => {
 		expect(fontMarks(rt)).toEqual([]);
 	});
 
-	it('keeps nested runs copied out of a leaf, whatever the registry holds', () => {
+	it('keeps runs copied out of a leaf, whatever the registry holds, one family a character', () => {
 		const rt = paste(
 			`<p><span data-qm-font-family="Gone">a<span data-qm-font-family="Lost">b</span></span></p>`,
 			[]
 		);
-		expect(fontMarks(rt)).toEqual([family('Gone', 0, 2), family('Lost', 1, 2)]);
+		expect(fontMarks(rt)).toEqual([family('Gone', 0, 1), family('Lost', 1, 2)]);
 	});
 });

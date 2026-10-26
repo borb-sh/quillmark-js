@@ -81,15 +81,13 @@ const marks: Record<string, MarkSpec> = {
 		],
 		toDOM: () => ['s', 0]
 	},
-	// A font run's family (`fonts.ts`). Ahead of `code`, so a code span inside a run
-	// renders inside its span and keeps the code face, as Typst keeps `raw`'s. It excludes
-	// nothing, its own type included, so families overlap as the store's do and the
-	// innermost span draws. The family draws in the face registered under its alias,
-	// falling to the surface's own where none is (`prose.css`); a paste reaches this
-	// spelling only through `font-paste.ts`, which checks the family against the registry.
+	// A font run's family (`fonts.ts`), one per character. Ahead of `code`, so a code span
+	// inside a run renders inside its span and keeps the code face, as Typst keeps `raw`'s.
+	// The family draws in the face registered under its alias, falling to the surface's own
+	// where none is (`prose.css`); a paste reaches this spelling only through
+	// `font-paste.ts`, which checks the family against the registry.
 	font_family: {
 		attrs: { name: {} },
-		excludes: '',
 		parseDOM: [
 			{
 				tag: 'span[data-qm-font-family]',

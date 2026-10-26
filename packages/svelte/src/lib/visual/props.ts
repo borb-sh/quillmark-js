@@ -20,7 +20,7 @@ export interface VisualEditorProps {
 	 */
 	quill: Quill;
 	/**
-	 * The font registry: the faces a render of `quill` sets type in,
+	 * The font registry: the faces a font mark sets in a render of `quill`,
 	 * `engine.fontFaces(quill)`. The formatting popover offers their families, a run set
 	 * in one draws in its face, a paste keeps a family they hold, and a run set in a
 	 * family they lack is marked as one the render cannot set. Absent, the popover offers

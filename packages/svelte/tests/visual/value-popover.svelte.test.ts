@@ -355,13 +355,13 @@ describe('the formatting popover over a field’s own leaf', () => {
 	}
 
 	it('draws the family menu over a registry, showing the family the selection is in', async () => {
-		expect(await familyShown('<qm-font family="Carlito">Intro</qm-font> words')).toEqual([
+		expect(await familyShown('<qm-span family="Carlito">Intro</qm-span> words')).toEqual([
 			'Carlito'
 		]);
 	});
 
 	it('shows a family the registry lacks as unavailable', async () => {
-		expect(await familyShown('<qm-font family="Gone">Intro</qm-font> words')).toEqual([
+		expect(await familyShown('<qm-span family="Gone">Intro</qm-span> words')).toEqual([
 			DEFAULT_VISUAL_STRINGS.formatFontMissing('Gone')
 		]);
 	});

@@ -97,7 +97,7 @@
 	let docHandle: Document | undefined = $state();
 	// Held so the recovery loop can try the open again; the surfaces never read it.
 	let engineHandle: Engine | undefined;
-	// The faces a render of the quill sets type in: the editor's font registry, read once
+	// The faces a font mark sets in a render of the quill: the editor's font registry, read once
 	// the backend has loaded.
 	let fonts = $state<FontFace[]>();
 	// What the engine refused the document with, and why there is no session to paint from.

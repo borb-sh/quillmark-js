@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A writer sets a selection's font family from the selection toolbar**, over the `font_family` mark `@quillmark/wasm` 0.131.0 adds. The menu lists the new `fonts` prop, the faces a render of the quill sets type in (`engine.fontFaces(quill)`), so a writer picks only families the preview sets; without it the toolbar offers none. Families overlap as the store's do, and the leaf draws on each character the family the render sets: a family set inside another nests in it, and removing it shows the outer one again. A marked run draws in its real face, registered with the document's font set, and a run in a family the registry lacks takes a danger tint and shows in the menu as unavailable. A paste keeps a family the registry holds. The new strings are `formatFont`, `formatFontDefault`, `formatFontMissing`, `formatFontRemove` and `formatFontMixed`.
+**A writer sets a selection's font family from the selection toolbar**, over the `font_family` mark `@quillmark/wasm` 0.131.0 adds. The menu lists the new `fonts` prop, the host library's faces (`engine.fontFaces(quill)`), so a writer picks only families the preview sets; without it the toolbar offers none. A character holds one family, as the store keeps it: a pick replaces the family the selection was set in, and removing it leaves the selection in the surrounding font. A marked run draws in its real face, registered with the document's font set, and a run in a family the registry lacks, compared case-insensitively, takes a danger tint and shows in the menu as unavailable. A paste keeps a family the registry holds. The new strings are `formatFont`, `formatFontDefault`, `formatFontMissing`, `formatFontRemove` and `formatFontMixed`.
 
 ## v0.26.2 - 2026-10-24
 

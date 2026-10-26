@@ -1,5 +1,5 @@
-// The font registry the editor offers and draws in: the faces a render of the quill
-// sets type in (`engine.fontFaces(quill)`), handed over as the `fonts` prop. Three reads
+// The font registry the editor offers and draws in: the faces a font mark sets in a
+// render of the quill (`engine.fontFaces(quill)`), handed over as the `fonts` prop. Three reads
 // come off it. The family menu lists its families, the paste pass keeps a family it holds
 // (`core/codec/font-paste.ts`), and a leaf marks a run set in a family it lacks
 // (`core/codec/fonts.ts`). Each face registers with the document's font set under the

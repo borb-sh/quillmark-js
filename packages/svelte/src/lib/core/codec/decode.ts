@@ -10,7 +10,6 @@
 import { DOMSerializer, type Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
 import type { Content, ContentContainer, ContentLine, ContentMark } from '@quillmark/wasm';
 import { ISLAND_SLOT, isBlockIsland, isEditedIsland, type IslandNodeAttrs } from './islands.js';
-import { familyRank } from './fonts.js';
 import { descriptorOf, markKey, pmMarkFromContent } from './marks.js';
 import { core } from '../lifecycle.js';
 import { hasMarks, isBlockSchema, isInlineSchema, takesLineBreak } from './schema.js';
@@ -441,18 +440,10 @@ function markSetKey(active: ContentMark[]): string {
 	return JSON.stringify(active.map((m) => markKey(descriptorOf(m))).sort());
 }
 
-/** The PM mark array for an active content mark set (anchors already excluded). The
- *  families go on in rank order, so the winner stands last (`fonts.ts`). */
+/** The PM mark array for an active content mark set (anchors already excluded). */
 function buildMarkSet(schema: Schema, active: ContentMark[]): readonly Mark[] {
-	const family = (m: ContentMark) =>
-		m.type === 'font_family' ? { start: m.start, end: m.end, name: m.attrs.name } : null;
-	const ordered = [...active].sort((a, b) => {
-		const x = family(a);
-		const y = family(b);
-		return x && y ? familyRank(x, y) : Number(!!x) - Number(!!y);
-	});
 	let set: readonly Mark[] = [];
-	for (const m of ordered) {
+	for (const m of active) {
 		const pm = pmMarkFromContent(schema, m);
 		if (pm) set = pm.addToSet(set);
 	}

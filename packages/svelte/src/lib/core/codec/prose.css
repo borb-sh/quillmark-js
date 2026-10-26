@@ -152,7 +152,7 @@ li.ProseMirror-selectednode::after {
 	font-size: inherit;
 }
 
-/* A font run (`fonts.ts`): the innermost span's family draws in the registry face
+/* A font run (`fonts.ts`): the span's family draws in the registry face
    registered under its alias, the surface's own face standing in where none is, as the
    render sets a family it lacks in the surrounding font. A family the registry lacks
    takes the danger tint besides, the leaf's word that the preview cannot set it. */
