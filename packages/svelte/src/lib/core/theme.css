@@ -147,7 +147,11 @@
 	   separates on its hairline and `--_qm-lift` there and the step joins them in
 	   dark. */
 	--_qm-surface-raised: color-mix(in oklab, var(--_qm-bg), #fff 8%);
-	--_qm-surface-hover: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 8%);
+	/* A step toward the ink laid over whatever plane is under it, rather than a tone off
+	   the card: a hover lands on the card, a well, a band and a floating surface, and a
+	   fixed tone stepped off the first sits level with `raised` in dark. Translucent, as
+	   the accent's tint is, so the step is the same over each. */
+	--_qm-surface-hover: color-mix(in oklab, var(--_qm-fg) 8%, transparent);
 	/* A band laid on the card rather than cut into it: a table's header, and the pill a
 	   grip draws. It steps toward the ink at both poles, a shade under white in light
 	   and a shade over the card in dark, where `well` sinks to a black stripe. */
@@ -380,22 +384,19 @@
 	--_qm-track-prose: calc(var(--_qm-track-min) * 2);
 
 	/* ── Type ────────────────────────────────────────────────────────────────
-	   `--qm-font-size` anchors the chrome rung; 1.125 is the ratio between adjacent
-	   rungs: a step up (title) and one down (label). The ratio and the
-	   weight are fixed conventions, not dials: no consumer tunes a typographic
-	   ratio, and a dial nobody turns is a name every reader still holds. Three chrome
-	   rungs: a second step below `label` lands near 11px, under a size anything here
-	   wants to be read at, and the supporting text that would take it is what `label`
-	   already is. */
+	   `--qm-font-size` anchors the chrome rung and `label` stands one 1.125 step under
+	   it. The ratio and the weight are fixed conventions, not dials: no consumer tunes
+	   a typographic ratio, and a dial nobody turns is a name every reader still holds.
+	   Two chrome rungs: nothing the chrome names ranks above the value it names, a card
+	   title being body at the mid weight, and a second step below `label` lands near
+	   11px, under a size anything here wants to be read at. */
 	--_qm-text-body: var(--qm-font-size, 0.875rem);
-	--_qm-text-title: calc(var(--_qm-text-body) * 1.125);
 	--_qm-text-label: calc(var(--_qm-text-body) / 1.125);
 	/* Paper: the document body answers to the preview's paper where every other
 	   surface here answers to the control beside it, so a rung shared with the chrome
 	   makes a consumer asking for larger prose take larger inputs with it. 16/15 where
 	   the ramp steps at 9/8: small enough to read as a change of register rather than
-	   a rung of hierarchy, and clear of the title rung, which one 9/8 step lands on
-	   exactly. */
+	   a rung of hierarchy. */
 	--_qm-text-paper: calc(var(--_qm-text-body) * 16 / 15);
 	/* Two weights over the regular, and only one of them is chrome. `mid` names
 	   everything the surface names — a card title, a section header, a field
