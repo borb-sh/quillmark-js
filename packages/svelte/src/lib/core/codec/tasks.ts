@@ -1,7 +1,7 @@
 // A task item is a `list_item` whose `checked` is a boolean (CODEC §"Task items"). Its
 // `toDOM` draws a checkbox ahead of the item's blocks, disabled, which is the drawing a
 // held leaf, a copy and `renderContent` take; a leaf that edits mounts the item through
-// `taskItemView`, whose checkbox toggles. A task item is minted by source mode and by a
+// `taskItemView`, whose checkbox toggles, as `Mod-Enter` does (`toggleTask`). A task item is minted by source mode and by a
 // paste alone: no shorthand, command or key makes one.
 import {
 	DOMSerializer,
@@ -148,5 +148,24 @@ export function splitTaskItem(itemType: NodeType): Command {
 			} else tr.setNodeAttribute(below, 'checked', false);
 			dispatch(tr);
 		});
+	};
+}
+
+/**
+ * `checked` flipped on the nearest task item around the caret, as one transaction. It
+ * declines outside a task item and inside a fence, where `baseKeymap`'s `exitCode` is the
+ * nearer answer to `Mod-Enter`.
+ */
+export function toggleTask(itemType: NodeType): Command {
+	return (state, dispatch) => {
+		const { $from } = state.selection;
+		if ($from.parent.type.spec.code) return false;
+		for (let d = $from.depth; d > 0; d--) {
+			const node = $from.node(d);
+			if (node.type !== itemType || !isTask(node)) continue;
+			dispatch?.(state.tr.setNodeAttribute($from.before(d), 'checked', !node.attrs.checked));
+			return true;
+		}
+		return false;
 	};
 }
