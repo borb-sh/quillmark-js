@@ -127,7 +127,7 @@ import '@quillmark/svelte/preset';
 </body>
 ```
 
-This is the stylesheet our own apps import: the playground and studio draw with these rules and nothing else, so what you get is what we ship, not a reduction of it.
+This is the stylesheet our own apps import: the playground, studio and quillkit's app client draw with these rules and nothing else, so what you get is what we ship, not a reduction of it.
 
 It carries a `--qmh-*` scale for the page, derived from the same nine dials and calibrated against the surfaces' own steps, so a plate of yours and a card of ours agree about which way "raised" goes. Turning a dial moves both.
 
@@ -177,9 +177,11 @@ An app that mounts an editor beside a preview over one session needs a screen to
 
 The narrow shape is one mount at a time, not two of them stacked: half a narrow viewport is under the width either surface reads at. The track you are not showing is `display: none`, so it leaves the tab order, hit-testing and the accessibility tree together: you need no `inert` on it, and no breakpoint in your JS, since the only state you hold is which of the two you last asked for. Keep both mounted: the hidden pane keeps its pixels, its caret and its scroll, and comes back to them — it rasters nothing at a box it has none of, and repaints only where it returns to a box that draws its pages at another scale. A preview scroll asked for while it was hidden is held and run on the way back, so it opens at the caret rather than several edits behind it. A click that lands in the hidden pane is the one thing the shape adds to your wiring, so send the caret and reveal the track together, or the hit goes somewhere the reader cannot see.
 
+Every rule behind the five is wrapped in `:where()`, so it computes at specificity zero: a rule of yours on the same element wins at any specificity and in any sheet order, which is what lets a stylesheet written by someone other than the app's author (an `app.css` over quillkit's app client) restyle a band without knowing which shell rules set it.
+
 The shape is shared; the look of a band is not. Your wordmark, your nav and the depth of your head are the most app-specific things on the screen, and a preset that drew them would hand every tool built on this the same face, so they read `--qmh-*` like everything else and you write the rules. `.qm-split`'s gap is a default rather than a fact about splitting: close it to `0` and carry a hairline on one pane if you want the two mounts to meet instead of stand apart.
 
-It is **unlayered** and at ordinary specificity, so your own rules beat it by ordinary precedence. It is also opt-in and side-effect free until imported: nothing that styles your document arrives with a component.
+It is **unlayered**, and nothing in it outranks a rule of yours aimed at the same element: the page, type, status and control recipes compute at ordinary specificity, so your own rules beat them by ordinary precedence, and the shell and the app chrome compute at specificity zero, as the surfaces do. It is also opt-in and side-effect free until imported: nothing that styles your document arrives with a component.
 
 One rule in it earns its place regardless of whether you take the rest, and you want it if you draw a focus ring of your own — cut the mounted surfaces out of the blanket:
 
@@ -190,6 +192,38 @@ One rule in it earns its place regardless of whether you take the rest, and you 
 ```
 
 A blanket `:focus-visible` of yours outranks ours, including on the controls that already draw one, so a ring written for the controls that draw none repaints the ones that do. The cut-out leaves yours everywhere else, and `:not(:where(…))` contributes no specificity, so your rule ranks exactly as it would without it.
+
+### The app chrome
+
+A tool's bands are yours, since a tool's head is the most app-specific thing on its screen. An app whose whole page is one form to fill in has less to say there: a name, the action the page leads to, and a line signing it. Four classes draw that much, quillkit's app client wears them, and a host of its own takes them the same way:
+
+| Class             | What it is                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
+| `.qm-app-header`  | The band naming the app: a plate, a gutter and a hairline under it. Put it beside `.qm-bar`.      |
+| `.qm-app-title`   | What the app is called, at the title rung: the one line on the screen read as a name.             |
+| `.qm-app-footer`  | The line signing the app, in meta type under a hairline; its links take the line's own ink.       |
+| `.qm-app-primary` | The one action the page leads to: the control wearing `--qm-accent`, standing at the touch floor. |
+
+They compute at specificity zero, as the shell does, so `.qm-app-header { background: #00308f; color: #fff; }` is the whole of rebranding the head.
+
+## What a stylesheet may aim at
+
+A stylesheet you write against a mounted surface, or one an author writes over an app someone else built, may aim at these and nothing else:
+
+- the nine dials (§"The dials");
+- the surface roots, `.qm-editor` and `.qm-preview`, and `.qm-pane`;
+- `data-qm-card="<kind>"`, on the box of every card the editor draws, its value the card's kind and `main` for the main card;
+- the preset's classes, on your own DOM, if you import it (§"Match ours").
+
+`data-qm-card` is the one hook named by the schema rather than by the package: a rule aimed at a kind lands on that kind's cards wherever the editor puts them, which is the one thing a quill-specific restyle needs and a dial cannot say.
+
+```css
+[data-qm-card='indorsement'] {
+	border-left: 3px solid var(--qm-accent);
+}
+```
+
+Nothing names a field or a property. Every other `data-qm-*` attribute the surfaces carry, `data-qm-prop` among them, is something the surface queries itself, and moves when it does.
 
 ## What is deliberately not public
 

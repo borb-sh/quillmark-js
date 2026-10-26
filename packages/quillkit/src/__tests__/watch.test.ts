@@ -36,7 +36,7 @@ describe('settle', () => {
 
 	it('cancels the call still waiting', async () => {
 		// A teardown that only unregisters leaves the scheduled half to run — in
-		// `studio` a repack into a tree the caller is done with — and the timer holds
+		// `serve` a repack into a tree the caller is done with — and the timer holds
 		// the process open until it does.
 		let calls = 0;
 		const fire = settle(10, () => calls++);
@@ -75,7 +75,7 @@ describe('watchCollection', () => {
 	});
 
 	it('repacks a collection that itself lives under node_modules', async () => {
-		// A quiver is consumed as a dependency, so `studio` is run against a root whose
+		// A quiver is consumed as a dependency, so `serve` is run against a root whose
 		// own path holds the segment the filter refuses. Reading it there answers every
 		// edit in the collection with silence.
 		const at = join(await temp.dir(), 'node_modules', '@acme', 'quills');

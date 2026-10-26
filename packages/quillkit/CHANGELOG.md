@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+**quillkit builds a quiver into a standalone app.** `app` is a target beside `studio` and `quiver`: a form for the people filling a quiver's forms in, beside the page it prints, with a Download PDF press that waits for the page to catch up and refuses a page that does not render. One quill opens its form and several open a card each; a phone shows one pane at a time under a Form/Page switch. My documents keeps every document a reader starts in their browser, keyed by the app's address, to reopen, download as `.md` or delete, and a reload reopens the one that was open. The app opens every quill in the quiver at its latest version, and the rest is found by name beside `Quiver.yaml`: `App.yaml` names the app's `title` and `description` and refuses any other key, `app.css` is linked last and its `url()` files are copied into the deploy, and `icon.svg` or `icon.png` is its icon. `build app` warns on a selector the theming contract does not promise and on a quill declaring no `license`.
+
+**A document reopens on the version it was made on.** A version a later release no longer opens by default stays openable while the quiver holds it, and offers Update to the latest form with the document's markdown offered first.
+
+**The verbs are `init`, `check`, `build`, `serve` and `preview`, each over the quiver in the working directory, and `build` and `serve` take a target, `studio` where none is named.** `test` is `check`. `studio` is `serve`, which repacks on save and always packs drafts, and `preview` serves the build in `dist/`, whichever target it is, with the cache headers a host owes it. `site` is `build`, which lays studio, the app or the quiver alone into `dist/`. `-D`, `-o` and `-p` spell `--drafts`, `--out` and `--port`, and `--open` opens the page in the platform's browser. `--quiver`, `--host` and `--templates` are gone, and a verb refuses a flag it does not take.
+
+**quillkit carries `@quillmark/quiver` and `@quillmark/wasm`.** Both are exact dependencies, the versions both clients are built against, so a quiver installs quillkit alone and the gate renders through the wasm a deploy serves; `init` writes a `package.json` naming quillkit and nothing else. A quiver's own `@quillmark/*` install is not read, and neither is `quillkit.config.js`, so a custom `engine` export no longer reaches the gate.
+
+**Templates are gone.** Studio draws no template picker and reads no `?template=`, `check` and `build` take no `--templates`, and a deploy lays no `templates/`. A quill's filled page is its `example.md`.
+
 ## v0.19.3 - 2026-10-23
 
 **Studio's editor splits a list to number a selection, and pastes a Word list as a list.** The client compiles `@quillmark/svelte` 0.26.0 in: `Mod-Shift-7`/`Mod-Shift-8` and the toolbar buttons on a selection inside a list of the other kind split the selected items out, where they retyped the whole list, and a list copied out of desktop Word or Outlook pastes nested by level, where each item landed as a paragraph.

@@ -1,14 +1,15 @@
 /**
  * The static server, at the two points a general-purpose one gets wrong for this: the
  * content type `.wasm` must carry, and the paths that must not resolve. Both are why
- * this server is written rather than borrowed.
+ * this server is written rather than borrowed. Beside them, the two things its callers
+ * add: roots composed under one prefix, and a deploy's cache rules for `preview`.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
-import { createStaticServer, fileFor, listen, type Mount } from '../serve.js';
+import { createStaticServer, fileFor, listen, type Mount, type ServeOptions } from '../serve.js';
 import { scratch } from './helpers/collection.js';
 
 const temp = scratch('quillkit-serve-');
@@ -22,8 +23,8 @@ afterEach(async () => {
 	await temp.cleanup();
 });
 
-/** A client root and a quiver root, mounted the way `quillkit studio` mounts them. */
-async function serveFixture(): Promise<string> {
+/** A client root and a quiver root, mounted the way `quillkit serve` mounts them. */
+async function serveFixture(options?: ServeOptions): Promise<string> {
 	const client = await temp.dir();
 	const quiver = await temp.dir();
 	await writeFile(join(client, 'index.html'), '<!doctype html>');
@@ -36,7 +37,7 @@ async function serveFixture(): Promise<string> {
 		{ prefix: '/quiver', root: quiver },
 		{ prefix: '', root: client }
 	];
-	const server = createStaticServer(mounts);
+	const server = createStaticServer(mounts, options);
 	servers.push(server);
 	return `http://127.0.0.1:${await listen(server, 0, '127.0.0.1')}`;
 }
@@ -73,6 +74,37 @@ describe('serving', () => {
 	it('refuses a method it does not serve', async () => {
 		const base = await serveFixture();
 		expect((await fetch(`${base}/`, { method: 'POST' })).status).toBe(405);
+	});
+});
+
+describe('roots under one prefix', () => {
+	it('answers from the first root holding the file', async () => {
+		// `dev app` serves the client and the app's staged files both at the root.
+		const client = await temp.dir();
+		const staged = await temp.dir();
+		await writeFile(join(client, 'index.html'), 'client');
+		await writeFile(join(staged, 'index.html'), 'staged');
+		await writeFile(join(staged, 'app.json'), '{}');
+		const mounts: Mount[] = [
+			{ prefix: '', root: client },
+			{ prefix: '', root: staged }
+		];
+
+		expect(fileFor(mounts, '/')).toBe(join(client, 'index.html'));
+		expect(fileFor(mounts, '/app.json')).toBe(join(staged, 'app.json'));
+		expect(fileFor(mounts, '/nope.json')).toBeNull();
+	});
+});
+
+describe("a host's cache rules", () => {
+	it('serves the bundle immutable and revalidates everything else', async () => {
+		// The four rules a deploy's host owes it, two of which are headers: what `preview`
+		// answers is what the host will.
+		const base = await serveFixture({ caching: 'host' });
+		const asset = await fetch(`${base}/assets/index.js`);
+		expect(asset.headers.get('cache-control')).toContain('immutable');
+		for (const path of ['/', '/quiver/quiver.json'])
+			expect((await fetch(`${base}${path}`)).headers.get('cache-control')).toBe('no-cache');
 	});
 });
 

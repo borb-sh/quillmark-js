@@ -101,12 +101,11 @@ dist
 # SvelteKit adapter-static playground output
 packages/*/build/
 
-# The fixture quiver, and studio's templates, packed into each app's served tree before dev/build.
+# The fixture quiver, packed into each client's served tree before dev/build.
 packages/playground/static/quiver/
 packages/quillkit/client/public/quiver/
-packages/quillkit/client/public/templates/
 
-# The client laid out beside a built quiver, the way a deploy serves it (`npm run site`).
+# Studio laid out beside a built quiver, the way a deploy serves it (`npm run site`).
 /site/
 
 # vitepress build output

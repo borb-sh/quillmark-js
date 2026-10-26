@@ -103,25 +103,32 @@ jobs:
             -- "${{ steps.pack.outputs.tgz }}"
 
       # ci.yml's deploy rehearsal, which is quillkit's alone: it is the only package
-      # carrying a client, and a `files` field that stopped shipping it passes every
+      # carrying a client, and a `files` field that stopped shipping one passes every
       # check above and fails in a consumer's deploy. Extracted beside the worktree
-      # rather than inside it, so nothing resolves out of the workspace and the bin
-      # runs on the bytes it ships.
+      # rather than inside it and installed from the registry, so nothing resolves out of
+      # the workspace and the bin runs on the bytes it ships and the pins it names.
       - name: Deploy layout, from the tarball
         if: steps.release.outputs.pkg == 'quillkit'
         run: |
           mkdir -p "$RUNNER_TEMP/tool"
           tar -xzf "${{ steps.pack.outputs.tgz }}" -C "$RUNNER_TEMP/tool" --strip-components=1
-          node "$RUNNER_TEMP/tool/dist/bin/quillkit.js" site --quiver fixtures --out "$RUNNER_TEMP/site"
-          test -f "$RUNNER_TEMP/site/index.html" \
-            || { echo "::error::the tarball laid no client at the site root"; exit 1; }
-          test -f "$RUNNER_TEMP/site/quiver/quiver.json" \
-            || { echo "::error::the tarball laid no quiver under the site"; exit 1; }
+          (cd "$RUNNER_TEMP/tool" && npm install --omit=dev --no-audit --no-fund --no-package-lock)
+          cd fixtures
+          for target in studio app; do
+            node "$RUNNER_TEMP/tool/dist/bin/quillkit.js" build "$target" --drafts --out "$RUNNER_TEMP/$target"
+            test -f "$RUNNER_TEMP/$target/index.html" \
+              || { echo "::error::the tarball laid no $target client at the deploy root"; exit 1; }
+            test -f "$RUNNER_TEMP/$target/quiver/quiver.json" \
+              || { echo "::error::the tarball laid no quiver under the $target deploy"; exit 1; }
+          done
+          test -f "$RUNNER_TEMP/app/app.json" \
+            || { echo "::error::the tarball laid no app.json beside the app"; exit 1; }
           # The stamp the notes below render. Asserted here rather than there,
           # because that step runs after the tag.
           test -f "$RUNNER_TEMP/tool/dist/client/carried.json" \
             || { echo "::error::the tarball carries no stamp of what it compiles in"; exit 1; }
-          node scripts/check-style.mjs --built "$RUNNER_TEMP/site"
+          cd "$GITHUB_WORKSPACE"
+          node scripts/check-style.mjs --built "$RUNNER_TEMP/studio" "$RUNNER_TEMP/app"
 
       - name: Tag
         run: |

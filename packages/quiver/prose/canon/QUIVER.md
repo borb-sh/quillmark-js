@@ -43,7 +43,7 @@ The property belongs here rather than to whatever is serving, because the direct
 
 `build` packs `0.1.0` and up. Below it is the draft space: a version an author is still shaping, inside a collection that is very likely already published, and the artifact is a deployment rather than a working tree. The floor is a semver reading rather than a policy knob — `0.0.x` is the range semver already spends on what is not for consumption — so it is a constant here and not a field `Quiver.yaml` carries.
 
-The source layout keeps every version, and `fromDir` reads them all: the filter is `build`'s alone, which is what leaves an author's own tooling and `quillkit test` looking at the whole tree. `isDraft(version)` on `/node` is the floor's one reading, for a tool asking what a deployment would leave out. `build(src, out, { drafts: true })` turns it off, for a viewer rather than a deployment — `quillkit studio` packs through this function to serve an author their own collection, where a floor would hide the quill most likely to be under the cursor, and `quillkit site --drafts` lays out a preview of the same.
+The source layout keeps every version, and `fromDir` reads them all: the filter is `build`'s alone, which is what leaves an author's own tooling and `quillkit check` looking at the whole tree. `isDraft(version)` on `/node` is the floor's one reading, for a tool asking what a deployment would leave out. `build(src, out, { drafts: true })` turns it off, for a viewer rather than a deployment — `quillkit serve` packs through this function to serve an author their own collection, where a floor would hide the quill most likely to be under the cursor, and `quillkit build --drafts` lays out a preview of the same.
 
 A quill with nothing above the floor is absent from `quiver.json` rather than present and empty, and a quiver of nothing but drafts builds an empty catalog. Which of the two ran is not stamped anywhere: no deployment reads that fact about a directory under `node_modules`.
 
@@ -103,7 +103,7 @@ Every error is a `QuiverError` carrying a `code`, a human-readable `message`, an
 
 ## Nothing here is a verb
 
-This package has no `bin`. Loading a quiver and packing one are library functions; the verbs a quill author types are [quillkit](../../../quillkit/prose/canon/QUILLKIT.md)'s, which resolves this package out of the collection's own `node_modules` and calls them.
+This package has no `bin`. Loading a quiver and packing one are library functions; the verbs a quill author types are [quillkit](../../../quillkit/prose/canon/QUILLKIT.md)'s, which carries this package at an exact version and calls them.
 
 **What that buys is stated there; what it costs is stated here.** This version number is a format number. `build` writes `quiver.json` and the names it lists, and `fromBuiltUrl` reads them, so a collection depending on this package pins both halves at once, and a release here is a release of the format. A verb added to a CLI must not move it.
 

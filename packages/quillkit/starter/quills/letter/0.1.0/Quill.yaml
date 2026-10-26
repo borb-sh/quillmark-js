@@ -3,6 +3,7 @@ quill:
   version: 0.1.0
   backend: typst
   description: A one-page letter with a date, a subject line and optional P.S. notes
+  license: CC0-1.0
 
 typst:
   plate_file: plate.typ

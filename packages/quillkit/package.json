@@ -1,7 +1,7 @@
 {
 	"name": "quillkit",
 	"version": "0.19.3",
-	"description": "The quill author's toolchain: start a quiver, gate it, pack it, look at it, ship it. Carries the studio client it serves.",
+	"description": "The quill author's toolchain: start a quiver, gate it, and build it into a studio for its authors or a standalone app for the people filling it in. Carries the wasm, the quiver and both clients.",
 	"type": "module",
 	"license": "Apache-2.0",
 	"repository": {
@@ -35,16 +35,19 @@
 	},
 	"scripts": {
 		"dev": "vite",
-		"build": "tsc && vite build",
+		"build": "tsc && vite build && vite build -c vite.app.config.ts",
 		"prepack": "rm -rf dist && npm run build",
 		"test": "vitest run",
 		"check": "svelte-check --tsconfig ./tsconfig.client.json --fail-on-warnings && tsc --noEmit -p tsconfig.check.json",
 		"check:pack": "publint"
 	},
+	"dependencies": {
+		"@quillmark/quiver": "0.38.1",
+		"@quillmark/wasm": "0.129.0",
+		"yaml": "^2.8.3"
+	},
 	"devDependencies": {
-		"@quillmark/quiver": "*",
 		"@quillmark/svelte": "*",
-		"@quillmark/wasm": ">=0.129.0-0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@types/node": "^24.19.1",
 		"publint": "^0.3.25",

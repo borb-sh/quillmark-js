@@ -52,7 +52,7 @@
 
 <!-- Not `.qm-switch`: that name is the preset's pane band, whose narrow-viewport rule
  stands every child of it at `--qmh-tap`, so a track wearing it grows a thumb three times
- its own height over the labels around it (`preset/recipes.css`, held by `check:style`). -->
+ its own height over the labels around it (`preset/shell.css`, held by `check:style`). -->
 <span
 	class="qm-toggle-wrap"
 	data-unset={unset ? '' : undefined}

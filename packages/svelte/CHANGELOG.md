@@ -12,6 +12,12 @@
 
 **The preview's zoom pill stays on a touch screen while the zoom is not the fit**, where it faded and no touch brought it back.
 
+**A card's box names its kind.** `data-qm-card` carries the card's kind, `main` for the main card, where it was a bare marker, and THEMING.md promises it as the one schema-named hook a stylesheet may aim at: `[data-qm-card='indorsement']` lands on every indorsement the editor draws. `[data-qm-card]` still matches every card. No hook names a field or a property, and `data-qm-prop` stays the surface's own.
+
+**The preset's shell computes at specificity zero.** `.qm-workspace`, `.qm-bar`, `.qm-split`, `.qm-switch` and `.qm-frame` are drawn inside `:where()`, so a host's rule on the same element wins in any sheet order, where one of equal specificity lost to a preset sheet landing after it. A `.qm-control` in the switch band still centres.
+
+**The preset draws an app's chrome.** `.qm-app-header` is the band naming an app, `.qm-app-title` its name, `.qm-app-footer` the line signing it and `.qm-app-primary` the one action it leads to, wearing `--qm-accent` at the touch floor. All four compute at specificity zero.
+
 ## v0.26.2 - 2026-10-24
 
 **A host that drops its `doc` and `quill` together unmounts the editor cleanly**, where a document with a subform prose cell (an `object` field's `text` or `richtext` property) threw `Cannot read properties of null (reading 'schema')` from the cell's teardown and left the host's page half-rendered.

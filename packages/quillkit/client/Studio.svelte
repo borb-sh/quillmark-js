@@ -30,8 +30,7 @@
   Studio stores no document, so a boot is a seed or the quill's example and a reload is
   the reseed: the carry is what keeps an edited `default:` off a field the document
   holds, and F5 is what puts it back (STUDIO §"The document is the blueprint's"). What
-  outlives a boot is which quill and which template, in the URL, since a link names them
-  (`link.ts`), and
+  outlives a boot is which quill, in the URL, since a link names it (`link.ts`), and
   whether a quill opens on its example, in the browser, since it is the author's habit
   rather than the link's (`examples.ts`).
 -->
@@ -47,13 +46,11 @@
 	import type { EditorChange } from '@quillmark/svelte/visual';
 	import Picker from './Picker.svelte';
 	import Markdown from './Markdown.svelte';
-	import Templates from './Templates.svelte';
 	import { save } from './save';
 	import { examplesOn, sayExamples } from './examples';
-	import { askedRef, askedTemplate, sayRef, sayTemplate } from './link';
+	import { askedRef, sayRef } from './link';
 	import { catalogOf, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
-	import { linkName, listTemplates, readTemplate, type Template } from './templates';
 	import { collect, diagnosticsOf, messageOf, placeOf } from './notes';
 
 	/** The dev server's signal that a repack landed. */
@@ -217,11 +214,7 @@
 	 *  open left held. */
 	const carrying = $derived(open !== undefined || held !== undefined);
 
-	/** What refused the text the panel opens on, where it opened because of a refusal. */
-	let sourceSaid = $state.raw<string | undefined>();
-
 	function openSource(): void {
-		sourceSaid = undefined;
 		sourceText = open ? open.doc.toMarkdown() : held;
 	}
 
@@ -234,7 +227,7 @@
 	 * honour, so the quill on screen takes it and the conform names what would not fit
 	 * (STUDIO §"The document has doors").
 	 */
-	async function applyMarkdown(text: string, from?: Template): Promise<string | undefined> {
+	async function applyMarkdown(text: string): Promise<string | undefined> {
 		let at = picked;
 		let asked: string;
 		let probe: Document | undefined;
@@ -258,38 +251,9 @@
 		sourceText = undefined;
 		repacked = false;
 		picked = at;
-		template = from && linkName(from);
 		held = undefined;
 		await mount(`${at.name}@${at.version}`, text);
 		return undefined;
-	}
-
-	// ── The templates ───────────────────────────────────────────────────────────
-	/** The collection's starter documents, where the verb was handed any. */
-	let templates = $state.raw<Template[]>([]);
-	/** The link name of the template the document on screen opened from, until another
-	 *  document comes in. An edit keeps it: a link is to the starter, and a reload of one
-	 *  reseeds as a reload of a quill does. */
-	let template = $state.raw<string | undefined>();
-
-	/**
-	 * A template is a file the reader did not have to find: it lands through the import
-	 * door and follows its own `$quill`. What it will not land as is said in the source
-	 * panel, beside its text, as a pasted file's refusal is. Resolves to whether it landed.
-	 */
-	async function openTemplate(from: Template): Promise<boolean> {
-		let text = '';
-		let said: string | undefined;
-		try {
-			text = await readTemplate(from);
-			said = await applyMarkdown(text, from);
-		} catch (err) {
-			said = messageOf(err);
-		}
-		if (said === undefined) return true;
-		sourceSaid = said;
-		sourceText = text;
-		return false;
 	}
 
 	// ── The examples ────────────────────────────────────────────────────────────
@@ -307,7 +271,6 @@
 		const at = open;
 		if (!at) return;
 		repacked = false;
-		template = undefined;
 		await mount(at.ref);
 	}
 
@@ -348,7 +311,6 @@
 	 *  own, which is what "what is this quill like to use" starts from. */
 	async function pick(name: string, version: string): Promise<void> {
 		picked = { name, version };
-		template = undefined;
 		held = undefined;
 		await mount(`${name}@${version}`);
 	}
@@ -379,14 +341,10 @@
 	// The address bar names the quill on screen, whichever way it got there: a pick, a
 	// document that named its own, or a repack that took the ref away. It is what makes
 	// a deployed studio linkable to a quill rather than to a quiver
-	// (STUDIO §"Opened, not stood on").
-	// The template beside it goes once a different document comes in. Both wait on a
-	// quill, so neither clears the URL before the boot has read it.
+	// (STUDIO §"Opened, not stood on"). It waits on a quill, so it does not clear the URL
+	// before the boot has read it.
 	$effect(() => {
 		if (picked) sayRef(`${picked.name}@${picked.version}`);
-	});
-	$effect(() => {
-		if (picked) sayTemplate(template);
 	});
 
 	/**
@@ -398,7 +356,6 @@
 	async function reload(): Promise<void> {
 		repacked = true;
 		const carry = open ? open.doc.toMarkdown() : held;
-		void listTemplates().then((next) => (templates = next));
 		let next: Catalog;
 		try {
 			quiver = await openQuiver();
@@ -516,10 +473,6 @@
 				// reads synchronously. The quiver awaits the same memoized gate to
 				// materialize a quill.
 				core = await init();
-				const listed = listTemplates().then((next) => {
-					if (!cancelled) templates = next;
-					return next;
-				});
 				quiver = await openQuiver();
 				const next = catalogOf(quiver);
 				catalog = next;
@@ -527,16 +480,6 @@
 				if (!at) throw new Error(`quiver "${next.name}" holds no quills`);
 				if (cancelled) return;
 				engine = new Engine();
-				// A template the link names opens in its own quill, over the one the quill
-				// param asked for; one the manifest does not list, or that will not land,
-				// leaves that quill to open and the address bar corrected to it.
-				const name = askedTemplate();
-				const from = name && (await listed).find((t) => linkName(t) === name);
-				if (cancelled) return;
-				if (from) {
-					picked = at;
-					if (await openTemplate(from)) return;
-				}
 				await pick(at.name, at.version);
 			} catch (err) {
 				if (!cancelled) {
@@ -573,9 +516,6 @@
 		<span class="qm-readout engine" data-testid="engine">wasm {WASM}</span>
 		{#if catalog}
 			<Picker {catalog} {picked} disabled={busy} onPick={pick} />
-		{/if}
-		{#if catalog && templates.length}
-			<Templates {templates} disabled={busy} onOpen={openTemplate} />
 		{/if}
 		<button
 			class="qm-control"
@@ -717,7 +657,6 @@
 	<Markdown
 		text={sourceText}
 		ref={`${picked.name}@${picked.version}`}
-		said={sourceSaid}
 		onApply={applyMarkdown}
 		onClose={() => (sourceText = undefined)}
 	/>

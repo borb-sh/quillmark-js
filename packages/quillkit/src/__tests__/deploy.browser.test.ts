@@ -1,6 +1,6 @@
 /**
- * The deploy as a reader reaches it: a site the bin laid, served under a subpath, opened
- * in a browser (`scripts/browser.mjs`).
+ * The deploy as a reader reaches it: a studio and an app the bin laid, each served under a
+ * subpath, opened in a browser (`scripts/browser.mjs`).
  *
  * The one test that loads what a consumer is served. Every other rule over built output
  * reads it as files — a path exists, a stylesheet survived the bundler — and a client
@@ -10,7 +10,7 @@
  * What it may assert is what TESTING.md §Assertions allows: presence against absence, and a
  * relation no dial owns.
  *
- * It runs against `dist/`, so it needs the package built, both halves.
+ * It runs against `dist/`, so it needs the package built, every half.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -35,6 +35,7 @@ const BIN = fileURLToPath(new URL('../../dist/bin/quillkit.js', import.meta.url)
  * root and blank here.
  */
 const PREFIX = '/quillmark-js/studio';
+const APP_PREFIX = '/quillmark-js/app';
 
 /** Both sides of the preset's threshold: two tracks abreast, then one. */
 const WIDE: Viewport = { width: 1440, height: 900 };
@@ -79,7 +80,6 @@ const SURVEY = `(async () => {
 	const picker = await until(() => document.querySelector('.picker'));
 	const split = await until(() => document.querySelector('.qm-split'));
 	const pane = await until(() => document.querySelector('.qm-pane'));
-	const templates = await until(() => document.querySelector('[data-testid="pick-template"]'));
 	const width = (el) => (el === null ? null : el.getBoundingClientRect().width);
 	const asked = () => {
 		const track = pane.parentElement;
@@ -174,7 +174,6 @@ const SURVEY = `(async () => {
 		booted: shell !== null,
 		quiverResolved: picker !== null,
 		editorMounted: pane !== null,
-		templatesResolved: templates !== null,
 		viewport: window.innerWidth,
 		shellWidth: width(shell),
 		splitWidth: width(split),
@@ -185,22 +184,55 @@ const SURVEY = `(async () => {
 	};
 })()`;
 
-/** The address bar once a template's document is on screen, the editor mounted over it. */
-const LANDED = `(async () => {
-	const deadline = Date.now() + 30000;
-	for (;;) {
-		if (document.querySelector('.qm-pane') && location.search.includes('template='))
-			return location.search;
-		if (Date.now() > deadline) return location.search;
-		await new Promise((wake) => setTimeout(wake, 50));
-	}
+/**
+ * What the app is asked: its landing over a quiver of several quills, then the first quill's
+ * document once a card is picked, the form and the page each mounted and the tracks laid
+ * against the viewport. Under the preset's threshold one track shows at a time, and the page
+ * is the one the switch brings up.
+ */
+const APP_SURVEY = `(async () => {
+	const deadline = Date.now() + 60000;
+	const until = async (find) => {
+		for (;;) {
+			const found = find();
+			if (found) return found;
+			if (Date.now() > deadline) return null;
+			await new Promise((wake) => setTimeout(wake, 50));
+		}
+	};
+	const width = (el) => (el === null ? null : el.getBoundingClientRect().width);
+	const header = await until(() => document.querySelector('.qm-app-header'));
+	const cards = await until(() => {
+		const found = document.querySelectorAll('[data-testid="pick"]');
+		return found.length ? found : null;
+	});
+	cards?.[0].click();
+	const pane = await until(() => document.querySelector('.qm-editor'));
+	const hooked = await until(() => document.querySelector('[data-qm-card]'));
+	const page = [...document.querySelectorAll('.qm-switch button')].find(
+		(b) => b.textContent.trim() === 'Page' && b.offsetParent !== null
+	);
+	page?.click();
+	const preview = await until(() => document.querySelector('.qm-preview canvas'));
+	const shell = document.querySelector('.qm-workspace');
+	const split = document.querySelector('.qm-split');
+	return {
+		booted: header !== null,
+		cards: cards?.length ?? 0,
+		editorMounted: pane !== null && hooked !== null,
+		previewMounted: preview !== null,
+		download: document.querySelector('.qm-app-primary') !== null,
+		viewport: window.innerWidth,
+		scrollWidth: document.documentElement.scrollWidth,
+		shellWidth: width(shell),
+		splitWidth: width(split)
+	};
 })()`;
 
 interface Survey {
 	booted: boolean;
 	quiverResolved: boolean;
 	editorMounted: boolean;
-	templatesResolved: boolean;
 	viewport: number;
 	shellWidth: number | null;
 	splitWidth: number | null;
@@ -217,21 +249,28 @@ interface Survey {
 	unfolded: { cells: number; offset: number; notes: number; spill: number } | null;
 }
 
+interface AppSurvey {
+	booted: boolean;
+	cards: number;
+	editorMounted: boolean;
+	previewMounted: boolean;
+	download: boolean;
+	viewport: number;
+	scrollWidth: number;
+	shellWidth: number | null;
+	splitWidth: number | null;
+}
+
 const temp = scratch('quillkit-deploy-');
 let server: Server;
 /** The quill the deployed quiver opens first, canonical. */
 let first: string;
 /** Opened by a link naming `first` by its name alone. */
 let wide: Survey;
-/** Opened by a link naming a ref the quiver does not hold, and a template the manifest
- *  does not list. */
+/** Opened by a link naming a ref the quiver does not hold. */
 let narrow: Survey;
-/** A template a link names, by its file less the `.md`, and the quill its `$quill` names,
- *  canonical: one whose quill is not the one the quiver opens first, so what opens it is
- *  the template and not the fallback. */
-let starter: { name: string; ref: string };
-/** The address bar after a link naming `starter`. */
-let landed: string;
+/** The app, wide and on a phone. */
+let apps: AppSurvey[];
 
 beforeAll(async () => {
 	expect(
@@ -239,39 +278,30 @@ beforeAll(async () => {
 		`${BIN} is missing: run \`npm run build -w packages/quillkit\` first`
 	).toBe(true);
 
-	const site = join(await temp.dir(), 'site');
 	const collection = await temp.collection();
-	await run(process.execPath, [
-		BIN,
-		'site',
-		'--quiver',
-		collection,
-		'--out',
-		site,
-		'--drafts',
-		'--templates',
-		join(collection, 'templates')
-	]);
+	const site = join(await temp.dir(), 'site');
+	const app = join(await temp.dir(), 'app');
+	await run(process.execPath, [BIN, 'build', 'studio', '--out', site, '--drafts'], {
+		cwd: collection
+	});
+	await run(process.execPath, [BIN, 'build', 'app', '--out', app, '--drafts'], {
+		cwd: collection
+	});
 	const { quills } = JSON.parse(await readFile(join(site, 'quiver', 'quiver.json'), 'utf8'));
 	first = `${quills[0].name}@${quills[0].version}`;
-	const manifest: { file: string }[] = JSON.parse(
-		await readFile(join(site, 'templates', 'templates.json'), 'utf8')
-	);
-	for (const { file } of manifest) {
-		const named = /^\$quill:\s*([a-z0-9_]+)/m.exec(
-			await readFile(join(site, 'templates', file), 'utf8')
-		);
-		const quill = quills.find((q: { name: string }) => q.name === named?.[1]);
-		if (quill && quill.name !== quills[0].name)
-			starter ??= { name: file.replace(/\.md$/, ''), ref: `${quill.name}@${quill.version}` };
-	}
 
-	server = createStaticServer([{ prefix: PREFIX, root: site }]);
-	const url = `http://127.0.0.1:${await listen(server, 0, '127.0.0.1')}${PREFIX}/`;
-	[wide, narrow, landed] = await Promise.all([
+	server = createStaticServer([
+		{ prefix: PREFIX, root: site },
+		{ prefix: APP_PREFIX, root: app }
+	]);
+	const origin = `http://127.0.0.1:${await listen(server, 0, '127.0.0.1')}`;
+	const url = `${origin}${PREFIX}/`;
+	const appUrl = `${origin}${APP_PREFIX}/`;
+	[wide, narrow, ...apps] = await Promise.all([
 		load<Survey>(`${url}?quill=${quills[0].name}`, SURVEY, WIDE),
-		load<Survey>(`${url}?quill=nope@9.9.9&template=nope`, SURVEY, NARROW),
-		load<string>(`${url}?template=${starter.name}`, LANDED, WIDE)
+		load<Survey>(`${url}?quill=nope@9.9.9`, SURVEY, NARROW),
+		load<AppSurvey>(appUrl, APP_SURVEY, WIDE),
+		load<AppSurvey>(appUrl, APP_SURVEY, NARROW)
 	]);
 }, LOAD_MS);
 
@@ -281,13 +311,12 @@ afterAll(async () => {
 });
 
 describe('the built client, served under a subpath', () => {
-	it('boots, resolves its quiver and templates against the base it was served at, and mounts a surface', () => {
+	it('boots, resolves its quiver against the base it was served at, and mounts a surface', () => {
 		for (const page of [wide, narrow]) {
 			const where = `at ${page.viewport}px`;
 			expect(page.booted, where).toBe(true);
 			expect(page.quiverResolved, where).toBe(true);
 			expect(page.editorMounted, where).toBe(true);
-			expect(page.templatesResolved, where).toBe(true);
 		}
 	});
 
@@ -350,16 +379,37 @@ describe('the built client, served under a subpath', () => {
 		}
 	});
 
-	// A ref the quiver does not hold opens the catalog's first, and a template the
-	// manifest does not list opens nothing, the address bar corrected to what is on screen.
+	// A ref the quiver does not hold opens the catalog's first, the address bar corrected
+	// to what is on screen.
 	it('opens the quill a link names, and says which one is on screen', () => {
 		expect(wide.search).toBe(`?quill=${first}`);
 		expect(narrow.search).toBe(`?quill=${first}`);
 	});
+});
 
-	it('opens the template a link names, in the quill it names', () => {
-		const said = new URLSearchParams(landed);
-		expect(said.get('template')).toBe(starter.name);
-		expect(said.get('quill')).toBe(starter.ref);
+describe('the built app, served under a subpath', () => {
+	it('boots, lands on a card for each quill, and opens the form and its page', () => {
+		for (const page of apps) {
+			const where = `at ${page.viewport}px`;
+			expect(page.booted, where).toBe(true);
+			expect(page.cards, `several quills land on a choice ${where}`).toBeGreaterThan(1);
+			expect(page.editorMounted, where).toBe(true);
+			expect(page.previewMounted, where).toBe(true);
+			expect(page.download, where).toBe(true);
+		}
+	});
+
+	it('stands its tracks in the viewport, at both sides of the threshold', () => {
+		for (const page of apps) {
+			const where = `at ${page.viewport}px`;
+			expect(page.shellWidth, `the shell is the viewport ${where}`).toBeCloseTo(page.viewport, 0);
+			expect(page.splitWidth, `the tracks sum to the shell ${where}`).toBeCloseTo(
+				page.shellWidth ?? 0,
+				0
+			);
+			expect(page.scrollWidth, `nothing scrolls sideways ${where}`).toBeLessThanOrEqual(
+				page.viewport
+			);
+		}
 	});
 });

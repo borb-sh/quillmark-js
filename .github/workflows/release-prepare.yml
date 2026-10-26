@@ -63,6 +63,12 @@ jobs:
             --no-git-tag-version --allow-same-version >/dev/null
           NEXT=$(node -p "require('./packages/$PKG/package.json').version")
 
+          # quillkit carries the quiver at exactly its workspace version (QUILLKIT
+          # §"One pin"), so a quiver release moves that pin with it.
+          if [ "$PKG" = quiver ]; then
+            npm pkg set "dependencies.@quillmark/quiver=$NEXT" -w packages/quillkit
+          fi
+
           # Reify the lock the one way every other install produces it, rather
           # than trusting npm version's partial rewrite.
           npm install --package-lock-only --no-audit --no-fund
@@ -141,6 +147,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add "packages/$PKG/package.json" "packages/$PKG/CHANGELOG.md" package-lock.json
+          if [ "$PKG" = quiver ]; then git add packages/quillkit/package.json; fi
           git commit -m "chore(release): ${NAME} v${VERSION}"
           git push -u origin "$BRANCH"
 
