@@ -14,7 +14,7 @@
 
 **Chrome inside a field's box takes the label rung.** The enum's chevron and a date's separators draw at `--_qm-ink-label`, where they drew at the value's ink, so the slashes of an empty date no longer stand darker than its `mm`/`dd`/`yyyy`.
 
-**A date's digits start on the column every other box's text starts on**, where they stood 2px further in. The guidance surface stands one `--qm-space` step off its glyph's target, as the enum list and the add-card menu stand off theirs, where it stood 6px off.
+**A date's digits start on the column every other box's text starts on**, where they stood 2px further in, and the Today chip's label ends on the same column from the right, where it stood 20px in. Number inputs and date segments set tabular figures. The guidance surface stands one `--qm-space` step off its glyph's target, as the enum list and the add-card menu stand off theirs, where it stood 6px off.
 
 ## v0.27.0 - 2026-10-26
 
