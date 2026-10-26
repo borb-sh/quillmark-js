@@ -444,6 +444,17 @@
 		flex-direction: column;
 		gap: var(--_qm-space-3);
 	}
+	/* Under a pane, a band of the pane rather than an island on it: the card runs to
+	 both of the pane's edges, where a side stroke would draw a line along the host's
+	 frame and a corner would cut a notch out of the column. The block hairlines stay,
+	 being what tells one card from the next across the band (`.qm-editor.qm-pane`).
+	 The inline inset rises to the block one: with no ground beside it, the card's edge
+	 is the pane's, and the island's tighter step reads as text crowding a frame. */
+	:global(:where(.qm-editor.qm-pane)) .qm-card {
+		border-inline: none;
+		border-radius: 0;
+		padding-inline: var(--_qm-space-3);
+	}
 	/* Headerless, the payload faces that edge with nothing between. A field row
 	 leading it stands the edge's own inset off the top, as it does off the side:
 	 this rung plus the section's block padding is the inline inset. A card that
@@ -452,11 +463,19 @@
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child) {
 		padding-top: var(--_qm-space);
 	}
+	:global(:where(.qm-editor.qm-pane))
+		.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child) {
+		padding-top: var(--_qm-space-2);
+	}
 	/* A section heading leading it: the vertical starts at the content's
 	 top-left, so the top inset is the inline one and the tip is a square
 	 corner of the card. */
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child > .qm-groups:first-child) {
 		padding-top: var(--_qm-space-2);
+	}
+	:global(:where(.qm-editor.qm-pane))
+		.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child > .qm-groups:first-child) {
+		padding-top: var(--_qm-space-3);
 	}
 	.qm-card-header {
 		display: flex;

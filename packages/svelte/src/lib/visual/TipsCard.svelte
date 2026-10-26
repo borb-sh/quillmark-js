@@ -126,6 +126,16 @@
 		line-height: var(--_qm-leading-body);
 		color: var(--_qm-tips-ink);
 	}
+	/* Under a pane `main` is square, so there are no corners to fill and no tuck: the
+	 slip starts at `main`'s bottom hairline, which is still the pair's only edge, and
+	 runs to the pane's edges as `main` does. The insets hold their ink where the tuck
+	 had it, the radius it pulled up by no longer standing under `main`, and the inline
+	 one loses `main`'s side stroke, which a pane card does not draw. */
+	:global(:where(.qm-editor.qm-pane)) .qm-tips {
+		margin-top: 0;
+		border-radius: 0;
+		padding: var(--_qm-space-3) calc(var(--_qm-space-3) * 2);
+	}
 	/* One line held open, so the foot does not step up under a shorter tip. */
 	.qm-tips-body {
 		min-height: calc(var(--_qm-leading-body) * 1em);
