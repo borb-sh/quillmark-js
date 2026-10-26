@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`check` says what the CLI says.** A failure prints each diagnostic whole beneath its `FAIL` line, with its code, `file:line:col` and hint, and names whether the seed or the example failed to render. A pass prints the warnings it carried, the plate's compile warnings such as a font nothing bundles, the quill's load warnings and the app's, and `--strict` fails on them. `--help`, `-h` and `help` print the usage.
+
 **Studio under `quillkit serve` follows a repack without a reload.** Save a plate or a `Quill.yaml` and the page repaints with the document in hand carried across, as it already did under the workspace's dev server; a reload, which reseeds, is no longer the way to see an edit. `serve` streams the repack at `/.quillkit/events`, and `preview` and a deployed studio stream nothing.
 
 ## v0.20.0 - 2026-10-26

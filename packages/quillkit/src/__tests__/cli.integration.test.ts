@@ -136,6 +136,63 @@ describe('quillkit check', () => {
 	);
 });
 
+describe('quillkit check, on what a quill says', () => {
+	/** A fresh starter quiver, with `lines` set into its plate under the helper import, so
+	 *  the first of them is `plate.typ:2`. */
+	async function starter(lines: string[]): Promise<string> {
+		const at = join(await temp.dir(), 'fresh');
+		await run(process.execPath, [BIN, 'init', at]);
+		const plate = join(at, 'quills', 'letter', '0.1.0', 'plate.typ');
+		const [head, ...tail] = (await readFile(plate, 'utf8')).split('\n');
+		await writeFile(plate, [head, ...lines, ...tail].join('\n'));
+		return at;
+	}
+
+	it(
+		'prints where a plate fails, beneath the quill it fails',
+		async () => {
+			const at = await starter(['#upper(datetime.today())']);
+			const failure = await refused(['check'], at);
+			expect(failure.message).toMatch(
+				/FAIL {2}letter@0\.1\.0 — seed does not render\n.*\(typst::\w+\)/
+			);
+			expect(failure.message).toMatch(/plate\.typ:2:\d+/);
+		},
+		RENDER_MS
+	);
+
+	it(
+		'prints the warnings a pass carries, and fails on them under --strict',
+		async () => {
+			const at = await starter(['#set text(font: "Nonesuch Sans")']);
+			const { stdout } = await run(process.execPath, [BIN, 'check'], { cwd: at });
+			expect(stdout).toMatch(/pass {2}letter@0\.1\.0 \(seed, example\)\n {2}.*nonesuch sans/i);
+			expect(stdout).toMatch(/plate\.typ:2:\d+/);
+			// The seed and the example compile one plate: its warning prints once.
+			expect(stdout.match(/nonesuch sans/gi)).toHaveLength(1);
+
+			const failure = await refused(['check', '--strict'], at);
+			expect(failure.message).toContain('FAIL  letter@0.1.0 — warnings under --strict');
+		},
+		RENDER_MS
+	);
+
+	it(
+		"prints an example's diagnostic with its hint",
+		async () => {
+			const at = await starter([]);
+			const example = join(at, 'quills', 'letter', '0.1.0', 'example.md');
+			const md = await readFile(example, 'utf8');
+			await writeFile(example, md.replace('$quill: letter\n', '$quill: letter\ntitel: hi\n'));
+
+			const failure = await refused(['check'], at);
+			expect(failure.message).toMatch(/FAIL {2}letter@0\.1\.0 — example is not clean\n.*titel/);
+			expect(failure.message).toMatch(/^ +hint: /m);
+		},
+		RENDER_MS
+	);
+});
+
 describe('quillkit init', () => {
 	it(
 		'lays a quiver that needs only quillkit, passes the gate and builds into an app',
@@ -298,6 +355,16 @@ describe('how a flag is spelled', () => {
 			['preview', '--drafts']
 		])
 			expect((await refused(args, source)).message, args.join(' ')).toMatch(/takes no -/);
+	});
+});
+
+describe('the bin asked for help', () => {
+	it('prints usage and succeeds, with or without a verb', async () => {
+		const at = await temp.dir();
+		for (const args of [['--help'], ['help'], ['check', '--help'], ['build', 'app', '-h']]) {
+			const { stdout } = await run(process.execPath, [BIN, ...args], { cwd: at });
+			expect(stdout, args.join(' ')).toMatch(/Usage:/);
+		}
 	});
 });
 

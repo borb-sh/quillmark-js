@@ -128,8 +128,11 @@ async function init(args: string[]): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function check(args: string[]): Promise<void> {
-	const { switches } = parse('check', args, { switches: ['--drafts'], words: 0 });
-	const { pass, fail } = await gate(resolve('.'), { drafts: switches.has('--drafts') });
+	const { switches } = parse('check', args, { switches: ['--drafts', '--strict'], words: 0 });
+	const { pass, fail } = await gate(resolve('.'), {
+		drafts: switches.has('--drafts'),
+		strict: switches.has('--strict')
+	});
 	console.log(`\n${pass}/${pass + fail} passed`);
 	if (fail > 0) process.exit(1);
 }
@@ -261,18 +264,19 @@ async function preview(args: string[]): Promise<void> {
 // Dispatch
 // ---------------------------------------------------------------------------
 
-function usage(): void {
-	console.error(
+function usage(print: (text: string) => void = console.error): void {
+	print(
 		[
 			'Usage:',
 			'  quillkit init  [<dir>]',
-			'  quillkit check [-D|--drafts]',
+			'  quillkit check [-D|--drafts] [--strict]',
 			'  quillkit build [quiver|studio|app] [-o|--out <dir>] [-D|--drafts]',
 			'  quillkit serve [quiver|studio|app] [-p|--port <n>] [--open]',
 			'  quillkit preview [-o|--out <dir>] [-p|--port <n>] [--open]',
 			'',
 			'The target is studio where none is named; preview serves whichever build is in --out.',
-			'check renders every version; --drafts admits drafts to the app it resolves and to a build.'
+			'check renders every version; --drafts admits drafts to the app it resolves and to a build.',
+			'check prints the warnings a pass carries, and fails on them under --strict.'
 		].join('\n')
 	);
 }
@@ -286,10 +290,14 @@ const VERBS: Record<string, (args: string[]) => Promise<void>> = {
 };
 
 const [verb, ...rest] = process.argv.slice(2);
+const asksHelp = verb === 'help' || [verb, ...rest].some((arg) => arg === '--help' || arg === '-h');
 
-// Own keys only: `in` reaches `Object.prototype`, and `quillkit toString` is a usage line
-// rather than a call onto whatever it found.
-if (verb !== undefined && Object.hasOwn(VERBS, verb)) {
+// A help flag anywhere is usage, ahead of the verb's own parse. Own keys only: `in` reaches
+// `Object.prototype`, and `quillkit toString` is a usage line rather than a call onto
+// whatever it found.
+if (asksHelp) {
+	usage(console.log);
+} else if (verb !== undefined && Object.hasOwn(VERBS, verb)) {
 	VERBS[verb]!(rest).catch((err: unknown) => {
 		console.error(`error: ${message(err)}`);
 		if (err instanceof Usage) usage();
