@@ -14,6 +14,8 @@
 
 **Templates are gone.** Studio draws no template picker and reads no `?template=`, `check` and `build` take no `--templates`, and a deploy lays no `templates/`. A quill's filled page is its `example.md`.
 
+**The carried `@quillmark/wasm` is 0.130.0.** Nothing a quill or a markdown document spells changes. A stored `Document` row tagged older than `quillmark/document@0.124.0` fails to load, which studio and the app never meet, since both keep a document as its markdown.
+
 ## v0.19.3 - 2026-10-23
 
 **Studio's editor splits a list to number a selection, and pastes a Word list as a list.** The client compiles `@quillmark/svelte` 0.26.0 in: `Mod-Shift-7`/`Mod-Shift-8` and the toolbar buttons on a selection inside a list of the other kind split the selected items out, where they retyped the whole list, and a list copied out of desktop Word or Outlook pastes nested by level, where each item landed as a paragraph.
