@@ -6,6 +6,14 @@
 
 **A writer sets a selection's font family from the selection toolbar**, over the `font_family` mark `@quillmark/wasm` 0.131.0 adds. The menu lists the new `fonts` prop, the host library's faces (`engine.fontFaces(quill)`), so a writer picks only families the preview sets; without it the toolbar offers none. A character holds one family, as the store keeps it: a pick replaces the family the selection was set in, and removing it leaves the selection in the surrounding font. A marked run draws in its real face, registered with the document's font set, and a run in a family the registry lacks, compared case-insensitively, takes a danger tint and shows in the menu as unavailable. A paste keeps a family the registry holds. The new strings are `formatFont`, `formatFontDefault`, `formatFontMissing`, `formatFontRemove` and `formatFontMixed`.
 
+**Zooming the preview stops at the pane-width fit as it stops at 100%, and landing there is the default again**: Ctrl/⌘-wheel and pinch hold at it, `Mod +`/`−` step to it, and from there the page follows a dragged divider and the zoom pill goes, where zooming back past the fit left the page at a fixed size the divider no longer moved.
+
+**A pinch or wheel leaving a zoom it held moves on from it smoothly**, where the page jumped by the stretch the hold had absorbed.
+
+**Dragging the divider beside the preview re-rasters its pages once the drag rests**, where every mounted page re-rastered on every frame of the drag.
+
+**The preview's zoom pill stays on a touch screen while the zoom is not the fit**, where it faded and no touch brought it back.
+
 ## v0.26.2 - 2026-10-24
 
 **A host that drops its `doc` and `quill` together unmounts the editor cleanly**, where a document with a subform prose cell (an `object` field's `text` or `richtext` property) threw `Cannot read properties of null (reading 'schema')` from the cell's teardown and left the host's page half-rendered.
