@@ -73,8 +73,8 @@ export interface ServeOptions {
  *  a client build emits, so it shadows no file. */
 export const EVENTS_PATH = '/.quillkit/events';
 /**
- * The header naming `EVENTS_PATH`, relative, on every response a server with `events`
- * answers. A page reads it off a request it makes anyway and subscribes only where it is
+ * The header naming `EVENTS_PATH`, relative, on every file a server with `events` serves.
+ * A page reads it off a HEAD of itself and subscribes only where it is
  * present, so a deployed client asks a static host for no stream it would 404.
  */
 export const EVENTS_HEADER = 'x-quillkit-events';
@@ -183,9 +183,7 @@ export function createStaticServer(
 ): Server {
 	const resolveFile = fileResolver(mounts);
 	const shared: Record<string, string> = {
-		...(cors
-			? { 'access-control-allow-origin': '*', 'access-control-expose-headers': EVENTS_HEADER }
-			: {}),
+		...(cors ? { 'access-control-allow-origin': '*' } : {}),
 		...(events ? { [EVENTS_HEADER]: EVENTS_PATH.slice(1) } : {})
 	};
 

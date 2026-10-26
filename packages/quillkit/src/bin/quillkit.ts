@@ -190,7 +190,8 @@ async function serve(args: string[]): Promise<void> {
 		...(client === undefined ? [] : [{ prefix: '', root: client }]),
 		...(target === 'app' ? [{ prefix: '', root: stage }] : [])
 	];
-	const events = new EventStream();
+	// Studio is the one client that follows a repack, so no other target streams one.
+	const events = target === 'studio' ? new EventStream() : undefined;
 	const bound = await listen(
 		createStaticServer(mounts, { cors: target === 'quiver', events }),
 		port,
@@ -201,7 +202,7 @@ async function serve(args: string[]): Promise<void> {
 		repack().then(
 			() => {
 				console.log('repacked');
-				events.send(REPACKED);
+				events?.send(REPACKED);
 			},
 			// A quiver mid-edit is invalid as often as not (a half-written `Quill.yaml`). A
 			// failed pack never reaches the swap, so the last good generation stays served and
@@ -218,7 +219,7 @@ async function serve(args: string[]): Promise<void> {
 	const url = frontDoor(target, bound);
 	console.log(`quillkit serve ${target}: ${url}`);
 	console.log(`  quiver: ${root}`);
-	if (target === 'app') console.log('  reload the page to pick up a repack.');
+	if (target !== 'studio') console.log('  reload the page to pick up a repack.');
 	if (parsed.switches.has('--open')) openBrowser(url);
 }
 
