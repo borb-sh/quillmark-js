@@ -91,11 +91,17 @@
 	 2.5.8's floor is half again that. The `<label for>` beside it forwards a press but
 	 stands at the label rung, so it is no taller: without the floor no region on the
 	 surface reaches this control at the size every other control on it holds. */
+	/* One length, the thumb's, and the track is two of them around the inset: the travel
+	 is a thumb's width at every setting of `--qm-space`, where a track sized apart from
+	 its inset ran the checked thumb into the end cap as the inset grew. */
+	.qm-toggle-wrap {
+		--thumb: 0.75rem;
+	}
 	.qm-toggle-wrap :global(.qm-toggle) {
 		display: inline-flex;
 		align-items: center;
-		width: 1.75rem;
-		height: 1rem;
+		width: calc(2 * var(--thumb) + 2 * var(--_qm-space-half));
+		height: calc(var(--thumb) + 2 * var(--_qm-space-half));
 		padding: var(--_qm-space-half);
 		border: none;
 		border-radius: var(--_qm-radius-pill);
@@ -113,21 +119,27 @@
 		background: var(--_qm-accent-default);
 	}
 	/* The focus ring rides `.qm-focus-ring` on the switch (controls.css). */
-	/* The thumb reads on tone alone: the base surface over the track's `hover` rung
-	 unchecked, and over `--_qm-accent` checked. No edge of its own: a hairline around
-	 a 12px pill is a second box inside the track's. */
+	/* The thumb reads on tone alone, and its tone is what says where it stands: the
+	 label rung over the track's `hover` rung unchecked, and the base surface over
+	 `--_qm-accent` checked. The card's own tone over the `hover` rung is a step of
+	 about 1.2:1 at either pole, a state indicator under WCAG 1.4.11's 3:1; the label
+	 rung clears it at both. No edge of its own: a hairline around a 12px pill is a
+	 second box inside the track's. */
 	.qm-toggle-wrap :global(.qm-toggle-thumb) {
-		width: 0.75rem;
-		height: 0.75rem;
+		width: var(--thumb);
+		height: var(--thumb);
 		border-radius: var(--_qm-radius-pill);
-		background: var(--_qm-surface);
-		transition: translate var(--_qm-duration-fast) var(--_qm-ease-reverse);
+		background: var(--_qm-ink-label);
+		transition:
+			translate var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			background var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-toggle-wrap :global(.qm-toggle-thumb[data-state='checked']) {
-		translate: 0.75rem;
+		translate: var(--thumb);
+		background: var(--_qm-surface);
 	}
 	/* Unset, the thumb stands at neither end: halfway along its travel. */
 	.qm-toggle-wrap[data-unset] :global(.qm-toggle-thumb) {
-		translate: 0.375rem;
+		translate: calc(var(--thumb) / 2);
 	}
 </style>

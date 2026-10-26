@@ -313,6 +313,11 @@
 		border-radius: var(--_qm-radius-inner);
 		outline: none;
 	}
+	/* The first segment's pad sits inside the box's inset rather than after it, so its
+	   digits start on the column every other box's text starts on. */
+	.qm-date-wrap :global(.qm-date-segment:first-child) {
+		margin-inline-start: calc(-1 * var(--_qm-space-half));
+	}
 	.qm-date-wrap :global(.qm-date-segment:focus) {
 		background: var(--_qm-surface-hover);
 	}
@@ -328,6 +333,12 @@
 	.qm-date-wrap :global(.qm-date-segment[data-ghosted='default']),
 	.qm-date-wrap :global(.qm-date[data-default] .qm-date-segment) {
 		color: var(--_qm-ink-default);
+	}
+	/* A separator is punctuation between the parts rather than part of the value, so it
+	 takes the label rung whatever the parts beside it hold: at `ink` it stood darker than
+	 the hint or the default digits either side of it. */
+	.qm-date-wrap :global(.qm-date .qm-date-segment[data-segment='literal']) {
+		color: var(--_qm-ink-label);
 	}
 	/* The toggle's state is its fill and its glyph, never the pointer: a hover fill
 	 would read as pressed. Off, it rests hidden where a pointer can reveal it, still

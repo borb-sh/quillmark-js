@@ -10,6 +10,12 @@
 
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
+**A switch's thumb shows which way it stands at either pole.** Unchecked, the thumb draws at the label rung over its track, where it drew in the card's own tone at about 1.2:1 against the track; checked, it keeps the card's tone over the accent. The track is sized off the thumb, so the checked thumb sits one inset from the end cap at any `--qm-space`, where a larger dial ran it into the cap.
+
+**Chrome inside a field's box takes the label rung.** The enum's chevron and a date's separators draw at `--_qm-ink-label`, where they drew at the value's ink, so the slashes of an empty date no longer stand darker than its `mm`/`dd`/`yyyy`.
+
+**A date's digits start on the column every other box's text starts on**, where they stood 2px further in. The guidance surface stands one `--qm-space` step off its glyph's target, as the enum list and the add-card menu stand off theirs, where it stood 6px off.
+
 ## v0.27.0 - 2026-10-26
 
 **Zooming the preview stops at the pane-width fit as it stops at 100%, and landing there is the default again**: Ctrl/⌘-wheel and pinch hold at it, `Mod +`/`−` step to it, and from there the page follows a dragged divider and the zoom pill goes, where zooming back past the fit left the page at a fixed size the divider no longer moved.
