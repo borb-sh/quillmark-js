@@ -21,7 +21,8 @@
   on the quill and the document alone, drawing the card the refusal named, while the
   preview says what refused. The edit that answers it tries the open again.
 
-  A repack of the source quiver arrives as one dev-server signal and is answered by
+  A repack of the source quiver arrives as one signal, over Vite's socket under the dev
+  server and over `quillkit serve`'s event stream otherwise, and is answered by
   minting a fresh `Quiver`: a repack writes a new `quiver.json`, and the quill cache
   lives as long as the quiver does, so the quiver is dropped rather than invalidated.
   The document crosses (STUDIO §"The document survives the quill"), which is what
@@ -49,7 +50,7 @@
 	import { save } from './save';
 	import { examplesOn, sayExamples } from './examples';
 	import { askedRef, sayRef } from './link';
-	import { catalogOf, openQuiver, type Catalog } from './quiver';
+	import { catalogOf, followRepacks, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
 	import { collect, diagnosticsOf, messageOf, placeOf } from './notes';
 
@@ -490,15 +491,17 @@
 			}
 		})();
 
-		// The repack signal, dev only: a built studio has no dev server behind it and
-		// nothing to repack.
+		// The repack signal: the dev server's socket where there is one, the loop's stream
+		// otherwise. A deployed studio has neither, and nothing to repack.
 		const hot = import.meta.hot;
 		hot?.on(REPACKED, reload);
+		const unfollow = hot ? undefined : followRepacks(() => void reload());
 
 		return () => {
 			cancelled = true;
 			clearTimeout(settle);
 			hot?.off(REPACKED, reload);
+			unfollow?.();
 			if (open) close(open);
 			open = undefined;
 		};

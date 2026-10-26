@@ -71,7 +71,7 @@ it('gates the quiver', () => {
 
 ## Looking at it
 
-`serve` is what you **look at**: it packs your quiver, drafts included, serves a client over it, and repacks whenever you save. Reload the page to pick up a repack.
+`serve` is what you **look at**: it packs your quiver, drafts included, serves a client over it, and repacks whenever you save. Studio follows each repack with the document you have open; the app picks one up on reload.
 
 ```sh
 npx quillkit serve --open      # studio
