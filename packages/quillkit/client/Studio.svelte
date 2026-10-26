@@ -808,8 +808,9 @@
 		text-overflow: ellipsis;
 	}
 
-	/* Where the panes were. It takes the same room so the bands do not move when a quill
-	   stops opening, and it holds the one sentence that says why.
+	/* Where the panes were. It takes the same room and the same ground, the tone behind
+	   the cards and the sheets, so neither the bands nor the room's tone change when a
+	   quill stops opening, and it holds the one sentence that says why.
 
 	   At the top of that room rather than centred in it: the sentence lands where the
 	   editor's first card was, which is where the author was already looking, and it
@@ -823,7 +824,7 @@
 		gap: var(--qmh-space-2);
 		min-height: 0;
 		padding: var(--qmh-space-4);
-		background: var(--qmh-surface);
+		background: var(--qmh-page);
 	}
 
 	.reason {
