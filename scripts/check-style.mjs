@@ -36,13 +36,13 @@
 //     that recipe (§"One name, one thing" below).
 //
 // `--built <dirs…>` runs the other end instead (`npm run check:bundle`, after
-// `npm run build`): in a built consumer, every rung a shipped stylesheet mints and the
-// bundle reads is defined in that bundle. A side-effect stylesheet import is an edge
-// carrying no binding, so a bundler told that module is side-effect-free prunes it and the
-// surface mounts unstyled, with every `var()` reading the pruned scale invalid at
-// computed-value time and its whole declaration dropped. The rungs are discovered rather
-// than listed, and it is presence against absence, so a renamed scale and a retuned dial
-// both leave it green.
+// `npm run build`): in a built consumer, every rung a shipped stylesheet mints and the bundle
+// reads is defined in that bundle, and no pole was lowered out of `light-dark()`. A
+// side-effect stylesheet import is an edge carrying no binding, so a bundler told that
+// module is side-effect-free prunes it and the surface mounts unstyled, with every
+// `var()` reading the pruned scale invalid at computed-value time and its whole
+// declaration dropped. The rungs are discovered rather than listed, and it is presence
+// against absence, so a renamed scale and a retuned dial both leave it green.
 //
 // What is outside it: a declaration in `.ts` (`preview/paint.ts` carries them in JS
 // strings), a value's own shape past its axis, and the shadow, pole and cross-scope rules — all
@@ -352,6 +352,14 @@ if (process.argv.includes('--built')) {
 		for (const file of filesUnder(bundle, /\.(css|js|html)$/)) {
 			const raw = readFileSync(file, 'utf8');
 			const text = file.endsWith('.css') ? deblock(raw) : raw;
+			// A minifier targeting a browser older than `light-dark()` rewrites each pole as
+			// two variables only a `color-scheme` declaration defines, and a rung stated at
+			// `:root` resolves there to both colours at once (scripts/css-target.mjs).
+			if (text.includes('--lightningcss-light'))
+				errors.push(
+					`${relative(ROOT, file)}: carries \`light-dark()\` lowered — ` +
+						`build with \`cssTarget: CSS_TARGET\` (scripts/css-target.mjs)`
+				);
 			for (const [, name] of text.matchAll(DEFINES)) defined.add(name);
 			for (const [, name] of text.matchAll(READS)) if (!read.has(name)) read.set(name, file);
 		}

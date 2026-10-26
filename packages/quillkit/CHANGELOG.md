@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The app's colours hold in a built deploy.** The bundle's minifier lowered `light-dark()` into variables that resolve to no colour where the preset states its poles, so the app's Download PDF press and an error's red drew nothing in a built app or studio; both clients now build for browsers that carry `light-dark()` natively. The press beside Download PDF stands at its height, studio's head holds its picker and the quiver's sentence on one line where the width allows, and a stalled page's notice starts on the sheet's edge over a pane already in the desk's tone.
+
 **`check` says what the CLI says.** A failure prints each diagnostic whole beneath its `FAIL` line, with its code, `file:line:col` and hint, and names whether the seed or the example failed to render. A pass prints the warnings it carried, the plate's compile warnings such as a font nothing bundles, the quill's load warnings and the app's, and `--strict` fails on them. `--help`, `-h` and `help` print the usage.
 
 **Studio under `quillkit serve` follows a repack without a reload.** Save a plate or a `Quill.yaml` and the page repaints with the document in hand carried across, as it already did under the workspace's dev server; a reload, which reseeds, is no longer the way to see an edit. `serve` streams the repack at `/.quillkit/events`, and `preview` and a deployed studio stream nothing.

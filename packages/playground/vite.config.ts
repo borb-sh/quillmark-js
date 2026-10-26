@@ -1,6 +1,7 @@
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { CSS_TARGET } from '../../scripts/css-target.mjs';
 
 // @quillmark/wasm ships wasm-bindgen's web target: no `.wasm` import and no
 // top-level await, so a static import is safe on any route's graph and Vite
@@ -29,5 +30,6 @@ export default defineConfig({
 			}
 		})
 	],
+	build: { cssTarget: CSS_TARGET },
 	optimizeDeps: { exclude: ['@quillmark/wasm'] }
 });
