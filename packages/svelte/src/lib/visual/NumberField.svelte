@@ -139,3 +139,10 @@
 	onkeydown={revert}
 	onchange={(e) => commit(e.currentTarget as HTMLInputElement)}
 />
+
+<style>
+	/* Tabular figures, so numbers stacked in a column line up digit for digit. */
+	.qm-input {
+		font-variant-numeric: tabular-nums;
+	}
+</style>

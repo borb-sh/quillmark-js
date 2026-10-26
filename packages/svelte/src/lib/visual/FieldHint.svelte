@@ -31,6 +31,7 @@
 <script lang="ts">
 	import { Popover } from 'bits-ui';
 	import Icon from './icons/Icon.svelte';
+	import { spacePx } from '../core/rungs.js';
 	import './controls.css';
 
 	interface Props {
@@ -205,7 +206,7 @@
 			collisionBoundary={bounds}
 			side={beside ? 'right' : 'top'}
 			align={beside ? 'center' : 'start'}
-			sideOffset={6 + reach}
+			sideOffset={(spacePx(triggerEl) ?? 0) + reach}
 			trapFocus={false}
 			onOpenAutoFocus={(e: Event) => e.preventDefault()}
 			onCloseAutoFocus={(e: Event) => e.preventDefault()}

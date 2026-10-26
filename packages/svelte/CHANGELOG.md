@@ -18,6 +18,12 @@
 
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
+**A switch's thumb shows which way it stands at either pole.** Unchecked, the thumb draws at the label rung over its track, where it drew in the card's own tone at about 1.2:1 against the track; checked, it keeps the card's tone over the accent. The track is sized off the thumb, so the checked thumb sits one inset from the end cap at any `--qm-space`, where a larger dial ran it into the cap.
+
+**Chrome inside a field's box takes the label rung.** The enum's chevron and a date's separators draw at `--_qm-ink-label`, where they drew at the value's ink, so the slashes of an empty date no longer stand darker than its `mm`/`dd`/`yyyy`.
+
+**A date's digits start on the column every other box's text starts on**, where they stood 2px further in, and the Today chip's label ends on the same column from the right, where it stood 20px in. Number inputs and date segments set tabular figures. The guidance surface stands one `--qm-space` step off its glyph's target, as the enum list and the add-card menu stand off theirs, where it stood 6px off.
+
 **An open matrix's add box stands in the roster's columns**: its plus where a tick stands and its words where a title starts, where both sat 8px further in, and a press on the plus lands in the box. An added item's remove is the minus an array row's is, where it was a cross, and rests at the muted rung on a touch screen as an array row's does.
 
 **A matrix's tick is a fill, as a switch's track is**: unheld, it draws the switch's unchecked tone with no edge, where it drew the field well under a hairline that matched it at the light pole.
