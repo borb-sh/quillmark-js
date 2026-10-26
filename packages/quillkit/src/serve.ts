@@ -2,8 +2,8 @@
  * The static server `serve` runs the loop over and `preview` serves a deploy with. It
  * composes its roots rather than copying one into another: the client out of this package,
  * the packed quiver out of the tree the packer swaps, an app's staged files beside them. A
- * repack replaces a directory the server reads per request, so nothing here is told a pack
- * happened.
+ * repack replaces a directory the server reads per request, so serving a file needs no word
+ * of it; what a loop's server adds is a stream that tells an open page one landed.
  *
  * Two things a general-purpose static server gets wrong for this, which is why this one
  * is written rather than borrowed: `.wasm` must be served as `application/wasm`, and a
@@ -64,6 +64,47 @@ export interface ServeOptions {
 	caching?: Caching;
 	/** Answer any origin, so a client of its own on another port reads a dev quiver. */
 	cors?: boolean;
+	/** The loop's push channel, served at `EVENTS_PATH`. Absent, as under `preview`, the
+	 *  server is the static host a deploy lands on and streams nothing. */
+	events?: EventStream;
+}
+
+/** Where a server with `events` streams them. Under neither the quiver mount nor any name
+ *  a client build emits, so it shadows no file. */
+export const EVENTS_PATH = '/.quillkit/events';
+/**
+ * The header naming `EVENTS_PATH`, relative, on every response a server with `events`
+ * answers. A page reads it off a request it makes anyway and subscribes only where it is
+ * present, so a deployed client asks a static host for no stream it would 404.
+ */
+export const EVENTS_HEADER = 'x-quillkit-events';
+
+/**
+ * Server-sent events to every page holding the stream open. An event carries its name and
+ * nothing else: what changed is what the page reads back off the files.
+ */
+export class EventStream {
+	readonly #open = new Set<ServerResponse>();
+
+	/** Hold `res` open as a stream until its client goes. */
+	attach(res: ServerResponse, headers: Record<string, string>): void {
+		res.writeHead(200, {
+			...headers,
+			'content-type': 'text/event-stream; charset=utf-8',
+			'cache-control': 'no-store'
+		});
+		// A comment, so the head and a first byte leave now rather than with the first event,
+		// and `EventSource` opens on connect.
+		res.write(': open\n\n');
+		this.#open.add(res);
+		res.on('close', () => this.#open.delete(res));
+	}
+
+	/** `EventSource` dispatches no event with an empty data buffer, so the name rides in
+	 *  both fields. */
+	send(event: string): void {
+		for (const res of this.#open) res.write(`event: ${event}\ndata: ${event}\n\n`);
+	}
 }
 
 /** A file a request may have, its length off the stat that found it, and the path it was
@@ -138,13 +179,28 @@ export function fileFor(mounts: Mount[], url: string): string | null {
 /** A server over `mounts`, caching as `caching` says. */
 export function createStaticServer(
 	mounts: Mount[],
-	{ caching = 'none', cors = false }: ServeOptions = {}
+	{ caching = 'none', cors = false, events }: ServeOptions = {}
 ): Server {
 	const resolveFile = fileResolver(mounts);
+	const shared: Record<string, string> = {
+		...(cors
+			? { 'access-control-allow-origin': '*', 'access-control-expose-headers': EVENTS_HEADER }
+			: {}),
+		...(events ? { [EVENTS_HEADER]: EVENTS_PATH.slice(1) } : {})
+	};
 
 	return createServer((req: IncomingMessage, res: ServerResponse) => {
 		if (req.method !== 'GET' && req.method !== 'HEAD') {
 			res.writeHead(405, { allow: 'GET, HEAD' }).end();
+			return;
+		}
+
+		if (
+			events &&
+			req.method === 'GET' &&
+			new URL(req.url ?? '/', 'http://localhost').pathname === EVENTS_PATH
+		) {
+			events.attach(res, shared);
 			return;
 		}
 
@@ -158,7 +214,7 @@ export function createStaticServer(
 			'content-type': TYPES[extname(found.at).toLowerCase()] ?? 'application/octet-stream',
 			'content-length': found.size,
 			'cache-control': cacheFor(caching, found.path),
-			...(cors ? { 'access-control-allow-origin': '*' } : {})
+			...shared
 		});
 		if (req.method === 'HEAD') {
 			res.end();

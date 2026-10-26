@@ -9,7 +9,16 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
-import { createStaticServer, fileFor, listen, type Mount, type ServeOptions } from '../serve.js';
+import {
+	EVENTS_HEADER,
+	EVENTS_PATH,
+	EventStream,
+	createStaticServer,
+	fileFor,
+	listen,
+	type Mount,
+	type ServeOptions
+} from '../serve.js';
 import { scratch } from './helpers/collection.js';
 
 const temp = scratch('quillkit-serve-');
@@ -74,6 +83,34 @@ describe('serving', () => {
 	it('refuses a method it does not serve', async () => {
 		const base = await serveFixture();
 		expect((await fetch(`${base}/`, { method: 'POST' })).status).toBe(405);
+	});
+});
+
+describe('the event stream', () => {
+	it('names the stream on the page and pushes each event to it', async () => {
+		const events = new EventStream();
+		const base = await serveFixture({ events });
+		const at = (await fetch(`${base}/`, { method: 'HEAD' })).headers.get(EVENTS_HEADER);
+		expect(at).not.toBeNull();
+
+		const res = await fetch(new URL(at!, `${base}/`));
+		expect(res.headers.get('content-type')).toMatch(/^text\/event-stream/);
+		const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+		// The opening comment arrives on connect, so the stream is attached before the send.
+		await reader.read();
+		events.send('repacked');
+		let said = '';
+		while (!said.includes('\n\n')) said += (await reader.read()).value ?? '';
+		expect(said).toBe('event: repacked\ndata: repacked\n\n');
+		await reader.cancel();
+	});
+
+	it('is absent from a server given none', async () => {
+		// `preview`, which stands in for a static host: a client reading this page finds no
+		// stream to ask for.
+		const base = await serveFixture();
+		expect((await fetch(`${base}/`, { method: 'HEAD' })).headers.get(EVENTS_HEADER)).toBeNull();
+		expect((await fetch(`${base}${EVENTS_PATH}`)).status).toBe(404);
 	});
 });
 
