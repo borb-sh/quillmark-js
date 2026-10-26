@@ -22,8 +22,12 @@ const app: AppConfig = {
 	quills: [
 		{ ref: 'memo@1.2.0', title: 'Memo' },
 		{ ref: 'letter@0.3.0', title: 'Letter' }
-	],
-	retired: ['memo@1.1.0']
+	]
+};
+/** The pack the build laid: the versions it holds of each quill. */
+const pack = {
+	versionsOf: (name: string): string[] =>
+		({ memo: ['1.2.0', '1.1.0'], letter: ['0.3.0'] })[name] ?? []
 };
 
 describe('a stored record', () => {
@@ -56,13 +60,14 @@ describe('a stored record', () => {
 
 describe("a record's pin", () => {
 	it('stands current, retired, or missing against the build', () => {
-		expect(standing(app.quills[0]!.ref, app)).toBe('current');
-		expect(standing(app.retired[0]!, app)).toBe('retired');
-		expect(standing('memo@0.9.0', app)).toBe('missing');
+		expect(standing(app.quills[0]!.ref, app, pack)).toBe('current');
+		expect(standing('memo@1.1.0', app, pack)).toBe('retired');
+		expect(standing('memo@0.9.0', app, pack)).toBe('missing');
+		expect(standing('notice@1.0.0', app, pack)).toBe('missing');
 	});
 
 	it("finds the same quill's current pin, and no other quill's", () => {
-		expect(latestFor(app.retired[0]!, app)).toBe(app.quills[0]);
+		expect(latestFor('memo@1.1.0', app)).toBe(app.quills[0]);
 		expect(latestFor('memo@0.9.0', app)).toBe(app.quills[0]);
 		expect(latestFor('notice@1.0.0', app)).toBeUndefined();
 	});

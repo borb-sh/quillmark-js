@@ -178,8 +178,8 @@ async function serveLive(args: string[]): Promise<void> {
 		await pack(root, out, { drafts: true });
 		if (target !== 'app') return;
 		const prepared = await prepareApp(root, await fromDir(root), true);
-		for (const said of await writeApp(prepared, root, stage, { lock: false }))
-			console.error(`warn  ${said}`);
+		for (const said of prepared.warnings) console.error(`warn  ${said}`);
+		await writeApp(prepared, root, stage);
 	};
 	const repack = serialize(generation);
 	// Before the server, so the first request finds a whole generation rather than an empty

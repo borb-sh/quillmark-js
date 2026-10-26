@@ -14,7 +14,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { APP_JSON, APP_LOCK, RESERVED } from '../app-files.js';
+import { APP_JSON, RESERVED } from '../app-files.js';
 import { APP, STUDIO } from '../paths.js';
 import {
 	CLIENTS,
@@ -111,25 +111,17 @@ describe('the targets', () => {
 });
 
 describe('the app target', () => {
-	it("keeps a pin an earlier build shipped as retired, and records the pins in the quiver's lock", async () => {
+	it('takes its icon by name, and writes nothing into the quiver', async () => {
 		const root = await temp.collection();
-		const client = await stubClient();
-		const build = async (
-			quill: string
-		): Promise<{ quills: { ref: string }[]; retired: string[] }> => {
-			await writeFile(join(root, 'App.yaml'), `quills: [${quill}]\n`);
-			const out = join(await temp.dir(), 'dist');
-			await layOut({ target: 'app', root, out, client, drafts: true });
-			return JSON.parse(await readFile(join(out, APP_JSON), 'utf8'));
-		};
+		await writeFile(join(root, 'icon.svg'), '<svg/>');
+		const before = await readdir(root);
+		const out = join(await temp.dir(), 'dist');
+		await layOut({ target: 'app', root, out, client: await stubClient() });
 
-		const first = await build('usaf_memo');
-		const second = await build('showcase');
-		const [shipped] = first.quills.map((q) => q.ref);
-
-		expect(second.retired).toEqual([shipped]);
-		const { pins } = JSON.parse(await readFile(join(root, APP_LOCK), 'utf8'));
-		expect(pins).toEqual(expect.arrayContaining([shipped, ...second.quills.map((q) => q.ref)]));
+		const app = JSON.parse(await readFile(join(out, APP_JSON), 'utf8'));
+		expect(app.icon).toBe('icon.svg');
+		expect(existsSync(join(out, 'icon.svg'))).toBe(true);
+		expect(await readdir(root)).toEqual(before);
 	});
 
 	it('copies the author files app.css names, and refuses one outside the quiver', async () => {

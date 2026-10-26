@@ -42,10 +42,10 @@ Then the core wasm, the quiver (`fromBuiltUrl` on `quiver/`), and the store. The
 
 ## Retired pins
 
-A document records the ref it was made on and reopens on it, so a quiver that moved a quill to a new version does not move a reader's half-filled form under them. Each document's pin stands one of three ways against the build:
+A document records the ref it was made on and reopens on it, so a quiver that moved a quill to a new version does not move a reader's half-filled form under them. Each document's pin stands one of three ways against the build, read off the pack the client has loaded:
 
 - **current**: the app opens it, and the document opens as it was left.
-- **retired**: an earlier build shipped it and the pack still holds it (`app.json`'s `retired`, out of `app-lock.json`). The document opens on that version, with "This document uses an earlier version of this form." over it and an Update to the latest form press.
+- **retired**: the app opens a later version and the pack still holds this one (`versionsOf`). The document opens on that version, with "This document uses an earlier version of this form." over it and an Update to the latest form press.
 - **missing**: the pack no longer holds it. The document cannot open, so it stands as its record: Download .md, and Update to the latest form where the app opens that quill at all.
 
 **An update offers the markdown first.** The move lands the document's markdown in the latest version, conforming as it does, and a schema that stopped asking for a field strands its answer. So the press opens a dialog whose first action is Download .md, and only then Update; the record keeps its id and takes the new pin, and what the move stranded is named on the fields it is about until the first edit.

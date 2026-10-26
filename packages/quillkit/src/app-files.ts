@@ -1,7 +1,7 @@
 /**
- * The app target's two inputs and what they resolve to. `App.yaml` says what the app is,
- * `app.css` how it looks, and `app.json` is both resolved against the quiver: the quills
- * pinned, the author's files named, and the pins earlier builds shipped kept as retired
+ * The app target's inputs and what they resolve to. `App.yaml` names the app, `app.css` says
+ * how it looks and `icon.svg` or `icon.png` marks it, each found by name; `app.json` is all
+ * three resolved against the quiver, with every quill it holds at its latest version
  * (QUILLKIT §"The app target").
  *
  * Everything that can refuse is read before a build clears anything, so a bad `App.yaml`
@@ -18,8 +18,8 @@ import { within } from './paths.js';
 export const APP_YAML = 'App.yaml';
 export const APP_CSS = 'app.css';
 export const APP_JSON = 'app.json';
-/** Every pin a build of this app has shipped, committed beside `App.yaml`. */
-export const APP_LOCK = 'app-lock.json';
+/** The names an app's icon is found by, the first present taken. */
+export const ICONS = ['icon.svg', 'icon.png'];
 
 /** The classes an author's stylesheet may aim at (THEMING §"What a stylesheet may aim at"). */
 export const PROMISED = [
@@ -40,11 +40,9 @@ export const RESERVED = ['index.html', 'assets', 'quiver', APP_JSON];
 export interface AppYaml {
 	title?: string;
 	description?: string;
-	quills?: string[];
-	icon?: string;
 }
 
-const KEYS = ['title', 'description', 'quills', 'icon'];
+const KEYS = ['title', 'description'];
 
 /** `App.yaml` at `root`, checked, or undefined where there is none. */
 export function readAppYaml(root: string): AppYaml | undefined {
@@ -63,61 +61,24 @@ export function readAppYaml(root: string): AppYaml | undefined {
 	for (const key of Object.keys(fields))
 		if (!KEYS.includes(key))
 			throw new Error(`${APP_YAML}: unknown key "${key}"; the keys are ${KEYS.join(', ')}`);
-	for (const key of ['title', 'description', 'icon'])
+	for (const key of KEYS)
 		if (fields[key] !== undefined && (typeof fields[key] !== 'string' || fields[key].trim() === ''))
 			throw new Error(`${APP_YAML}: "${key}" is a string`);
-	const { quills } = fields;
-	if (
-		quills !== undefined &&
-		(!Array.isArray(quills) || quills.length === 0 || quills.some((q) => typeof q !== 'string'))
-	)
-		throw new Error(`${APP_YAML}: "quills" is a list of quill selectors`);
 	return fields as AppYaml;
 }
 
-const versionOf = (ref: string): string => ref.slice(ref.indexOf('@') + 1);
-
 /**
- * The canonical refs an app pins: each selector `App.yaml` lists, resolved, or every quill
- * at its latest version where it lists none. A draft is admitted only under `drafts`, as a
- * pack admits one (QUIVER §"The draft floor").
+ * The canonical refs an app opens: every quill the quiver holds, at its latest version. A
+ * draft is admitted only under `drafts`, as a pack admits one (QUIVER §"The draft floor").
  */
-export function resolveRefs(
-	quiver: Quiver,
-	selectors: string[] | undefined,
-	drafts: boolean
-): string[] {
-	const admitted = (version: string): boolean => drafts || !isDraft(version);
-	if (selectors === undefined) {
-		const refs = quiver.quillNames().flatMap((name) => {
-			const version = quiver.versionsOf(name).find(admitted);
-			return version === undefined ? [] : [`${name}@${version}`];
-		});
-		if (refs.length === 0)
-			throw new Error('the quiver holds no quill at 0.1.0 or above: pass --drafts to ship a draft');
-		return refs;
-	}
-	const named = new Map<string, string>();
-	return selectors.map((selector) => {
-		let ref: string;
-		try {
-			ref = quiver.resolve(selector);
-		} catch {
-			throw new Error(`${APP_YAML}: "${selector}" names no quill in the quiver`);
-		}
-		if (!admitted(versionOf(ref)))
-			throw new Error(
-				`${APP_YAML}: "${selector}" resolves to ${ref}, a draft: pass --drafts to ship it`
-			);
-		const name = ref.slice(0, ref.indexOf('@'));
-		const twice = named.get(name);
-		if (twice !== undefined)
-			throw new Error(
-				`${APP_YAML}: "${twice}" and "${selector}" both name ${name}; an app pins one version of a quill`
-			);
-		named.set(name, selector);
-		return ref;
+export function appRefs(quiver: Quiver, drafts: boolean): string[] {
+	const refs = quiver.quillNames().flatMap((name) => {
+		const version = quiver.versionsOf(name).find((v) => drafts || !isDraft(v));
+		return version === undefined ? [] : [`${name}@${version}`];
 	});
+	if (refs.length === 0)
+		throw new Error('the quiver holds no quill at 0.1.0 or above: pass --drafts to ship a draft');
+	return refs;
 }
 
 /** `memo_for` → `Memo For`: an id as the label a reader sees, where nothing names it in words. */
@@ -180,31 +141,27 @@ export interface AppJson {
 	icon?: string;
 	css?: string;
 	quills: AppQuill[];
-	retired: string[];
 }
 
 /** An app resolved against its quiver, before anything is written. */
 export interface Prepared {
-	app: Omit<AppJson, 'retired'>;
+	app: AppJson;
 	/** The author's files the deploy carries, `/`-separated and relative to the quiver. */
 	files: string[];
-	/** Every canonical ref the pack holds, which is where a retired pin can still open. */
-	held: Set<string>;
 	warnings: string[];
 }
 
 /**
- * Read `App.yaml` and `app.css` at `root` and resolve them against `quiver`, the source
- * layout loaded whole: every refusal a build can meet, met before it clears anything.
+ * Read `App.yaml`, `app.css` and the icon at `root` and resolve them against `quiver`, the
+ * source layout loaded whole: every refusal a build can meet, met before it clears anything.
  */
 export async function prepareApp(root: string, quiver: Quiver, drafts: boolean): Promise<Prepared> {
 	const yaml = readAppYaml(root) ?? {};
 	const warnings: string[] = [];
 	const files: string[] = [];
 
-	const icon =
-		yaml.icon === undefined ? undefined : authorFile(root, yaml.icon, `${APP_YAML} "icon"`);
-	if (icon !== undefined) files.push(icon);
+	const icon = ICONS.find((name) => existsSync(join(root, name)));
+	if (icon !== undefined) files.push(authorFile(root, icon, 'the icon'));
 
 	let css: string | undefined;
 	if (existsSync(join(root, APP_CSS))) {
@@ -222,7 +179,7 @@ export async function prepareApp(root: string, quiver: Quiver, drafts: boolean):
 	}
 
 	const quills: AppQuill[] = [];
-	for (const ref of resolveRefs(quiver, yaml.quills, drafts)) {
+	for (const ref of appRefs(quiver, drafts)) {
 		const quill = await quiver.getQuill(ref);
 		const { name, description, license } = quill.metadata;
 		if (!license)
@@ -236,15 +193,6 @@ export async function prepareApp(root: string, quiver: Quiver, drafts: boolean):
 		});
 	}
 
-	const held = new Set(
-		quiver.quillNames().flatMap((name) =>
-			quiver
-				.versionsOf(name)
-				.filter((v) => drafts || !isDraft(v))
-				.map((v) => `${name}@${v}`)
-		)
-	);
-
 	const description = yaml.description ?? quiver.description;
 	return {
 		app: {
@@ -255,62 +203,18 @@ export async function prepareApp(root: string, quiver: Quiver, drafts: boolean):
 			quills
 		},
 		files: [...new Set(files)],
-		held,
 		warnings
 	};
 }
 
-/** The pins `app-lock.json` records, or none where it is absent. */
-function readLock(root: string): string[] {
-	const at = join(root, APP_LOCK);
-	if (!existsSync(at)) return [];
-	let pins: unknown;
-	try {
-		pins = JSON.parse(readFileSync(at, 'utf8')).pins;
-	} catch (cause) {
-		throw new Error(`${APP_LOCK} is not JSON`, { cause });
-	}
-	if (!Array.isArray(pins) || pins.some((p) => typeof p !== 'string'))
-		throw new Error(`${APP_LOCK}: "pins" is a list of canonical refs`);
-	return pins;
-}
-
-/**
- * Write `app.json` and the author's files into `out`. A pin an earlier build shipped and this
- * one does not is retired: listed, so a document made on it opens on that version, as long
- * as the pack still holds it. With `lock`, the pins this build ships join `app-lock.json`,
- * which is what a fresh checkout reads them back from.
- */
-export async function writeApp(
-	prepared: Prepared,
-	root: string,
-	out: string,
-	{ lock }: { lock: boolean }
-): Promise<string[]> {
-	const warnings = [...prepared.warnings];
-	const locked = readLock(root);
-	const current = prepared.app.quills.map((q) => q.ref);
-	const earlier = locked.filter((ref) => !current.includes(ref));
-	const retired = earlier.filter((ref) => prepared.held.has(ref));
-	for (const ref of earlier.filter((ref) => !prepared.held.has(ref)))
-		warnings.push(
-			`${ref} shipped in an earlier build and the pack no longer holds it: a document made on it offers its markdown and the latest form`
-		);
-
+/** Write `app.json` and the author's files into `out`. */
+export async function writeApp(prepared: Prepared, root: string, out: string): Promise<void> {
 	await mkdir(out, { recursive: true });
-	const app: AppJson = { ...prepared.app, retired };
 	const json = join(out, APP_JSON);
-	await writeFile(`${json}.next`, `${JSON.stringify(app, null, '\t')}\n`);
+	await writeFile(`${json}.next`, `${JSON.stringify(prepared.app, null, '\t')}\n`);
 	await rename(`${json}.next`, json);
 	for (const file of [...(prepared.app.css ? [prepared.app.css] : []), ...prepared.files]) {
 		await mkdir(dirname(join(out, file)), { recursive: true });
 		await copyFile(join(root, file), join(out, file));
 	}
-
-	if (lock) {
-		const pins = [...new Set([...locked, ...current])].sort();
-		if (pins.length !== locked.length || pins.some((p, i) => p !== [...locked].sort()[i]))
-			await writeFile(join(root, APP_LOCK), `${JSON.stringify({ pins }, null, '\t')}\n`);
-	}
-	return warnings;
 }

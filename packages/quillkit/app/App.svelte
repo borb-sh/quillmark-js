@@ -154,7 +154,7 @@
 
 	/** Mount `next` and open its session behind it. */
 	async function mount(next: Omit<Open, 'standing'>, landed: Diagnostic[]): Promise<void> {
-		open = { ...next, standing: standing(next.ref, app) };
+		open = { ...next, standing: standing(next.ref, app, quiver!) };
 		stranded = landed;
 		choosing = false;
 		shown = 1;
@@ -209,7 +209,7 @@
 		const mine = ++turn;
 		await unmount();
 		void store?.setOpened(record.id);
-		if (standing(record.quill, app) === 'missing') {
+		if (standing(record.quill, app, quiver!) === 'missing') {
 			unopenable = record;
 			choosing = false;
 			return;

@@ -118,16 +118,19 @@ describe('quillkit check', () => {
 	);
 
 	it(
-		'gates the app App.yaml describes, failing a pin to a draft without --drafts',
+		'gates the app App.yaml describes, with the drafts under --drafts',
 		async () => {
 			const source = await temp.collection();
-			await writeFile(join(source, APP_YAML), 'quills: [showcase, usaf_memo]\n');
+			await writeFile(join(source, APP_YAML), 'quills: [showcase]\n');
 
 			const failure = await refused(['check'], source);
-			expect(failure.message).toMatch(new RegExp(`FAIL {2}${APP_YAML} — .*--drafts`));
+			expect(failure.message).toMatch(new RegExp(`FAIL {2}app — .*unknown key "quills"`));
 
-			const { stdout } = await run(process.execPath, [BIN, 'check', '-D'], { cwd: source });
-			expect(stdout).toContain(`pass  ${APP_YAML} (showcase@1.0.0, usaf_memo@0.0.0)`);
+			await writeFile(join(source, APP_YAML), 'title: Forms\n');
+			const { stdout } = await run(process.execPath, [BIN, 'check'], { cwd: source });
+			expect(stdout).toContain('pass  app (showcase@1.0.0)');
+			const drafts = await run(process.execPath, [BIN, 'check', '-D'], { cwd: source });
+			expect(drafts.stdout).toContain('pass  app (showcase@1.0.0, usaf_memo@0.0.0)');
 		},
 		RENDER_MS
 	);

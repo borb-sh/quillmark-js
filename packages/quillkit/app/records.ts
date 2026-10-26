@@ -19,7 +19,6 @@ export interface AppConfig {
 	icon?: string;
 	css?: string;
 	quills: AppQuill[];
-	retired: string[];
 }
 
 /** A document as the app stores it. */
@@ -65,18 +64,24 @@ export function readRecord(raw: unknown): DocRecord | undefined {
 }
 
 /**
- * Where a document's pin stands in this build: one of the quills the app opens, one an
- * earlier build opened and the pack still holds, or neither.
+ * Where a document's pin stands in this build: one of the quills the app opens, an earlier
+ * version the pack still holds, or neither.
  */
 export type Standing = 'current' | 'retired' | 'missing';
 
-export function standing(ref: string, app: AppConfig): Standing {
-	if (app.quills.some((q) => q.ref === ref)) return 'current';
-	if (app.retired.includes(ref)) return 'retired';
-	return 'missing';
+/** What a pack says of the versions it holds, which is all `standing` asks of a quiver. */
+export interface Holds {
+	versionsOf(name: string): string[];
 }
 
 const nameOf = (ref: string): string => ref.slice(0, ref.indexOf('@'));
+const versionOf = (ref: string): string => ref.slice(ref.indexOf('@') + 1);
+
+export function standing(ref: string, app: AppConfig, pack: Holds): Standing {
+	if (app.quills.some((q) => q.ref === ref)) return 'current';
+	if (pack.versionsOf(nameOf(ref)).includes(versionOf(ref))) return 'retired';
+	return 'missing';
+}
 
 /** The quill this build opens in a document's place: the same quill at its current pin. */
 export function latestFor(ref: string, app: AppConfig): AppQuill | undefined {

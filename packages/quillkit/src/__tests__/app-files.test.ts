@@ -1,6 +1,6 @@
 /**
- * The app target's inputs, read: what `App.yaml` may say, which quills its selectors pin,
- * and what `app.css` reaches for. The layout they land in is `deploy.test.ts`'s.
+ * The app target's inputs, read: what `App.yaml` may say, which quills the app opens, and
+ * what `app.css` reaches for. The layout they land in is `deploy.test.ts`'s.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -9,7 +9,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fromDir, isDraft } from '@quillmark/quiver/node';
-import { APP_YAML, PROMISED, readAppYaml, resolveRefs, scanCss } from '../app-files.js';
+import { APP_YAML, PROMISED, appRefs, readAppYaml, scanCss } from '../app-files.js';
 import { scratch } from './helpers/collection.js';
 
 const THEMING = fileURLToPath(new URL('../../../svelte/THEMING.md', import.meta.url));
@@ -29,63 +29,39 @@ describe('App.yaml', () => {
 	});
 
 	it('reads what the app is', async () => {
-		const at = await withAppYaml(
-			'title: Memos\ndescription: Fill it in.\nquills: [memo@0.3]\nicon: icon.svg\n'
-		);
-		expect(readAppYaml(at)).toEqual({
-			title: 'Memos',
-			description: 'Fill it in.',
-			quills: ['memo@0.3'],
-			icon: 'icon.svg'
-		});
+		const at = await withAppYaml('title: Memos\ndescription: Fill it in.\n');
+		expect(readAppYaml(at)).toEqual({ title: 'Memos', description: 'Fill it in.' });
 	});
 
 	it('refuses a key it does not know, which is how a look would creep in', async () => {
-		await expect(withAppYaml('theme: dark\n').then(readAppYaml)).rejects.toThrow(
-			/unknown key "theme"/
-		);
+		for (const key of ['theme', 'quills', 'icon'])
+			await expect(withAppYaml(`${key}: x\n`).then(readAppYaml), key).rejects.toThrow(
+				new RegExp(`unknown key "${key}"`)
+			);
 	});
 
 	it('refuses a value of the wrong shape', async () => {
-		for (const text of ['title: [a]\n', 'quills: memo\n', 'quills: []\n', 'quills: [1]\n'])
+		for (const text of ['title: [a]\n', "title: ''\n", 'description: 1\n'])
 			await expect(withAppYaml(text).then(readAppYaml), text).rejects.toThrow(/App\.yaml/);
 	});
 });
 
-describe('the pins', () => {
-	it('resolves each selector to the canonical ref the quiver holds', async () => {
+describe('the quills', () => {
+	it('are every quill the quiver holds, at its latest version', async () => {
 		const quiver = await fromDir(await temp.collection());
-		const [name] = quiver.quillNames().filter((n) => quiver.versionsOf(n).some((v) => !isDraft(v)));
-		const [ref] = resolveRefs(quiver, [name!], false);
 
-		expect(ref).toBe(quiver.resolve(name!));
+		expect(appRefs(quiver, true)).toEqual(quiver.quillNames().map((name) => quiver.resolve(name)));
 	});
 
-	it('takes every quill at its latest version where App.yaml lists none', async () => {
-		const quiver = await fromDir(await temp.collection());
-		const refs = resolveRefs(quiver, undefined, true);
-
-		expect(refs).toEqual(quiver.quillNames().map((name) => quiver.resolve(name)));
-	});
-
-	it('admits a draft only under --drafts', async () => {
+	it('admit a draft only under --drafts', async () => {
 		const quiver = await fromDir(await temp.collection());
 		const draft = quiver
 			.quillNames()
 			.find((name) => quiver.versionsOf(name).every((v) => isDraft(v)));
 		expect(draft, 'the reference quiver holds a quill only in drafts').toBeDefined();
 
-		expect(() => resolveRefs(quiver, [draft!], false)).toThrow(/--drafts/);
-		expect(resolveRefs(quiver, [draft!], true)).toEqual([quiver.resolve(draft!)]);
-		expect(resolveRefs(quiver, undefined, false)).not.toContain(quiver.resolve(draft!));
-	});
-
-	it('refuses a selector naming no quill, and one quill pinned twice', async () => {
-		const quiver = await fromDir(await temp.collection());
-		const [name] = quiver.quillNames();
-
-		expect(() => resolveRefs(quiver, ['nope'], true)).toThrow(/names no quill/);
-		expect(() => resolveRefs(quiver, [name!, quiver.resolve(name!)], true)).toThrow(/one version/);
+		expect(appRefs(quiver, true)).toContain(quiver.resolve(draft!));
+		expect(appRefs(quiver, false)).not.toContain(quiver.resolve(draft!));
 	});
 });
 

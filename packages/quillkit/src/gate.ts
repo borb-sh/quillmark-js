@@ -1,8 +1,8 @@
 /**
  * `check`, the gate: every quill's seed renders, and so does its root `example.md` where it
  * ships one, through the wasm this package carries, which is the wasm every deployed client
- * renders through (QUILLKIT §"One pin"). With an `App.yaml` beside the quiver, the app it
- * describes resolves too.
+ * renders through (QUILLKIT §"One pin"). With an `App.yaml` or an `app.css` beside the
+ * quiver, the app they describe resolves too.
  *
  * The only door onto the verdict, so an author on vitest, jest or another runner spawns
  * the bin (`execFileSync('quillkit', ['check'])`) rather than rebuilding the loop.
@@ -12,7 +12,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Document, Quill } from '@quillmark/wasm';
 import { fromDir } from '@quillmark/quiver/node';
-import { APP_YAML, prepareApp } from './app-files.js';
+import { APP_CSS, APP_YAML, prepareApp } from './app-files.js';
 
 export interface Verdict {
 	pass: number;
@@ -80,8 +80,8 @@ export async function gate(root: string, { drafts }: { drafts: boolean }): Promi
 		}
 	}
 
-	if (existsSync(join(root, APP_YAML)))
-		await tally(APP_YAML, async () => {
+	if ([APP_YAML, APP_CSS].some((name) => existsSync(join(root, name))))
+		await tally('app', async () => {
 			const { app } = await prepareApp(root, quiver, drafts);
 			return app.quills.map((q) => q.ref).join(', ');
 		});

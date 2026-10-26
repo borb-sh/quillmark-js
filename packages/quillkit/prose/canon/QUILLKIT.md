@@ -42,7 +42,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **What an author wrote is held to every diagnostic.** A quill's `example.md` fails on any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is the author's own to fix. The seed is the schema's, and answers for its render alone. The compile's own warnings are the plate's, and fail neither.
 
-**The app resolves too.** With an `App.yaml` beside `Quiver.yaml` the gate runs what `build app` runs before it writes anything (§"The app target"), so a selector naming no quill, a pin to a draft without `--drafts`, an unknown key or an `app.css` naming a file outside the quiver fails the gate as it would fail the deploy. What `build app` only warns about, it does not fail.
+**The app resolves too.** With an `App.yaml` or an `app.css` beside `Quiver.yaml` the gate runs what `build app` runs before it writes anything (§"The app target"), so an unknown key, or an `app.css` naming a file outside the quiver or none, fails the gate as it would fail the deploy. What `build app` only warns about, it does not fail.
 
 **One door.** An author on vitest, jest or another runner spawns the bin (`execFileSync('quillkit', ['check'])`) and gates what CI gates; a second entry onto the verdict would be a second answer under one name. The suite spawns it against the reference quiver, since nothing that imports a module proves a surface reached through a linked bin.
 
@@ -54,7 +54,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
 
-**One devDependency.** The written `package.json` ranges `quillkit` at its own version and nothing else (§"One pin"), with `serve`, `test` and `build` scripts running `quillkit serve --open`, `quillkit check` and `quillkit build app`, so `npm test` is the gate. `.gitignore` names `node_modules/` and `dist/`; `app-lock.json` is committed (§"The app target").
+**One devDependency.** The written `package.json` ranges `quillkit` at its own version and nothing else (§"One pin"), with `serve`, `test` and `build` scripts running `quillkit serve --open`, `quillkit check` and `quillkit build app`, so `npm test` is the gate. `.gitignore` names `node_modules/` and `dist/`.
 
 **It refuses rather than merges.** An entry of `starter/` already in the directory fails the verb before anything is written. A `package.json` already there is left alone and the install line is printed instead; `.gitignore` and `.prettierignore` are written only where absent. The last is there because prettier rewrites a card's `~~~` fence as a backtick fence, which opens no card.
 
@@ -62,7 +62,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 `serve` packs the source into `node_modules/.quillkit/quiver`, serves the target's client at the root with the pack mounted at `/quiver`, and repacks when the source changes. For `app` it also writes `app.json` and the author's files into `node_modules/.quillkit/app`, served behind the client, so `App.yaml` and `app.css` reload with the page. For `quiver` it serves the pack alone with CORS open, for a consumer's own dev server on another port. Three parts, and only the first is subtle:
 
-**The pack lands whole, and that is quiver's** (QUIVER §"The generation lands whole"). Nothing here stages or swaps: the directory belongs to `build`, and a caller cannot close a window inside it. What is left here is the trigger: a burst of watcher events collapsed to one repack, the work tree and `dist/` filtered out of the watch so a watcher seeing its own writes does not repack forever, and a queue that serializes packs without ending on the first failure, a quiver mid-edit being invalid as often as not. A close ends both halves in the teardown's order, the watch first and then the burst still settling, so nothing packs into a tree the caller is done with. It always packs drafts (QUIVER §"The draft floor"): this is the author looking at their own quiver, where a quill under `0.1.0` is the likeliest thing on the screen. It writes no `app-lock.json`, a dev session being no release.
+**The pack lands whole, and that is quiver's** (QUIVER §"The generation lands whole"). Nothing here stages or swaps: the directory belongs to `build`, and a caller cannot close a window inside it. What is left here is the trigger: a burst of watcher events collapsed to one repack, the work tree and `dist/` filtered out of the watch so a watcher seeing its own writes does not repack forever, and a queue that serializes packs without ending on the first failure, a quiver mid-edit being invalid as often as not. A close ends both halves in the teardown's order, the watch first and then the burst still settling, so nothing packs into a tree the caller is done with. It always packs drafts (QUIVER §"The draft floor"): this is the author looking at their own quiver, where a quill under `0.1.0` is the likeliest thing on the screen.
 
 **The server is written rather than borrowed.** Two things a general-purpose static server gets wrong for this: `.wasm` must be served as `application/wasm`, since wasm-bindgen's web target instantiates by streaming and `WebAssembly.instantiateStreaming` refuses any other type; and a path escaping its root must be refused, checked on the resolved path so `%2e%2e`, a doubled separator and a plain `..` collapse into one answer. Mounts sharing a prefix fall through in order, which is how the app's staged files stand behind its client. The live loop caches nothing, a cache answering about the last generation. The repack is also what a borrowed server has no reason to survive: it takes a file out from under a request between the stat and the open, and a read that fails there destroys the response rather than ending the session.
 
@@ -93,24 +93,23 @@ The verb is the whole encapsulation, which is why there is no workflow beside it
 
 ## The app target
 
-`App.yaml`, beside `Quiver.yaml`, says what the app is; `app.css` beside it says how it looks; `build app` resolves both against the quiver into `app.json`, which is all the client reads at boot. Neither is required: with no `App.yaml` the app opens every quill at its latest version and takes its name from `Quiver.yaml`.
+Convention over configuration: everything the app target reads is found by name beside `Quiver.yaml`, and none of it is required. `build app` resolves it against the quiver into `app.json`, which is all the client reads at boot.
 
-| `App.yaml` key | Default | What |
+| File | Default | What |
 | --- | --- | --- |
-| `title` | `Quiver.yaml`'s `name`, made readable | The header and the tab. |
-| `description` | `Quiver.yaml`'s `description` | The sentence over the landing's cards. |
-| `quills` | every quill, at its latest version | Selectors, each resolved to one canonical ref; one version per quill. |
-| `icon` | none | A file in the quiver, shown in the header and as the tab's icon. |
+| `App.yaml` | `Quiver.yaml`'s `name`, made readable, and its `description` | `title`, the header and the tab; `description`, the sentence over the landing's cards. |
+| `app.css` | the preset's look | How the app looks. |
+| `icon.svg`, else `icon.png` | none | The header's mark and the tab's icon. |
 
-**An unknown key is refused.** A look written into `App.yaml` would be a second theming system with a vocabulary of its own; the look is `app.css`, and the keys are what the app is.
+**The quills are the quiver's.** The app opens every quill the pack holds, each at its latest version, so a different set of forms is a different quiver, which can depend on another through npm rather than copy its quills. The ref is canonical and is what a document records, so a document made today reopens on the version it was made on; a draft is admitted only under `--drafts`, as the pack admits one.
 
-**A pin is canonical and admits no draft without `--drafts`.** Each selector resolves through the quiver as `getQuill` does, and the ref is what a document records, so a document made today reopens on the version it was made on. A draft is admitted only where the pack holds it.
+**An unknown key is refused.** `App.yaml` names the app and nothing else: a look written into it would be a second theming system with a vocabulary of its own, and a list of quills a second way to say what the quiver already says.
 
 **`app.css` lands last, and its files with it.** The client links it after its own sheets, so a rule of equal rank is the author's. Every relative `url()` it names is copied at the same path, and one naming a file outside the quiver, or none, is refused; one from the host's root is warned, a deploy under a subpath not serving it. A selector aiming at anything the theming contract does not promise (THEMING §"What a stylesheet may aim at") is warned, since a release may move it.
 
 **A quill without a licence is warned, not refused.** An app hands its plate and its fonts to every reader, which is a licensing question the author answers in `Quill.yaml`'s `license`; a quiver deployed for its own organisation may have answered it elsewhere.
 
-**Retired pins come out of `app-lock.json`.** A deploy is a directory a host replaces whole, so the previous `app.json` is not there to be read; the quiver's repository is the one thing that outlives a build. Every `build app` adds the refs it ships to `app-lock.json` beside `App.yaml`, which the author commits. A ref the lock holds and this build does not ship is listed in `app.json` as retired where the pack still holds it, so a document made on it opens on that version (APP §"Retired pins"); where the pack does not, the build warns, and such a document offers its markdown and the latest form.
+**An earlier version opens while the pack holds it.** The client reads a document's standing off the quiver it has loaded rather than off anything the build records, since a deploy is a directory a host replaces whole and the pack is the one thing in it that knows which versions remain (APP §"Retired pins"). Only the app makes a document, so every pin a reader holds is one a build shipped; a version the quiver keeps keeps its documents opening on it, and one it drops leaves them offering their markdown and the latest form.
 
 ## Not
 

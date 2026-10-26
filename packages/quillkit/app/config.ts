@@ -25,7 +25,6 @@ export async function loadApp(): Promise<AppConfig> {
 	const app = (await res.json()) as AppConfig;
 	if (!Array.isArray(app?.quills) || app.quills.length === 0)
 		throw new Error('app.json names no quill');
-	app.retired ??= [];
 
 	document.title = app.title;
 	if (app.icon) {

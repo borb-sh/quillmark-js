@@ -57,7 +57,7 @@ A verb refuses a flag it does not take.
 }
 ```
 
-It loads the quiver, then renders every quill's seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill, and so does any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is yours to fix. With an `App.yaml`, the app it describes resolves too, so a selector naming no quill or a pin to a draft without `--drafts` fails here before it fails a deploy.
+It loads the quiver, then renders every quill's seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill, and so does any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is yours to fix. With an `App.yaml` or an `app.css`, the app they describe resolves too, so an unknown key or a `url()` naming no file fails here before it fails a deploy.
 
 On vitest, jest or `node:test`, spawn the bin rather than rebuilding the loop against the library. The gate stays one implementation, and the case gates what CI gates:
 
@@ -84,14 +84,16 @@ npx quillkit serve app --open  # the app, with your App.yaml and app.css
 
 ## The app
 
-`App.yaml` beside `Quiver.yaml` says what the app is. Every key is optional, and an unknown one is refused:
+The app opens every quill in the quiver at its latest version, so a different set of forms is a different quiver. Everything else is found by name beside `Quiver.yaml`, and all of it is optional.
+
+`App.yaml` names the app. It takes two keys and refuses any other:
 
 ```yaml
 title: Memo Builder # the header and the tab; Quiver.yaml's name, made readable, by default
 description: Fill in a memo and download it as a PDF. # over the cards; Quiver.yaml's by default
-quills: [usaf_memo@0.3, letter] # selectors; every quill at its latest version by default
-icon: icon.svg # a file in the quiver
 ```
+
+`icon.svg`, else `icon.png`, is the app's icon, in the header and on the tab.
 
 `app.css` beside it says how it looks. It is linked after the app's own styles, and every relative `url()` in it is copied into the deploy at the same path:
 
@@ -110,9 +112,9 @@ icon: icon.svg # a file in the quiver
 }
 ```
 
-What it may aim at is the theming contract: the `--qm-*` dials, `.qm-editor`, `.qm-preview` and `.qm-pane`, the app chrome (`.qm-app-header`, `.qm-app-title`, `.qm-app-footer`, `.qm-app-primary`), and `[data-qm-card="<kind>"]` on each card of a document ([THEMING.md](../svelte/THEMING.md)). `build app` warns on any other `.qm-*` class or `data-qm-*` attribute, since a release may move it, and on a pinned quill that declares no `license` in its `Quill.yaml`, since an app hands its plate and fonts to every reader.
+What it may aim at is the theming contract: the `--qm-*` dials, `.qm-editor`, `.qm-preview` and `.qm-pane`, the app chrome (`.qm-app-header`, `.qm-app-title`, `.qm-app-footer`, `.qm-app-primary`), and `[data-qm-card="<kind>"]` on each card of a document ([THEMING.md](../svelte/THEMING.md)). `build app` warns on any other `.qm-*` class or `data-qm-*` attribute, since a release may move it, and on a quill that declares no `license` in its `Quill.yaml`, since an app hands its plate and fonts to every reader.
 
-**A document reopens on the version it was made on.** Each `build app` records the versions it ships in `app-lock.json` beside `App.yaml`; commit it. When a later build moves a quill to a new version, a document made on the old one still opens on it, as long as the quiver still holds that version, and offers **Update to the latest form** with its markdown offered first.
+**A document reopens on the version it was made on.** When a release moves a quill to a new version, a document made on the old one still opens on it, as long as the quiver still holds that version, and offers **Update to the latest form** with its markdown offered first. Keep a released version in the quiver for as long as documents made on it should open.
 
 ## Shipping it
 

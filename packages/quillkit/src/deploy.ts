@@ -92,6 +92,6 @@ export async function layOut({
 	await rm(at, { recursive: true, force: true });
 	if (client !== undefined) await cp(client, at, { recursive: true });
 	await pack(root, join(at, 'quiver'), { drafts });
-	const warnings = prepared ? await writeApp(prepared, root, at, { lock: true }) : [];
-	return { at, warnings };
+	if (prepared) await writeApp(prepared, root, at);
+	return { at, warnings: prepared?.warnings ?? [] };
 }
