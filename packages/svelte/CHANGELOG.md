@@ -12,6 +12,12 @@
 
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
+**An open matrix's add box stands in the roster's columns**: its plus where a tick stands and its words where a title starts, where both sat 8px further in, and a press on the plus lands in the box. An added item's remove is the minus an array row's is, where it was a cross, and rests at the muted rung on a touch screen as an array row's does.
+
+**A matrix's tick is a fill, as a switch's track is**: unheld, it draws the switch's unchecked tone with no edge, where it drew the field well under a hairline that matched it at the light pole.
+
+**A table's pinned remove hides the column scrolling under it all the way to the clip**, where a sliver of that column showed past the slab's rounded corners.
+
 ## v0.27.0 - 2026-10-26
 
 **Zooming the preview stops at the pane-width fit as it stops at 100%, and landing there is the default again**: Ctrl/⌘-wheel and pinch hold at it, `Mod +`/`−` step to it, and from there the page follows a dragged divider and the zoom pill goes, where zooming back past the fit left the page at a fixed size the divider no longer moved.
