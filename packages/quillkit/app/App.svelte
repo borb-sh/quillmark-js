@@ -631,6 +631,12 @@
 		object-fit: contain;
 	}
 
+	/* One height for the head's presses: the primary stands at the touch floor, so the
+	   control beside it does too, and the line reads as one row of buttons. */
+	.head > .qm-control {
+		min-height: var(--qmh-tap);
+	}
+
 	.body {
 		display: flex;
 		flex-direction: column;
@@ -671,20 +677,22 @@
 		min-height: 0;
 	}
 
+	/* The preview's desk tone under the preview, so the pane does not change tone when
+	   the first paint lands (studio's `.pane.paint`). */
 	.pane.paint {
 		position: relative;
-		background: var(--qmh-surface);
+		background: var(--qmh-page);
 	}
 
 	/* Laid over the page rather than above it, so the page does not move when it stops
-	   answering the form. */
+	   answering the form. Its words start on the sheet's edge, the desk's gutter. */
 	.stalled {
 		position: absolute;
 		inset-block-start: 0;
 		inset-inline: 0;
 		z-index: 1;
 		margin: 0;
-		padding: var(--qmh-space-2) var(--qmh-space-3);
+		padding: var(--qmh-space-2) var(--qmh-space-4);
 		font-size: var(--qmh-text-label);
 		color: var(--qmh-ink-meta);
 		background: var(--qmh-page);

@@ -234,3 +234,5 @@ The derived surface scale (surface / border / ink rungs, the blur radius, the po
 ## Requirements
 
 `:where()`, `color-mix()`, `light-dark()` and relative colour syntax (`oklab(from …)`): Baseline since 2021, 2023, 2024 and 2024 respectively — the last is what lets a plane step by the card's own lightness. `@property` is the one feature the surface does not require: where it is missing, an invalid length dial collapses the surface rather than falling back.
+
+Build your stylesheets for browsers that carry `light-dark()` natively. A minifier targeting older ones lowers each pole to a pair of variables only an element declaring `color-scheme` defines, and the preset states its poles at `:root`, where that pair is two colours at once and no colour: the primary press and the error hue draw nothing. Under Vite, `build.cssTarget: ['chrome123', 'edge123', 'firefox128', 'safari18']`.

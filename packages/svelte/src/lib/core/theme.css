@@ -347,6 +347,11 @@
 	   `check:style`'s rhythm axis sees each of them read a rung, never that they read
 	   the same one — the case `--_qm-inset-control` above is cut for. */
 	--_qm-nest: var(--_qm-space-3);
+	/* The text column, measured in from a block's own inline inset: a section's vertical
+	   plus the rung its heading stands off it, so a heading riding that vertical and a
+	   line beside it start on one edge. A rung for the reason the nesting step is: the
+	   card and the tip tucked under `main` are two components holding one edge. */
+	--_qm-column: calc(var(--_qm-space) + var(--_qm-vertical-width));
 	/* The scroll tail: dead space under the last card, so it can be read at the
 	   middle of a pane rather than at its bottom edge. A fraction of the viewport
 	   rather than a step on the ramp, because what it answers is how far the eye
