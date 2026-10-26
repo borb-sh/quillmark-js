@@ -78,8 +78,13 @@
 
 <style>
 	/* The switch stands on the first line of the boxes beside it: a row of controls tops
-	 out together, and a mark carries no line of its own to sit on. */
+	 out together, and a mark carries no line of its own to sit on.
+
+	 One length, the thumb's, and the track is two of them around the inset: the travel
+	 is a thumb's width at every setting of `--qm-space`, where a track sized apart from
+	 its inset ran the checked thumb into the end cap as the inset grew. */
 	.qm-toggle-wrap {
+		--thumb: 0.75rem;
 		display: flex;
 		align-items: center;
 		min-height: var(--_qm-box-line);
@@ -91,12 +96,6 @@
 	 2.5.8's floor is half again that. The `<label for>` beside it forwards a press but
 	 stands at the label rung, so it is no taller: without the floor no region on the
 	 surface reaches this control at the size every other control on it holds. */
-	/* One length, the thumb's, and the track is two of them around the inset: the travel
-	 is a thumb's width at every setting of `--qm-space`, where a track sized apart from
-	 its inset ran the checked thumb into the end cap as the inset grew. */
-	.qm-toggle-wrap {
-		--thumb: 0.75rem;
-	}
 	.qm-toggle-wrap :global(.qm-toggle) {
 		display: inline-flex;
 		align-items: center;

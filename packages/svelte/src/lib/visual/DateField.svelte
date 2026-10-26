@@ -307,8 +307,8 @@
 	}
 	/* The ring rides `.qm-focus-ring-within` (controls.css) rather than the plain
 	   marker: focus lives on the segment, so it rings the field, not the segment
-	   the caret happens to be in. */
-	/* Tabular figures, so a segment keeps its width as its digits change. */
+	   the caret happens to be in. Tabular figures, so a segment keeps its width as its
+	   digits change. */
 	.qm-date-wrap :global(.qm-date-segment) {
 		padding: 0 var(--_qm-space-half);
 		font-variant-numeric: tabular-nums;
@@ -345,10 +345,9 @@
 	/* The toggle's state is its fill and its glyph, never the pointer: a hover fill
 	 would read as pressed. Off, it rests hidden where a pointer can reveal it, still
 	 holding its width so the digits never shift. It sits inside the box's line, so
-	 the box stands as tall as the inputs beside it. */
-	/* The chip's pad sits inside the box's inset, so its label ends on the column the
-	 digits start on from the other side, and its fill stands about as far off the box's
-	 end as off its top and bottom. */
+	 the box stands as tall as the inputs beside it. Its pad sits inside the box's
+	 inset, so its label ends on the column the digits start on from the other side,
+	 and its fill stands about as far off the box's end as off its top and bottom. */
 	.qm-date-today {
 		margin-inline-start: auto;
 		margin-inline-end: calc(-1 * var(--_qm-space-2));
