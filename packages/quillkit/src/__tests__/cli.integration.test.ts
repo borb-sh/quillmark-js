@@ -190,8 +190,7 @@ describe('quillkit build', () => {
 		const source = await temp.collection();
 		for (const args of [
 			['build', 'site'],
-			['serve', 'site'],
-			['serve', '--built', 'site']
+			['serve', 'site']
 		]) {
 			const { message } = await refused(args, source);
 			for (const target of TARGETS) expect(message, args.join(' ')).toContain(target);
@@ -237,14 +236,15 @@ describe('quillkit serve', () => {
 	}, 60_000);
 });
 
-describe('quillkit serve --built', () => {
-	it('serves a build as a static host does', async () => {
+describe('quillkit preview', () => {
+	it('serves the build in dist as a static host does, whichever target it is', async () => {
 		const source = await temp.collection();
 		await run(process.execPath, [BIN, 'build', 'app', '-D'], { cwd: source });
-		const url = await serving(['serve', '--built', 'app'], source);
+		const url = await serving(['preview'], source);
 
 		const index = await fetch(url);
 		expect(index.status).toBe(200);
+		expect((await fetch(new URL(APP_JSON, url))).status).toBe(200);
 		const asset = /assets\/[^"]+\.js/.exec(await index.text())?.[0];
 		expect(asset).toBeDefined();
 
@@ -255,12 +255,21 @@ describe('quillkit serve --built', () => {
 		expect((await fetch(new URL('nope.html', url))).status).toBe(404);
 	}, 60_000);
 
-	it('refuses a directory holding no build of the target', async () => {
+	it("opens a quiver build at the quiver's index", async () => {
 		const source = await temp.collection();
-		await run(process.execPath, [BIN, 'build'], { cwd: source });
-		expect((await refused(['serve', '--built', 'app'], source)).message).toMatch(
-			/holds no app build: run `quillkit build app`/
+		await run(process.execPath, [BIN, 'build', 'quiver'], { cwd: source });
+		const url = await serving(['preview'], source);
+
+		expect(url.pathname).toBe('/quiver/quiver.json');
+		expect((await fetch(url)).status).toBe(200);
+	}, 60_000);
+
+	it('refuses a directory holding no build, and a target word', async () => {
+		const source = await temp.collection();
+		expect((await refused(['preview'], source)).message).toMatch(
+			/holds no build: run `quillkit build`/
 		);
+		expect((await refused(['preview', 'app'], source)).message).toMatch(/takes no argument/);
 	});
 });
 
@@ -285,7 +294,7 @@ describe('how a flag is spelled', () => {
 			['build', 'app', '--port', '1'],
 			['serve', '-D'],
 			['serve', '-o', 'dist'],
-			['serve', '--built', '--drafts']
+			['preview', '--drafts']
 		])
 			expect((await refused(args, source)).message, args.join(' ')).toMatch(/takes no -/);
 	});

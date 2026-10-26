@@ -4,23 +4,23 @@
 
 ## TL;DR
 
-The verbs a quill author types, one bin over a quiver's whole life: `init` starts one, `check` gates it, `serve` shows it as it is edited, `build` lays it out for a static host, and `serve --built` serves that layout the way the host will. A verb's argument is a target, `studio` where none is named: `quiver` is the pack alone, `studio` is the client the quiver's authors judge it in ([STUDIO.md](STUDIO.md)), and `app` is the client the people filling its forms in reach ([APP.md](APP.md)). It is the only name in the toolchain an author installs: a quiver's `package.json` lists `quillkit` in `devDependencies` and nothing else, and the loaders a browser consumer reaches stay [`@quillmark/quiver`](../../../quiver/prose/canon/QUIVER.md)'s.
+The verbs a quill author types, one bin over a quiver's whole life: `init` starts one, `check` gates it, `serve` shows it as it is edited, `build` lays it out for a static host, and `preview` serves that layout the way the host will. A verb's argument is a target, `studio` where none is named: `quiver` is the pack alone, `studio` is the client the quiver's authors judge it in ([STUDIO.md](STUDIO.md)), and `app` is the client the people filling its forms in reach ([APP.md](APP.md)). It is the only name in the toolchain an author installs: a quiver's `package.json` lists `quillkit` in `devDependencies` and nothing else, and the loaders a browser consumer reaches stay [`@quillmark/quiver`](../../../quiver/prose/canon/QUIVER.md)'s.
 
 ## Verbs and targets
 
 | Verb | Takes | Does |
 | --- | --- | --- |
 | `init` | `[<dir>]` | Lays a quiver: `Quiver.yaml`, one quill, a `package.json` naming quillkit. |
-| `check` | `[-D]` | Renders every quill's seed and example, and resolves `App.yaml` where there is one. |
+| `check` | `[-D]` | Renders every quill's seed and example, and resolves the app where there is an `App.yaml` or `app.css`. |
 | `build` | `[target] [-o <dir>] [-D]` | Lays the target's deploy into `dist/`, or `-o`. |
 | `serve` | `[target] [-p <n>] [--open]` | Packs, serves the target over the pack, repacks on change. |
-| `serve --built` | `[target] [-o <dir>] [-p <n>] [--open]` | Serves a built deploy with the host's rules. |
+| `preview` | `[-o <dir>] [-p <n>] [--open]` | Serves the build in `dist/`, or `-o`, with the host's rules. |
 
-**The quiver is the working directory.** No verb takes a path to it: every verb runs where `Quiver.yaml` stands, as npm runs where `package.json` stands, so a `scripts` entry and a terminal mean the same tree. The flags are `-D`/`--drafts`, `-o`/`--out`, `-p`/`--port`, `--open` and `--built`, and a verb refuses a flag it does not take rather than read it as absent, since a flag read as absent runs the verb over something nobody asked for.
+**The quiver is the working directory.** No verb takes a path to it: every verb runs where `Quiver.yaml` stands, as npm runs where `package.json` stands, so a `scripts` entry and a terminal mean the same tree. The flags are `-D`/`--drafts`, `-o`/`--out`, `-p`/`--port` and `--open`, and a verb refuses a flag it does not take rather than read it as absent, since a flag read as absent runs the verb over something nobody asked for.
 
 **Every verb's default target is studio.** It is the client a quiver's own authors judge it in, and the one a first `serve` is for; a pipeline deploying the app names `app`.
 
-**`serve` is one verb with two sources.** Live, it packs the source and repacks on save (§"The local loop"); with `--built` it serves what `build` laid, under the host's rules (§"The deploy layout"). Both serve one target at a front door, so a reader of the command line reads the same shape either way, and the two take different ports by default so both can run at once. `--open` opens that door in the platform's browser, and a machine with no opener, a CI runner above all, serves on and prints the address.
+**`serve` shows the source, `preview` the build.** `serve` packs the source and repacks on save (§"The local loop"); `preview` serves what `build` laid, under the host's rules (§"The deploy layout"). A deploy says which target it was built for, `app.json` an app, a bare `index.html` studio and a bare `quiver/` the quiver, so `preview` takes no target and serves whichever build `dist/` holds. Each serves one front door, a client's page or, for the quiver alone, `quiver/quiver.json`, and the two take different ports by default so both can run at once. `--open` opens that door in the platform's browser, and a machine with no opener, a CI runner above all, serves on and prints the address.
 
 **No base path is configured.** Each client resolves its assets, `quiver/`, `app.json` and `app.css` relative to `document.baseURI`, and the app keys its documents by that same base, so one build serves a root, a subpath and a preview URL unchanged, and two apps under one origin keep apart. What a subpath asks of a host is that the deploy's own address ends in `/`, a directory a static host redirects to.
 
@@ -54,7 +54,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
 
-**One devDependency.** The written `package.json` ranges `quillkit` at its own version and nothing else (§"One pin"), with `serve`, `test` and `build` scripts running `quillkit serve --open`, `quillkit check` and `quillkit build app`, so `npm test` is the gate. `.gitignore` names `node_modules/` and `dist/`.
+**One devDependency.** The written `package.json` ranges `quillkit` at its own version and nothing else (§"One pin"), with `serve`, `test`, `build` and `preview` scripts running `quillkit serve --open`, `quillkit check`, `quillkit build app` and `quillkit preview --open`, so `npm test` is the gate. `.gitignore` names `node_modules/` and `dist/`.
 
 **It refuses rather than merges.** An entry of `starter/` already in the directory fails the verb before anything is written. A `package.json` already there is left alone and the install line is printed instead; `.gitignore` and `.prettierignore` are written only where absent. The last is there because prettier rewrites a card's `~~~` fence as a backtick fence, which opens no card.
 
@@ -85,7 +85,7 @@ The verb is the whole encapsulation, which is why there is no workflow beside it
 
 **The floor is the default, and `--drafts` lifts it.** A deploy is a deployment, so it takes quiver's floor; a quiver whose studio is where reviewers preview its prototypes asks for the draft space with `--drafts`.
 
-**What the layout cannot assert is the host's, and it is four rules**: `assets/*` immutable, no edge cache on `quiver/quiver.json`, a missing path answered as a 404, and https. The first is the client's own content-hashed bundle; the second is the edge alone, the browser layer being closed by the fetch mode the loader picks for each name (QUIVER §"The index"). The last two are what a static host's defaults get wrong, and both surface as something other than themselves: a file refused as not the one it was named, and bytes nothing checked. `serve --built` serves a build under the first three, every path outside `assets/` sent `no-cache`, so a deploy is looked at locally under the rules it will meet. The README carries them with the host recipes.
+**What the layout cannot assert is the host's, and it is four rules**: `assets/*` immutable, no edge cache on `quiver/quiver.json`, a missing path answered as a 404, and https. The first is the client's own content-hashed bundle; the second is the edge alone, the browser layer being closed by the fetch mode the loader picks for each name (QUIVER §"The index"). The last two are what a static host's defaults get wrong, and both surface as something other than themselves: a file refused as not the one it was named, and bytes nothing checked. `preview` serves a build under the first three, every path outside `assets/` sent `no-cache`, so a deploy is looked at locally under the rules it will meet. The README carries them with the host recipes.
 
 **The gate is the recipe's, not this verb's.** The packer stats each `Quill.yaml` as a sentinel and parses none, and the app target loads the quills it pins but renders none, so a quill whose plate does not compile builds cleanly; the verb that renders is `check`, and every documented recipe runs it first. Putting it inside `build` would buy the author who does not read, at the price of a second gate for every pipeline already running one.
 

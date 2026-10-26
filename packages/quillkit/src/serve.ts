@@ -1,5 +1,5 @@
 /**
- * The static server `serve` runs the loop over and `serve --built` serves a deploy with. It
+ * The static server `serve` runs the loop over and `preview` serves a deploy with. It
  * composes its roots rather than copying one into another: the client out of this package,
  * the packed quiver out of the tree the packer swaps, an app's staged files beside them. A
  * repack replaces a directory the server reads per request, so nothing here is told a pack

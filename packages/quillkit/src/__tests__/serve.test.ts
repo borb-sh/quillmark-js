@@ -2,7 +2,7 @@
  * The static server, at the two points a general-purpose one gets wrong for this: the
  * content type `.wasm` must carry, and the paths that must not resolve. Both are why
  * this server is written rather than borrowed. Beside them, the two things its callers
- * add: roots composed under one prefix, and a deploy's cache rules for `serve --built`.
+ * add: roots composed under one prefix, and a deploy's cache rules for `preview`.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -98,7 +98,7 @@ describe('roots under one prefix', () => {
 
 describe("a host's cache rules", () => {
 	it('serves the bundle immutable and revalidates everything else', async () => {
-		// The four rules a deploy's host owes it, two of which are headers: what `serve --built`
+		// The four rules a deploy's host owes it, two of which are headers: what `preview`
 		// answers is what the host will.
 		const base = await serveFixture({ caching: 'host' });
 		const asset = await fetch(`${base}/assets/index.js`);

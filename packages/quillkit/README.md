@@ -29,20 +29,20 @@ That is the whole install. quillkit carries `@quillmark/quiver` and `@quillmark/
 
 Every verb runs over the quiver in the working directory. A verb's argument is a target: `studio` (where you and your co-authors judge the quills, and the target when none is named), `app` (what the people filling your forms in use) or `quiver` (the packed quiver alone).
 
-| Verb                              | What it does                                                             |
-| --------------------------------- | ------------------------------------------------------------------------ |
-| `quillkit init [<dir>]`           | lay a new quiver holding one starter quill                               |
-| `quillkit check`                  | the gate: every quill's seed and example render, and `App.yaml` resolves |
-| `quillkit serve [target]`         | pack, serve the target over the pack, repack on save                     |
-| `quillkit build [target]`         | lay the target's deploy into `dist/`                                     |
-| `quillkit serve --built [target]` | serve a built deploy the way a static host will                          |
+| Verb                      | What it does                                                          |
+| ------------------------- | --------------------------------------------------------------------- |
+| `quillkit init [<dir>]`   | lay a new quiver holding one starter quill                            |
+| `quillkit check`          | the gate: every quill's seed and example render, and the app resolves |
+| `quillkit serve [target]` | pack, serve the target over the pack, repack on save                  |
+| `quillkit build [target]` | lay the target's deploy into `dist/`                                  |
+| `quillkit preview`        | serve the build in `dist/` the way a static host will                 |
 
-| Flag                | Verbs                    |                                                   |
-| ------------------- | ------------------------ | ------------------------------------------------- |
-| `-D`, `--drafts`    | `check`, `build`         | admit versions below `0.1.0`; `serve` always does |
-| `-o`, `--out <dir>` | `build`, `serve --built` | the deploy directory, `dist` by default           |
-| `-p`, `--port <n>`  | `serve`                  | `5174` live, `4174` built                         |
-| `--open`            | `serve`                  | open the page in your browser                     |
+| Flag                | Verbs              |                                                   |
+| ------------------- | ------------------ | ------------------------------------------------- |
+| `-D`, `--drafts`    | `check`, `build`   | admit versions below `0.1.0`; `serve` always does |
+| `-o`, `--out <dir>` | `build`, `preview` | the deploy directory, `dist` by default           |
+| `-p`, `--port <n>`  | `serve`, `preview` | `5174` for `serve`, `4174` for `preview`          |
+| `--open`            | `serve`, `preview` | open the page in your browser                     |
 
 A verb refuses a flag it does not take.
 
@@ -122,7 +122,7 @@ What it may aim at is the theming contract: the `--qm-*` dials, `.qm-editor`, `.
 
 ```sh
 npx quillkit check && npx quillkit build app
-npx quillkit serve --built app
+npx quillkit preview
 ```
 
 | Path                           | Target       |                                                 |
@@ -136,7 +136,7 @@ npx quillkit serve --built app
 
 **`--drafts` packs the versions below `0.1.0` too.** Without it `build` takes quiver's draft floor, as a deployment should; with it a studio deploy is a preview of the quiver as it stands, prototypes included.
 
-**No base path to configure.** Each client resolves its assets, its quiver, `app.json` and `app.css` relative to the page's own address, and the app keeps its documents per address, so one build serves a root, a subpath (`https://you.github.io/forms/`) and a preview URL with no rebuild, and a `?quill=` link needs no rewrite rule. Serve a subpath with its trailing `/`, which every static host redirects a directory to. `serve --built` serves `dist/` with the cache headers below, so a deploy is looked at under the rules it will meet.
+**No base path to configure.** Each client resolves its assets, its quiver, `app.json` and `app.css` relative to the page's own address, and the app keeps its documents per address, so one build serves a root, a subpath (`https://you.github.io/forms/`) and a preview URL with no rebuild, and a `?quill=` link needs no rewrite rule. Serve a subpath with its trailing `/`, which every static host redirects a directory to. `preview` serves `dist/` with the cache headers below, so a deploy is looked at under the rules it will meet.
 
 ### What a host owes it
 

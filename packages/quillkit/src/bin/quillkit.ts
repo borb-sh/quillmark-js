@@ -19,7 +19,7 @@ import { serialize, watchCollection } from '../watch.js';
 
 const HOST = 'localhost';
 /** The live loop's port, and a built deploy's beside it, so both can run at once. */
-const PORTS = { live: 5174, built: 4174 };
+const PORTS = { serve: 5174, preview: 4174 };
 
 /** The short spelling of each flag that has one. */
 const SHORT: Record<string, string> = { '-o': '--out', '-p': '--port', '-D': '--drafts' };
@@ -77,9 +77,10 @@ function portOf(args: Args, fallback: number): number {
 	return port;
 }
 
-/** The address a target's front door is at. */
+/** The address a target's front door is at: a client's page, or the quiver's index where
+ *  there is no client. */
 const frontDoor = (target: Target, port: number): string =>
-	`http://${HOST}:${port}/${target === 'quiver' ? 'quiver/' : ''}`;
+	`http://${HOST}:${port}/${target === 'quiver' ? 'quiver/quiver.json' : ''}`;
 
 /** `url` in the platform's browser. Best effort: a machine with no opener, a CI runner
  *  above all, serves on and says where. */
@@ -151,20 +152,15 @@ async function build(args: string[]): Promise<void> {
 // serve
 // ---------------------------------------------------------------------------
 
-/** Either half of `serve`, by whether `--built` is among its arguments. */
-async function serve(args: string[]): Promise<void> {
-	return args.includes('--built') ? serveBuilt(args) : serveLive(args);
-}
-
 /**
  * The local loop: pack the quiver into a served tree, serve the target's client over it,
  * and repack when the source changes. It always packs the drafts, being the author looking
  * at their own quiver (QUILLKIT §"The local loop").
  */
-async function serveLive(args: string[]): Promise<void> {
+async function serve(args: string[]): Promise<void> {
 	const parsed = parse('serve', args, { values: ['--port'], switches: ['--open'], words: 1 });
 	const target = targetOf(parsed.words[0], 'serve');
-	const port = portOf(parsed, PORTS.live);
+	const port = portOf(parsed, PORTS.serve);
 	const root = resolve('.');
 	// Under the quiver's `node_modules`, which is both out of the way and already excluded
 	// from the watch.
@@ -215,34 +211,36 @@ async function serveLive(args: string[]): Promise<void> {
 	if (parsed.switches.has('--open')) openBrowser(url);
 }
 
-/** What a target's build leaves at a deploy's root, which is how `serve --built` tells one
- *  from another. */
-const BUILT: Record<Target, (dir: string) => boolean> = {
-	quiver: (dir) => existsSync(join(dir, 'quiver', 'quiver.json')),
-	studio: (dir) => existsSync(join(dir, 'index.html')) && !existsSync(join(dir, APP_JSON)),
-	app: (dir) => existsSync(join(dir, APP_JSON))
-};
+// ---------------------------------------------------------------------------
+// preview
+// ---------------------------------------------------------------------------
+
+/** The target a deploy was built for, read off what its build left at the root. */
+function builtTarget(dir: string): Target {
+	if (existsSync(join(dir, APP_JSON))) return 'app';
+	if (existsSync(join(dir, 'index.html'))) return 'studio';
+	if (existsSync(join(dir, 'quiver', 'quiver.json'))) return 'quiver';
+	throw new Error(`${dir} holds no build: run \`quillkit build\` first`);
+}
 
 /** A built deploy, served as a static host serves it: at the root, a missing path a 404, and
  *  the host's cache rules on every response (QUILLKIT §"The deploy layout"). */
-async function serveBuilt(args: string[]): Promise<void> {
-	const parsed = parse('serve --built', args, {
+async function preview(args: string[]): Promise<void> {
+	const parsed = parse('preview', args, {
 		values: ['--out', '--port'],
-		switches: ['--built', '--open'],
-		words: 1
+		switches: ['--open'],
+		words: 0
 	});
-	const target = targetOf(parsed.words[0], 'serve --built');
-	const port = portOf(parsed, PORTS.built);
+	const port = portOf(parsed, PORTS.preview);
 	const dir = resolve(parsed.values.get('--out') ?? 'dist');
-	if (!BUILT[target](dir))
-		throw new Error(`${dir} holds no ${target} build: run \`quillkit build ${target}\` first`);
+	const target = builtTarget(dir);
 	const bound = await listen(
 		createStaticServer([{ prefix: '', root: dir }], { caching: 'host' }),
 		port,
 		HOST
 	);
 	const url = frontDoor(target, bound);
-	console.log(`quillkit serve --built ${target}: ${url}`);
+	console.log(`quillkit preview ${target}: ${url}`);
 	console.log(`  serving: ${dir}`);
 	if (parsed.switches.has('--open')) openBrowser(url);
 }
@@ -259,14 +257,20 @@ function usage(): void {
 			'  quillkit check [-D|--drafts]',
 			'  quillkit build [quiver|studio|app] [-o|--out <dir>] [-D|--drafts]',
 			'  quillkit serve [quiver|studio|app] [-p|--port <n>] [--open]',
-			'  quillkit serve --built [quiver|studio|app] [-o|--out <dir>] [-p|--port <n>] [--open]',
+			'  quillkit preview [-o|--out <dir>] [-p|--port <n>] [--open]',
 			'',
-			'The target is studio where none is named.'
+			'The target is studio where none is named; preview serves whichever build is in --out.'
 		].join('\n')
 	);
 }
 
-const VERBS: Record<string, (args: string[]) => Promise<void>> = { init, check, build, serve };
+const VERBS: Record<string, (args: string[]) => Promise<void>> = {
+	init,
+	check,
+	build,
+	serve,
+	preview
+};
 
 const [verb, ...rest] = process.argv.slice(2);
 

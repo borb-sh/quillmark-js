@@ -59,7 +59,8 @@ export async function layStarter(dir: string): Promise<Laid> {
 			scripts: {
 				serve: 'quillkit serve --open',
 				test: 'quillkit check',
-				build: 'quillkit build app'
+				build: 'quillkit build app',
+				preview: 'quillkit preview --open'
 			},
 			devDependencies: { quillkit: range }
 		};
