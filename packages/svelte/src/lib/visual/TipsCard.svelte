@@ -97,8 +97,8 @@
 	 ground. What shows below the seam is the slip's tint, a step off `main`'s plane, so it
 	 reads as a slip of the card rather than as a second card.
 
-	 The bottom corners take the inner rung where the card above takes the outer: a slip
-	 is cut crisper than the thing it is tucked under, at every setting of the dial.
+	 The bottom corners are the card's own, so the pair stands in the stack with the same
+	 silhouette as every island beside it: the tint is what says slip, once.
 
 	 Down, the insets are the document's own rhythm and they are measured to the ink, not
 	 to the boxes. The top is a block gap below the seam, what two of the body's paragraphs
@@ -109,13 +109,15 @@
 	 slack at each edge, and spent inside the gap that is enough to make the tightest space
 	 in the card measure as the widest.
 
-	 Across, the inset is twice the card's block rung, so the tip's ink stands a step inside
-	 the body's. */
+	 Across, the inset is the card's inline one and then its text column, so the tip starts
+	 on the edge the body's lines do and the foot's label ends where a card's delete glyph
+	 does: the face and the tint already set the tip apart, and an indent would say it a
+	 third time. */
 	.qm-tips {
 		margin-top: calc(var(--_qm-radius) * -1);
-		border-radius: 0 0 var(--_qm-radius-inner) var(--_qm-radius-inner);
-		padding: calc(var(--_qm-space-3) + var(--_qm-radius)) calc(var(--_qm-space-3) * 2)
-			var(--_qm-space-3);
+		border-radius: 0 0 var(--_qm-radius) var(--_qm-radius);
+		padding: calc(var(--_qm-space-3) + var(--_qm-radius))
+			calc(var(--_qm-space-2) + var(--_qm-column)) var(--_qm-space-3);
 		background: var(--_qm-tips-surface);
 		display: flex;
 		flex-direction: column;

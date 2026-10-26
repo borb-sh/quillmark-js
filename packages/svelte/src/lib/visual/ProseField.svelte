@@ -208,11 +208,6 @@
 	.qm-prose-block:not(.qm-control-box) {
 		font-size: var(--_qm-text-paper);
 	}
-	/* Paper's margin, which a field has none of. On the editable, so a press in the strip
-	 lands a caret; carried by the card's inset it would be dead width. */
-	.qm-prose-block:not(.qm-control-box) :global(.ProseMirror) {
-		padding-inline: var(--_qm-space-2);
-	}
 	/* The caret is the body's focus indicator: a ring around the one surface in a card
 	 that is paper reads as form chrome. So the contenteditable's own outline is dropped
 	 everywhere, and a boxed leaf takes the shared ring on its wrapper instead
