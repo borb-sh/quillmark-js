@@ -16,9 +16,9 @@ There are three depths to that. An app mounting into an unstyled page stops at t
 <VisualEditor {doc} {quill} />
 ```
 
-Nothing to import and nothing to set. The package pulls its own stylesheet, and each surface owns its whole **column**, not only the cards in it: the ground the stack sits on, the tone behind it, and (for the preview) the desk the painted sheet floats on. A bare `<div>` is a mounting site.
+Nothing to import and nothing to set. The package pulls its own stylesheet, and each surface owns its whole **column**, not only the cards in it: the gutter the stack sits in, the tone behind it, and (for the preview) the desk the painted sheet floats on. A bare `<div>` is a mounting site.
 
-**Mounting into a fixed-height pane**: pass `class="qm-pane"`. The surface becomes its own scroll container and takes a scroll tail, so the last card can be read at the middle of your pane rather than against its bottom edge. The cards run to the pane's edges, square and with no side stroke, and the gutter becomes a band of ground above the stack and between the cards: in a narrow pane the width a side gutter held goes to what is written. Without it the editor grows to its content and your page scrolls, which is what you want when the editor _is_ the page. The preview always scrolls: a viewport onto a document has nothing else to be.
+**Mounting into a fixed-height pane**: pass `class="qm-pane"`. The surface becomes its own scroll container and takes a scroll tail, so the last card can be read at the middle of your pane rather than against its bottom edge. The gutter around the cards narrows, since your frame already stands the stack off your page. Without it the editor grows to its content and your page scrolls, which is what you want when the editor _is_ the page. The preview always scrolls: a viewport onto a document has nothing else to be.
 
 `.qm-pane` is opt-in on the editor rather than the default because the editor is what its own popovers portal into, and a scroll container clips them. In a pane you would have had that clipping from your own scrolling frame anyway; in a page you should not have it at all.
 
@@ -45,7 +45,7 @@ The whole contract is **nine CSS custom properties**. They are dials, not a pale
 
 `--qm-bg` and `--qm-fg` are the two a themed host sets before any brand decision. Their defaults are a self-consistent neutral for a bare mounting site, not a guess at your page.
 
-`--qm-bg` is the **card**, not the column behind it: the plane a document is written on, which is also the sheet the preview paints. Everything else is a step off it, and the column the cards sit in is a step down, so a mounted editor draws its own ground and the cards read as islands on it. Under `.qm-pane` the cards are bands across the pane rather than islands on it, and the ground is what shows above and between them. Give it the tone you want a card to be — white, in most light themes — and let the column fall out. If you want the column to meet your page instead, set a `background` of your own on `.qm-editor`; any rule of yours wins.
+`--qm-bg` is the **card**, not the column behind it: the plane a document is written on, which is also the sheet the preview paints. Everything else is a step off it, and the column the cards sit in is a step down, so a mounted editor draws its own ground and the cards read as islands on it. Give it the tone you want a card to be — white, in most light themes — and let the column fall out. If you want the column to meet your page instead, set a `background` of your own on `.qm-editor`; any rule of yours wins.
 
 The poles take a colour, not `transparent` or `inherit`: the raised surfaces, the borders and the muted inks are each a `color-mix` against `--qm-bg`, so a transparent pole makes every one of them translucent instead of letting your page through. Hand over the value your page is painted with and the derivation steps off it.
 

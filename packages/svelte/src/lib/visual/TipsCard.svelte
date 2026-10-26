@@ -93,9 +93,9 @@
 	 paints over the rest. The two read as one block, which is what document-level
 	 guidance is: the main card's, not a card of its own. Still in-flow, no lift.
 
-	 No stroke of its own. A tint below the card reads as a slip; the same tint inside an
-	 outline reads as a second card, which is the one thing the tuck exists to deny. What
-	 shows below the seam is fill, and `main`'s hairline is the pair's only edge.
+	 No stroke, as `main` draws none: the pair's edge is where the two fills meet the
+	 ground. What shows below the seam is the slip's tint, a step off `main`'s plane, so it
+	 reads as a slip of the card rather than as a second card.
 
 	 The bottom corners take the inner rung where the card above takes the outer: a slip
 	 is cut crisper than the thing it is tucked under, at every setting of the dial.
@@ -109,14 +109,13 @@
 	 slack at each edge, and spent inside the gap that is enough to make the tightest space
 	 in the card measure as the widest.
 
-	 Across, the inset is `main`'s stroke and the two nested insets under it, the card's
-	 own and the prose control's, so the tip starts on the prose's edge rather than short
-	 of it. */
+	 Across, the inset is twice the card's block rung, so the tip's ink stands a step inside
+	 the body's. */
 	.qm-tips {
 		margin-top: calc(var(--_qm-radius) * -1);
 		border-radius: 0 0 var(--_qm-radius-inner) var(--_qm-radius-inner);
-		padding: calc(var(--_qm-space-3) + var(--_qm-radius))
-			calc(var(--_qm-border-width) + var(--_qm-space-3) * 2) var(--_qm-space-3);
+		padding: calc(var(--_qm-space-3) + var(--_qm-radius)) calc(var(--_qm-space-3) * 2)
+			var(--_qm-space-3);
 		background: var(--_qm-tips-surface);
 		display: flex;
 		flex-direction: column;
@@ -125,16 +124,6 @@
 		font-size: var(--_qm-text-body);
 		line-height: var(--_qm-leading-body);
 		color: var(--_qm-tips-ink);
-	}
-	/* Under a pane `main` is square, so there are no corners to fill and no tuck: the
-	 slip starts at `main`'s bottom hairline, which is still the pair's only edge, and
-	 runs to the pane's edges as `main` does. The insets hold their ink where the tuck
-	 had it, the radius it pulled up by no longer standing under `main`, and the inline
-	 one loses `main`'s side stroke, which a pane card does not draw. */
-	:global(:where(.qm-editor.qm-pane)) .qm-tips {
-		margin-top: 0;
-		border-radius: 0;
-		padding: var(--_qm-space-3) calc(var(--_qm-space-3) * 2);
 	}
 	/* One line held open, so the foot does not step up under a shorter tip. */
 	.qm-tips-body {

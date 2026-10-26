@@ -428,32 +428,21 @@
 {/snippet}
 
 <style>
-	/* An island: the card is the base plane, the column behind it the sunken one, and the
-	 hairline closes it (ARCHITECTURE §Styling). The block half is the same rung as the
+	/* An island: the card is the base plane and the column behind it the sunken one, and
+	 the step between the two tones is the whole of its edge (ARCHITECTURE §"A plane is a
+	 tone"). The block half is the same rung as the
 	 gap: the payload stands that far off the card's edge and off the body below it. The
 	 header insets itself to the section-heading column (`.qm-card-header`). The inline
 	 half stands a step tighter than the nesting rung the verticals inside keep: this
 	 edge closes the block rather than nesting one, and the rules it holds run that much
 	 further for it. */
 	.qm-card {
-		border: var(--_qm-border-width) solid var(--_qm-border);
 		border-radius: var(--_qm-radius);
 		padding: var(--_qm-space-3) var(--_qm-space-2);
 		background: var(--_qm-surface);
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space-3);
-	}
-	/* Under a pane, a band of the pane rather than an island on it: the card runs to
-	 both of the pane's edges, where a side stroke would draw a line along the host's
-	 frame and a corner would cut a notch out of the column. The block hairlines stay,
-	 being what tells one card from the next across the band (`.qm-editor.qm-pane`).
-	 The inline inset rises to the block one: with no ground beside it, the card's edge
-	 is the pane's, and the island's tighter step reads as text crowding a frame. */
-	:global(:where(.qm-editor.qm-pane)) .qm-card {
-		border-inline: none;
-		border-radius: 0;
-		padding-inline: var(--_qm-space-3);
 	}
 	/* Headerless, the payload faces that edge with nothing between. A field row
 	 leading it stands the edge's own inset off the top, as it does off the side:
@@ -463,19 +452,11 @@
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child) {
 		padding-top: var(--_qm-space);
 	}
-	:global(:where(.qm-editor.qm-pane))
-		.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child) {
-		padding-top: var(--_qm-space-2);
-	}
 	/* A section heading leading it: the vertical starts at the content's
 	 top-left, so the top inset is the inline one and the tip is a square
 	 corner of the card. */
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child > .qm-groups:first-child) {
 		padding-top: var(--_qm-space-2);
-	}
-	:global(:where(.qm-editor.qm-pane))
-		.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child > .qm-groups:first-child) {
-		padding-top: var(--_qm-space-3);
 	}
 	.qm-card-header {
 		display: flex;
@@ -484,7 +465,7 @@
 		gap: var(--_qm-space-2);
 		/* The group's vertical plus the rung the chevron stands off it: the title
 		 shares that column. Inline only. The block pull is half the card's block
-		 inset, so the header sits that far off the hairline and the rule. */
+		 inset, so the header sits that far off the card's edge and the rule. */
 		padding-inline: calc(var(--_qm-space) + var(--_qm-vertical-width));
 		margin-block: calc(-1 * var(--_qm-space-3) / 2);
 	}
@@ -641,8 +622,8 @@
 	}
 	/* The nesting vertical, one `--_qm-nest` in from the card's edge with the panel's
 	 fields the same rung off it (ARCHITECTURE §"A plane is a tone"). `--_qm-border` and
-	 not `--_qm-accent`: a card's edge and the verticals inside it are one stroke at three
-	 depths, and a tone that changed as it went in would read as unrelated lines rather
+	 not `--_qm-accent`: the verticals and the rules beside them are one stroke at every
+	 depth, and a tone that changed as it went in would read as unrelated lines rather
 	 than one figure. A named section is what earns it, which is why the ungrouped block
 	 above draws none.
 
@@ -811,9 +792,10 @@
 		flex-direction: column;
 		gap: var(--_qm-space);
 	}
-	/* The state is in the stroke's pattern, every card being closed by one already. */
+	/* The one card that draws an edge, and the edge is the state: a dashed stroke is the
+	 placeholder idiom, which a card the schema cannot project is. */
 	.qm-card.qm-unschemable {
-		border-style: dashed;
+		border: var(--_qm-border-width) dashed var(--_qm-border);
 	}
 	/* One typographic role with the editable title above. */
 	.qm-card-title-static {

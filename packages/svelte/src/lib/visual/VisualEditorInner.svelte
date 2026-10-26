@@ -1057,9 +1057,7 @@
 	   than as more card (ARCHITECTURE §Styling). The inset is the widest rung on the
 	   ramp, which is what gives the ground enough of itself to read as ground: at a
 	   narrower one the stack meets whatever frames the surface and the islands are
-	   back to being one block clipped at its edges. That is the page form, where the
-	   page around the surface is ground too; a pane spends the ground otherwise
-	   (`.qm-pane` below). */
+	   back to being one block clipped at its edges. */
 	:global(:where(.qm-editor)) {
 		box-sizing: border-box;
 		display: flex;
@@ -1094,19 +1092,16 @@
 	   shrink to fit: a flex item's automatic minimum floors each at its own height, so
 	   the stack overflows and scrolls rather than squashing.
 
-	   A pane is the narrow case and its frame is the host's, so the ground goes where
-	   it still separates something: a band above the stack and one between cards,
-	   none at the sides. The cards run to the pane's edges (`Card.svelte`), and the
-	   width a side gutter held goes to what is written in them. The band is the
-	   card's own block inset, one rung under the page form's seam: between square
-	   cards it is the only ground left, and at the wider rung the stack reads looser
-	   than a column of one document. */
+	   A pane is where the host has already framed the surface, so the ground needs less
+	   of itself to read as ground: the frame is what the stack would otherwise meet. The
+	   inset steps in from the page form's to half a rung under the seam the add strip
+	   holds between cards, and the width it gives back goes to what is written. */
 	:global(:where(.qm-editor.qm-pane)) {
 		height: 100%;
 		overflow: auto;
 		overscroll-behavior: contain;
-		gap: var(--_qm-space-3);
-		padding: var(--_qm-space-3) 0 var(--_qm-tail);
+		padding: calc(var(--_qm-space-3) + var(--_qm-space-half));
+		padding-block-end: var(--_qm-tail);
 	}
 	/* The stack's one gapless seam, which `TipsCard` draws and this holds the two
 	 blocks to. `main` has to paint over the tip: a later sibling paints over an earlier
@@ -1130,9 +1125,6 @@
 		flex-direction: column;
 		gap: var(--_qm-space-2);
 	}
-	:global(:where(.qm-editor.qm-pane)) .qm-card-slot {
-		gap: var(--_qm-space-3);
-	}
 	/* The strip between two blocks, and the whole of it is the target: a gap is found by
 	 position, so reveal and hit region are the full-bleed row rather than a word to aim
 	 at in the middle of it. Taking the editor's gap back on both sides is what makes it
@@ -1146,9 +1138,6 @@
 		display: flex;
 		margin-top: calc(var(--_qm-space-2) * -1);
 		margin-bottom: calc(var(--_qm-space-2) * -1);
-	}
-	:global(:where(.qm-editor.qm-pane)) .qm-add-card {
-		margin-block: calc(var(--_qm-space-3) * -1);
 	}
 	/* Unboxed, like every button, and not dashed: a dashed edge is the placeholder idiom
 	 ("nothing is here yet"), which on a button reads as disabled or as a drop target. It
@@ -1210,29 +1199,5 @@
 		transition:
 			opacity var(--_qm-reveal),
 			background-color var(--_qm-reveal);
-	}
-	/* Under a pane the band is a rung narrower than the pill, and the pill keeps its
-	   height: what it holds is the glyph, which a narrower band would shrink to a speck.
-	   So the band stays the strip and the whole target, and the pill gives the
-	   difference back as margin, overhanging each card by half of it. Above the cards,
-	   which paint later and would cover the overhang below it.
-
-	   Crossing a card's hairline, the fill alone would read as a smudge on two planes at
-	   once, so the pill draws as a plane of its own: the card's surface with the fill
-	   over it, and the hairline a card closes with. */
-	:global(:where(.qm-editor.qm-pane)) .qm-add-card:not(.qm-add-card-marked) :global(.qm-add-btn) {
-		z-index: 1;
-		margin-block: calc((var(--_qm-space-3) - var(--_qm-space-4)) / 2);
-	}
-	:global(:where(.qm-editor.qm-pane))
-		.qm-add-card:not(.qm-add-card-marked)
-		:global(.qm-add-btn:is(:hover, :focus-visible, [data-state='open'])) {
-		background: linear-gradient(var(--_qm-add-fill), var(--_qm-add-fill)) var(--_qm-surface);
-		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-border);
-	}
-	/* Every strip under a pane spans it, so a ring drawn outside the pill is cut at both
-	   ends by the pane's clip: it draws inside instead. */
-	:global(:where(.qm-editor.qm-pane)) .qm-add-card :global(.qm-add-btn) {
-		outline-offset: calc(var(--_qm-ring-width) * -1);
 	}
 </style>

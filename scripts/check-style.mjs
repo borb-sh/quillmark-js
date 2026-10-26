@@ -27,8 +27,7 @@
 //     beats ours"). The same rank holds over the contract classes wherever a component
 //     draws one, Svelte's scoping class otherwise outranking the bare class a consumer is
 //     told to write, and over the preset's shell and app chrome, whose sheets are listed
-//     as `zero` on their scope. A contract class at zero rank on an ancestor is a
-//     condition on the element a rule draws, not a draw of its own.
+//     as `zero` on their scope.
 //   · Every `--qm-*` dial a surface consumes is documented in THEMING.md, and every
 //     `.qm-*` class the doc promises is carried by something in `src/` — the halves a
 //     consumer is hurt by. The reverse halves warn, so prose may run ahead of code.
@@ -299,20 +298,6 @@ function weighs(sel) {
 	return /#[\w-]+|\.[\w-]+|\[[^\]]*\]|:[\w-]+/.test(bare);
 }
 
-/** The compound a selector draws: its last, past every combinator outside a group. What
- *  stands before it is a condition on an ancestor, and weighs on that ancestor nothing. */
-function subject(sel) {
-	let depth = 0;
-	let start = 0;
-	for (let i = 0; i < sel.length; i++) {
-		const c = sel[i];
-		if (c === '(' || c === '[') depth++;
-		else if (c === ')' || c === ']') depth--;
-		else if (depth === 0 && /[\s>+~]/.test(c)) start = i + 1;
-	}
-	return sel.slice(start);
-}
-
 /** Every selector a rule states, at the line it sits on. A `@keyframes` child states an
  *  offset rather than a selector, so its rules are skipped. */
 function* selectorsOf(root) {
@@ -474,11 +459,7 @@ for (const scope of SCOPES) {
 				errors.push(
 					`${rel}:${at(line)}: \`${sel}\` weighs outside \`:where()\` — a consumer's own rule has to outrank it`
 				);
-			else if (
-				[unwrap(sel), subject(sel)].some((part) =>
-					[...part.matchAll(CLASS_IN_SRC)].some((m) => SURFACE_CONTRACT.includes(m[0]))
-				)
-			)
+			else if ([...sel.matchAll(CLASS_IN_SRC)].some((m) => SURFACE_CONTRACT.includes(m[0])))
 				errors.push(
 					`${rel}:${at(line)}: \`${sel}\` weighs on a surface's contract class — ` +
 						`wrap it \`:global(:where(…))\` so a consumer's own rule wins`

@@ -4,7 +4,9 @@
 
 ## Unreleased
 
-**Under `.qm-pane` the editor's cards run to the pane's edges.** A card in a pane is square, draws no side stroke and insets its content by 12px rather than 8px, and the ground is a 12px band above the stack and between the cards, where a 20px gutter stood on every side. A 400px pane writes a 362px memo body, where it wrote 328px. The add strip is the band, and its pill keeps its height and overhangs each card by 2px on hover. A page-mounted editor keeps its gutter and its rounded cards.
+**Cards draw no border.** A card is told from the ground by its tone alone, in every mount; the un-schemable card keeps its dashed edge, now the only edge a card draws. The body of a 400px pane gains 2px.
+
+**Under `.qm-pane` the editor's gutter is 14px**, where it was 20px. With the borders gone, a 400px pane writes a 342px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
 
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
