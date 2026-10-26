@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { splitBlock } from 'prosemirror-commands';
 import { undo } from 'prosemirror-history';
-import { Selection, TextSelection } from 'prosemirror-state';
+import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { Content, ContentContainer, Document } from '@quillmark/wasm';
 import {
@@ -197,6 +197,15 @@ describe('Mod-Enter in a body', () => {
 			[true],
 			[true, undefined]
 		]);
+	});
+
+	it('on a selected task item ticks that item, not the one around it', () => {
+		const state = endOf('- [ ] parent\n  - [ ] child', 1);
+		const child = state.selection.$from.before(-1);
+		const selected = state.apply(state.tr.setSelection(NodeSelection.create(state.doc, child)));
+		expect(
+			items(pmToContent(press(selected, 'Mod-Enter').doc)).map((p) => p.map((a) => a.checked))
+		).toEqual([[false], [false, true]]);
 	});
 
 	it('declines outside a task item', () => {
