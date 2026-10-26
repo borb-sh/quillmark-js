@@ -48,7 +48,6 @@
 			<button
 				class="qm-control"
 				type="button"
-				aria-label="Close"
 				onclick={(e) => e.currentTarget.closest('dialog')?.close()}>Close</button
 			>
 		</header>
