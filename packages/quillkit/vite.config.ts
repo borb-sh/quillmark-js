@@ -3,6 +3,7 @@ import { build } from '@quillmark/quiver/node';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 import { carried } from '../../scripts/carried.mjs';
+import { CSS_TARGET } from '../../scripts/css-target.mjs';
 
 // The client half of this package, built. `client/` is the browser's tree and `src/` is
 // the bin's; the two share a manifest and a `dist`, and meet nowhere else: the tool
@@ -129,7 +130,7 @@ export default defineConfig({
 	// so a public directory left behind by a dev run cannot ride into it. `emptyOutDir`
 	// is explicit because the target sits outside the root, and it clears the client's
 	// own directory rather than the `dist` it shares with the bin.
-	build: { outDir: DIST, emptyOutDir: true, copyPublicDir: false },
+	build: { outDir: DIST, emptyOutDir: true, copyPublicDir: false, cssTarget: CSS_TARGET },
 	define: { __CARRIED__: JSON.stringify(CARRIED) },
 	// @quillmark/wasm ships wasm-bindgen's web target: no `.wasm` import and no
 	// top-level await, so a static import is safe and Vite resolves it unaided.
