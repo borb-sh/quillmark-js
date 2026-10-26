@@ -487,7 +487,7 @@
 	 itself, which a two-state button has no third face for. */
 	.qm-format-divider {
 		align-self: stretch;
-		width: 1px;
+		width: var(--_qm-border-width);
 		margin: var(--_qm-space-half) 0;
 		background: var(--_qm-rule);
 	}

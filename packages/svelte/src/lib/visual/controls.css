@@ -339,9 +339,14 @@
  over content the surface did not choose, so there is no plane under it for a
  tone to step off (ARCHITECTURE §Styling). The edge and `--_qm-lift` carry it
  there, and the raised rung joins them in dark, where a tone still has somewhere
- to go. */
+ to go.
+
+ The inset is the difference between the two radii, `--_qm-space` between the
+ surface's `--_qm-radius` and the item's `--_qm-radius-inner`, so a highlighted
+ item's corners run concentric with the surface's. It is the format popover's inset
+ too: every floating surface holds its contents one rung in. */
 :where(.qm-menu-surface) {
-	padding: var(--_qm-space-half);
+	padding: var(--_qm-space);
 	border: var(--_qm-border-width) solid var(--_qm-border);
 	border-radius: var(--_qm-radius);
 	background: var(--_qm-surface-raised);
