@@ -8,6 +8,8 @@
 
 **Under `.qm-pane` the editor's gutter is 16px**, where it was 20px, the width of the seam between cards, so the ground is one width all round the stack. With the borders gone, a 400px pane writes a 338px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
 
+**Floating surfaces share one inset and one radius.** The enum listbox, the card stack's kind menu and the slash menu hold their items 4px in from the surface's edge, where they held them 2px in, so a highlighted item's corners run concentric with the surface's. The table's alignment cluster takes the format popover's geometry, the card's radius and a 4px inset, and stands 34px tall where it stood 26px.
+
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
 ## v0.27.0 - 2026-10-26
