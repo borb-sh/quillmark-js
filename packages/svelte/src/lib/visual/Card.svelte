@@ -434,7 +434,11 @@
 	 the card's edge and off the body below it. The header insets itself to the
 	 section-heading column (`.qm-card-header`). The inline half stands a step tighter
 	 than the nesting rung the verticals inside keep: this edge closes the block rather
-	 than nesting one, and the rules it holds run that much further for it. */
+	 than nesting one, and the rules it holds run that much further for it.
+
+	 Inside that inset is the card's one text column (`--_qm-column`): the title, a
+	 top-level field, the body's lines, the recovery note and the delete glyph's far edge
+	 all stand on it, so the card reads as one measure at both ends. */
 	.qm-card {
 		border-radius: var(--_qm-radius);
 		padding: var(--_qm-space-3) var(--_qm-space-2);
@@ -462,10 +466,9 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--_qm-space-2);
-		/* The group's vertical plus the rung the chevron stands off it: the title
-		 shares that column. Inline only. The block pull is half the card's block
-		 inset, so the header sits that far off the card's edge and the rule. */
-		padding-inline: calc(var(--_qm-space) + var(--_qm-vertical-width));
+		/* On the column, inline only. The block pull is half the card's block inset,
+		 so the header sits that far off the card's edge and the rule. */
+		padding-inline: var(--_qm-column);
 		margin-block: calc(-1 * var(--_qm-space-3) / 2);
 	}
 	.qm-card-header-right {
@@ -590,11 +593,10 @@
 	 vertical those two edges hold.
 
 	 No stroke: a vertical would mark a section a reader has no name for. The start
-	 inset is the heading's — the group's vertical plus the rung the chevron stands
-	 off it — so a top-level field and a section heading share a column. */
+	 inset is the column, so a top-level field and a section heading share it. */
 	.qm-section {
 		padding-block: var(--_qm-space);
-		padding-inline-start: calc(var(--_qm-space) + var(--_qm-vertical-width));
+		padding-inline-start: var(--_qm-column);
 	}
 	/* Where it faces a rule, the rung a heading already stands off one. The fields
 	 sit on the heading column, not the card's edge. */
@@ -791,6 +793,13 @@
 		flex-direction: column;
 		gap: var(--_qm-space);
 	}
+	/* Paper's margin is the column. On the editable, so a press in the strip lands a
+	 caret; carried by the leaf's inset it would be dead width. The diagnostics under the
+	 body start where its lines do, as a field's start under its well. */
+	.qm-body-leaf :global(.ProseMirror),
+	.qm-body-leaf > :global(.qm-diag-list) {
+		padding-inline: var(--_qm-column);
+	}
 	/* The one card that draws an edge, and the edge is the state: a dashed stroke is the
 	 placeholder idiom, which a card the schema cannot project is. */
 	.qm-card.qm-unschemable {
@@ -807,6 +816,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space-2);
+		padding-inline: var(--_qm-column);
 	}
 	.qm-recovery-note {
 		margin: 0;
@@ -820,9 +830,11 @@
 		font-size: var(--_qm-text-label);
 		color: var(--_qm-ink-label);
 	}
-	/* The one native control the surface draws, on the box's own recipe (controls.css). */
+	/* The one native control the surface draws, on the box's own recipe (controls.css).
+	 `font` carries no colour, so the value's ink is restated over the UA's. */
 	.qm-recovery-retype select {
 		font: inherit;
+		color: var(--_qm-ink);
 		border: none;
 		border-radius: var(--_qm-radius-inner);
 		background: var(--_qm-surface-well);

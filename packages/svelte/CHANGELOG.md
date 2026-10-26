@@ -8,6 +8,8 @@
 
 **Under `.qm-pane` the editor's gutter is 16px**, where it was 20px, the width of the seam between cards, so the ground is one width all round the stack. With the borders gone, a 400px pane writes a 338px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
 
+**A card's text stands on one column at both ends.** The body's lines and the un-schemable card's note start where the title and the field labels do, where the body stood 2.5px further in and the note 5.5px further out, and the body gains 5px of measure. The tips slip starts on that column too and ends where a card's delete glyph does, where it stood a further 10.5px in, and takes the card's own corners, so the pair has the silhouette every card has. The un-schemable card's type picker draws its value in the surface's ink rather than the browser's.
+
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
 ## v0.27.0 - 2026-10-26
