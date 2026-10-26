@@ -49,9 +49,7 @@
 	}
 
 	.ask::backdrop {
-		/* mint: a scrim is a tone between two planes, and the host scale carries no
-		   opacity rung, as studio's source panel says of its own. */
-		background: color-mix(in srgb, var(--qmh-page) 80%, transparent);
+		background: var(--qmh-scrim);
 	}
 
 	.plate {

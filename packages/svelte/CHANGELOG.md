@@ -8,6 +8,10 @@
 
 **Under `.qm-pane` the editor's gutter is 16px**, where it was 20px, the width of the seam between cards, so the ground is one width all round the stack. With the borders gone, a 400px pane writes a 338px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
 
+**The preset's host scale defaults to the surfaces' own poles**, `#fff`/`#1c1c1c` and `#272729`/`#d7dadc`, where it fell back to `Canvas`/`CanvasText`. At the dark pole a page that turns no dial meets the editor's ground and the preview's desk at one tone, where it sat near-black around them; at the light pole host ink is `#1c1c1c` where it was black. `--qmh-ink-meta` takes the surfaces' label figure (35%) and `--qmh-border-strong` steps half way to the ink, so each still clears its contrast floor against the new poles. `--qmh-scrim` is the backdrop a host's modal lays over the page.
+
+**A hover steps off whatever plane it lands on**: `--_qm-surface-hover` is the ink at 8% laid translucent, where it was one tone off the card. At the dark pole a button in the selection popover and an option in a table's alignment cluster drew no hover, the fixed tone sitting level with the raised plane under them.
+
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
 ## v0.27.0 - 2026-10-26

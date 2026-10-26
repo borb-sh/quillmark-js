@@ -277,10 +277,8 @@ li.ProseMirror-selectednode::after {
 /* Six levels, one weight, no size step. The quill reads no level at all, so a size
    ramp here would be the editor predicting a hierarchy the paper does not set; the
    level stays in the model, which is where the codec round-trips it. It is also all
-   the ramp could carry: this leaf renders at `--_qm-text-paper` and the next rung up
-   is `--_qm-text-title`, a chrome rung a heading inside a document has no business
-   reading. Six levels do not fit in the gap, and
-   minting five more is the drift the scale exists to prevent. */
+   the ramp could carry: this leaf renders at `--_qm-text-paper`, the top of the ramp,
+   and minting six more is the drift the scale exists to prevent. */
 .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
 	font-size: inherit;
 	font-weight: var(--_qm-weight-strong);
