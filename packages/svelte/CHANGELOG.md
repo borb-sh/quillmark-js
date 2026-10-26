@@ -6,7 +6,7 @@
 
 **Cards draw no border.** A card is told from the ground by its tone alone, in every mount; the un-schemable card keeps its dashed edge, now the only edge a card draws. The body of a 400px pane gains 2px.
 
-**Under `.qm-pane` the editor's ground is 14px wide everywhere**: the gutter round the cards, where it was 20px, and the seam between them and the add strip that fills it, where they were 16px. With the borders gone, a 400px pane writes a 342px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
+**Under `.qm-pane` the editor's gutter is 16px**, where it was 20px, the width of the seam between cards, so the ground is one width all round the stack. With the borders gone, a 400px pane writes a 338px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
 
 **`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
 
