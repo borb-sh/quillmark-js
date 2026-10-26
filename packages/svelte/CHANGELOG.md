@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
+
 ## v0.27.0 - 2026-10-26
 
 **Zooming the preview stops at the pane-width fit as it stops at 100%, and landing there is the default again**: Ctrl/⌘-wheel and pinch hold at it, `Mod +`/`−` step to it, and from there the page follows a dragged divider and the zoom pill goes, where zooming back past the fit left the page at a fixed size the divider no longer moved.

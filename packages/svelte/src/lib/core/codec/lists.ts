@@ -29,7 +29,7 @@ import { canJoin, findWrapping, liftTarget } from 'prosemirror-transform';
 import { chainCommands, joinTextblockBackward, joinTextblockForward } from 'prosemirror-commands';
 import { withinNesting } from './nesting.js';
 import { toggleList } from './list-toggle.js';
-import { splitTaskItem } from './tasks.js';
+import { splitTaskItem, toggleTask } from './tasks.js';
 import { joinAll, joinLists, touching } from './touching.js';
 
 /** The caret's enclosing `list_item` when it sits at the very start of that item's
@@ -498,6 +498,8 @@ function sinkIntoList(itemType: NodeType): Command {
  * `Tab` sinks an unnumbered line alone into a sub-list, any other line its whole item,
  * and a block right after a list into the list's last item.
  *
+ * `Mod-Enter` ticks or unticks the task item around the caret (`toggleTask`).
+ *
  * `Enter` is a chain in precedence order: the empty line above an unnumbered one, the
  * marker off an empty middle item and back on an empty continuation line, then `splitListItem`
  * (`splitTaskItem`, which leaves a task item's new half an open task), then
@@ -523,6 +525,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 		'Mod-Shift-8': toggleList(false),
 		Tab: chainCommands(sinkLine(itemType), sinkWithin(itemType), sinkIntoList(itemType)),
 		'Shift-Tab': outdent(itemType),
+		'Mod-Enter': toggleTask(itemType),
 		Enter: chainCommands(
 			lineAbove(itemType, paragraph),
 			continueAbove(itemType),
