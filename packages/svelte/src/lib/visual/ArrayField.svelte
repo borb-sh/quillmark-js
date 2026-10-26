@@ -1261,6 +1261,17 @@
 		border-radius: var(--_qm-radius-inner);
 		color: var(--_qm-ink-label);
 	}
+	/* The pad past the slab, flat: the plane's spread above rounds with the slab's
+	 corners, and a cell scrolled under them shows through at the clip. */
+	.qm-array-table-row > .qm-remove::after,
+	.qm-array-table-head-end::after {
+		content: '';
+		position: absolute;
+		inset-block: calc(-1 * var(--_qm-ring-reach));
+		inset-inline-start: 100%;
+		width: var(--_qm-ring-reach);
+		background: var(--_qm-surface);
+	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so
 	 the two read as one register. Inner radius: the chip family is the card's, and this
 	 box is a line of type. The chip's tap floor is given back (`.qm-tap-floor`),
