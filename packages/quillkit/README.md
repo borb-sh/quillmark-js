@@ -13,7 +13,7 @@ npm install
 npx quillkit serve --open
 ```
 
-`init` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`, `example.md`), and a `package.json` whose one devDependency is quillkit. The quill passes `quillkit check` as laid; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
+`init` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`, `example.md`), and a `package.json` whose one devDependency is quillkit. The quill passes `quillkit check` and builds into an app as laid, declaring `CC0-1.0` as its `license` until you name your own; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
 
 `@latest` names the release outright. An unversioned `npx quillkit` takes the newest release whose `engines` admits the running Node.
 
@@ -37,12 +37,12 @@ Every verb runs over the quiver in the working directory. A verb's argument is a
 | `quillkit build [target]` | lay the target's deploy into `dist/`                                  |
 | `quillkit preview`        | serve the build in `dist/` the way a static host will                 |
 
-| Flag                | Verbs              |                                                   |
-| ------------------- | ------------------ | ------------------------------------------------- |
-| `-D`, `--drafts`    | `check`, `build`   | admit versions below `0.1.0`; `serve` always does |
-| `-o`, `--out <dir>` | `build`, `preview` | the deploy directory, `dist` by default           |
-| `-p`, `--port <n>`  | `serve`, `preview` | `5174` for `serve`, `4174` for `preview`          |
-| `--open`            | `serve`, `preview` | open the page in your browser                     |
+| Flag                | Verbs              |                                                                                                                                                     |
+| ------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-D`, `--drafts`    | `build`, `check`   | admit versions below `0.1.0` to the deploy, or to the app `check` resolves; `check` renders every version either way, and `serve` always packs them |
+| `-o`, `--out <dir>` | `build`, `preview` | the deploy directory, `dist` by default                                                                                                             |
+| `-p`, `--port <n>`  | `serve`, `preview` | `5174` for `serve`, `4174` for `preview`                                                                                                            |
+| `--open`            | `serve`, `preview` | open the page in your browser                                                                                                                       |
 
 A verb refuses a flag it does not take.
 
@@ -57,7 +57,7 @@ A verb refuses a flag it does not take.
 }
 ```
 
-It loads the quiver, then renders every quill's seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill, and so does any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is yours to fix. With an `App.yaml` or an `app.css`, the app they describe resolves too, so an unknown key or a `url()` naming no file fails here before it fails a deploy.
+It loads the quiver, then renders every version of every quill, drafts included: its seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill, and so does any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is yours to fix. With an `App.yaml` or an `app.css`, the app they describe resolves too, so an unknown key or a `url()` naming no file fails here before it fails a deploy.
 
 On vitest, jest or `node:test`, spawn the bin rather than rebuilding the loop against the library. The gate stays one implementation, and the case gates what CI gates:
 

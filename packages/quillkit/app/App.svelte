@@ -58,6 +58,8 @@
 	const QUILLMARK = __CARRIED__['@quillmark/wasm'];
 	const CANT_RENDER = "This form can't render right now.";
 	const CANT_LOAD = "This app can't load right now.";
+	const CANT_OPEN = "This document can't open right now.";
+	const GONE = 'This document was made with a form this app no longer has.';
 	const FIX_FIELDS = 'Some answers need fixing before the page can update.';
 
 	/** The document on screen and what it was opened on. */
@@ -83,8 +85,10 @@
 	let failed = $state.raw<string | undefined>();
 	let open = $state.raw<Open | undefined>();
 	let session = $state.raw<LiveSession | undefined>();
-	/** A document whose form this build cannot open, kept as its record. */
+	/** A document that would not open, kept as its record. */
 	let unopenable = $state.raw<DocRecord | undefined>();
+	/** Whether that is because the pack no longer holds its pin. */
+	let gone = $state.raw(false);
 	/** Whether the landing is up: several quills, and no document chosen. */
 	let choosing = $state.raw(false);
 	let keeps = $state.raw(false);
@@ -133,6 +137,10 @@
 	let turn = 0;
 	/** The session being opened, which a download waits on. */
 	let opening: Promise<void> | undefined;
+	/** The document an open is in flight for, and whether an edit has moved it since that
+	 *  open read it. */
+	let attaching: Open | undefined;
+	let behind = false;
 
 	/** Take down what is mounted. The surfaces go first: a live preview paints from the
 	 *  session it was handed, so freeing it under them would hand them a freed handle. */
@@ -165,6 +173,8 @@
 
 	async function attach(at: Open): Promise<void> {
 		engine ??= new Engine();
+		attaching = at;
+		behind = false;
 		try {
 			const opened = await engine.open(at.quill, at.doc);
 			if (open !== at) return opened.free();
@@ -173,7 +183,10 @@
 		} catch (err) {
 			if (open !== at) return;
 			thrown = diagnosticsOf(err);
+		} finally {
+			if (attaching === at) attaching = undefined;
 		}
+		if (behind) return recompileNow();
 		syncNotes();
 	}
 
@@ -182,6 +195,13 @@
 	function fail(err: unknown): void {
 		console.error(err);
 		failed = CANT_LOAD;
+	}
+
+	/** A document that would not open, shown as its record, which still downloads. */
+	function standAsRecord(record: DocRecord): void {
+		unopenable = record;
+		gone = standing(record.quill, app, quiver!) === 'missing';
+		choosing = false;
 	}
 
 	const labelOf = (ref: string): string =>
@@ -203,17 +223,13 @@
 		}
 	}
 
-	/** A kept document, on the pin it was made on. One whose pin this build cannot open
-	 *  stands as its record, with its markdown and the latest form offered. */
+	/** A kept document, on the pin it was made on. One that will not open stands as its
+	 *  record, with its markdown and the latest form offered. */
 	async function resume(record: DocRecord): Promise<void> {
 		const mine = ++turn;
 		await unmount();
 		void store?.setOpened(record.id);
-		if (standing(record.quill, app, quiver!) === 'missing') {
-			unopenable = record;
-			choosing = false;
-			return;
-		}
+		if (standing(record.quill, app, quiver!) === 'missing') return standAsRecord(record);
 		try {
 			const quill = await quiver!.getQuill(record.quill);
 			if (mine !== turn) return;
@@ -222,10 +238,10 @@
 				{ id: record.id, ref: record.quill, label: labelOf(record.quill), quill, doc, kept: true },
 				landed
 			);
-		} catch {
+		} catch (err) {
 			if (mine === turn) {
-				unopenable = record;
-				choosing = false;
+				console.error(err);
+				standAsRecord(record);
 			}
 		}
 	}
@@ -290,6 +306,9 @@
 				thrown = diagnosticsOf(err);
 			}
 			syncNotes();
+		} else if (attaching === at) {
+			// The open in flight read the document before this edit, which applies once it lands.
+			behind = true;
 		} else if (thrown.length) {
 			// The last open was refused, and this edit may be what answers it.
 			opening = attach(at);
@@ -362,7 +381,7 @@
 	// ── Retired pins ────────────────────────────────────────────────────────────
 	/** Move the document on screen onto the latest form, in place: same record, the latest
 	 *  pin, what the move stranded named on its fields. The dialog that calls this offered
-	 *  the markdown first. */
+	 *  the markdown first, and a move that does not land leaves the record on its own pin. */
 	async function update(): Promise<void> {
 		asking = false;
 		const record = current();
@@ -379,7 +398,10 @@
 			void store?.setOpened(record.id);
 			await mount(next, landed);
 		} catch (err) {
-			if (mine === turn) fail(err);
+			if (mine === turn) {
+				console.error(err);
+				standAsRecord(record);
+			}
 		}
 	}
 
@@ -479,12 +501,12 @@
 		{:else if unopenable}
 			{@const latest = latestFor(unopenable.quill, app)}
 			<div class="vacant" data-testid="unopenable">
-				<p>This document was made with a form this app no longer has.</p>
+				<p>{gone ? GONE : CANT_OPEN}</p>
 				<div class="qm-bar">
 					<button class="qm-control" type="button" onclick={() => downloadMarkdown(unopenable!)}
 						>Download .md</button
 					>
-					{#if latest}
+					{#if latest && latest.ref !== unopenable.quill}
 						<button class="qm-app-primary" type="button" onclick={() => (asking = true)}
 							>Update to the latest form</button
 						>

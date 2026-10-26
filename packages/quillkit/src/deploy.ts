@@ -6,7 +6,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { cp, rm } from 'node:fs/promises';
+import { cp, mkdir, rename, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { build as pack, fromDir } from '@quillmark/quiver/node';
 import { prepareApp, writeApp } from './app-files.js';
@@ -88,10 +88,19 @@ export async function layOut({
 	const at = resolve(out);
 	const prepared =
 		target === 'app' ? await prepareApp(root, await fromDir(root), drafts) : undefined;
+	// Packed beside the out and moved in after the clear, so a quiver the packer refuses
+	// leaves the last deploy standing.
+	const packed = `${at}.quiver`;
+	await pack(root, packed, { drafts });
 
-	await rm(at, { recursive: true, force: true });
-	if (client !== undefined) await cp(client, at, { recursive: true });
-	await pack(root, join(at, 'quiver'), { drafts });
-	if (prepared) await writeApp(prepared, root, at);
+	try {
+		await rm(at, { recursive: true, force: true });
+		await mkdir(at, { recursive: true });
+		if (client !== undefined) await cp(client, at, { recursive: true });
+		await rename(packed, join(at, 'quiver'));
+		if (prepared) await writeApp(prepared, root, at);
+	} finally {
+		await rm(packed, { recursive: true, force: true });
+	}
 	return { at, warnings: prepared?.warnings ?? [] };
 }

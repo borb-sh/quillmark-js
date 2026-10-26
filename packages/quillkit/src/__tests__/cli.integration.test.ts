@@ -152,7 +152,8 @@ describe('quillkit init', () => {
 			const { stdout } = await run(process.execPath, [BIN, 'check'], { cwd: at });
 			expect(stdout).toContain('pass  letter@0.1.0 (seed, example)');
 
-			await run(process.execPath, [BIN, 'build', 'app'], { cwd: at });
+			const built = await run(process.execPath, [BIN, 'build', 'app'], { cwd: at });
+			expect(built.stderr).not.toMatch(/^warn/m);
 			const app = JSON.parse(await readFile(join(at, 'dist', APP_JSON), 'utf8'));
 			expect(app.quills.map((q: { ref: string }) => q.ref)).toEqual(['letter@0.1.0']);
 		},

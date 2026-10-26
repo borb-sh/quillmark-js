@@ -205,6 +205,25 @@ describe('owning the output', () => {
 		expect(existsSync(join(out, 'keep.txt'))).toBe(true);
 	});
 
+	it('refuses a quiver the packer refuses before it deletes, for every target', async () => {
+		const root = await temp.collection();
+		const out = join(await temp.dir(), 'dist');
+		await layOut({ target: 'studio', root, out, client: await stubClient() });
+		const before = await packed(out);
+		await mkdir(join(root, 'quills', 'showcase', 'bad'), { recursive: true });
+		await writeFile(join(root, 'quills', 'showcase', 'bad', 'Quill.yaml'), '');
+
+		for (const target of TARGETS) {
+			const client = CLIENTS[target] && (await stubClient());
+			await expect(layOut({ target, root, out, client })).rejects.toThrow(
+				/non-canonical version directory/
+			);
+		}
+		expect(await packed(out)).toEqual(before);
+		expect(existsSync(join(out, 'index.html'))).toBe(true);
+		expect(existsSync(`${out}.quiver`)).toBe(false);
+	});
+
 	it('refuses an out that holds the quiver or the working directory', () => {
 		expect(() => assertSafeOut('/work/quiver', '/work')).toThrow(/the quiver/);
 		expect(() => assertSafeOut('/work/quiver', '/work/quiver')).toThrow(/the quiver/);

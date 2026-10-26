@@ -11,12 +11,14 @@ The verbs a quill author types, one bin over a quiver's whole life: `init` start
 | Verb | Takes | Does |
 | --- | --- | --- |
 | `init` | `[<dir>]` | Lays a quiver: `Quiver.yaml`, one quill, a `package.json` naming quillkit. |
-| `check` | `[-D]` | Renders every quill's seed and example, and resolves the app where there is an `App.yaml` or `app.css`. |
+| `check` | `[-D]` | Renders every version's seed and example, drafts included, and resolves the app where there is an `App.yaml` or `app.css`. |
 | `build` | `[target] [-o <dir>] [-D]` | Lays the target's deploy into `dist/`, or `-o`. |
 | `serve` | `[target] [-p <n>] [--open]` | Packs, serves the target over the pack, repacks on change. |
 | `preview` | `[-o <dir>] [-p <n>] [--open]` | Serves the build in `dist/`, or `-o`, with the host's rules. |
 
 **The quiver is the working directory.** No verb takes a path to it: every verb runs where `Quiver.yaml` stands, as npm runs where `package.json` stands, so a `scripts` entry and a terminal mean the same tree. The flags are `-D`/`--drafts`, `-o`/`--out`, `-p`/`--port` and `--open`, and a verb refuses a flag it does not take rather than read it as absent, since a flag read as absent runs the verb over something nobody asked for.
+
+**`-D` lifts quiver's draft floor where one applies** (QUIVER §"The draft floor"): on what `build` packs, and on the quills the app opens when `check` resolves it. `check` renders every version either way, and `serve` always packs them.
 
 **Every verb's default target is studio.** It is the client a quiver's own authors judge it in, and the one a first `serve` is for; a pipeline deploying the app names `app`.
 
@@ -52,7 +54,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **The starter is a quiver the suite gates.** Carried as files rather than emitted from strings, so `cli.integration.test.ts` lays it, runs `check` over it and builds it into an app: a scaffold that stops rendering fails CI before it fails an author on their first command.
 
-**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font, so its first file raises no licensing question.
+**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font and declares `CC0-1.0`, so its first `build app` raises no licensing warning.
 
 **One devDependency.** The written `package.json` ranges `quillkit` at its own version and nothing else (§"One pin"), with `serve`, `test`, `build` and `preview` scripts running `quillkit serve --open`, `quillkit check`, `quillkit build app` and `quillkit preview --open`, so `npm test` is the gate. `.gitignore` names `node_modules/` and `dist/`.
 
@@ -81,7 +83,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 The verb is the whole encapsulation, which is why there is no workflow beside it: a consumer's `scripts`, this repository's CI and a Pages job all reach the layout by running it, and an author running it locally gates the shape their deploy will have.
 
-**What can refuse is read before anything is cleared**, so a bad `App.yaml` leaves the last deploy where it stood. A client carrying a `quiver/` of its own would occupy the URL the laid one is served from, so that is refused too, and no author file may land on a name the client or the quiver occupies.
+**What can refuse is read before anything is cleared**, the quiver packed beside the out and moved in after the clear, so a bad `App.yaml` or a quill the packer refuses leaves the last deploy where it stood. A client carrying a `quiver/` of its own would occupy the URL the laid one is served from, so that is refused too, and no author file may land on a name the client or the quiver occupies.
 
 **The floor is the default, and `--drafts` lifts it.** A deploy is a deployment, so it takes quiver's floor; a quiver whose studio is where reviewers preview its prototypes asks for the draft space with `--drafts`.
 

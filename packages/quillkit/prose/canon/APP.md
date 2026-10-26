@@ -50,6 +50,8 @@ A document records the ref it was made on and reopens on it, so a quiver that mo
 
 **An update offers the markdown first.** The move lands the document's markdown in the latest version, conforming as it does, and a schema that stopped asking for a field strands its answer. So the press opens a dialog whose first action is Download .md, and only then Update; the record keeps its id and takes the new pin, and what the move stranded is named on the fields it is about until the first edit.
 
+**A document whose form does not load stands as its record too.** Where a pin the pack holds fails to open, or an update fails to land, the screen says "This document can't open right now." rather than that the form is gone, with Download .md, and Update to the latest form where that is a later version; the record keeps the pin it had.
+
 ## The chrome
 
 The app is drawn with `@quillmark/svelte/preset`, the import a third-party consumer makes: the preset's shell (`.qm-workspace`, `.qm-bar`, `.qm-split`, `.qm-switch`) and its app chrome (`.qm-app-header`, `.qm-app-title`, `.qm-app-footer`, `.qm-app-primary`; THEMING §"The app chrome"). `chrome.css` adds two widths the preset does not carry, the drawer's and the narrowest a landing card reads at. Everything an author's `app.css` may aim at is THEMING §"What a stylesheet may aim at"; the client's own classes are not in it.

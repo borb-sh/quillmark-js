@@ -259,7 +259,8 @@ function usage(): void {
 			'  quillkit serve [quiver|studio|app] [-p|--port <n>] [--open]',
 			'  quillkit preview [-o|--out <dir>] [-p|--port <n>] [--open]',
 			'',
-			'The target is studio where none is named; preview serves whichever build is in --out.'
+			'The target is studio where none is named; preview serves whichever build is in --out.',
+			'check renders every version; --drafts admits drafts to the app it resolves and to a build.'
 		].join('\n')
 	);
 }
