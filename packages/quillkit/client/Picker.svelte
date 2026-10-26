@@ -91,12 +91,18 @@
 </div>
 
 <style>
+	/* Sized by the head rather than by the sentence: a basis of its max-content would be
+	   the sentence's whole length, which is wider than any head and puts the picker on a
+	   line of its own, then the sentence on another. From nothing, it takes what the
+	   head's other parts leave and goes to its own line only when that is narrower than
+	   its controls. */
 	.picker {
+		flex: 1 1 0;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--qmh-space) var(--qmh-space-3);
-		min-width: 0;
+		min-width: min-content;
 	}
 
 	/* Label and value on one line: the label is the value's name, not a heading over
@@ -105,14 +111,15 @@
 		display: flex;
 		align-items: center;
 		gap: var(--qmh-space);
+		white-space: nowrap;
 	}
 
 	/* The only part of this band that yields: it truncates to whatever the controls beside
 	   it leave, a sentence pushing the picker off the line costing the author the control
-	   they came for. */
+	   they came for. No width of its own, so it adds nothing to the picker's minimum. */
 	.said {
-		flex: 0 1 auto;
-		min-width: 0;
+		flex: 1 1 0;
+		width: 0;
 		font-size: var(--qmh-text-meta);
 		line-height: var(--qmh-leading-tight);
 		color: var(--qmh-ink-meta);

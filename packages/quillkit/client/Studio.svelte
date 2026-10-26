@@ -760,19 +760,21 @@
 
 	/* Positioned, because the compile failure is laid over this pane. The seam between the
 	   two is the split's gap; there is no resizer, a divider that can be dragged being an
-	   instrument. It carries its own ground, which the preview paints over: `.panes` lays
-	   the seam's colour behind both tracks, so a pane with nothing mounted on it would
-	   show that colour across its whole area. */
+	   instrument. It carries its own ground, the preview's desk tone, which the preview
+	   paints over: `.panes` lays the seam's colour behind both tracks, so a pane with
+	   nothing mounted on it would show that colour across its whole area, and a ground
+	   of any other tone would change under the author when the first paint lands. */
 	.pane.paint {
 		position: relative;
-		background: var(--qmh-surface);
+		background: var(--qmh-page);
 	}
 
 	/* The failure over the paint rather than above it. The last good paint, where there is
 	   one, stays whole underneath: it is what the author was judging, and the only
 	   evidence of what the plate did before it stopped compiling. Overlaid rather than stacked, so the
 	   keystroke that breaks a plate and the one that fixes it do not resize the surface
-	   being judged. */
+	   being judged. Its words start on the edge the sheet under it starts on, the desk's
+	   gutter, which is the head's. */
 	.stalled {
 		position: absolute;
 		inset-block-start: 0;
@@ -782,7 +784,7 @@
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: var(--qmh-space) var(--qmh-space-3);
-		padding: var(--qmh-space-2) var(--qmh-space-3);
+		padding: var(--qmh-space-2) var(--qmh-space-4);
 		background: var(--qmh-page);
 		border-block-end: var(--qmh-border-width) solid var(--qmh-alert);
 	}
@@ -806,8 +808,9 @@
 		text-overflow: ellipsis;
 	}
 
-	/* Where the panes were. It takes the same room so the bands do not move when a quill
-	   stops opening, and it holds the one sentence that says why.
+	/* Where the panes were. It takes the same room and the same ground, the tone behind
+	   the cards and the sheets, so neither the bands nor the room's tone change when a
+	   quill stops opening, and it holds the one sentence that says why.
 
 	   At the top of that room rather than centred in it: the sentence lands where the
 	   editor's first card was, which is where the author was already looking, and it
@@ -821,7 +824,7 @@
 		gap: var(--qmh-space-2);
 		min-height: 0;
 		padding: var(--qmh-space-4);
-		background: var(--qmh-surface);
+		background: var(--qmh-page);
 	}
 
 	.reason {

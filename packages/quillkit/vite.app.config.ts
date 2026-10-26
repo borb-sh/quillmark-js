@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 import { carried } from '../../scripts/carried.mjs';
+import { CSS_TARGET } from '../../scripts/css-target.mjs';
 
 // The app client, built: `app/` is its browser tree, landing at `dist/app` beside studio's
 // `dist/client`. The two clients share the modules they have in common by relative import
@@ -24,7 +25,7 @@ export default defineConfig({
 			}
 		})
 	],
-	build: { outDir: DIST, emptyOutDir: true, copyPublicDir: false },
+	build: { outDir: DIST, emptyOutDir: true, copyPublicDir: false, cssTarget: CSS_TARGET },
 	define: { __CARRIED__: JSON.stringify(carried()) },
 	optimizeDeps: { exclude: ['@quillmark/wasm'] }
 });
