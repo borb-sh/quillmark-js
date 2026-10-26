@@ -43,8 +43,9 @@ Every verb runs over the quiver in the working directory. A verb's argument is a
 | `-o`, `--out <dir>` | `build`, `preview` | the deploy directory, `dist` by default                                                                                                             |
 | `-p`, `--port <n>`  | `serve`, `preview` | `5174` for `serve`, `4174` for `preview`                                                                                                            |
 | `--open`            | `serve`, `preview` | open the page in your browser                                                                                                                       |
+| `--strict`          | `check`            | fail a quill, or the app, on a warning it would otherwise pass with                                                                                 |
 
-A verb refuses a flag it does not take.
+A verb refuses a flag it does not take, and `--help` anywhere prints the usage.
 
 ## Gating
 
@@ -58,6 +59,8 @@ A verb refuses a flag it does not take.
 ```
 
 It loads the quiver, then renders every version of every quill, drafts included: its seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill, and so does any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is yours to fix. With an `App.yaml` or an `app.css`, the app they describe resolves too, so an unknown key or a `url()` naming no file fails here before it fails a deploy.
+
+A failure prints every diagnostic as `quillmark render` does, with its code, `file:line:col` and hint. A pass prints the warnings it carried beneath it, a font the plate names but nothing bundles among them; `--strict` fails on them.
 
 On vitest, jest or `node:test`, spawn the bin rather than rebuilding the loop against the library. The gate stays one implementation, and the case gates what CI gates:
 

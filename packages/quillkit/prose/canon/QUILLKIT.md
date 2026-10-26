@@ -11,12 +11,12 @@ The verbs a quill author types, one bin over a quiver's whole life: `init` start
 | Verb | Takes | Does |
 | --- | --- | --- |
 | `init` | `[<dir>]` | Lays a quiver: `Quiver.yaml`, one quill, a `package.json` naming quillkit. |
-| `check` | `[-D]` | Renders every version's seed and example, drafts included, and resolves the app where there is an `App.yaml` or `app.css`. |
+| `check` | `[-D] [--strict]` | Renders every version's seed and example, drafts included, and resolves the app where there is an `App.yaml` or `app.css`. |
 | `build` | `[target] [-o <dir>] [-D]` | Lays the target's deploy into `dist/`, or `-o`. |
 | `serve` | `[target] [-p <n>] [--open]` | Packs, serves the target over the pack, repacks on change. |
 | `preview` | `[-o <dir>] [-p <n>] [--open]` | Serves the build in `dist/`, or `-o`, with the host's rules. |
 
-**The quiver is the working directory.** No verb takes a path to it: every verb runs where `Quiver.yaml` stands, as npm runs where `package.json` stands, so a `scripts` entry and a terminal mean the same tree. The flags are `-D`/`--drafts`, `-o`/`--out`, `-p`/`--port` and `--open`, and a verb refuses a flag it does not take rather than read it as absent, since a flag read as absent runs the verb over something nobody asked for.
+**The quiver is the working directory.** No verb takes a path to it: every verb runs where `Quiver.yaml` stands, as npm runs where `package.json` stands, so a `scripts` entry and a terminal mean the same tree. The flags are `-D`/`--drafts`, `-o`/`--out`, `-p`/`--port`, `--open` and `--strict`, and a verb refuses a flag it does not take rather than read it as absent, since a flag read as absent runs the verb over something nobody asked for.
 
 **`-D` lifts quiver's draft floor where one applies** (QUIVER §"The draft floor"): on what `build` packs, and on the quills the app opens when `check` resolves it. `check` renders every version either way, and `serve` always packs them.
 
@@ -42,9 +42,11 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **The gate loads and renders.** `fromDir`, then compile and render every quill's seed, `quill.seedDocument()`: one card per kind, every field absent and every body empty, so what the gate proves is that the plate renders the blank a reader starts from. The core is instantiated before the first render, so a setup fault fails the verb rather than printing as the first quill's.
 
-**What an author wrote is held to every diagnostic.** A quill's `example.md` fails on any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is the author's own to fix. The seed is the schema's, and answers for its render alone. The compile's own warnings are the plate's, and fail neither.
+**What an author wrote is held to every diagnostic.** A quill's `example.md` fails on any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is the author's own to fix. The seed is the schema's, and answers for its render alone. The compile's own warnings are the plate's, and the quill's load warnings its schema's: both print under the quill's `pass` line, once each, and fail it only under `--strict`.
 
-**The app resolves too.** With an `App.yaml` or an `app.css` beside `Quiver.yaml` the gate runs what `build app` runs before it writes anything (§"The app target"), so an unknown key, or an `app.css` naming a file outside the quiver or none, fails the gate as it would fail the deploy. What `build app` only warns about, it does not fail.
+**A failure prints as the CLI prints it.** Every diagnostic on a failure prints whole beneath the `FAIL` line, through the wasm's `formatDiagnostic`: severity, message, code, `file:line:col`, path and hint, so the gate an author is blocked on says no less than `quillmark render` does.
+
+**The app resolves too.** With an `App.yaml` or an `app.css` beside `Quiver.yaml` the gate runs what `build app` runs before it writes anything (§"The app target"), so an unknown key, or an `app.css` naming a file outside the quiver or none, fails the gate as it would fail the deploy. What `build app` only warns about prints under its `pass` line and fails only under `--strict`.
 
 **One door.** An author on vitest, jest or another runner spawns the bin (`execFileSync('quillkit', ['check'])`) and gates what CI gates; a second entry onto the verdict would be a second answer under one name. The suite spawns it against the reference quiver, since nothing that imports a module proves a surface reached through a linked bin.
 
