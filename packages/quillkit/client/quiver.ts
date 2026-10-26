@@ -1,6 +1,6 @@
 // Where studio's quills come from: the built quiver the Node half packs, served beside
 // the client and read back with `Quiver.fromBuiltUrl` (`quiver.json`, one
-// content-addressed bundle per quill, fonts dehydrated beside them). The browser consumer
+// content-addressed `.quill` bundle per quill, fonts inside it). The browser consumer
 // path in full, which is what an author-facing surface owes the loader it is a surface for.
 //
 // The base is a runtime fact, taken off the document's own, and nothing here is

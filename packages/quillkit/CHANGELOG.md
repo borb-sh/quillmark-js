@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio and `site` read a quiver built in format 3, one `.quill` bundle per quill with its fonts inside.** The client compiles in the `@quillmark/quiver` that writes format 3, so over a collection whose own `@quillmark/quiver` packs format 2 the studio page refuses the quiver, naming the rebuild: upgrade `@quillmark/quiver` in the collection in the same change as `quillkit`. `studio` serves a `.quill` bundle as `application/vnd.quillmark.quill+zip`.
+
 ## v0.19.3 - 2026-10-23
 
 **Studio's editor splits a list to number a selection, and pastes a Word list as a list.** The client compiles `@quillmark/svelte` 0.26.0 in: `Mod-Shift-7`/`Mod-Shift-8` and the toolbar buttons on a selection inside a list of the other kind split the selected items out, where they retyped the whole list, and a list copied out of desktop Word or Outlook pastes nested by level, where each item landed as a paragraph.

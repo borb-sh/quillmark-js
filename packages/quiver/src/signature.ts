@@ -1,6 +1,7 @@
 /**
- * The leading bytes of what an artifact holds. A host answering a missing name with a
- * page of its own answers 200, and nothing else read here tells that page from a font.
+ * Leading bytes. A host answering a missing name with a page of its own answers 200, so a
+ * bundle is read only once it opens as a zip; and Typst substitutes a font it cannot parse
+ * without a word, so `build` packs a font file only once it opens as a font.
  */
 const SFNT = ['\0\x01\0\0', 'OTTO', 'true', 'ttcf'];
 const WOFF = ['wOFF', 'wOF2'];

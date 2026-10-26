@@ -20,9 +20,8 @@ afterEach(() => temp.cleanup());
 const fresh = async (): Promise<string> => join(await temp.dir(), 'q');
 
 /**
- * Build a minimal Source Quiver programmatically.
- * If `fonts` is provided for a quill entry, those files are written as font
- * bytes (same content for dedup testing).
+ * Build a minimal Source Quiver programmatically. `fonts` are written into the quill
+ * directory at their paths.
  */
 async function seedSourceQuiver(
 	root: string,
@@ -77,96 +76,76 @@ describe('buildQuiver — happy path (sample-quiver fixture)', () => {
 	});
 });
 
-describe('buildQuiver — font dehydration & deduplication', () => {
-	it('writes the shared font exactly once under fonts/', async () => {
+describe('buildQuiver — one .quill bundle per quill, fonts and all', () => {
+	it("carries each quill's fonts in its own bundle, and writes no fonts/", async () => {
 		const src = await fresh();
 		const out = await fresh();
-
-		const sharedFontBytes = font(1, 2, 3, 4, 5, 6, 7, 8);
+		const shared = font(1, 2, 3, 4, 5, 6, 7, 8);
 
 		await seedSourceQuiver(src, {
-			name: 'font_test',
 			quills: [
-				{
-					name: 'quill_a',
-					version: '1.0.0',
-					fonts: [{ path: 'fonts/font.ttf', content: sharedFontBytes }]
-				},
-				{
-					name: 'quill_b',
-					version: '1.0.0',
-					fonts: [{ path: 'fonts/font.ttf', content: sharedFontBytes }]
-				}
+				{ name: 'quill_a', version: '1.0.0', fonts: [{ path: 'fonts/font.ttf', content: shared }] },
+				{ name: 'quill_b', version: '1.0.0', fonts: [{ path: 'fonts/font.ttf', content: shared }] }
 			]
 		});
-
 		await buildQuiver(src, out);
 
-		expect(await readdir(join(out, 'fonts'))).toHaveLength(1);
+		const { quills } = (await indexOf(out)) as { quills: Array<Record<string, unknown>> };
+		for (const entry of quills) {
+			expect(Object.keys(entry).sort()).toEqual(['bundle', 'name', 'version']);
+			const files = unpackFiles(await readFile(join(out, entry['bundle'] as string)));
+			expect(Object.keys(files).sort()).toEqual(['Quill.yaml', 'fonts/font.ttf', 'template.typ']);
+			expect(files['fonts/font.ttf']).toEqual(shared);
+		}
+		expect((await readdir(out)).sort()).toEqual(
+			['latest.json', 'quiver.json', ...quills.map((q) => q['bundle'] as string)].sort()
+		);
 	});
 
-	it('bundle zip does NOT contain the font file', async () => {
+	it('packs a font collection the size of a CJK one into its bundle', async () => {
 		const src = await fresh();
 		const out = await fresh();
-
-		const fontBytes = font(0xde, 0xad, 0xbe, 0xef);
+		const collection = new Uint8Array(20 * 1024 * 1024);
+		collection.set(new TextEncoder().encode('ttcf'));
 
 		await seedSourceQuiver(src, {
-			name: 'font_test',
 			quills: [
-				{
-					name: 'quill_a',
-					version: '1.0.0',
-					fonts: [{ path: 'fonts/font.otf', content: fontBytes }]
-				}
+				{ name: 'memo', version: '1.0.0', fonts: [{ path: 'fonts/cjk.ttc', content: collection }] }
 			]
 		});
-
 		await buildQuiver(src, out);
 
 		const { quills } = (await indexOf(out)) as { quills: Array<{ bundle: string }> };
-
-		const bundleBytes = await readFile(join(out, quills[0]!.bundle));
-		const bundleFiles = unpackFiles(bundleBytes);
-
-		expect(Object.keys(bundleFiles)).toContain('Quill.yaml');
-		expect(Object.keys(bundleFiles)).not.toContain('fonts/font.otf');
+		const files = unpackFiles(await readFile(join(out, quills[0]!.bundle)));
+		expect(files['fonts/cjk.ttc']!.length).toBe(collection.length);
 	});
 
-	it('writes a font collection under fonts/, named in quiver.json', async () => {
+	it('packs every font signature Quillmark parses', async () => {
 		const src = await fresh();
 		const out = await fresh();
-		const collection = (...tail: number[]) =>
-			new Uint8Array([...new TextEncoder().encode('ttcf'), ...tail]);
+		const signatures: [string, string][] = [
+			['\0\x01\0\0', 'ttf'],
+			['OTTO', 'otf'],
+			['true', 'ttf'],
+			['ttcf', 'ttc'],
+			['ttcf', 'otc'],
+			['wOFF', 'woff'],
+			['wOF2', 'woff2']
+		];
+		const fonts = signatures.map(([magic, ext], i) => ({
+			path: `fonts/${i}.${ext}`,
+			content: new TextEncoder().encode(`${magic}rest`)
+		}));
+		await seedSourceQuiver(src, { quills: [{ name: 'memo', version: '1.0.0', fonts }] });
 
-		await seedSourceQuiver(src, {
-			quills: [
-				{
-					name: 'memo',
-					version: '1.0.0',
-					fonts: [
-						{ path: 'fonts/cjk.ttc', content: collection(1) },
-						{ path: 'fonts/cjk.otc', content: collection(2) }
-					]
-				}
-			]
-		});
-		await buildQuiver(src, out);
-
-		const { quills } = (await indexOf(out)) as {
-			quills: Array<{ bundle: string; fonts: Record<string, string> }>;
-		};
-		const [entry] = quills;
-		expect(Object.keys(entry!.fonts).sort()).toEqual(['fonts/cjk.otc', 'fonts/cjk.ttc']);
-		expect(await readFile(join(out, 'fonts', entry!.fonts['fonts/cjk.ttc']!))).toEqual(
-			Buffer.from(collection(1))
-		);
-		const bundleFiles = unpackFiles(await readFile(join(out, entry!.bundle)));
-		expect(Object.keys(bundleFiles)).not.toContain('fonts/cjk.ttc');
-		expect(Object.keys(bundleFiles)).not.toContain('fonts/cjk.otc');
+		await expect(buildQuiver(src, out)).resolves.toBeUndefined();
 	});
 
-	it('refuses a font file that does not open as a font, naming it', async () => {
+	it.each([
+		['a page', 'fonts/body.ttf', '<html>'],
+		// Quillmark parses sfnt alone; a WOFF under `.ttf` would reach Typst and be substituted.
+		['WOFF bytes under .ttf', 'fonts/body.ttf', 'wOF2rest']
+	])('refuses a font file holding %s, naming it', async (_, path, content) => {
 		const src = await fresh();
 		const out = await fresh();
 		await seedSourceQuiver(src, {
@@ -174,7 +153,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 				{
 					name: 'memo',
 					version: '1.0.0',
-					fonts: [{ path: 'fonts/body.ttf', content: new TextEncoder().encode('<html>') }]
+					fonts: [{ path, content: new TextEncoder().encode(content) }]
 				}
 			]
 		});
@@ -182,9 +161,7 @@ describe('buildQuiver — font dehydration & deduplication', () => {
 		await expect(buildQuiver(src, out)).rejects.toThrow(
 			expect.objectContaining({
 				code: 'quiver_invalid',
-				message: expect.stringContaining(
-					'"fonts/body.ttf" does not open as the font its extension names'
-				)
+				message: expect.stringContaining(`"${path}" does not open as the font its extension names`)
 			})
 		);
 	});
@@ -332,7 +309,7 @@ describe('buildQuiver — outDir guard', () => {
 describe('buildQuiver — every name but the index carries the digest of its own bytes', () => {
 	// What makes a name safe to cache forever: a changed byte is a changed name.
 
-	it('bundle and font names are SHA-256 of their contents', async () => {
+	it('a bundle is named for its quill and the SHA-256 of its bytes', async () => {
 		const src = await fresh();
 		const out = await fresh();
 
@@ -347,20 +324,12 @@ describe('buildQuiver — every name but the index carries the digest of its own
 		});
 		await buildQuiver(src, out);
 
-		const { quills } = (await indexOf(out)) as {
-			quills: Array<{ bundle: string; fonts: Record<string, string> }>;
-		};
+		const { quills } = (await indexOf(out)) as { quills: Array<{ bundle: string }> };
 		const digestOf = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 		const [entry] = quills;
-		const zipBytes = await readFile(join(out, entry!.bundle));
-		expect(entry!.bundle).toBe(`memo@1.0.0.${digestOf(zipBytes).slice(0, 32)}.zip`);
-
-		const fontHash = entry!.fonts['fonts/body.ttf']!;
-		// Full width, not truncated: fonts are keyed by hash, so two distinct fonts
-		// sharing a prefix would merge into one file.
-		expect(fontHash).toBe(digestOf(await readFile(join(out, 'fonts', fontHash))));
-		expect(fontHash).toHaveLength(64);
+		const bytes = await readFile(join(out, entry!.bundle));
+		expect(entry!.bundle).toBe(`memo@1.0.0.${digestOf(bytes).slice(0, 32)}.quill`);
 	});
 });
 
@@ -430,6 +399,6 @@ describe('buildQuiver — the draft floor', () => {
 		await buildQuiver(src, out);
 
 		expect(await refsOf(out)).toEqual([]);
-		expect((await readdir(out)).filter((n) => n.endsWith('.zip'))).toEqual([]);
+		expect((await readdir(out)).filter((n) => n.endsWith('.quill'))).toEqual([]);
 	});
 });

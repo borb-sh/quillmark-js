@@ -16,8 +16,7 @@ import { within } from './paths.js';
 
 /**
  * What the roots hold: the client `vite build` emits, a packed quiver's `quiver.json`
- * and bundles, and a collection's templates. Fonts carry no type because they carry no extension either,
- * being dehydrated into `fonts/<sha256>`; anything unlisted falls back to
+ * and `.quill` bundles, and a collection's templates. Anything unlisted falls back to
  * `application/octet-stream`, which is right for opaque bytes.
  *
  * `.wasm` is the one that is not a nicety: `@quillmark/wasm` ships wasm-bindgen's web
@@ -32,9 +31,9 @@ const TYPES: Record<string, string> = {
 	'.json': 'application/json; charset=utf-8',
 	'.md': 'text/markdown; charset=utf-8',
 	'.png': 'image/png',
+	'.quill': 'application/vnd.quillmark.quill+zip',
 	'.svg': 'image/svg+xml',
-	'.wasm': 'application/wasm',
-	'.zip': 'application/zip'
+	'.wasm': 'application/wasm'
 };
 
 export interface Mount {

@@ -1,6 +1,6 @@
 /**
  * Built-quiver loader: reads `quiver.json` through a reader, validates it, and hands back
- * a Quiver whose loader reads bundles and fonts on demand.
+ * a Quiver whose loader reads one `.quill` bundle per quill on demand.
  *
  * Package-internal, and browser-safe: no static `node:` imports at any level.
  */
@@ -10,7 +10,7 @@ import { unpackFiles } from './bundle.js';
 import { isQuillName } from './ref.js';
 import { isCanonicalSemver, compareSemver } from './semver.js';
 import { FORMAT, INDEX } from './format.js';
-import { isFont, isZip } from './signature.js';
+import { isZip } from './signature.js';
 import type { Quiver, QuiverLoader } from './quiver.js';
 import { createQuiver } from './quiver.js';
 
@@ -18,7 +18,6 @@ interface BuiltQuillEntry {
 	name: string;
 	version: string;
 	bundle: string;
-	fonts: Record<string, string>;
 }
 
 interface BuiltIndex {
@@ -80,10 +79,9 @@ export function filesReader(files: ReadonlyMap<string, Uint8Array>): ArtifactRea
 	};
 }
 
-// The shapes `build` writes. Neither admits a separator, so a validated name read off
+// The shape `build` writes. It admits no separator, so a validated name read off
 // `quiver.json` stays inside the artifact on every reader.
-const BUNDLE_RE = /^[A-Za-z0-9_-]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9a-f]+\.zip$/;
-const FONT_HASH_RE = /^[0-9a-f]{64}$/;
+const BUNDLE_RE = /^[A-Za-z0-9_-]+@[0-9]+\.[0-9]+\.[0-9]+\.[0-9a-f]+\.quill$/;
 
 /** Bytes a host answered with that are not the file named: a `transport_error`, so the
  *  reread below gets its turn. */
@@ -111,7 +109,6 @@ async function readChecked(
 }
 
 class BuiltLoader implements QuiverLoader {
-	readonly #fonts = new Map<string, Promise<Uint8Array>>();
 	#rereading: Promise<BuiltIndex> | undefined;
 
 	constructor(
@@ -138,7 +135,7 @@ class BuiltLoader implements QuiverLoader {
 				throw reread instanceof QuiverError && reread.code === 'quiver_invalid' ? reread : err;
 			}
 			const fresh = index.entries.get(key);
-			if (fresh === undefined || sameFiles(fresh, entry)) throw err;
+			if (fresh === undefined || fresh.bundle === entry.bundle) throw err;
 			return this.#treeOf(fresh);
 		}
 	}
@@ -158,34 +155,9 @@ class BuiltLoader implements QuiverLoader {
 	}
 
 	async #treeOf(entry: BuiltQuillEntry): Promise<Map<string, Uint8Array>> {
-		const zip = await readChecked(this.read, entry.bundle, isZip, 'a zip');
-		const files = unpackFiles(zip);
-		await Promise.all(
-			Object.entries(entry.fonts).map(async ([path, hash]) => {
-				files[path] = await this.#font(hash, path);
-			})
-		);
-		return new Map(Object.entries(files));
+		const bundle = await readChecked(this.read, entry.bundle, isZip, 'a zip');
+		return new Map(Object.entries(unpackFiles(bundle)));
 	}
-
-	/** One read per hash, coalesced; a failure is evicted so a retry reads again. */
-	#font(hash: string, rel: string): Promise<Uint8Array> {
-		let bytes = this.#fonts.get(hash);
-		if (bytes === undefined) {
-			bytes = readChecked(this.read, `fonts/${hash}`, (font) => isFont(font, rel), 'a font').catch(
-				(err: unknown) => {
-					this.#fonts.delete(hash);
-					throw err;
-				}
-			);
-			this.#fonts.set(hash, bytes);
-		}
-		return bytes;
-	}
-}
-
-function sameFiles(a: BuiltQuillEntry, b: BuiltQuillEntry): boolean {
-	return a.bundle === b.bundle && JSON.stringify(a.fonts) === JSON.stringify(b.fonts);
 }
 
 async function readIndex(read: ArtifactReader): Promise<BuiltIndex> {
@@ -227,6 +199,13 @@ function parseIndex(raw: string): BuiltIndex {
 			'quiver_invalid',
 			`This quiver is built in format ${format} and this loader reads ${FORMAT}. ` +
 				`Upgrade @quillmark/quiver, or for a served client the client itself, which carries the copy that reads this.`
+		);
+	}
+	if (format < FORMAT) {
+		throw new QuiverError(
+			'quiver_invalid',
+			`This quiver is built in format ${format} and this loader reads ${FORMAT}. ` +
+				`Rebuild it with a @quillmark/quiver that writes format ${FORMAT}, in the collection where it is packed.`
 		);
 	}
 
@@ -291,27 +270,11 @@ function parseIndex(raw: string): BuiltIndex {
 			throw new QuiverError('quiver_invalid', `${at}.bundle is invalid: "${String(bundle)}"`);
 		}
 
-		const declared = e['fonts'];
-		if (typeof declared !== 'object' || declared === null || Array.isArray(declared)) {
-			throw new QuiverError('quiver_invalid', `${at}.fonts must be an object`);
-		}
-
-		const fonts: Record<string, string> = {};
-		for (const [path, hash] of Object.entries(declared)) {
-			if (typeof hash !== 'string' || !FONT_HASH_RE.test(hash)) {
-				throw new QuiverError(
-					'quiver_invalid',
-					`${at}.fonts["${path}"] is not a font hash: ${JSON.stringify(hash)}`
-				);
-			}
-			fonts[path] = hash;
-		}
-
 		const key = `${quillName}@${version}`;
 		if (entries.has(key)) {
 			throw new QuiverError('quiver_invalid', `Duplicate quill entry in ${INDEX}: "${key}"`);
 		}
-		entries.set(key, { name: quillName, version, bundle, fonts });
+		entries.set(key, { name: quillName, version, bundle });
 	}
 
 	return { name, description, entries };

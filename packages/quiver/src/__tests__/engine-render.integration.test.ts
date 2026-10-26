@@ -16,7 +16,7 @@
  *
  * The last block closes the loop the package exists for, against the
  * workspace's reference quill rather than a toy: source layout → `build` →
- * read → font rehydration → `Quill.fromTree` →
+ * read → unzip → `Quill.fromTree` →
  * `engine.render`. The apps walk the same loop, but only under a human.
  *
  * The Typst backend load makes this the slowest test in the suite (seconds).
@@ -38,8 +38,8 @@ const core = await init();
 const RENDER_FIXTURE = fileURLToPath(new URL('./fixtures/render-quiver', import.meta.url));
 
 // The workspace's reference quiver: `showcase@1.0.0`, a published-shape quill with a
-// Typst package tree, an image asset, and five fonts the build dehydrates into
-// `fonts/`; beside it `usaf_memo@0.0.0`, which a build leaves out as a draft.
+// Typst package tree, an image asset, and five fonts its bundle carries; beside it
+// `usaf_memo@0.0.0`, which a build leaves out as a draft.
 const REFERENCE_QUIVER = fileURLToPath(new URL('../../../../fixtures', import.meta.url));
 
 describe('Engine.render against a quiver quill', () => {
@@ -131,9 +131,9 @@ describe('the reference quill, source → build → fetch → render', () => {
 		const quill = await built.getQuill('showcase');
 		expect(quill.backendId).toBe('typst');
 
-		// The fonts left the bundle at build time and came back from `fonts/` on
-		// read. Typst substitutes for a missing face rather than failing, so the
-		// rehydration is asserted here rather than left to the render.
+		// The fonts travel inside the quill's bundle. Typst substitutes for a missing
+		// face rather than failing, so they are asserted here rather than left to the
+		// render.
 		const tree = quill.toTree();
 		const fonts = [...tree.keys()].filter((p) => /\.(ttf|otf)$/i.test(p));
 		expect(fonts.length).toBeGreaterThan(0);
@@ -150,7 +150,7 @@ describe('the reference quill, source → build → fetch → render', () => {
 	}, 120000);
 
 	it('round-trips the tree byte for byte', async () => {
-		// Zip, dehydrate, fetch, rehydrate: the quill that comes back out is the
+		// Zip, read, unzip: the quill that comes back out is the
 		// quill that went in. A build that drops, truncates, or reorders a file
 		// shows up here rather than as a typesetting error downstream.
 		const source = await (await fromDir(REFERENCE_QUIVER)).getQuill('showcase@1.0.0');
