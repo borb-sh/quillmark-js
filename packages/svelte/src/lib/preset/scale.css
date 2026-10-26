@@ -36,7 +36,7 @@
 	   declared scheme on its own, so the ramp reads whichever plane it resolved to
 	   rather than trusting an arm to match. */
 	--qmh-surface: var(--qm-bg, Canvas);
-	--qmh-page: oklab(from var(--qmh-surface) calc(l - (0.0214 + 0.0467 * (1 - l))) a b);
+	--qmh-page: oklab(from var(--qmh-surface) calc(l - (0.04 + 0.0202 * (1 - l))) a b);
 	--qmh-ink: var(--qm-fg, CanvasText);
 	/* One step off the ink and no second: a page's chrome type is small, tracked and
 	   uppercase, so a rung below this reads under 4.5:1 against the plate and the

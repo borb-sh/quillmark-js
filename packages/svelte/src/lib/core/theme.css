@@ -115,33 +115,33 @@
 	   light, and the base plane — a card, the preview's paper — is the pole
 	   itself.
 
-	   Two planes sink. `sunken` is the ground — the column behind the cards, the
-	   desk behind the sheets — and lifting the plane above it takes very little
-	   at the light pole. `well` is the hole cut into a card: a field, the one
-	   native select, neither of which draws an edge, so the step is the whole of
-	   what says a value is typed there. The order at the
-	   light pole is card, ground, well; at the dark pole the two sink to within
-	   a channel of each other, which is where a card with little light left to
-	   give up leaves them.
+	   One plane sinks, in two roles. `well` is the hole cut into a card: a field,
+	   the one native select, neither of which draws an edge, so the step is the
+	   whole of what says a value is typed there. `sunken` is the ground — the
+	   column behind the cards, the desk behind the sheets — and it is the same
+	   tone: a card draws no edge either, so the step off the ground is the whole
+	   of where one card stops and the next starts, and the well's step is one
+	   that carries that at the light pole. The order is card, then ground
+	   and well together, at both poles.
 
-	   How far each sinks is a function of the card's own L, not of the scheme the
+	   How far it sinks is a function of the card's own L, not of the scheme the
 	   host declared: a dark surface has to spend more of what little it has
 	   before the card above it reads as lifted, so the two calibrated distances
-	   — 0.0214 off white, 0.0553 off the dark default — interpolate linearly
+	   — 0.04 off white, 0.0547 off the dark default — interpolate linearly
 	   between. A card pinned at neither pole takes a proportionate step whatever
 	   `color-scheme` says, which is the half of the derivation that reads a
 	   colour rather than a declaration.
 
-	   Both sink by subtraction where every other rung mixes: a mix toward black
+	   It sinks by subtraction where every other rung mixes: a mix toward black
 	   is a ratio, so it scales what it takes and pulls the result toward
 	   neutral, and a ground is a fixed distance. `a b` pass through, so the
 	   plane keeps the pole's hue and a turned `--qm-bg` tints it. The defaults
-	   land within a channel of `#f7f8f9` and `#1a1a1b`. Below L ≈ 0.065 the
-	   ground clamps to black, which is where a near-black card leaves no room
+	   land within a channel of `#f2f2f2` and `#1a1a1c`. Below L ≈ 0.06 the
+	   plane clamps to black, which is where a near-black card leaves no room
 	   for a ground of its own. */
 	--_qm-surface: var(--_qm-bg);
-	--_qm-surface-sunken: oklab(from var(--_qm-bg) calc(l - (0.0214 + 0.0467 * (1 - l))) a b);
 	--_qm-surface-well: oklab(from var(--_qm-bg) calc(l - (0.04 + 0.0202 * (1 - l))) a b);
+	--_qm-surface-sunken: var(--_qm-surface-well);
 	/* `raised` is the same ramp spelled as a mix, its step 0.08 × (1 − l): the light
 	   arm is zero, a white card having nowhere further to go, so a floating surface
 	   separates on its hairline and `--_qm-lift` there and the step joins them in
