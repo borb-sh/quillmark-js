@@ -14,10 +14,13 @@ import { APP_JSON, prepareApp, writeApp } from '../app-files.js';
 import { CLIENTS, assertClient, layOut, targetOf, type Target } from '../deploy.js';
 import { gate, message } from '../gate.js';
 import { layStarter } from '../init.js';
-import { createStaticServer, listen, type Mount } from '../serve.js';
+import { EventStream, createStaticServer, listen, type Mount } from '../serve.js';
 import { serialize, watchCollection } from '../watch.js';
 
 const HOST = 'localhost';
+/** What the loop's stream says after each repack lands. Studio answers it with the carry
+ *  it answers the dev server's signal with (STUDIO §"The document survives the quill"). */
+const REPACKED = 'repacked';
 /** The live loop's port, and a built deploy's beside it, so both can run at once. */
 const PORTS = { serve: 5174, preview: 4174 };
 
@@ -190,11 +193,20 @@ async function serve(args: string[]): Promise<void> {
 		...(client === undefined ? [] : [{ prefix: '', root: client }]),
 		...(target === 'app' ? [{ prefix: '', root: stage }] : [])
 	];
-	const bound = await listen(createStaticServer(mounts, { cors: target === 'quiver' }), port, HOST);
+	// Studio is the one client that follows a repack, so no other target streams one.
+	const events = target === 'studio' ? new EventStream() : undefined;
+	const bound = await listen(
+		createStaticServer(mounts, { cors: target === 'quiver', events }),
+		port,
+		HOST
+	);
 
 	const watcher = watchCollection(root, [work, join(root, 'dist')], () => {
 		repack().then(
-			() => console.log('repacked'),
+			() => {
+				console.log('repacked');
+				events?.send(REPACKED);
+			},
 			// A quiver mid-edit is invalid as often as not (a half-written `Quill.yaml`). A
 			// failed pack never reaches the swap, so the last good generation stays served and
 			// the failure is a line rather than an exit.
@@ -210,7 +222,7 @@ async function serve(args: string[]): Promise<void> {
 	const url = frontDoor(target, bound);
 	console.log(`quillkit serve ${target}: ${url}`);
 	console.log(`  quiver: ${root}`);
-	console.log('  reload the page to pick up a repack.');
+	if (target !== 'studio') console.log('  reload the page to pick up a repack.');
 	if (parsed.switches.has('--open')) openBrowser(url);
 }
 
