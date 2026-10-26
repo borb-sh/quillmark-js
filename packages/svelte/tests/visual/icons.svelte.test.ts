@@ -48,10 +48,10 @@ describe('Icon', () => {
 	});
 
 	it('sizes the frame, and defaults to a square the card controls override in CSS', () => {
-		const sized = draw({ name: 'x', size: 14 });
+		const sized = draw({ name: 'minus', size: 14 });
 		expect([sized.getAttribute('width'), sized.getAttribute('height')]).toEqual(['14', '14']);
 
-		const bare = draw({ name: 'x' });
+		const bare = draw({ name: 'minus' });
 		expect(bare.getAttribute('width')).toBeTruthy();
 		expect(bare.getAttribute('height')).toBe(bare.getAttribute('width'));
 	});

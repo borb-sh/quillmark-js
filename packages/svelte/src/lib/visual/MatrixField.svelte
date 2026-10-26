@@ -337,7 +337,7 @@
 						class="qm-icon-btn qm-focus-ring qm-member-remove"
 						title={t.strings.matrixRemove(name)}
 						aria-label={t.strings.matrixRemove(name)}
-						onclick={() => removeItem(item.id)}><Icon name="x" /></button
+						onclick={() => removeItem(item.id)}><Icon name="minus" /></button
 					>
 				</div>
 				{@render columns(item.id, name, true)}
@@ -512,8 +512,8 @@
 	.qm-member-title-input:focus {
 		background: var(--_qm-surface-well);
 	}
-	/* The remove is offered by the row the pointer or the focus is in, as an array row's
-	 is, and says destructive under the pointer. */
+	/* The remove is an array row's, the minus to the add box's plus: offered by the row
+	 the pointer or the focus is in, and destructive under the pointer. */
 	.qm-member-remove {
 		flex-shrink: 0;
 		color: var(--_qm-ink-label);
@@ -530,6 +530,11 @@
 	.qm-member-remove:hover {
 		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
+	}
+	@media (hover: none) {
+		.qm-member-remove {
+			opacity: var(--_qm-opacity-muted);
+		}
 	}
 	/* The default's set is what prints and nothing written: its titles, its ticks and
 	 every value its columns draw take the default rung (theme.css), and the first
