@@ -413,7 +413,7 @@ li.ProseMirror-selectednode::after {
 .qm-table {
 	border-collapse: separate;
 	border-spacing: 0;
-	border: var(--_qm-border-width) solid var(--_qm-rule);
+	border: var(--_qm-border-width) solid var(--_qm-border);
 	border-radius: var(--_qm-radius);
 }
 /* One rule at one strength, the frame's and every line between cells, so the grid
@@ -421,8 +421,8 @@ li.ProseMirror-selectednode::after {
    `collapse`: a collapsed border cannot be rounded. */
 .qm-table-cell {
 	position: relative;
-	border-right: var(--_qm-border-width) solid var(--_qm-rule);
-	border-bottom: var(--_qm-border-width) solid var(--_qm-rule);
+	border-right: var(--_qm-border-width) solid var(--_qm-border);
+	border-bottom: var(--_qm-border-width) solid var(--_qm-border);
 	padding: var(--_qm-space) var(--_qm-space-2);
 	vertical-align: top;
 	font-weight: inherit;

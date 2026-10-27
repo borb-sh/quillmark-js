@@ -30,6 +30,8 @@
 
 **A table's pinned remove hides the column scrolling under it all the way to the clip**, where a sliver of that column showed past the slab's rounded corners.
 
+**Every hairline is one stroke, one and a half ground steps off the card at both poles**: the rules closing a card's payload, the verticals, the dashed edge of an un-schemable card, a table's grid and a floating surface's edge all take it, where a light stroke sat barely off the card and a dark one twice as far, and a table's grid took a rung of its own.
+
 **A card's delete rests at the label ink**, as an array row's and a matrix member's remove do, and turns to the danger colour under the pointer or the focus, where it rested at a faded danger.
 
 **A typed card title draws at the ink**, steady under the pointer and the focus, where it rested at the label ink and stepped up on hover; the automatic title stays at the label ink, as every placeholder does.

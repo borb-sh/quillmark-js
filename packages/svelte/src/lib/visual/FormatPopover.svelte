@@ -489,7 +489,7 @@
 		align-self: stretch;
 		width: var(--_qm-border-width);
 		margin: var(--_qm-space-half) 0;
-		background: var(--_qm-rule);
+		background: var(--_qm-border);
 	}
 	.qm-mark-btn {
 		padding: var(--_qm-space) var(--_qm-space-2);

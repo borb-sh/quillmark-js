@@ -101,11 +101,10 @@
 	--_qm-font-mono: var(--qm-font-mono, ui-monospace, monospace);
 
 	/* ── Colour ──────────────────────────────────────────────────────────────
-	   Ink steps fg → bg, the border and hover rungs step bg → fg, all mixed in
-	   oklab; sRGB muddies the mid-tones and the label/meta/border rungs are
-	   exactly mid-tone. So inverting the poles inverts that half of the scale.
-	   The percentages are calibrated to the light-mode literals they stand in
-	   for (17% ≈ #d4d4d4, 35% ≈ #555).
+	   Ink steps fg → bg and the hover rung steps bg → fg, both mixed in oklab;
+	   sRGB muddies the mid-tones and the label rung is exactly mid-tone. So
+	   inverting the poles inverts that half of the scale. The percentages are
+	   calibrated to the light-mode literals they stand in for (35% ≈ #555).
 
 	   Planes are the half that does not read the ink pole, because what makes a
 	   card read as a card is that it is the brighter plane, in both schemes
@@ -156,21 +155,20 @@
 	   grip draws. It steps toward the ink at both poles, a shade under white in light
 	   and a shade over the card in dark, where `well` sinks to a black stripe. */
 	--_qm-surface-band: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%);
-	/* The one rung whose arms are not a single ratio: a stroke is read against what it
-	   separates, and the mix that reads as a hairline on the dark default draws the
-	   light card's verticals and rules heavier than the type beside them. The light
-	   arm is calibrated rather than derived, which makes this the one rung under the
-	   poles that reads the declared scheme rather than only the colours it resolves
-	   to. */
+	/* The one stroke: a card's two horizontals, a section's and a subform's verticals,
+	   a table's frame and the lines between its cells, a floating surface's edge, the
+	   popover's divider. One and a half ground steps off the card at both poles, the
+	   same derivation the well takes, so a hairline stands off the card by the same
+	   measure a card stands off the ground whatever the scheme. Toward the ink, which
+	   is the half of the step `light-dark()` carries: the well always sinks, a stroke
+	   darkens a light card and lightens a dark one. On the defaults the arms land near
+	   #ececec and #3b3c3e. The multiple is the whole calibration: at it a stroke reads
+	   in light without outweighing the type beside it, and reads in dark without being
+	   the loudest line on the card. */
 	--_qm-border: light-dark(
-		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%),
-		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 17%)
+		oklab(from var(--_qm-bg) calc(l - 1.5 * (0.04 + 0.0202 * (1 - l))) a b),
+		oklab(from var(--_qm-bg) calc(l + 1.5 * (0.04 + 0.0202 * (1 - l))) a b)
 	);
-	/* A stroke ruled through content rather than round it: a table's frame and every
-	   line between its cells. The light arm of `border` is a stroke standing clear of
-	   type, and drawn between lines of it it vanishes, so a grid takes one ratio at
-	   both poles, which lands within a few points of `border` in dark. */
-	--_qm-rule: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 14%);
 	/* Three rungs, and nothing under the last: a step below `label` lands under 3:1 on
 	   the well a field draws it against, and what would take it — an unset value's word,
 	   an invitation — is content a reader has to read (WCAG 1.4.3), not decoration.
