@@ -6,7 +6,6 @@
  */
 
 import { QuiverError } from './errors.js';
-import { unpackFiles } from './bundle.js';
 import { isQuillName } from './ref.js';
 import { isCanonicalSemver, compareSemver } from './semver.js';
 import { FORMAT, INDEX } from './format.js';
@@ -122,11 +121,11 @@ class BuiltLoader implements QuiverLoader {
 	 * names other files. A reread refusing the index is the error that explains the
 	 * failure, and is the one thrown.
 	 */
-	async loadTree(name: string, version: string): Promise<Map<string, Uint8Array>> {
+	async load(name: string, version: string): Promise<Uint8Array> {
 		const key = `${name}@${version}`;
 		const entry = this.entries.get(key)!;
 		try {
-			return await this.#treeOf(entry);
+			return await this.#bundleOf(entry);
 		} catch (err) {
 			let index: BuiltIndex;
 			try {
@@ -136,7 +135,7 @@ class BuiltLoader implements QuiverLoader {
 			}
 			const fresh = index.entries.get(key);
 			if (fresh === undefined || fresh.bundle === entry.bundle) throw err;
-			return this.#treeOf(fresh);
+			return this.#bundleOf(fresh);
 		}
 	}
 
@@ -154,9 +153,8 @@ class BuiltLoader implements QuiverLoader {
 			}));
 	}
 
-	async #treeOf(entry: BuiltQuillEntry): Promise<Map<string, Uint8Array>> {
-		const bundle = await readChecked(this.read, entry.bundle, isZip, 'a zip');
-		return new Map(Object.entries(unpackFiles(bundle)));
+	#bundleOf(entry: BuiltQuillEntry): Promise<Uint8Array> {
+		return readChecked(this.read, entry.bundle, isZip, 'a zip');
 	}
 }
 

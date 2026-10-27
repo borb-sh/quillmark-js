@@ -3,15 +3,15 @@
  * `getQuill`, against one artifact written to a temporary directory.
  *
  * `fromBuiltUrl` takes http(s):// URLs only, so `globalThis.fetch` is stubbed to
- * serve the packed tree off disk. `Quill.fromTree` is stubbed too: what is under
- * test is the tree that reaches it, not the quill it builds.
+ * serve the packed tree off disk. `Quill.fromBundle` is stubbed too: what is under
+ * test is the bundle that reaches it, not the quill it builds.
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { cp, rm, readFile, readdir } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { Quiver, build, fromBuiltDir } from '../node.js';
-import { mockQuillFromTree } from './helpers/mock-engine.js';
+import { mockQuillLoad } from './helpers/mock-engine.js';
 import { scratch } from './helpers/scratch.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
@@ -26,21 +26,21 @@ beforeAll(async () => {
 
 afterAll(() => temp.cleanup());
 
-let stub: ReturnType<typeof mockQuillFromTree> | undefined;
+let stub: ReturnType<typeof mockQuillLoad> | undefined;
 afterEach(() => {
 	stub?.restore();
 	stub = undefined;
 	vi.unstubAllGlobals();
 });
 
-/** The catalog and the first tree a built quiver hands `Quill.fromTree`. */
+/** The catalog and the tree of the first bundle a built quiver hands `Quill.fromBundle`. */
 async function readBack(built: Quiver): Promise<void> {
 	expect(built.name).toBe('sample');
 	expect(built.quillNames()).toEqual(['memo', 'resume']);
 	expect(built.versionsOf('memo')).toEqual(['1.1.0', '1.0.0']);
 	expect(built.versionsOf('resume')).toEqual(['2.0.0']);
 
-	stub = mockQuillFromTree();
+	stub = mockQuillLoad();
 	await built.getQuill('memo@1.0.0');
 	expect(stub.calls).toHaveLength(1);
 	expect(stub.calls[0]!.has('Quill.yaml')).toBe(true);

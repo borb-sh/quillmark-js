@@ -9,24 +9,24 @@ import type { ArtifactReader } from '../built-loader.js';
 import { packFiles } from '../bundle.js';
 import { QuiverError } from '../errors.js';
 import { FORMAT } from '../format.js';
-import { mockQuillFromTree } from './helpers/mock-engine.js';
+import { mockQuillLoad } from './helpers/mock-engine.js';
 
-// The Quiver tree path is private (`getQuill` → the loader). To observe the
-// tree the loader produced, stub `Quill.fromTree` and read the tree it was
-// handed; `getQuill` resolves the ref and drives the same loader.
-let treeStub: ReturnType<typeof mockQuillFromTree> | undefined;
+// The Quiver load path is private (`getQuill` → the loader). To observe the
+// bundle the loader produced, stub `Quill.fromBundle` and read the tree it
+// unzips to; `getQuill` resolves the ref and drives the same loader.
+let treeStub: ReturnType<typeof mockQuillLoad> | undefined;
 afterEach(() => {
 	treeStub?.restore();
 	treeStub = undefined;
 });
 
-/** Drives the loader via `getQuill` and returns the tree fed to Quill.fromTree. */
-async function loadTreeViaGetQuill(
+/** Drives the loader via `getQuill` and returns the tree of the bundle fed to Quill.fromBundle. */
+async function loadViaGetQuill(
 	quiver: { getQuill: (ref: string) => Promise<unknown> },
 	name: string,
 	version: string
 ): Promise<Map<string, Uint8Array>> {
-	treeStub ??= mockQuillFromTree();
+	treeStub ??= mockQuillLoad();
 	const before = treeStub.calls.length;
 	await quiver.getQuill(`${name}@${version}`);
 	return treeStub.calls[before]!;
@@ -146,7 +146,7 @@ describe('loadBuiltQuiver — happy path', () => {
 describe('loadBuiltQuiver — the tree', () => {
 	it('loaded tree has correct bytes for content files', async () => {
 		const q = await loadMinimal();
-		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		const tree = await loadViaGetQuill(q, 'memo', '1.0.0');
 
 		expect(new TextDecoder().decode(tree.get('Quill.yaml'))).toBe('name: memo\n');
 	});
@@ -154,7 +154,7 @@ describe('loadBuiltQuiver — the tree', () => {
 	it('reads one bundle, and nothing of another quill', async () => {
 		const artifact = buildMinimalArtifact();
 		const q = await loadBuiltQuiver(artifact.read);
-		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		await loadViaGetQuill(q, 'memo', '1.0.0');
 
 		expect(artifact.log).toEqual(['quiver.json', bundleName('memo', '1.0.0')]);
 	});
@@ -164,7 +164,7 @@ describe('loadBuiltQuiver — the index revalidates', () => {
 	it('asks the reader to revalidate quiver.json and nothing else', async () => {
 		const artifact = buildMinimalArtifact();
 		const q = await loadBuiltQuiver(artifact.read);
-		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		await loadViaGetQuill(q, 'memo', '1.0.0');
 
 		expect(artifact.revalidated).toEqual(['quiver.json']);
 		expect(artifact.log.length).toBeGreaterThan(1);
@@ -198,7 +198,7 @@ describe('loadBuiltQuiver — a newer generation', () => {
 			'b'
 		);
 
-		const tree = await loadTreeViaGetQuill(q, 'memo', '1.0.0');
+		const tree = await loadViaGetQuill(q, 'memo', '1.0.0');
 		expect(new TextDecoder().decode(tree.get('Quill.yaml'))).toBe('name: memo\n# next\n');
 	});
 
@@ -219,8 +219,8 @@ describe('loadBuiltQuiver — a newer generation', () => {
 		}
 		artifact.files.set('quiver.json', enc.encode(JSON.stringify(next)));
 
-		await loadTreeViaGetQuill(q, 'memo', '1.0.0');
-		await loadTreeViaGetQuill(q, 'resume', '2.0.0');
+		await loadViaGetQuill(q, 'memo', '1.0.0');
+		await loadViaGetQuill(q, 'resume', '2.0.0');
 		expect(artifact.log.filter((p) => p === 'quiver.json')).toHaveLength(2);
 	});
 
@@ -293,9 +293,44 @@ describe('loadBuiltQuiver — a host answering with something else', () => {
 			return path === bundle && mode === 'force-cache' ? page : artifact.read(path, mode);
 		};
 
-		const tree = await loadTreeViaGetQuill(await loadBuiltQuiver(read), 'memo', '1.0.0');
+		const tree = await loadViaGetQuill(await loadBuiltQuiver(read), 'memo', '1.0.0');
 		expect(tree.size).toBeGreaterThan(0);
 		expect(modes).toEqual(['force-cache', 'reload']);
+	});
+});
+
+describe("loadBuiltQuiver — Quillmark's codec reads the bundle", () => {
+	const MEMO = bundleName('memo', '1.0.0');
+
+	/** The minimal artifact with memo's bundle rewritten by `patch`, its central directory found for it. */
+	function patched(patch: (view: DataView, central: number) => void): MemArtifact {
+		const artifact = buildMinimalArtifact();
+		const zip = artifact.files.get(MEMO)!.slice();
+		const view = new DataView(zip.buffer);
+		for (let at = 0; at + 4 <= zip.length; at++)
+			if (view.getUint32(at, true) === 0x02014b50) patch(view, at);
+		artifact.files.set(MEMO, zip);
+		return artifact;
+	}
+
+	it('a CRC-32 that disagrees with the bytes → quill::bundle_invalid', async () => {
+		const q = await loadBuiltQuiver(patched((view, at) => view.setUint32(at + 16, 0, true)).read);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				diagnostics: [expect.objectContaining({ code: 'quill::bundle_invalid' })]
+			})
+		);
+	});
+
+	it('an entry declaring past the per-file budget → quill::bundle_too_large, uninflated', async () => {
+		const q = await loadBuiltQuiver(
+			patched((view, at) => view.setUint32(at + 24, 0xffff_fff0, true)).read
+		);
+		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
+			expect.objectContaining({
+				diagnostics: [expect.objectContaining({ code: 'quill::bundle_too_large' })]
+			})
+		);
 	});
 });
 

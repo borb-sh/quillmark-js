@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { fromDir } from '../node.js';
-import { mockQuillFromTree } from './helpers/mock-engine.js';
+import { mockQuillLoad } from './helpers/mock-engine.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
@@ -23,7 +23,7 @@ describe('fromDir', () => {
 	// The tree path is private: `getQuill` hands the loaded tree straight to
 	// `Quill.fromTree`. Stub that to read the tree the loader produced.
 
-	let stub: ReturnType<typeof mockQuillFromTree> | undefined;
+	let stub: ReturnType<typeof mockQuillLoad> | undefined;
 	afterEach(() => {
 		stub?.restore();
 		stub = undefined;
@@ -31,7 +31,7 @@ describe('fromDir', () => {
 
 	it('loads the correct version: 1.1.0 content differs from 1.0.0', async () => {
 		const q = await fromDir(SAMPLE_FIXTURE);
-		stub = mockQuillFromTree();
+		stub = mockQuillLoad();
 		await q.getQuill('memo@1.0.0');
 		await q.getQuill('memo@1.1.0');
 		expect(stub.calls[0]!.has('Quill.yaml')).toBe(true);

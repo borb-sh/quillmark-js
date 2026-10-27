@@ -16,6 +16,8 @@ A host rule naming `fonts/*` or `*.zip` under a built quiver names `*.quill` now
 
 **A quill whose tree holds a file name the `.quill` format refuses fails `build`**: one that holds `\`, `:` or NUL, which a filesystem on Linux or macOS allows. Rename the file.
 
+**A bundle the `.quill` format refuses fails `getQuill` with the `QuillmarkError` `Quill.fromBundle` throws**, its diagnostic a `quill::bundle_*` code, where an over-budget or misnamed entry was a `QuiverError` coded `quiver_invalid`. Code that sorts a `getQuill` failure by `QuiverError.code` reads `diagnostics` off the error `isQuillmarkError` narrows. The `@quillmark/wasm` peer floor is `>=0.132.0-0`.
+
 ## 0.29 → 0.30
 
 ### Rebuild every artifact, and move quiver and quillkit together

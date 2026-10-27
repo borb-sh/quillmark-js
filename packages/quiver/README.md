@@ -43,7 +43,7 @@ const quill = await quiver.getQuill(doc.quillRef);
 const result = await engine.render(quill, doc, { format: 'pdf' });
 ```
 
-`getQuill(ref)` is the only way to obtain a quill from a quiver, and the only entry point most consumers need. It accepts selector refs (`"memo"`, `"memo@1.0"`) and canonical ones (`"memo@1.0.0"`), resolves the selector, materializes the quill via `Quill.fromTree`, and caches one instance per canonical ref for the quiver's lifetime; concurrent calls for the same ref coalesce into a single load. It awaits `init()` itself, so instantiating the core is not a precondition of calling it.
+`getQuill(ref)` is the only way to obtain a quill from a quiver, and the only entry point most consumers need. It accepts selector refs (`"memo"`, `"memo@1.0"`) and canonical ones (`"memo@1.0.0"`), resolves the selector, materializes the quill via `Quill.fromBundle` (a built quiver) or `Quill.fromTree` (a source one), and caches one instance per canonical ref for the quiver's lifetime; concurrent calls for the same ref coalesce into a single load. It awaits `init()` itself, so instantiating the core is not a precondition of calling it.
 
 That quill is **borrowed, not owned**: every caller asking for that ref gets the same instance, so `free()` on it hands the next caller a freed handle. Code that owns its quill mints one from `(await quiver.getQuill(ref)).toTree()` and frees that.
 
@@ -127,7 +127,7 @@ Nothing checks fetched bytes against their names: the digests are there for cach
 
 ## Error handling
 
-Every error is a `QuiverError` carrying a `code` from a closed set — `invalid_ref`, `quill_not_found`, `quiver_invalid`, `transport_error` — a human-readable `message`, and the offending `ref` where there is one.
+Every error is a `QuiverError` carrying a `code` from a closed set — `invalid_ref`, `quill_not_found`, `quiver_invalid`, `transport_error` — a human-readable `message`, and the offending `ref` where there is one. A quill that does not load, a bundle the `.quill` format refuses among them, is the exception: `getQuill` throws what `Quill.fromBundle` or `Quill.fromTree` threw, a `QuillmarkError` carrying its `diagnostics`.
 
 ```ts
 import { QuiverError } from '@quillmark/quiver';

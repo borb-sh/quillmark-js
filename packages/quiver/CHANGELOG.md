@@ -8,6 +8,8 @@
 
 **A bundle holds the `.quill` format's budget**: 32 MiB a file, where 16 MiB was the ceiling, 64 MiB in all and 2048 entries. An entry name that starts with `/`, holds `\`, `:` or NUL, or has an empty, `.` or `..` segment fails `build` and the load as `quiver_invalid`, and a directory entry is dropped. A font file that does not open as a font still fails `build`.
 
+**The `@quillmark/wasm` peer floor is `>=0.132.0-0`, and a built quiver's bundle is read by `Quill.fromBundle`**, Quillmark's own codec, where it was unzipped with fflate and handed to `Quill.fromTree`. A bundle whose CRC-32 or size disagrees with what it declares, that names an entry twice or as a file and a directory, or that holds ZIP64, encryption or a symbolic link, fails `getQuill`, where the read took it. A bundle the format refuses throws the `QuillmarkError` `Quill.fromBundle` throws, its diagnostic one of `quill::bundle_invalid`, `quill::bundle_path`, `quill::bundle_unsupported` and `quill::bundle_too_large`, where an over-budget or misnamed entry was `quiver_invalid`. `build` still refuses such a quill as `quiver_invalid`.
+
 ## v0.38.1 - 2026-10-19
 
 **A `.ttc` or `.otc` font collection builds under `fonts/`**, named in `quiver.json` as every other font is, where `build` packed it into the quill's bundle and refused one over 16 MiB, the size of a typical CJK collection. (#759)

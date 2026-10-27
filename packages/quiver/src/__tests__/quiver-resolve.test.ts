@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { fromDir } from '../node.js';
 import { createQuiver, type Quiver } from '../quiver.js';
-import { mockQuillFromTree } from './helpers/mock-engine.js';
+import { mockQuillLoad } from './helpers/mock-engine.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
@@ -72,7 +72,7 @@ describe('Quiver.resolve', () => {
 describe('Quiver.getQuill', () => {
 	// `getQuill` builds quills via the engine-free `Quill.fromTree`; stub it so
 	// these tests don't depend on the real WASM validator.
-	let stub: ReturnType<typeof mockQuillFromTree> | undefined;
+	let stub: ReturnType<typeof mockQuillLoad> | undefined;
 	afterEach(() => {
 		stub?.restore();
 		stub = undefined;
@@ -80,7 +80,7 @@ describe('Quiver.getQuill', () => {
 
 	it('selector ref resolves and returns a quill', async () => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
-		stub = mockQuillFromTree();
+		stub = mockQuillLoad();
 
 		const a = await quiver.getQuill('memo');
 		const b = await quiver.getQuill('memo@1.1.0');
@@ -91,7 +91,7 @@ describe('Quiver.getQuill', () => {
 
 	it('concurrent calls for same ref coalesce into one Quill.fromTree call', async () => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
-		stub = mockQuillFromTree();
+		stub = mockQuillLoad();
 
 		const [a, b] = await Promise.all([
 			quiver.getQuill('memo@1.0.0'),
@@ -112,7 +112,7 @@ function makeCountingQuiver(opts: { name: string; catalog: Map<string, string[]>
 } {
 	let calls = 0;
 	const loader = {
-		async loadTree(_name: string, _version: string) {
+		async load(_name: string, _version: string) {
 			calls++;
 			return new Map<string, Uint8Array>([
 				['Quill.yaml', new TextEncoder().encode('name: stub\n')]
@@ -129,7 +129,7 @@ describe('Quiver quill cache lifecycle', () => {
 	// The quill cache is keyed by ref (not engine): `Quill.fromTree` is engine-free,
 	// so one quill per ref is shared. It is the one cache — a tree is held only for
 	// the length of the materialization that consumes it.
-	let stub: ReturnType<typeof mockQuillFromTree> | undefined;
+	let stub: ReturnType<typeof mockQuillLoad> | undefined;
 	afterEach(() => {
 		stub?.restore();
 		stub = undefined;
@@ -140,7 +140,7 @@ describe('Quiver quill cache lifecycle', () => {
 			name: 'test',
 			catalog: new Map([['memo', ['1.0.0']]])
 		});
-		stub = mockQuillFromTree();
+		stub = mockQuillLoad();
 
 		const a = await quiver.getQuill('memo@1.0.0');
 		const b = await quiver.getQuill('memo@1.0.0');
@@ -155,7 +155,7 @@ describe('Quiver quill cache lifecycle', () => {
 			name: 'test',
 			catalog: new Map([['memo', ['1.0.0']]])
 		});
-		stub = mockQuillFromTree();
+		stub = mockQuillLoad();
 		let fromTreeCalls = 0;
 		stub.spy.mockImplementation(() => {
 			fromTreeCalls++;
