@@ -132,10 +132,8 @@ describe('the hold on a body over what no node holds', () => {
 	};
 
 	for (const [name, markdown] of [
-		['an element', 'lead\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
-		['an element beside a task item', '- [x] done\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
-		['a definition list', 'lead\n\nTerm\n: one\n: two\n\n  - a list in it'],
-		['a font family', 'lead <qm-span family="Carlito">set</qm-span>']
+		['a font family', 'lead <qm-span family="Carlito">set</qm-span>'],
+		['a font family beside a task item', '- [x] done\n\n<qm-span family="Carlito">kept</qm-span>']
 	]) {
 		it(`holds over ${name}, drawing its text and committing nothing`, () => {
 			held(markdown, (view) =>

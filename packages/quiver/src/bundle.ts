@@ -1,10 +1,10 @@
 /**
- * The `.quill` bundle, written and read through fflate — browser-safe. The format is
- * Quillmark's (quill-bundle.md in the quillmark repository): one quill's tree as one zip,
- * `Quill.yaml` at the root.
+ * The `.quill` bundle, written through fflate. The format is Quillmark's (quill-bundle.md
+ * in the quillmark repository): one quill's tree as one zip, `Quill.yaml` at the root.
+ * `Quill.fromBundle` reads it.
  */
 
-import { zipSync, unzipSync } from 'fflate';
+import { zipSync } from 'fflate';
 import { QuiverError } from './errors.js';
 
 /** The extension a `.quill` bundle's name ends in. */
@@ -24,11 +24,9 @@ const ZIP_EPOCH = new Date(1980, 0, 1, 0, 0, 0, 0);
 
 /**
  * What a bundle may hold: the `.quill` format's budget, which every Quillmark runtime
- * spends on the same three bounds. Deflate tops out near 1032:1, so a megabyte of zip is
- * a gigabyte resident and the bundle is what a reader inflates to find that out.
- *
- * A constant rather than something a consumer raises, because the format fixes it. Both
- * ends spend it, so an artifact no loader would read is refused where it is written.
+ * spends on the same three bounds. A constant rather than something a consumer raises,
+ * because the format fixes it. The reader spends it too, so an artifact no loader would
+ * read is refused where it is written.
  */
 const MAX_BUNDLE_BYTES = 64 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 32 * 1024 * 1024;
@@ -51,15 +49,7 @@ function checkPath(name: string): void {
 	}
 }
 
-/**
- * The budget, spent one entry at a time. Throws `quiver_invalid`.
- *
- * Unpacking spends the sizes the central directory declares, and those are the sizes
- * fflate allocates: each entry inflates into a buffer of exactly its declared size,
- * which never grows. So a header cannot buy more than it declares — it can only
- * understate itself and truncate its own entry, which is a corrupt bundle rather than an
- * allocation.
- */
+/** The budget, spent one entry at a time. Throws `quiver_invalid`. */
 function bundleBudget(): (name: string, size: number) => void {
 	let total = 0;
 	let count = 0;
@@ -102,24 +92,4 @@ export function packFiles(files: Record<string, Uint8Array>): Uint8Array {
 		input[key] = [bytes, { mtime: ZIP_EPOCH }];
 	}
 	return zipSync(input, { level: 6 });
-}
-
-/**
- * Unpack a zip into a flat file map.
- * Returns { path: Uint8Array } for every file entry in the archive; a directory entry
- * carries nothing and is dropped.
- * Throws `quiver_invalid` where the budget is spent or an entry name is one the format
- * refuses. fflate filters and inflates one entry per pass, so the entries the budget
- * already took are resident when it throws — bounded, being what fit inside it.
- */
-export function unpackFiles(data: Uint8Array): Record<string, Uint8Array> {
-	const spend = bundleBudget();
-	return unzipSync(data, {
-		filter: ({ name, originalSize }) => {
-			spend(name, originalSize);
-			const directory = name.endsWith('/');
-			checkPath(directory ? name.slice(0, -1) : name);
-			return !directory;
-		}
-	});
 }

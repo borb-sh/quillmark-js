@@ -2,8 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, writeFile, readFile, access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { unzipSync } from 'fflate';
 import { buildQuiver } from '../build.js';
-import { unpackFiles } from '../bundle.js';
 import { FORMAT } from '../format.js';
 import { scratch } from './helpers/scratch.js';
 
@@ -93,7 +93,7 @@ describe('buildQuiver — one .quill bundle per quill, fonts and all', () => {
 		const { quills } = (await indexOf(out)) as { quills: Array<Record<string, unknown>> };
 		for (const entry of quills) {
 			expect(Object.keys(entry).sort()).toEqual(['bundle', 'name', 'version']);
-			const files = unpackFiles(await readFile(join(out, entry['bundle'] as string)));
+			const files = unzipSync(await readFile(join(out, entry['bundle'] as string)));
 			expect(Object.keys(files).sort()).toEqual(['Quill.yaml', 'fonts/font.ttf', 'template.typ']);
 			expect(files['fonts/font.ttf']).toEqual(shared);
 		}
@@ -116,7 +116,7 @@ describe('buildQuiver — one .quill bundle per quill, fonts and all', () => {
 		await buildQuiver(src, out);
 
 		const { quills } = (await indexOf(out)) as { quills: Array<{ bundle: string }> };
-		const files = unpackFiles(await readFile(join(out, quills[0]!.bundle)));
+		const files = unzipSync(await readFile(join(out, quills[0]!.bundle)));
 		expect(files['fonts/cjk.ttc']!.length).toBe(collection.length);
 	});
 

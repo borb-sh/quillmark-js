@@ -314,7 +314,7 @@ async function walkDir(
 export class SourceLoader implements QuiverLoader {
 	constructor(private readonly rootDir: string) {}
 
-	async loadTree(name: string, version: string): Promise<Map<string, Uint8Array>> {
+	async load(name: string, version: string): Promise<Map<string, Uint8Array>> {
 		const quillDir = join(this.rootDir, 'quills', name, version);
 		return readQuillTree(quillDir);
 	}

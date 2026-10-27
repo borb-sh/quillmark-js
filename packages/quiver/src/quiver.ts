@@ -14,9 +14,12 @@ import type { Quill } from '@quillmark/wasm';
 import { parseQuillRef } from './ref.js';
 import { matchesSemverSelector } from './semver.js';
 
+/** A quill as a loader holds it: a source quiver's file tree, or a built one's `.quill` bundle. */
+export type QuillSource = Map<string, Uint8Array> | Uint8Array;
+
 /** Loader strategy: source or build output. Package-internal. */
 export interface QuiverLoader {
-	loadTree(name: string, version: string): Promise<Map<string, Uint8Array>>;
+	load(name: string, version: string): Promise<QuillSource>;
 }
 
 /**
@@ -131,7 +134,7 @@ export class Quiver {
 	 *
 	 * Sync, and in-memory by construction rather than by implementation: every
 	 * loader materializes the catalog as the quiver is built, and `QuiverLoader`
-	 * carries one verb, `loadTree`, which resolution never reaches.
+	 * carries one verb, `load`, which resolution never reaches.
 	 *
 	 * Throws:
 	 *   - `invalid_ref` if ref fails parseQuillRef
@@ -182,7 +185,8 @@ export class Quiver {
 	 *   - `invalid_ref` if ref is malformed
 	 *   - `quill_not_found` if ref does not match any version in this quiver
 	 *   - propagates I/O errors from the loader unchanged
-	 *   - propagates validation errors from Quill.fromTree() unchanged
+	 *   - propagates errors from Quill.fromTree() or Quill.fromBundle() unchanged,
+	 *     a bundle the format refuses among them as `quill::bundle_*`
 	 */
 	async getQuill(ref: string): Promise<Quill> {
 		const canonicalRef = this.resolve(ref);
@@ -199,12 +203,13 @@ export class Quiver {
 	}
 
 	/**
-	 * Internal: load the tree + construct via Quill.fromTree. Errors propagate.
+	 * Internal: load the tree or bundle + construct via Quill.fromTree or
+	 * Quill.fromBundle. Errors propagate.
 	 *
-	 * The tree is held only for the length of this call: the quill cache holds the
-	 * materialized result, and it is the one cache. A second tree cache beside it
-	 * would buy a retry after a `Quill.fromTree` throw its refetch, which is a
-	 * saved round-trip on the path where the quill is broken.
+	 * The source is held only for the length of this call: the quill cache holds the
+	 * materialized result, and it is the one cache. A second source cache beside it
+	 * would buy a retry after a throw its refetch, which is a saved round-trip on the
+	 * path where the quill is broken.
 	 *
 	 * Every caller arrives through `resolve` or the catalog itself, so the ref is
 	 * catalog-backed by construction and the loader needs no gate.
@@ -215,11 +220,11 @@ export class Quiver {
 	 */
 	async #materializeQuill(canonicalRef: string): Promise<Quill> {
 		const at = canonicalRef.indexOf('@');
-		const [{ Quill }, tree] = await Promise.all([
+		const [{ Quill }, source] = await Promise.all([
 			init(),
-			this.#loader.loadTree(canonicalRef.slice(0, at), canonicalRef.slice(at + 1))
+			this.#loader.load(canonicalRef.slice(0, at), canonicalRef.slice(at + 1))
 		]);
-		return Quill.fromTree(tree);
+		return source instanceof Uint8Array ? Quill.fromBundle(source) : Quill.fromTree(source);
 	}
 }
 
