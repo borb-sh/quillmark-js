@@ -58,7 +58,8 @@ import {
 	rowCount,
 	rowEmpty,
 	setAlign,
-	setHeadless,
+	setHead,
+	headRows,
 	columnShares,
 	setWidths,
 	shapeEqual,
@@ -1259,23 +1260,20 @@ class TableIslandView implements NodeView {
 
 		// `thead`/`tbody` rather than one `tbody`: the header is a separate field in the
 		// model, and this is the markup that says so to something that cannot see the
-		// weight the header row draws. A headless table's first row is a body row on the
-		// page, so it is one here too, still holding row 0's chrome.
+		// weight the header rows draw. A table with no header row draws its first row as a
+		// body row on the page, so it is one here too, still holding row 0's chrome.
 		const table = el('table', 'qm-table');
 		const colgroup = el('colgroup');
 		this.cols = Array.from({ length: columnCount(props) }, () => el('col'));
 		colgroup.append(...this.cols);
-		const first = this.row(props, 0, s);
+		const heads = Math.min(headRows(props), rowCount(props));
 		const body = el('tbody');
-		if (props.headless) {
-			body.appendChild(first);
-			table.append(colgroup, body);
-		} else {
+		if (heads) {
 			const head = el('thead');
-			head.appendChild(first);
+			for (let r = 0; r < heads; r++) head.appendChild(this.row(props, r, s));
 			table.append(colgroup, head, body);
-		}
-		for (let r = 1; r < rowCount(props); r++) body.appendChild(this.row(props, r, s));
+		} else table.append(colgroup, body);
+		for (let r = heads; r < rowCount(props); r++) body.appendChild(this.row(props, r, s));
 
 		// The frame is the grid's own box, and the two controls about an axis rather than
 		// about a line hang off its edges: an add bar along each trailing edge. A cell
@@ -1321,7 +1319,7 @@ class TableIslandView implements NodeView {
 
 	/** One table row: its cells, each carrying whatever chrome hangs off it. */
 	private row(props: TableProps, r: number, s: TableChromeStrings): HTMLElement {
-		const heads = r === 0 && !props.headless;
+		const heads = r < headRows(props);
 		const tr = el('tr', heads ? 'qm-table-header-row' : undefined);
 		rowCells(props, r).forEach((cell, c) => {
 			const box = el(heads ? 'th' : 'td', 'qm-table-cell');
@@ -1350,11 +1348,11 @@ class TableIslandView implements NodeView {
 				box.appendChild(
 					this.grip(
 						{ axis: 'row', index: r },
-						heads ? s.tableSelectHeaderRow : s.tableSelectRow(props.headless ? r + 1 : r)
+						heads ? s.tableSelectHeaderRow : s.tableSelectRow(r - headRows(props) + 1)
 					)
 				);
 			if (r === 0 && c === columnCount(props) - 1)
-				box.appendChild(this.headerToggle(!props.headless, s));
+				box.appendChild(this.headerToggle(headRows(props) > 0, s));
 			tr.appendChild(box);
 			this.mountCell(box, host, r, c, s);
 		});
@@ -1419,7 +1417,7 @@ class TableIslandView implements NodeView {
 	}
 
 	/** The first row's header toggle: one press draws the row as the header or as a body
-	 *  row, writing the table's `headless` as one `set`, and the row stays held. Up only
+	 *  row, writing the table's `head` as one `set`, and the row stays held. Up only
 	 *  while the first row is held, hanging under its last cell, and out of the tab order
 	 *  for the reason a grip is. */
 	private headerToggle(header: boolean, s: TableChromeStrings): HTMLElement {
@@ -1428,7 +1426,7 @@ class TableIslandView implements NodeView {
 		cluster.hidden = true;
 		cluster.addEventListener('mousedown', (e) => e.preventDefault());
 		const btn = chromeButton('qm-table-align-option', s.tableHeaderToggle, () => {
-			this.write(setHeadless(this.props(), header));
+			this.write(setHead(this.props(), header ? 0 : 1));
 			this.selectLine({ axis: 'row', index: 0 });
 		});
 		btn.tabIndex = -1;
@@ -1470,7 +1468,8 @@ class TableIslandView implements NodeView {
 		s: TableChromeStrings
 	): void {
 		const props = this.props();
-		const row = props.headless ? s.tableRow(r + 1) : r === 0 ? s.tableHeaderRow : s.tableRow(r);
+		const head = headRows(props);
+		const row = r < head ? s.tableHeaderRow : s.tableRow(r - head + 1);
 		const name = s.tableCell(row, s.tableColumn(c + 1));
 		const seed = cellAt(props, r, c);
 		const view: EditorView = new EditorView(host, {

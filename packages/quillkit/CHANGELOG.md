@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.131.0.** A `<qm-span family="…">` pair inside a line sets its text's font family, and a table writes as a pipe table or as HTML, which spells merged cells and the layout `qm-table` and `qm-cell` spelled before: markdown wrapping a table in either keeps the table and loses its widths, placement, header setting and cell alignment. Rewrite such a table as HTML.
+
 **Studio's picker spaces its controls at the bar's inner rhythm**, 8px, where it spent 12.
 
 **The app's footer stands on the header's plate**, where it showed the page tone, so the two bands framing the panes match.

@@ -9,7 +9,7 @@ import type { TableCell, TableProps } from '@quillmark/wasm';
 import { decode } from './decode.js';
 import { tablePropsOfNode } from './islands.js';
 import { blockSchema, cellSchema } from './schema.js';
-import { cellAt, cellContent, columnCount, rowCount } from './table.js';
+import { cellAt, cellContent, columnCount, headRows, rowCount } from './table.js';
 
 /** A block of cells, both corners inclusive, in the row space `table.ts` names. */
 export interface CellRange {
@@ -42,7 +42,7 @@ export function tableElement(props: TableProps, range = whole(props)): HTMLTable
 	const table = document.createElement('table');
 	let body: HTMLTableSectionElement | undefined;
 	for (let r = range.r0; r <= range.r1; r++) {
-		const head = r === 0 && !props.headless;
+		const head = r < headRows(props);
 		const section = head ? table.createTHead() : (body ??= table.createTBody());
 		const tr = section.insertRow();
 		for (let c = range.c0; c <= range.c1; c++)

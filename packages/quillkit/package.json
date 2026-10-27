@@ -43,7 +43,7 @@
 	},
 	"dependencies": {
 		"@quillmark/quiver": "0.38.1",
-		"@quillmark/wasm": "0.130.0",
+		"@quillmark/wasm": "0.131.0",
 		"yaml": "^2.8.3"
 	},
 	"devDependencies": {

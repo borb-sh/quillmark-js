@@ -35,7 +35,7 @@ import {
 	rowCells,
 	rowCount,
 	setAlign,
-	setHeadless,
+	setHead,
 	setWidths,
 	shapeEqual,
 	withCell
@@ -147,7 +147,7 @@ describe('the layout keys ride every op', () => {
 		header: [{ ...cell('h1'), align: 'right' }, cell('h2')],
 		widths: [2, null],
 		align: 'center',
-		headless: true
+		head: 0
 	});
 
 	it('a column op carries its width, and the table its placement', () => {
@@ -176,7 +176,7 @@ describe('the layout keys ride every op', () => {
 		for (const next of ops) {
 			const back = propsOf(stored(withTable(next)));
 			expect(back.widths).toEqual(next.widths);
-			expect([back.align, back.headless]).toEqual(['center', true]);
+			expect([back.align, back.head]).toEqual(['center', 0]);
 		}
 	});
 
@@ -1032,7 +1032,7 @@ describe('the first row is the header or a body row', () => {
 		expect(press.getAttribute('aria-pressed')).toBe('true');
 		press.click();
 
-		expect(leafProps(field).headless).toBe(true);
+		expect(leafProps(field).head).toBe(0);
 		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
 		expect(field.el.querySelector('thead')).toBeNull();
 		expect(field.el.querySelectorAll('th.qm-table-cell')).toHaveLength(0);
@@ -1047,14 +1047,22 @@ describe('the first row is the header or a body row', () => {
 		expect(toggle(field).querySelector('button')!.getAttribute('aria-pressed')).toBe('false');
 
 		undo(outerView(field).state, outerView(field).dispatch);
-		expect(leafProps(field).headless).toBeUndefined();
+		expect(leafProps(field).head).toBeUndefined();
 		expect(field.el.querySelectorAll('thead th.qm-table-cell')).toHaveLength(2);
 		field.destroy();
 	});
 
-	it('headless rides the store', () => {
-		expect(propsOf(stored(withTable(setHeadless(LETTERED, true)))).headless).toBe(true);
-		expect(propsOf(stored(withTable(setHeadless(LETTERED, false)))).headless).toBeUndefined();
+	it('a head past one draws that many rows as the header', () => {
+		const { field } = tableLeaf(setHead(LETTERED, 2));
+		expect(field.el.querySelectorAll('thead tr')).toHaveLength(2);
+		expect(field.el.querySelectorAll('tbody tr')).toHaveLength(rowCount(LETTERED) - 2);
+		field.destroy();
+	});
+
+	it('head rides the store', () => {
+		expect(propsOf(stored(withTable(setHead(LETTERED, 0)))).head).toBe(0);
+		expect(propsOf(stored(withTable(setHead(LETTERED, 1)))).head).toBeUndefined();
+		expect(propsOf(stored(withTable(setHead(LETTERED, 2)))).head).toBe(2);
 	});
 });
 
@@ -1081,7 +1089,7 @@ describe('a cell’s own alignment is carried, never authored', () => {
 			moveColumn(OWN, 0, 1),
 			deleteColumn(OWN, 1),
 			setAlign(OWN, 1, 'center'),
-			setHeadless(OWN, true)
+			setHead(OWN, 0)
 		];
 		for (const next of ops) {
 			const back = propsOf(stored(withTable(next)));

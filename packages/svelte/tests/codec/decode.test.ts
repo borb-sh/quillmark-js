@@ -126,6 +126,14 @@ describe('constructs read, not edited', () => {
 		expect(fitsLeaf(rt, block)).toBe(false);
 		expect(fitsLeaf(md('Term'), block)).toBe(true);
 	});
+
+	it('a font family holds a block or an inline leaf, and not a plain one', () => {
+		const rt = md('a <qm-span family="Carlito">set</qm-span> run');
+		expect(rt.marks.map((m) => m.type)).toEqual(['font_family']);
+		expect(fitsLeaf(rt, block)).toBe(false);
+		expect(fitsLeaf(rt, { ...block, inline: true })).toBe(false);
+		expect(fitsLeaf(rt, { ...block, plaintext: true })).toBe(true);
+	});
 });
 
 describe('one-line / plain constraints', () => {

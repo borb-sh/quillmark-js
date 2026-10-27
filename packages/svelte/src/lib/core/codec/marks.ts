@@ -8,12 +8,14 @@ import type { Mark, Schema } from 'prosemirror-model';
 import type { ContentMark, ContentMarkKind } from '@quillmark/wasm';
 import { canonicalJson } from './reconcile.js';
 
-/** A PM mark from a content formatting mark, or `null` for an anchor. Exhaustive over
+/** A PM mark from a content formatting mark, or `null` for an anchor or a font family,
+ *  which no PM mark draws and whose leaf is held (`decode.ts` §`fitsLeaf`). Exhaustive over
  *  the closed mark vocabulary, so a member added upstream is a compile error here rather
  *  than an index into a PM mark this schema does not declare. */
 export function pmMarkFromContent(schema: Schema, m: ContentMark): Mark | null {
 	switch (m.type) {
 		case 'anchor':
+		case 'font_family':
 			return null;
 		case 'emph':
 			return schema.marks.em.create();

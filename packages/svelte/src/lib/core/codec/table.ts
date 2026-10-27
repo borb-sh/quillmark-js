@@ -87,8 +87,13 @@ export function normalizeTable(props: TableProps): TableProps {
 		aligns: Array.from({ length: cols }, (_, c) => props.aligns[c] ?? 'none'),
 		...(widths.some((w) => w !== null) && { widths }),
 		...(props.align && { align: props.align }),
-		...(props.headless && { headless: true })
+		...(props.head !== undefined && props.head !== 1 && { head: props.head })
 	};
+}
+
+/** How many rows from the top draw as header rows, absent being one. */
+export function headRows(props: TableProps): number {
+	return props.head ?? 1;
 }
 
 /**
@@ -257,10 +262,10 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
 	});
 }
 
-/** Draw the first row as a header or as a body row: what the header toggle writes
+/** Draw the top `head` rows as header rows: what the header toggle writes
  *  (`table-view.ts`). */
-export function setHeadless(props: TableProps, headless: boolean): TableProps {
-	return normalizeTable({ ...props, headless: headless || undefined });
+export function setHead(props: TableProps, head: number): TableProps {
+	return normalizeTable({ ...props, head });
 }
 
 /** Set or clear the column weights: what a border drag and its double-click write
@@ -359,7 +364,7 @@ export function shapeEqual(a: TableProps, b: TableProps): boolean {
 		a.rows.length === b.rows.length &&
 		a.aligns.length === b.aligns.length &&
 		a.aligns.every((x, i) => x === b.aligns[i]) &&
-		!a.headless === !b.headless &&
+		headRows(a) === headRows(b) &&
 		valueEqual(a.widths, b.widths)
 	);
 }
