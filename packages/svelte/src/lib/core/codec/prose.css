@@ -23,11 +23,12 @@
 	outline: var(--_qm-ring);
 }
 /* Upstream's `-32px` is measured against the UA's 40px list indent, which the list
-   rule below replaces with a rung. The offset moves with it, or a selected item's
-   outline hangs into the margin by the difference. */
+   rule below replaces. The offset is that indent, so a selected item's outline takes in
+   its marker and stands on the list's own edge rather than crossing a `10.` or hanging
+   into the margin. */
 li.ProseMirror-selectednode::after {
 	border: var(--_qm-ring);
-	left: calc(var(--_qm-space-4) * -1);
+	left: calc(-1 * (var(--_qm-marker-digits) + var(--_qm-nest)));
 }
 /* A node selection is drawn while its leaf holds the focus, as a text selection is: a
    ring left behind on a field the focus has moved off names a subject no key reaches. */
