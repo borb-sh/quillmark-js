@@ -60,7 +60,7 @@ The font library belongs to the client that builds the engine, never to the cont
 | quill fonts | set the plate, ride inside each `.quill` bundle, never a writer's choice |
 | `App.yaml` | names the app and nothing else |
 | `@quillmark/svelte` | the editor's `fonts` prop takes the faces the engine lists |
-| studio, the app, the playground | build the engine over `loadSuite()`; the playground under `?fonts` |
+| studio, the app, the playground | build the engine over `loadSuite()` |
 | `quillkit check` | renders over the `/node` suite, as the clients it gates do |
 | quillmark CLI | renders with `--font`; parity with the browser is passing this package's files |
 

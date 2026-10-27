@@ -98,7 +98,7 @@
 	let docHandle: Document | undefined = $state();
 	// Held so the recovery loop can try the open again; the surfaces never read it.
 	let engineHandle: Engine | undefined;
-	// The faces the suite offers the editor's picker: `?fonts` only.
+	// The faces the suite offers the editor's picker.
 	let fonts = $state<FontFace[]>([]);
 	// What the engine refused the document with, and why there is no session to paint from.
 	let refused = $state<string | undefined>();
@@ -366,11 +366,13 @@
 			// route's heaviest payload and nothing before paint needs them, so they load
 			// after mount. `init` instantiates the core and resolves to `Quill`, which the
 			// artifact exports nowhere statically. The fixture load awaits the same
-			// memoized gate to materialize its quill.
-			const [{ Engine, MAIN_CARD_ADDR }, { init }, visual] = await Promise.all([
+			// memoized gate to materialize its quill. The font suite downloads beside them,
+			// as an app's does.
+			const [{ Engine, MAIN_CARD_ADDR }, { init }, visual, library] = await Promise.all([
 				import('@quillmark/wasm'),
 				import('@quillmark/svelte/core'),
-				import('@quillmark/svelte/visual')
+				import('@quillmark/svelte/visual'),
+				loadSuite()
 			]);
 			const { Quill } = await init();
 			fixtures = await fixtureNames();
@@ -401,10 +403,8 @@
 					]
 				});
 			}
-			// `?fonts` builds the engine over `@quillmark/fonts`, as an app does: a quill's own
-			// fonts set its plate and never a mark, so the suite's reach text only through the
-			// editor's picker.
-			const library = params.has('fonts') ? await loadSuite() : [];
+			// Built over `@quillmark/fonts`, as an app's is: a quill's own fonts set its plate
+			// and never a mark, so the suite's reach text only through the editor's picker.
 			const engine = new Engine({ fonts: library });
 			// Always free: it answers off the backend descriptor without loading the binary
 			// or cloning the quill.
@@ -428,13 +428,12 @@
 			// Behind the editor, as the session is: listing the faces loads the render build. A
 			// refused library rejects the session's open with the same error, which the band
 			// words, so this rejection has nothing to add.
-			if (library.length)
-				engine.fontFaces(quill).then(
-					(faces) => {
-						if (mine === generation) fonts = faces;
-					},
-					() => {}
-				);
+			engine.fontFaces(quill).then(
+				(faces) => {
+					if (mine === generation) fonts = faces;
+				},
+				() => {}
+			);
 		} catch (e) {
 			for (const h of created) h.free();
 			if (mine === generation)
