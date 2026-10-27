@@ -149,8 +149,7 @@ describe('a block leaf reads markdown text', () => {
 	// What no leaf edits, no paste mints: the text that would build it is the paste.
 	it.each([
 		['an equation', '- the area\n- $\\pi r^2$'],
-		['a footnote', '- noted[^1]\n\n[^1]: The note.'],
-		['a definition list', '- item\n\nTerm\n: described']
+		['a footnote', '- noted[^1]\n\n[^1]: The note.']
 	])('a draft holding %s stays literal', (_, markdown) => {
 		const rt = pasted(text(markdown));
 		expect(rt.islands).toEqual([]);

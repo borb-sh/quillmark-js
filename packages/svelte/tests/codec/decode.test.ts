@@ -93,7 +93,7 @@ describe('island round-trip (id preserved)', () => {
 	});
 });
 
-// A footnote, an equation and a definition list are read, not edited: the leaf holding
+// A footnote, an equation and a font family are read, not edited: the leaf holding
 // one is held (`fitsLeaf`), so what decode draws of it is never a commit's source.
 describe('constructs read, not edited', () => {
 	const block = { inline: false, plaintext: false, islands: true };
@@ -111,20 +111,6 @@ describe('constructs read, not edited', () => {
 		expect(back.islands).toEqual(rt.islands);
 		expect(contentEqual(normalize(back), normalize(rt))).toBe(true);
 		expect(fitsLeaf(rt, block)).toBe(false);
-	});
-
-	it('a definition list draws its term as a paragraph and each description as its blocks', () => {
-		const rt = md('Term\n: one\n: two');
-		expect(rt.lines.map((line) => [line.kind, line.containers])).toEqual([
-			['term', []],
-			['para', [{ container: 'description' }]],
-			['para', [{ container: 'description', instance: 1 }]]
-		]);
-		expect(decode(rt, blockSchema).toString()).toBe(
-			'doc(paragraph("Term"), paragraph("one"), paragraph("two"))'
-		);
-		expect(fitsLeaf(rt, block)).toBe(false);
-		expect(fitsLeaf(md('Term'), block)).toBe(true);
 	});
 
 	it('a font family holds a block or an inline leaf, and not a plain one', () => {
