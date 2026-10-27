@@ -39,7 +39,7 @@ Contiguity plus an equal path is the whole of what makes one container, so `inst
 
 Marks apply over their `[start, end)` range; PM splits inline nodes at mark boundaries, so free overlap of *different* formatting kinds is representable without loss (`strong[0,4)` + `emph[2,6)` → text nodes `{strong}`, `{strong,emph}`, `{emph}`). An island slot decodes to an inline node (an image) unless it is a block island alone on its line, which decodes to a block node (a table), either carrying the island `id` and typed props.
 
-**A font family, a footnote and an equation are read, not edited.** No PM mark holds a `font_family` mark, a table cell's included, so the first keystroke would store the field without it; a footnote and an equation ride the inline island node, which no gesture edits or mints. A block leaf holding any of them, or an inline leaf holding a font family, is held as a narrowed leaf over structure is (§Inline mode), read-only, and nothing commits. A footnote draws as its reference mark, numbered in reading order, its note the mark's title, and an equation as its TeX between the dollars that write it (`islands.ts`, `prose.css`). A task item is edited (§"Task items").
+**A footnote and an equation are read, not edited.** Both ride the inline island node, which no gesture edits or mints, so a block leaf holding either is held as a narrowed leaf over structure is (§Inline mode), read-only, and nothing commits. A footnote draws as its reference mark, numbered in reading order, its note the mark's title, and an equation as its TeX between the dollars that write it (`islands.ts`, `prose.css`). A task item is edited (§"Task items").
 
 Two mark kinds do **not** become PM marks: see §Marks.
 
@@ -71,10 +71,12 @@ A **block** island is one bundle of two channels: the `delta` inserts the `\n` t
 
 The content mark set is two algebra classes, and they route to two different PM mechanisms:
 
-- **formatting** (`strong` / `emph` / `underline` / `strike` / `code` / `link`) is a property of a range. ↔ PM marks. A round-trip through PM yields the union ranges, which is what content normalization produces anyway, so formatting is stable.
+- **formatting** (`strong` / `emph` / `underline` / `strike` / `code` / `font_family` / `link`) is a property of a range. ↔ PM marks. A round-trip through PM yields the union ranges, which is what content normalization produces anyway, so formatting is stable.
 - **identity** (`anchor{id}`: comment threads, stable references; zero-width capable, no glyph) is a handle, not a property. It has no home as a PM mark (a PM mark needs a text node and carries no zero-width span). ↔ **PM decorations** (or plugin-held positions) keyed by id, carried across edits by `tr.mapping` and lowered to `anchor` mark ops. This split is what dissolves the "Peritext overlap vs nested marks" tension: overlap only bites where identity and formatting coexist, and they never share a mechanism.
 
 **A code line's text carries no marks.** `code_block` declares `marks: ''` (`schema.ts`), so decode builds its text node bare and the projection hands `emitText` an empty set. A formatting mark over code text has no reader anywhere — the fence and the Typst `#raw` emit the segment verbatim — so one that reaches a field survives the read and is gone on the first `markOps` diff; `importMarkdown` mints none and no gesture does. What reaches a code line is identity: an anchor is a decoration, and a comment thread on a fence holds.
+
+**A `font_family` is one family a character.** The store keys the mark on its `name`, one per character, and PM's default exclusion of a mark by its own type is the same rule, so a second family over a first replaces it under its range and the diff lowers the pair as one family exchanged for another. The leaf draws a run in its family over the root's face, which is what a family the page has not loaded falls to; the editor loads the faces a host hands it (VISUAL_EDITOR §Chrome). A span styling `font-family` is the source's face and no mark: only the leaf's own `data-qm-family` parses, so a paste from a word processor takes the document's face as it does everywhere else. A family holds in a table cell as any mark does, the cell's schema sharing the set.
 
 **A `link` renders through a scheme allowlist.** An `href` is an attribute value rather than markup, so the path that keeps a document's text from becoming tags never reaches it, and `renderContent` paints marks outside a `contenteditable` (the tips card, whose channel is the document's own `$ext.editor.tips`), where a click is a plain one. `toDOM` emits an `<a>` for a scheme the surface makes clickable and an inert span otherwise; the prompt refuses the same set on submit. The gate is the render's and not the model's: a refused href stays on the mark and round-trips, so opening a document never edits it.
 
@@ -170,7 +172,7 @@ Four of the content's discriminants name their whole vocabulary: a mark `type`, 
 | --- | --- |
 | line `kind` | `para`, `heading`, `code`, `rule` |
 | container | `list_item`, `quote` |
-| mark `type` | `strong`, `emph`, `underline`, `strike`, `code`, `link`, `anchor` |
+| mark `type` | `strong`, `emph`, `underline`, `strike`, `code`, `font_family`, `link`, `anchor` |
 | island `type` | `table`, `image`, `footnote`, `math` |
 
 Reading is a discriminant check: `line.kind === 'heading'` reaches `line.attrs.level`, `m.type === 'link'` reaches `m.attrs.url`, with no guard in between. Writing is a literal the checker admits or rejects. **What the codec must not do is restate a set as a literal check**, which compiles unchanged against a widened union and silently refuses — or worse, flattens — the member it does not know. Each of the four places that names a set names it against the boundary's own: an exhaustive `switch` closed by a `never` for the line kinds and the marks, a `satisfies` for the container left after the list, and a `Record` keyed by the union for the island `type`, stating whether its markup is a block and whether a leaf edits it.

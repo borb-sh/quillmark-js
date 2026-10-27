@@ -100,6 +100,10 @@ describe('a copy and a paste carry the whole node', () => {
 				S.nodes.heading.create({ level: 3 }, S.text('h')),
 				para(S.text('a', [S.marks.link.create({ href: 'https://x.test' })]))
 			)
+		],
+		[
+			'a font family whose name needs quoting',
+			doc(para(S.text('a', [S.marks.font_family.create({ name: 'Say "Hi" \\o/' })])))
 		]
 	];
 
@@ -130,6 +134,11 @@ describe('a copy and a paste carry the whole node', () => {
 // The parse rules read this package's own `data-*` names, which nothing on the web
 // spells, so the foreign door is where a rule deliberately widens it and nowhere else.
 describe('what a paste from outside the editor states', () => {
+	it('a span styling a face is the source face, never a font family', () => {
+		const pasted = parse('<p><span style="font-family: Tinos">a</span></p>');
+		expect(pmToContent(pasted).marks).toEqual([]);
+	});
+
 	it.each([
 		[
 			'language- on the code, which every highlighter emits',

@@ -15,7 +15,9 @@
  prompt it raises being this surface's: a document `keydown` the leaf's keymap left
  unclaimed. Over a leaf that holds lists, two more buttons number or bullet every
  selected line, or take the marker off where every one carries it: the codec's
- `toggleList`, whose keys (Mod-Shift-7/8) the leaf's keymap binds.
+ `toggleList`, whose keys (Mod-Shift-7/8) the leaf's keymap binds. Where the host
+ handed the editor a font library, or the selection already sets a family, a picker
+ sets the selection's family or takes it back to the surrounding face (`fonts.ts`).
 
  Selection observation. The view's `dispatchTransaction` is the leaf's
  (read-only), so there is no hook to observe transactions from outside.
@@ -78,14 +80,17 @@
 	import { hasMarks, rangeAnchor, toggleList, type RangeAnchor } from '../core/codec/index.js';
 	import type { ActiveProse } from './leaves.js';
 	import { clearLink, hrefInSelection, normalizeHref, setLink } from './links.js';
+	import { familyInSelection, setFamily } from './fonts.js';
 	import { spacePx } from '../core/rungs.js';
 	import './controls.css';
 
 	interface Props {
 		/** The observation seam VisualEditor exposes over its `leaves` registry. */
 		getActiveLeaf: () => ActiveProse | undefined;
+		/** The families the host's font library offers, in its order. */
+		families?: string[];
 	}
-	let { getActiveLeaf }: Props = $props();
+	let { getActiveLeaf, families = [] }: Props = $props();
 
 	const SETTLE_MS = 450;
 	/** The six content formatting marks. `anchor` is withheld: it draws nothing until
@@ -108,6 +113,23 @@
 	/** Whether the leaf under the selection holds lists: a body does, a one-line field
 	 *  and a table cell do not. */
 	let listable = $state(false);
+	/** Whether the leaf under the selection declares `font_family`: a `text` leaf does not. */
+	let markable = $state(false);
+	/** The family the selection is set in, `''` for none and `null` for several. */
+	let family = $state<string | null>('');
+	/** Whether the picker draws: the leaf declares the mark, and there is a family to
+	 *  offer or one under the selection to clear. */
+	const fontable = $derived(markable && (families.length > 0 || !!family));
+	/** The picker's options: the library's families, and the selection's own where the
+	 *  library lacks it, so the picker always shows what the document says. */
+	const familyOptions = $derived(
+		family && !families.includes(family) ? [...families, family] : families
+	);
+	/** The picker's value over a selection setting several families: no family's. */
+	const MIXED = '\u0000';
+	/** The view the surface rose over. The picker takes the focus, and a cell view
+	 *  without it is no longer the leaf's `focusedView`. */
+	let surfaceView: EditorView | undefined;
 	/** A pointer is down outside this surface: the selection is still being made. */
 	let pressed = false;
 	let linkPromptOpen = $state(false);
@@ -173,6 +195,9 @@
 		}
 		portalTarget = view.dom.closest<HTMLElement>('[data-qm-root]') ?? undefined;
 		listable = !!view.state.schema.nodes.list_item;
+		markable = !!view.state.schema.marks.font_family;
+		family = familyInSelection(view.state);
+		surfaceView = view;
 		const { from, to } = view.state.selection;
 		anchor = rangeAnchor(view, from, to);
 		open = true;
@@ -276,6 +301,14 @@
 			return;
 		}
 		toggleMark(type)(view.state, view.dispatch);
+		view.focus();
+		sync();
+	}
+
+	function pickFamily(name: string): void {
+		const view = surfaceView && !surfaceView.isDestroyed ? surfaceView : activeLeafView();
+		if (!view) return;
+		setFamily(name)(view.state, view.dispatch);
 		view.focus();
 		sync();
 	}
@@ -441,6 +474,24 @@
 										onclick={() => toggle(m.name)}><Icon name={m.icon} /></button
 									>
 								{/each}
+								{#if fontable}
+									<span class="qm-format-divider" aria-hidden="true"></span>
+									<select
+										class="qm-font-select qm-focus-ring"
+										title={t.strings.formatFont}
+										aria-label={t.strings.formatFont}
+										value={family ?? MIXED}
+										onchange={(e) => pickFamily(e.currentTarget.value)}
+									>
+										{#if family === null}
+											<option value={MIXED} disabled hidden>{t.strings.fontMixed}</option>
+										{/if}
+										<option value="">{t.strings.fontDefault}</option>
+										{#each familyOptions as name (name)}
+											<option value={name}>{name}</option>
+										{/each}
+									</select>
+								{/if}
 								{#if listable}
 									<span class="qm-format-divider" aria-hidden="true"></span>
 									{#each LISTS as l (l.icon)}
@@ -494,6 +545,17 @@
 	.qm-mark-btn {
 		padding: var(--_qm-space) var(--_qm-space-2);
 		color: var(--_qm-ink);
+	}
+	/* The link input's box, a pick rather than a typed value. */
+	.qm-font-select {
+		font: inherit;
+		font-size: var(--_qm-text-body);
+		padding: var(--_qm-inset-control);
+		border: none;
+		border-radius: var(--_qm-radius-inner);
+		background: var(--_qm-surface-well);
+		color: var(--_qm-ink);
+		max-width: 12rem;
 	}
 	/* Stretched, so the prompt's buttons stand the input's box line and the face is one
 	   row height rather than a box between two shorter buttons. */

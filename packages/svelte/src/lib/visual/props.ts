@@ -3,7 +3,7 @@
 // `VisualEditorInner` (the editor, which mounts once per key). A component cannot
 // export a type without a module script, and a type imported across the two would
 // make the pair circular, so the shape lives beside them instead.
-import type { Document, Quill, Addr, Diagnostic } from '@quillmark/wasm';
+import type { Document, Quill, Addr, Diagnostic, FontFace } from '@quillmark/wasm';
 import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
@@ -87,6 +87,14 @@ export interface VisualEditorProps {
 	 * (VISUAL_EDITOR §"Enum policy").
 	 */
 	enumDisallowed?: 'hide' | 'disable';
+	/**
+	 * The faces a `font_family` mark may set: `await engine.fontFaces(quill)`, over an
+	 * engine built with the host's `fonts`. The format popover offers each family, and
+	 * the editor registers each face with the page for as long as it is mounted, so a
+	 * run draws in the face the preview sets it in. Absent or empty, no family is
+	 * offered, and a family the document already sets still edits and can be cleared.
+	 */
+	fonts?: FontFace[];
 	/**
 	 * Every word the surface says, keyed and partial: unset keys take the package's
 	 * English. Several are accessible names rather than decoration, so this is what

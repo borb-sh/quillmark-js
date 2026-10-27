@@ -17,6 +17,8 @@ import {
 import type { Content } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { pmMarkFromContent } from '$lib/core/codec/marks.js';
+import { cellSchema } from '$lib/core/codec/schema.js';
+import { cellContent, cellFromDoc } from '$lib/core/codec/table.js';
 import { md, normalize, contentEqual, titleContent, bodyContent, quill } from './_util.js';
 
 /** decode → pmToContent, both sides normalized through the real content. */
@@ -93,7 +95,7 @@ describe('island round-trip (id preserved)', () => {
 	});
 });
 
-// A footnote, an equation and a font family are read, not edited: the leaf holding
+// A footnote and an equation are read, not edited: the leaf holding
 // one is held (`fitsLeaf`), so what decode draws of it is never a commit's source.
 describe('constructs read, not edited', () => {
 	const block = { inline: false, plaintext: false, islands: true };
@@ -112,13 +114,37 @@ describe('constructs read, not edited', () => {
 		expect(contentEqual(normalize(back), normalize(rt))).toBe(true);
 		expect(fitsLeaf(rt, block)).toBe(false);
 	});
+});
 
-	it('a font family holds a block or an inline leaf, and not a plain one', () => {
+// A font family is edited: a PM mark carries it, a table cell's included, so a commit
+// stores it back.
+describe('a font family', () => {
+	const block = { inline: false, plaintext: false, islands: true };
+
+	it('edits in a block and an inline leaf, and drops from a plain one', () => {
 		const rt = md('a <qm-span family="Carlito">set</qm-span> run');
 		expect(rt.marks.map((m) => m.type)).toEqual(['font_family']);
-		expect(fitsLeaf(rt, block)).toBe(false);
-		expect(fitsLeaf(rt, { ...block, inline: true })).toBe(false);
+		expect(fitsLeaf(rt, block)).toBe(true);
+		expect(fitsLeaf(rt, { ...block, inline: true })).toBe(true);
 		expect(fitsLeaf(rt, { ...block, plaintext: true })).toBe(true);
+	});
+
+	it.each([
+		['a body', blockSchema],
+		['a one-line leaf', inlineSchema]
+	])('survives decode → pmToContent in %s', (_, schema) => {
+		const rt = md('a <qm-span family="Carlito">**set**</qm-span> run');
+		const back = pmToContent(decode(rt, schema));
+		expect(contentEqual(normalize(back), normalize(rt))).toBe(true);
+	});
+
+	it('survives a table cell', () => {
+		const rt = md('| <qm-span family="Carlito">head</qm-span> |\n| --- |\n| cell |');
+		expect(fitsLeaf(rt, block)).toBe(true);
+		const island = rt.islands[0];
+		if (island.type !== 'table') throw new Error('expected a table');
+		const cell = island.props.header[0];
+		expect(cellFromDoc(decode(cellContent(cell), cellSchema), cell)).toEqual(cell);
 	});
 });
 

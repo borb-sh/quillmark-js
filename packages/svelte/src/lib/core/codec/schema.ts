@@ -45,6 +45,9 @@ const styledSpan = (styled: (el: HTMLElement) => boolean): TagParseRule => ({
 	getAttrs: (el) => styled(el) && null
 });
 
+/** `s` as a CSS string literal. */
+const cssString = (s: string): string => `"${s.replace(/[\\"]/g, '\\$&').replace(/\n/g, '\\a ')}"`;
+
 // ── Marks (the block and inline schemas share them; plaintext declares none) ─
 const marks: Record<string, MarkSpec> = {
 	// Order matters: it fixes mark-set sort order and parse precedence. `link`
@@ -81,6 +84,31 @@ const marks: Record<string, MarkSpec> = {
 		toDOM: () => ['s', 0]
 	},
 	code: { parseDOM: [{ tag: 'code' }], toDOM: () => ['code', 0] },
+	// One family a character, which is PM's default exclusion of a mark by its own type:
+	// an `addMark` of a second family replaces the first, as the store's keyed `add` does.
+	// A family the page cannot draw falls to the root's face rather than the UA's. A span
+	// styling `font-family` is the source's face, never a mark, so only this package's own
+	// name parses.
+	font_family: {
+		attrs: { name: { default: '' } },
+		parseDOM: [
+			{
+				tag: 'span[data-qm-family]',
+				getAttrs: (el) => {
+					const name = el.getAttribute('data-qm-family');
+					return name ? { name } : false;
+				}
+			}
+		],
+		toDOM: (mark) => {
+			const name = mark.attrs.name as string;
+			return [
+				'span',
+				{ 'data-qm-family': name, style: `font-family: ${cssString(name)}, var(--_qm-font)` },
+				0
+			];
+		}
+	},
 	link: {
 		attrs: { href: { default: '' } },
 		inclusive: false,

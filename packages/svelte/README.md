@@ -165,6 +165,26 @@ The package ships English and a seam to replace it. `strings` is keyed and **par
 
 `formatDiagnostic` gets the whole `Diagnostic` and returns `undefined` to take its own message. Validation and edit diagnostics re-word from `code`, `path` and `args`; parse errors and render warnings carry their detail inside English text and stand as they are ([VISUAL_EDITOR.md](prose/canon/VISUAL_EDITOR.md)).
 
+### Fonts
+
+A run of text can be set in a font family the **host** supplies, spelled `<qm-span family="…">` in markdown. Build the engine with the font files (`.ttf`, `.otf`, `.ttc`, `.otc`) and hand the editor the faces it lists: the format popover then offers each family, and the editor registers the faces with the page so a run draws in the face the preview sets it in.
+
+```ts
+const carlito = new Uint8Array(await (await fetch('/fonts/Carlito-Regular.ttf')).arrayBuffer());
+const engine = new Engine({ fonts: [carlito] });
+```
+
+```svelte
+<script lang="ts">
+	let fonts = $state<FontFace[]>([]);
+	engine.fontFaces(quill).then((faces) => (fonts = faces));
+</script>
+
+<VisualEditor {doc} {quill} {fonts} />
+```
+
+`fontFaces` loads the render build, as `open` does, so mount the editor first and let the faces arrive behind it. A family the document already sets edits with no library at all, and the picker offers it so it can be cleared.
+
 ### Recompiling
 
 `onChange` is the signal to recompile, and it covers **all three lanes**: a prose keystroke, a scalar write, a card operation. `onCaretMove` is a _selection_ signal, not a change signal: it fires on a bare arrow key, so a recompile hung off it recompiles on every one.

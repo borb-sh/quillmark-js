@@ -71,12 +71,13 @@
 		LiveSession,
 		ChangeSet,
 		Diagnostic,
+		FontFace,
 		OutputFormat
 	} from '@quillmark/wasm';
 	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
 	import { Preview } from '@quillmark/svelte/preview';
-	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
+	import { DEFAULT_FIXTURE, fixtureNames, fontFiles, loadFixtureTree } from '../fixture';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -96,6 +97,8 @@
 	let docHandle: Document | undefined = $state();
 	// Held so the recovery loop can try the open again; the surfaces never read it.
 	let engineHandle: Engine | undefined;
+	// The faces the host's font library offers the editor's picker: `?fonts` only.
+	let fonts = $state<FontFace[]>([]);
 	// What the engine refused the document with, and why there is no session to paint from.
 	let refused = $state<string | undefined>();
 
@@ -345,6 +348,7 @@
 		quillHandle = undefined;
 		docHandle = undefined;
 		engineHandle = undefined;
+		fonts = [];
 		refused = undefined;
 		editorRef = undefined;
 		previewRef = undefined;
@@ -372,7 +376,8 @@
 			const params = new URLSearchParams(window.location.search);
 			// Chrome rather than a seed, so it rides no document and outlives a pick.
 			stats = params.has('stats');
-			const quill = Quill.fromTree(await loadFixtureTree(name));
+			const tree = await loadFixtureTree(name);
+			const quill = Quill.fromTree(tree);
 			created.unshift(quill);
 			const example = examples ? quill.exampleDocument() : undefined;
 			const doc = example ?? quill.seedDocument();
@@ -396,7 +401,11 @@
 					]
 				});
 			}
-			const engine = new Engine();
+			// `?fonts` hands the engine a host font library, the font files the quill's own
+			// tree holds standing in for the app's: a quill's fonts set its plate and never a
+			// mark, so these reach text only through the editor's picker.
+			const library = params.has('fonts') ? fontFiles(tree) : [];
+			const engine = new Engine({ fonts: library });
 			// Always free: it answers off the backend descriptor without loading the binary
 			// or cloning the quill.
 			const emits = await engine.supportedFormats(quill);
@@ -416,6 +425,16 @@
 			toFree = created;
 			status = { phase: 'ready' };
 			void reopen();
+			// Behind the editor, as the session is: listing the faces loads the render build. A
+			// refused library rejects the session's open with the same error, which the band
+			// words, so this rejection has nothing to add.
+			if (library.length)
+				engine.fontFaces(quill).then(
+					(faces) => {
+						if (mine === generation) fonts = faces;
+					},
+					() => {}
+				);
 		} catch (e) {
 			for (const h of created) h.free();
 			if (mine === generation)
@@ -611,6 +630,7 @@
 						onChange={handleChange}
 						onError={handleError}
 						diagnostics={externalDiagnostics}
+						{fonts}
 					/>
 				{/if}
 			</section>
