@@ -12,7 +12,7 @@ Studio is for the quiver's authors and shows the quiver; the app is for its read
 
 `app.json` is fetched `no-cache` against `document.baseURI`, so an app serves from wherever it is put, and it says three things about the page before anything mounts: the tab's title, its icon, and the author's `app.css`, linked after the client's own sheets so a rule of equal rank is the author's. The mount waits on that sheet, so the first paint is the author's look rather than the client's with the author's arriving over it; a sheet that will not load settles the wait anyway, and the app stands in its own look.
 
-Then the core wasm, the quiver (`fromBuiltUrl` on `quiver/`), and the store. The form mounts on the core alone; the render wasm is the engine's, loaded by the first `engine.open`, so the page follows the form rather than holding it back. A boot that fails says "This app can't load right now." and puts what failed in the console, where whoever can fix it looks.
+Then the core wasm, the quiver (`fromBuiltUrl` on `quiver/`), and the store, with the font suite downloading beside them for the engine to be built over (FONTS §"Size and loading"). The form mounts on the core alone; the render wasm is the engine's, loaded by the first `engine.open`, which awaits the suite, so the page follows the form rather than holding it back. Once a session stands, the form's font picker offers the suite's families. A boot that fails says "This app can't load right now." and puts what failed in the console, where whoever can fix it looks.
 
 ## The first screen
 

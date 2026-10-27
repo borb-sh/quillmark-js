@@ -77,7 +77,8 @@
 	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
 	import { Preview } from '@quillmark/svelte/preview';
-	import { DEFAULT_FIXTURE, fixtureNames, fontFiles, loadFixtureTree } from '../fixture';
+	import { loadSuite } from '@quillmark/fonts';
+	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -97,7 +98,7 @@
 	let docHandle: Document | undefined = $state();
 	// Held so the recovery loop can try the open again; the surfaces never read it.
 	let engineHandle: Engine | undefined;
-	// The faces the host's font library offers the editor's picker: `?fonts` only.
+	// The faces the suite offers the editor's picker: `?fonts` only.
 	let fonts = $state<FontFace[]>([]);
 	// What the engine refused the document with, and why there is no session to paint from.
 	let refused = $state<string | undefined>();
@@ -376,8 +377,7 @@
 			const params = new URLSearchParams(window.location.search);
 			// Chrome rather than a seed, so it rides no document and outlives a pick.
 			stats = params.has('stats');
-			const tree = await loadFixtureTree(name);
-			const quill = Quill.fromTree(tree);
+			const quill = Quill.fromTree(await loadFixtureTree(name));
 			created.unshift(quill);
 			const example = examples ? quill.exampleDocument() : undefined;
 			const doc = example ?? quill.seedDocument();
@@ -401,10 +401,10 @@
 					]
 				});
 			}
-			// `?fonts` hands the engine a host font library, the font files the quill's own
-			// tree holds standing in for the app's: a quill's fonts set its plate and never a
-			// mark, so these reach text only through the editor's picker.
-			const library = params.has('fonts') ? fontFiles(tree) : [];
+			// `?fonts` builds the engine over `@quillmark/fonts`, as an app does: a quill's own
+			// fonts set its plate and never a mark, so the suite's reach text only through the
+			// editor's picker.
+			const library = params.has('fonts') ? await loadSuite() : [];
 			const engine = new Engine({ fonts: library });
 			// Always free: it answers off the backend descriptor without loading the binary
 			// or cloning the quill.

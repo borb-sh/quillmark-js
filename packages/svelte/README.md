@@ -183,7 +183,7 @@ const engine = new Engine({ fonts: [carlito] });
 <VisualEditor {doc} {quill} {fonts} />
 ```
 
-`fontFaces` loads the render build, as `open` does, so mount the editor first and let the faces arrive behind it. A family the document already sets edits with no library at all, and the picker offers it so it can be cleared.
+[`@quillmark/fonts`](../fonts) is the library every Quillmark client builds its engine over, so a family a document names sets the same way in each; a host's own files go after it. `fontFaces` loads the render build, as `open` does, so mount the editor first and let the faces arrive behind it. A family the document already sets edits with no library at all, and the picker offers it so it can be cleared.
 
 ### Recompiling
 

@@ -102,6 +102,14 @@ jobs:
           npm run check:pack -w packages/${{ steps.release.outputs.pkg }} \
             -- "${{ steps.pack.outputs.tgz }}"
 
+      # The font suite's promise to stored documents, held against the release it follows:
+      # no family the registry's latest names is gone, and no face it shipped changed its
+      # bytes outside a major (FONTS §Rules). Before the tag, since a published version is
+      # permanent and a family it drops strands every document that named it.
+      - name: Font suite, against the registry
+        if: steps.release.outputs.pkg == 'fonts'
+        run: node scripts/check-fonts.mjs --published
+
       # ci.yml's deploy rehearsal, which is quillkit's alone: it is the only package
       # carrying a client, and a `files` field that stopped shipping one passes every
       # check above and fails in a consumer's deploy. Extracted beside the worktree
