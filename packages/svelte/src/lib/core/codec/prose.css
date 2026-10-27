@@ -660,12 +660,14 @@ li.ProseMirror-selectednode::after {
 /* The held column's alignment cluster, hung off its header cell and floating over the
    first row, the band's top edge being the grips'. Up only while its column is held and
    absent otherwise (`table-view.ts` §`alignCluster`), so the reveal is `hidden` rather
-   than the band's opacity. It floats over content it did not choose, so the edge and
-   `--_qm-lift` separate it and the raised rung joins them in dark (ARCHITECTURE
-   §Styling). Its geometry is the format popover's, a row of toggles held one rung in
-   from a surface at the card's radius, so the two floating rows of glyphs are one
-   height and one shape. The pressed toggle takes the selected grip's tint and accent:
-   it names the held column's alignment the way the grip names the held line. */
+   than the band's opacity. It is a row of glyphs floating over text, the format popover's
+   family (ARCHITECTURE §Styling), and takes that recipe: the popover's translucent
+   surface over a blur, the edge and `--_qm-lift` for its separation, and a scale-in on
+   arrival, stated from its starting style since the codec shows it by clearing
+   `hidden`. Its geometry is the popover's too, a row of toggles held one rung in from
+   a surface at the card's radius, so the two floating rows of glyphs are one height,
+   one shape and one material. The pressed toggle takes the selected grip's tint and
+   accent: it names the held column's alignment the way the grip names the held line. */
 .qm-table-align {
 	position: absolute;
 	z-index: 2;
@@ -678,8 +680,17 @@ li.ProseMirror-selectednode::after {
 	padding: var(--_qm-space);
 	border: var(--_qm-border-width) solid var(--_qm-border);
 	border-radius: var(--_qm-radius);
-	background: var(--_qm-surface-raised);
+	background: var(--_qm-surface-popover);
+	backdrop-filter: blur(var(--_qm-blur));
+	-webkit-backdrop-filter: blur(var(--_qm-blur));
 	box-shadow: var(--_qm-lift);
+	transition:
+		opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
+		transform var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	@starting-style {
+		opacity: 0;
+		transform: scale(0.94);
+	}
 }
 .qm-table-align[hidden] {
 	display: none;
