@@ -41,7 +41,10 @@ import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
 import {
 	ALIGNS,
+	anchorAt,
+	canMerge,
 	cellAt,
+	closeBlock,
 	cellContent,
 	cellEqual,
 	cellFromDoc,
@@ -51,6 +54,7 @@ import {
 	deleteRow,
 	insertColumn,
 	insertRow,
+	mergeCells,
 	moveColumn,
 	moveRow,
 	normalizeTable,
@@ -58,11 +62,15 @@ import {
 	rowCount,
 	rowEmpty,
 	setAlign,
-	setHeadless,
+	setHead,
+	headRows,
 	columnShares,
 	setWidths,
 	shapeEqual,
+	spanGrid,
+	splitCell,
 	withCell,
+	type Span,
 	type TableAlign
 } from './table.js';
 
@@ -94,6 +102,10 @@ export interface TableChromeStrings {
 	tableAlignRight: string;
 	/** The held first row's toggle, pressed while the row draws as the header. */
 	tableHeaderToggle: string;
+	/** The held cells' cluster: one cell from the block, and the merged cells in it back
+	 *  to the cells under them. */
+	tableMergeCells: string;
+	tableSplitCell: string;
 }
 
 /**
@@ -117,7 +129,9 @@ export const DEFAULT_TABLE_STRINGS: TableChromeStrings = {
 	tableAlignLeft: 'Align left',
 	tableAlignCenter: 'Align center',
 	tableAlignRight: 'Align right',
-	tableHeaderToggle: 'Header row'
+	tableHeaderToggle: 'Header row',
+	tableMergeCells: 'Merge cells',
+	tableSplitCell: 'Split cell'
 };
 
 /** What the field hands each island view: its wording (read live, so a locale swap
@@ -293,7 +307,20 @@ interface MountedCell {
 	unregister: () => void;
 	r: number;
 	c: number;
+	/** The columns and rows the cell spans: one each unless it is merged. */
+	span: Span;
 }
+
+/** Whether a mounted cell's span reaches into an inclusive block. */
+const touches = (m: MountedCell, b: { r0: number; c0: number; r1: number; c1: number }): boolean =>
+	m.r <= b.r1 &&
+	m.r + m.span.rowspan - 1 >= b.r0 &&
+	m.c <= b.c1 &&
+	m.c + m.span.colspan - 1 >= b.c0;
+
+/** Whether a mounted cell's span covers the slot `(r, c)`. */
+const covers = (m: MountedCell, r: number, c: number): boolean =>
+	touches(m, { r0: r, c0: c, r1: r, c1: c });
 
 /** Which line a gesture acts on. `row` is in the chrome's row space (0 is the
  *  header), `column` in the column space. */
@@ -418,6 +445,13 @@ class TableIslandView implements NodeView {
 	private clusters: HTMLElement[] = [];
 	/** The first row's header toggle, up while that row is held. */
 	private headerCluster: HTMLElement | undefined;
+	/** The merge and split cluster, hung under the held block's first cell or the caret's
+	 *  merged cell while either is up. */
+	private cellCluster: HTMLElement | undefined;
+	/** The rail's cells, one per column: a row of no height above the first, which the
+	 *  column chrome hangs off, a merged cell in the first row standing over several. */
+	private rails: HTMLElement[] = [];
+
 	/** The grid's own box, and the containing block every out-of-flow control is placed
 	 *  against. Not the scroller: an absolute inside a scroll container is placed
 	 *  against a padding box the scroll then slides out from under, so a control at the
@@ -816,7 +850,9 @@ class TableIslandView implements NodeView {
 			: undefined;
 	}
 
-	private select(cells: Cells): void {
+	private select(held: Cells): void {
+		// A block over part of a merged cell holds all of it, as the cell is one.
+		const cells = held.swept ? { ...closeBlock(this.props(), held), swept: true } : held;
 		// A sweep resolves a rectangle per pointer move and most of them are the one
 		// already held, which is a repaint of the state that is up.
 		if (this.selected && sameCells(this.selected, cells)) return;
@@ -864,10 +900,58 @@ class TableIslandView implements NodeView {
 				this.headerCluster.hidden = !named;
 		}
 		for (const cell of this.cells)
-			cell.box.toggleAttribute(
-				'data-selected',
-				!!held && cell.r >= held.r0 && cell.r <= held.r1 && cell.c >= held.c0 && cell.c <= held.c1
-			);
+			cell.box.toggleAttribute('data-selected', !!held && touches(cell, held));
+		this.paintCellCluster();
+	}
+
+	/** The merge and split cluster: up under the block's bottom-left cell, offering
+	 *  Merge where the block is more than one cell and Split where it holds a merged one,
+	 *  and under the caret's own cell where that is merged and nothing is held. */
+	private paintCellCluster(): void {
+		const cluster = this.cellCluster;
+		if (!cluster) return;
+		const props = this.props();
+		const held = this.selected;
+		const caret = held ? undefined : this.cells.find((m) => m.view.hasFocus());
+		const block = held?.swept
+			? held
+			: caret && (caret.span.colspan > 1 || caret.span.rowspan > 1)
+				? { r0: caret.r, c0: caret.c, r1: caret.r, c1: caret.c }
+				: undefined;
+		const merge = !!held && canMerge(props, held);
+		const split =
+			!!block &&
+			this.cells.some((m) => touches(m, block) && (m.span.colspan > 1 || m.span.rowspan > 1));
+		const host = block && this.cells.find((m) => covers(m, block.r1, block.c0));
+		cluster.hidden = !host || (!merge && !split);
+		if (cluster.hidden || !host) return cluster.remove();
+		const [mergeBtn, splitBtn] = cluster.children as unknown as [HTMLElement, HTMLElement];
+		mergeBtn.hidden = !merge;
+		splitBtn.hidden = !split;
+		if (cluster.parentElement !== host.box) host.box.appendChild(cluster);
+	}
+
+	/** Merge the held block into one cell, holding the caret in it. */
+	private merge(): void {
+		const held = this.selected;
+		if (!held) return;
+		const block = closeBlock(this.props(), held);
+		this.selected = undefined;
+		this.write(mergeCells(this.props(), block), { r: block.r0, c: block.c0 });
+	}
+
+	/** Split every merged cell the held block or the caret's cell holds. */
+	private split(): void {
+		const held = this.selected;
+		const caret = held ? undefined : this.cells.find((m) => m.view.hasFocus());
+		const block = held ?? (caret && { r0: caret.r, c0: caret.c, r1: caret.r, c1: caret.c });
+		if (!block) return;
+		let props = this.props();
+		for (const m of this.cells)
+			if (touches(m, block) && (m.span.colspan > 1 || m.span.rowspan > 1))
+				props = splitCell(props, m.r, m.c);
+		this.selected = undefined;
+		this.write(props, { r: block.r0, c: block.c0 });
 	}
 
 	/**
@@ -1013,26 +1097,25 @@ class TableIslandView implements NodeView {
 		drag.origin0 = { left: box.left, top: box.top };
 		const { floor, limit } = this.bounds(drag.line.axis, this.props());
 		for (let i = floor; i <= limit; i++) {
-			const cells = this.boxesOf({ axis: drag.line.axis, index: i });
-			if (!cells.length) continue;
-			const head = cells[0]!.getBoundingClientRect();
-			const tail = cells[cells.length - 1]!.getBoundingClientRect();
+			// A line's extent is read off the cells standing in it alone: a merged cell
+			// stretches across the lines it covers.
+			const row = drag.line.axis === 'row';
+			const cells = this.cells
+				.filter((m) =>
+					row ? m.r === i && m.span.rowspan === 1 : m.c === i && m.span.colspan === 1
+				)
+				.map((m) => m.box.getBoundingClientRect());
+			const all = this.boxesOf({ axis: drag.line.axis, index: i }).map((b) =>
+				b.getBoundingClientRect()
+			);
+			const own = cells[0];
+			if (!own || !all.length) continue;
+			const cross = Math.min(...all.map((b) => (row ? b.left : b.top)));
+			const far = Math.max(...all.map((b) => (row ? b.right : b.bottom)));
 			drag.lines.push(
-				drag.line.axis === 'row'
-					? {
-							index: i,
-							start: head.top,
-							end: head.bottom,
-							cross: head.left,
-							span: tail.right - head.left
-						}
-					: {
-							index: i,
-							start: head.left,
-							end: head.right,
-							cross: head.top,
-							span: tail.bottom - head.top
-						}
+				row
+					? { index: i, start: own.top, end: own.bottom, cross, span: far - cross }
+					: { index: i, start: own.left, end: own.right, cross, span: far - cross }
 			);
 		}
 	}
@@ -1086,9 +1169,8 @@ class TableIslandView implements NodeView {
 	}
 
 	private boxesOf(line: Line): HTMLElement[] {
-		return this.cells
-			.filter((m) => (line.axis === 'row' ? m.r === line.index : m.c === line.index))
-			.map((m) => m.box);
+		const props = this.props();
+		return this.cells.filter((m) => touches(m, this.lineCells(line, props))).map((m) => m.box);
 	}
 
 	/** The drop indicator: one rule on the boundary the line would land against, drawn
@@ -1151,11 +1233,13 @@ class TableIslandView implements NodeView {
 	private readonly onResizeDown = (c: number, handle: HTMLElement, event: PointerEvent): void => {
 		if (event.button !== 0) return;
 		this.endResize();
-		const heads = this.cells.filter((m) => m.r === 0).sort((a, b) => a.c - b.c);
-		const widths = heads.map((m) => m.box.getBoundingClientRect().width);
-		// A cell's floor is its host's measure plus the box's own padding and border, read
-		// off the header cell the border hangs from.
-		const head = heads[c];
+		// Each column's width and a cell's floor, its host's measure plus the box's own
+		// padding and border, read off a cell standing in that column alone.
+		const alone = (x: number) => this.cells.find((m) => m.c === x && m.span.colspan === 1);
+		const widths = this.rails.map(
+			(rail, x) => (alone(x)?.box ?? rail).getBoundingClientRect().width
+		);
+		const head = alone(c);
 		const floor = head
 			? Number.parseFloat(getComputedStyle(head.host).minWidth) +
 				head.box.getBoundingClientRect().width -
@@ -1242,6 +1326,8 @@ class TableIslandView implements NodeView {
 		this.near = [];
 		this.clusters = [];
 		this.headerCluster = undefined;
+		this.cellCluster = undefined;
+		this.rails = [];
 		this.dom.textContent = '';
 		const props = tablePropsOfNode(this.node);
 		const departure = props && departures.get(props);
@@ -1259,23 +1345,21 @@ class TableIslandView implements NodeView {
 
 		// `thead`/`tbody` rather than one `tbody`: the header is a separate field in the
 		// model, and this is the markup that says so to something that cannot see the
-		// weight the header row draws. A headless table's first row is a body row on the
-		// page, so it is one here too, still holding row 0's chrome.
+		// weight the header rows draw. A table with no header row draws its first row as a
+		// body row on the page, so it is one here too, still holding row 0's chrome.
 		const table = el('table', 'qm-table');
 		const colgroup = el('colgroup');
 		this.cols = Array.from({ length: columnCount(props) }, () => el('col'));
-		colgroup.append(...this.cols);
-		const first = this.row(props, 0, s);
+		colgroup.append(el('col', 'qm-table-rail-col'), ...this.cols);
+		const heads = Math.min(headRows(props), rowCount(props));
+		const grid = spanGrid(props);
 		const body = el('tbody');
-		if (props.headless) {
-			body.appendChild(first);
-			table.append(colgroup, body);
-		} else {
-			const head = el('thead');
-			head.appendChild(first);
-			table.append(colgroup, head, body);
-		}
-		for (let r = 1; r < rowCount(props); r++) body.appendChild(this.row(props, r, s));
+		const head = heads ? el('thead') : body;
+		head.appendChild(this.rail(props, s));
+		for (let r = 0; r < rowCount(props); r++)
+			(r < heads ? head : body).appendChild(this.row(props, grid, r, s));
+		table.append(colgroup, ...(heads ? [head] : []), body);
+		this.cellCluster = this.mergeCluster(s);
 
 		// The frame is the grid's own box, and the two controls about an axis rather than
 		// about a line hang off its edges: an add bar along each trailing edge. A cell
@@ -1319,44 +1403,83 @@ class TableIslandView implements NodeView {
 		else this.focusCell(seat.r, seat.c);
 	}
 
-	/** One table row: its cells, each carrying whatever chrome hangs off it. */
-	private row(props: TableProps, r: number, s: TableChromeStrings): HTMLElement {
-		const heads = r === 0 && !props.headless;
+	/** The rail: a row of no height above the first, a cell per column, holding each
+	 *  column's grip and the border handle after it. The column chrome hangs here rather
+	 *  than off the first row's cells, a merged cell there standing over several columns
+	 *  and covering others. */
+	private rail(props: TableProps, s: TableChromeStrings): HTMLElement {
+		const tr = el('tr', 'qm-table-rail');
+		tr.setAttribute('aria-hidden', 'true');
+		tr.appendChild(el('td', 'qm-table-rail-cell'));
+		for (let c = 0; c < columnCount(props); c++) {
+			const cell = el('td', 'qm-table-rail-cell');
+			cell.appendChild(this.grip({ axis: 'column', index: c }, s.tableSelectColumn(c + 1)));
+			if (c < columnCount(props) - 1) cell.appendChild(this.resizer(c));
+			this.rails.push(cell);
+			tr.appendChild(cell);
+		}
+		return tr;
+	}
+
+	/** One table row: its drawn cells, each carrying whatever chrome hangs off it, after a
+	 *  rail cell of no width holding the row's grip, which hangs there for the reason a
+	 *  column's hangs off the rail row. A slot a merged cell covers draws nothing of its
+	 *  own. */
+	private row(
+		props: TableProps,
+		grid: (Span | null)[][],
+		r: number,
+		s: TableChromeStrings
+	): HTMLElement {
+		const head = headRows(props);
+		const heads = r < head;
+		const cols = columnCount(props);
+		const rows = rowCount(props);
 		const tr = el('tr', heads ? 'qm-table-header-row' : undefined);
-		rowCells(props, r).forEach((cell, c) => {
+		const rail = el('td', 'qm-table-rail-cell');
+		rail.setAttribute('aria-hidden', 'true');
+		// The grip takes a name of its own on the header for the reason a cell does: the
+		// gesture is every other row's, but the line it names is still the header.
+		rail.appendChild(
+			this.grip(
+				{ axis: 'row', index: r },
+				heads ? s.tableSelectHeaderRow : s.tableSelectRow(r - head + 1)
+			)
+		);
+		tr.appendChild(rail);
+		rowCells(props, r).forEach((_, c) => {
+			const span = grid[r]?.[c];
+			if (!span) return;
 			const box = el(heads ? 'th' : 'td', 'qm-table-cell');
-			if (heads) box.setAttribute('scope', 'col');
+			if (heads) box.setAttribute('scope', span.colspan > 1 ? 'colgroup' : 'col');
+			if (span.colspan > 1) box.setAttribute('colspan', String(span.colspan));
+			if (span.rowspan > 1) box.setAttribute('rowspan', String(span.rowspan));
 			box.setAttribute('data-r', String(r));
 			box.setAttribute('data-c', String(c));
-			const align = props.aligns[c] ?? 'none';
+			// Which edges of the frame the box meets, which the stroke and the corners read
+			// (`prose.css`): a merged cell meets the edge its span reaches.
+			const right = c + span.colspan === cols;
+			const last = r + span.rowspan === rows;
+			const corners = [
+				r === 0 && c === 0 && 'start-start',
+				r === 0 && right && 'start-end',
+				last && c === 0 && 'end-start',
+				last && right && 'end-end'
+			].filter((corner): corner is string => !!corner);
+			if (right) box.setAttribute('data-edge-end', '');
+			if (last && rows > Math.min(head, rows)) box.setAttribute('data-edge-bottom', '');
+			if (corners.length) box.setAttribute('data-corners', corners.join(' '));
 			layCell(box, props, r, c);
 			const host = el('div', 'qm-table-cell-host');
 			box.appendChild(host);
-
-			// The column band hangs off the header row; the row band off every row's first
-			// cell, the header's included. Both are absolutely positioned into the frame's
-			// own padding, so neither is in the grid's layout and neither is a cell of its
-			// own, and the two the header's first cell carries hang off perpendicular edges
-			// and meet at no point. The header takes a grip because a row grip acts on a
-			// row and the header is one: it selects, it deletes, and it drags, all by the
-			// rules every other row is under.
+			// The first row's cells hold the clusters about a column: each column's under the
+			// drawn cell standing over it, and the header toggle under the last.
 			if (r === 0)
-				box.append(
-					this.grip({ axis: 'column', index: c }, s.tableSelectColumn(c + 1)),
-					this.alignCluster(c, align, s)
-				);
-			if (r === 0 && c < columnCount(props) - 1) box.appendChild(this.resizer(c));
-			if (c === 0)
-				box.appendChild(
-					this.grip(
-						{ axis: 'row', index: r },
-						heads ? s.tableSelectHeaderRow : s.tableSelectRow(props.headless ? r + 1 : r)
-					)
-				);
-			if (r === 0 && c === columnCount(props) - 1)
-				box.appendChild(this.headerToggle(!props.headless, s));
+				for (let x = c; x < c + span.colspan; x++)
+					box.appendChild(this.alignCluster(x, props.aligns[x] ?? 'none', s));
+			if (r === 0 && right) box.appendChild(this.headerToggle(head > 0, s));
 			tr.appendChild(box);
-			this.mountCell(box, host, r, c, s);
+			this.mountCell(box, host, r, c, span, s);
 		});
 		return tr;
 	}
@@ -1419,7 +1542,7 @@ class TableIslandView implements NodeView {
 	}
 
 	/** The first row's header toggle: one press draws the row as the header or as a body
-	 *  row, writing the table's `headless` as one `set`, and the row stays held. Up only
+	 *  row, writing the table's `head` as one `set`, and the row stays held. Up only
 	 *  while the first row is held, hanging under its last cell, and out of the tab order
 	 *  for the reason a grip is. */
 	private headerToggle(header: boolean, s: TableChromeStrings): HTMLElement {
@@ -1428,7 +1551,7 @@ class TableIslandView implements NodeView {
 		cluster.hidden = true;
 		cluster.addEventListener('mousedown', (e) => e.preventDefault());
 		const btn = chromeButton('qm-table-align-option', s.tableHeaderToggle, () => {
-			this.write(setHeadless(this.props(), header));
+			this.write(setHead(this.props(), header ? 0 : 1));
 			this.selectLine({ axis: 'row', index: 0 });
 		});
 		btn.tabIndex = -1;
@@ -1436,6 +1559,27 @@ class TableIslandView implements NodeView {
 		btn.appendChild(svg(HEADER_GLYPH, 2));
 		cluster.appendChild(btn);
 		this.headerCluster = cluster;
+		return cluster;
+	}
+
+	/** The merge and split cluster, one for the grid, which
+	 *  {@link TableIslandView.paintCellCluster} hangs where it applies. Out of the tab
+	 *  order for the reason a grip is. */
+	private mergeCluster(s: TableChromeStrings): HTMLElement {
+		const cluster = el('div', 'qm-table-align');
+		cluster.setAttribute('data-cells', '');
+		cluster.setAttribute('role', 'group');
+		cluster.hidden = true;
+		cluster.addEventListener('mousedown', (e) => e.preventDefault());
+		for (const [label, run] of [
+			[s.tableMergeCells, () => this.merge()],
+			[s.tableSplitCell, () => this.split()]
+		] as const) {
+			const btn = chromeButton('qm-table-cells-option', label, run);
+			btn.tabIndex = -1;
+			btn.textContent = label;
+			cluster.appendChild(btn);
+		}
 		return cluster;
 	}
 
@@ -1467,10 +1611,12 @@ class TableIslandView implements NodeView {
 		host: HTMLElement,
 		r: number,
 		c: number,
+		span: Span,
 		s: TableChromeStrings
 	): void {
 		const props = this.props();
-		const row = props.headless ? s.tableRow(r + 1) : r === 0 ? s.tableHeaderRow : s.tableRow(r);
+		const head = headRows(props);
+		const row = r < head ? s.tableHeaderRow : s.tableRow(r - head + 1);
 		const name = s.tableCell(row, s.tableColumn(c + 1));
 		const seed = cellAt(props, r, c);
 		const view: EditorView = new EditorView(host, {
@@ -1503,7 +1649,12 @@ class TableIslandView implements NodeView {
 				focus: () => {
 					this.clearSelection();
 					this.retireIsland();
+					this.paintCellCluster();
 					this.deps.onCellFocus();
+					return false;
+				},
+				blur: () => {
+					queueMicrotask(() => this.paintCellCluster());
 					return false;
 				}
 			}
@@ -1517,7 +1668,8 @@ class TableIslandView implements NodeView {
 			shown: seed,
 			unregister: this.deps.register(view),
 			r,
-			c
+			c,
+			span
 		};
 		this.cells.push(mounted);
 	}
@@ -1563,7 +1715,7 @@ class TableIslandView implements NodeView {
 		const props = this.props();
 		const row = Math.max(0, Math.min(r, rowCount(props) - 1));
 		const col = Math.max(0, Math.min(c, columnCount(props) - 1));
-		const mounted = this.cells.find((m) => m.r === row && m.c === col);
+		const mounted = this.cells.find((m) => covers(m, row, col));
 		if (!mounted) return;
 		const { view } = mounted;
 		const { doc } = view.state;
@@ -1581,14 +1733,28 @@ class TableIslandView implements NodeView {
 		view.dispatch(view.state.tr.setSelection(at).scrollIntoView());
 	}
 
+	/** The span of the drawn cell at `(r, c)`: one each where nothing is merged. */
+	private spanAt(r: number, c: number): Span {
+		return this.cells.find((m) => m.r === r && m.c === c)?.span ?? { colspan: 1, rowspan: 1 };
+	}
+
 	/** The cell beside `(r, c)` in reading order, a row's end wrapping to the next row's
 	 *  start; past the first or last cell its row is outside the table. */
 	private reading(r: number, c: number, dir: 1 | -1): { r: number; c: number } {
-		const cols = columnCount(this.props());
-		const next = c + dir;
-		if (next >= cols) return { r: r + 1, c: 0 };
-		if (next < 0) return { r: r - 1, c: cols - 1 };
-		return { r, c: next };
+		const props = this.props();
+		const cols = columnCount(props);
+		const grid = spanGrid(props);
+		let at = { r, c };
+		do {
+			const next = at.c + dir;
+			at =
+				next >= cols
+					? { r: at.r + 1, c: 0 }
+					: next < 0
+						? { r: at.r - 1, c: cols - 1 }
+						: { r: at.r, c: next };
+		} while (at.r >= 0 && at.r < rowCount(props) && !grid[at.r]?.[at.c]);
+		return at;
 	}
 
 	/**
@@ -1621,7 +1787,7 @@ class TableIslandView implements NodeView {
 		const walk = (dir: 'up' | 'down'): Command => {
 			return (_state, _dispatch, view) => {
 				if (!caretAtEdge(view, dir)) return false;
-				this.focusCell(dir === 'up' ? r - 1 : r + 1, c);
+				this.focusCell(dir === 'up' ? r - 1 : r + this.spanAt(r, c).rowspan, c);
 				return true;
 			};
 		};
@@ -1752,9 +1918,10 @@ class TableIslandView implements NodeView {
 				// the row goes and the caret lands past the table. Row 1 is never the one
 				// refused, so the table keeps a row under its first.
 				const props = this.props();
-				if (r < rowCount(props) - 1) this.focusCell(r + 1, c);
+				const below = r + this.spanAt(r, c).rowspan;
+				if (below < rowCount(props)) this.focusCell(below, c);
 				else if (r > 1 && rowEmpty(props, r) && this.leave(1)) this.write(deleteRow(props, r));
-				else this.write(insertRow(props, r), { r: r + 1, c });
+				else this.write(insertRow(props, below - 1), { r: below, c });
 				return true;
 			},
 			// Escape climbs a rung a press: the caret's own row, then the island. The row
@@ -1788,8 +1955,9 @@ class TableIslandView implements NodeView {
 		const to = this.reading(r, c, dir);
 		if (to.r < 0) return false;
 		if (to.r >= rowCount(props)) {
-			if (rowEmpty(props, r)) return false;
-			this.write(insertRow(props, r), to);
+			const last = rowCount(props) - 1;
+			if (rowEmpty(props, last)) return false;
+			this.write(insertRow(props, last), { r: last + 1, c: 0 });
 		} else this.focusCell(to.r, to.c);
 		return true;
 	}

@@ -429,11 +429,24 @@ li.ProseMirror-selectednode::after {
 	font-weight: inherit;
 	text-align: inherit;
 }
-.qm-table tr > .qm-table-cell:last-child {
+.qm-table-cell[data-edge-end] {
 	border-right: none;
 }
-.qm-table tbody tr:last-child > .qm-table-cell {
+.qm-table-cell[data-edge-bottom] {
 	border-bottom: none;
+}
+/* The rails: a row of no height above the first and a column of no width before the
+   first, which the grips and border handles hang off rather than the first row's and
+   column's cells, a merged cell there standing over several lines. */
+.qm-table-rail-cell {
+	position: relative;
+	width: 0;
+	height: 0;
+	padding: 0;
+	border: none;
+}
+.qm-table-rail-col {
+	width: 0;
 }
 /* The header row is the one weight distinction the island draws: `header` is a
    separate field in the model rather than a flag on a row, so the surface says so.
@@ -445,20 +458,17 @@ li.ProseMirror-selectednode::after {
 }
 /* The corner cells take the frame's corner, inside its stroke, so a header's band or a
    selection's wash keeps to the rounded edge rather than painting a square one over
-   it. The first row is the colgroup's next sibling's, whichever section holds it. */
-.qm-table > colgroup + * > tr:first-child > .qm-table-cell:first-child {
+   it. A merged cell takes each corner its span reaches. */
+.qm-table-cell[data-corners~='start-start'] {
 	border-start-start-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
 }
-.qm-table > colgroup + * > tr:first-child > .qm-table-cell:last-child {
+.qm-table-cell[data-corners~='start-end'] {
 	border-start-end-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
 }
-.qm-table
-	> :is(:last-child, thead:has(+ tbody:empty))
-	> tr:last-child
-	> .qm-table-cell:first-child {
+.qm-table-cell[data-corners~='end-start'] {
 	border-end-start-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
 }
-.qm-table > :is(:last-child, thead:has(+ tbody:empty)) > tr:last-child > .qm-table-cell:last-child {
+.qm-table-cell[data-corners~='end-end'] {
 	border-end-end-radius: calc(var(--_qm-radius) - var(--_qm-border-width));
 }
 /* A cell holds a whole nested view. Its measure floor keeps an empty table from
@@ -699,6 +709,30 @@ li.ProseMirror-selectednode::after {
    trailing edge. */
 .qm-table-align[data-header] {
 	margin-inline: auto 0;
+}
+/* The merge and split cluster hangs under the held block's first cell, flush with its
+   leading edge, its options worded. */
+.qm-table-align[data-cells] {
+	margin-inline: 0 auto;
+}
+.qm-table-cells-option {
+	display: flex;
+	align-items: center;
+	min-height: var(--_qm-tap-min);
+	padding: 0 var(--_qm-space-2);
+	border: none;
+	border-radius: var(--_qm-radius-inner);
+	background: none;
+	color: var(--_qm-ink);
+	font: inherit;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.qm-table-cells-option:hover {
+	background: var(--_qm-surface-hover);
+}
+.qm-table-cells-option[hidden] {
+	display: none;
 }
 .qm-table-align-option {
 	display: flex;

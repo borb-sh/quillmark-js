@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A table draws and edits merged cells.** A cell's `colspan` and `rowspan` draw as the span they say, and a sweep of several cells offers Merge, which joins their texts a line each, while a merged cell offers Split. Row and column ops keep a span whose lines stay together, a copy carries the spans, and the caret walks a merged cell as one stop. The grips and column borders hang off rails of no size before the first row and column, where they hung off the first row's and column's cells.
+
+**`@quillmark/wasm` 0.131.0 is the floor.** A table's header rows are its `head`: the header toggle writes `head` 0 or 1 where it wrote `headless`, and a table whose `head` is past 1 draws that many rows as its header. A field holding a `font_family` mark, which no editor mark draws yet, is held read-only rather than edited into a value without it.
+
 **The matrix add box rests at the add chip's rung**, idle under a pointer and muted on a touch screen, and comes up under the pointer, the focus or typed words, where it rested at full label ink beside a chip that rested faded. The chip eases up as the box does, where it snapped.
 
 **Cards draw no border, and the ground is the field well's tone.** A card is told from the ground by its tone alone, in every mount; the un-schemable card keeps its dashed edge, now the only edge a card draws. At the light pole the ground behind the cards, the preview's desk and the preset's `--qmh-page` deepen from `#f8f8f8` to `#f2f2f2`; at the dark pole they were the well's tone already. The body of a 400px pane gains 2px.

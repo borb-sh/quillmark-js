@@ -134,7 +134,8 @@ describe('the hold on a body over what no node holds', () => {
 	for (const [name, markdown] of [
 		['an element', 'lead\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
 		['an element beside a task item', '- [x] done\n\n<qm-keep>\n\nkept\n\n</qm-keep>'],
-		['a definition list', 'lead\n\nTerm\n: one\n: two\n\n  - a list in it']
+		['a definition list', 'lead\n\nTerm\n: one\n: two\n\n  - a list in it'],
+		['a font family', 'lead <qm-span family="Carlito">set</qm-span>']
 	]) {
 		it(`holds over ${name}, drawing its text and committing nothing`, () => {
 			held(markdown, (view) =>
@@ -142,6 +143,12 @@ describe('the hold on a body over what no node holds', () => {
 			);
 		});
 	}
+
+	it('holds over a font family in a table cell', () => {
+		held('| <qm-span family="Carlito">a</qm-span> |\n|---|\n| b |', (view) =>
+			expect(view.dom.querySelector('.qm-table-island')).not.toBeNull()
+		);
+	});
 
 	it('holds over a footnote, drawing its reference mark with the note as its title', () => {
 		held('Noted[^1] here.\n\n[^1]: The **note**.', (view) => {

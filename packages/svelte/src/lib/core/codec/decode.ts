@@ -8,7 +8,13 @@
 // applied here; they are decorations (field.ts). Positions throughout are USV; `Array.from` iterates by
 // code point so an astral char is one unit, never a surrogate half.
 import { DOMSerializer, type Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
-import type { Content, ContentContainer, ContentLine, ContentMark } from '@quillmark/wasm';
+import type {
+	Content,
+	ContentContainer,
+	ContentLine,
+	ContentMark,
+	TableCell
+} from '@quillmark/wasm';
 import { ISLAND_SLOT, isBlockIsland, isEditedIsland, type IslandNodeAttrs } from './islands.js';
 import { descriptorOf, markKey, pmMarkFromContent } from './marks.js';
 import { core } from '../lifecycle.js';
@@ -116,19 +122,39 @@ export function fitsPlain(rt: Content): boolean {
 
 /** Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed
  *  and {@link fitsPlain} plain, past which the decode drops what the first commit would
- *  store; on the block schema anything but a construct read and not edited — an element,
- *  a definition list ({@link editable}), a footnote or an equation (`isEditedIsland`) —
- *  and an island where the leaf mounts no island view (`islands`), which draws as its
- *  placeholder tag, an atom a keystroke deletes unseen. What a leaf held over the rest
- *  reads. */
+ *  store; on the block schema anything but a construct read and not edited — a font
+ *  family, an element, a definition list ({@link editable}), a footnote or an equation
+ *  (`isEditedIsland`) — and an island where the leaf mounts no island view (`islands`),
+ *  which draws as its placeholder tag, an atom a keystroke deletes unseen. What a leaf
+ *  held over the rest reads. */
 export function fitsLeaf(
 	rt: Content,
 	leaf: { inline: boolean; plaintext: boolean; islands: boolean }
 ): boolean {
-	if (leaf.inline) return fitsInline(rt);
+	if (leaf.inline) return fitsInline(rt) && !setsFamily(rt);
 	if (leaf.plaintext) return fitsPlain(rt);
+	if (setsFamily(rt)) return false;
 	if (!leaf.islands && rt.islands.length) return false;
 	return rt.islands.every((isl) => isEditedIsland(isl.type)) && rt.lines.every(editable);
+}
+
+/** Whether `rt` sets a font family anywhere, a table cell's text included: no PM mark
+ *  draws one, so the first commit would drop it. A table's props are read as found, a
+ *  shape no reader indexes setting none. */
+function setsFamily(rt: Content): boolean {
+	const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+	const family = (marks: unknown) =>
+		list(marks).some((m) => (m as ContentMark | null)?.type === 'font_family');
+	return (
+		family(rt.marks) ||
+		rt.islands.some(
+			(isl) =>
+				isl.type === 'table' &&
+				[isl.props.header, ...list(isl.props.rows)].some((row) =>
+					list(row).some((cell) => family((cell as TableCell | null)?.marks))
+				)
+		)
+	);
 }
 
 /** Whether the block schema edits `line`'s kind and every container on it: a term draws
