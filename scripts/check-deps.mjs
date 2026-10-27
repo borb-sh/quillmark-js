@@ -6,10 +6,11 @@
 //
 //   1. The graph. `@quillmark/wasm` is external and above everything; `svelte` and `quiver`
 //      are siblings at one tier with no edge between them, in either direction; and a node
-//      reaching both is composing them, which is the only way the two meet. Declared
-//      dependencies and source specifiers both, since either alone is half a check: an
-//      undeclared import resolves fine in a workspace, and a declared dependency nothing
-//      imports is still a promise.
+//      reaching both is composing them, which is the only way the two meet. `fonts` stands
+//      beside them on the same terms: a client hands its files to the engine, and no
+//      library reaches it. Declared dependencies and source specifiers both, since either
+//      alone is half a check: an undeclared import resolves fine in a workspace, and a
+//      declared dependency nothing imports is still a promise.
 //
 //   2. One wasm per process. A handle minted by one copy of the linear memory and handed
 //      to another is foreign, so what matters is how many copies meet inside one process. A
@@ -49,10 +50,11 @@ import { ROOT, filesUnder, packages, report } from './workspace.mjs';
 
 /** The graph. An edge absent from this table is a violation; an edge in it is optional. */
 const ALLOWED = {
-	playground: ['@quillmark/svelte', '@quillmark/quiver'],
-	quillkit: ['@quillmark/svelte', '@quillmark/quiver'],
+	playground: ['@quillmark/svelte', '@quillmark/quiver', '@quillmark/fonts'],
+	quillkit: ['@quillmark/svelte', '@quillmark/quiver', '@quillmark/fonts'],
 	'@quillmark/svelte': [],
-	'@quillmark/quiver': []
+	'@quillmark/quiver': [],
+	'@quillmark/fonts': []
 };
 
 const WASM = '@quillmark/wasm';

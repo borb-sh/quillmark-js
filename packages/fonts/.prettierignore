@@ -1,0 +1,6 @@
+# Prettier reads the ignore file at its cwd, not the workspace root's, so a run started
+# here reads this one: canon and the build output.
+prose/
+dist/
+build/
+.svelte-kit/

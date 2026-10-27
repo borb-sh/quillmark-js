@@ -28,9 +28,9 @@ The verbs a quill author types, one bin over a quiver's whole life: `init` start
 
 ## One pin
 
-quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root pin and `@quillmark/quiver` at its workspace version, both exact. The bin packs with the quiver it carries, `check` renders with the wasm it carries, and both clients are built against the same two, so what the gate renders, what `serve` shows and what a deploy serves are one release by construction. An author upgrades the whole set by moving one devDependency.
+quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root pin, and `@quillmark/quiver` and `@quillmark/fonts` at their workspace versions, all exact. The bin packs with the quiver it carries, `check` renders with the wasm and over the font suite it carries, and both clients are built against the same three, so what the gate renders, what `serve` shows and what a deploy serves are one release by construction. An author upgrades the whole set by moving one devDependency.
 
-**Exact, because the clients are bundled.** A range would let an install pair this bin with a wasm or a quiver its clients were not built with, and the gate would then pass a render the deployed page does not perform. `check:deps` holds the pins exact, and a quiver release moves quillkit's pin in the same release PR.
+**Exact, because the clients are bundled.** A range would let an install pair this bin with a wasm or a quiver its clients were not built with, and the gate would then pass a render the deployed page does not perform. `check:deps` holds the pins exact, and a quiver or fonts release moves quillkit's pin in the same release PR.
 
 **The format agrees with its reader.** The quiver that writes `quiver.json` is the quiver the clients read it with, so a pack and the client laid over it cannot disagree on the format. The collection's own `node_modules` decides nothing: a quiver installs no loader and no engine beside quillkit, and a `quillkit.config.js` is not read.
 

@@ -1,0 +1,7 @@
+Quillmark
+Copyright 2026 Nibs
+
+The font files under files/ are not covered by the Apache License. Each is a
+subset of an upstream release and is licensed under the SIL Open Font License,
+Version 1.1, whose text travels beside it as files/<Family>-OFL.txt. manifest.json
+names each file's upstream source and licence.

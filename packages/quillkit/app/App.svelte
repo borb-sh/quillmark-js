@@ -11,19 +11,27 @@
     preview click ─► editor.setCaret(at), and the form shown on a phone
     editor caret  ─► preview.focusPosition(at)
 
-  The editor stands on the core wasm alone, so the form is up while the render wasm is
-  still arriving; the session, and with it the page, follows when it lands.
+  The editor stands on the core wasm alone, so the form is up while the render wasm and the
+  font suite are still arriving; the session, and with it the page, follows when they land.
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { Engine } from '@quillmark/wasm';
-	import type { CoreSurface, Diagnostic, Document, LiveSession, Quill } from '@quillmark/wasm';
+	import type {
+		CoreSurface,
+		Diagnostic,
+		Document,
+		Engine,
+		FontFace,
+		LiveSession,
+		Quill
+	} from '@quillmark/wasm';
 	import type { Quiver } from '@quillmark/quiver';
 	import { init } from '@quillmark/svelte/core';
 	import type { EditorError, Landing, Place } from '@quillmark/svelte/core';
 	import { Preview } from '@quillmark/svelte/preview';
 	import { VisualEditor } from '@quillmark/svelte/visual';
 	import type { EditorChange } from '@quillmark/svelte/visual';
+	import { engineOverSuite, facesFor } from '../client/engine';
 	import { collect, diagnosticsOf } from '../client/notes';
 	import { openQuiver } from '../client/quiver';
 	import { save } from '../client/save';
@@ -78,13 +86,16 @@
 	// Held, not tracked: nothing in the markup reads them.
 	let core: CoreSurface | undefined;
 	let quiver: Quiver | undefined;
-	let engine: Engine | undefined;
+	/** Built over the suite at boot; the first open awaits it. */
+	let engine: Promise<Engine> | undefined;
 	let store: Store | undefined;
 
 	let booted = $state.raw(false);
 	let failed = $state.raw<string | undefined>();
 	let open = $state.raw<Open | undefined>();
 	let session = $state.raw<LiveSession | undefined>();
+	/** The faces the suite offers the form's font picker, once a session has loaded them. */
+	let fonts = $state.raw<FontFace[]>([]);
 	/** A document that would not open, kept as its record. */
 	let unopenable = $state.raw<DocRecord | undefined>();
 	/** Whether that is because the pack no longer holds its pin. */
@@ -172,14 +183,17 @@
 	}
 
 	async function attach(at: Open): Promise<void> {
-		engine ??= new Engine();
 		attaching = at;
 		behind = false;
 		try {
-			const opened = await engine.open(at.quill, at.doc);
+			const ready = await engine!;
+			const opened = await ready.open(at.quill, at.doc);
 			if (open !== at) return opened.free();
 			session = opened;
 			thrown = [];
+			void facesFor(ready, at.quill).then((faces) => {
+				if (open === at) fonts = faces;
+			});
 		} catch (err) {
 			if (open !== at) return;
 			thrown = diagnosticsOf(err);
@@ -435,6 +449,10 @@
 	onMount(() => {
 		let cancelled = false;
 		(async () => {
+			engine = engineOverSuite();
+			// Awaited by the first open, which says what refused it; held here so a suite
+			// that fails before then is not reported as unhandled.
+			engine.catch(() => {});
 			try {
 				core = await init();
 				quiver = await openQuiver();
@@ -555,6 +573,7 @@
 						onCaretMove={handleCaretMove}
 						onChange={handleChange}
 						onError={handleSurfaceError}
+						{fonts}
 					/>
 				</section>
 				<section class="pane paint" aria-label="Page">

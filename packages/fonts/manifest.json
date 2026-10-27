@@ -1,0 +1,245 @@
+{
+	"subset": "latin",
+	"families": [
+		{
+			"name": "Tinos",
+			"license": "OFL-1.1",
+			"licenseFile": "Tinos-OFL.txt",
+			"source": "https://github.com/googlefonts/tinos/tree/3b4482a99b80ea5fc75f187b1be3120a3f5905b3",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "Tinos-Regular.ed6a7e887c55c70c.ttf",
+					"sha256": "ed6a7e887c55c70c36e5cbb216f2c582b185606ca653f0c11cfdb70128ceeb69",
+					"upstream": {
+						"file": "fonts/ttf/Tinos-Regular.ttf",
+						"sha256": "60a0e8ef0c04dd5dd69ffe91025fa2ae5836cbd35600a82ba031977557e2cb61"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "Tinos-Italic.f8149c62e5e63f8e.ttf",
+					"sha256": "f8149c62e5e63f8e5c4269958be1a83a5a7f23b2f726aed96e4e002d1cdefb2b",
+					"upstream": {
+						"file": "fonts/ttf/Tinos-Italic.ttf",
+						"sha256": "5942266ed398b155d7dc23e36833e7ec6be988f2439bdbeb8ef1bede808eaa91"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "Tinos-Bold.79806bc27f1d34c4.ttf",
+					"sha256": "79806bc27f1d34c419f528ef93be13f64f5d79be36aee4dd56d341a5f296fc64",
+					"upstream": {
+						"file": "fonts/ttf/Tinos-Bold.ttf",
+						"sha256": "393269dbab8899f938db19783eca5eac92eb431f7ae0ab45b8349ca895f1a06b"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "Tinos-BoldItalic.554796f371159c0c.ttf",
+					"sha256": "554796f371159c0c64de3cb850a18335b9274818452f21cf40dee1d3c5e0ed80",
+					"upstream": {
+						"file": "fonts/ttf/Tinos-BoldItalic.ttf",
+						"sha256": "a5de79f0fe863ea0954757acb3d47b3ccd0a930ce3dd5b97230cd3866790a06e"
+					}
+				}
+			]
+		},
+		{
+			"name": "Arimo",
+			"license": "OFL-1.1",
+			"licenseFile": "Arimo-OFL.txt",
+			"source": "https://github.com/googlefonts/arimo/tree/4a6255f269916ae7ad3fc2706b0935e7621396b8",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "Arimo-Regular.34a961de9f3789b9.ttf",
+					"sha256": "34a961de9f3789b9d958f5680b16c8ef0ed6b3982aed15309f41fbbc80511653",
+					"upstream": {
+						"file": "fonts/ttf/Arimo-Regular.ttf",
+						"sha256": "41b22bc8f0b51f932825d37bc55b5eb6ba67dfe599a626e4aff2b43b624f9f8c"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "Arimo-Italic.33d051fe4b0c4440.ttf",
+					"sha256": "33d051fe4b0c44404ea244d0015fee60d7481d8a2ca7e52a9304c6fe6471bf64",
+					"upstream": {
+						"file": "fonts/ttf/Arimo-Italic.ttf",
+						"sha256": "ffdf690e4357a392e4edcc3df0b3adb0302920f75e54f2e6eec355afbe7edcba"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "Arimo-Bold.18743596edea4da2.ttf",
+					"sha256": "18743596edea4da2206c8a77880a84b49b122e485a4773a9999ed98c06d4d0b5",
+					"upstream": {
+						"file": "fonts/ttf/Arimo-Bold.ttf",
+						"sha256": "d7a8b187cf8444d4cfee102e8eae9e3043682fd5106d5d33ed677fe268a0e2ba"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "Arimo-BoldItalic.c38d12f284cc360d.ttf",
+					"sha256": "c38d12f284cc360d316daf995fabfafe5d1de879082634b551da100e04f7f719",
+					"upstream": {
+						"file": "fonts/ttf/Arimo-BoldItalic.ttf",
+						"sha256": "77c967d49d4ef4a63c39fbcd1e27892102e503e35a20983cb058430c4f268b34"
+					}
+				}
+			]
+		},
+		{
+			"name": "Cousine",
+			"license": "OFL-1.1",
+			"licenseFile": "Cousine-OFL.txt",
+			"source": "https://github.com/googlefonts/cousine/tree/c0fbdb438443968c884a5c13f5f9bee916a7f89b",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "Cousine-Regular.550ad969668e3be8.ttf",
+					"sha256": "550ad969668e3be805e856c028e604cdcbac5893877e2b307c2a3d743426b03a",
+					"upstream": {
+						"file": "fonts/ttf/Cousine-Regular.ttf",
+						"sha256": "5a57f0184000371cb22fe3fcea4c500354cab1a69efaf7beaf3e6eca6ecfefea"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "Cousine-Italic.b6716e135f85f4df.ttf",
+					"sha256": "b6716e135f85f4dfc778ed8b60e63869bcf3525861ccce83afb259bffcf17590",
+					"upstream": {
+						"file": "fonts/ttf/Cousine-Italic.ttf",
+						"sha256": "afb869eee8643d09915c3286edb61dad66278ceb1511c79b474ce21548421bcd"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "Cousine-Bold.094a6e10f6f5e4c8.ttf",
+					"sha256": "094a6e10f6f5e4c8203b170b16325dc519a79257621247a3cc904e90f40c213e",
+					"upstream": {
+						"file": "fonts/ttf/Cousine-Bold.ttf",
+						"sha256": "331215ec6445f41e98d8971251bb6237e722907f4101faae990583accfe79545"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "Cousine-BoldItalic.7899671373af94fe.ttf",
+					"sha256": "7899671373af94fe819e1e0b71c161e053b25c00ead8a1fa41a20dd0e9b88cdb",
+					"upstream": {
+						"file": "fonts/ttf/Cousine-BoldItalic.ttf",
+						"sha256": "7f804549c941ceaac0a9635389ed09c4bbc86e4bfe37589191dacd1b5b0e26a5"
+					}
+				}
+			]
+		},
+		{
+			"name": "Caladea",
+			"license": "OFL-1.1",
+			"licenseFile": "Caladea-OFL.txt",
+			"source": "https://github.com/googlefonts/caladea/tree/336a529cfad3d103d6527752686f8331d13e820a",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "Caladea-Regular.055303caa316a701.ttf",
+					"sha256": "055303caa316a701f44263f407ffc8387114a9c5e046a760bd4a54d568827b84",
+					"upstream": {
+						"file": "fonts/ttf/Caladea-Regular.ttf",
+						"sha256": "f1e899278b7b4491aba5b6a8253c4b04c050cc59b21865be5c37559a775153cd"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "Caladea-Italic.3b23d582fecfe1c4.ttf",
+					"sha256": "3b23d582fecfe1c45bcdca4e6f0ea069df65fc448563eb92718b333a2c559ac6",
+					"upstream": {
+						"file": "fonts/ttf/Caladea-Italic.ttf",
+						"sha256": "4359a8e24f748b6447b1ff6d7a174febe70961d29f8bb8634b56dacd740a3deb"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "Caladea-Bold.999d49902c9c6080.ttf",
+					"sha256": "999d49902c9c6080ad4208092fa30e4bcaf3edbd536a55c7d6dcb431c5bd5e14",
+					"upstream": {
+						"file": "fonts/ttf/Caladea-Bold.ttf",
+						"sha256": "ae3cb2dcbc925809dd29d2a44e9802211cab66be541bacbfc9c08c74b27c3742"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "Caladea-BoldItalic.fcf50540430660d6.ttf",
+					"sha256": "fcf50540430660d6b204fe579d7f2ab9ba4b34e4ccba8aa7d471bcb917cc4ce0",
+					"upstream": {
+						"file": "fonts/ttf/Caladea-BoldItalic.ttf",
+						"sha256": "ccabaa7b7e2fdf253d2b1a5fa699dd8a3df8d835a9eb285ad82631a677eb76c0"
+					}
+				}
+			]
+		},
+		{
+			"name": "Libertinus Serif",
+			"license": "OFL-1.1",
+			"licenseFile": "LibertinusSerif-OFL.txt",
+			"source": "https://github.com/googlefonts/libertinus/tree/63b24ea7904a0ae69b38732b50dc6ebc277f9b68",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "LibertinusSerif-Regular.441c8e6ec20b46bb.ttf",
+					"sha256": "441c8e6ec20b46bbca23e3015bff8f1b8bcbb84097cee77bba7f71e2e8d2a9fd",
+					"upstream": {
+						"file": "fonts/ttf/LibertinusSerif-Regular.ttf",
+						"sha256": "81ea17858245163742c9f5ddf19e9c54667ee5e026708556fb1bf5dce7f92fae"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "LibertinusSerif-Italic.ecd29061b8cb8e80.ttf",
+					"sha256": "ecd29061b8cb8e80c52cc47df14501de6dfcb7f20f3a0009fa0d262d7e4650fb",
+					"upstream": {
+						"file": "fonts/ttf/LibertinusSerif-Italic.ttf",
+						"sha256": "c8d62202ff921968c491bbbd05f9794213e98e1317c8cbf5edc1d8043f4a21d6"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "LibertinusSerif-Bold.0f044667fa361be1.ttf",
+					"sha256": "0f044667fa361be1be887f3c0d47ba04afb4de0418a8d8d820fa5e4ae016671f",
+					"upstream": {
+						"file": "fonts/ttf/LibertinusSerif-Bold.ttf",
+						"sha256": "dc5c00822f0d248256dbbe9fea8e68153e90c0dd7f95c906ed667b2ce053b415"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "LibertinusSerif-BoldItalic.3fad1372216d19f2.ttf",
+					"sha256": "3fad1372216d19f272a7d4a77935603eda3e90d27d7bf1c59f15e0f0f4bbd631",
+					"upstream": {
+						"file": "fonts/ttf/LibertinusSerif-BoldItalic.ttf",
+						"sha256": "8d7406b1e84e4ee1a658289139d16de75ee4380a2309dce2e4d68704b1d8cfe8"
+					}
+				}
+			]
+		}
+	]
+}

@@ -1,9 +1,9 @@
-// The three versions a quillkit bundle carries, read off the resolved manifests. A
+// The versions a quillkit bundle carries, read off the resolved manifests. A
 // browser resolves nothing, so the siblings are compiled in and their coordinate is for
 // diagnosis rather than resolution: what a consumer holding a tarball nobody can `npm ls`
 // needs in a bug report is which copies are in there.
 //
-// The version as its manifest states it, for all three. Whether a checkout sits ahead of
+// The version as its manifest states it, for each. Whether a checkout sits ahead of
 // the tag that version names is a question about a working tree, and a published tarball
 // is not one — `release.yml` builds from the merge commit it tags, so the manifest and the
 // bytes agree by construction.
@@ -24,7 +24,8 @@ import { ROOT, wasmVersion } from './workspace.mjs';
  *  one of them: it is external, and read off its own resolved manifest. */
 const SIBLINGS = [
 	{ dir: 'svelte', name: '@quillmark/svelte' },
-	{ dir: 'quiver', name: '@quillmark/quiver' }
+	{ dir: 'quiver', name: '@quillmark/quiver' },
+	{ dir: 'fonts', name: '@quillmark/fonts' }
 ];
 
 const versionAt = (manifest) => JSON.parse(readFileSync(manifest, 'utf8')).version;
@@ -40,7 +41,7 @@ export function carried(root = ROOT) {
 	return out;
 }
 
-/** The same three as one sentence, for a release's notes. */
+/** The same versions as one sentence, for a release's notes. */
 export function line(what = carried()) {
 	const each = Object.entries(what).map(([name, version]) => `\`${name}\` ${version}`);
 	return `Carries ${each.join(', ')}.`;

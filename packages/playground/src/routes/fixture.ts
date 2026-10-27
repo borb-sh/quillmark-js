@@ -47,11 +47,3 @@ export async function loadFixtureTree(
 ): Promise<Map<string, Uint8Array>> {
 	return (await (await quiver()).getQuill(name)).toTree();
 }
-
-/** The font files in a quill's tree, in path order: the formats an engine's `fonts` takes. */
-export function fontFiles(tree: Map<string, Uint8Array>): Uint8Array[] {
-	return [...tree.keys()]
-		.filter((path) => /\.(?:ttf|otf|ttc|otc)$/i.test(path))
-		.sort()
-		.map((path) => tree.get(path)!);
-}

@@ -19,6 +19,7 @@ on:
         options:
           - svelte
           - quiver
+          - fonts
           - quillkit
       bump:
         description: Version bump
@@ -63,10 +64,10 @@ jobs:
             --no-git-tag-version --allow-same-version >/dev/null
           NEXT=$(node -p "require('./packages/$PKG/package.json').version")
 
-          # quillkit carries the quiver at exactly its workspace version (QUILLKIT
-          # §"One pin"), so a quiver release moves that pin with it.
-          if [ "$PKG" = quiver ]; then
-            npm pkg set "dependencies.@quillmark/quiver=$NEXT" -w packages/quillkit
+          # quillkit carries the quiver and the font suite at exactly their workspace
+          # versions (QUILLKIT §"One pin"), so a release of either moves that pin with it.
+          if [ "$PKG" = quiver ] || [ "$PKG" = fonts ]; then
+            npm pkg set "dependencies.@quillmark/$PKG=$NEXT" -w packages/quillkit
           fi
 
           # Reify the lock the one way every other install produces it, rather
@@ -147,7 +148,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add "packages/$PKG/package.json" "packages/$PKG/CHANGELOG.md" package-lock.json
-          if [ "$PKG" = quiver ]; then git add packages/quillkit/package.json; fi
+          if [ "$PKG" = quiver ] || [ "$PKG" = fonts ]; then git add packages/quillkit/package.json; fi
           git commit -m "chore(release): ${NAME} v${VERSION}"
           git push -u origin "$BRANCH"
 

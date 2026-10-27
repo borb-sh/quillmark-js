@@ -55,7 +55,7 @@ Two branches are not a schema's to declare — a guidance channel a consumer sup
 
 `?foreign` draws the recovery shell: the engine renders past a kind the schema does not declare and warns `validation::unknown_card`, so the preview leaves the card out and the shell is the one surface that reaches it. The retype it offers puts the card on the page.
 
-A host font library is a consumer channel too, an app's rather than a quill's, so it is the flag `?fonts`: the engine is built with the font files the opened quill's tree holds as its `fonts`, standing in for an app's, and the editor takes `engine.fontFaces(quill)` as its `fonts`, so the format popover offers each family and a run set in one draws in it on both panes. The faces arrive behind the editor, as the session does, listing them loading the render build.
+A host font library is a consumer channel too, an app's rather than a quill's, so it is the flag `?fonts`: the engine is built over `@quillmark/fonts`' suite as its `fonts`, as an app builds it (FONTS §"The suite"), and the editor takes `engine.fontFaces(quill)` as its `fonts`, so the format popover offers each family and a run set in one draws in it on both panes. The faces arrive behind the editor, as the session does, listing them loading the render build.
 
 ## Quiver, not bundler
 
