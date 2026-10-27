@@ -243,7 +243,7 @@ li.ProseMirror-selectednode::after {
 	width: var(--_qm-glyph-control);
 	height: var(--_qm-glyph-control);
 	border: var(--_qm-border-width) solid var(--_qm-border);
-	border-radius: calc(var(--_qm-radius-inner) / 2);
+	border-radius: var(--_qm-radius-inner);
 	background: var(--_qm-surface-well);
 	cursor: pointer;
 	transition:

@@ -34,6 +34,8 @@
 
 **The band is a resting fill one ground step past the hover step at both poles, and the off switch's track and the unticked box rest on it**, where the three sat within a step of each other and both marks took the hover rung, so an off switch read as a button under the pointer. The thumb clears 3:1 on it at 4.6:1 in light and 3.3:1 in dark.
 
+**A matrix tick and a prose task box take the inner corner**, where each halved it to a corner on no rung.
+
 **The table's alignment cluster is the format popover's material**: translucent over a blur, and it scales in, where it drew an opaque plate that appeared at once.
 
 **An open `object` row's subform hangs at the row's edge**, where it stood a nesting rung in, so a step in is one distance whether it is an open row, an object in an object, a variant's cells or a matrix's columns; the cells a variant unfolds stand one rung under the discriminant, as a row's and a member's do, where they stood two.
