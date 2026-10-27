@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The matrix add box rests at the add chip's idle rung** and comes up under the pointer or the focus, where it rested at full label ink beside a chip that rested faded.
+
 **Cards draw no border, and the ground is the field well's tone.** A card is told from the ground by its tone alone, in every mount; the un-schemable card keeps its dashed edge, now the only edge a card draws. At the light pole the ground behind the cards, the preview's desk and the preset's `--qmh-page` deepen from `#f8f8f8` to `#f2f2f2`; at the dark pole they were the well's tone already. The body of a 400px pane gains 2px.
 
 **Under `.qm-pane` the editor's gutter is 16px**, where it was 20px, the width of the seam between cards, so the ground is one width all round the stack. With the borders gone, a 400px pane writes a 338px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
