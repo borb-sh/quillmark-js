@@ -151,10 +151,17 @@
 	   fixed tone stepped off the first sits level with `raised` in dark. Translucent, as
 	   the accent's tint is, so the step is the same over each. */
 	--_qm-surface-hover: color-mix(in oklab, var(--_qm-fg) 8%, transparent);
-	/* A band laid on the card rather than cut into it: a table's header, and the pill a
-	   grip draws. It steps toward the ink at both poles, a shade under white in light
-	   and a shade over the card in dark, where `well` sinks to a black stripe. */
-	--_qm-surface-band: color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 6%);
+	/* A band laid on the card rather than cut into it: a table's header, the pill a
+	   grip draws, the off switch's track and the unticked box. A resting fill, where
+	   `hover` above is a state, so the two have to be told apart on a card that shows
+	   both at once: each arm stands one ground step past the hover step at its pole,
+	   which lands the band two steps off the card in dark and a little over in light.
+	   It steps toward the ink at both poles, a shade under white in light and a shade
+	   over the card in dark, where `well` sinks to a black stripe. */
+	--_qm-surface-band: light-dark(
+		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 12%),
+		color-mix(in oklab, var(--_qm-bg), var(--_qm-fg) 18%)
+	);
 	/* The one stroke: a card's two horizontals, a section's and a subform's verticals,
 	   a table's frame and the lines between its cells, a floating surface's edge, the
 	   popover's divider. One and a half ground steps off the card at both poles, the

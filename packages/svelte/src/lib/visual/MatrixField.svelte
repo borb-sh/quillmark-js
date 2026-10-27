@@ -458,7 +458,7 @@
 		height: 100%;
 		border: none;
 		border-radius: calc(var(--_qm-radius-inner) / 2);
-		background: var(--_qm-surface-hover);
+		background: var(--_qm-surface-band);
 		cursor: pointer;
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}

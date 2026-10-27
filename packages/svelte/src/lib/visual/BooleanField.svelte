@@ -106,8 +106,10 @@
 		border-radius: var(--_qm-radius-pill);
 		/* The track is a fill and nothing else: an edge around it would be a second
 		 statement of a shape the tone already draws, and the checked state swaps that
-		 one fill for the accent (ARCHITECTURE §Styling). */
-		background: var(--_qm-surface-hover);
+		 one fill for the accent (ARCHITECTURE §Styling). The fill is the band, a
+		 resting tone: on the hover rung an off switch read as a button under the
+		 pointer. */
+		background: var(--_qm-surface-band);
 		cursor: pointer;
 		transition: background var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
@@ -119,11 +121,11 @@
 	}
 	/* The focus ring rides `.qm-focus-ring` on the switch (controls.css). */
 	/* The thumb reads on tone alone, and its tone is what says where it stands: the
-	 label rung over the track's `hover` rung unchecked, and the base surface over
-	 `--_qm-accent` checked. The card's own tone over the `hover` rung is a step of
-	 about 1.2:1 at either pole, a state indicator under WCAG 1.4.11's 3:1; the label
-	 rung clears it at both. No edge of its own: a hairline around a 12px pill is a
-	 second box inside the track's. */
+	 label rung over the track's band unchecked, and the base surface over
+	 `--_qm-accent` checked. The card's own tone over the band is a step of about
+	 1.3:1 in light and 1.5:1 in dark, a state indicator under WCAG 1.4.11's 3:1; the
+	 label rung clears it at both, at 4.6:1 and 3.3:1. No edge of its own: a hairline
+	 around a 12px pill is a second box inside the track's. */
 	.qm-toggle-wrap :global(.qm-toggle-thumb) {
 		width: var(--thumb);
 		height: var(--thumb);
