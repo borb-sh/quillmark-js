@@ -44,7 +44,7 @@ export async function fromDir(pathOrFileUrl: string): Promise<Quiver> {
 
 /**
  * Loads a packed (build-output) quiver from a local directory containing
- * `quiver.json` and the bundles and fonts written by `build`.
+ * `quiver.json` and the `.quill` bundles written by `build`.
  * Symmetric to `Quiver.fromBuiltUrl(url)` but reads from disk instead of HTTP:
  * no network required.
  *

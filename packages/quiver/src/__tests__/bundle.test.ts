@@ -47,7 +47,7 @@ describe('the bundle budget', () => {
 	});
 
 	it('refuses one entry over the per-file ceiling, naming it', () => {
-		expect(() => unpackFiles(declaring(17 * MIB, 'fat.bin'))).toThrow(/"fat\.bin" is \d+ bytes/);
+		expect(() => unpackFiles(declaring(33 * MIB, 'fat.bin'))).toThrow(/"fat\.bin" is \d+ bytes/);
 	});
 
 	it('refuses more entries than the count allows', () => {
@@ -61,6 +61,26 @@ describe('the bundle budget', () => {
 		expect(() => packFiles({ a: zeros, b: zeros, c: zeros, d: zeros, e: zeros })).toThrow(
 			QuiverError
 		);
+	});
+});
+
+describe('the entry names a .quill bundle admits', () => {
+	it.each(['../Quill.yaml', '/Quill.yaml', 'assets\\logo.svg', 'C:/plate.typ', 'assets//logo.svg'])(
+		'refuses %s at both ends',
+		(name) => {
+			const files = { 'Quill.yaml': enc.encode('x'), [name]: enc.encode('y') };
+			expect(() => unpackFiles(zipOf(files))).toThrow(
+				expect.objectContaining({ code: 'quiver_invalid' })
+			);
+			expect(() => packFiles(files)).toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
+		}
+	);
+
+	it('drops a directory entry, which carries nothing', () => {
+		const files = unpackFiles(
+			zipOf({ 'assets/': new Uint8Array(), 'assets/logo.svg': enc.encode('<svg/>') })
+		);
+		expect(Object.keys(files)).toEqual(['assets/logo.svg']);
 	});
 });
 

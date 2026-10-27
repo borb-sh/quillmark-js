@@ -7,7 +7,7 @@
  */
 
 import { QuiverError } from './errors.js';
-import { packFiles } from './bundle.js';
+import { BUNDLE_EXTENSION, packFiles } from './bundle.js';
 import { FORMAT, INDEX, LEGACY_POINTER } from './format.js';
 import { isFont } from './signature.js';
 import { isDraft } from './semver.js';
@@ -84,11 +84,9 @@ function assertSafeOutDir(
  * Output layout. Every name but the two JSON documents carries the SHA-256 of what it
  * names, which is what makes it safe to cache forever:
  *   outDir/
- *     quiver.json                       # the format and the catalog
- *     latest.json                       # the format alone, for a reader of format 1
- *     <name>@<version>.<sha256:32>.zip  # one bundle per quill
- *     fonts/
- *       <sha256>                        # dehydrated font bytes (full hash, no ext)
+ *     quiver.json                         # the format and the catalog
+ *     latest.json                         # the format alone, for a reader of format 1
+ *     <name>@<version>.<sha256:32>.quill  # one `.quill` bundle per quill, fonts and all
  *
  * A generation is assembled beside outDir and moved in whole, so a reader
  * fetching mid-build reads the previous one rather than a torn tree, and a
@@ -148,7 +146,7 @@ export async function buildQuiver(
 	async function packGeneration(): Promise<void> {
 		try {
 			await rm(stage, { recursive: true, force: true });
-			await mkdir(join(stage, 'fonts'), { recursive: true });
+			await mkdir(stage, { recursive: true });
 		} catch (err) {
 			throw new QuiverError(
 				'transport_error',
@@ -157,14 +155,7 @@ export async function buildQuiver(
 			);
 		}
 
-		const quills: Array<{
-			name: string;
-			version: string;
-			bundle: string;
-			fonts: Record<string, string>;
-		}> = [];
-
-		const stored = new Set<string>();
+		const quills: Array<{ name: string; version: string; bundle: string }> = [];
 
 		for (const [quillName, versions] of catalog) {
 			for (const version of versions) {
@@ -174,42 +165,19 @@ export async function buildQuiver(
 
 				const tree = await readQuillTree(quillDir);
 
-				const fonts: Record<string, string> = {};
 				const contentRecord: Record<string, Uint8Array> = {};
 
 				for (const [rel, bytes] of tree) {
-					if (!FONT_EXT.test(rel)) {
-						contentRecord[rel] = bytes;
-						continue;
-					}
-
-					// The loader refuses what does not open as a font, so the build refuses it
-					// first, where the author it names can do something about it.
-					if (!isFont(bytes, rel)) {
+					// Typst substitutes a font it cannot parse without a word, so a font file
+					// that is not one is refused where the author it names can fix it.
+					if (FONT_EXT.test(rel) && !isFont(bytes, rel)) {
 						throw new QuiverError(
 							'quiver_invalid',
 							`Quill "${quillName}@${version}": "${rel}" does not open as the font its extension names`,
 							{ quiverName: meta.name, version }
 						);
 					}
-
-					// Full width: fonts are keyed by hash, so two distinct fonts sharing a
-					// prefix would merge into one file.
-					const hash = createHash('sha256').update(bytes).digest('hex');
-					fonts[rel] = hash;
-					if (stored.has(hash)) continue;
-
-					try {
-						await writeFile(join(stage, 'fonts', hash), bytes);
-					} catch (err) {
-						throw new QuiverError(
-							'transport_error',
-							`Failed to write font "${join(outDir, 'fonts', hash)}": ${(err as Error).message}`,
-							{ cause: err }
-						);
-					}
-
-					stored.add(hash);
+					contentRecord[rel] = bytes;
 				}
 
 				// The budget `bundle.ts` carries is spent here as well as at the read, so
@@ -230,7 +198,7 @@ export async function buildQuiver(
 					.update(zipBytes)
 					.digest('hex')
 					.slice(0, NAME_DIGEST_LENGTH);
-				const bundleName = `${quillName}@${version}.${bundleHash}.zip`;
+				const bundleName = `${quillName}@${version}.${bundleHash}.${BUNDLE_EXTENSION}`;
 
 				try {
 					await writeFile(join(stage, bundleName), zipBytes);
@@ -242,7 +210,7 @@ export async function buildQuiver(
 					);
 				}
 
-				quills.push({ name: quillName, version, bundle: bundleName, fonts });
+				quills.push({ name: quillName, version, bundle: bundleName });
 			}
 		}
 

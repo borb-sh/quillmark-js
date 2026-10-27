@@ -3,12 +3,12 @@
 export const INDEX = 'quiver.json';
 
 /**
- * The artifact's format, stamped into `quiver.json` and refused to be read past (QUIVER
- * §"The index"). A change a reader assuming the previous shape would misread moves it, and
- * so does the first added field, which format-2 readers before 0.38 refuse; from 3 on, an
- * added field a reader can skip does not.
+ * The artifact's format, stamped into `quiver.json` and read at exactly this value (QUIVER
+ * §"The index"). A change a reader assuming the previous shape would misread moves it; an
+ * added field a reader can skip does not. Format 3 is one `.quill` bundle per quill and no
+ * `fonts/`.
  */
-export const FORMAT = 2;
+export const FORMAT = 3;
 
 /**
  * What a reader of format 1 fetches first. It reads `format` off it before anything else,

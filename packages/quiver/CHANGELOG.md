@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A built quiver is `quiver.json` and one `.quill` bundle per quill, its fonts inside it.** `build` writes `<name>@<x.y.z>.<digest>.quill`, the zip Quillmark specifies as a quill's one file, `Quill.yaml` at its root, and writes no `fonts/`; a `quiver.json` entry carries no `fonts`. `quiver.json` and `latest.json` state format 3, so a reader of format 2 refuses the artifact naming the upgrade, and this one refuses a format-2 artifact naming the rebuild (MIGRATION.md). A font two quills or versions carry is in both bundles.
+
+**A bundle holds the `.quill` format's budget**: 32 MiB a file, where 16 MiB was the ceiling, 64 MiB in all and 2048 entries. An entry name that starts with `/`, holds `\`, `:` or NUL, or has an empty, `.` or `..` segment fails `build` and the load as `quiver_invalid`, and a directory entry is dropped. A font file that does not open as a font still fails `build`.
+
 ## v0.38.1 - 2026-10-19
 
 **A `.ttc` or `.otc` font collection builds under `fonts/`**, named in `quiver.json` as every other font is, where `build` packed it into the quill's bundle and refused one over 16 MiB, the size of a typical CJK collection. (#759)

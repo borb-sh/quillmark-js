@@ -103,7 +103,7 @@ const quiver = await fromBuiltDir('./static/quills/my-quiver');
 
 ## Server-side runtime (no filesystem)
 
-A serverless function's packed artifact is not on a path the invocation can read, so `fromBuiltDir` cannot see it. Hand over the bytes instead, keyed by artifact-relative path as `build` writes them (`quiver.json`, `<name>@<x.y.z>.<digest>.zip`, `fonts/<hash>`):
+A serverless function's packed artifact is not on a path the invocation can read, so `fromBuiltDir` cannot see it. Hand over the bytes instead, keyed by artifact-relative path as `build` writes them (`quiver.json`, `<name>@<x.y.z>.<digest>.quill`):
 
 ```ts
 import { Quiver } from '@quillmark/quiver';
@@ -115,9 +115,9 @@ Nothing is fetched, so nothing self-fetches over your own load balancer. The map
 
 ## The `quiver.json` index
 
-`Quiver.fromBuiltUrl(url)` first fetches `<url>/quiver.json`: the format and the catalog, naming each quill's bundle and fonts. Every other name carries the digest of its own bytes, so a changed file is a changed name and is safe to cache forever; `quiver.json` is not, and a cache layer serving a stale one silently pins the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), and every other request is `force-cache`, read once more with `reload` if what the cache answered fails. Both are the browser layer only: a stale CDN edge is answered by that host's cache headers, and `quillkit`'s README states the whole contract for a deploy serving a client over one.
+`Quiver.fromBuiltUrl(url)` first fetches `<url>/quiver.json`: the format and the catalog, naming each quill's bundle. Every other name carries the digest of its own bytes, so a changed file is a changed name and is safe to cache forever; `quiver.json` is not, and a cache layer serving a stale one silently pins the client to the old catalog. It is therefore the one request fetched `no-cache` (revalidate with the origin; a 304 still serves from disk), and every other request is `force-cache`, read once more with `reload` if what the cache answered fails. Both are the browser layer only: a stale CDN edge is answered by that host's cache headers, and `quillkit`'s README states the whole contract for a deploy serving a client over one.
 
-A `getQuill` reads one bundle and the fonts it names, nothing of another quill. Fonts are stored once by hash, so a release that edits a template re-downloads that quill's bundle and not its fonts. A tab still holding the previous release's `quiver.json` rereads it once when a read fails.
+A `getQuill` reads one bundle, nothing of another quill. Each bundle is a `.quill` bundle: the quill's whole tree as one zip, fonts included, `Quill.yaml` at the root — the file `Quill.fromBundle` in `@quillmark/wasm`, `Quill.from_bundle` in Python and the `quillmark` CLI read. A release that edits a template re-downloads that quill's bundle, fonts and all. A tab still holding the previous release's `quiver.json` rereads it once when a read fails.
 
 ## What a quiver is trusted to be
 

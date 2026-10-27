@@ -92,8 +92,8 @@ export class Quiver {
 
 	/**
 	 * Browser-safe factory. Loads build output from the bytes themselves, keyed
-	 * by artifact-relative path (`quiver.json`, `<name>@<x.y.z>.<digest>.zip`,
-	 * `fonts/<hash>`) — the shape `build` writes and `fromBuiltDir` reads back.
+	 * by artifact-relative path (`quiver.json`, `<name>@<x.y.z>.<digest>.quill`)
+	 * — the shape `build` writes and `fromBuiltDir` reads back.
 	 *
 	 * Nothing is fetched, so a runtime whose artifact is not on a path it can
 	 * read (a serverless function, a bundler that inlines it, a test) reaches

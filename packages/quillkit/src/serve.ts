@@ -17,10 +17,9 @@ import { within } from './paths.js';
 
 /**
  * What the roots hold: the clients `vite build` emits, a packed quiver's `quiver.json` and
- * bundles, and an app's `app.json` and the author's files `app.css` names. A packed font
- * carries no type because it carries no extension either, being dehydrated into
- * `fonts/<sha256>`; anything unlisted falls back to `application/octet-stream`, which is
- * right for opaque bytes.
+ * `.quill` bundles, and an app's `app.json` and the author's files `app.css` names.
+ * Anything unlisted falls back to `application/octet-stream`, which is right for opaque
+ * bytes.
  *
  * `.wasm` is the one that is not a nicety: `@quillmark/wasm` ships wasm-bindgen's web
  * target, which instantiates by streaming, and `WebAssembly.instantiateStreaming`
@@ -37,13 +36,13 @@ const TYPES: Record<string, string> = {
 	'.json': 'application/json; charset=utf-8',
 	'.otf': 'font/otf',
 	'.png': 'image/png',
+	'.quill': 'application/vnd.quillmark.quill+zip',
 	'.svg': 'image/svg+xml',
 	'.ttf': 'font/ttf',
 	'.wasm': 'application/wasm',
 	'.webp': 'image/webp',
 	'.woff': 'font/woff',
-	'.woff2': 'font/woff2',
-	'.zip': 'application/zip'
+	'.woff2': 'font/woff2'
 };
 
 export interface Mount {
