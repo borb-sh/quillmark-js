@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio's picker spaces its controls at the bar's inner rhythm**, 8px, where it spent 12.
+
 **The app's footer stands on the header's plate**, where it showed the page tone, so the two bands framing the panes match.
 
 **The app's colours hold in a built deploy.** The bundle's minifier lowered `light-dark()` into variables that resolve to no colour where the preset states its poles, so the app's Download PDF press and an error's red drew nothing in a built app or studio; both clients now build for browsers that carry `light-dark()` natively. The press beside Download PDF stands at its height, studio's head holds its picker and the quiver's sentence on one line where the width allows, and a stalled page's notice starts on the sheet's edge over a pane already in the desk's tone. Studio's failed-open room keeps that tone too, and the documents drawer's Close press carries its name once.

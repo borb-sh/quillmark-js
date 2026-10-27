@@ -649,7 +649,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
-		gap: var(--qmh-space-2) var(--pg-space-6);
+		gap: var(--qmh-space-2) var(--qmh-space-4);
 	}
 
 	/* A label sits a word-space from what it names, the gap the picker's label keeps from
@@ -676,7 +676,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--qmh-space-3);
+		gap: var(--qmh-space-2);
 		margin-inline-start: auto;
 	}
 
