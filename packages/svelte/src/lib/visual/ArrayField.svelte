@@ -652,6 +652,27 @@
 		if (!drag?.engaged || drag.drop !== k || drag.drop === drag.k) return undefined;
 		return drag.drop > drag.k ? 'after' : 'before';
 	}
+
+	/** Whether cells stand past the table scroller's end edge, under the pinned remove,
+	 *  which is what the fade before the remove draws on. */
+	let tableOverflow = $state(false);
+	/** The head row spans every track, so its box is the content width a new row or a
+	 *  longer cell changes. */
+	function trackOverflow(el: HTMLElement): () => void {
+		const measure = () => {
+			tableOverflow = el.scrollWidth - el.clientWidth - Math.abs(el.scrollLeft) > 1;
+		};
+		measure();
+		el.addEventListener('scroll', measure, { passive: true });
+		const observer =
+			typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure);
+		observer?.observe(el);
+		if (el.firstElementChild) observer?.observe(el.firstElementChild);
+		return () => {
+			el.removeEventListener('scroll', measure);
+			observer?.disconnect();
+		};
+	}
 </script>
 
 <div
@@ -691,7 +712,12 @@
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
-			<div class="qm-array-table-scroller" style:--table-cols={columns.length}>
+			<div
+				class="qm-array-table-scroller"
+				data-overflow={tableOverflow ? '' : undefined}
+				style:--table-cols={columns.length}
+				{@attach trackOverflow}
+			>
 				<!-- The header names the columns, so a cell carries no label of its own: its
 				     accessible name is the row's and the column's composed (`ObjectField`). The
 				     guidance affordance rides the header, being the column's rather than any
@@ -1123,12 +1149,16 @@
 	.qm-element-summary :global(.qm-el-chevron) {
 		flex-shrink: 0;
 		display: block;
+		stroke-width: var(--_qm-glyph-stroke);
 		color: var(--_qm-ink-label);
 		transform: rotate(0deg);
 		transform-origin: center;
 		transition:
 			transform var(--_qm-duration-slow) var(--_qm-ease-reverse),
 			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-element-summary :global(.qm-el-chevron > *) {
+		vector-effect: non-scaling-stroke;
 	}
 	.qm-element-summary:hover :global(.qm-el-chevron),
 	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
@@ -1250,6 +1280,28 @@
 		inset-inline-end: 0;
 		background: var(--_qm-surface);
 		box-shadow: 0 0 0 var(--_qm-ring-reach) var(--_qm-surface);
+	}
+	/* While cells stand past the end edge, the slab fades them in over a step before it
+	 rather than cutting them at its edge: the column the cut hides is still there. */
+	.qm-array-table-row > .qm-remove::before,
+	.qm-array-table-head-end::before {
+		content: '';
+		position: absolute;
+		inset-block: calc(-1 * var(--_qm-ring-reach));
+		inset-inline-end: calc(100% + var(--_qm-ring-reach));
+		width: var(--_qm-space-3);
+		background: linear-gradient(to right, transparent, var(--_qm-surface));
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-array-table-row > .qm-remove:dir(rtl)::before,
+	.qm-array-table-head-end:dir(rtl)::before {
+		background: linear-gradient(to left, transparent, var(--_qm-surface));
+	}
+	.qm-array-table-scroller[data-overflow] > .qm-array-table-row > .qm-remove::before,
+	.qm-array-table-scroller[data-overflow] .qm-array-table-head-end::before {
+		opacity: 1;
 	}
 	/* The glyph stands on the row's first line with the cells, however far the slab
 	 stretches under it. */

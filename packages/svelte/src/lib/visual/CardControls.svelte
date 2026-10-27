@@ -80,15 +80,11 @@
 		height: var(--_qm-tap-min);
 		padding: 0;
 	}
-	/* Hover fill comes from `.qm-chip` (controls.css). Idle recede is on the ink,
-	 not the box: a layer on the chip is two rasters of the same stroke, and the
-	 fill has to stay opaque. Danger mixed to the idle rung; full under the pointer. */
+	/* Hover fill comes from `.qm-chip` (controls.css). The delete rests at label ink,
+	 as an array row's and a matrix member's remove do, and is destructive under the
+	 pointer or the focus. */
 	.qm-card-delete {
-		color: color-mix(
-			in oklab,
-			var(--_qm-danger) calc(100% * var(--_qm-opacity-idle)),
-			var(--_qm-surface)
-		);
+		color: var(--_qm-ink-label);
 	}
 	.qm-card-delete:hover,
 	.qm-card-delete:focus-visible {

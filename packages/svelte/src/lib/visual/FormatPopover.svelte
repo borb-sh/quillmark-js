@@ -10,7 +10,7 @@
  the result as it commits a keystroke: a field's lowers it to `markOps` through
  `applyChange` (field.ts), a by-value leaf's hands the re-encoded value to its parent
  (`ProseValue`). This component never touches the content. The keymap mirror
- (Mod-b/i/u) lives in the codec's keymap (field.ts); this is the pointer
+ (Mod-b/i/u, Mod-Shift-x, Mod-e) lives in the codec's keymap (field.ts); this is the pointer
  affordance for all six marks. Mod-K is this surface's own key, the prompt it raises
  being this surface's: a document `keydown` the leaf's keymap left unclaimed. Over a
  leaf that holds lists, two more buttons number or bullet every selected line, or take

@@ -30,6 +30,24 @@
 
 **A table's pinned remove hides the column scrolling under it all the way to the clip**, where a sliver of that column showed past the slab's rounded corners.
 
+**A card's delete rests at the label ink**, as an array row's and a matrix member's remove do, and turns to the danger colour under the pointer or the focus, where it rested at a faded danger.
+
+**A typed card title draws at the ink**, steady under the pointer and the focus, where it rested at the label ink and stepped up on hover; the automatic title stays at the label ink, as every placeholder does.
+
+**A section's guidance marker stands beside its name**, where it stood at the far end of the header row; the whole row still opens and closes the section.
+
+**A disclosure chevron strokes at the weight of every other glyph**: the 16px chevron of a section and of an `object` row draws the 14px chip glyph's stroke, where it drew a seventh heavier.
+
+**A Today toggle the default supplies drops its hairline**: it keeps the pressed fill, and the default ink alone says it is shown and not written.
+
+**A table that scrolls fades its cells in before the pinned remove** while more of it stands past the end edge, where the remove cut the last visible column at its edge.
+
+**Strikethrough and code take keys**: `Mod-Shift-x` toggles `strike` and `Mod-e` toggles `code` in a prose leaf and a table cell, and the popover's tooltips name both chords.
+
+**A list in a prose leaf indents by two digits and the nesting step**, where it indented 16px, so a tenth item's number stands inside the leaf as the first's does.
+
+**An open matrix member takes a rung of air from the members around it**, as an open array row does, so its columns stand nearer its own tick than the next member's.
+
 ## v0.27.0 - 2026-10-26
 
 **Zooming the preview stops at the pane-width fit as it stops at 100%, and landing there is the default again**: Ctrl/⌘-wheel and pinch hold at it, `Mod +`/`−` step to it, and from there the page follows a dragged divider and the zoom pill goes, where zooming back past the fit left the page at a fixed size the divider no longer moved.

@@ -283,7 +283,7 @@
 		{#each members as m (m.id)}
 			{@const on = held(m.id)}
 			<div
-				class={['qm-member qm-wash', { held: on }]}
+				class={['qm-member qm-wash', { held: on, open: on && hasColumns }]}
 				data-qm-prop={m.id}
 				bind:this={memberEls[m.id]}
 			>
@@ -311,7 +311,7 @@
 		{#each added as item, k (item.id)}
 			{@const name = item.title || t.strings.matrixItemTitle(label ?? '', k + 1)}
 			<div
-				class="qm-member qm-wash held added"
+				class={['qm-member qm-wash held added', { open: hasColumns }]}
 				data-qm-prop={item.id}
 				bind:this={memberEls[item.id]}
 			>
@@ -425,6 +425,13 @@
 		flex-direction: column;
 		gap: var(--_qm-space);
 		border-radius: var(--_qm-radius-inner);
+	}
+	/* An open array row's guard (`ArrayField`): a member whose columns are unfolded takes
+	 a rung of air from the members either side of it, so its columns stand nearer its own
+	 head than the next member's. Abreast, a margin would set the member below the heads
+	 its row of tracks shares, and each track holds one member's columns alone. */
+	.qm-matrix-roster:not(.compact) > .qm-member.open {
+		margin-block: var(--_qm-space);
 	}
 	/* The tick and its title on one line, the line holding the tap floor a tick alone
 	 would not reach: the title is the target, the `for` carrying its press to the input. */

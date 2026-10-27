@@ -347,6 +347,10 @@
 	   `check:style`'s rhythm axis sees each of them read a rung, never that they read
 	   the same one — the case `--_qm-inset-control` above is cut for. */
 	--_qm-nest: var(--_qm-space-3);
+	/* The numerals a list marker is given room for: two digits, so a tenth item's number
+	   stands inside the leaf as the first's does. In `ch`, so it tracks the face the
+	   numbers are set in. */
+	--_qm-marker-digits: 2ch;
 	/* The text column, measured in from a block's own inline inset: a section's vertical
 	   plus the rung its heading stands off it, so a heading riding that vertical and a
 	   line beside it start on one edge. A rung for the reason the nesting step is: the
@@ -368,6 +372,10 @@
 	   rather than through the icon's `size`, so a stylesheet beats the SVG presentation
 	   attribute and one rung is the whole of what a control draws. */
 	--_qm-glyph-control: 14px;
+	/* The stroke a control glyph draws, in screen length: the frame's 2 units of 24 at
+	   the control rung. A glyph drawn at another edge reads it under
+	   `vector-effect: non-scaling-stroke`, so every glyph strokes at one weight. */
+	--_qm-glyph-stroke: calc(var(--_qm-glyph-control) / 12);
 	/* The narrowest track a control that fills its width stays usable in: a table's
 	   column floors at it, rises no further than its content, and a row of them scrolls
 	   sideways rather than crushing a cell. A column drawing a mark takes no floor — a

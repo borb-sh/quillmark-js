@@ -203,7 +203,9 @@ li.ProseMirror-selectednode::after {
 }
 
 /* The UA's 40px list indent is the one box the reset above does not take (it is
-   padding, not margin), and it is a length nothing chose. A rung replaces it.
+   padding, not margin), and it is a length nothing chose. The indent is room for a
+   marker's two digits and the nesting step past them, so a marker, `10.` included,
+   hangs into its own list's indent and never past the leaf's edge.
 
    The markers are the UA's, reclaimed rather than inherited. `disc` and `decimal`
    are right and this restates neither: a host reset (Tailwind's preflight sets
@@ -217,7 +219,7 @@ li.ProseMirror-selectednode::after {
    that takes those ever turns up: the positive half states what it leaves to the
    UA, and what a reset takes is what has to be asked back. */
 .ProseMirror :is(ul, ol) {
-	padding-left: var(--_qm-space-4);
+	padding-left: calc(var(--_qm-marker-digits) + var(--_qm-nest));
 	list-style: revert;
 }
 

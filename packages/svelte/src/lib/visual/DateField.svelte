@@ -363,9 +363,9 @@
 		background: var(--_qm-accent-tint);
 		color: var(--_qm-ink);
 	}
+	/* A default-supplied today keeps the pressed fill: the default ink alone says it is
+	 shown and not written, as it does for the digits beside it. */
 	.qm-date-today[data-default] {
-		background: transparent;
-		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-border);
 		color: var(--_qm-ink-default);
 	}
 	@media (hover: hover) {
