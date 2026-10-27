@@ -76,15 +76,15 @@
 		color: var(--_qm-ink-label);
 	}
 	/* At rest the box is the add chip it stands in for: no well, its words at the label
-	 ink, and the whole line at the chip's idle rung. It comes up under the pointer, and
-	 the well with it, and both stay while it holds the focus or typed words. */
+	 ink, and the line at the chip's idle rung. The line comes up under the pointer with
+	 the well, and both stay while the box holds the focus or typed words. */
 	.qm-matrix-add-field {
+		opacity: var(--_qm-opacity-idle);
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	.qm-matrix-add-field:has(.qm-input:placeholder-shown:not(:focus)) {
-		opacity: var(--_qm-opacity-idle);
-	}
-	.qm-matrix-add-field:hover {
+	.qm-matrix-add-field:hover,
+	.qm-matrix-add-field:focus-within,
+	.qm-matrix-add-field:has(.qm-input:not(:placeholder-shown)) {
 		opacity: 1;
 	}
 	.qm-matrix-add-field .qm-input {
@@ -99,5 +99,11 @@
 	}
 	.qm-matrix-add-field:hover .qm-input:placeholder-shown:not(:focus) {
 		background: var(--_qm-surface-hover);
+	}
+	/* No hover to come up on: the line stands at the muted rung, as the chip does. */
+	@media (hover: none) {
+		.qm-matrix-add-field {
+			opacity: var(--_qm-opacity-muted);
+		}
 	}
 </style>

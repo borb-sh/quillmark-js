@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The matrix add box rests at the add chip's idle rung** and comes up under the pointer or the focus, where it rested at full label ink beside a chip that rested faded.
+**The matrix add box rests at the add chip's rung**, idle under a pointer and muted on a touch screen, and comes up under the pointer, the focus or typed words, where it rested at full label ink beside a chip that rested faded. The chip eases up as the box does, where it snapped.
 
 **Cards draw no border, and the ground is the field well's tone.** A card is told from the ground by its tone alone, in every mount; the un-schemable card keeps its dashed edge, now the only edge a card draws. At the light pole the ground behind the cards, the preview's desk and the preset's `--qmh-page` deepen from `#f8f8f8` to `#f2f2f2`; at the dark pole they were the well's tone already. The body of a 400px pane gains 2px.
 

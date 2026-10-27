@@ -1330,6 +1330,10 @@
 		line-height: var(--_qm-leading-tight);
 		border-radius: var(--_qm-radius-inner);
 		opacity: var(--_qm-opacity-idle);
+		transition:
+			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-add-el:hover:not(:disabled),
 	.qm-add-el:focus-visible {
