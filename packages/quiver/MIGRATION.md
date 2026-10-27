@@ -4,11 +4,11 @@ Upgrade notes per range. The [CHANGELOG](CHANGELOG.md) is the full record; this 
 
 ## 0.38 → 0.39
 
-### Rebuild every artifact, and move quiver and quillkit together
+### Rebuild every artifact
 
 A built quiver is `quiver.json` beside one `<name>@<x.y.z>.<digest>.quill` bundle per quill, each carrying its quill's fonts; `fonts/` is gone, and `quiver.json` and `latest.json` state format 3. A format-2 artifact under 0.39 is refused as `quiver_invalid` naming the rebuild; a 0.39 artifact under an older reader is refused with the upgrade named. Re-run `build`; nothing in the source layout changes.
 
-`quillkit`'s client carries its own copy of this package's reader and packs through the collection's, so a collection upgrades `@quillmark/quiver` in the same change as `quillkit`.
+`quillkit` packs and reads with the `@quillmark/quiver` it carries, so a quillkit deploy moves to format 3 with the quillkit release that carries 0.39, and nothing in the collection pins this package.
 
 A host rule naming `fonts/*` or `*.zip` under a built quiver names `*.quill` now. A server whose static handler types files by extension serves `.quill` as `application/vnd.quillmark.quill+zip` or `application/octet-stream`; the loader reads the bytes whatever the type.
 

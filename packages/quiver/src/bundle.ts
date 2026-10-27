@@ -89,7 +89,7 @@ function bundleBudget(): (name: string, size: number) => void {
 /**
  * Pack a flat file map into a deterministic zip.
  * Keys are sorted before zipping so insertion order doesn't affect output.
- * Throws `quiver_invalid` where the budget is spent.
+ * Throws `quiver_invalid` where the budget is spent or a name is one the format refuses.
  */
 export function packFiles(files: Record<string, Uint8Array>): Uint8Array {
 	const spend = bundleBudget();
