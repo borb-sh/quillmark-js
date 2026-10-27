@@ -925,7 +925,7 @@ function ghostPlugin(opts: {
 /**
  * The field's keymap: history, mark toggles, and the body's structural keys; Enter
  * suppressed inline. The toggles are bound per mark type the schema declares, so a
- * `text` leaf leaves Mod-b/i/u to the browser.
+ * `text` leaf leaves the mark chords to the browser.
  *
  * Tab forks on the leaf's role, not on the caret's position. A one-line or `text`
  * leaf is a form field: Tab stays unbound, so field navigation is open for a shell
@@ -942,6 +942,8 @@ function editorKeymap(schema: Schema, inline: boolean, slash?: boolean): Record<
 	if (schema.marks.strong) map['Mod-b'] = toggleMark(schema.marks.strong);
 	if (schema.marks.em) map['Mod-i'] = toggleMark(schema.marks.em);
 	if (schema.marks.underline) map['Mod-u'] = toggleMark(schema.marks.underline);
+	if (schema.marks.strike) map['Mod-Shift-x'] = toggleMark(schema.marks.strike);
+	if (schema.marks.code) map['Mod-e'] = toggleMark(schema.marks.code);
 	if (inline) {
 		// One textblock only: swallow Enter so no second block is attempted. One *line*
 		// only too (`Content::is_inline`), so Shift-Enter goes with it: the schema

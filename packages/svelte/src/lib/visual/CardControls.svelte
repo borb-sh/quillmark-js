@@ -3,7 +3,7 @@
   Right-aligned in the header: a move-up/move-down chevron pair (each disabled at its
   edge), then delete, the row revealed while the pointer or the caret is in the card.
   Reorder is buttons, not drag (V1). All three are chips (controls.css): fill arrives
-  on hover, and delete draws faded danger, full under the pointer. The card scopes
+  on hover, and delete rests at the label ink beside them. The card scopes
   that reveal, so its condition lives in the parent's CSS; the row keeps the narrower
   guarantee here, that a focused control is a visible one.
 -->
@@ -80,18 +80,12 @@
 		height: var(--_qm-tap-min);
 		padding: 0;
 	}
-	/* Hover fill comes from `.qm-chip` (controls.css). Idle recede is on the ink,
-	 not the box: a layer on the chip is two rasters of the same stroke, and the
-	 fill has to stay opaque. Danger mixed to the idle rung; full under the pointer. */
-	.qm-card-delete {
-		color: color-mix(
-			in oklab,
-			var(--_qm-danger) calc(100% * var(--_qm-opacity-idle)),
-			var(--_qm-surface)
-		);
-	}
+	/* The delete rests at the chip's label ink, as an array row's and a matrix member's
+	 remove do, and under the pointer or the focus takes their danger tint and ink in
+	 place of the chip's hover fill. */
 	.qm-card-delete:hover,
 	.qm-card-delete:focus-visible {
+		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
 	}
 </style>

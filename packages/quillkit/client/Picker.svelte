@@ -101,7 +101,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--qmh-space) var(--qmh-space-3);
+		gap: var(--qmh-space) var(--qmh-space-2);
 		min-width: min-content;
 	}
 

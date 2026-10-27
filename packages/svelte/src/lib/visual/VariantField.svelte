@@ -149,9 +149,11 @@
 </div>
 
 <style>
+	/* The distance from the discriminant to the cells it unfolds is the one an array row
+	 and a matrix member keep from what they unfold. */
 	.qm-variant {
 		display: flex;
 		flex-direction: column;
-		gap: var(--_qm-space-2);
+		gap: var(--_qm-space);
 	}
 </style>

@@ -27,9 +27,11 @@
 	overflow-wrap: anywhere;
 }
 
-/* The foot: a line of meta type under a hairline, its links in the line's own ink. */
+/* The foot: a line of meta type on the head's plate under a hairline, its links in the
+   line's own ink. The two bands framing the panes stand on one plate. */
 :where(.qm-app-footer) {
 	padding: var(--qmh-space-2) var(--qmh-space-4);
+	background: var(--qmh-surface);
 	border-block-start: var(--qmh-border-width) solid var(--qmh-border);
 	font-size: var(--qmh-text-meta);
 	line-height: var(--qmh-leading-tight);

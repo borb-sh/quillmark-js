@@ -122,7 +122,8 @@
 	}
 
 	/** Not `--_qm-glyph-control`: that rung centres a glyph in a tap target, where this
-	 * one stands in a run of text at the body rung and is sized to sit level with it. */
+	 * one stands in a run of text at the body rung and is sized to sit level with it. It
+	 * strokes at the control glyph's weight (`--_qm-glyph-stroke`). */
 	const CHEVRON = 16;
 
 	const ungrouped = $derived(card.sections.filter((s) => s.group == null));
@@ -502,9 +503,9 @@
 	 overlaid input tracks its content width. Both carry the same nothing for a box model
 	 and inherit the same type tokens, which is what makes the two measure alike.
 
-	 The type is the group header's, down to the ink and its hover step below: a card
-	 title and a section header both name a block of fields, so they read as one register
-	 and what ranks them is position rather than a size step. */
+	 The type is the group header's: a card title and a section header both name a block
+	 of fields, so they read as one register and what ranks them is position rather than
+	 a size step. */
 	.qm-card-title-sizer {
 		display: inline-grid;
 		align-items: center;
@@ -523,9 +524,9 @@
 		min-width: 2ch;
 	}
 	/* The title draws no box in any state: a card title is already the one line that
-	 reads as the card's name, and the region's `cursor: text` says the rest. The ink step
-	 replaces it, the same cue the group header takes — a wide borderless target has no
-	 other way to answer the pointer. */
+	 reads as the card's name, and the region's `cursor: text` answers the pointer. A
+	 typed title is a value, at the ink, and the automatic one a placeholder, at label
+	 ink, as in every field. */
 	.qm-card-title {
 		grid-area: 1 / 1;
 		width: 100%;
@@ -533,18 +534,12 @@
 		font: inherit;
 		/* `font: inherit` does not carry colour: a form control defaults to the UA's own
 		 text colour rather than the header's ink without this line. */
-		color: var(--_qm-ink-label);
+		color: var(--_qm-ink);
 		border: none;
 		padding: 0;
 		background: transparent;
-		transition: color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	.qm-card-title:hover,
-	.qm-card-title:focus {
-		color: var(--_qm-ink);
-	}
-	/* The automatic title, at the label ink every placeholder takes rather than the UA's
-	 grey, and steady under focus, where a typed title steps to the ink. */
+	/* The label ink every placeholder takes rather than the UA's grey. */
 	.qm-card-title::placeholder {
 		color: var(--_qm-ink-label);
 		opacity: 1;
@@ -685,17 +680,10 @@
 	 the accordion stops looking like structure. Size, weight and leading sit after
 	 `font`, a shorthand that carries `line-height`. */
 	.qm-group-header {
-		/* Positioned, and paint is not what it buys: a group's box grows by
-		 `--stroke-reach` at both ends and hands the growth back as margin, so
-		 consecutive boxes overlap in a band at every seam, and a closed group's header
-		 ends inside the next group's box. In flow, the later sibling takes the presses
-		 that land in the band and the bottom of the header is a dead strip; positioned,
-		 the control holds its own box, and the band paints the same either way. */
-		position: relative;
 		display: flex;
 		align-items: center;
 		gap: var(--_qm-space);
-		width: 100%;
+		min-width: 0;
 		border: none;
 		background: transparent;
 		padding: var(--_qm-space) 0 var(--_qm-space) var(--_qm-space);
@@ -710,17 +698,26 @@
 	}
 	/* The header row: the press target, and beside it the guidance marker a headed
 	 section carries (`FieldHint`), which is its own control and so not inside the
-	 button. Positioned for the reason the header is, the row being the box that
-	 stands in the band. */
+	 button. The button sizes to its text so the marker follows the name, and its
+	 `::after` spans the row so the whole row still presses it; the marker, positioned
+	 by its tap floor and later in the row, stands over that plane.
+
+	 Positioned, and paint is not what it buys: a group's box grows by `--stroke-reach`
+	 at both ends and hands the growth back as margin, so consecutive boxes overlap in a
+	 band at every seam, and a closed group's header ends inside the next group's box.
+	 In flow, the later sibling takes the presses that land in the band and the bottom
+	 of the header is a dead strip; positioned, the row holds its own box, and the band
+	 paints the same either way. */
 	.qm-group-head {
 		position: relative;
 		display: flex;
 		align-items: center;
 		gap: var(--_qm-space);
 	}
-	.qm-group-head > .qm-group-header {
-		flex: 1;
-		min-width: 0;
+	.qm-group-header::after {
+		content: '';
+		position: absolute;
+		inset: 0;
 	}
 	/* The parked description: `FieldLabel`'s recipe, for the one description a
 	 header rather than a label parks. */
@@ -735,9 +732,13 @@
 	.qm-group-header :global(.qm-group-chevron) {
 		flex-shrink: 0;
 		display: block;
+		stroke-width: var(--_qm-glyph-stroke);
 		transform: rotate(0deg);
 		transform-origin: center;
 		transition: transform var(--_qm-duration-slow) var(--_qm-ease-reverse);
+	}
+	.qm-group-header :global(.qm-group-chevron > *) {
+		vector-effect: non-scaling-stroke;
 	}
 	/* Open shares hover's ink step: a big borderless target draws no box, so the ink is
 	 the only cue an open section keeps once the pointer leaves it. The chevron's

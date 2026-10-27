@@ -652,6 +652,27 @@
 		if (!drag?.engaged || drag.drop !== k || drag.drop === drag.k) return undefined;
 		return drag.drop > drag.k ? 'after' : 'before';
 	}
+
+	/** Whether cells stand past the table scroller's end edge, under the pinned remove,
+	 *  which is what the fade before the remove draws on. */
+	let tableOverflow = $state(false);
+	/** The head row spans every track, so its box is the content width a new row or a
+	 *  longer cell changes. */
+	function trackOverflow(el: HTMLElement): () => void {
+		const measure = () => {
+			tableOverflow = el.scrollWidth - el.clientWidth - Math.abs(el.scrollLeft) > 1;
+		};
+		measure();
+		el.addEventListener('scroll', measure, { passive: true });
+		const observer =
+			typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure);
+		observer?.observe(el);
+		if (el.firstElementChild) observer?.observe(el.firstElementChild);
+		return () => {
+			el.removeEventListener('scroll', measure);
+			observer?.disconnect();
+		};
+	}
 </script>
 
 <div
@@ -691,7 +712,12 @@
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
-			<div class="qm-array-table-scroller" style:--table-cols={columns.length}>
+			<div
+				class="qm-array-table-scroller"
+				data-overflow={tableOverflow ? '' : undefined}
+				style:--table-cols={columns.length}
+				{@attach trackOverflow}
+			>
 				<!-- The header names the columns, so a cell carries no label of its own: its
 				     accessible name is the row's and the column's composed (`ObjectField`). The
 				     guidance affordance rides the header, being the column's rather than any
@@ -1072,27 +1098,21 @@
 	 The distance inside an open row is the list's own, and the row then takes a rung of
 	 air from the rows either side of it, so what it unfolded is nearer the summary it
 	 hangs off than the sibling below. The wider distance on the inside is the inversion:
-	 a subform reading as the next row's preamble. A variant spends the wider rung on the
-	 same join and needs no such guard, a field carrying one control and no siblings for
-	 its cells to drift toward. */
+	 a subform reading as the next row's preamble. A variant takes the same distance and
+	 needs no such guard, a field carrying one control and no siblings for its cells to
+	 drift toward. */
 	.qm-element {
 		row-gap: var(--_qm-space);
 	}
 	.qm-element.open {
 		margin-block: var(--_qm-space);
 	}
-	/* The inline distance is the stacker's too, and here it is a rung: the summary stands
-	 for the row rather than being a cell of it, so its subform's vertical takes the
-	 disclosure's own column — `--_qm-nest` in, the distance every stroke on the ladder
-	 keeps from the one outside it (ARCHITECTURE §"A plane is a tone"). Flush with the
-	 row's edge that stroke is collinear with the box above it and with the sibling row
-	 below, so a row's cells read as the list's own rung and the content of an open row
-	 stands outboard of the chevron that opened it. A variant's cells and a matrix's
-	 columns keep the flush edge: those sit beside the discriminant and the tick they are
-	 stored with, not under them. */
-	.qm-element > :global(.qm-object) {
-		margin-inline-start: var(--_qm-nest);
-	}
+	/* No inline distance: the subform's vertical hangs at the row's edge, under the
+	 summary that unfolded it, as a variant's cells hang at the discriminant's and a
+	 matrix's columns at the tick's. Every vertical hangs at the edge of the control it
+	 unfolds from, so a step in is one nesting distance wherever it is read, the
+	 `--_qm-nest` the subform keeps from its own stroke (ARCHITECTURE §"A plane is a
+	 tone"); a second rung here read as a deeper level than the object the row holds. */
 	/* The slabs measure the head, not the row: an open element is the head plus
 	 everything it unfolded, and the controls belong to the line they sit on rather than
 	 to all of that. Positioned, so `.qm-row-actions` anchors here. */
@@ -1123,12 +1143,16 @@
 	.qm-element-summary :global(.qm-el-chevron) {
 		flex-shrink: 0;
 		display: block;
+		stroke-width: var(--_qm-glyph-stroke);
 		color: var(--_qm-ink-label);
 		transform: rotate(0deg);
 		transform-origin: center;
 		transition:
 			transform var(--_qm-duration-slow) var(--_qm-ease-reverse),
 			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-element-summary :global(.qm-el-chevron > *) {
+		vector-effect: non-scaling-stroke;
 	}
 	.qm-element-summary:hover :global(.qm-el-chevron),
 	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
@@ -1250,6 +1274,28 @@
 		inset-inline-end: 0;
 		background: var(--_qm-surface);
 		box-shadow: 0 0 0 var(--_qm-ring-reach) var(--_qm-surface);
+	}
+	/* While cells stand past the end edge, the slab fades them in over a step before it
+	 rather than cutting them at its edge: the column the cut hides is still there. */
+	.qm-array-table-row > .qm-remove::before,
+	.qm-array-table-head-end::before {
+		content: '';
+		position: absolute;
+		inset-block: calc(-1 * var(--_qm-ring-reach));
+		inset-inline-end: calc(100% + var(--_qm-ring-reach));
+		width: var(--_qm-space-3);
+		background: linear-gradient(to right, transparent, var(--_qm-surface));
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-array-table-row > .qm-remove:dir(rtl)::before,
+	.qm-array-table-head-end:dir(rtl)::before {
+		background: linear-gradient(to left, transparent, var(--_qm-surface));
+	}
+	.qm-array-table-scroller[data-overflow] > .qm-array-table-row > .qm-remove::before,
+	.qm-array-table-scroller[data-overflow] .qm-array-table-head-end::before {
+		opacity: 1;
 	}
 	/* The glyph stands on the row's first line with the cells, however far the slab
 	 stretches under it. */

@@ -10,12 +10,12 @@
  the result as it commits a keystroke: a field's lowers it to `markOps` through
  `applyChange` (field.ts), a by-value leaf's hands the re-encoded value to its parent
  (`ProseValue`). This component never touches the content. The keymap mirror
- (Mod-b/i/u) lives in the codec's keymap (field.ts); this is the pointer
- affordance for all six marks. Mod-K is this surface's own key, the prompt it raises
- being this surface's: a document `keydown` the leaf's keymap left unclaimed. Over a
- leaf that holds lists, two more buttons number or bullet every selected line, or take
- the marker off where every one carries it: the codec's `toggleList`, whose keys
- (Mod-Shift-7/8) the leaf's keymap binds.
+ (Mod-b/i/u, Mod-Shift-x, Mod-e) lives in the codec's keymap (field.ts); this is
+ the pointer affordance for all six marks. Mod-K is this surface's own key, the
+ prompt it raises being this surface's: a document `keydown` the leaf's keymap left
+ unclaimed. Over a leaf that holds lists, two more buttons number or bullet every
+ selected line, or take the marker off where every one carries it: the codec's
+ `toggleList`, whose keys (Mod-Shift-7/8) the leaf's keymap binds.
 
  Selection observation. The view's `dispatchTransaction` is the leaf's
  (read-only), so there is no hook to observe transactions from outside.
@@ -489,7 +489,7 @@
 		align-self: stretch;
 		width: var(--_qm-border-width);
 		margin: var(--_qm-space-half) 0;
-		background: var(--_qm-rule);
+		background: var(--_qm-border);
 	}
 	.qm-mark-btn {
 		padding: var(--_qm-space) var(--_qm-space-2);

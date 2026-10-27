@@ -5,12 +5,12 @@
 // field holds over a value upstream's one-line rule refuses, and releases once it fits.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorView } from 'prosemirror-view';
-import { Selection } from 'prosemirror-state';
+import { Selection, TextSelection } from 'prosemirror-state';
 import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
-import { mount, quill, example, normalize, contentEqual, md, viewOf } from './_util.js';
+import { mount, quill, example, normalize, contentEqual, md, viewOf, press } from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
 // rect to reveal it. Stubbed rather than guarded in the source: a landing is right to
@@ -296,6 +296,34 @@ describe('text fields fire no markdown input rules', () => {
 		const rt = doc.getStored('colophon') as { text: string; marks: { type: string }[] };
 		expect(rt.text).toBe('x');
 		expect(rt.marks.some((m) => m.type === 'strong')).toBe(true);
+		field.destroy();
+	});
+});
+
+describe('the mark chords', () => {
+	// The keymap's toggles over a selection, pressed as the keyboard does; jsdom names no
+	// platform, so `Mod` is Ctrl.
+	const marksOf = (doc: Document): string[] =>
+		(doc.getStored('colophon') as { marks: { type: string }[] }).marks.map((m) => m.type);
+
+	it('toggles strike on Mod-Shift-x and code on Mod-e', () => {
+		const doc = example();
+		const field = createField({
+			doc,
+			quill: quill(),
+			addr: { field: 'colophon' },
+			container: mount(),
+			inline: true
+		});
+		const view = viewOf(field);
+		view.dispatch(view.state.tr.insertText('word', 1));
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 5)));
+		press(view, 'x', { ctrlKey: true, shiftKey: true });
+		expect(marksOf(doc)).toEqual(['strike']);
+		press(view, 'x', { ctrlKey: true, shiftKey: true });
+		expect(marksOf(doc)).toEqual([]);
+		press(view, 'e', { ctrlKey: true });
+		expect(marksOf(doc)).toEqual(['code']);
 		field.destroy();
 	});
 });

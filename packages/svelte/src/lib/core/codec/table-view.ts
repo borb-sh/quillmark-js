@@ -1604,6 +1604,8 @@ class TableIslandView implements NodeView {
 		if (cellSchema.marks.strong) marks['Mod-b'] = toggleMark(cellSchema.marks.strong);
 		if (cellSchema.marks.em) marks['Mod-i'] = toggleMark(cellSchema.marks.em);
 		if (cellSchema.marks.underline) marks['Mod-u'] = toggleMark(cellSchema.marks.underline);
+		if (cellSchema.marks.strike) marks['Mod-Shift-x'] = toggleMark(cellSchema.marks.strike);
+		if (cellSchema.marks.code) marks['Mod-e'] = toggleMark(cellSchema.marks.code);
 		// The arrows are the grid's own walk, each leaving a cell only from the text's edge
 		// on its side. Up and down reach the cell above or below, `focusCell` clamping at
 		// the top and bottom. Left and right reach the neighbour in reading order, landing

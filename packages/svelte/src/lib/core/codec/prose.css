@@ -23,11 +23,12 @@
 	outline: var(--_qm-ring);
 }
 /* Upstream's `-32px` is measured against the UA's 40px list indent, which the list
-   rule below replaces with a rung. The offset moves with it, or a selected item's
-   outline hangs into the margin by the difference. */
+   rule below replaces. The offset is that indent, so a selected item's outline takes in
+   its marker and stands on the list's own edge rather than crossing a `10.` or hanging
+   into the margin. */
 li.ProseMirror-selectednode::after {
 	border: var(--_qm-ring);
-	left: calc(var(--_qm-space-4) * -1);
+	left: calc(-1 * (var(--_qm-marker-digits) + var(--_qm-nest)));
 }
 /* A node selection is drawn while its leaf holds the focus, as a text selection is: a
    ring left behind on a field the focus has moved off names a subject no key reaches. */
@@ -203,7 +204,9 @@ li.ProseMirror-selectednode::after {
 }
 
 /* The UA's 40px list indent is the one box the reset above does not take (it is
-   padding, not margin), and it is a length nothing chose. A rung replaces it.
+   padding, not margin), and it is a length nothing chose. The indent is room for a
+   marker's two digits and the nesting step past them, so a marker, `10.` included,
+   hangs into its own list's indent and never past the leaf's edge.
 
    The markers are the UA's, reclaimed rather than inherited. `disc` and `decimal`
    are right and this restates neither: a host reset (Tailwind's preflight sets
@@ -217,7 +220,7 @@ li.ProseMirror-selectednode::after {
    that takes those ever turns up: the positive half states what it leaves to the
    UA, and what a reset takes is what has to be asked back. */
 .ProseMirror :is(ul, ol) {
-	padding-left: var(--_qm-space-4);
+	padding-left: calc(var(--_qm-marker-digits) + var(--_qm-nest));
 	list-style: revert;
 }
 
@@ -240,7 +243,7 @@ li.ProseMirror-selectednode::after {
 	width: var(--_qm-glyph-control);
 	height: var(--_qm-glyph-control);
 	border: var(--_qm-border-width) solid var(--_qm-border);
-	border-radius: calc(var(--_qm-radius-inner) / 2);
+	border-radius: var(--_qm-radius-inner);
 	background: var(--_qm-surface-well);
 	cursor: pointer;
 	transition:
@@ -411,7 +414,7 @@ li.ProseMirror-selectednode::after {
 .qm-table {
 	border-collapse: separate;
 	border-spacing: 0;
-	border: var(--_qm-border-width) solid var(--_qm-rule);
+	border: var(--_qm-border-width) solid var(--_qm-border);
 	border-radius: var(--_qm-radius);
 }
 /* One rule at one strength, the frame's and every line between cells, so the grid
@@ -419,8 +422,8 @@ li.ProseMirror-selectednode::after {
    `collapse`: a collapsed border cannot be rounded. */
 .qm-table-cell {
 	position: relative;
-	border-right: var(--_qm-border-width) solid var(--_qm-rule);
-	border-bottom: var(--_qm-border-width) solid var(--_qm-rule);
+	border-right: var(--_qm-border-width) solid var(--_qm-border);
+	border-bottom: var(--_qm-border-width) solid var(--_qm-border);
 	padding: var(--_qm-space) var(--_qm-space-2);
 	vertical-align: top;
 	font-weight: inherit;
@@ -657,12 +660,14 @@ li.ProseMirror-selectednode::after {
 /* The held column's alignment cluster, hung off its header cell and floating over the
    first row, the band's top edge being the grips'. Up only while its column is held and
    absent otherwise (`table-view.ts` §`alignCluster`), so the reveal is `hidden` rather
-   than the band's opacity. It floats over content it did not choose, so the edge and
-   `--_qm-lift` separate it and the raised rung joins them in dark (ARCHITECTURE
-   §Styling). Its geometry is the format popover's, a row of toggles held one rung in
-   from a surface at the card's radius, so the two floating rows of glyphs are one
-   height and one shape. The pressed toggle takes the selected grip's tint and accent:
-   it names the held column's alignment the way the grip names the held line. */
+   than the band's opacity. It is a row of glyphs floating over text, the format popover's
+   family (ARCHITECTURE §Styling), and takes that recipe: the popover's translucent
+   surface over a blur, the edge and `--_qm-lift` for its separation, and a scale-in on
+   arrival, stated from its starting style since the codec shows it by clearing
+   `hidden`. Its geometry is the popover's too, a row of toggles held one rung in from
+   a surface at the card's radius, so the two floating rows of glyphs are one height,
+   one shape and one material. The pressed toggle takes the selected grip's tint and
+   accent: it names the held column's alignment the way the grip names the held line. */
 .qm-table-align {
 	position: absolute;
 	z-index: 2;
@@ -675,8 +680,17 @@ li.ProseMirror-selectednode::after {
 	padding: var(--_qm-space);
 	border: var(--_qm-border-width) solid var(--_qm-border);
 	border-radius: var(--_qm-radius);
-	background: var(--_qm-surface-raised);
+	background: var(--_qm-surface-popover);
+	backdrop-filter: blur(var(--_qm-blur));
+	-webkit-backdrop-filter: blur(var(--_qm-blur));
 	box-shadow: var(--_qm-lift);
+	transition:
+		opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
+		transform var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	@starting-style {
+		opacity: 0;
+		transform: scale(0.94);
+	}
 }
 .qm-table-align[hidden] {
 	display: none;
