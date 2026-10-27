@@ -9,7 +9,15 @@ import type { TableCell, TableProps } from '@quillmark/wasm';
 import { decode } from './decode.js';
 import { tablePropsOfNode } from './islands.js';
 import { blockSchema, cellSchema } from './schema.js';
-import { cellAt, cellContent, columnCount, headRows, rowCount } from './table.js';
+import {
+	anchorAt,
+	cellAt,
+	cellContent,
+	columnCount,
+	headRows,
+	rowCount,
+	spanGrid
+} from './table.js';
 
 /** A block of cells, both corners inclusive, in the row space `table.ts` names. */
 export interface CellRange {
@@ -35,18 +43,33 @@ function cellDOM(tag: 'th' | 'td', cell: TableCell): HTMLElement {
 	return dom;
 }
 
-/** The cells of `range` as a `<table>`, the header row in a `<thead>` where the range
- *  holds it and the table has one. The cells carry their marks and breaks, and nothing
- *  of the table's layout. */
+/** The cells of `range` as a `<table>`, the header rows in a `<thead>` where the range
+ *  holds them. The cells carry their marks, breaks and spans, a span cut to the range,
+ *  and nothing else of the table's layout. A slot a merged cell in the range covers
+ *  draws nothing; one whose cell starts outside the range draws empty. */
 export function tableElement(props: TableProps, range = whole(props)): HTMLTableElement {
 	const table = document.createElement('table');
+	const grid = spanGrid(props);
 	let body: HTMLTableSectionElement | undefined;
 	for (let r = range.r0; r <= range.r1; r++) {
 		const head = r < headRows(props);
 		const section = head ? table.createTHead() : (body ??= table.createTBody());
 		const tr = section.insertRow();
-		for (let c = range.c0; c <= range.c1; c++)
-			tr.append(cellDOM(head ? 'th' : 'td', cellAt(props, r, c)));
+		for (let c = range.c0; c <= range.c1; c++) {
+			const tag = head ? 'th' : 'td';
+			const at = anchorAt(grid, r, c);
+			if (at.r < range.r0 || at.c < range.c0) {
+				tr.append(cellDOM(tag, { text: '', marks: [] }));
+				continue;
+			}
+			if (at.r !== r || at.c !== c) continue;
+			const dom = cellDOM(tag, cellAt(props, r, c));
+			const colspan = Math.min(at.span.colspan, range.c1 - c + 1);
+			const rowspan = Math.min(at.span.rowspan, range.r1 - r + 1);
+			if (colspan > 1) dom.setAttribute('colspan', String(colspan));
+			if (rowspan > 1) dom.setAttribute('rowspan', String(rowspan));
+			tr.append(dom);
+		}
 	}
 	return table;
 }
