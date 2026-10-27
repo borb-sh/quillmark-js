@@ -21,7 +21,12 @@
 	<ul class="cards" aria-label="Forms">
 		{#each quills as quill (quill.ref)}
 			<li>
-				<button class="card" type="button" data-testid="pick" onclick={() => onPick(quill)}>
+				<button
+					class="qm-panel card"
+					type="button"
+					data-testid="pick"
+					onclick={() => onPick(quill)}
+				>
 					<span class="name">{quill.title}</span>
 					{#if quill.description}
 						<span class="said">{quill.description}</span>
@@ -54,22 +59,17 @@
 		list-style: none;
 	}
 
-	/* A card is one press: the whole plate is the control, so nothing on it is a second
-	   target. */
+	/* A card is one press: the whole plate (`.qm-panel`) is the control, so nothing on it
+	   is a second target. */
 	.card {
-		box-sizing: border-box;
 		display: grid;
 		align-content: start;
 		gap: var(--qmh-space-2);
 		width: 100%;
 		height: 100%;
-		padding: var(--qmh-space-4);
 		font: inherit;
 		text-align: start;
 		color: var(--qmh-ink);
-		background: var(--qmh-surface);
-		border: var(--qmh-border-width) solid var(--qmh-border);
-		border-radius: var(--qmh-radius);
 		cursor: pointer;
 		transition: border-color var(--qmh-duration) var(--qmh-ease-reverse);
 	}

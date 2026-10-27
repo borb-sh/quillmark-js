@@ -44,6 +44,8 @@
 
 **Strikethrough and code take keys**: `Mod-Shift-x` toggles `strike` and `Mod-e` toggles `code` in a prose leaf and a table cell, and the popover's tooltips name both chords.
 
+**The preset's `.qm-app-footer` stands on the head's plate**, `--qmh-surface`, where it showed the page tone beneath it, so the two bands framing an app's panes match.
+
 **A list in a prose leaf indents by two digits and the nesting step**, where it indented 16px, so a tenth item's number stands inside the leaf as the first's does.
 
 **An open matrix member takes a rung of air from the members around it**, as an open array row does, so its columns stand nearer its own tick than the next member's.

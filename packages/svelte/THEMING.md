@@ -197,12 +197,12 @@ A blanket `:focus-visible` of yours outranks ours, including on the controls tha
 
 A tool's bands are yours, since a tool's head is the most app-specific thing on its screen. An app whose whole page is one form to fill in has less to say there: a name, the action the page leads to, and a line signing it. Four classes draw that much, quillkit's app client wears them, and a host of its own takes them the same way:
 
-| Class             | What it is                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------- |
-| `.qm-app-header`  | The band naming the app: a plate, a gutter and a hairline under it. Put it beside `.qm-bar`.      |
-| `.qm-app-title`   | What the app is called, at the title rung: the one line on the screen read as a name.             |
-| `.qm-app-footer`  | The line signing the app, in meta type under a hairline; its links take the line's own ink.       |
-| `.qm-app-primary` | The one action the page leads to: the control wearing `--qm-accent`, standing at the touch floor. |
+| Class             | What it is                                                                                                      |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| `.qm-app-header`  | The band naming the app: a plate, a gutter and a hairline under it. Put it beside `.qm-bar`.                    |
+| `.qm-app-title`   | What the app is called, at the title rung: the one line on the screen read as a name.                           |
+| `.qm-app-footer`  | The line signing the app, in meta type on the head's plate under a hairline; its links take the line's own ink. |
+| `.qm-app-primary` | The one action the page leads to: the control wearing `--qm-accent`, standing at the touch floor.               |
 
 They compute at specificity zero, as the shell does, so `.qm-app-header { background: #00308f; color: #fff; }` is the whole of rebranding the head.
 
