@@ -652,10 +652,12 @@
 		gap: var(--qmh-space-2) var(--pg-space-6);
 	}
 
+	/* A label sits a word-space from what it names, the gap the picker's label keeps from
+	   its control, so every name on the strip is the same distance from its value. */
 	.stat {
 		display: flex;
 		align-items: baseline;
-		gap: var(--qmh-space-2);
+		gap: var(--qmh-space);
 		min-width: 0;
 	}
 

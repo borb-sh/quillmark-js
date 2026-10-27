@@ -1,0 +1,15 @@
+/* What the app client adds to the preset, and nothing the preset already carries: the
+   shell and the app chrome are `@quillmark/svelte/preset`'s, imported in `main.ts`, and
+   the client's own components read `--qmh-*` throughout (APP.md is the language).
+
+   Literals live here and nowhere else under `app/`: `check:style` runs its axes over this
+   scope too, with this file exempt as the place these are minted. */
+
+:root {
+	/* How wide the documents drawer stands: a list of titles and their dates, which is a
+	   measure in names rather than in sentences. */
+	--app-drawer: 24rem;
+	/* The narrowest a quill's card on the landing reads at before the grid takes a column
+	   away. */
+	--app-card: 16rem;
+}

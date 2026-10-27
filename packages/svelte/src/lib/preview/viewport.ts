@@ -37,6 +37,9 @@ const WHEEL_RATE = [0.0025, 0.08, 0.25] as const;
  *  rate that inverts the pinch's encoding. */
 const PINCH_DELTA = 50;
 const PINCH_RATE = 0.01;
+/** How far, as a log of the spread's ratio, two fingers part or close before a touch
+ *  pinch zooms rather than only pans. */
+const PINCH_SLOP = 0.04;
 
 /** Safari's trackpad pinch: not a wheel event there, and not in the DOM lib. */
 interface GestureEvent extends UIEvent {
@@ -46,6 +49,12 @@ interface GestureEvent extends UIEvent {
 }
 
 const px = (value: string): number => parseFloat(value) || 0;
+
+interface Bounds {
+	current: number;
+	floor: number;
+	fit: number;
+}
 
 export function createViewport(
 	container: HTMLElement,
@@ -80,14 +89,16 @@ export function createViewport(
 		return width > 0 && height > 0 ? { width, height } : undefined;
 	}
 
-	// What the pages are drawn at, the zoom held against this pane's floor, and the floor.
-	function bounds(): { current: number; floor: number } | undefined {
+	// What the pages are drawn at, the zoom held against this pane's floor, the floor, and
+	// the default fit.
+	function bounds(): Bounds | undefined {
 		const box = pane();
 		if (!box || !slots.length) return undefined;
 		const sizes = slots.map((s) => s.size);
 		const floor = floorZoom(sizes, box);
-		const current = zoom === undefined ? fitZoom(sizes, box) : clampZoom(zoom, floor);
-		return { current, floor };
+		const fit = fitZoom(sizes, box);
+		const current = zoom === undefined ? fit : clampZoom(zoom, floor);
+		return { current, floor, fit };
 	}
 
 	function apply(settle?: number): void {
@@ -147,10 +158,10 @@ export function createViewport(
 	// A re-fit holds the line at the pane's top edge, so a dragged divider leaves the
 	// reader where they were. The desk turns the browser's own scroll anchoring off
 	// (`Preview.svelte`), which would correct the same move a second time.
-	function refit(): void {
-		if (!container.scrollTop && !container.scrollLeft) return apply();
+	function refit(settle?: number): void {
+		if (!container.scrollTop && !container.scrollLeft) return apply(settle);
 		const r = container.getBoundingClientRect();
-		holding(r.left + r.width / 2, r.top, () => apply());
+		holding(r.left + r.width / 2, r.top, () => apply(settle));
 	}
 
 	function centre(): { x: number; y: number } {
@@ -160,14 +171,15 @@ export function createViewport(
 	// The pointer while it is over the pane, else the pane's centre.
 	const anchor = (): { x: number; y: number } => pointer ?? centre();
 
-	function step(
-		next: (b: { current: number; floor: number }) => number | undefined,
-		at = anchor()
-	): void {
+	// A zoom landing on the fit is the default again, and follows the pane from there.
+	const settled = (next: number | undefined, b: Bounds): number | undefined =>
+		next === b.fit ? undefined : next;
+
+	function step(next: (b: Bounds) => number | undefined, at = anchor()): void {
 		const b = bounds();
 		if (!b) return;
 		run = undefined;
-		zoomTo(next(b), at.x, at.y);
+		zoomTo(settled(next(b), b), at.x, at.y);
 	}
 
 	// About the pane's centre, the pointer being on the pill.
@@ -176,15 +188,15 @@ export function createViewport(
 	// The raw zoom a gesture starting now carries from: the run's own while it is still
 	// the one on screen.
 	function from(b: { current: number }): Glide {
-		return run && run.shown === b.current ? run : { raw: b.current, shown: b.current };
+		return run && run.shown === b.current ? run : { raw: b.current, shown: b.current, slack: 0 };
 	}
 
 	function glideTo(raw: (from: Glide) => number, x: number, y: number): void {
 		const b = bounds();
 		if (!b) return;
 		const start = from(b);
-		run = glide(start, raw(start), b.floor);
-		zoomTo(run.shown, x, y, SETTLE_MS);
+		run = glide(start, raw(start), b.floor, b.fit);
+		zoomTo(settled(run.shown, b), x, y, SETTLE_MS);
 	}
 
 	// Ctrl-wheel is a mouse's zoom, and the trackpad pinch Chromium and Firefox send as
@@ -197,40 +209,78 @@ export function createViewport(
 		glideTo((g) => g.raw * factor, e.clientX, e.clientY);
 	}
 
-	// The keys reach the pane under the pointer as well as the focused one: a click on a
-	// page lands its caret in the editor, taking the focus with it.
-	// The first pane to take a key claims it, so two previews never both step, and a key
-	// a host's own handler took is left to it.
+	// The keys are the focused pane's alone: elsewhere they are the browser's own zoom,
+	// the pointer over the pane notwithstanding. A key a host's own handler took is left
+	// to it.
 	function onKeyDown(e: KeyboardEvent): void {
 		if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || e.isComposing) return;
-		if (!pointer && !container.contains(document.activeElement)) return;
+		if (!container.contains(document.activeElement)) return;
 		const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' || e.key === '_' ? -1 : 0;
 		if ((!dir && e.key !== '0') || !bounds()) return;
 		e.preventDefault();
-		step((b) => (dir ? stepZoom(b.current, dir, b.floor) : undefined));
+		step((b) => (dir ? stepZoom(b.current, dir, b.floor, b.fit) : undefined));
 	}
 
 	// A two-finger pinch on a touch screen. The browser's own page zoom is held off by the
-	// desk's `touch-action` and by cancelling the move, which also stops the pan a second
-	// finger would otherwise start.
-	let pinch: { spread: number; raw: number } | undefined;
-	const spread = (t: TouchList): number =>
-		Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-	function onTouchStart(e: TouchEvent): void {
-		if (e.touches.length !== 2) return;
+	// desk's `touch-action`, and cancelling the move stops the pan a second finger would
+	// otherwise start: the pinch pans itself, holding the point it began under, as a
+	// fraction of its page, under the fingers' midpoint. Placed afresh on each move rather
+	// than stepped, since the scroll offsets round. The spread zooms only once it has
+	// moved past `PINCH_SLOP`, so a two-finger drag pans and leaves the fit alone.
+	interface Pinch {
+		spread: number;
+		raw: number;
+		zooming: boolean;
+		page: HTMLElement;
+		fx: number;
+		fy: number;
+	}
+	let pinch: Pinch | undefined;
+	// The fingers on this pane, not one resting on the editor beside it.
+	const fingers = (e: TouchEvent): Touch[] =>
+		[...e.touches].filter((t) => t.target instanceof Node && container.contains(t.target));
+	const spread = ([a, b]: Touch[]): number =>
+		Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+	const midpoint = ([a, b]: Touch[]): { x: number; y: number } => ({
+		x: (a.clientX + b.clientX) / 2,
+		y: (a.clientY + b.clientY) / 2
+	});
+	function grip(at: { x: number; y: number }): Pick<Pinch, 'page' | 'fx' | 'fy'> | undefined {
+		const page = pageAt(at.y);
+		const r = page?.getBoundingClientRect();
+		if (!page || !r?.width || !r.height) return undefined;
+		return { page, fx: (at.x - r.left) / r.width, fy: (at.y - r.top) / r.height };
+	}
+	// A finger landing or lifting starts the pinch over with the two that remain.
+	function onTouches(e: TouchEvent): void {
+		pinch = undefined;
+		const t = fingers(e);
 		const b = bounds();
-		if (b) pinch = { spread: spread(e.touches), raw: from(b).raw };
+		const held = t.length === 2 && b ? grip(midpoint(t)) : undefined;
+		if (held) pinch = { spread: spread(t), raw: from(b!).raw, zooming: false, ...held };
 	}
 	function onTouchMove(e: TouchEvent): void {
-		if (!pinch || e.touches.length !== 2) return;
+		const t = fingers(e);
+		if (!pinch || t.length !== 2) return;
 		e.preventDefault();
-		const [a, b] = [e.touches[0], e.touches[1]];
-		const ratio = spread(e.touches) / pinch.spread;
-		const start = pinch.raw;
-		glideTo(() => start * ratio, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
-	}
-	function onTouchEnd(e: TouchEvent): void {
-		if (e.touches.length < 2) pinch = undefined;
+		const mid = midpoint(t);
+		const ratio = spread(t) / pinch.spread;
+		if (pinch.zooming) {
+			const start = pinch.raw;
+			glideTo(() => start * ratio, mid.x, mid.y);
+		} else if (Math.abs(Math.log(ratio)) >= PINCH_SLOP) {
+			pinch.zooming = true;
+			pinch.spread = spread(t);
+		}
+		// A move the browser is already scrolling cannot be cancelled: its pan stands, and
+		// the pinch holds whatever is under the fingers now.
+		if (!e.cancelable) {
+			Object.assign(pinch, grip(mid));
+			return;
+		}
+		const r = pinch.page.getBoundingClientRect();
+		container.scrollLeft += r.left + pinch.fx * r.width - mid.x;
+		container.scrollTop += r.top + pinch.fy * r.height - mid.y;
 	}
 
 	// Safari's trackpad pinch. iOS sends these beside the touches, which are the ones read
@@ -268,10 +318,10 @@ export function createViewport(
 	const listeners: Array<[EventTarget, string, EventListener, AddEventListenerOptions?]> = [
 		[container, 'wheel', onWheel as EventListener, { passive: false }],
 		[window, 'keydown', onKeyDown as EventListener],
-		[container, 'touchstart', onTouchStart as EventListener, { passive: true }],
+		[container, 'touchstart', onTouches as EventListener, { passive: true }],
 		[container, 'touchmove', onTouchMove as EventListener, { passive: false }],
-		[container, 'touchend', onTouchEnd as EventListener],
-		[container, 'touchcancel', onTouchEnd as EventListener],
+		[container, 'touchend', onTouches as EventListener],
+		[container, 'touchcancel', onTouches as EventListener],
 		[container, 'gesturestart', onGestureStart],
 		[container, 'gesturechange', onGestureChange],
 		[container, 'gestureend', onGestureEnd],
@@ -281,16 +331,17 @@ export function createViewport(
 	];
 	for (const [target, type, fn, opts] of listeners) target.addEventListener(type, fn, opts);
 
-	// The pane's box moving: a dragged divider, a resized window, a hidden track shown.
-	// Guarded for jsdom, which ships no ResizeObserver.
+	// The pane's box moving: a dragged divider, a resized window, a hidden track shown. A
+	// drag is a gesture, so its pages re-raster once it rests. Guarded for jsdom, which
+	// ships no ResizeObserver.
 	const resizeObserver =
-		typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => refit());
+		typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => refit(SETTLE_MS));
 	resizeObserver?.observe(container);
 
 	apply();
 
 	return {
-		update: refit,
+		update: () => refit(),
 		setZoom(next) {
 			const valid = next !== undefined && Number.isFinite(next) && next > 0 ? next : undefined;
 			if (bounds()) step(() => valid);

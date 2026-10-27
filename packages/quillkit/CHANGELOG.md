@@ -4,7 +4,27 @@
 
 ## Unreleased
 
-**Studio and `site` read a quiver built in format 3, one `.quill` bundle per quill with its fonts inside.** The client compiles in the `@quillmark/quiver` that writes format 3, so over a collection whose own `@quillmark/quiver` packs format 2 the studio page refuses the quiver, naming the rebuild: upgrade `@quillmark/quiver` in the collection in the same change as `quillkit`. `studio` serves a `.quill` bundle as `application/vnd.quillmark.quill+zip`.
+**The app's colours hold in a built deploy.** The bundle's minifier lowered `light-dark()` into variables that resolve to no colour where the preset states its poles, so the app's Download PDF press and an error's red drew nothing in a built app or studio; both clients now build for browsers that carry `light-dark()` natively. The press beside Download PDF stands at its height, studio's head holds its picker and the quiver's sentence on one line where the width allows, and a stalled page's notice starts on the sheet's edge over a pane already in the desk's tone. Studio's failed-open room keeps that tone too, and the documents drawer's Close press carries its name once.
+
+**`check` says what the CLI says.** A failure prints each diagnostic whole beneath its `FAIL` line, with its code, `file:line:col` and hint, and names whether the seed or the example failed to render. A pass prints the warnings it carried, the plate's compile warnings such as a font nothing bundles, the quill's load warnings and the app's, and `--strict` fails on them. `--help`, `-h` and `help` print the usage.
+
+**Studio under `quillkit serve` follows a repack without a reload.** Save a plate or a `Quill.yaml` and the page repaints with the document in hand carried across, as it already did under the workspace's dev server; a reload, which reseeds, is no longer the way to see an edit. `serve` streams the repack at `/.quillkit/events`, and `preview` and a deployed studio stream nothing.
+
+**A deploy's quiver is one `.quill` bundle per quill, its fonts inside.** `build` packs, and studio and the app read, through the `@quillmark/quiver` quillkit carries, which writes format 3: `<name>@<x.y.z>.<digest>.quill` beside `quiver.json`, and no `fonts/`. Rebuild a deploy to move it; a page still open on the previous client refuses the new quiver as newer until it reloads. `serve` and `preview` serve a `.quill` bundle as `application/vnd.quillmark.quill+zip`.
+
+## v0.20.0 - 2026-10-26
+
+**quillkit builds a quiver into a standalone app.** `app` is a target beside `studio` and `quiver`: a form for the people filling a quiver's forms in, beside the page it prints, with a Download PDF press that waits for the page to catch up and refuses a page that does not render. One quill opens its form and several open a card each; a phone shows one pane at a time under a Form/Page switch. My documents keeps every document a reader starts in their browser, keyed by the app's address, to reopen, download as `.md` or delete, and a reload reopens the one that was open. The app opens every quill in the quiver at its latest version, and the rest is found by name beside `Quiver.yaml`: `App.yaml` names the app's `title` and `description` and refuses any other key, `app.css` is linked last and its `url()` files are copied into the deploy, and `icon.svg` or `icon.png` is its icon. `build app` warns on a selector the theming contract does not promise and on a quill declaring no `license`.
+
+**A document reopens on the version it was made on.** A version a later release no longer opens by default stays openable while the quiver holds it, and offers Update to the latest form with the document's markdown offered first.
+
+**The verbs are `init`, `check`, `build`, `serve` and `preview`, each over the quiver in the working directory, and `build` and `serve` take a target, `studio` where none is named.** `test` is `check`. `studio` is `serve`, which repacks on save and always packs drafts, and `preview` serves the build in `dist/`, whichever target it is, with the cache headers a host owes it. `site` is `build`, which lays studio, the app or the quiver alone into `dist/`. `-D`, `-o` and `-p` spell `--drafts`, `--out` and `--port`, and `--open` opens the page in the platform's browser. `--quiver`, `--host` and `--templates` are gone, and a verb refuses a flag it does not take.
+
+**quillkit carries `@quillmark/quiver` and `@quillmark/wasm`.** Both are exact dependencies, the versions both clients are built against, so a quiver installs quillkit alone and the gate renders through the wasm a deploy serves; `init` writes a `package.json` naming quillkit and nothing else. A quiver's own `@quillmark/*` install is not read, and neither is `quillkit.config.js`, so a custom `engine` export no longer reaches the gate.
+
+**Templates are gone.** Studio draws no template picker and reads no `?template=`, `check` and `build` take no `--templates`, and a deploy lays no `templates/`. A quill's filled page is its `example.md`.
+
+**The carried `@quillmark/wasm` is 0.130.0.** Nothing a quill or a markdown document spells changes. A stored `Document` row tagged older than `quillmark/document@0.124.0` fails to load, which studio and the app never meet, since both keep a document as its markdown.
 
 ## v0.19.3 - 2026-10-23
 

@@ -2,7 +2,7 @@
 // away, so the separation is held by a gate rather than by distance. Zero deps; run via
 // `npm run check:deps`.
 //
-// Five rules:
+// Six rules:
 //
 //   1. The graph. `@quillmark/wasm` is external and above everything; `svelte` and `quiver`
 //      are siblings at one tier with no edge between them, in either direction; and a node
@@ -18,7 +18,7 @@
 //      makes a narrow one honest); root `overrides` pins the developed-against version to
 //      exactly one, loose ranges permitting two installs rather than preventing them. A
 //      package with no importable entry is a bundled terminal: nothing imports it, so the
-//      copy it bundles meets no other, and what its manifest may hold is review's.
+//      copy it bundles meets no other.
 //
 //   3. `/preview` stays free of editor weight, which is what makes the subpath claim ("a
 //      bundler pulls only what the imported entry reaches") true for the one surface whose
@@ -36,6 +36,12 @@
 //      no document, a worker's `init` or a server's, and a dev server serves a side-effect
 //      stylesheet (or a component's `<style>`) as a module that writes into one. A built
 //      consumer extracts the sheet, so only the source graph shows the breach.
+//
+//   6. A terminal carries what it was developed against. A bundled terminal's runtime
+//      `dependencies` on the artifact or on a sibling are exact: the root pin for the
+//      artifact, the sibling's own version for a sibling. A range there would let an install
+//      run the bin on a release its bundled clients were not built with, so what it renders
+//      locally and what a deploy renders could differ (QUILLKIT §"One pin").
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -237,8 +243,25 @@ for (const entry of SUBSTRATE) {
 	}
 }
 
+// ── 6. A terminal's pins ────────────────────────────────────────────────────────
+
+const versions = Object.fromEntries(PACKAGES.map(({ json }) => [json.name, json.version]));
+let pinned = 0;
+for (const { dir, json } of PACKAGES) {
+	if (json.private || importable(json)) continue;
+	for (const [dep, range] of Object.entries(json.dependencies ?? {})) {
+		const want = dep === WASM ? pin : versions[dep];
+		if (want === undefined) continue;
+		pinned++;
+		if (range !== want)
+			fail(
+				`packages/${dir}/package.json: \`dependencies.${dep}\` is \`${range}\` — a terminal pins exactly what it was developed against, \`${want}\``
+			);
+	}
+}
+
 report(
 	'Dependency law check',
 	errors,
-	`Dependency law OK — ${PACKAGES.length} packages, ${WASM} pinned at ${pin}, /preview holds ${held} modules, the substrate entries reach ${reached.size}, lock resolves ${optionals} optionals.`
+	`Dependency law OK — ${PACKAGES.length} packages, ${WASM} pinned at ${pin}, /preview holds ${held} modules, the substrate entries reach ${reached.size}, lock resolves ${optionals} optionals, ${pinned} terminal pins exact.`
 );

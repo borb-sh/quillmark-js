@@ -74,10 +74,6 @@ export const ICONS = {
 		['path', { d: 'M5 12h14' }],
 		['path', { d: 'M12 5v14' }]
 	],
-	x: [
-		['path', { d: 'M18 6 6 18' }],
-		['path', { d: 'm6 6 12 12' }]
-	],
 	'trash-2': [
 		['path', { d: 'M10 11v6' }],
 		['path', { d: 'M14 11v6' }],

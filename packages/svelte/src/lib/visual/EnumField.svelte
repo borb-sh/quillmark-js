@@ -203,8 +203,11 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	/* The chevron is chrome, so it takes the label rung the other chrome glyphs take: at
+	   `ink` beside a written value it read as part of the value. */
 	.qm-select-wrap :global(.qm-select-chevron) {
 		flex-shrink: 0;
+		color: var(--_qm-ink-label);
 		width: var(--_qm-glyph-control);
 		height: var(--_qm-glyph-control);
 	}

@@ -37,7 +37,7 @@ export interface BridgeController {
 	destroy(): void;
 }
 
-/** A pane hidden by the shell's narrow switch (`preset/recipes.css`) measures 0×0, and so
+/** A pane hidden by the shell's narrow switch (`preset/shell.css`) measures 0×0, and so
  *  does every box on it: the clearance arithmetic reads that as a caret clear of both
  *  edges, and a centring computes its trip out of zeros. Neither is an answer about where
  *  the caret is. */

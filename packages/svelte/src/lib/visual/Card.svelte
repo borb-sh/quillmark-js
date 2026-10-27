@@ -211,12 +211,14 @@
 </script>
 
 <!-- `data-qm-card` names the island for a floating surface that has to stay inside one
- ({@link FieldHint}). A surface portals to `[data-qm-root]`, so the card is not its
- ancestor and nothing else marks the box its guidance belongs in. -->
+ ({@link FieldHint}): a surface portals to `[data-qm-root]`, so the card is not its
+ ancestor and nothing else marks the box its guidance belongs in. Its value is the card's
+ kind, `main` for the main card, which is the one schema-named hook a host's stylesheet
+ is promised (THEMING §"What a stylesheet may aim at"). -->
 <section
 	bind:this={el}
 	class={['qm-card', { 'qm-main': card.isMain, 'qm-unschemable': card.unschemable }]}
-	data-qm-card
+	data-qm-card={card.kind}
 >
 	{#if card.unschemable}
 		{@render recoveryShell()}
@@ -426,15 +428,18 @@
 {/snippet}
 
 <style>
-	/* An island: the card is the base plane, the column behind it the sunken one, and the
-	 hairline closes it (ARCHITECTURE §Styling). The block half is the same rung as the
-	 gap: the payload stands that far off the card's edge and off the body below it. The
-	 header insets itself to the section-heading column (`.qm-card-header`). The inline
-	 half stands a step tighter than the nesting rung the verticals inside keep: this
-	 edge closes the block rather than nesting one, and the rules it holds run that much
-	 further for it. */
+	/* An island: the card is the base plane and the column behind it the sunken one, and
+	 the step between the two tones is the whole of its edge (ARCHITECTURE §"A plane is a
+	 tone"). The block half is the same rung as the gap: the payload stands that far off
+	 the card's edge and off the body below it. The header insets itself to the
+	 section-heading column (`.qm-card-header`). The inline half stands a step tighter
+	 than the nesting rung the verticals inside keep: this edge closes the block rather
+	 than nesting one, and the rules it holds run that much further for it.
+
+	 Inside that inset is the card's one text column (`--_qm-column`): the title, a
+	 top-level field, the body's lines, the recovery note and the delete glyph's far edge
+	 all stand on it, so the card reads as one measure at both ends. */
 	.qm-card {
-		border: var(--_qm-border-width) solid var(--_qm-border);
 		border-radius: var(--_qm-radius);
 		padding: var(--_qm-space-3) var(--_qm-space-2);
 		background: var(--_qm-surface);
@@ -461,10 +466,9 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--_qm-space-2);
-		/* The group's vertical plus the rung the chevron stands off it: the title
-		 shares that column. Inline only. The block pull is half the card's block
-		 inset, so the header sits that far off the hairline and the rule. */
-		padding-inline: calc(var(--_qm-space) + var(--_qm-vertical-width));
+		/* On the column, inline only. The block pull is half the card's block inset,
+		 so the header sits that far off the card's edge and the rule. */
+		padding-inline: var(--_qm-column);
 		margin-block: calc(-1 * var(--_qm-space-3) / 2);
 	}
 	.qm-card-header-right {
@@ -589,11 +593,10 @@
 	 vertical those two edges hold.
 
 	 No stroke: a vertical would mark a section a reader has no name for. The start
-	 inset is the heading's — the group's vertical plus the rung the chevron stands
-	 off it — so a top-level field and a section heading share a column. */
+	 inset is the column, so a top-level field and a section heading share it. */
 	.qm-section {
 		padding-block: var(--_qm-space);
-		padding-inline-start: calc(var(--_qm-space) + var(--_qm-vertical-width));
+		padding-inline-start: var(--_qm-column);
 	}
 	/* Where it faces a rule, the rung a heading already stands off one. The fields
 	 sit on the heading column, not the card's edge. */
@@ -620,8 +623,8 @@
 	}
 	/* The nesting vertical, one `--_qm-nest` in from the card's edge with the panel's
 	 fields the same rung off it (ARCHITECTURE §"A plane is a tone"). `--_qm-border` and
-	 not `--_qm-accent`: a card's edge and the verticals inside it are one stroke at three
-	 depths, and a tone that changed as it went in would read as unrelated lines rather
+	 not `--_qm-accent`: the verticals and the rules beside them are one stroke at every
+	 depth, and a tone that changed as it went in would read as unrelated lines rather
 	 than one figure. A named section is what earns it, which is why the ungrouped block
 	 above draws none.
 
@@ -790,9 +793,17 @@
 		flex-direction: column;
 		gap: var(--_qm-space);
 	}
-	/* The state is in the stroke's pattern, every card being closed by one already. */
+	/* Paper's margin is the column. On the editable, so a press in the strip lands a
+	 caret; carried by the leaf's inset it would be dead width. The diagnostics under the
+	 body start where its lines do, as a field's start under its well. */
+	.qm-body-leaf :global(.ProseMirror),
+	.qm-body-leaf > :global(.qm-diag-list) {
+		padding-inline: var(--_qm-column);
+	}
+	/* The one card that draws an edge, and the edge is the state: a dashed stroke is the
+	 placeholder idiom, which a card the schema cannot project is. */
 	.qm-card.qm-unschemable {
-		border-style: dashed;
+		border: var(--_qm-border-width) dashed var(--_qm-border);
 	}
 	/* One typographic role with the editable title above. */
 	.qm-card-title-static {
@@ -805,6 +816,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space-2);
+		padding-inline: var(--_qm-column);
 	}
 	.qm-recovery-note {
 		margin: 0;
@@ -818,9 +830,11 @@
 		font-size: var(--_qm-text-label);
 		color: var(--_qm-ink-label);
 	}
-	/* The one native control the surface draws, on the box's own recipe (controls.css). */
+	/* The one native control the surface draws, on the box's own recipe (controls.css).
+	 `font` carries no colour, so the value's ink is restated over the UA's. */
 	.qm-recovery-retype select {
 		font: inherit;
+		color: var(--_qm-ink);
 		border: none;
 		border-radius: var(--_qm-radius-inner);
 		background: var(--_qm-surface-well);

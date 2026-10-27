@@ -1,8 +1,6 @@
 // The quill on screen, said in the address bar. A reader who followed a link to a quiver
 // is one link from being sent to a quill in it, which is the whole of what this is for:
-// `?quill=showcase@1.0.0`, the grammar `getQuill` already takes. A template is the other
-// thing a link sends a reader to: `?template=army_memo` opens that starter document, and
-// the quill it names stands beside it.
+// `?quill=showcase@1.0.0`, the grammar `getQuill` already takes.
 //
 // A query rather than a path segment: a deploy is static files behind whatever host the
 // author has, and a query participates in no file resolution, where a path would be a
@@ -11,8 +9,6 @@
 
 /** The quill on screen. */
 const QUILL = 'quill';
-/** The template the document on screen opened from. */
-const TEMPLATE = 'template';
 
 function asked(key: string): string | undefined {
 	const at = new URLSearchParams(window.location.search).get(key)?.trim();
@@ -53,14 +49,4 @@ export function askedRef(): string | undefined {
 /** Point the address bar at `ref`, canonical. */
 export function sayRef(ref: string): void {
 	say(QUILL, ref);
-}
-
-/** The template the URL asks for, by its link name (`templates.ts`), or undefined. */
-export function askedTemplate(): string | undefined {
-	return asked(TEMPLATE);
-}
-
-/** Point the address bar at the template `name`, or take the template out of it. */
-export function sayTemplate(name: string | undefined): void {
-	say(TEMPLATE, name);
 }

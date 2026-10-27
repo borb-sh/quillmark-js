@@ -307,11 +307,18 @@
 	}
 	/* The ring rides `.qm-focus-ring-within` (controls.css) rather than the plain
 	   marker: focus lives on the segment, so it rings the field, not the segment
-	   the caret happens to be in. */
+	   the caret happens to be in. Tabular figures, so a segment keeps its width as its
+	   digits change. */
 	.qm-date-wrap :global(.qm-date-segment) {
 		padding: 0 var(--_qm-space-half);
+		font-variant-numeric: tabular-nums;
 		border-radius: var(--_qm-radius-inner);
 		outline: none;
+	}
+	/* The first segment's pad sits inside the box's inset rather than after it, so its
+	   digits start on the column every other box's text starts on. */
+	.qm-date-wrap :global(.qm-date-segment:first-child) {
+		margin-inline-start: calc(-1 * var(--_qm-space-half));
 	}
 	.qm-date-wrap :global(.qm-date-segment:focus) {
 		background: var(--_qm-surface-hover);
@@ -329,12 +336,21 @@
 	.qm-date-wrap :global(.qm-date[data-default] .qm-date-segment) {
 		color: var(--_qm-ink-default);
 	}
+	/* A separator is punctuation between the parts rather than part of the value, so it
+	 takes the label rung whatever the parts beside it hold: at `ink` it stood darker than
+	 the hint or the default digits either side of it. */
+	.qm-date-wrap :global(.qm-date .qm-date-segment[data-segment='literal']) {
+		color: var(--_qm-ink-label);
+	}
 	/* The toggle's state is its fill and its glyph, never the pointer: a hover fill
 	 would read as pressed. Off, it rests hidden where a pointer can reveal it, still
 	 holding its width so the digits never shift. It sits inside the box's line, so
-	 the box stands as tall as the inputs beside it. */
+	 the box stands as tall as the inputs beside it. Its pad sits inside the box's
+	 inset, so its label ends on the column the digits start on from the other side,
+	 and its fill stands about as far off the box's end as off its top and bottom. */
 	.qm-date-today {
 		margin-inline-start: auto;
+		margin-inline-end: calc(-1 * var(--_qm-space-2));
 		padding-block: var(--_qm-space-half);
 		line-height: 1;
 		border-radius: var(--_qm-radius-inner);

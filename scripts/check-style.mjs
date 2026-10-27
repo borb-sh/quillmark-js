@@ -26,7 +26,8 @@
 //     a host's rule wins whatever order a bundler emits the sheets in (THEMING §"Your CSS
 //     beats ours"). The same rank holds over the contract classes wherever a component
 //     draws one, Svelte's scoping class otherwise outranking the bare class a consumer is
-//     told to write.
+//     told to write, and over the preset's shell and app chrome, whose sheets are listed
+//     as `zero` on their scope.
 //   · Every `--qm-*` dial a surface consumes is documented in THEMING.md, and every
 //     `.qm-*` class the doc promises is carried by something in `src/` — the halves a
 //     consumer is hurt by. The reverse halves warn, so prose may run ahead of code.
@@ -35,13 +36,13 @@
 //     that recipe (§"One name, one thing" below).
 //
 // `--built <dirs…>` runs the other end instead (`npm run check:bundle`, after
-// `npm run build`): in a built consumer, every rung a shipped stylesheet mints and the
-// bundle reads is defined in that bundle. A side-effect stylesheet import is an edge
-// carrying no binding, so a bundler told that module is side-effect-free prunes it and the
-// surface mounts unstyled, with every `var()` reading the pruned scale invalid at
-// computed-value time and its whole declaration dropped. The rungs are discovered rather
-// than listed, and it is presence against absence, so a renamed scale and a retuned dial
-// both leave it green.
+// `npm run build`): in a built consumer, every rung a shipped stylesheet mints and the bundle
+// reads is defined in that bundle, and no pole was lowered out of `light-dark()`. A
+// side-effect stylesheet import is an edge carrying no binding, so a bundler told that
+// module is side-effect-free prunes it and the surface mounts unstyled, with every
+// `var()` reading the pruned scale invalid at computed-value time and its whole
+// declaration dropped. The rungs are discovered rather than listed, and it is presence
+// against absence, so a renamed scale and a retuned dial both leave it green.
 //
 // What is outside it: a declaration in `.ts` (`preview/paint.ts` carries them in JS
 // strings), a value's own shape past its axis, and the shadow, pole and cross-scope rules — all
@@ -75,7 +76,8 @@ const SCOPES = [
 		prefix: '--qmh-',
 		derivation: 'packages/svelte/src/lib/preset/scale.css',
 		doc: 'THEMING §"Match ours"',
-		census: true
+		census: true,
+		zero: ['packages/svelte/src/lib/preset/shell.css', 'packages/svelte/src/lib/preset/app.css']
 	},
 	{
 		dir: 'packages/playground/src/routes',
@@ -89,6 +91,12 @@ const SCOPES = [
 		exclude: ['packages/quillkit/client/public'],
 		prefix: '--st-',
 		derivation: 'packages/quillkit/client/studio.css',
+		doc: 'ARCHITECTURE §Styling'
+	},
+	{
+		dir: 'packages/quillkit/app',
+		prefix: '--app-',
+		derivation: 'packages/quillkit/app/chrome.css',
 		doc: 'ARCHITECTURE §Styling'
 	}
 ];
@@ -304,11 +312,12 @@ function* selectorsOf(root) {
 // ── The bundle half ─────────────────────────────────────────────────────────────
 
 if (process.argv.includes('--built')) {
-	/** The built consumers in this workspace: what `quillkit studio` serves, what
-	 *  `quillkit site` lays into a deploy, and what Pages holds. A third-party consumer takes
-	 *  the package the same way. CI names the site laid from the tarball as an argument. */
+	/** The built consumers in this workspace: the studio and app clients quillkit lays into
+	 *  a deploy, and what Pages holds. A third-party consumer takes the package the same way.
+	 *  CI names the deploys laid from the tarball as arguments. */
 	const bundles = [
 		join(ROOT, 'packages/quillkit/dist/client'),
+		join(ROOT, 'packages/quillkit/dist/app'),
 		join(ROOT, 'packages/playground/build'),
 		...process.argv.slice(process.argv.indexOf('--built') + 1).map((a) => resolve(a))
 	];
@@ -343,6 +352,14 @@ if (process.argv.includes('--built')) {
 		for (const file of filesUnder(bundle, /\.(css|js|html)$/)) {
 			const raw = readFileSync(file, 'utf8');
 			const text = file.endsWith('.css') ? deblock(raw) : raw;
+			// A minifier targeting a browser older than `light-dark()` rewrites each pole as
+			// two variables only a `color-scheme` declaration defines, and a rung stated at
+			// `:root` resolves there to both colours at once (scripts/css-target.mjs).
+			if (text.includes('--lightningcss-light'))
+				errors.push(
+					`${relative(ROOT, file)}: carries \`light-dark()\` lowered — ` +
+						`build with \`cssTarget: CSS_TARGET\` (scripts/css-target.mjs)`
+				);
 			for (const [, name] of text.matchAll(DEFINES)) defined.add(name);
 			for (const [, name] of text.matchAll(READS)) if (!read.has(name)) read.set(name, file);
 		}
@@ -427,9 +444,17 @@ for (const scope of SCOPES) {
 		});
 
 		// ── Rank ────────────────────────────────────────────────────────────────────
-		// The surfaces alone: an app's own page ranks by ordinary precedence, and the preset's
-		// classes land on a consumer's DOM where a rule of their own is aimed rather than
-		// incidental.
+		// The surfaces, and the preset sheets drawn at zero: an app's own page ranks by
+		// ordinary precedence, and the preset's recipes land on a consumer's DOM where a rule
+		// of their own is aimed rather than incidental.
+		if (scope.zero?.includes(rel)) {
+			for (const { sel, line } of selectorsOf(root))
+				if (weighs(sel))
+					errors.push(
+						`${rel}:${at(line)}: \`${sel}\` weighs outside \`:where()\` — this sheet ranks at zero (THEMING §"The shell, if you are building a tool")`
+					);
+			continue;
+		}
 		if (!scope.surface) continue;
 		if (/@layer\b/.test(region.css))
 			errors.push(

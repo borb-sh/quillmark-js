@@ -12,7 +12,7 @@ description: |
   assertions keyed to its shapes fail where they will.
 
   `0.0.0` is under the quiver's draft floor, so a floored build leaves it out: the
-  suite and `quillkit test` gate it from source, and a published artifact serves
+  suite and `quillkit check` gate it from source, and a published artifact serves
   `showcase` alone. The playground's dev server lifts the floor and its Pages build
   does not, a public page being a deployment. A copy is not the release, and the
   version is what holds it to that.

@@ -8,9 +8,9 @@
  a subform is collapsed rows again, so an open row under an open row is one figure two
  rungs in.
 
- The nesting is a vertical at `--_qm-border`, the ladder's last stroke: the card's edge,
- an open section's vertical one `--_qm-nest` in where the field is in one, this one a rung
- further, the properties a rung inside it (ARCHITECTURE §"A plane is a tone").
+ The nesting is a vertical at `--_qm-border`, the ladder's last stroke: an open section's
+ vertical one `--_qm-nest` in from the card's edge where the field is in one, this one a
+ rung further, the properties a rung inside it (ARCHITECTURE §"A plane is a tone").
 
  One figure wherever it mounts, and where its stroke lands is the stacker's. A
  variant's cells and a matrix member's columns sit at the depth a field-level subform
@@ -482,7 +482,7 @@
 	   the card and the section hold too.
 
 	   `--_qm-border`: this is the stroke that structures (ARCHITECTURE §"A plane is a
-	   tone"), the one the card's edge and the section's vertical read.
+	   tone"), the one the section's vertical reads.
 
 	   `padding-block` is the stroke's end caps, the same rung and the same reason as a
 	   section's (`Card.svelte`). A cap and not a leading gap: what stands the subform off

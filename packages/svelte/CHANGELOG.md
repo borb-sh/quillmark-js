@@ -4,6 +4,58 @@
 
 ## Unreleased
 
+**Cards draw no border, and the ground is the field well's tone.** A card is told from the ground by its tone alone, in every mount; the un-schemable card keeps its dashed edge, now the only edge a card draws. At the light pole the ground behind the cards, the preview's desk and the preset's `--qmh-page` deepen from `#f8f8f8` to `#f2f2f2`; at the dark pole they were the well's tone already. The body of a 400px pane gains 2px.
+
+**Under `.qm-pane` the editor's gutter is 16px**, where it was 20px, the width of the seam between cards, so the ground is one width all round the stack. With the borders gone, a 400px pane writes a 338px memo body where it wrote 328px. A page-mounted editor keeps its 20px.
+
+**The preset's host scale defaults to the surfaces' own poles**, `#fff`/`#1c1c1c` and `#272729`/`#d7dadc`, where it fell back to `Canvas`/`CanvasText`. At the dark pole a page that turns no dial meets the editor's ground and the preview's desk at one tone, where it sat near-black around them; at the light pole host ink is `#1c1c1c` where it was black. `--qmh-ink-meta` takes the surfaces' label figure (35%) and `--qmh-border-strong` steps half way to the ink, so each still clears its contrast floor against the new poles. `--qmh-scrim` is the backdrop a host's modal lays over the page.
+
+**A hover steps off whatever plane it lands on**: `--_qm-surface-hover` is the ink at 8% laid translucent, where it was one tone off the card. At the dark pole a button in the selection popover and an option in a table's alignment cluster drew no hover, the fixed tone sitting level with the raised plane under them.
+
+**A card's text stands on one column at both ends.** The body's lines and the un-schemable card's note start where the title and the field labels do, where the body stood 2.5px further in and the note 5.5px further out, and the body gains 5px of measure. The tips slip starts on that column too and ends where a card's delete glyph does, where it stood a further 10.5px in, and takes the card's own corners, so the pair has the silhouette every card has. The un-schemable card's type picker draws its value in the surface's ink rather than the browser's.
+
+**Floating surfaces share one inset and one radius.** The enum listbox, the card stack's kind menu and the slash menu hold their items 4px in from the surface's edge, where they held them 2px in, so a highlighted item's corners run concentric with the surface's. The table's alignment cluster takes the format popover's geometry, the card's radius and a 4px inset, and stands 34px tall where it stood 26px. The format popover's link prompt stands its buttons at the input's height, so switching to it no longer gives the row two heights.
+
+**`Mod-Enter` ticks a task item's checkbox from the keyboard**: ⌘Enter or Ctrl+Enter flips the nearest task item around the caret as one step `Mod-z` takes back, where only a pointer could tick one. Outside a task item, and inside a fence, the key keeps leaving a code block.
+
+**A switch's thumb shows which way it stands at either pole.** Unchecked, the thumb draws at the label rung over its track, where it drew in the card's own tone at about 1.2:1 against the track; checked, it keeps the card's tone over the accent. The track is sized off the thumb, so the checked thumb sits one inset from the end cap at any `--qm-space`, where a larger dial ran it into the cap.
+
+**Chrome inside a field's box takes the label rung.** The enum's chevron and a date's separators draw at `--_qm-ink-label`, where they drew at the value's ink, so the slashes of an empty date no longer stand darker than its `mm`/`dd`/`yyyy`.
+
+**A date's digits start on the column every other box's text starts on**, where they stood 2px further in, and the Today chip's label ends on the same column from the right, where it stood 20px in. Number inputs and date segments set tabular figures. The guidance surface stands one `--qm-space` step off its glyph's target, as the enum list and the add-card menu stand off theirs, where it stood 6px off.
+
+**An open matrix's add box stands in the roster's columns**: its plus where a tick stands and its words where a title starts, where both sat 8px further in, and a press on the plus lands in the box. An added item's remove is the minus an array row's is, where it was a cross, and rests at the muted rung on a touch screen as an array row's does.
+
+**A matrix's tick is a fill, as a switch's track is**: unheld, it draws the switch's unchecked tone with no edge, where it drew the field well under a hairline that matched it at the light pole.
+
+**A table's pinned remove hides the column scrolling under it all the way to the clip**, where a sliver of that column showed past the slab's rounded corners.
+
+## v0.27.0 - 2026-10-26
+
+**Zooming the preview stops at the pane-width fit as it stops at 100%, and landing there is the default again**: Ctrl/⌘-wheel and pinch hold at it, `Mod +`/`−` step to it, and from there the page follows a dragged divider and the zoom pill goes, where zooming back past the fit left the page at a fixed size the divider no longer moved.
+
+**A pinch or wheel leaving a zoom it held moves on from it smoothly**, where the page jumped by the stretch the hold had absorbed.
+
+**Dragging the divider beside the preview re-rasters its pages once the drag rests**, where every mounted page re-rastered on every frame of the drag.
+
+**The preview's zoom pill stays on a touch screen while the zoom is not the fit**, where it faded and no touch brought it back.
+
+**A card's box names its kind.** `data-qm-card` carries the card's kind, `main` for the main card, where it was a bare marker, and THEMING.md promises it as the one schema-named hook a stylesheet may aim at: `[data-qm-card='indorsement']` lands on every indorsement the editor draws. `[data-qm-card]` still matches every card. No hook names a field or a property, and `data-qm-prop` stays the surface's own.
+
+**The preset's shell computes at specificity zero.** `.qm-workspace`, `.qm-bar`, `.qm-split`, `.qm-switch` and `.qm-frame` are drawn inside `:where()`, so a host's rule on the same element wins in any sheet order, where one of equal specificity lost to a preset sheet landing after it. A `.qm-control` in the switch band still centres.
+
+**The preset draws an app's chrome.** `.qm-app-header` is the band naming an app, `.qm-app-title` its name, `.qm-app-footer` the line signing it and `.qm-app-primary` the one action it leads to, wearing `--qm-accent` at the touch floor. All four compute at specificity zero.
+
+## v0.26.2 - 2026-10-24
+
+**A host that drops its `doc` and `quill` together unmounts the editor cleanly**, where a document with a subform prose cell (an `object` field's `text` or `richtext` property) threw `Cannot read properties of null (reading 'schema')` from the cell's teardown and left the host's page half-rendered.
+
+## v0.26.1 - 2026-10-24
+
+**A two-finger touch gesture on the preview pans as well as zooms**, the pages following the fingers' midpoint, where a pinch held the point between the fingers still and a two-finger drag moved nothing.
+
+**`Mod +`/`−`/`0` zoom the preview only while it holds the focus**, where they also zoomed it with the pointer merely over it and took the browser's own zoom keys from a writer typing in the editor.
+
 ## v0.26.0 - 2026-10-23
 
 **Numbering or bulleting a selection inside a list of the other kind splits that list** (`Mod-Shift-7`, `Mod-Shift-8`, the toolbar buttons), as Google Docs and Notion do, where it retyped the whole list. The selected items become a list of the kind, joining one of that kind they touch, and the items after them count from 1.

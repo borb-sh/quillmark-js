@@ -1,6 +1,7 @@
-// The client's type check, run by `svelte-check`. The browser half of this package:
-// DOM libs, bundler resolution, and Vite's own client types, none of which the bin's
-// program wants. `tsconfig.json` builds the Node half and `tsconfig.check.json` reaches
+// The clients' type check, run by `svelte-check`: studio's `client/` and the app's `app/`,
+// one program, since the app reaches studio's shared modules. The browser half of this
+// package: DOM libs, bundler resolution, and Vite's own client types, none of which the
+// bin's program wants. `tsconfig.json` builds the Node half and `tsconfig.check.json` reaches
 // the configs beside it; one package, three programs, and no file is in two of them.
 {
 	"extends": "./tsconfig.base.json",
@@ -15,5 +16,5 @@
 		"noEmit": true,
 		"isolatedModules": true
 	},
-	"include": ["client/**/*.ts", "client/**/*.svelte"]
+	"include": ["client/**/*.ts", "client/**/*.svelte", "app/**/*.ts", "app/**/*.svelte"]
 }

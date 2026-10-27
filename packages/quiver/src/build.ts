@@ -39,7 +39,7 @@ const stagesOf = (out: string): { stage: string; prev: string } => ({
 /**
  * The build deletes each of the three trees it owns, so an outDir that is, or contains,
  * the source quiver or the working directory deletes the thing the caller was building
- * from. `quillkit build --out .` and a mistyped `--out ..` are both one keystroke away,
+ * from. `quillkit build quiver --out .` and a mistyped `--out ..` are both one keystroke away,
  * and the failure is unrecoverable, so an outDir that owns the caller is refused up
  * front. The staging siblings are checked too: they are named off outDir and cleared
  * with it, so a caller who avoids one spelling has not avoided the others.

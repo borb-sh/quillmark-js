@@ -1,8 +1,7 @@
-// Node, no environment shim, and no wasm imported here: every verb resolves what it
-// needs out of a collection, so the suite builds collections rather than mocking a
-// resolver. `helpers/collection.ts` copies the workspace's reference quiver somewhere
-// writable with the workspace's `node_modules` symlinked beside it, which is what a
-// consumer's tree looks like from a resolver's point of view.
+// Node, no environment shim. `src/__tests__` is the bin's half, run against quivers
+// `helpers/collection.ts` copies out of the workspace's reference quiver; `app/__tests__` is
+// the app client's readings that need no browser. What a browser has to show is
+// `deploy.browser.test.ts`'s, over a deploy the built bin lays.
 //
 // `cli.integration.test.ts` spawns the built bin, so the suite needs `dist/`, and the
 // gate builds before it tests. There is no `prepare` to build it at install time: `tsc`
@@ -14,6 +13,6 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	test: {
-		include: ['src/__tests__/**/*.test.ts']
+		include: ['src/__tests__/**/*.test.ts', 'app/__tests__/**/*.test.ts']
 	}
 });

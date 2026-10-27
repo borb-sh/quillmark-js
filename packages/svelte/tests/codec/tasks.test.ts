@@ -1,14 +1,22 @@
 // @vitest-environment jsdom
 // A task item (CODEC §"Task items"): `checked` rides the list item through decode and
 // lowering, a body holding one edits, its checkbox toggles as one undoable step, Enter
-// leaves a task item's new half an open task, and a markdown paste lands one editable.
+// leaves a task item's new half an open task, Mod-Enter ticks the one around the caret,
+// and a markdown paste lands one editable.
 import { describe, it, expect } from 'vitest';
 import { splitBlock } from 'prosemirror-commands';
 import { undo } from 'prosemirror-history';
-import { Selection, TextSelection } from 'prosemirror-state';
+import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { Content, ContentContainer, Document } from '@quillmark/wasm';
-import { blockSchema, createField, decode, listKeymap, pmToContent } from '$lib/core/codec';
+import {
+	blockSchema,
+	bodyKeymap,
+	createField,
+	decode,
+	listKeymap,
+	pmToContent
+} from '$lib/core/codec';
 import {
 	contentEqual,
 	endOf,
@@ -170,6 +178,65 @@ describe('Enter in a task item', () => {
 
 	it('an ordinary item splits into ordinary items', () => {
 		expect(checkedOf(press(endOf('- plain', 0), 'Enter'))).toEqual(['none', 'none']);
+	});
+});
+
+describe('Mod-Enter in a body', () => {
+	const { press } = keyDriver(bodyKeymap(blockSchema));
+	const checkedOf = (state: ReturnType<typeof press>) => checks(pmToContent(state.doc));
+
+	it('ticks the task item around the caret, and a second press unticks it', () => {
+		const once = press(endOf(TASKS, 1), 'Mod-Enter');
+		expect(checkedOf(once)).toEqual([true, true, 'none']);
+		expect(checkedOf(press(once, 'Mod-Enter'))).toEqual([true, false, 'none']);
+	});
+
+	it('in an ordinary item under a task item ticks the task item', () => {
+		const next = press(endOf('- [ ] parent\n  - child', 1), 'Mod-Enter');
+		expect(items(pmToContent(next.doc)).map((p) => p.map((a) => a.checked))).toEqual([
+			[true],
+			[true, undefined]
+		]);
+	});
+
+	it('on a selected task item ticks that item, not the one around it', () => {
+		const state = endOf('- [ ] parent\n  - [ ] child', 1);
+		const child = state.selection.$from.before(-1);
+		const selected = state.apply(state.tr.setSelection(NodeSelection.create(state.doc, child)));
+		expect(
+			items(pmToContent(press(selected, 'Mod-Enter').doc)).map((p) => p.map((a) => a.checked))
+		).toEqual([[false], [false, true]]);
+	});
+
+	it('declines outside a task item', () => {
+		const state = endOf(TASKS, 2);
+		expect(press(state, 'Mod-Enter')).toBe(state);
+		const lead = endOf(`lead\n\n${TASKS}`, 0);
+		expect(press(lead, 'Mod-Enter')).toBe(lead);
+	});
+
+	it('in a fence inside a task item leaves the fence, ticking nothing', () => {
+		const next = press(endOf('- [ ] task\n\n  ```\n  code\n  ```', 1), 'Mod-Enter');
+		expect(next.selection.$from.parent.type.name).toBe('paragraph');
+		expect(next.selection.$from.parent.textContent).toBe('');
+		expect(checkedOf(next).every((c) => c === false)).toBe(true);
+	});
+
+	it('pressed in a mounted body is one step one undo takes back', () => {
+		const { doc, field, view } = body(TASKS);
+		view.dispatch(
+			view.state.tr.setSelection(
+				TextSelection.create(view.state.doc, endOf(TASKS, 1).selection.from)
+			)
+		);
+		view.dom.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true })
+		);
+		expect(checks(doc.main.body)).toEqual([true, true, 'none']);
+		expect(boxes(view)[1].checked).toBe(true);
+		undo(view.state, view.dispatch);
+		expect(checks(doc.main.body)).toEqual([true, false, 'none']);
+		field.destroy();
 	});
 });
 
