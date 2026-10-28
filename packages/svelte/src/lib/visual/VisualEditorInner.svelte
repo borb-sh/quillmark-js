@@ -102,6 +102,7 @@
 		enumOptionAllowed,
 		enumDisallowed = 'disable',
 		fonts,
+		fontLabels,
 		strings,
 		formatDiagnostic,
 		class: className,
@@ -973,7 +974,7 @@
 	{/each}
 </div>
 
-<FormatPopover {getActiveLeaf} families={fontFamilies} />
+<FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
 
 <!-- The add affordance is gated on the schema declaring `card_kinds`, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to

@@ -3,6 +3,7 @@
 	"families": [
 		{
 			"name": "TeXGyreTermes",
+			"label": "Termes",
 			"license": "LicenseRef-GUST-Font-License",
 			"licenseFile": "TeXGyreTermes-GUST.txt",
 			"source": "https://www.gust.org.pl/projects/e-foundry/tex-gyre/termes/qtm2.004otf.zip",

@@ -2,18 +2,18 @@
 
 The font suite every Quillmark client hands its engine: openly licensed families a stored document can name and find again in any client that loads the suite.
 
-| Family           | Role                        |
-| ---------------- | --------------------------- |
-| TeXGyreTermes    | Times New Roman metrics     |
-| Arimo            | Arial and Helvetica metrics |
-| Cousine          | Courier New metrics         |
-| Caladea          | Cambria metrics             |
-| Gelasio          | Georgia metrics             |
-| Libertinus Serif | Typst's default text face   |
-| Spectral SC      | small-capital serif         |
-| Cinzel           | inscriptional capitals      |
-| DejaVu Sans      | wide humanist sans          |
-| Inter            | screen-first UI sans        |
+| Family           | Role                                       |
+| ---------------- | ------------------------------------------ |
+| TeXGyreTermes    | Times New Roman metrics, shown as "Termes" |
+| Arimo            | Arial and Helvetica metrics                |
+| Cousine          | Courier New metrics                        |
+| Caladea          | Cambria metrics                            |
+| Gelasio          | Georgia metrics                            |
+| Libertinus Serif | Typst's default text face                  |
+| Spectral SC      | small-capital serif                        |
+| Cinzel           | inscriptional capitals                     |
+| DejaVu Sans      | wide humanist sans                         |
+| Inter            | screen-first UI sans                       |
 
 Each in regular, italic, bold and bold italic (Cinzel, drawn in capitals, in regular and bold), subset to Latin, about 2.5 MB in all. A character outside the subset falls back to the surrounding font.
 
@@ -50,15 +50,17 @@ A third-party client opening the same documents does not have those, and a run s
 
 ## The editor
 
-`@quillmark/svelte`'s `VisualEditor` takes the faces the engine lists, which are the suite's bytes, so one download serves both sides:
+`@quillmark/svelte`'s `VisualEditor` takes the faces the engine lists, which are the suite's bytes, so one download serves both sides. `LABELS` is the name its picker shows for a family whose own name reads badly; the mark saves the family:
 
 ```svelte
 <script lang="ts">
+	import { LABELS } from '@quillmark/fonts';
+
 	let fonts = $state<FontFace[]>([]);
 	engine.fontFaces(quill).then((faces) => (fonts = faces));
 </script>
 
-<VisualEditor {doc} {quill} {fonts} />
+<VisualEditor {doc} {quill} {fonts} fontLabels={LABELS} />
 ```
 
 ## Rendering with the CLI
@@ -71,7 +73,7 @@ quillmark render ./my-quill doc.md $(for f in node_modules/@quillmark/fonts/file
 
 ## What a version promises
 
-A family name is a promise to every document that sets text in it, so the suite only grows. A family is never removed or renamed. A face's file changes only in a major version, since new metrics can reflow a stored document; a new family is a minor one. `FAMILIES` names the suite's families, and `manifest.json` (importable as `@quillmark/fonts/manifest.json`) each face's weight, style, file and sha256.
+A family name is a promise to every document that sets text in it, so the suite only grows. A family is never removed or renamed. A face's file changes only in a major version, since new metrics can reflow a stored document; a new family is a minor one. `FAMILIES` names the suite's families, `LABELS` the display names, which can change in any version, and `manifest.json` (importable as `@quillmark/fonts/manifest.json`) each face's weight, style, file and sha256.
 
 ## Licences and provenance
 

@@ -6,7 +6,7 @@
 
 import { FILES } from './suite.js';
 
-export { FAMILIES } from './suite.js';
+export { FAMILIES, LABELS } from './suite.js';
 
 /**
  * Every face in the suite, in the manifest's order: the `fonts` `new Engine({ fonts })`

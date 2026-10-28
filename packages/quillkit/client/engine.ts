@@ -5,6 +5,8 @@ import { loadSuite } from '@quillmark/fonts';
 import { Engine } from '@quillmark/wasm';
 import type { FontFace, Quill } from '@quillmark/wasm';
 
+export { LABELS as fontLabels } from '@quillmark/fonts';
+
 /**
  * An engine over the suite, started at boot beside the core and the quiver. The engine
  * reads its library when the render build first loads, so the suite is on the path to the

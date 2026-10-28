@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**Text sets a font family from the host's library.** `VisualEditor` takes `fonts`, the faces `engine.fontFaces(quill)` lists over an engine built with the host's `fonts`, and the format popover offers each family in a picker, its default setting none. The editor registers those faces with the page while mounted, so a run draws in the face the preview sets it in. A field holding a `font_family` mark, a table cell's included, edits and keeps it, and the picker offers a family the document sets though the library lacks it, so it can be cleared; with no library and no family under the selection the picker draws nothing. A pasted span styling `font-family` sets no family.
+**Text sets a font family from the host's library.** `VisualEditor` takes `fonts`, the faces `engine.fontFaces(quill)` lists over an engine built with the host's `fonts`, and the format popover offers each family in a picker, its default setting none. `fontLabels` names what the picker shows for a family, which otherwise shows as itself. The editor registers those faces with the page while mounted, so a run draws in the face the preview sets it in. A field holding a `font_family` mark, a table cell's included, edits and keeps it, and the picker offers a family the document sets though the library lacks it, so it can be cleared; with no library and no family under the selection the picker draws nothing. A pasted span styling `font-family` sets no family.
 
 **Select-all raises the selection popover**, in a leaf and in a table cell, once it stands still as any keyboard selection does. Mod-A selected the whole leaf and raised nothing.
 

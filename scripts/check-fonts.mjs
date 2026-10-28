@@ -67,6 +67,8 @@ for (const family of manifest.families) {
 	const at = `manifest.json: "${family.name}"`;
 	if (seen.has(family.name)) fail(`${at} is listed twice`);
 	seen.add(family.name);
+	if ('label' in family && (typeof family.label !== 'string' || !family.label.trim()))
+		fail(`${at}: \`label\` is a name to show, or left out`);
 	if (!LICENSES.has(family.license))
 		fail(`${at}: licence \`${family.license}\` is not one the suite ships`);
 	named.add(family.licenseFile);
@@ -114,6 +116,9 @@ for (const file of readdirSync(FILES))
 
 function render() {
 	const families = manifest.families.map((f) => `\t'${f.name}',`);
+	const labels = manifest.families
+		.filter((f) => f.label)
+		.map((f) => `\t${/^[A-Za-z_$][\w$]*$/.test(f.name) ? f.name : `'${f.name}'`}: '${f.label}',`);
 	const urls = manifest.families.flatMap((f) =>
 		f.faces.map((face) => `\tnew URL('../files/${face.file}', import.meta.url),`)
 	);
@@ -125,6 +130,15 @@ function render() {
 		'export const FAMILIES = [',
 		...families.map((line, i) => (i === families.length - 1 ? line.slice(0, -1) : line)),
 		'] as const;',
+		'',
+		'/** The name a picker shows for a family, where the manifest gives one other than its own. */',
+		...(labels.length
+			? [
+					'export const LABELS: Readonly<Record<string, string>> = {',
+					...labels.map((line, i) => (i === labels.length - 1 ? line.slice(0, -1) : line)),
+					'};'
+				]
+			: ['export const LABELS: Readonly<Record<string, string>> = {};']),
 		'',
 		"/** Every face's file, in the manifest's order: one literal each, so a bundler emits each as",
 		' *  an asset. */',

@@ -77,7 +77,7 @@
 	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
 	import { Preview } from '@quillmark/svelte/preview';
-	import { loadSuite } from '@quillmark/fonts';
+	import { LABELS as fontLabels, loadSuite } from '@quillmark/fonts';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
@@ -645,6 +645,7 @@
 						onError={handleError}
 						diagnostics={externalDiagnostics}
 						{fonts}
+						{fontLabels}
 					/>
 				{/if}
 			</section>

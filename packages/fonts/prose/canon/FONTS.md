@@ -23,7 +23,7 @@ Ten families, each under a licence that allows redistribution in an app, embeddi
 | DejaVu Sans | wide humanist sans, the Linux desktop default |
 | Inter | screen-first UI sans |
 
-**Family names are the engine's.** A family is listed under the name Typst reads from the face, which is the name a document saves and the name an upstream copy of the face is found by in any other client. TeX Gyre Termes is filed by Typst as `TeXGyreTermes`, so that is its name here.
+**Family names are the engine's.** A family is listed under the name Typst reads from the face, which is the name a document saves and the name an upstream copy of the face is found by in any other client. TeX Gyre Termes is filed by Typst as `TeXGyreTermes`, so that is its name here. Where that name reads badly, the manifest gives the family an optional `label`, the name a picker shows; TeXGyreTermes shows as "Termes". A label is display only: the mark saves the family, and a label can change in any version.
 
 **Subset to Latin.** Each file holds the Latin range Google Fonts serves as `latin`, every layout feature and every name record kept, which brings the suite to about 2.5 MB where the full files are near 13 MB. A character outside the subset falls back to the surrounding font. DejaVu Sans's regular face also drops its `MATH` table, which would file it as a math face no mark can set text in, and whose math glyphs the subset has already cut.
 
@@ -38,12 +38,12 @@ Noto CJK is tens of MB a weight, and New Computer Modern, also under the GUST li
 ## Package shape
 
 - **`files/`**: one subset TTF or OTF a face, named `<Family>-<Style>.<sha256:16>.<ttf|otf>` after the outlines it holds, and each family's licence text as `<Family>-<Licence>.txt`, which each licence requires beside the files.
-- **`manifest.json`**: per family, its name, SPDX licence id, licence file and upstream source, a repository at a commit or a release archive; per face, its CSS weight and style, its file and sha256, and the upstream file and sha256 it was subset from. The list of family names is the package's public contract.
+- **`manifest.json`**: per family, its name, its optional label, SPDX licence id, licence file and upstream source, a repository at a commit or a release archive; per face, its CSS weight and style, its file and sha256, and the upstream file and sha256 it was subset from. The list of family names is the package's public contract.
 - **The main entry**: `loadSuite(): Promise<Uint8Array[]>` fetches every face through `new URL(file, import.meta.url)`, which Vite and webpack 5 emit as hashed static assets with no plugin. The hashed names make every visit after the first a cache hit.
 - **`/node`**: the same loader reading the files off disk, for a test, a server render or a gate. It mirrors `@quillmark/quiver`'s split between a browser-pure entry and a `/node` one, and neither imports the other.
-- **`FAMILIES`**: the family names, from both entries.
+- **`FAMILIES`** and **`LABELS`**: the family names, and the label of each family the manifest gives one, from both entries.
 
-`src/suite.ts` is written from the manifest, one `new URL` literal a face, since a bundler emits an asset only for a literal it can read. A client writes `new Engine({ fonts: [...(await loadSuite()), ...extras] })` and hands the editor `engine.fontFaces(quill)`.
+`src/suite.ts` is written from the manifest, one `new URL` literal a face, since a bundler emits an asset only for a literal it can read. A client writes `new Engine({ fonts: [...(await loadSuite()), ...extras] })` and hands the editor `engine.fontFaces(quill)` and `LABELS`.
 
 ## Rules
 
@@ -72,7 +72,7 @@ The font library belongs to the client that builds the engine, never to the cont
 | `@quillmark/quiver` | carries no `fonts/`, no `quiver.json` field, no format change |
 | quill fonts | set the plate, ride inside each `.quill` bundle, never a writer's choice |
 | `App.yaml` | names the app and nothing else |
-| `@quillmark/svelte` | the editor's `fonts` prop takes the faces the engine lists |
+| `@quillmark/svelte` | the editor's `fonts` prop takes the faces the engine lists, and `fontLabels` the suite's labels |
 | studio, the app, the playground | build the engine over `loadSuite()` |
 | `quillkit check` | renders over the `/node` suite, as the clients it gates do |
 | quillmark CLI | renders with `--font`; parity with the browser is passing this package's files |

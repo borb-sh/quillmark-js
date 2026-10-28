@@ -96,6 +96,11 @@ export interface VisualEditorProps {
 	 */
 	fonts?: FontFace[];
 	/**
+	 * The name the picker shows for a family, keyed by the family the mark saves. A
+	 * family missing here shows as itself.
+	 */
+	fontLabels?: Readonly<Record<string, string>>;
+	/**
 	 * Every word the surface says, keyed and partial: unset keys take the package's
 	 * English. Several are accessible names rather than decoration, so this is what
 	 * a product shipping in another language replaces. The empty body's per-card

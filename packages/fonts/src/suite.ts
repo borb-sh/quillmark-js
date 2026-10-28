@@ -15,6 +15,11 @@ export const FAMILIES = [
 	'Inter'
 ] as const;
 
+/** The name a picker shows for a family, where the manifest gives one other than its own. */
+export const LABELS: Readonly<Record<string, string>> = {
+	TeXGyreTermes: 'Termes'
+};
+
 /** Every face's file, in the manifest's order: one literal each, so a bundler emits each as
  *  an asset. */
 export const FILES: readonly URL[] = [

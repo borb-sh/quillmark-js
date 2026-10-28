@@ -31,7 +31,7 @@
 	import { Preview } from '@quillmark/svelte/preview';
 	import { VisualEditor } from '@quillmark/svelte/visual';
 	import type { EditorChange } from '@quillmark/svelte/visual';
-	import { engineOverSuite, facesFor } from '../client/engine';
+	import { engineOverSuite, facesFor, fontLabels } from '../client/engine';
 	import { collect, diagnosticsOf } from '../client/notes';
 	import { openQuiver } from '../client/quiver';
 	import { save } from '../client/save';
@@ -574,6 +574,7 @@
 						onChange={handleChange}
 						onError={handleSurfaceError}
 						{fonts}
+						{fontLabels}
 					/>
 				</section>
 				<section class="pane paint" aria-label="Page">

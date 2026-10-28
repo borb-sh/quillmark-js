@@ -108,6 +108,19 @@ describe('the font picker', () => {
 		]);
 	});
 
+	it('shows a family under its label, and saves the family', async () => {
+		const { q, doc, intro } = load('Set in face');
+		const { editor } = mountInner(q, doc, { fonts: LIBRARY, fontLabels: { Tinos: 'Times' } });
+		await select(editor, 0, 3);
+		const box = (await picker())!;
+		expect(options(box)).toEqual([DEFAULT_VISUAL_STRINGS.fontDefault, 'Times', 'Carlito']);
+
+		pick(box, 'Tinos');
+		expect(intro()?.marks).toEqual([
+			{ start: 0, end: 3, type: 'font_family', attrs: { name: 'Tinos' } }
+		]);
+	});
+
 	it('reads the selection’s family, and its default clears it', async () => {
 		const { q, doc, intro } = load('<qm-span family="Tinos">Set</qm-span> in face');
 		const { editor } = mountInner(q, doc, { fonts: LIBRARY });

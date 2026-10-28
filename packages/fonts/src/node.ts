@@ -6,7 +6,7 @@
 import { readFile } from 'node:fs/promises';
 import { FILES } from './suite.js';
 
-export { FAMILIES } from './suite.js';
+export { FAMILIES, LABELS } from './suite.js';
 
 /** Every face in the suite, in the manifest's order, as the browser entry's `loadSuite`. */
 export async function loadSuite(): Promise<Uint8Array[]> {
