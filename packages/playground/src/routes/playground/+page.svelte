@@ -98,6 +98,8 @@
 	let docHandle: Document | undefined = $state();
 	// Held so the recovery loop can try the open again; the surfaces never read it.
 	let engineHandle: Engine | undefined;
+	// One download for every open; a failed one is dropped so the next open asks again.
+	let suite: Promise<Uint8Array[]> | undefined;
 	// The faces the suite offers the editor's picker.
 	let fonts = $state<FontFace[]>([]);
 	// What the engine refused the document with, and why there is no session to paint from.
@@ -367,12 +369,15 @@
 			// after mount. `init` instantiates the core and resolves to `Quill`, which the
 			// artifact exports nowhere statically. The fixture load awaits the same
 			// memoized gate to materialize its quill. The font suite downloads beside them,
-			// as an app's does.
-			const [{ Engine, MAIN_CARD_ADDR }, { init }, visual, library] = await Promise.all([
+			// as an app's does, and only the engine waits on it.
+			const library = (suite ??= loadSuite());
+			library.catch(() => {
+				if (suite === library) suite = undefined;
+			});
+			const [{ Engine, MAIN_CARD_ADDR }, { init }, visual] = await Promise.all([
 				import('@quillmark/wasm'),
 				import('@quillmark/svelte/core'),
-				import('@quillmark/svelte/visual'),
-				loadSuite()
+				import('@quillmark/svelte/visual')
 			]);
 			const { Quill } = await init();
 			fixtures = await fixtureNames();
@@ -403,27 +408,37 @@
 					]
 				});
 			}
-			// Built over `@quillmark/fonts`, as an app's is: a quill's own fonts set its plate
-			// and never a mark, so the suite's reach text only through the editor's picker.
-			const engine = new Engine({ fonts: library });
-			// Always free: it answers off the backend descriptor without loading the binary
-			// or cloning the quill.
-			const emits = await engine.supportedFormats(quill);
 			if (mine !== generation) {
 				for (const h of created) h.free();
 				return;
 			}
-			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the render
-			// build; the session follows behind it.
+			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
+			// suite and the render build; the engine and the session follow behind it.
 			VisualEditor = visual.VisualEditor;
-			formats = emits;
-			engineHandle = engine;
 			quillHandle = quill;
 			docHandle = doc;
 			syncDiagnostics();
 			lastOpened = example ? 'example' : 'seed';
 			toFree = created;
 			status = { phase: 'ready' };
+
+			// Built over `@quillmark/fonts`, as an app's is: a quill's own fonts set its plate
+			// and never a mark, so the suite's reach text only through the editor's picker. A
+			// suite that never lands leaves the editor up and names why there is no paint.
+			let engine: Engine;
+			let emits: OutputFormat[];
+			try {
+				engine = new Engine({ fonts: await library });
+				// Always free: it answers off the backend descriptor without loading the
+				// binary or cloning the quill.
+				emits = await engine.supportedFormats(quill);
+			} catch (e) {
+				if (mine === generation) refused = e instanceof Error ? e.message : String(e);
+				return;
+			}
+			if (mine !== generation) return;
+			formats = emits;
+			engineHandle = engine;
 			void reopen();
 			// Behind the editor, as the session is: listing the faces loads the render build. A
 			// refused library rejects the session's open with the same error, which the band

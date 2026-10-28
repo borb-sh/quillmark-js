@@ -58,7 +58,7 @@
 	const REPACKED = 'studio:quiver-repacked';
 	/** One apply per settled burst of keystrokes. A structure op skips it. */
 	const RECOMPILE_MS = 120;
-	/** The wasm compiled into this bundle, one of the three the build stamps. */
+	/** The wasm compiled into this bundle, one of the four the build stamps. */
 	const WASM = __CARRIED__['@quillmark/wasm'];
 
 	type Phase =
@@ -424,7 +424,13 @@
 			if (open !== at) return landed.session?.free();
 			open = { ...at, ...landed };
 			thrown = landed.refused;
-			if (landed.session) phase = { kind: 'ready' };
+			if (landed.session) {
+				phase = { kind: 'ready' };
+				const mine = turn;
+				void facesFor(engine, at.quill).then((faces) => {
+					if (mine === turn) fonts = faces;
+				});
+			}
 		}
 		syncNotes();
 	}
@@ -478,6 +484,7 @@
 			// The suite downloads beside the core and the quiver, and the engine is built over
 			// it before the first open.
 			const built = engineOverSuite();
+			built.catch(() => {});
 			try {
 				// `init` instantiates the core and latches the surface the editor's codec
 				// reads synchronously. The quiver awaits the same memoized gate to
@@ -489,7 +496,9 @@
 				const at = firstOpen(quiver, next);
 				if (!at) throw new Error(`quiver "${next.name}" holds no quills`);
 				if (cancelled) return;
-				engine = await built;
+				const ready = await built;
+				if (cancelled) return;
+				engine = ready;
 				await pick(at.name, at.version);
 			} catch (err) {
 				if (!cancelled) {

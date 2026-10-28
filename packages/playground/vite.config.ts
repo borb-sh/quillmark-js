@@ -10,8 +10,10 @@ import { CSS_TARGET } from '../../scripts/css-target.mjs';
 // `runtime::init_failed`, so the package stays unbundled.
 //
 // The reference quill is not a bundler input at all: it is packed into
-// `static/quiver/` before dev and build, and fetched at runtime. So nothing here
-// reaches outside the app root.
+// `static/quiver/` before dev and build, and fetched at runtime. The one reach
+// outside the app root is the font suite: the workspace symlink resolves
+// `@quillmark/fonts` to its real path, which the dev server serves only when
+// allowed.
 export default defineConfig({
 	plugins: [
 		sveltekit({
@@ -30,6 +32,7 @@ export default defineConfig({
 			}
 		})
 	],
+	server: { fs: { allow: ['../fonts/files'] } },
 	build: { cssTarget: CSS_TARGET },
 	optimizeDeps: { exclude: ['@quillmark/wasm'] }
 });

@@ -26,8 +26,9 @@
 //      weight and style with the same `sha256`, unless this version's major is above its
 //      major: new metrics or a new subset can reflow a stored document.
 //
-// The registry pair runs where a release is cut (`release.yml`), not in `gate`: it needs the
-// network, and the version it compares against is the one this branch is about to follow.
+// The registry pair runs where a release is prepared and cut (`release-prepare.yml`,
+// `release.yml`), not in `gate`: it needs the network, and the version it compares against
+// is the one this branch is about to follow.
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

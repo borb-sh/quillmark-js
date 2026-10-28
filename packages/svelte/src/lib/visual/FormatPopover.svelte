@@ -118,8 +118,8 @@
 	/** The family the selection is set in, `''` for none and `null` for several. */
 	let family = $state<string | null>('');
 	/** Whether the picker draws: the leaf declares the mark, and there is a family to
-	 *  offer or one under the selection to clear. */
-	const fontable = $derived(markable && (families.length > 0 || !!family));
+	 *  offer or one under the selection to clear, mixed with others or with none. */
+	const fontable = $derived(markable && (families.length > 0 || family !== ''));
 	/** The picker's options: the library's families, and the selection's own where the
 	 *  library lacks it, so the picker always shows what the document says. */
 	const familyOptions = $derived(

@@ -1,7 +1,7 @@
 // The href logic behind the link prompt, off the component: the parts carrying a
 // data consequence are functions with tests rather than event handlers.
 //
-// `link` is the one mark carrying a value, which is what keeps it off `toggleMark`:
+// `link` carries a value, which is what keeps it off `toggleMark`:
 // that command matches by type (`rangeHasMark(from, to, markType)`), so a second
 // href over a range already holding one removes the mark rather than replacing it.
 // `setLink` spells the mark ops out for that reason, and puts the pair in one
