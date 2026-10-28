@@ -9,12 +9,12 @@
 //      seen.
 //
 //   2. TrueType or OpenType, nothing else. The engine's library refuses WOFF and WOFF2
-//      (`engine::font_unsupported`), so a face is read by its magic rather than by its
-//      extension.
+//      (`engine::font_unsupported`), so a face is read by its magic, and its extension names
+//      what the magic says.
 //
-//   3. Every family travels with its licence. OFL requires its text beside the files, so a
-//      family's `licenseFile` is in `files/`, and `files/` holds nothing the manifest does not
-//      name.
+//   3. Every family travels with its licence. Each licence the suite admits (OFL, GUST,
+//      Bitstream Vera) requires its text beside the files, so a family's `licenseFile` is in
+//      `files/`, and `files/` holds nothing the manifest does not name.
 //
 //   4. The entries agree with the manifest. `src/suite.ts` is written from it, one
 //      `new URL` literal a face so a bundler emits each as an asset; `--write` rewrites it.
@@ -40,7 +40,7 @@ const PKG = join(ROOT, 'packages', 'fonts');
 const FILES = join(PKG, 'files');
 const SUITE = join(PKG, 'src', 'suite.ts');
 const NAME = '@quillmark/fonts';
-const LICENSES = new Set(['OFL-1.1', 'Apache-2.0']);
+const LICENSES = new Set(['OFL-1.1', 'LicenseRef-GUST-Font-License', 'Bitstream-Vera']);
 const STYLES = new Set(['normal', 'italic']);
 
 const errors = [];
@@ -82,7 +82,10 @@ for (const family of manifest.families) {
 		if (styles.has(`${face.weight} ${face.style}`)) fail(`${where} is listed twice`);
 		styles.add(`${face.weight} ${face.style}`);
 		named.add(face.file);
-		if (!face.file.endsWith(`.${face.sha256.slice(0, 16)}.ttf`))
+		if (
+			!/\.[0-9a-f]{16}\.(ttf|otf)$/.test(face.file) ||
+			!face.file.includes(`.${face.sha256.slice(0, 16)}.`)
+		)
 			fail(`${where}: \`${face.file}\` does not carry its sha256's first sixteen digits`);
 		let bytes;
 		try {
@@ -95,7 +98,11 @@ for (const family of manifest.families) {
 			fail(`${where}: \`files/${face.file}\` does not hash to its manifest sha256`);
 		const kind = format(bytes);
 		if (kind === 'woff') fail(`${where}: \`${face.file}\` is WOFF — the engine reads TTF/OTF only`);
-		else if (kind !== 'ttf') fail(`${where}: \`${face.file}\` is not a TrueType file`);
+		else if (!kind) fail(`${where}: \`${face.file}\` is not a TrueType or OpenType file`);
+		else if (!face.file.endsWith(`.${kind}`))
+			fail(
+				`${where}: \`${face.file}\` holds ${kind === 'ttf' ? 'TrueType' : 'OpenType'} outlines — name it \`.${kind}\``
+			);
 	}
 }
 
@@ -105,7 +112,7 @@ for (const file of readdirSync(FILES))
 // ── 4. The entries ──────────────────────────────────────────────────────────────
 
 function render() {
-	const families = manifest.families.map((f) => `'${f.name}'`).join(', ');
+	const families = manifest.families.map((f) => `\t'${f.name}',`);
 	const urls = manifest.families.flatMap((f) =>
 		f.faces.map((face) => `\tnew URL('../files/${face.file}', import.meta.url),`)
 	);
@@ -114,7 +121,9 @@ function render() {
 		'// disagree.',
 		'',
 		"/** The suite's families, in the manifest's order. */",
-		`export const FAMILIES = [${families}] as const;`,
+		'export const FAMILIES = [',
+		...families.map((line, i) => (i === families.length - 1 ? line.slice(0, -1) : line)),
+		'] as const;',
 		'',
 		"/** Every face's file, in the manifest's order: one literal each, so a bundler emits each as",
 		' *  an asset. */',

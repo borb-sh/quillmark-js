@@ -62,7 +62,7 @@ describe('loadSuite (browser)', () => {
 
 	it('rejects naming the file that would not load', async () => {
 		vi.stubGlobal('fetch', async () => new Response(null, { status: 404 }));
-		await expect(fetchSuite()).rejects.toThrow(/\.ttf answered 404/);
+		await expect(fetchSuite()).rejects.toThrow(/\.(ttf|otf) answered 404/);
 	});
 });
 

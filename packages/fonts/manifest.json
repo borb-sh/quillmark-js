@@ -2,49 +2,49 @@
 	"subset": "latin",
 	"families": [
 		{
-			"name": "Tinos",
-			"license": "OFL-1.1",
-			"licenseFile": "Tinos-OFL.txt",
-			"source": "https://github.com/googlefonts/tinos/tree/3b4482a99b80ea5fc75f187b1be3120a3f5905b3",
+			"name": "TeXGyreTermes",
+			"license": "LicenseRef-GUST-Font-License",
+			"licenseFile": "TeXGyreTermes-GUST.txt",
+			"source": "https://files.pythonhosted.org/packages/b9/15/82225ab8b159aba51073b61ee35955aac8e3b340ff7c6612be8f356e3a27/rinoh_typeface_texgyretermes-0.1.1-py3-none-any.whl",
 			"faces": [
 				{
 					"weight": 400,
 					"style": "normal",
-					"file": "Tinos-Regular.ed6a7e887c55c70c.ttf",
-					"sha256": "ed6a7e887c55c70c36e5cbb216f2c582b185606ca653f0c11cfdb70128ceeb69",
+					"file": "TeXGyreTermes-Regular.bb30035ec45d518e.otf",
+					"sha256": "bb30035ec45d518e778784e0b9334d12c64d839b747915f7171c595eee4e5ea2",
 					"upstream": {
-						"file": "fonts/ttf/Tinos-Regular.ttf",
-						"sha256": "60a0e8ef0c04dd5dd69ffe91025fa2ae5836cbd35600a82ba031977557e2cb61"
+						"file": "rinoh_typeface_texgyretermes/texgyretermes-regular.otf",
+						"sha256": "cc3fe7c707b81428d23d54df3eadd9228a2bf6a4d43125d94df56f5f63134659"
 					}
 				},
 				{
 					"weight": 400,
 					"style": "italic",
-					"file": "Tinos-Italic.f8149c62e5e63f8e.ttf",
-					"sha256": "f8149c62e5e63f8e5c4269958be1a83a5a7f23b2f726aed96e4e002d1cdefb2b",
+					"file": "TeXGyreTermes-Italic.7ddc0ba237c4ade9.otf",
+					"sha256": "7ddc0ba237c4ade96de1d2b19bbd3283373519ac557226fbc7ca806844aebd66",
 					"upstream": {
-						"file": "fonts/ttf/Tinos-Italic.ttf",
-						"sha256": "5942266ed398b155d7dc23e36833e7ec6be988f2439bdbeb8ef1bede808eaa91"
+						"file": "rinoh_typeface_texgyretermes/texgyretermes-italic.otf",
+						"sha256": "6dd103a1672e50568cd2f8a706ccd48443d44d7d073a59d2286f4e6f746575d6"
 					}
 				},
 				{
 					"weight": 700,
 					"style": "normal",
-					"file": "Tinos-Bold.79806bc27f1d34c4.ttf",
-					"sha256": "79806bc27f1d34c419f528ef93be13f64f5d79be36aee4dd56d341a5f296fc64",
+					"file": "TeXGyreTermes-Bold.4b540f231f155b6a.otf",
+					"sha256": "4b540f231f155b6a138bcad55d959ae13790873b15d1c5e88db99a3bac12fbde",
 					"upstream": {
-						"file": "fonts/ttf/Tinos-Bold.ttf",
-						"sha256": "393269dbab8899f938db19783eca5eac92eb431f7ae0ab45b8349ca895f1a06b"
+						"file": "rinoh_typeface_texgyretermes/texgyretermes-bold.otf",
+						"sha256": "2fb3e952065fa153c7e4e64e04b98b9d79225739b6025aa3f0f0782d299ff61e"
 					}
 				},
 				{
 					"weight": 700,
 					"style": "italic",
-					"file": "Tinos-BoldItalic.554796f371159c0c.ttf",
-					"sha256": "554796f371159c0c64de3cb850a18335b9274818452f21cf40dee1d3c5e0ed80",
+					"file": "TeXGyreTermes-BoldItalic.0dd9cbf614b20345.otf",
+					"sha256": "0dd9cbf614b20345f4fea9116b7e6a69a9d2b2efd732ad4170439c94b6178189",
 					"upstream": {
-						"file": "fonts/ttf/Tinos-BoldItalic.ttf",
-						"sha256": "a5de79f0fe863ea0954757acb3d47b3ccd0a930ce3dd5b97230cd3866790a06e"
+						"file": "rinoh_typeface_texgyretermes/texgyretermes-bolditalic.otf",
+						"sha256": "1bf6af99cb0e26c12951317032d79b96ae009551e59ccf02a5b24f325ecfec87"
 					}
 				}
 			]
@@ -194,6 +194,54 @@
 			]
 		},
 		{
+			"name": "Gelasio",
+			"license": "OFL-1.1",
+			"licenseFile": "Gelasio-OFL.txt",
+			"source": "https://github.com/SorkinType/Gelasio/tree/9228e69b160d79f33950e026293f6e13ba9780d0",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "Gelasio-Regular.d9e3ce4a4e5bc9ad.ttf",
+					"sha256": "d9e3ce4a4e5bc9ad6b39ce44532e7393b515793626ac998abe0ffb2a78e22c64",
+					"upstream": {
+						"file": "fonts/ttf/Gelasio-Regular.ttf",
+						"sha256": "48c797fbe0e07c48a18cb962e7bdfa23f19618327dddf54093265328dc9eb39d"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "Gelasio-Italic.9ebec19f1fe980d4.ttf",
+					"sha256": "9ebec19f1fe980d44fbaaaca493d7a8eb8460d4c31f55d0114c26faa39d3d28d",
+					"upstream": {
+						"file": "fonts/ttf/Gelasio-Italic.ttf",
+						"sha256": "1d8bda4ff258bb8251eae4f7d7500c8d97d084136192bb264bc2305168765d1b"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "Gelasio-Bold.4ff30fe8a1e373a4.ttf",
+					"sha256": "4ff30fe8a1e373a42acada2fa8e3791ddca8dd35ebcb24a8a07f0fd5aa9a8a88",
+					"upstream": {
+						"file": "fonts/ttf/Gelasio-Bold.ttf",
+						"sha256": "e0ef3addf1acf35f5c6aef2be00d0a2c01363bf70a5950e16650976051a0c462"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "Gelasio-BoldItalic.ce0ae207c41fb7c9.ttf",
+					"sha256": "ce0ae207c41fb7c9db298e94dd2167aea269e2697143dd0e7e057ef917d8ee17",
+					"upstream": {
+						"file": "fonts/ttf/Gelasio-BoldItalic.ttf",
+						"sha256": "aa87e21b46aef3dcb50a68dc6e1946f0c0a9819d067e4be6a98a6daa8f5b3c16"
+					}
+				}
+			]
+		},
+		{
 			"name": "Libertinus Serif",
 			"license": "OFL-1.1",
 			"licenseFile": "LibertinusSerif-OFL.txt",
@@ -237,6 +285,178 @@
 					"upstream": {
 						"file": "fonts/ttf/LibertinusSerif-BoldItalic.ttf",
 						"sha256": "8d7406b1e84e4ee1a658289139d16de75ee4380a2309dce2e4d68704b1d8cfe8"
+					}
+				}
+			]
+		},
+		{
+			"name": "Spectral SC",
+			"license": "OFL-1.1",
+			"licenseFile": "SpectralSC-OFL.txt",
+			"source": "https://github.com/productiontype/Spectral/tree/dbc06862d7030eedb1b01b60cdad8f6102f4ddfa",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "SpectralSC-Regular.3ed045c7bfd712c5.ttf",
+					"sha256": "3ed045c7bfd712c5ced927b718497104922b1305fe7583a0af04e5aa2fe4a1e0",
+					"upstream": {
+						"file": "fonts/ttf/SC/SpectralSC-Regular.ttf",
+						"sha256": "11b89ee8eff243c4068a9fc105650f8d90005b288f90c98c6d40fecd85a0306d"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "SpectralSC-Italic.eae9c1c2b9644e15.ttf",
+					"sha256": "eae9c1c2b9644e156e53dd601d82c2716380819a8ad7df9482290444e3c1878e",
+					"upstream": {
+						"file": "fonts/ttf/SC/SpectralSC-Italic.ttf",
+						"sha256": "774281eb396b34b89b30ffc7779d32267299f275b050be6723c7cc252177e33d"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "SpectralSC-Bold.80ed8968332130bf.ttf",
+					"sha256": "80ed8968332130bf8834c042674469dab8d9d13bf87635ab6a1bda1eab953697",
+					"upstream": {
+						"file": "fonts/ttf/SC/SpectralSC-Bold.ttf",
+						"sha256": "ddbd53f4b1fd856f5a9b6f5110c095a4a4f4382bdab6decfd79cffd15656dddc"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "SpectralSC-BoldItalic.a0ab6e65964776ea.ttf",
+					"sha256": "a0ab6e65964776ea55e19dd5d00d69808f5a3f968f753cbe601ee7acf524f685",
+					"upstream": {
+						"file": "fonts/ttf/SC/SpectralSC-BoldItalic.ttf",
+						"sha256": "66d58379ac57b8cf25c4c7e45290934c39098533d3490259826e1e8f2f294caa"
+					}
+				}
+			]
+		},
+		{
+			"name": "Cinzel",
+			"license": "OFL-1.1",
+			"licenseFile": "Cinzel-OFL.txt",
+			"source": "https://github.com/NDISCOVER/Cinzel/tree/8271e162a7c6064ff1e539ba86011b16b6a6184f",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "Cinzel-Regular.28b8df13a36735ea.ttf",
+					"sha256": "28b8df13a36735ea71141357bb1bfb78b8c8238b36de8247c191e08389bbc921",
+					"upstream": {
+						"file": "fonts/ttf/Cinzel-Regular.ttf",
+						"sha256": "af0031129f27dc752e8629a80b793d27abea94027faa27cc660c3fc33f607a1f"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "Cinzel-Bold.0adc5e4ce481a8f7.ttf",
+					"sha256": "0adc5e4ce481a8f708bc25b37f0dd2427f1045204723c75ceb77a7cfa494c8b3",
+					"upstream": {
+						"file": "fonts/ttf/Cinzel-Bold.ttf",
+						"sha256": "0c23ec565db45c5508ee95889c60ad87debd167ca07167a43a5d68572b4e2eac"
+					}
+				}
+			]
+		},
+		{
+			"name": "DejaVu Sans",
+			"license": "Bitstream-Vera",
+			"licenseFile": "DejaVuSans-Bitstream-Vera.txt",
+			"source": "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "DejaVuSans-Regular.c03d708cf15633b1.ttf",
+					"sha256": "c03d708cf15633b1bfb124a2fcfb5fb4b832fa28d21d2fdf37b29839c335a46a",
+					"upstream": {
+						"file": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf",
+						"sha256": "7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "DejaVuSans-Italic.a894321c7636222e.ttf",
+					"sha256": "a894321c7636222ed34326afecb9a8f0c3dcb59ff0fac3cfc7b14aed73a84de2",
+					"upstream": {
+						"file": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans-Oblique.ttf",
+						"sha256": "4af75fa16ee6d3ad43e1ecec41862c24954af26a55c6bb1ebb27bd486a50f5f4"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "DejaVuSans-Bold.97da797b1e619add.ttf",
+					"sha256": "97da797b1e619add0434cf299b000cf59ac9a1fd17efed8f1719c173ea585376",
+					"upstream": {
+						"file": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans-Bold.ttf",
+						"sha256": "e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "DejaVuSans-BoldItalic.eed68fec0687e70a.ttf",
+					"sha256": "eed68fec0687e70aa02f0435a4275c8792d8bd976ce31d896c4a59abc5ccaae2",
+					"upstream": {
+						"file": "dejavu-fonts-ttf-2.37/ttf/DejaVuSans-BoldOblique.ttf",
+						"sha256": "eb436dca0c2594b73d8b603b892e374fdfd8d885d25ffb4f18df4c4c0b49e50f"
+					}
+				}
+			]
+		},
+		{
+			"name": "Inter",
+			"license": "OFL-1.1",
+			"licenseFile": "Inter-OFL.txt",
+			"source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "Inter-Regular.8dca5fc38e6dfa08.ttf",
+					"sha256": "8dca5fc38e6dfa081d33b3231a2f2a10eb0673613cb68862a904b9ee4b48fa09",
+					"upstream": {
+						"file": "extras/ttf/Inter-Regular.ttf",
+						"sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "Inter-Italic.009a3b40d13a3847.ttf",
+					"sha256": "009a3b40d13a38479d009b84066d8dfb264d94e06b096f3a38d50175a0aa0d22",
+					"upstream": {
+						"file": "extras/ttf/Inter-Italic.ttf",
+						"sha256": "bbc051dd204b5019a1aa0bc0ae2aa8a05ab13e7a3f979fa357631dc7feb6833a"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "Inter-Bold.c987a8bb69f6dff3.ttf",
+					"sha256": "c987a8bb69f6dff39a53cc5e81cab63269e23ed2c833ff6859012f9e300d239f",
+					"upstream": {
+						"file": "extras/ttf/Inter-Bold.ttf",
+						"sha256": "288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "Inter-BoldItalic.1370c12fb1e5d2d9.ttf",
+					"sha256": "1370c12fb1e5d2d96fd5c824e276a1136625300e80cdc67fb20c86b12ffb2471",
+					"upstream": {
+						"file": "extras/ttf/Inter-BoldItalic.ttf",
+						"sha256": "948405a16cdc62701da5f4005ed068ca5f4d27061d98f7974ccfc37831d9581d"
 					}
 				}
 			]
