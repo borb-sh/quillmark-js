@@ -1,7 +1,6 @@
 // A document landed in a quill: read as markdown, pinned to the canonical ref it opens in,
-// and conformed against that quill's schema. One door for a record reopened, a retired
-// document moved to the latest form, and nothing else, so what an update strands is named
-// the way a reopen's would be.
+// and conformed against that quill's schema. A reopen and an update to the latest form
+// both come through here, so what either strands is named the same way.
 import type { CoreSurface, Diagnostic, Document, Quill } from '@quillmark/wasm';
 
 export function land(

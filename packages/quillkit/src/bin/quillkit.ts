@@ -103,10 +103,6 @@ function openBrowser(url: string): void {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// init
-// ---------------------------------------------------------------------------
-
 /** A new quiver in the named directory, else the working one: one quill that passes `check`
  *  and opens in `serve`. It refuses a directory that already holds a quiver rather than
  *  merging into it. */
@@ -123,10 +119,6 @@ async function init(args: string[]): Promise<void> {
 	console.log(`\nNext:\n${steps.map((s) => `  ${s}`).join('\n')}`);
 }
 
-// ---------------------------------------------------------------------------
-// check
-// ---------------------------------------------------------------------------
-
 async function check(args: string[]): Promise<void> {
 	const { switches } = parse('check', args, { switches: ['--drafts', '--strict'], words: 0 });
 	const { pass, fail } = await gate(resolve('.'), {
@@ -136,10 +128,6 @@ async function check(args: string[]): Promise<void> {
 	console.log(`\n${pass}/${pass + fail} passed`);
 	if (fail > 0) process.exit(1);
 }
-
-// ---------------------------------------------------------------------------
-// build
-// ---------------------------------------------------------------------------
 
 async function build(args: string[]): Promise<void> {
 	const parsed = parse('build', args, { values: ['--out'], switches: ['--drafts'], words: 1 });
@@ -153,10 +141,6 @@ async function build(args: string[]): Promise<void> {
 	for (const said of warnings) console.error(`warn  ${said}`);
 	console.log(`quillkit build ${target}: ${at}`);
 }
-
-// ---------------------------------------------------------------------------
-// serve
-// ---------------------------------------------------------------------------
 
 /**
  * The local loop: pack the quiver into a served tree, serve the target's client over it,
@@ -226,10 +210,6 @@ async function serve(args: string[]): Promise<void> {
 	if (parsed.switches.has('--open')) openBrowser(url);
 }
 
-// ---------------------------------------------------------------------------
-// preview
-// ---------------------------------------------------------------------------
-
 /** The target a deploy was built for, read off what its build left at the root. */
 function builtTarget(dir: string): Target {
 	if (existsSync(join(dir, APP_JSON))) return 'app';
@@ -259,10 +239,6 @@ async function preview(args: string[]): Promise<void> {
 	console.log(`  serving: ${dir}`);
 	if (parsed.switches.has('--open')) openBrowser(url);
 }
-
-// ---------------------------------------------------------------------------
-// Dispatch
-// ---------------------------------------------------------------------------
 
 function usage(print: (text: string) => void = console.error): void {
 	print(

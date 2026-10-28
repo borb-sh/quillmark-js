@@ -1,6 +1,4 @@
-// The app client's one entry: the endorsed look, what the client adds to it, `app.json`,
-// and then the app. The author's `app.css` is linked by `loadApp`, after both sheets here,
-// so it lands last.
+// The app client's one entry. `loadApp` links the author's `app.css` after both sheets here.
 import { mount } from 'svelte';
 import '@quillmark/svelte/preset';
 import './chrome.css';

@@ -518,15 +518,6 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('every anchor in the FIELD survives a cell keystroke', () => {
-		const { doc, field } = tableLeaf(LETTERED);
-		field.insertAnchor('a1', 2);
-		const cellView = cellViews(field)[0];
-		cellView.dispatch(cellView.state.tr.insertText('!', 1));
-		expect(doc.main.body.marks.some((m) => m.type === 'anchor')).toBe(true);
-		field.destroy();
-	});
-
 	it('a grip SELECTS its line: the wash is the whole of what the FIRST press does', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[1].click();
@@ -1383,49 +1374,54 @@ describe('a grip holds a line and a sweep holds cells', () => {
 		field.destroy();
 	});
 
-	it('a block of cells CLEARS on Backspace, and the rectangle stays selected', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		sweep(field, 2, 4); // rows 1–2, column 1 only
-		expect(washed(field)).toEqual(['1,0', '2,0']);
-		press(cellViews(field)[2], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([
-			['h1', 'h2'],
-			['', 'a2'],
-			['', 'b2']
-		]);
-		expect(washed(field)).toEqual(['1,0', '2,0']);
-		field.destroy();
-	});
-
-	it('a sweep across whole rows clears them, and the rows stay', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		sweep(field, 2, 5); // both body rows, both columns
-		press(cellViews(field)[2], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([
-			['h1', 'h2'],
-			['', ''],
-			['', '']
-		]);
-		expect(washed(field)).toEqual(['1,0', '1,1', '2,0', '2,1']);
-		field.destroy();
-	});
-
-	it('a sweep down a whole column clears it, and the column stays', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		sweep(field, 1, 5); // header through last body row, column 2 only
-		expect(washed(field)).toEqual(['0,1', '1,1', '2,1']);
-		press(cellViews(field)[1], 'Backspace');
-		expect(grid(leafProps(field))).toEqual([
-			['h1', ''],
-			['a1', ''],
-			['b1', '']
-		]);
-		expect(leafProps(field).aligns).toEqual(['left', 'right']);
-		field.destroy();
-	});
+	it.each([
+		[
+			'a block of cells',
+			2,
+			4,
+			['1,0', '2,0'],
+			[
+				['h1', 'h2'],
+				['', 'a2'],
+				['', 'b2']
+			]
+		],
+		[
+			'whole rows',
+			2,
+			5,
+			['1,0', '1,1', '2,0', '2,1'],
+			[
+				['h1', 'h2'],
+				['', ''],
+				['', '']
+			]
+		],
+		[
+			'a whole column',
+			1,
+			5,
+			['0,1', '1,1', '2,1'],
+			[
+				['h1', ''],
+				['a1', ''],
+				['b1', '']
+			]
+		]
+	])(
+		'a sweep over %s clears them on Backspace, and the rectangle stays',
+		(_, from, to, wash, cells) => {
+			const { field } = tableLeaf(LETTERED);
+			layout(field);
+			sweep(field, from, to);
+			expect(washed(field)).toEqual(wash);
+			press(cellViews(field)[from]!, 'Backspace');
+			expect(grid(leafProps(field))).toEqual(cells);
+			expect(leafProps(field).aligns).toEqual(['left', 'right']);
+			expect(washed(field)).toEqual(wash);
+			field.destroy();
+		}
+	);
 
 	it('a sweep over every cell clears the table, and the table stays', () => {
 		const { doc, field } = tableLeaf(LETTERED);

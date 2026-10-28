@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-// One scale for every page, and the pill standing exactly while the zoom is not the
-// default. jsdom lays out nothing, so the pane's box is stubbed and the scale is read
-// back off the slots' widths.
+// One scale for every page, and the pill standing exactly while the zoom is not the default. The
+// pane's box is stubbed and the scale is read off the slots' widths.
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { createPreview, type PreviewController } from '$lib/preview/controller';
 import type { LiveSession } from '@quillmark/wasm';
@@ -12,7 +11,7 @@ beforeAll(stubPaintGlobals);
 const portrait = { widthPt: 612, heightPt: 792 };
 const landscape = { widthPt: 792, heightPt: 612 };
 
-/** A memo with a landscape attachment between its two pages. */
+/** Two portrait pages with a landscape one between. */
 function mixed(): LiveSession {
 	const sizes = [portrait, landscape, portrait];
 	return { ...mockSession(sizes.length), pageSize: (i: number) => sizes[i] } as LiveSession;

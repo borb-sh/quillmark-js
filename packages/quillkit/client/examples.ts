@@ -3,8 +3,7 @@
 import type { Diagnostic, Document, Quill } from '@quillmark/wasm';
 import { diagnosticsOf } from './notes';
 
-/** A preference and not a document, so it outlives the tab where nothing the document
- *  holds does. Absent is on. */
+/** A preference, so it outlives the tab. Absent is on. */
 const KEY = 'quillkit.studio.examples';
 
 /** Whether a quill opens on its example. Storage a private window refuses reads as on. */

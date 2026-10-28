@@ -15,14 +15,10 @@ describe('QuiverError', () => {
 			const err = new QuiverError(code, `test message for ${code}`);
 			expect(err).toBeInstanceOf(Error);
 			expect(err).toBeInstanceOf(QuiverError);
+			expect(err.name).toBe('QuiverError');
 			expect(err.code).toBe(code);
 			expect(err.message).toBe(`test message for ${code}`);
 		}
-	});
-
-	it('has name QuiverError', () => {
-		const err = new QuiverError('invalid_ref', 'bad ref');
-		expect(err.name).toBe('QuiverError');
 	});
 
 	it('preserves all payload fields together', () => {

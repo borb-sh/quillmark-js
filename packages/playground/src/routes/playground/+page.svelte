@@ -14,10 +14,6 @@
     editor caret  ─► onCaretMove(at)  ─► preview.focusPosition(at) (editor→preview)
     editor focus  ─► onActiveLeafChange ─► preview.endFollow()     (editor→preview)
 
-  The bridge is consumer-layer and one-way-independent: the editor is unaware of
-  the preview (it only emits addresses + carets), the preview is unaware of the
-  editor (it only surfaces hits). This route is the seam that joins them.
-
   Recompile is fed by `onChange` alone, which covers all three lanes: a prose
   commit, a scalar/array write, a card operation. A structure op applies at once
   (one per gesture, and the stack moved); prose and field edits debounce, since

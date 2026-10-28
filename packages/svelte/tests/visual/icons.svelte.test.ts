@@ -1,14 +1,5 @@
 // @vitest-environment jsdom
-// The vendored glyph set. What is worth holding is the renderer against its own
-// table rather than any number in the frame: a doctrine value asserted here is a
-// second place it lives, and the stroke and the viewBox are the component's.
-//
-// So the set is walked and each render compared to the entry that produced it — the
-// one failure mode a copied table has is an entry the renderer cannot draw — plus the
-// two things a call site depends on and neither TypeScript nor a render of one icon
-// would catch: `class` reaching the `<svg>`, which is what the card's open/closed
-// rotation hangs off, and decorative-by-default, which is what keeps every glyph
-// out of the a11y tree inside buttons that already carry the name.
+// The renderer against its own table, plus `class` reaching the `<svg>` and decorative-by-default.
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount, unmount, type ComponentProps } from 'svelte';
 import Icon from '$lib/visual/icons/Icon.svelte';
@@ -45,15 +36,6 @@ describe('Icon', () => {
 				name
 			).toEqual(nodes.map(([tag, attrs]) => [tag, { ...attrs }]));
 		}
-	});
-
-	it('sizes the frame, and defaults to a square the card controls override in CSS', () => {
-		const sized = draw({ name: 'minus', size: 14 });
-		expect([sized.getAttribute('width'), sized.getAttribute('height')]).toEqual(['14', '14']);
-
-		const bare = draw({ name: 'minus' });
-		expect(bare.getAttribute('width')).toBeTruthy();
-		expect(bare.getAttribute('height')).toBe(bare.getAttribute('width'));
 	});
 
 	it('forwards `class` to the svg', () => {

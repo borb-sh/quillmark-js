@@ -1,11 +1,9 @@
 /**
  * `check`, the gate: every quill's seed renders, and so does its root `example.md` where it
- * ships one, through the wasm this package carries, which is the wasm every deployed client
- * renders through (QUILLKIT §"One pin"). With an `App.yaml` or an `app.css` beside the
- * quiver, the app they describe resolves too.
+ * ships one, through the wasm every deployed client renders through (QUILLKIT §"One pin").
+ * With an `App.yaml` or an `app.css` beside the quiver, the app they describe resolves too.
  *
- * The only door onto the verdict, so an author on vitest, jest or another runner spawns
- * the bin (`execFileSync('quillkit', ['check'])`) rather than rebuilding the loop.
+ * The only door onto the verdict: other runners spawn the bin rather than rebuild the loop.
  */
 
 import { existsSync } from 'node:fs';
@@ -15,7 +13,7 @@ import { loadSuite } from '@quillmark/fonts/node';
 import { fromDir } from '@quillmark/quiver/node';
 import { APP_CSS, APP_YAML, prepareApp } from './app-files.js';
 
-export interface Verdict {
+interface Verdict {
 	pass: number;
 	fail: number;
 }
@@ -49,8 +47,7 @@ export async function gate(
 	// Loaded here rather than at the top of the bin: `check` is the verb that renders.
 	const { init, Engine, isQuillmarkError } = await import('@quillmark/wasm');
 	const { formatDiagnostic } = await init();
-	// The suite the deployed clients build their engine over, so a family a document names
-	// sets here as it sets on the page.
+	// The suite the deployed clients build their engine over.
 	const engine = new Engine({ fonts: await loadSuite() });
 	const quiver = await fromDir(root);
 

@@ -1,25 +1,13 @@
-// `@quillmark/svelte/preview`: the live-preview surface.
-//
-// `createPreview(session)` (vanilla-TS core) + a thin `<Preview>` Svelte wrapper
-// land here. Reserved-package invariant: this subpath imports no editor-side code
-// (the codec, the VisualEditor) so a `@quillmark/preview` promotion stays a
-// re-export, not a refactor: it may reach `/core` (the shared WASM boundary) and
-// nothing else. Enforced by `check:deps`, at the subpath's edge: a relative hop past a
-// module directly in `core/` is what pulls the codec, and all of ProseMirror with it.
+// `@quillmark/svelte/preview`: the live-preview surface. Imports no editor-side code; it may reach
+// `/core` and nothing else (`check:deps`).
 
-// The theme derivation, which the page slots read through `var()`.
-// Imported at the barrel because a subpath is what a consumer gets: this surface
-// reaches modules inside `core/` and never its entry, which carries no sheet.
-// `check:deps` holds the reach.
+// The theme derivation the page slots read through `var()`; a subpath import reaches `core/`
+// modules, never its entry, which carries no sheet.
 import '../core/theme.css';
 
 export { createPreview } from './controller.js';
 export type { PreviewOptions, PreviewController } from './controller.js';
 export { default as Preview } from './Preview.svelte';
 
-// What the preview says: its message states and the zoom pill's name. Keyed and partial; the
-// English is exported so a consumer composes against it rather than restating it.
-// The merge is the surface's own: a consumer hands `strings` to a prop, never
-// merges one.
 export { DEFAULT_PREVIEW_STRINGS } from './strings.js';
 export type { PreviewStrings, PreviewStringsInput } from './strings.js';

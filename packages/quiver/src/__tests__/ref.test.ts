@@ -44,11 +44,7 @@ describe('parseQuillRef — invalid refs', () => {
 		}
 	}
 
-	it('rejects empty string', () => expectInvalidRef(''));
-	it('rejects bare @', () => expectInvalidRef('@'));
-	it('rejects foo@ (missing selector)', () => expectInvalidRef('foo@'));
-	it('rejects @1.0 (missing name)', () => expectInvalidRef('@1.0'));
-	it('rejects showcase@1 (a major alone)', () => {
+	it('names the selector when a major stands alone', () => {
 		for (const ref of ['showcase@1', 'showcase@0', 'borb.showcase@2']) {
 			expect(() => parseQuillRef(ref), ref).toThrow(
 				expect.objectContaining({
@@ -58,21 +54,27 @@ describe('parseQuillRef — invalid refs', () => {
 			);
 		}
 	});
-	it('rejects foo@^1 (caret range)', () => expectInvalidRef('foo@^1'));
-	it('rejects foo@~1 (tilde range)', () => expectInvalidRef('foo@~1'));
-	it('rejects foo@>=1 (gte range)', () => expectInvalidRef('foo@>=1'));
-	it('rejects foo@* (wildcard)', () => expectInvalidRef('foo@*'));
-	it('rejects foo@1.2.3-beta (prerelease)', () => expectInvalidRef('foo@1.2.3-beta'));
-	it('rejects foo@1.2.3+build (build metadata)', () => expectInvalidRef('foo@1.2.3+build'));
-	it('rejects foo!bar (invalid name char)', () => expectInvalidRef('foo!bar'));
-	it('rejects foo@1.2.3.4 (four-part selector)', () => expectInvalidRef('foo@1.2.3.4'));
-	it('rejects a.b.c (two collections)', () => expectInvalidRef('a.b.c'));
-	it('rejects .foo (empty collection)', () => expectInvalidRef('.foo'));
-	it('rejects foo. (empty name)', () => expectInvalidRef('foo.'));
-	it('rejects a-b (hyphen)', () => expectInvalidRef('a-b'));
-	it('rejects MyQuill (uppercase)', () => expectInvalidRef('MyQuill'));
-	it('rejects _memo (leading underscore)', () => expectInvalidRef('_memo'));
-	it('rejects 2memo (leading digit)', () => expectInvalidRef('2memo'));
-	it('rejects a name over 64 characters', () => expectInvalidRef('a'.repeat(65)));
-	it('rejects foo@1.x (non-digit in selector)', () => expectInvalidRef('foo@1.x'));
+	it.each([
+		'',
+		'@',
+		'foo@',
+		'@1.0',
+		'foo@^1',
+		'foo@~1',
+		'foo@>=1',
+		'foo@*',
+		'foo@1.2.3-beta',
+		'foo@1.2.3+build',
+		'foo!bar',
+		'foo@1.2.3.4',
+		'a.b.c',
+		'.foo',
+		'foo.',
+		'a-b',
+		'MyQuill',
+		'_memo',
+		'2memo',
+		'a'.repeat(65),
+		'foo@1.x'
+	])('rejects %j', (ref) => expectInvalidRef(ref));
 });

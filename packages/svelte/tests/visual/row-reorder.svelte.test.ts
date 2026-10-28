@@ -22,7 +22,7 @@ import {
 
 afterEach(unmountAll);
 
-function threeRows(q: Quill): Document {
+function threeRows(): Document {
 	const doc = example();
 	doc.storeField('revisions', [
 		{ note: 'A', pages: 1 },
@@ -67,7 +67,7 @@ function dragHandle(el: HTMLElement, ys: number[], end = 'pointerup'): void {
 describe('reorder on an object row', () => {
 	it('moves the row by its handle onto the row it is dropped on, and commits the order', () => {
 		const q = quill();
-		const doc = threeRows(q);
+		const doc = threeRows();
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		layOut(arr);
@@ -89,7 +89,7 @@ describe('reorder on an object row', () => {
 
 	it('marks the lifted row and the drop while the drag is held, and leaves no trace', () => {
 		const q = quill();
-		const doc = threeRows(q);
+		const doc = threeRows();
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		layOut(arr);
@@ -107,7 +107,7 @@ describe('reorder on an object row', () => {
 
 	it('re-picks the drop as the rows scroll under a held drag', () => {
 		const q = quill();
-		const doc = threeRows(q);
+		const doc = threeRows();
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		layOut(arr);
@@ -146,7 +146,7 @@ describe('reorder on an object row', () => {
 		});
 		function lastRowPastTheFold() {
 			const q = quill();
-			const doc = threeRows(q);
+			const doc = threeRows();
 			const arr = revisions(mountEditor(q, doc).target);
 			stand(arr, [innerHeight - 140, innerHeight - 90, innerHeight - 30]);
 			const grip = handle(arr, 2);
@@ -204,7 +204,7 @@ describe('reorder on an object row', () => {
 
 	it('moves nothing on a press that stays in the dead zone, or a drop on its own row', () => {
 		const q = quill();
-		const doc = threeRows(q);
+		const doc = threeRows();
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		layOut(arr);
@@ -217,7 +217,7 @@ describe('reorder on an object row', () => {
 
 	it('leaves a key a cell already took to that cell', () => {
 		const q = quill();
-		const doc = threeRows(q);
+		const doc = threeRows();
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		summaries(arr)[1].click();
@@ -239,7 +239,7 @@ describe('reorder on an object row', () => {
 
 	it('moves the row by Alt+arrow from its summary, and keeps the open row open', async () => {
 		const q = quill();
-		const doc = threeRows(q);
+		const doc = threeRows();
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 
@@ -270,7 +270,7 @@ describe('reorder on an object row', () => {
 
 	it("keeps the open row's subform mounted across its own move", () => {
 		const q = quill();
-		const doc = threeRows(q);
+		const doc = threeRows();
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		summaries(arr)[0].click();

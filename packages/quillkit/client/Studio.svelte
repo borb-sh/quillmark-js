@@ -67,8 +67,7 @@
 		| { kind: 'ready' }
 		| { kind: 'failed'; message: string };
 
-	// The engine, the quiver and the core surface are held, not tracked: nothing in the
-	// markup reads them, and the surfaces read the handles under `open`.
+	// Held, not tracked: nothing in the markup reads them.
 	let engine: Engine | undefined;
 	let quiver: Quiver | undefined;
 	let core: CoreSurface | undefined;
@@ -79,38 +78,29 @@
 	let open = $state.raw<Opened | undefined>();
 	/** The faces the suite offers the editor's font picker, once a session has loaded them. */
 	let fonts = $state.raw<FontFace[]>([]);
-	/** The document as text, kept across an open that materialized no quill: a `Quill.yaml`
-	 *  mid-edit is reloaded through, and the document survives the trip. */
+	/** The document as text, kept across an open that materialized no quill. */
 	let held = $state.raw<string | undefined>();
 
 	// ── The errors ──────────────────────────────────────────────────────────────
 	/** The diagnostics of a throw: a failed open or a failed recompile. */
 	let thrown = $state.raw<Diagnostic[]>([]);
 	/** What a surface last reported: an edit the store does not hold, a page that would not
-	 *  paint. About neither a field nor a line of source, so it reaches the strip
-	 *  and not the editor, and holds until the next edit lands. */
+	 *  paint. It reaches the strip, not the editor, and holds until the next edit lands. */
 	let surfaced = $state.raw<EditorError | undefined>();
-	/** What the last carry stranded. Held for the open and dropped at the first edit:
-	 *  from then on the schema producer speaks for the document's current state. */
+	/** What the last carry stranded; dropped at the first edit. */
 	let carried = $state.raw<Diagnostic[]>([]);
-	/** What the last emit refused. Its own slot rather than the compile's: a session that
-	 *  paints can still fail to write a file, the PDF spine being the one lane a canvas
-	 *  paint does not run, so the paint on screen is whole and what failed is the file. */
+	/** What the last emit refused. Its own slot: a session that paints can still fail to
+	 *  write a file. */
 	let unemitted = $state.raw<Diagnostic[]>([]);
 	/** Every producer's diagnostics, merged, for the editor to route by `path`. */
 	let notes = $state.raw<Diagnostic[]>([]);
 
-	/** The first diagnostic of the throw naming a place in the quill's source. A compile
-	 *  failure carries one and nothing the schema says does, so this is the line the
-	 *  author opens whichever shape the failure took. */
+	/** The first diagnostic of the throw naming a place in the quill's source. */
 	const placed = $derived(thrown.find((d) => d.location));
 	/**
-	 * What the strip over the paint stands for, with the surfaces up, and what it is
-	 * called. Four failures reach it and one is shown, in this order: a compile that will
-	 * not land or an open the engine refused, which are why the paint does not answer the
-	 * document; what a surface reported, an editor the paint may not answer either; an
-	 * emit that would not write the file. `at` is the failure's place where it carried
-	 * one, a surface's error code for a surface.
+	 * What the strip over the paint stands for. Four failures reach it and one is shown, in
+	 * this order: a compile or open the engine refused, what a surface reported, an emit
+	 * that would not write the file. `at` is the failure's place, or a surface's error code.
 	 */
 	const halt = $derived.by(() => {
 		if (!open) return undefined;
@@ -131,9 +121,7 @@
 		return { said, at: note.location && placeOf(note.location), message: note.message };
 	});
 
-	/** Whether a repack put the document where it is. An import lands through the same
-	 *  carry, and says nothing: a repack happens to the author, and an import is a thing
-	 *  the reader just did. */
+	/** Whether a repack put the document where it is; an import says nothing. */
 	let repacked = $state.raw(false);
 
 	function syncNotes(): void {
@@ -150,26 +138,20 @@
 	let editorRef: { setCaret(at: Landing): Promise<void> } | undefined = $state.raw();
 	let previewRef: ReturnType<typeof Preview> | undefined = $state.raw();
 
-	/** Which of the split's two tracks is showing. Read only under the preset's threshold,
-	 *  where one shows at a time; above it the attribute is inert and the switch band is
-	 *  not drawn, so studio holds one number rather than a viewport in JS beside the one
-	 *  the stylesheet already has. */
+	/** Which of the split's two tracks is showing; read only under the preset's threshold. */
 	let shown = $state.raw<1 | 2>(1);
 
 	// ── Opening ─────────────────────────────────────────────────────────────────
 	/** Whether an open is in flight: the picker is inert while one is. */
 	const busy = $derived(phase.kind === 'booting' || phase.kind === 'opening');
 
-	/** The open in progress. An open takes as long as the backend takes to load and
-	 *  compile a page, which is long enough for a second repack to land inside one, so
-	 *  the loser drops what it built instead of both writing the same slot. */
+	/** The open in progress; the loser of two overlapping opens drops what it built. */
 	let turn = 0;
 
 	/**
 	 * Replace what is mounted with `ref`, over `carry` when the document should cross.
-	 * The old handles are freed only after the surfaces are gone: a live `<Preview>`
-	 * paints from the session it was handed, so unmounting first is what keeps a
-	 * freed handle out of reach.
+	 * Old handles are freed after the surfaces are gone, since a live `<Preview>` paints
+	 * from the session it was handed.
 	 */
 	async function mount(ref: string, carry?: string): Promise<void> {
 		if (!engine || !quiver) return;
@@ -211,10 +193,8 @@
 	}
 
 	// ── The door ────────────────────────────────────────────────────────────────
-	/** The document as text while the door is open, taken when it opened rather than
-	 *  tracked: an edit mutates the document in place and reassigns nothing, so a
-	 *  derivation over it would hold whatever the last remount produced. Undefined is the
-	 *  door being shut. */
+	/** The document as text while the door is open, taken when it opened: an edit mutates
+	 *  the document in place, so a derivation over it would go stale. Undefined is shut. */
 	let sourceText = $state.raw<string | undefined>();
 
 	/** Whether there is a document to read at all: the session's, or the text a failed
@@ -227,12 +207,8 @@
 
 	/**
 	 * Land `text` as the document, which is the repack's carry with a different source.
-	 * Resolves to what refused it, or to `undefined` once it is mounted.
-	 *
-	 * The file names its own quill and is believed: a ref this quiver resolves is the one
-	 * it lands in, the picker following. A ref the quiver does not hold has nothing to
-	 * honour, so the quill on screen takes it and the conform names what would not fit
-	 * (STUDIO §"The document has doors").
+	 * Resolves to what refused it, or to `undefined` once it is mounted. The file names its
+	 * own quill and is believed (STUDIO §"The document has doors").
 	 */
 	async function applyMarkdown(text: string): Promise<string | undefined> {
 		let at = picked;
@@ -267,11 +243,7 @@
 	/** Whether a quill opens on its example document rather than the seed. */
 	let examples = $state.raw(examplesOn());
 
-	/**
-	 * Either way the quill opens afresh, discarding the document in hand: an example is a
-	 * whole document, so there is nothing to fill around, and a written example is an
-	 * answer like any other.
-	 */
+	/** Either way the quill opens afresh, discarding the document in hand. */
 	async function toggleExamples(): Promise<void> {
 		examples = !examples;
 		sayExamples(examples);
@@ -282,23 +254,14 @@
 	}
 
 	// ── The file ────────────────────────────────────────────────────────────────
-	/** Whether the quill on screen writes a document as one file, which is what `pdf` is
-	 *  and the raster formats are not (one artifact per page). Latched from the open rather
-	 *  than derived off it, so the control holds its place while the next one loads; a
-	 *  backend that emits no PDF draws none, a control that cannot be used being chrome
-	 *  standing on the mounts. */
+	/** Whether the quill on screen writes a document as one file, which `pdf` is and the
+	 *  raster formats are not. Latched from the open so the control holds its place. */
 	let writes = $state.raw(false);
 
 	/**
-	 * The document out as the file a reader keeps, named by the ref the address bar
-	 * carries.
-	 *
-	 * It renders the compiled snapshot the preview is painting rather than opening a
-	 * second compile, so the file is the paint: where a keystroke has not settled or a
-	 * compile failed, what is written is what is on screen, and the strip over the preview
-	 * is what says so. The emit is its own lane — a page that paints can still fail to
-	 * write — so a refusal lands in `unemitted`, which neither clobbers the compile's
-	 * failure nor is clobbered by it.
+	 * The document out as the file a reader keeps, named by the ref the address bar carries.
+	 * It renders the compiled snapshot the preview is painting, so the file is the paint. A
+	 * refusal lands in `unemitted`, its own lane beside the compile's.
 	 */
 	function download(): void {
 		const at = open;
@@ -314,8 +277,7 @@
 		syncNotes();
 	}
 
-	/** A pick is a different document, so nothing crosses: the picked quill seeds its
-	 *  own, which is what "what is this quill like to use" starts from. */
+	/** A pick is a different document, so nothing crosses. */
 	async function pick(name: string, version: string): Promise<void> {
 		picked = { name, version };
 		held = undefined;
@@ -324,11 +286,7 @@
 
 	/**
 	 * The quill a boot opens: what the URL asks for where the quiver holds it, else the
-	 * catalog's first. A selector is honoured (`?quill=showcase`, `?quill=showcase@1.0`),
-	 * being the grammar `getQuill` already takes.
-	 *
-	 * A ref this quiver does not hold has nothing to honour, so the first quill opens and
-	 * the write below corrects the address bar to it.
+	 * catalog's first; the write below corrects the address bar.
 	 */
 	function firstOpen(from: Quiver, next: Catalog): { name: string; version: string } | undefined {
 		const asked = askedRef();
@@ -345,20 +303,16 @@
 		return { name: first.name, version: first.versions[0] };
 	}
 
-	// The address bar names the quill on screen, whichever way it got there: a pick, a
-	// document that named its own, or a repack that took the ref away. It is what makes
-	// a deployed studio linkable to a quill rather than to a quiver
-	// (STUDIO §"Opened, not stood on"). It waits on a quill, so it does not clear the URL
+	// The address bar names the quill on screen, whichever way it got there
+	// (STUDIO §"Opened, not stood on"). It waits on a quill so it does not clear the URL
 	// before the boot has read it.
 	$effect(() => {
 		if (picked) sayRef(`${picked.name}@${picked.version}`);
 	});
 
 	/**
-	 * A repack landed: mint a fresh `Quiver`, re-read the catalog (a version directory
-	 * may have appeared or gone), and carry the document into the quill that came out.
-	 * The ref is unchanged, so the document is landed under a schema that may have
-	 * moved under it; a ref that vanished falls back to whatever the catalog now holds.
+	 * A repack landed: mint a fresh `Quiver`, re-read the catalog, and carry the document
+	 * into the quill that came out; a ref that vanished falls back to the catalog.
 	 */
 	async function reload(): Promise<void> {
 		repacked = true;
@@ -448,14 +402,9 @@
 		else scheduleRecompile();
 	}
 
-	/** The caret and the reveal together: under the threshold the editor is the track that
-	 *  is not showing, and a caret placed in it is a round-trip the author cannot see
-	 *  land. Above it the write is a no-op the stylesheet ignores.
-	 *
-	 *  The reveal needs no flush of its own, which is what makes the tab hop ordinary:
-	 *  `setCaret` already waits one out before it lands (a collapsed group is `inert` and
-	 *  swallows a focus, the same way a hidden track would), and the track's `display`
-	 *  moves in that same flush. */
+	/** The caret and the reveal together: under the threshold a caret placed in the hidden
+	 *  track needs the reveal first, which `setCaret` already waits out. Above it the write
+	 *  is a no-op. */
 	function handlePick(at: Landing): void {
 		shown = 1;
 		editorRef?.setCaret(at);
@@ -471,9 +420,7 @@
 		previewRef?.endFollow();
 	}
 
-	/** Both surfaces report here, and two codes reach the strip: an edit the store does not
-	 *  hold and a page that would not paint. Every other code leaves the document and the
-	 *  paint as they read, or is drawn on its field already. */
+	/** Both surfaces report here; only `commit-lost` and `paint-failed` reach the strip. */
 	function handleSurfaceError(err: EditorError): void {
 		if (err.code === 'commit-lost' || err.code === 'paint-failed') surfaced = err;
 	}

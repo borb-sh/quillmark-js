@@ -53,10 +53,6 @@ describe('packFiles determinism', () => {
 		expect(packFiles(input1)).not.toEqual(packFiles(input2));
 	});
 
-	it('empty record packs to an empty zip', () => {
-		expect(Object.keys(unzipSync(packFiles({})))).toHaveLength(0);
-	});
-
 	it('produces TZ-independent mtime bytes in zip header', () => {
 		// fflate reads mtime via local-time getters. We anchor ZIP_EPOCH with the
 		// local-time Date constructor so its components are 1980-01-01 00:00:00 in

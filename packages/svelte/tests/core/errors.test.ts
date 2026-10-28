@@ -15,12 +15,12 @@ const err = (over: Partial<EditorError> = {}): EditorError => ({
 afterEach(() => vi.restoreAllMocks());
 
 describe('reportError', () => {
-	it('hands the error to the handler', () => {
+	it('hands the error to the handler, cause unwrapped', () => {
 		const seen: EditorError[] = [];
-		reportError((e) => seen.push(e), err({ page: 3 }));
+		const cause = new Error('the original');
+		reportError((e) => seen.push(e), err({ page: 3, cause }));
 		expect(seen).toHaveLength(1);
-		expect(seen[0].code).toBe('paint-failed');
-		expect(seen[0].page).toBe(3);
+		expect(seen[0]).toMatchObject({ code: 'paint-failed', page: 3, cause });
 	});
 
 	it('logs when nothing is listening, so an unwired consumer still sees it', () => {
@@ -40,13 +40,6 @@ describe('reportError', () => {
 			}, err())
 		).not.toThrow();
 		expect(spy).toHaveBeenCalledOnce();
-	});
-
-	it('carries the cause unwrapped', () => {
-		const cause = new Error('the original');
-		let seen: EditorError | undefined;
-		reportError((e) => (seen = e), err({ cause }));
-		expect(seen?.cause).toBe(cause);
 	});
 });
 

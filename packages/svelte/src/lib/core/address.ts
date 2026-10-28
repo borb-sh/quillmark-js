@@ -1,40 +1,27 @@
-// The one address vocabulary the surfaces speak in public: canonical `DocPath`
-// strings for places, `Addr` for the document verbs. Declared here because both
-// `/preview` and `/visual` name a place in their hooks, and a type declared twice
-// structurally is drift with nothing to catch it: `/core` is the module both
-// already import.
+// The one address vocabulary the surfaces speak in public: canonical `DocPath` strings for places,
+// `Addr` (from `@quillmark/wasm`) for the document verbs. Declared here because both `/preview` and
+// `/visual` name a place in their hooks, and a type declared twice is drift with nothing to catch
+// it.
 //
-// Slogan: paths for places, indexes for structure ops. `Addr` (`{card?, field?}`,
-// from `@quillmark/wasm`) is the mutator currency; the conversions at the foot of
-// this module are the hop between the two. `fieldPathForAddr` and `addrForFieldPath`
-// are public, because a host given a path by a hook and holding a verb that takes an
-// `Addr` needs them; `cardPath` is the editor's own.
-//
-// The grammar is the boundary's, reached through the init gate (`core()`):
-// `parseDocPath` / `formatDocPath` are on the awaited surface, and the verbs here are
-// pure and sync on both sides of it.
+// Paths for places, indexes for structure ops. `fieldPathForAddr` and `addrForFieldPath` are public
+// for a host holding both a hook's path and a verb that takes an `Addr`; `cardPath` is the editor's
+// own. The grammar is the boundary's, reached through `core()`.
 import type { Addr, DocPathSeg, HitGranularity, PathStep } from '@quillmark/wasm';
 import { core } from './lifecycle.js';
 
 /**
- * A canonical field address: `main.<field>` / `main.body` /
- * `cards.<kind>[<i>].<field>`, cards keyed by absolute document index.
- *
- * The grammar `parseDocPath` / `formatDocPath` speak, and the one
- * `Diagnostic.path`, `ContentHit.field`, `FieldRegion.field` and
- * `session.regions()` keys already use. An alias over `string`: the boundary
- * exports the parser and the segment type, not a nominal type, so this names the
- * grammar at a signature rather than inventing a checked one.
+ * A canonical field address: `main.<field>` / `main.body` / `cards.<kind>[<i>].<field>`, cards
+ * keyed by absolute document index. The grammar `parseDocPath` / `formatDocPath` speak, and the one
+ * `Diagnostic.path`, `ContentHit.field`, `FieldRegion.field` and `session.regions()` keys use. An
+ * alias over `string`: the boundary exports no nominal type.
  */
 export type DocPath = string;
 
 /**
- * A place in the document: a field and a caret within it. What the editor reports
- * when its caret moves and what the preview scrolls to, so the editor→preview hop
- * is `onCaretMove={preview.focusPosition}` and translates nothing.
- *
- * `pos` is USV, the shared content coordinate on both sides of the boundary: a
- * `ContentHit` is a `Place` with its own extras, and fits wherever one is taken.
+ * A place in the document: a field and a caret within it. What the editor reports when its caret
+ * moves and what the preview scrolls to, so `onCaretMove={preview.focusPosition}` translates
+ * nothing. `pos` is USV, the coordinate shared on both sides of the boundary; a `ContentHit` is a
+ * `Place` with extras.
  */
 export interface Place {
 	field: DocPath;
@@ -43,13 +30,10 @@ export interface Place {
 }
 
 /**
- * Where a preview click landed. What the preview surfaces and what the editor's
- * `setCaret` takes.
- *
- * **An absent `pos` is the placement rung**, not a caret at zero: the click resolved
- * a field the plate places without tracking its content (`fieldAt` answers,
- * `positionAt` does not), so there is no offset and the landing is a focus. A `Place`
- * is a landing carrying its caret, and a `ContentHit` is one too.
+ * Where a preview click landed: what the preview surfaces and the editor's `setCaret` takes. **An
+ * absent `pos` is the placement rung**, not a caret at zero: the click resolved a field the plate
+ * places without tracking its content (`fieldAt` answers, `positionAt` does not), so the landing is
+ * a focus.
  */
 export interface Landing {
 	field: DocPath;
@@ -61,29 +45,23 @@ export interface Landing {
 }
 
 // ── Addr ↔ DocPath ──────────────────────────────────────────────────────────
-// The one hop between the two vocabularies, both directions, pure and
-// document-free: `kinds` is the kind of each composable card by content index
-// (`doc.cards.map(c => c.kind)`), which is all the card segment needs. The editor
-// mints it off its own derived card tree rather than re-reading `doc.cards`, which
-// serializes every card per read and is not a thing to do per keystroke.
+// The one hop between the two vocabularies, pure and document-free: `kinds` is the kind of each
+// card by content index (`doc.cards.map(c => c.kind)`). The editor mints it off its own derived
+// card tree, since `doc.cards` serializes every card per read.
 
 /**
- * A field's canonical `DocPath`, or `undefined` when `addr.card` is outside the live
- * `kinds` array (a stale address: drop it rather than mis-target). A field-less card
- * addresses its body, which is the leaf `{card: i}` names.
+ * A field's canonical `DocPath`, or `undefined` when `addr.card` is outside the live `kinds` array
+ * (a stale address: drop it rather than mis-target). A field-less card addresses its body.
  *
  * - `{}` → `"main.body"`
  * - `{field}` → `"main.<field>"`
  * - `{card: i}` → `"cards.<kind>[i].body"`
  * - `{card: i, field}` → `"cards.<kind>[i].<field>"`
  *
- * `steps` descend from the field to a leaf inside it, the inverse of
- * {@link nestedAddrForFieldPath}: `{field: 'contact'}` with `['email']` is
- * `"main.contact.email"`, `{field: 'keywords'}` with `[0]` is `"main.keywords[0]"`. A body
- * holds no cells, so a field-less address with steps is `undefined`.
- *
- * `cards[i]` stands in for an unknown or blank kind. The index is the addr's own: no
- * per-kind counting, since `DocPath` addresses cards by document-array index.
+ * `steps` descend from the field to a leaf inside it, the inverse of {@link
+ * nestedAddrForFieldPath}: `{field: 'keywords'}` with `[0]` is `"main.keywords[0]"`. A body holds
+ * no cells, so a field-less address with steps is `undefined`. `cards[i]` stands in for an unknown
+ * or blank kind; the index is the addr's own, `DocPath` addressing cards by document-array index.
  */
 export function fieldPathForAddr(
 	addr: Addr,
@@ -103,9 +81,8 @@ export function fieldPathForAddr(
 }
 
 /**
- * A card's own path (`cards.<kind>[i]`), not a leaf's: what a structure op names,
- * where the change is the card rather than anything inside it. `undefined` for an
- * index outside `kinds`.
+ * A card's own path (`cards.<kind>[i]`), what a structure op names. `undefined` for an index
+ * outside `kinds`.
  */
 export function cardPath(index: number, kinds: readonly string[]): DocPath | undefined {
 	const head = cardHead(index, kinds);
@@ -113,15 +90,11 @@ export function cardPath(index: number, kinds: readonly string[]): DocPath | und
 }
 
 /**
- * The inverse: a canonical `DocPath` back to the `Addr` the document verbs take, or
- * `undefined` for a path that names no single commit address — a nested or
- * array-element path (`main.keywords[0]`, which {@link nestedAddrForFieldPath} and
- * {@link nearestAddrForFieldPath} take instead), a field-rooted one, or a malformed
- * one. A bare card and a `.body` terminal both land on the field-less `{card: i}`
- * the body leaf answers to.
- *
- * Needs no `kinds`: the path carries the absolute index, and the kind in it is
- * decoration the `Addr` has no room for.
+ * The inverse: a canonical `DocPath` back to the `Addr` the document verbs take, or `undefined` for
+ * a path that names no single commit address: a nested or array-element path (see {@link
+ * nestedAddrForFieldPath} and {@link nearestAddrForFieldPath}), a field-rooted one, or a malformed
+ * one. A bare card and a `.body` terminal both land on the field-less `{card: i}`. Needs no
+ * `kinds`: the path carries the absolute index.
  */
 export function addrForFieldPath(path: DocPath): Addr | undefined {
 	const segs = segsOf(path);
@@ -129,16 +102,10 @@ export function addrForFieldPath(path: DocPath): Addr | undefined {
 }
 
 /**
- * The nearest ancestor a commit address can name: {@link addrForFieldPath} where the
- * path has one, else the root and its first field. `main.contact.email` and
- * `main.keywords[0]` land on their field, any deeper nesting on the top-level field
- * it hangs off. `undefined` where those two segments name nothing — a field-rooted
- * (config-space) or malformed path.
- *
- * An `Addr` reaches a root and one field, so two segments is the whole search: a
- * deeper prefix is unaddressable by arity alone. Addressability being `Addr`'s reach
- * rather than the grammar's is what makes the truncation a consumer's to make
- * (VISUAL_EDITOR §Diagnostics).
+ * The nearest ancestor a commit address can name: {@link addrForFieldPath} where the path has one,
+ * else the root and its first field (`main.contact.email` and `main.keywords[0]` land on their
+ * field). `undefined` for a field-rooted (config-space) or malformed path. An `Addr` reaches a root
+ * and one field, so the truncation is a consumer's to make (VISUAL_EDITOR §Diagnostics).
  */
 export function nearestAddrForFieldPath(path: DocPath): Addr | undefined {
 	const segs = segsOf(path);
@@ -146,17 +113,12 @@ export function nearestAddrForFieldPath(path: DocPath): Addr | undefined {
 }
 
 /**
- * A nested address, split: the field's `Addr`, and the steps from it to the leaf.
- * `main.keywords[0]` is `{field: keywords, steps: [0]}`,
- * `main.vectors[0].tours[2].title` is `[0, 'tours', 2, 'title']`, and
- * `main.contact.email` is `['email']`: an index segment reads as a number and a key as
- * a string, the `PathStep` grammar `reader.getContentAt` walks. Anything
- * {@link addrForFieldPath} can name — a field, a body, a card — has no steps and lands
- * here as `undefined`; so does a body with something after it, a body holding no
- * cells. Whether the schema declares each step is the caller's to check: this module
- * holds the grammar and no schema. `regions()`, `positionAt` and `formatDocPath` all
- * spell the index segment bracketed, so there is one spelling to read and none to
- * bridge.
+ * A nested address, split: the field's `Addr`, and the steps from it to the leaf (the `PathStep`
+ * grammar `reader.getContentAt` walks). `main.keywords[0]` is `{field: keywords, steps: [0]}`,
+ * `main.contact.email` is `['email']`, `main.vectors[0].tours[2].title` is `[0, 'tours', 2,
+ * 'title']`. Anything {@link addrForFieldPath} can name has no steps and lands here as `undefined`,
+ * as does a body with something after it. Whether the schema declares each step is the caller's to
+ * check.
  */
 export function nestedAddrForFieldPath(path: DocPath): NestedAddr | undefined {
 	const segs = segsOf(path);
@@ -178,9 +140,10 @@ export interface NestedAddr {
 	steps: PathStep[];
 }
 
-/** `parseDocPath`, with a malformed path as `undefined` rather than a throw. The gate
- *  is read outside the try: an uninitialized core is not a malformed path, and would
- *  otherwise leave here as one. */
+/**
+ * `parseDocPath`, with a malformed path as `undefined` rather than a throw. The gate is read
+ * outside the try: an uninitialized core is not a malformed path.
+ */
 function segsOf(path: DocPath): DocPathSeg[] | undefined {
 	const { parseDocPath } = core();
 	try {
@@ -190,8 +153,7 @@ function segsOf(path: DocPath): DocPathSeg[] | undefined {
 	}
 }
 
-/** {@link addrForFieldPath} over already-parsed segments, so the element walk reuses
- *  it for the head of a path rather than re-serializing one. */
+/** {@link addrForFieldPath} over already-parsed segments. */
 function addrForSegs(segs: DocPathSeg[]): Addr | undefined {
 	const [head, ...rest] = segs;
 	if (!head) return undefined;
@@ -207,8 +169,10 @@ function addrForSegs(segs: DocPathSeg[]): Addr | undefined {
 	return undefined;
 }
 
-/** The head segment a card index resolves to, or `undefined` when it is out of the
- *  live array. `null` kind is the unknown-kind form the grammar spells `cards[i]`. */
+/**
+ * The head segment a card index resolves to, or `undefined` when out of the live array. A falsy
+ * kind is the unknown-kind form `cards[i]`.
+ */
 function cardHead(index: number | undefined, kinds: readonly string[]): DocPathSeg | undefined {
 	if (index == null) return { seg: 'main' };
 	if (!Number.isInteger(index) || index < 0 || index >= kinds.length) return undefined;

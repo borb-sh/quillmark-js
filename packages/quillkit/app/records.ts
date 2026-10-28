@@ -1,9 +1,5 @@
-// What the app keeps of a document, and the readings it takes off one: the record a browser
-// stores, where the pin it names stands in this build, the title it goes by and the file
-// name it leaves as (APP §"Documents").
-//
-// Free of the browser and of the wasm, so the suite reads the records an earlier release
-// wrote without either.
+// What the app keeps of a document, and the readings it takes off one (APP §"Documents").
+// Free of the browser and of the wasm, so the suite reads earlier records without either.
 
 /** One quill the app opens, as `app.json` names it. */
 export interface AppQuill {
@@ -30,14 +26,12 @@ export interface DocRecord {
 	quill: string;
 	/** Milliseconds since the epoch, at its last save. */
 	edited: number;
-	/** Its canonical markdown, which is what the record is for: it reads as a file, and it
-	 *  re-conforms on the way in. */
+	/** Its canonical markdown. */
 	markdown: string;
 }
 
-/** The shape a record is stored in. A later release reading an earlier one's records
- *  branches on `v`. */
-export const RECORD_VERSION = 1;
+/** The shape a record is stored in; a later release branches on it. */
+const RECORD_VERSION = 1;
 
 export type Stored = DocRecord & { v: typeof RECORD_VERSION };
 

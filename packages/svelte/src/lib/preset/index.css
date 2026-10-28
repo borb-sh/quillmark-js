@@ -1,11 +1,9 @@
-/* `@quillmark/svelte/preset`, the package's one CSS entry point: the endorsed look for
-   the page a surface is mounted on. Opt-in and side-effect free until imported:
-   the surface barrels pull `core/theme.css` and never this, because this
-   styles the document and nothing may put that in a consumer's page uninvited.
-
-   `scale.css` is where the literals are minted and is exempt; the rest are held to
-   reading them. `recipes.css` ranks at ordinary specificity, `shell.css` and `app.css`
-   at zero. */
+/*
+ * `@quillmark/svelte/preset`, the package's one CSS entry point: the endorsed look for the page a
+ * surface is mounted on. Opt-in: the surface barrels pull `core/theme.css` and never this, because
+ * this styles the document. `scale.css` is where the literals are minted; the rest read them.
+ * `recipes.css` ranks at ordinary specificity, `shell.css` and `app.css` at zero.
+ */
 
 @import './scale.css';
 @import './recipes.css';

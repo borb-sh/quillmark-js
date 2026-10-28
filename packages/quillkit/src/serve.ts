@@ -1,12 +1,10 @@
 /**
  * The static server `serve` runs the loop over and `preview` serves a deploy with. It
- * composes its roots rather than copying one into another: the client out of this package,
- * the packed quiver out of the tree the packer swaps, an app's staged files beside them. A
- * repack replaces a directory the server reads per request, so serving a file needs no word
- * of it; what a loop's server adds is a stream that tells an open page one landed.
+ * composes its roots (the client, the packed quiver, an app's staged files) and reads them
+ * per request, so a repack needs no word to it; a loop's server adds a stream that tells
+ * an open page one landed.
  *
- * Two things a general-purpose static server gets wrong for this, which is why this one
- * is written rather than borrowed: `.wasm` must be served as `application/wasm`, and a
+ * Written rather than borrowed because `.wasm` must be served as `application/wasm` and a
  * path escaping its root must be refused.
  */
 
@@ -18,12 +16,9 @@ import { within } from './paths.js';
 /**
  * What the roots hold: the clients `vite build` emits, a packed quiver's `quiver.json` and
  * `.quill` bundles, and an app's `app.json` and the author's files `app.css` names.
- * Anything unlisted falls back to `application/octet-stream`, which is right for opaque
- * bytes.
+ * Anything unlisted is `application/octet-stream`.
  *
- * `.wasm` is the one that is not a nicety: `@quillmark/wasm` ships wasm-bindgen's web
- * target, which instantiates by streaming, and `WebAssembly.instantiateStreaming`
- * refuses a response of any other type.
+ * `.wasm` is load-bearing: `WebAssembly.instantiateStreaming` refuses any other type.
  */
 const TYPES: Record<string, string> = {
 	'.css': 'text/css; charset=utf-8',
@@ -57,7 +52,7 @@ export interface Mount {
  * cache would answer about the last generation. `host` is the four rules a deploy's host
  * owes it (QUILLKIT §"The deploy layout"), so a built deploy served locally caches as the host will.
  */
-export type Caching = 'none' | 'host';
+type Caching = 'none' | 'host';
 
 export interface ServeOptions {
 	caching?: Caching;
@@ -121,11 +116,8 @@ function cacheFor(caching: Caching, path: string): string {
 	return path.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
 }
 
-/**
- * What each request resolves against. The mounts are fixed before the server listens,
- * so the longest-prefix order and each root are settled once rather than per request.
- */
-export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
+/** What each request resolves against, the mounts' order settled once. */
+function fileResolver(mounts: Mount[]): (url: string) => Served | null {
 	// Longest prefix first, so `/quiver/…` reaches the pack rather than the client. The sort
 	// is stable, so mounts sharing a prefix keep the order they were listed in.
 	const ordered = [...mounts]
@@ -137,7 +129,6 @@ export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
 		try {
 			path = decodeURIComponent(new URL(url, 'http://localhost').pathname);
 		} catch {
-			// A malformed escape names no file; refusing beats guessing at the intent.
 			return null;
 		}
 		if (path.includes('\0')) return null;
@@ -146,18 +137,13 @@ export function fileResolver(mounts: Mount[]): (url: string) => Served | null {
 			if (mount.prefix !== '' && path !== mount.prefix && !path.startsWith(`${mount.prefix}/`))
 				continue;
 			const rest = path.slice(mount.prefix.length).replace(/^\/+/, '');
-			// One screen, no router: the root is the client's `index.html` and nothing else
-			// falls back to it, so a missing asset is a 404 rather than a page.
+			// Nothing falls back to `index.html`, so a missing asset is a 404.
 			const at = resolve(mount.root, rest === '' ? 'index.html' : rest);
 
-			// The escape refusal, checked on the resolved path: `%2e%2e`, a doubled separator
-			// and a plain `..` all collapse into one answer here, where a check against the
-			// request text would have to anticipate each spelling.
+			// Checked on the resolved path, where every spelling of an escape collapses.
 			if (!within(mount.root, at)) return null;
 
-			// One stat answers all three questions the response has: is it there, is it a
-			// file, how long is it. A second would read a tree a repack swaps under the
-			// server, and the length it read would not be the body's.
+			// One stat: a second would read a tree a repack swaps, and the length would differ.
 			let stats;
 			try {
 				stats = statSync(at);
@@ -219,14 +205,11 @@ export function createStaticServer(
 		}
 
 		const stream = createReadStream(found.at);
-		// A repack removes the file between the stat and the open, and a `ReadStream`
-		// that errors with nothing listening throws out of the event loop and takes the
-		// loop down mid-session. The head is already written, so the answer is a
-		// destroyed response rather than a status: a body short of the length it
-		// declared has to be a read a client can tell from a whole one.
+		// A repack can remove the file between the stat and the open. The head is written, so
+		// the answer is a destroyed response: a short body must be distinguishable from a whole
+		// one.
 		stream.on('error', () => res.destroy());
-		// `pipe` unpipes on a closed destination and leaves the source paused, so a client
-		// that cancels mid-body would leave the fd open for the life of the server.
+		// `pipe` leaves the source paused on a closed destination, leaking the fd.
 		res.on('close', () => stream.destroy());
 		stream.pipe(res);
 	});

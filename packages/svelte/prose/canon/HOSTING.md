@@ -36,7 +36,7 @@ What an app is left holding once it mounts `<VisualEditor>` and `<Preview>`: the
 
 **The lane split is the default, not a tuning exercise**: `EditorChange.source` names the lane, structure recompiles at once, prose and field wait for the burst to settle ([VISUAL_EDITOR.md](VISUAL_EDITOR.md) §"Edits are ops to the live Document").
 
-**`session.update` is transactional.** A document mid-edit that cannot compile leaves the last-good compile painted and throws; the next good keystroke recovers it. A host needs no last-good bookkeeping of its own, and a compile failure is a thing to show beside the preview rather than instead of it.
+**`session.update` is transactional.** A document mid-edit that cannot compile leaves the last-good compile painted and throws; the next good keystroke recovers it. A host needs no last-good bookkeeping, and shows a compile failure beside the preview rather than instead of it.
 
 ## What is addressable, and why a field is not
 

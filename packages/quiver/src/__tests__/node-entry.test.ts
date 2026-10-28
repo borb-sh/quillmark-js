@@ -22,22 +22,16 @@ describe('node entry — the class is untouched', () => {
 		for (const verb of ['fromDir', 'fromBuiltDir', 'build']) {
 			expect(MainQuiver).not.toHaveProperty(verb);
 		}
-	});
-
-	it('leaves the browser-safe static in place', () => {
 		expect(typeof MainQuiver.fromBuiltUrl).toBe('function');
 	});
 });
 
 describe('node entry — the factories', () => {
-	it('returns an instance of the constructor the main entry exports', async () => {
+	it("returns the main entry's class, carrying Quiver.yaml's description", async () => {
 		const fixture = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
-		expect(await fromDir(fixture)).toBeInstanceOf(MainQuiver);
-	});
-
-	it("carries Quiver.yaml's description off a source tree", async () => {
-		const fixture = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
-		expect((await fromDir(fixture)).description).toBe('A sample quiver for testing');
+		const q = await fromDir(fixture);
+		expect(q).toBeInstanceOf(MainQuiver);
+		expect(q.description).toBe('A sample quiver for testing');
 	});
 });
 

@@ -1,10 +1,5 @@
-// The client's one entry: the endorsed look, what studio adds to it, and the app.
-//
-// `@quillmark/svelte/preset` is the scale and the recipes studio's chrome is drawn
-// with, and the same import a third-party consumer makes, which is what makes "studio
-// looks like the endorsed version" a fact rather than a claim. `studio.css` is the one
-// height it adds on top. Both are global imports, so the chrome reaches every
-// component's markup rather than being scoped out of it (ARCHITECTURE §Styling).
+// The client's one entry. Both stylesheets are global imports so the chrome reaches every
+// component's markup (ARCHITECTURE §Styling).
 import { mount } from 'svelte';
 import '@quillmark/svelte/preset';
 import './studio.css';

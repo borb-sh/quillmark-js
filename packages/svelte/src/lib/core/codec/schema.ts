@@ -1,21 +1,16 @@
-// The PM schema: the codec owns it; decode/encode target it. Nodes mirror the
-// content block kinds (para/heading/code/rule/island) and its container nesting
-// (list_item/quote → lists/blockquote); marks mirror the content formatting set.
-// Each set is closed upstream, so the schema names its whole vocabulary and carries
-// nothing inert. `blockSchema` is the full field; `inlineSchema` is the constrained
-// single-textblock form for a one-line `richtext` (one paragraph, no block split, no
-// containers, no islands) and `plaintextSchema` is that one without marks, for a
-// one-line `text`; `plainSchema` is a `text` field declaring `multiline: true`,
-// paragraphs and hard breaks and nothing else; `cellSchema` is the inline form with
-// hard breaks, for a table cell. Same decode/lower/position machinery,
-// narrower shapes. Anchors are not marks here (decorations).
+// The PM schema: the codec owns it; decode/encode target it. Nodes mirror the content block kinds
+// (para/heading/code/rule/island) and container nesting (list_item/quote); marks mirror the content
+// formatting set. Each set is closed upstream, so the schema names its whole vocabulary.
+// `blockSchema` is the full field; `inlineSchema` the single-textblock form for a one-line
+// `richtext`; `plaintextSchema` that without marks, for a one-line `text`; `plainSchema` a `text`
+// field declaring `multiline: true` (paragraphs and hard breaks only); `cellSchema` the inline form
+// with hard breaks, for a table cell. Anchors are not marks here (decorations).
 //
-// `toDOM` and `parseDOM` are one tier, not two halves of a rendering: a copy and a
-// paste inside one body run the whole document through them (CODEC §"Markdown at the
-// edges"), so every attribute written here is read back here. Foreign HTML spells none
-// of this package's `data-qm-*` names, so what a paste takes off the web is unchanged;
-// the rules here that widen that door on purpose are the fence's and a span's styled
-// marks, a `<table>` being the block leaf's clipboard parser's (`table-paste.ts`).
+// `toDOM` and `parseDOM` are one tier: a copy and a paste inside one body run the whole document
+// through them (CODEC §"Markdown at the edges"), so every attribute written here is read back here.
+// Foreign HTML spells none of this package's `data-qm-*` names; the rules that widen that door on
+// purpose are the fence's and a span's styled marks, a `<table>` being the block leaf's clipboard
+// parser's (`table-paste.ts`).
 import { Schema } from 'prosemirror-model';
 import type { MarkSpec, NodeSpec, NodeType, TagParseRule } from 'prosemirror-model';
 import { islandBlockSpec, islandInlineSpec } from './islands.js';
@@ -23,12 +18,11 @@ import { taskBody, taskChecked, taskDOM } from './tasks.js';
 import { rendersHref, storableUrl } from './urls.js';
 
 // ── Marks spelled as style ──────────────────────────────────────────────────
-// A word processor writes formatting as a span's inline style rather than as a tag:
-// Google Docs spells all four marks below that way, and wraps a whole copy in a `<b>`
-// stating a regular weight. Read off a `<span>` alone, since the same style on a cell or
-// a heading is that block's face rather than a run's. An underline inside a link is the
-// link's own: Docs underlines every one, and Chrome inlines the computed decoration on a
-// copy off any page.
+// A word processor writes formatting as a span's inline style rather than a tag: Google Docs spells
+// all four marks below that way, and wraps a whole copy in a `<b>` stating a regular weight. Read
+// off a `<span>` alone (the same style on a cell or heading is that block's face). An underline
+// inside a link is the link's own: Docs underlines every one, and Chrome inlines the computed
+// decoration on a copy.
 
 /** Whether `el`'s inline style states a bold weight. */
 const bold = (el: HTMLElement): boolean => /^(?:bold(?:er)?|[6-9]\d\d)$/.test(el.style.fontWeight);
@@ -37,8 +31,10 @@ const bold = (el: HTMLElement): boolean => /^(?:bold(?:er)?|[6-9]\d\d)$/.test(el
 const decoration = (el: HTMLElement): string =>
 	`${el.style.textDecoration} ${el.style.textDecorationLine}`;
 
-/** A mark a `<span>` carries where `styled` holds of it. Not consuming, so every mark a
- *  span states matches, and so do the span's own rules after them. */
+/**
+ * A mark a `<span>` carries where `styled` holds of it. Not consuming, so every mark a span states
+ * matches, and so do the span's own rules.
+ */
 const styledSpan = (styled: (el: HTMLElement) => boolean): TagParseRule => ({
 	tag: 'span',
 	consuming: false,
@@ -84,11 +80,9 @@ const marks: Record<string, MarkSpec> = {
 		toDOM: () => ['s', 0]
 	},
 	code: { parseDOM: [{ tag: 'code' }], toDOM: () => ['code', 0] },
-	// One family a character, which is PM's default exclusion of a mark by its own type:
-	// an `addMark` of a second family replaces the first, as the store's keyed `add` does.
-	// A family the page cannot draw falls to the root's face rather than the UA's. A span
-	// styling `font-family` is the source's face, never a mark, so only this package's own
-	// name parses.
+	// One family a character, PM's default exclusion of a mark by its own type: a second family
+	// replaces the first, as the store's keyed `add` does. A family the page cannot draw falls to
+	// the root's face. A span styling `font-family` is the source's face, never a mark.
 	font_family: {
 		attrs: { name: { default: '' } },
 		parseDOM: [
@@ -119,11 +113,8 @@ const marks: Record<string, MarkSpec> = {
 				getAttrs: (el) => ({ href: storableUrl(el.getAttribute('data-qm-href') ?? '') })
 			}
 		],
-		// A refused href draws as a bare span: the text stands, unstyled and
-		// unclickable, and the mark keeps its value for encode. The value rides on the
-		// span rather than going with the tag — an `href` no renderer will follow is one
-		// the document still holds, and a copy is not the explicit conversion allowed to
-		// lose it.
+		// A refused href draws as a bare span, unstyled and unclickable, and the mark keeps its
+		// value for encode: a copy is not the explicit conversion allowed to lose it.
 		toDOM: (mark) => {
 			const href = mark.attrs.href as string;
 			return rendersHref(href) ? ['a', { href }, 0] : ['span', { 'data-qm-href': href }, 0];
@@ -132,17 +123,16 @@ const marks: Record<string, MarkSpec> = {
 };
 
 // ── The fence's language ────────────────────────────────────────────────────
-// Minted by the fence shorthand, which fires on Enter with the language typed after the
-// backticks (`inputrules.ts`), and by a paste, which this reads: a fence copied off a
-// highlighted page arrives carrying the language that page stated, one copied inside
-// the body keeps its own.
+// Minted by the fence shorthand (`inputrules.ts`) and by a paste: a fence copied off a highlighted
+// page carries the page's language, one copied inside the body keeps its own.
 
 /** A `language-x` / `lang-x` token in a class list. */
 const LANG_CLASS = /(?:^|\s)lang(?:uage)?-(\S+)/;
 
-/** The language a `<pre>` states: `data-lang`, which is what `toDOM` writes, else the
- *  class convention on the `pre` or on the `code` it wraps. `null` where it states
- *  none, which is also what an empty value is. */
+/**
+ * The language a `<pre>` states: `data-lang` (what `toDOM` writes), else the class convention on
+ * the `pre` or its `code`. `null` for none or an empty value.
+ */
 function fenceLang(pre: HTMLElement): string | null {
 	const stated = pre.getAttribute('data-lang');
 	if (stated) return stated;
@@ -162,10 +152,9 @@ const blockNodes: Record<string, NodeSpec> = {
 		parseDOM: [{ tag: 'p' }],
 		toDOM: () => ['p', 0]
 	},
-	// A heading holds no `hard_break`: it is a block of one line, so the store clears a
-	// `continues` after one and markdown has no syntax for a break inside it. Declaring
-	// it out is what makes that structural — a paste parses the `<br>` away and a
-	// conversion onto a heading drops it, rather than each door holding the rule.
+	// A heading holds no `hard_break`: the store clears a `continues` after one and markdown has no
+	// syntax for a break inside it. Declaring it out makes that structural rather than a rule each
+	// door holds.
 	heading: {
 		content: '(text | island_inline)*',
 		group: 'block',
@@ -211,12 +200,11 @@ const blockNodes: Record<string, NodeSpec> = {
 			{
 				tag: 'ol',
 				getAttrs: (el) => {
-					// A list stating no `start` starts at one, the absence `toDOM` writes for
-					// it; `Number(null)` would read that absence as zero. A value the store
-					// would normalize away reads as that absence too: the leaf re-hydrates
-					// only on an external change (CODEC §Reconciliation), so a PM doc keeping
-					// one disagrees with the store for the rest of the session. Zero is not
-					// one — `0.` is an ordinal `importMarkdown` produces and the store keeps.
+					// A list stating no `start` starts at one, the absence `toDOM` writes;
+					// `Number(null)` would read it as zero. A value the store would normalize away
+					// reads as that absence too, since a PM doc keeping one would disagree with the
+					// store for the session (CODEC §Reconciliation). Zero is not one: `0.` is an
+					// ordinal `importMarkdown` produces.
 					const stated = el.getAttribute('start');
 					const start = stated ? Number(stated) : 1;
 					return { start: Number.isSafeInteger(start) && start >= 0 ? start : 1 };
@@ -253,9 +241,8 @@ const blockNodes: Record<string, NodeSpec> = {
 // ── Inline nodes ────────────────────────────────────────────────────────────
 const inlineLeafNodes: Record<string, NodeSpec> = {
 	text: { group: 'inline' },
-	// `linebreakReplacement` is what makes a join across a `code_block`'s edge
-	// lossless: `Transform.join` and `setBlockType` convert its `\n`s to breaks
-	// rather than flattening them to spaces, and a break is a `continues` line.
+	// `linebreakReplacement` makes a join across a `code_block`'s edge lossless: `Transform.join`
+	// and `setBlockType` convert its `\n`s to breaks, which are `continues` lines.
 	hard_break: {
 		inline: true,
 		group: 'inline',
@@ -273,35 +260,32 @@ export const blockSchema = new Schema({
 	marks
 });
 
-// ── The constrained inline nodes (the inline schemas and the cell's) ────
-// `doc: "paragraph"` (exactly one child) is what makes an Enter a no-op at the
-// model level: there is no second block for a split to land.
+// `doc: "paragraph"` (exactly one child) makes Enter a no-op at the model level: no second block
+// for a split to land.
 const inlineNodes: Record<string, NodeSpec> = {
 	doc: { content: 'paragraph' },
 	paragraph: { content: 'inline*', toDOM: () => ['p', 0] },
 	text: { group: 'inline' }
 };
 
-/** The constrained inline schema: one paragraph, no block splitting, no
- *  containers, no islands, and the full mark set (a `richtext(inline)` field). */
+/**
+ * The constrained inline schema: one paragraph, no containers or islands, the full mark set (a
+ * `richtext(inline)` field).
+ */
 export const inlineSchema = new Schema({ nodes: inlineNodes, marks });
 
 /**
- * The inline schema with no mark types at all: a `plaintext(inline)` field, whose
- * value is literal text the boundary refuses to coerce back once it carries a mark.
- *
- * Declaring none is what makes that structural rather than a rule each path
- * restates: `toggleMark` has no type to apply, the mark input rules build nothing,
- * a paste parses its marks away, and `decode` drops any a stray content arrives
- * carrying (CODEC §Inline mode).
+ * The inline schema with no mark types: a `plaintext(inline)` field, whose value is literal text
+ * the boundary refuses to coerce back once it carries a mark. Declaring none makes that structural:
+ * `toggleMark` has no type, the mark input rules build nothing, a paste parses marks away, and
+ * `decode` drops any a stray content carries (CODEC §Inline mode).
  */
 export const plaintextSchema = new Schema({ nodes: inlineNodes, marks: {} });
 
 /**
- * A table cell: the inline schema plus `hard_break`, which a `TableCell` stores as a
- * `\n` in its `text`. Still one paragraph, so Enter has no block to split; a break is
- * Shift-Enter's (`breaks.ts`). Declaring the break routes `decode` through the plain
- * path, which folds a cell's `continues` lines into that one paragraph.
+ * A table cell: the inline schema plus `hard_break`, which a `TableCell` stores as a `\n` in its
+ * `text`. Still one paragraph; a break is Shift-Enter's (`breaks.ts`). Declaring it routes `decode`
+ * through the plain path, folding a cell's `continues` lines into that paragraph.
  */
 export const cellSchema = new Schema({
 	nodes: { ...inlineNodes, hard_break: inlineLeafNodes.hard_break },
@@ -309,13 +293,9 @@ export const cellSchema = new Schema({
 });
 
 /**
- * A `text` field declaring `multiline: true`: paragraphs and hard breaks, no marks, no
- * islands, no containers, which is the shape `Content::is_plain` admits. Mark-free
- * for the reason {@link plaintextSchema} is.
- *
- * A paragraph and a break both store one `\n`, so a paragraph here is a line and
- * says so (`data-qm-line`): `prose.css` draws a run of them at the leading, and a
- * boundary reads as the one line down that a break does.
+ * A `text` field declaring `multiline: true`: paragraphs and hard breaks, no marks, islands or
+ * containers, the shape `Content::is_plain` admits. A paragraph and a break both store one `\n`, so
+ * a paragraph here is a line (`data-qm-line`): `prose.css` draws a run of them at the leading.
  */
 export const plainSchema = new Schema({
 	nodes: {
@@ -351,9 +331,10 @@ export function isBlockSchema(schema: Schema): boolean {
 	return !!schema.nodes.blockquote;
 }
 
-/** Whether `type` can hold a within-block line break, which a heading cannot (§`heading`).
- *  What a `\n` landing in a textblock is rewritten to turns on it (`breaks.ts`), and so
- *  does what decode puts between a block's continued segments. */
+/**
+ * Whether `type` can hold a within-block line break, which a heading cannot (§`heading`); a `\n`
+ * landing in a textblock and decode's continued segments turn on it (`breaks.ts`).
+ */
 export function takesLineBreak(type: NodeType): boolean {
 	const br = type.schema.nodes.hard_break;
 	return !!br && type.contentMatch.matchType(br) !== null;
