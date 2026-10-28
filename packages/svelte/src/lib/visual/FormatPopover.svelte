@@ -71,7 +71,7 @@
 	const t = wording();
 	import { toggleMark } from 'prosemirror-commands';
 	import { keydownHandler } from 'prosemirror-keymap';
-	import { TextSelection, type Command } from 'prosemirror-state';
+	import { NodeSelection, type Command } from 'prosemirror-state';
 	import type { EditorView } from 'prosemirror-view';
 	import type { MarkType } from 'prosemirror-model';
 	import { Popover } from 'bits-ui';
@@ -169,11 +169,12 @@
 		if (insidePopover) return;
 		if (pressed) return;
 		const view = activeLeafView();
-		// A non-empty text selection. A node selection is non-empty too and has nothing
-		// to format: it covers a leaf block (an island, a rule), which is exactly where
-		// Escape out of a table cell lands.
+		// A non-empty selection that is not a node's. Select-all is one: an `AllSelection`,
+		// which spans text like any range. A node selection covers a leaf block (an island,
+		// a rule), which has nothing to format and is exactly where Escape out of a table
+		// cell lands.
 		const selection = view?.state.selection;
-		const formattable = selection instanceof TextSelection && !selection.empty;
+		const formattable = !!selection && !selection.empty && !(selection instanceof NodeSelection);
 		// …in a leaf that has formatting at all. A `text` leaf declares no mark types
 		// (`plaintextSchema`, `plainSchema`), so this surface withholds itself over one
 		// entirely, the way it never rises over a form control: the value is literal
