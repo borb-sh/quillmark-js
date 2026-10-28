@@ -109,11 +109,17 @@ export async function load(url, expression, viewport) {
 			child.on('error', no);
 		});
 
-		const targets = await (
-			await fetch(new URL('/json/list', endpoint.replace('ws:', 'http:')))
-		).json();
-		const page = targets.find((t) => t.type === 'page');
-		if (page === undefined) throw new Error('the browser opened no page');
+		// The endpoint prints before the browser lists its first page, so a busy machine
+		// can answer the list empty for a moment.
+		const list = new URL('/json/list', endpoint.replace('ws:', 'http:'));
+		let page;
+		for (const until = Date.now() + 10_000; ;) {
+			const targets = await (await fetch(list)).json();
+			page = targets.find((t) => t.type === 'page');
+			if (page !== undefined) break;
+			if (Date.now() > until) throw new Error('the browser opened no page');
+			await new Promise((ok) => setTimeout(ok, 50));
+		}
 
 		const socket = new WebSocket(page.webSocketDebuggerUrl);
 		await new Promise((ok, no) => {
