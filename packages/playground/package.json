@@ -19,6 +19,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
 	},
 	"dependencies": {
+		"@quillmark/fonts": "*",
 		"@quillmark/quiver": "*",
 		"@quillmark/svelte": "*"
 	},

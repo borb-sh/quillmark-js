@@ -177,6 +177,29 @@ describe('formatting marks round-trip', () => {
 		const link = stored.marks.find((m) => m.type === 'link');
 		expect(link?.attrs.url).toBe('http://x');
 	});
+	it('a font family over part of a run carries its name', () => {
+		const { stored } = lowerApply(md('set in face'), (s) =>
+			s.tr.addMark(8, 12, blockSchema.marks.font_family.create({ name: 'Tinos' }))
+		);
+		expect(stored.marks).toEqual([
+			{ start: 7, end: 11, type: 'font_family', attrs: { name: 'Tinos' } }
+		]);
+	});
+	it('a second family over a family replaces it under its range', () => {
+		const { stored } = lowerApply(md('<qm-span family="Tinos">whole run</qm-span>'), (s) =>
+			s.tr.addMark(1, 6, blockSchema.marks.font_family.create({ name: 'Carlito' }))
+		);
+		expect(stored.marks).toEqual([
+			{ start: 0, end: 5, type: 'font_family', attrs: { name: 'Carlito' } },
+			{ start: 5, end: 9, type: 'font_family', attrs: { name: 'Tinos' } }
+		]);
+	});
+	it('removing the family leaves the text in the surrounding face', () => {
+		const { stored } = lowerApply(md('<qm-span family="Tinos">whole run</qm-span>'), (s) =>
+			s.tr.removeMark(1, 10, blockSchema.marks.font_family)
+		);
+		expect(stored.marks).toEqual([]);
+	});
 });
 
 // The mark diff groups a WASM read against a PM projection with one key. The two
@@ -189,7 +212,8 @@ describe('both descriptor producers key one mark alike', () => {
 		strong: mark({ type: 'strong' }),
 		emph: mark({ type: 'emph' }),
 		code: mark({ type: 'code' }),
-		link: mark({ type: 'link', attrs: { url: 'http://x' } })
+		link: mark({ type: 'link', attrs: { url: 'http://x' } }),
+		font_family: mark({ type: 'font_family', attrs: { name: 'Tinos' } })
 	};
 
 	for (const [name, m] of Object.entries(cases)) {

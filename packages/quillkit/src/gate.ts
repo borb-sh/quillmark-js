@@ -11,6 +11,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Diagnostic, Document, Quill } from '@quillmark/wasm';
+import { loadSuite } from '@quillmark/fonts/node';
 import { fromDir } from '@quillmark/quiver/node';
 import { APP_CSS, APP_YAML, prepareApp } from './app-files.js';
 
@@ -48,7 +49,9 @@ export async function gate(
 	// Loaded here rather than at the top of the bin: `check` is the verb that renders.
 	const { init, Engine, isQuillmarkError } = await import('@quillmark/wasm');
 	const { formatDiagnostic } = await init();
-	const engine = new Engine();
+	// The suite the deployed clients build their engine over, so a family a document names
+	// sets here as it sets on the page.
+	const engine = new Engine({ fonts: await loadSuite() });
 	const quiver = await fromDir(root);
 
 	const names = quiver.quillNames();

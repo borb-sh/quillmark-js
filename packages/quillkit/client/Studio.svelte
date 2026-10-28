@@ -37,8 +37,7 @@
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { Engine } from '@quillmark/wasm';
-	import type { CoreSurface, Diagnostic, Document } from '@quillmark/wasm';
+	import type { CoreSurface, Diagnostic, Document, Engine, FontFace } from '@quillmark/wasm';
 	import type { Quiver } from '@quillmark/quiver';
 	import { init } from '@quillmark/svelte/core';
 	import type { EditorError, Landing, Place } from '@quillmark/svelte/core';
@@ -52,13 +51,14 @@
 	import { askedRef, sayRef } from './link';
 	import { catalogOf, followRepacks, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
+	import { engineOverSuite, facesFor } from './engine';
 	import { collect, diagnosticsOf, messageOf, placeOf } from './notes';
 
 	/** The dev server's signal that a repack landed. */
 	const REPACKED = 'studio:quiver-repacked';
 	/** One apply per settled burst of keystrokes. A structure op skips it. */
 	const RECOMPILE_MS = 120;
-	/** The wasm compiled into this bundle, one of the three the build stamps. */
+	/** The wasm compiled into this bundle, one of the four the build stamps. */
 	const WASM = __CARRIED__['@quillmark/wasm'];
 
 	type Phase =
@@ -77,6 +77,8 @@
 	let catalog = $state.raw<Catalog | undefined>();
 	let picked = $state.raw<{ name: string; version: string } | undefined>();
 	let open = $state.raw<Opened | undefined>();
+	/** The faces the suite offers the editor's font picker, once a session has loaded them. */
+	let fonts = $state.raw<FontFace[]>([]);
 	/** The document as text, kept across an open that materialized no quill: a `Quill.yaml`
 	 *  mid-edit is reloaded through, and the document survives the trip. */
 	let held = $state.raw<string | undefined>();
@@ -184,6 +186,10 @@
 			if (mine !== turn) return close(next);
 			open = next;
 			held = undefined;
+			if (next.session)
+				void facesFor(engine, next.quill).then((faces) => {
+					if (mine === turn) fonts = faces;
+				});
 			writes = next.formats.includes('pdf');
 			thrown = next.refused;
 			carried = next.carry.stranded;
@@ -418,7 +424,13 @@
 			if (open !== at) return landed.session?.free();
 			open = { ...at, ...landed };
 			thrown = landed.refused;
-			if (landed.session) phase = { kind: 'ready' };
+			if (landed.session) {
+				phase = { kind: 'ready' };
+				const mine = turn;
+				void facesFor(engine, at.quill).then((faces) => {
+					if (mine === turn) fonts = faces;
+				});
+			}
 		}
 		syncNotes();
 	}
@@ -469,6 +481,10 @@
 	onMount(() => {
 		let cancelled = false;
 		(async () => {
+			// The suite downloads beside the core and the quiver, and the engine is built over
+			// it before the first open.
+			const built = engineOverSuite();
+			built.catch(() => {});
 			try {
 				// `init` instantiates the core and latches the surface the editor's codec
 				// reads synchronously. The quiver awaits the same memoized gate to
@@ -480,7 +496,9 @@
 				const at = firstOpen(quiver, next);
 				if (!at) throw new Error(`quiver "${next.name}" holds no quills`);
 				if (cancelled) return;
-				engine = new Engine();
+				const ready = await built;
+				if (cancelled) return;
+				engine = ready;
 				await pick(at.name, at.version);
 			} catch (err) {
 				if (!cancelled) {
@@ -609,6 +627,7 @@
 						onCaretMove={handleCaretMove}
 						onChange={handleChange}
 						onError={handleSurfaceError}
+						{fonts}
 					/>
 				</section>
 				<section class="pane paint" aria-label="Preview">

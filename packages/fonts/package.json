@@ -1,0 +1,70 @@
+{
+	"name": "@quillmark/fonts",
+	"version": "0.0.0",
+	"description": "The font suite every Quillmark client hands its engine: openly licensed families a stored document can name and find again.",
+	"type": "module",
+	"license": "Apache-2.0 AND OFL-1.1",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/borb-sh/quillmark-js.git",
+		"directory": "packages/fonts"
+	},
+	"bugs": {
+		"url": "https://github.com/borb-sh/quillmark-js/issues"
+	},
+	"homepage": "https://github.com/borb-sh/quillmark-js/tree/main/packages/fonts#readme",
+	"keywords": [
+		"quillmark",
+		"fonts",
+		"typst"
+	],
+	"author": "Quillmark Contributors",
+	"engines": {
+		"node": ">=22"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./node": {
+			"types": "./dist/node.d.ts",
+			"import": "./dist/node.js",
+			"default": "./dist/node.js"
+		},
+		"./manifest.json": "./manifest.json"
+	},
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"files",
+		"manifest.json",
+		"NOTICE"
+	],
+	"peerDependencies": {
+		"@quillmark/wasm": ">=0.131.0-0"
+	},
+	"peerDependenciesMeta": {
+		"@quillmark/wasm": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@types/node": "^24.19.1",
+		"publint": "^0.3.25",
+		"typescript": "^6.0.0",
+		"vitest": "^5.0.0"
+	},
+	"scripts": {
+		"build": "tsc",
+		"prepare": "npm run build",
+		"prepack": "rm -rf dist && npm run build",
+		"test": "vitest run",
+		"check": "tsc --noEmit -p tsconfig.check.json",
+		"check:pack": "publint"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}

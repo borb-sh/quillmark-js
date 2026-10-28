@@ -131,21 +131,25 @@ describe('the hold on a body over what no node holds', () => {
 		field.destroy();
 	};
 
-	for (const [name, markdown] of [
-		['a font family', 'lead <qm-span family="Carlito">set</qm-span>'],
-		['a font family beside a task item', '- [x] done\n\n<qm-span family="Carlito">kept</qm-span>']
-	]) {
-		it(`holds over ${name}, drawing its text and committing nothing`, () => {
-			held(markdown, (view) =>
-				expect(view.state.doc.textContent).toBe(md(markdown).text.replaceAll('\n', ''))
-			);
-		});
-	}
-
-	it('holds over a font family in a table cell', () => {
-		held('| <qm-span family="Carlito">a</qm-span> |\n|---|\n| b |', (view) =>
-			expect(view.dom.querySelector('.qm-table-island')).not.toBeNull()
-		);
+	it('edits over a font family, a table cell’s included, keeping the family', () => {
+		for (const markdown of [
+			'lead <qm-span family="Carlito">set</qm-span>',
+			'lead\n\n| <qm-span family="Carlito">a</qm-span> |\n|---|\n| b |'
+		]) {
+			const doc = example();
+			doc.overwrite({}, md(markdown));
+			const families = JSON.stringify(doc.main.body.islands);
+			const holds: boolean[] = [];
+			const field = body(doc, holds);
+			const view = viewOf(field);
+			expect(holds, markdown).toEqual([]);
+			expect(view.editable).toBe(true);
+			view.dispatch(view.state.tr.insertText('Z', 1));
+			expect(doc.main.body.text).toBe(md(`Z${markdown}`).text);
+			expect(doc.main.body.marks).toEqual(md(`Z${markdown}`).marks);
+			expect(JSON.stringify(doc.main.body.islands)).toBe(families);
+			field.destroy();
+		}
 	});
 
 	it('holds over a footnote, drawing its reference mark with the note as its title', () => {

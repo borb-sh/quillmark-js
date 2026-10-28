@@ -127,7 +127,7 @@ describe('a body holding task items', () => {
 
 	it('a held leaf draws its task items disabled', () => {
 		const holds: boolean[] = [];
-		const { field, view } = body('- [x] done\n\n<qm-span family="Carlito">kept</qm-span>', holds);
+		const { field, view } = body('- [x] done\n\nNoted[^1].\n\n[^1]: Kept.', holds);
 		expect(holds).toEqual([true]);
 		expect(boxes(view).map((b) => b.disabled)).toEqual([true]);
 		field.destroy();

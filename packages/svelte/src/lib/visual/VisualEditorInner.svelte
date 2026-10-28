@@ -82,6 +82,7 @@
 	import { tipsChannel } from './tips.js';
 	import { patchEditorExt } from './ext.js';
 	import { raiseGuidance } from './guidance.js';
+	import { familiesOf, registerFaces } from './fonts.js';
 	import Card from './Card.svelte';
 	import Icon from './icons/Icon.svelte';
 	import TipsCard from './TipsCard.svelte';
@@ -100,6 +101,7 @@
 		diagnostics,
 		enumOptionAllowed,
 		enumDisallowed = 'disable',
+		fonts,
 		strings,
 		formatDiagnostic,
 		class: className,
@@ -118,6 +120,11 @@
 			return formatDiagnostic;
 		}
 	});
+
+	// The host's font library: registered with the page while mounted, so a run draws in
+	// the face the preview sets it in, and offered family by family to the popover.
+	const fontFamilies = $derived(familiesOf(fonts ?? []));
+	$effect(() => registerFaces(fonts ?? []));
 
 	// ── Reactivity + session identity ───────────────────────────────────────────
 	let revision = $state(0);
@@ -966,7 +973,7 @@
 	{/each}
 </div>
 
-<FormatPopover {getActiveLeaf} />
+<FormatPopover {getActiveLeaf} families={fontFamilies} />
 
 <!-- The add affordance is gated on the schema declaring `card_kinds`, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to

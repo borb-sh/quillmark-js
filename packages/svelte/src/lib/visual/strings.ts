@@ -122,6 +122,13 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	formatLink: string;
 	formatNumberedList: string;
 	formatBulletedList: string;
+	/** The font picker's accessible name; drawn only where the host hands the editor a
+	 *  font library or the selection sets a family. */
+	formatFont: string;
+	/** The picker's option that sets no family: the text takes the surrounding face. */
+	fontDefault: string;
+	/** What the picker reads over a selection setting more than one family. */
+	fontMixed: string;
 	/** The anchor button's accessible name. The popover withholds the button, so
 	 *  nothing draws this or the title below. */
 	formatAnchor: string;
@@ -243,6 +250,9 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	formatLink: `Link (${chord('K')})`,
 	formatNumberedList: `Numbered list (${chord('Shift-7')})`,
 	formatBulletedList: `Bulleted list (${chord('Shift-8')})`,
+	formatFont: 'Font',
+	fontDefault: 'Default font',
+	fontMixed: 'Mixed fonts',
 	formatAnchor: 'Anchor',
 	formatAnchorTitle: 'Anchor — an identity handle over the selection',
 	linkPlaceholder: 'https://…',

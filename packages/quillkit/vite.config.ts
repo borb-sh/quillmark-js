@@ -35,7 +35,7 @@ const SETTLE_MS = 80;
  *  fresh `Quiver`; nothing on this side knows what a quill is. */
 const REPACKED = 'studio:quiver-repacked';
 
-/** What this build compiles in: the two siblings and the wasm, read off the copies the
+/** What this build compiles in: the siblings and the wasm, read off the copies the
  *  bundle takes rather than off declared ranges (`scripts/carried.mjs`). */
 const CARRIED = carried();
 

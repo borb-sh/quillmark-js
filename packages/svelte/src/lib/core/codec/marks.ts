@@ -1,5 +1,5 @@
 // Mark algebra: two content classes to two PM mechanisms.
-//   formatting (strong/emph/underline/strike/code/link)  ↔ PM marks
+//   formatting (strong/emph/underline/strike/code/font_family/link)  ↔ PM marks
 //   identity   (anchor{id}, zero-width)                  ↔ decorations (see field.ts)
 // This module owns the type-name translation and the descriptor keying the mark
 // diff groups by; the anchor↔decoration bridge is field.ts, the mark ops are
@@ -8,15 +8,16 @@ import type { Mark, Schema } from 'prosemirror-model';
 import type { ContentMark, ContentMarkKind } from '@quillmark/wasm';
 import { canonicalJson } from './reconcile.js';
 
-/** A PM mark from a content formatting mark, or `null` for an anchor or a font family,
- *  which no PM mark draws and whose leaf is held (`decode.ts` §`fitsLeaf`). Exhaustive over
+/** A PM mark from a content formatting mark, or `null` for an anchor, which no PM mark
+ *  draws (`field.ts` holds it as a decoration). Exhaustive over
  *  the closed mark vocabulary, so a member added upstream is a compile error here rather
  *  than an index into a PM mark this schema does not declare. */
 export function pmMarkFromContent(schema: Schema, m: ContentMark): Mark | null {
 	switch (m.type) {
 		case 'anchor':
-		case 'font_family':
 			return null;
+		case 'font_family':
+			return schema.marks.font_family.create({ name: m.attrs.name });
 		case 'emph':
 			return schema.marks.em.create();
 		case 'link':
@@ -36,13 +37,15 @@ export function pmMarkFromContent(schema: Schema, m: ContentMark): Mark | null {
 /**
  * A content mark descriptor from a PM mark (range-free): the `{ type, … }` half
  * of a `ContentMark` / `MarkOp`. `em` collapses to `emph` and a link's `href` rides
- * out as the `url` its payload spells; the other four are their own content name,
- * which is what the cast claims.
+ * out as the `url` its payload spells; a font family's `name` is its own, and the
+ * other four are their own content name, which is what the cast claims.
  */
 export function contentDescriptorFromPM(mark: Mark): ContentMarkKind {
 	const name = mark.type.name;
 	if (name === 'em') return { type: 'emph' };
 	if (name === 'link') return { type: 'link', attrs: { url: mark.attrs.href as string } };
+	if (name === 'font_family')
+		return { type: 'font_family', attrs: { name: mark.attrs.name as string } };
 	return { type: name as 'strong' | 'underline' | 'strike' | 'code' };
 }
 
