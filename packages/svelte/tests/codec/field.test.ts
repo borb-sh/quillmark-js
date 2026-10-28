@@ -102,6 +102,28 @@ describe('field-level reconciliation', () => {
 		expect((field.getContent() as { text: string }).text.startsWith('EXT ')).toBe(true);
 		field.destroy();
 	});
+
+	it('lands a foreign edit as a step: the caret maps through it and undo skips it', () => {
+		const doc = example();
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const view = viewOf(field);
+		field.setCaret(3);
+		view.dispatch(view.state.tr.insertText('MINE', view.state.selection.head));
+		const caret = field.selectionRange().from;
+
+		// Someone else's edit, ahead of the caret, straight to the store.
+		doc.applyChange({}, { delta: { ops: [{ insert: 'THEIRS ' }] } });
+		field.applyExternal();
+		expect(field.selectionRange().from).toBe(caret + 'THEIRS '.length);
+		expect(view.state.doc.textContent.startsWith('THEIRS ')).toBe(true);
+
+		// Undo takes back the leaf's own edit and keeps the other.
+		undo(view.state, view.dispatch);
+		expect(view.state.doc.textContent).not.toContain('MINE');
+		expect(view.state.doc.textContent.startsWith('THEIRS ')).toBe(true);
+		expect((field.getContent() as { text: string }).text).not.toContain('MINE');
+		field.destroy();
+	});
 });
 
 describe('the hold on a body over what no node holds', () => {

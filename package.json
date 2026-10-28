@@ -15,7 +15,7 @@
 		"dev": "node scripts/playground.mjs",
 		"probe": "node scripts/playground.mjs --probe",
 		"dev:studio": "npm run dev -w packages/quillkit",
-		"build": "npm run build -w packages/quiver -w packages/svelte -w packages/fonts && npm run build -w packages/quillkit -w packages/playground",
+		"build": "npm run build -w packages/quiver -w packages/svelte -w packages/fonts -w packages/collab && npm run build -w packages/quillkit -w packages/playground",
 		"site": "cd fixtures && node ../packages/quillkit/dist/bin/quillkit.js build studio --drafts --out ../site",
 		"check": "npm run check --workspaces --if-present",
 		"test": "npm run test --workspaces --if-present",

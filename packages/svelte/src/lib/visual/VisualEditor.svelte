@@ -74,6 +74,10 @@
 	export async function focusField(field: DocPath): Promise<void> {
 		await inner?.focusField(field);
 	}
+	/** Draw a change the host wrote to the document under the prose leaf at `field`. */
+	export function applyExternal(field: DocPath): void {
+		inner?.applyExternal(field);
+	}
 	/** Seed a card of `kind` at `at` (default: the end); the new card's session key. */
 	export function insertCard(kind: string, at?: number): CardId | undefined {
 		return inner?.insertCard(kind, at);

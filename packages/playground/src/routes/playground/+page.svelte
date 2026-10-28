@@ -75,6 +75,7 @@
 	import { Preview } from '@quillmark/svelte/preview';
 	import { LABELS as fontLabels, loadSuite } from '@quillmark/fonts';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
+	import { joinRoom, type Room } from './collab';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -102,7 +103,11 @@
 	let refused = $state<string | undefined>();
 
 	// Surface handles for the imperative bridge hops.
-	let editorRef: { setCaret(at: Landing): Promise<void> } | undefined = $state();
+	let editorRef:
+		{ setCaret(at: Landing): Promise<void>; applyExternal(field: string): void } | undefined =
+		$state();
+	// The live room `?collab=<room>` joins, for the open in force.
+	let room: Room | undefined;
 	let previewRef: ReturnType<typeof Preview> | undefined = $state();
 
 	// Which of the split's two tracks is showing. It is read only under the preset's
@@ -260,6 +265,7 @@
 	// lag.
 	function handleChange(change: EditorChange): void {
 		lastChangeSource = change.source;
+		if (room?.push()) editorRef?.applyExternal('main.body');
 		if (change.source === 'structure') void recompileNow();
 		else scheduleRecompile();
 	}
@@ -343,6 +349,8 @@
 			clearTimeout(recompileTimer);
 			recompileTimer = undefined;
 		}
+		room?.close();
+		room = undefined;
 		session = undefined;
 		quillHandle = undefined;
 		docHandle = undefined;
@@ -408,6 +416,12 @@
 				for (const h of created) h.free();
 				return;
 			}
+			const roomName = params.get('collab');
+			if (roomName)
+				room = joinRoom(doc, roomName, () => {
+					editorRef?.applyExternal('main.body');
+					scheduleRecompile();
+				});
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
 			// suite and the render build; the engine and the session follow behind it.
 			VisualEditor = visual.VisualEditor;
@@ -467,6 +481,8 @@
 			// reads, so an unmount mid-open frees what that open made and lands nothing.
 			generation++;
 			if (recompileTimer != null) clearTimeout(recompileTimer);
+			room?.close();
+			room = undefined;
 			for (const h of toFree) h.free();
 			toFree = [];
 			session = undefined;

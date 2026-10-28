@@ -19,9 +19,11 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
 	},
 	"dependencies": {
+		"@quillmark/collab": "*",
 		"@quillmark/fonts": "*",
 		"@quillmark/quiver": "*",
-		"@quillmark/svelte": "*"
+		"@quillmark/svelte": "*",
+		"yjs": "^13.6.33"
 	},
 	"devDependencies": {
 		"@quillmark/wasm": ">=0.132.0-0",

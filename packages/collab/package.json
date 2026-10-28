@@ -1,0 +1,37 @@
+{
+	"name": "@quillmark/collab",
+	"version": "0.0.0",
+	"private": true,
+	"description": "A Yjs binding for a Quillmark Document's content fields: the shared state Documents merge through.",
+	"type": "module",
+	"license": "Apache-2.0",
+	"engines": {
+		"node": ">=22"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"sideEffects": false,
+	"files": [
+		"dist"
+	],
+	"peerDependencies": {
+		"@quillmark/wasm": ">=0.132.0-0",
+		"yjs": "^13.6.0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.19.1",
+		"typescript": "^6.0.0",
+		"vitest": "^5.0.0",
+		"yjs": "^13.6.33"
+	},
+	"scripts": {
+		"build": "tsc",
+		"test": "vitest run",
+		"check": "tsc --noEmit -p tsconfig.check.json"
+	}
+}

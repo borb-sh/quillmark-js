@@ -6,7 +6,7 @@
 // `doc.applyChange` (a `text` leaf's whole text through the typed writer), then fires `onChange` if
 // it committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through
 // `onError`. An external change re-hydrates through `applyExternal`, gated by `reconcile` except
-// where the hold it re-evaluates flips.
+// where the hold it re-evaluates flips, as one replace step outside history.
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
@@ -158,7 +158,8 @@ export interface FieldController {
 	/** Place the caret at USV `pos` (preview onPick → usvToPM → here). */
 	setCaret(pos: number): void;
 	/** External content change → re-hydrate this leaf (gated by reconcile), and
-	 *  re-evaluate its hold against the value now stored. */
+	 *  re-evaluate its hold against the value now stored. The change lands as one step outside
+	 *  history, so the caret and undo stay the leaf's own; a hold that flips rebuilds the view. */
 	applyExternal(): void;
 	/**
 	 * Move the empty-leaf ghost after mount (a card retyped to another kind takes its new wording;
@@ -210,6 +211,10 @@ export interface LeafViews {
 }
 
 const anchorKey = new PluginKey<AnchorPos[]>('quill-anchors');
+
+/** The meta on a transaction that draws a change the store already holds ({@link
+ *  FieldController.applyExternal}). */
+const remoteKey = new PluginKey('quill-remote');
 
 /**
  * An anchor mutation carried on a transaction's `anchorKey` meta, folded into the plugin's position
@@ -393,6 +398,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			const next = view.state.apply(tr);
 			// A filtered transaction (`nesting.ts`) leaves the state as it was.
 			if (next === view.state) return;
+			// A change the store already holds: drawn, never lowered back into it.
+			if (tr.getMeta(remoteKey)) {
+				view.updateState(next);
+				index = lineIndexOf(scanDoc(next.doc));
+				return;
+			}
 			// An edit takes a held default: the commit below writes the whole leaf, so the
 			// mark goes in the same update that draws the edit.
 			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) defaulted = false;
@@ -456,6 +467,34 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			})
 		});
 		return { state: built, index: seedIndex };
+	}
+
+	/**
+	 * Draw a change the store already holds as one replace step over the range where the decoded
+	 * value differs, outside history: the caret and the anchors map through it, and undo skips it
+	 * the way it skips any step not the leaf's own. Returns false where the step would not land
+	 * the decoded document exactly, and the caller rebuilds instead.
+	 */
+	function applyRemote(rt: Content): boolean {
+		const fresh = decode(rt, schema);
+		const old = view.state.doc;
+		const start = old.content.findDiffStart(fresh.content);
+		if (start == null) return true;
+		let { a: endA, b: endB } = old.content.findDiffEnd(fresh.content)!;
+		const overlap = start - Math.min(endA, endB);
+		if (overlap > 0) {
+			endA += overlap;
+			endB += overlap;
+		}
+		let tr;
+		try {
+			tr = view.state.tr.replace(start, endA, fresh.slice(start, endB));
+		} catch {
+			return false;
+		}
+		if (!tr.doc.eq(fresh)) return false;
+		view.dispatch(tr.setMeta('addToHistory', false).setMeta(remoteKey, true));
+		return true;
 	}
 
 	// (b)+(c): lower the edit to ops and commit, or `overwrite` a field not yet at content rest.
@@ -583,6 +622,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				return;
 			}
 			if (flipped) held = !held;
+			else if (!held && applyRemote(current)) {
+				reconciler.commit(current);
+				return;
+			}
 			const caretUsv = pmToUsv(index, view.state.selection.head);
 			const fresh = buildState(current);
 			index = fresh.index;
