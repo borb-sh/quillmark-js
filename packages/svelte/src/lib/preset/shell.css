@@ -145,3 +145,13 @@
 	border-radius: var(--qmh-radius);
 	overflow: hidden;
 }
+
+/* One track is the whole width under the threshold, so a frame's sides and corners would
+   frame the screen rather than a pane. It keeps the rules above and below it, which part
+   it from the bands. After the frame, since both rank zero and the later one wins. */
+@media (width < 50rem), (height < 30rem) {
+	:where(.qm-frame) {
+		border-inline: none;
+		border-radius: 0;
+	}
+}
