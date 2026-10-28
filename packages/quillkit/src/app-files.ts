@@ -1,11 +1,7 @@
 /**
- * The app target's inputs and what they resolve to. `App.yaml` names the app, `app.css` says
- * how it looks and `icon.svg` or `icon.png` marks it, each found by name; `app.json` is all
- * three resolved against the quiver, with every quill it holds at its latest version
- * (QUILLKIT §"The app target").
- *
- * Everything that can refuse is read before a build clears anything, so a bad `App.yaml`
- * leaves the last deploy where it stood.
+ * The app target's inputs and what they resolve to: `App.yaml`, `app.css` and the icon,
+ * each found by name, resolved against the quiver into `app.json` (QUILLKIT §"The app target").
+ * Everything that can refuse is read before a build clears anything.
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -37,7 +33,7 @@ const HOOK = 'data-qm-card';
 /** The top-level names a deploy's client and quiver occupy, so no author file lands on one. */
 export const RESERVED = ['index.html', 'assets', 'quiver', APP_JSON];
 
-export interface AppYaml {
+interface AppYaml {
 	title?: string;
 	description?: string;
 }
@@ -135,7 +131,7 @@ export interface AppQuill {
 }
 
 /** `app.json`, which the app client reads at boot. */
-export interface AppJson {
+interface AppJson {
 	title: string;
 	description?: string;
 	icon?: string;
@@ -144,7 +140,7 @@ export interface AppJson {
 }
 
 /** An app resolved against its quiver, before anything is written. */
-export interface Prepared {
+interface Prepared {
 	app: AppJson;
 	/** The author's files the deploy carries, `/`-separated and relative to the quiver. */
 	files: string[];

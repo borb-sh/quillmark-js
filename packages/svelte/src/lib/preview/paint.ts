@@ -1,13 +1,8 @@
-// The paint + scroll-virtualization loop: one <canvas> per visible-plus-margin
-// page, mounted/unmounted as the container scrolls so live memory stays bounded
-// (`session.paint` re-rasterizes in full every call; never pool a canvas across
-// pages, per the paint contract). Builds the per-page slot elements bridge.ts
-// attaches its own listeners to; owns `pageSize` caching and
-// slot-count reconciliation across an `apply` (`ChangeSet.pageCount` can differ
-// from the previous compile; pages can be added or removed). Every slot is drawn at
-// the one scale `setScale` hands it, and a canvas fills its slot, so its ink stays on
-// the box the click and scroll geometry measure; a scale change and a DPR
-// media-query listener repaint mounted pages, so the raster stays sharp.
+// The paint + scroll-virtualization loop: one <canvas> per visible-plus-margin page, mounted and
+// unmounted as the container scrolls (`session.paint` re-rasterizes in full every call, so a canvas
+// is never pooled across pages). Builds the page slots bridge.ts listens on, caches `pageSize`, and
+// reconciles the slot count across an `apply`. Every slot is drawn at the one scale `setScale`
+// hands it, and a scale change or DPR change repaints mounted pages.
 import type { LiveSession, PageSize } from '@quillmark/wasm';
 
 /** One page's DOM slot: the box bridge.ts measures against, plus its cached geometry. */
@@ -23,36 +18,30 @@ export interface PaintLoop {
 	/** Reconcile slot count to `pageCount`, re-cache geometry, repaint mounted `dirtyPages`. */
 	refresh(dirtyPages: readonly number[], pageCount: number): void;
 	/**
-	 * Draw every page at `scale` CSS px per PDF pt and repaint the mounted ones: on the
-	 * next frame, or once `settle` has passed without another call, which is what a
-	 * gesture asks for, the stretched raster standing in until it rests.
+	 * Draw every page at `scale` CSS px per PDF pt and repaint the mounted ones on the next frame,
+	 * or once `settle` ms pass without another call (a gesture's request, the stretched raster
+	 * standing in).
 	 */
 	setScale(scale: number, settle?: number): void;
 	destroy(): void;
 }
 
-// Vertical breathing room between stacked pages; cosmetic only, and a rung like
-// any other gap: the stack breathes on the same rhythm the cards do.
 const PAGE_GAP = 'var(--_qm-space-4)';
 
-// The least raster density, in device pixels per CSS pixel. Glyphs rasterize
-// unhinted, so a raster at a 1× or fractional ratio (1.25, 1.5; browser zoom)
-// is resampled nearly 1:1 and small text smears; a raster at least twice the
-// box is downsampled instead, which keeps body text legible.
+// The least raster density, in device pixels per CSS pixel: glyphs rasterize unhinted, so a 1× or
+// fractional raster smears small text where a 2× one downsamples cleanly.
 const MIN_DENSITY = 2;
 
 export function createPaintLoop(
 	session: LiveSession,
 	container: HTMLElement,
 	margin: number,
-	// Notified when a slot's `session.paint` throws: the loop swallows the throw
-	// (see `paintSlot`) so one bad page never aborts the band sweep; the caller
-	// decides how to surface it.
+	// Notified when a slot's `session.paint` throws; the throw is swallowed so one bad page never
+	// aborts the band sweep.
 	onPaintError?: (page: number, err: unknown) => void
 ): PaintLoop {
-	// The IntersectionObserver root must be a scrollable ancestor of the slots;
-	// respect a consumer's own choice if they already set one (computed style, so
-	// a stylesheet rule counts as a choice, not just an inline style).
+	// The IntersectionObserver root must be a scrollable ancestor of the slots; a consumer's own
+	// choice stands.
 	const computed = getComputedStyle(container);
 	if (computed.overflowY === 'visible') container.style.overflowY = 'auto';
 	if (computed.position === 'static') container.style.position = 'relative';
@@ -82,27 +71,15 @@ export function createPaintLoop(
 
 	function makeSlot(page: number): PageSlot {
 		const size = session.pageSize(page);
-		// The sheet is a plane and the desk is the one under it: paper sits at
-		// `--_qm-surface` and the container paints `--_qm-surface-sunken`, so the
-		// edge is where two tones meet and no stroke is drawn around it
-		// (ARCHITECTURE §Styling). It leaves the no-ink rule untouched, since a
-		// boundary that is not painted is not a mark on the page (PREVIEW §"Two
-		// responsibilities"). `border-box` costs nothing here and keeps a slot a
-		// consumer insets from measuring wider than its paper.
+		// The paper edge is where `--_qm-surface` meets the container's `--_qm-surface-sunken`; no
+		// stroke is drawn (ARCHITECTURE §Styling).
 		const el = document.createElement('div');
-		// Not `.qm-page`: that name is the preset's page baseline, an unlayered rule at
-		// ordinary specificity a host puts on `<body>`, and a slot wearing it takes that
-		// rule's `color-scheme` inside a mounted root, which the derivation leaves to the
-		// host (`core/theme.css`).
+		// Not `.qm-page`: that is the preset's page baseline, whose `color-scheme` a slot must not
+		// take inside a mounted root (`core/theme.css`).
 		el.className = 'qm-page-slot';
-		// The page's index, in the DOM. `pageByEl` is this module's and a consumer
-		// drawing an overlay of its own needs the number: position among the slots is
-		// the only handle without it, which is right today and is not a contract.
 		el.dataset.page = String(page);
-		// `flex: none` under the flex column `Preview.svelte` lays the desk out as, which
-		// would otherwise shrink a page to fit the pane; auto inline margins centre a page
-		// narrower than the pane and resolve to zero on one wider, so it overflows to the
-		// scrollable side.
+		// `flex: none` keeps the flex column from shrinking a page; auto inline margins centre a
+		// narrower page and overflow a wider one to the scrollable side.
 		Object.assign(el.style, {
 			position: 'relative',
 			boxSizing: 'border-box',
@@ -113,7 +90,7 @@ export function createPaintLoop(
 		});
 		sizeSlot(el, size);
 		if (page > 0) el.style.marginTop = PAGE_GAP;
-		// After the last slot rather than at the end: the zoom pill's dock is a child too.
+		// After the last slot: the zoom pill's dock is a child too.
 		const last = slots.at(-1)?.el;
 		if (last) last.after(el);
 		else container.prepend(el);
@@ -132,8 +109,6 @@ export function createPaintLoop(
 		return layoutScale * Math.max(window.devicePixelRatio || 1, MIN_DENSITY);
 	}
 
-	// Rasterize `slot` into its canvas (creating the canvas if this is its first
-	// paint since mounting).
 	function paintSlot(slot: PageSlot): void {
 		let canvas = canvases.get(slot.page);
 		if (!canvas) {
@@ -147,8 +122,7 @@ export function createPaintLoop(
 				height: '100%'
 			});
 		}
-		// Contextless canvas: bail before registering, so `updateBand` still sees
-		// the page as unmounted and retries instead of keeping a blank page.
+		// Bail before registering so `updateBand` retries rather than keeping a blank page.
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 		if (!canvases.has(slot.page)) {
@@ -160,11 +134,8 @@ export function createPaintLoop(
 			session.paint(ctx, slot.page, at);
 			rastered.set(slot.page, at);
 		} catch (err) {
-			// A paint that throws must not abort the band loop; `updateBand` runs in
-			// the IntersectionObserver callback and sweeps every entry, so an
-			// uncaught throw would strand the rest of the band unpainted. Unmount the
-			// half-mounted canvas (so the page is a retryable unmounted slot, not a
-			// blank registered one) and surface the failure; the sweep moves on.
+			// Unmount the half-mounted canvas so the page stays a retryable unmounted slot, and let
+			// the sweep move on.
 			unmountPage(slot.page);
 			onPaintError?.(slot.page, err);
 		}
@@ -178,10 +149,8 @@ export function createPaintLoop(
 		rastered.delete(page);
 	}
 
-	// Mount pages newly inside [min(visible)-margin, max(visible)+margin], unmount
-	// pages that fell outside it. Only touches pages changing band membership;
-	// an already-mounted page in the band is left alone (paint contract: an idle
-	// canvas keeps its pixels for free; repainting it here would be pure waste).
+	// Mount pages newly inside [min(visible)-margin, max(visible)+margin] and unmount those outside
+	// it; a mounted page in the band keeps its pixels.
 	function updateBand(): Set<number> {
 		const painted = new Set<number>();
 		if (visible.size === 0 || slots.length === 0) return painted;
@@ -199,10 +168,7 @@ export function createPaintLoop(
 		return painted;
 	}
 
-	// Grow/shrink the slot array to `pageCount` (trailing add/remove; a recompile
-	// reports the new count, and dirtyPages already covers any reflow), then
-	// re-cache every page's geometry (cheap report-only reads; simplest way to
-	// stay correct across any recompile, not just a count change).
+	// Grow or shrink the slots to `pageCount`, then re-cache every page's geometry.
 	function reconcile(pageCount: number): void {
 		while (slots.length > pageCount) {
 			const slot = slots.pop();
@@ -219,25 +185,17 @@ export function createPaintLoop(
 		for (let i = 0; i < slots.length; i++) {
 			const size = session.pageSize(i);
 			slots[i] = { ...slots[i], size };
-			// Keep the page box's shape in step with the re-read size: a recompile
-			// can change a page's dimensions without changing the count, and every
-			// %-space click/scroll transform assumes box shape matches PageSize.
+			// A recompile can change a page's dimensions without changing the count.
 			slots[i].el.style.aspectRatio = `${size.widthPt} / ${size.heightPt}`;
 			sizeSlot(slots[i].el, size);
 		}
 	}
 
-	// Slots are built on the first `refresh` (the controller calls it immediately),
-	// not here: reconcile → `session.pageSize` must run after the controller's
-	// `pageCount` gate, since `pageSize` throws for a page the count excludes.
+	// Slots are built on the first `refresh`: `session.pageSize` throws for a page the count
+	// excludes.
 
-	// ── Keep mounted rasters sharp ──────────────────────────────────────────────
-	// A canvas stretches with its slot, so a page that stays mounted while the scale
-	// or `devicePixelRatio` shifts keeps its place and goes soft. Both repaint mounted
-	// pages; canvases are `position:absolute`, so a repaint can't feed back into
-	// layout.
-
-	// Repaint mounted pages whose raster scale moved. A no-op for an unmounted page.
+	// Repaint mounted pages whose raster scale moved; a canvas stretches with its slot and goes
+	// soft otherwise.
 	function repaint(): void {
 		for (const page of canvases.keys()) {
 			const slot = slots[page];
@@ -268,11 +226,9 @@ export function createPaintLoop(
 		});
 	}
 
-	// `devicePixelRatio` changes (window dragged to a different-DPI monitor, browser
-	// zoom) leave the scale untouched, so `setScale` never hears of them; watch DPR
-	// directly. A `(resolution: …dppx)` query pins the current ratio and
-	// is therefore one-shot: re-arm it against the new ratio on each change. Guarded
-	// for environments (jsdom) without `matchMedia`.
+	// A `devicePixelRatio` change never reaches `setScale`. A `(resolution: …dppx)` query pins the
+	// current ratio, so it is re-armed on each change. Guarded for jsdom, which has no
+	// `matchMedia`.
 	let dprQuery: MediaQueryList | undefined;
 	function onDprChange(): void {
 		scheduleRepaint();
@@ -291,9 +247,7 @@ export function createPaintLoop(
 		},
 		refresh(dirtyPages, pageCount) {
 			reconcile(pageCount);
-			// Slot count may have moved the band (pages added/removed); a page the
-			// band just painted is already post-apply, so a second full
-			// rasterization from the dirty loop would add nothing.
+			// A page the band just painted is already post-apply.
 			const painted = updateBand();
 			for (const page of dirtyPages) {
 				if (painted.has(page)) continue;

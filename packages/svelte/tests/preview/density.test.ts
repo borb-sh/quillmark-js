@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-// The raster is denser than the display where the display alone would leave small text
-// soft, and exactly the display where it would not.
+// The raster is denser than the display where the display alone would leave small text soft.
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { createPreview } from '$lib/preview/controller';
 import type { LiveSession } from '@quillmark/wasm';
@@ -18,8 +17,7 @@ function densityAt(ratio: number): number {
 	let density = 0;
 	const session = {
 		...mockSession(),
-		// jsdom lays no box out, so the slot paints at a layout scale of 1 and the scale
-		// is the density alone.
+		// jsdom lays no box out, so the layout scale is 1 and the scale is the density alone.
 		paint: (_ctx: unknown, _page: number, scale: number) => {
 			density = scale;
 		}

@@ -352,38 +352,21 @@ describe('placeFields', () => {
 		]);
 	});
 
-	it('declines the compact hint for shapes that grow under their neighbours', () => {
-		// Block richtext (`multiline: true`) holds paragraphs and an object nests a field
-		// set: either one stands its neighbours in a column of whitespace, so both take
-		// a full row despite `ui.compact`.
-		expect(
-			spans([
-				mk('block', true, { control: 'prose', inline: false }),
-				mk('obj', true, { control: 'object', schema: { type: 'object' } })
-			])
-		).toEqual([
-			['block', 'full'],
-			['obj', 'full']
-		]);
-	});
-
-	it('declines the compact hint for a variant, whose height a pick sets', () => {
-		// A variant's height is the live world's cell count, so it moves on a pick rather
-		// than only with the document: a packed neighbour would reflow every flip.
-		expect(
-			spans([
-				mk('world', true, { control: 'variant', schema: { type: 'enum', values: ['a'] } }),
-				mk('after', true)
-			])
-		).toEqual([
-			['world', 'full'],
-			['after', 'full']
-		]);
+	it('declines the compact hint for shapes whose height the document or a pick sets', () => {
+		const declined = [
+			mk('block', true, { control: 'prose', inline: false }),
+			mk('obj', true, { control: 'object', schema: { type: 'object' } }),
+			mk('world', true, { control: 'variant', schema: { type: 'enum', values: ['a'] } }),
+			arr('strings', true, { type: 'text' }),
+			arr('untyped', true),
+			arr('inline_prose', true, { type: 'richtext', multiline: false }),
+			arr('blocks', true, { type: 'richtext', multiline: true }),
+			arr('objects', true, { type: 'object' })
+		];
+		expect(spans(declined).every(([, span]) => span === 'full')).toBe(true);
 	});
 
 	it("reads a variant's compact hint as nothing at all, its neighbours included", () => {
-		// Not merely "the variant spans the row": the hint moves no field on either side
-		// of it, so a schema that declares it and one that does not place identically.
 		const row = (compact: boolean) => [
 			mk('a', true),
 			mk('b', true),
@@ -396,28 +379,6 @@ describe('placeFields', () => {
 			['b', 'cell'],
 			['world', 'full'],
 			['c', 'full']
-		]);
-	});
-
-	it('declines the compact hint for an array whatever its items are', () => {
-		// `memo_for` in the reference quill: an address block of one-line strings, the
-		// shape that packs on any per-items reading. The element count is the document's,
-		// so a packed array pays a cell of whitespace for every element its neighbour has
-		// past it. An array with no `items` has text elements and declines the same.
-		expect(
-			spans([
-				arr('strings', true, { type: 'text' }),
-				arr('untyped', true),
-				arr('inline_prose', true, { type: 'richtext', multiline: false }),
-				arr('blocks', true, { type: 'richtext', multiline: true }),
-				arr('objects', true, { type: 'object' })
-			])
-		).toEqual([
-			['strings', 'full'],
-			['untyped', 'full'],
-			['inline_prose', 'full'],
-			['blocks', 'full'],
-			['objects', 'full']
 		]);
 	});
 

@@ -1,13 +1,6 @@
-// The shared pixel<->PDF-pt transform (src/lib/preview/geometry.ts), tested both
-// as pure math (synthetic rects, exact round-trip) and against a real compiled
-// session (every fieldBoxes rect -> % -> a simulated click inside it ->
-// positionAt), proving the forward transform and its inverse never drift
-// apart. No canvas needed; geometry and positionAt are session
-// queries, so this runs in Node against the real Typst backend.
-//
-// geometry.ts is reached directly (not through the `$lib/preview` barrel, which
-// only re-exports the public `createPreview`/`Preview` surface per PREVIEW.md;
-// the transform is an internal correctness seam, not part of that surface).
+// The pixel<->PDF-pt transform (src/lib/preview/geometry.ts) as pure math, and against a real
+// compiled session: every fieldBoxes rect -> % -> a simulated click inside it -> positionAt, so the
+// forward transform and its inverse never drift apart.
 import { describe, it, expect, beforeAll, afterAll, onTestFinished } from 'vitest';
 import {
 	Engine,
@@ -34,7 +27,6 @@ async function open(edit?: (doc: Document) => void, name?: FixtureName): Promise
 	return session;
 }
 
-// The unedited showcase example, which the tests that only read it share.
 let showcaseDoc: Document;
 let showcase: LiveSession;
 beforeAll(async () => {

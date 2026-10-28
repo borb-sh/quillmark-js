@@ -1,12 +1,9 @@
-// Decode: content → PM, a pure function (CODEC §Decode). Fold the flat lines into
-// the tree: group a `continues` run into one block (para hard breaks → `hard_break`
-// nodes; a code fence's lines → one `code_block`), nest by shared `containers`
-// prefix (`list_item`/`quote` → lists/blockquote), select the block node by
-// `kind`, apply marks over their `[start,end)` USV ranges (PM splits inline nodes
-// at mark boundaries), and lower island slots to leaf nodes (block where a block
-// island's slot stands alone on its line, inline otherwise). Anchors are not
-// applied here; they are decorations (field.ts). Positions throughout are USV; `Array.from` iterates by
-// code point so an astral char is one unit, never a surrogate half.
+// Decode: content → PM, a pure function (CODEC §Decode). Fold the flat lines into the tree: group a
+// `continues` run into one block (para hard breaks → `hard_break`; a fence's lines → one
+// `code_block`), nest by shared `containers` prefix, select the block node by `kind`, apply marks
+// over their `[start,end)` USV ranges, and lower island slots to leaf nodes. Anchors are
+// decorations (field.ts). Positions are USV; `Array.from` iterates by code point so an astral char
+// is one unit.
 import { DOMSerializer, type Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
 import type { Content, ContentContainer, ContentLine, ContentMark } from '@quillmark/wasm';
 import { ISLAND_SLOT, isBlockIsland, isEditedIsland, type IslandNodeAttrs } from './islands.js';
@@ -36,14 +33,9 @@ interface Leaf {
 type IslandCursor = { i: number; rt: Content };
 
 /**
- * A `Content` as read-only DOM: decode under `schema`, then the nodes' own `toDOM`.
- * The rendering half of the codec's job with no editing attached (no PM view, no
- * plugins, no `contenteditable`) for chrome that must show content in the same
- * mark vocabulary a leaf edits it in (the tips card). A second renderer over the
- * same content would drift from `decode`; this cannot.
- *
- * `DOMSerializer.fromSchema` memoizes on the schema, so repeat calls build no
- * serializer.
+ * A `Content` as read-only DOM: decode under `schema`, then the nodes' own `toDOM`, for chrome that
+ * must show content in the mark vocabulary a leaf edits it in (the tips card) without a second
+ * renderer to drift from `decode`. `DOMSerializer.fromSchema` memoizes on the schema.
  */
 export function renderContent(rt: Content, schema: Schema): Node {
 	return DOMSerializer.fromSchema(schema).serializeFragment(decode(rt, schema).content);
@@ -59,15 +51,13 @@ export function decode(rt: Content, schema: Schema): PMNode {
 		starts.push(acc);
 		acc += usvLength(lineTexts[i]) + 1; // +1 for the `\n` boundary
 	}
-	// A mark-free schema (`plaintextSchema`) has nothing to apply them with, and a
-	// `text` field that acquired one anyway — an older build's popover, a hand-written
-	// document — is exactly the content that must open and then heal on the next
-	// commit, not throw here.
+	// A mark-free schema has nothing to apply marks with, and a `text` field that acquired one
+	// anyway (a hand-written document) must open and heal on the next commit, not throw.
 	const marks = hasMarks(schema) ? rt.marks.filter((m) => m.type !== 'anchor') : [];
 	const cursor: IslandCursor = { i: 0, rt };
 
 	if (isInlineSchema(schema)) {
-		return decodeInline(rt, schema, lineTexts, starts, marks, cursor);
+		return decodeInline(schema, lineTexts, starts, marks, cursor);
 	}
 	if (!isBlockSchema(schema)) {
 		return decodePlain(rt, schema, lineTexts, starts, marks, cursor);
@@ -89,11 +79,11 @@ export function decode(rt: Content, schema: Schema): PMNode {
 	return schema.nodes.doc.create(null, blocks.length ? blocks : schema.nodes.paragraph.create());
 }
 
-/** Whether `rt` decodes under an inline schema with nothing but whitespace dropped:
- *  upstream's one-line rule, or one plain line and the empty one a trailing `\n`
- *  opens. That newline is the one a YAML `|` scalar keeps in a `text` value, which
- *  upstream ignores and the inline decode drops. Marks are the schema's own business
- *  (`plaintextSchema` declares none). */
+/**
+ * Whether `rt` decodes under an inline schema with nothing but whitespace dropped: upstream's
+ * one-line rule, or one plain line and the empty one a trailing `\n` opens (the one a YAML `|`
+ * scalar keeps in a `text` value). Marks are the schema's business.
+ */
 export function fitsInline(rt: Content): boolean {
 	if (core().isInline(rt)) return true;
 	const plain = (line: ContentLine): boolean =>
@@ -107,19 +97,21 @@ export function fitsInline(rt: Content): boolean {
 	);
 }
 
-/** Whether `rt` decodes under `plainSchema` losing nothing but its marks, which the
- *  next commit heals (CODEC §Inline mode): upstream's `isPlain`, asked of the content
- *  with them set aside. */
+/**
+ * Whether `rt` decodes under `plainSchema` losing nothing but its marks, which the next commit
+ * heals (CODEC §Inline mode): upstream's `isPlain` with marks set aside.
+ */
 export function fitsPlain(rt: Content): boolean {
 	return core().isPlain({ ...rt, marks: [] });
 }
 
-/** Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed
- *  and {@link fitsPlain} plain, past which the decode drops what the first commit would
- *  store; on the block schema anything but a construct read and not edited — a footnote
- *  or an equation (`isEditedIsland`) — and an island where the leaf mounts no island view
- *  (`islands`), which draws as its placeholder tag, an atom a keystroke deletes unseen.
- *  What a leaf held over the rest reads. */
+/**
+ * Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed and {@link
+ * fitsPlain} plain, past which the decode drops what the first commit would store. On the block
+ * schema, anything but a construct read and not edited (`isEditedIsland`) and an island where the
+ * leaf mounts no island view (`islands`), which draws as a placeholder atom a keystroke deletes
+ * unseen.
+ */
 export function fitsLeaf(
 	rt: Content,
 	leaf: { inline: boolean; plaintext: boolean; islands: boolean }
@@ -132,17 +124,15 @@ export function fitsLeaf(
 
 /** Inline decode: one paragraph, containers and islands stripped. */
 function decodeInline(
-	rt: Content,
 	schema: Schema,
 	lineTexts: string[],
 	starts: number[],
 	marks: ContentMark[],
 	cursor: IslandCursor
 ): PMNode {
-	// An inline field is single-line; join any stray lines with a space (no
-	// hard_break node exists in this schema). The empty line a trailing `\n` opens is
-	// dropped rather than joined, so a first edit stores no space nobody typed. Islands
-	// are not representable inline: the slot char is dropped and its entry skipped.
+	// An inline field is single-line: stray lines join with a space. The empty line a trailing `\n`
+	// opens is dropped, so a first edit stores no space nobody typed. Islands are not representable
+	// inline: the slot char is dropped and its entry skipped.
 	const inline: PMNode[] = [];
 	const last = lineTexts.length - 1;
 	for (let i = 0; i < lineTexts.length; i++) {
@@ -154,9 +144,11 @@ function decodeInline(
 	return schema.nodes.doc.create(null, para);
 }
 
-/** Plain decode: a `continues` line is a `hard_break` in the paragraph above and every
- *  other line opens one. A line's kind and containers and every island have no node
- *  here and are dropped, so a content {@link fitsPlain} refuses opens flattened. */
+/**
+ * Plain decode: a `continues` line is a `hard_break` in the paragraph above and every other line
+ * opens one. Line kinds, containers and islands are dropped, so content {@link fitsPlain} refuses
+ * opens flattened.
+ */
 function decodePlain(
 	rt: Content,
 	schema: Schema,
@@ -229,10 +221,9 @@ function groupBlocks(
 			i = j;
 			continue;
 		}
-		// The quote, and the whole of what is left: `satisfies` is the exhaustiveness
-		// check, so a container added upstream is a compile error here rather than a
-		// blockquote it is not. A wrapper over the run of leaves carrying the identical
-		// container here, identity by `containerKey`.
+		// The quote, and the whole of what is left: `satisfies` makes a container added upstream a
+		// compile error. A wrapper over the run of leaves carrying the identical container
+		// (`containerKey`).
 		here.container satisfies 'quote';
 		const key = containerKey(here);
 		let j = i + 1;
@@ -252,8 +243,10 @@ function atDepth(leaf: Leaf, depth: number): ContentContainer | undefined {
 	return leaf.containers[depth];
 }
 
-/** The `ordinal` of a leaf's `list_item` at `depth`: only called inside a run the
- * discriminant has already established, so a miss is unreachable. */
+/**
+ * The `ordinal` of a leaf's `list_item` at `depth`, only called inside a run the discriminant
+ * established.
+ */
 function ordinalAt(leaf: Leaf, depth: number): number {
 	const c = atDepth(leaf, depth);
 	return c?.container === 'list_item' ? c.attrs.ordinal : -1;
@@ -266,9 +259,10 @@ function checkedAt(leaf: Leaf, depth: number): boolean | null {
 	return c?.container === 'list_item' ? (c.attrs.checked ?? null) : null;
 }
 
-/** A container's `instance`, absent meaning the zero a canonical read omits. It is what
- * tells one container from an adjacent sibling of identical shape, which contiguity
- * alone reads as one, so absent and `0` have to answer alike. */
+/**
+ * A container's `instance`, absent meaning the zero a canonical read omits. It tells one container
+ * from an adjacent sibling of identical shape, so absent and `0` answer alike.
+ */
 function instanceOf(c: ContentContainer): number {
 	return c.instance ?? 0;
 }
@@ -280,9 +274,10 @@ function containerKey(c: ContentContainer): string {
 	return `${c.container}\u0000${instanceOf(c)}`;
 }
 
-/** A single leaf block node from its segments. Exhaustive over the closed line
- *  vocabulary, so a kind added upstream is a compile error rather than a silent
- *  flattening to `para` that the next commit would store. */
+/**
+ * A single leaf block node from its segments, exhaustive over the closed line vocabulary so a kind
+ * added upstream is a compile error.
+ */
 function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: IslandCursor): PMNode {
 	const line = leaf.line;
 	switch (line.kind) {
@@ -298,10 +293,9 @@ function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: Isla
 		case 'heading': {
 			if (line.kind !== 'heading' && blockIslandLine(leaf, cursor))
 				return schema.nodes.island_block.create(islandAttrs(cursor)!);
-			// Inline content, the segment boundary a `hard_break` in a paragraph and a space
-			// in a heading, which takes none (`schema.ts` §`takesLineBreak`). A stored heading
-			// carries no continuation — the store clears one after a block of a single line —
-			// so the space is what keeps a hand-built content decodable.
+			// Inline content: the segment boundary is a `hard_break` in a paragraph and a space in
+			// a heading, which takes none (`schema.ts` §`takesLineBreak`). A stored heading carries
+			// no continuation, so the space keeps hand-built content decodable.
 			const type = line.kind === 'heading' ? schema.nodes.heading : schema.nodes.paragraph;
 			const inline: PMNode[] = [];
 			leaf.segments.forEach((seg, idx) => {
@@ -320,30 +314,30 @@ function makeLeaf(schema: Schema, leaf: Leaf, marks: ContentMark[], cursor: Isla
 	}
 }
 
-/** Whether a `para` leaf is one block island: a single line holding its slot alone,
- *  backed by an island whose markup is a block. The island is the one fact; the line
- *  carries no kind of its own for it. */
+/**
+ * Whether a `para` leaf is one block island: a single line holding its slot alone, backed by an
+ * island whose markup is a block.
+ */
 function blockIslandLine(leaf: Leaf, cursor: IslandCursor): boolean {
 	if (leaf.segments.length !== 1 || leaf.segments[0].text !== ISLAND_SLOT) return false;
 	const isl = cursor.rt.islands[cursor.i];
 	return isl != null && isBlockIsland(isl.type);
 }
 
-/** Consume the next island entry as PM node attrs (text-order matched to slots): the
- *  whole entry, which an island edit has to write back (`islands.ts`). `null` where a
- *  slot has no entry behind it, which is a malformed content: the slot draws nothing
- *  and its line an empty paragraph, so the decode stays total without minting a node
- *  whose `type` the vocabulary would refuse on the way back. */
+/**
+ * Consume the next island entry as PM node attrs (text-order matched to slots): the whole entry,
+ * which an island edit writes back (`islands.ts`). `null` where a slot has no entry (malformed
+ * content): the slot draws nothing, keeping the decode total.
+ */
 function islandAttrs(cursor: IslandCursor): IslandNodeAttrs | null {
 	const isl = cursor.rt.islands[cursor.i++];
 	return isl ? { id: isl.id, islandType: isl.type, props: isl.props } : null;
 }
 
 /**
- * Inline nodes for one segment: split text into maximal runs of a constant mark
- * set, lower each `U+FFFC` to an inline island node. `stripIslands` drops slots
- * (inline-field mode). Offsets are USV; `pos = segStartUSV + k` indexes into the
- * global mark ranges.
+ * Inline nodes for one segment: split text into maximal runs of a constant mark set, lower each
+ * `U+FFFC` to an inline island node. `stripIslands` drops slots. `pos = segStartUSV + k` indexes
+ * into the global mark ranges.
  */
 function buildInline(
 	schema: Schema,
@@ -362,9 +356,8 @@ function buildInline(
 		if (runText.length) out.push(schema.text(runText, runMarks));
 		runText = '';
 	};
-	// A mark set changes only where a mark starts or ends. `marks` is the field's whole
-	// list, so resolving one per code point costs the text against every mark in the
-	// document.
+	// A mark set changes only where a mark starts or ends; `marks` is the whole list, so resolving
+	// per code point would cost the text against every mark.
 	const segEndUSV = segStartUSV + cps.length;
 	const spanning = marks.filter((m) => m.start < segEndUSV && m.end > segStartUSV);
 	const edges = new Set<number>();
@@ -407,10 +400,8 @@ function buildInline(
 /** A stable key for a mark set (order-independent) to detect run boundaries. */
 function markSetKey(active: ContentMark[]): string {
 	if (!active.length) return '';
-	// Per-mark keys via the shared descriptor + NUL-delimited `markKey`: the same
-	// pair the mark diff groups families by, so a run boundary and a mark family are
-	// one rule. The set is JSON-joined so no url/attrs content collides with a
-	// delimiter: a `link:a|strong` url stays distinct from `{link:a} + {strong}`.
+	// Per-mark keys via the shared descriptor + NUL-delimited `markKey`, the pair the mark diff
+	// groups by. JSON-joined so a `link:a|strong` url stays distinct from `{link:a} + {strong}`.
 	return JSON.stringify(active.map((m) => markKey(descriptorOf(m))).sort());
 }
 

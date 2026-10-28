@@ -1,7 +1,6 @@
-// The mounted-surface helpers the visual suites share: the jsdom stubs a mount
-// reaches, the mount itself, and the DOM lookups a test reads a field through. Each
-// file still declares `@vitest-environment jsdom` and registers `afterEach(unmountAll)`:
-// a hook registered here would bind to the first file that imported this module.
+// The mounted-surface helpers the visual suites share: jsdom stubs, the mount, and DOM lookups.
+// Each file declares `@vitest-environment jsdom` and registers `afterEach(unmountAll)` itself: a
+// hook registered here would bind to the first importer.
 import { mount, unmount, flushSync, tick, type Component } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
@@ -13,12 +12,8 @@ import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
 
 /**
- * What jsdom does not implement and a mount reaches: the reveal's scroll hop, the
- * reorder trip's query, the arrival wash (stubbed to note the host it played on, where
- * a test reads it), the caret rects PM measures, and
- * the pointer capture the enum trigger probes for. Every mount calls it; a file calls
- * it itself only to spy on a stub before its first mount. `??=` so a file stubbing its
- * own keeps it.
+ * What jsdom lacks and a mount reaches: scroll, animation (the arrival wash notes its host), caret
+ * rects and pointer capture. Every mount calls it; `??=` keeps a file's own stub.
  */
 export function stubLayout(): void {
 	Element.prototype.scrollIntoView ??= () => {};

@@ -48,13 +48,13 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **The app resolves too.** With an `App.yaml` or an `app.css` beside `Quiver.yaml` the gate runs what `build app` runs before it writes anything (§"The app target"), so an unknown key, or an `app.css` naming a file outside the quiver or none, fails the gate as it would fail the deploy. What `build app` only warns about prints under its `pass` line and fails only under `--strict`.
 
-**One door.** An author on vitest, jest or another runner spawns the bin (`execFileSync('quillkit', ['check'])`) and gates what CI gates; a second entry onto the verdict would be a second answer under one name. The suite spawns it against the reference quiver, since nothing that imports a module proves a surface reached through a linked bin.
+**One door.** An author on vitest, jest or another runner spawns the bin (`execFileSync('quillkit', ['check'])`) and gates what CI gates; a second entry onto the verdict would be a second answer under one name.
 
 ## Where a quiver comes from
 
 `init` lays one: `Quiver.yaml` and a single quill out of the tarball's `starter/`, plus the files a tarball cannot carry, written by the verb. Every other verb runs over a quiver that exists.
 
-**The starter is a quiver the suite gates.** Carried as files rather than emitted from strings, so `cli.integration.test.ts` lays it, runs `check` over it and builds it into an app: a scaffold that stops rendering fails CI before it fails an author on their first command.
+**The starter is a quiver the suite gates.** Carried as files, so `cli.integration.test.ts` lays it, runs `check` over it and builds it into an app: a scaffold that stops rendering fails CI before it fails an author on their first command.
 
 **One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font and declares `CC0-1.0`, so its first `build app` raises no licensing warning.
 
@@ -64,13 +64,11 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 ## The local loop
 
-`serve` packs the source into `node_modules/.quillkit/quiver`, serves the target's client at the root with the pack mounted at `/quiver`, and repacks when the source changes. For `app` it also writes `app.json` and the author's files into `node_modules/.quillkit/app`, served behind the client, so `App.yaml` and `app.css` reload with the page. For `quiver` it serves the pack alone with CORS open, for a consumer's own dev server on another port. Three parts, and only the first is subtle:
+`serve` packs the source into `node_modules/.quillkit/quiver`, serves the target's client at the root with the pack mounted at `/quiver`, and repacks when the source changes. For `app` it also writes `app.json` and the author's files into `node_modules/.quillkit/app`, served behind the client, so `App.yaml` and `app.css` reload with the page. For `quiver` it serves the pack alone with CORS open, for a consumer's own dev server on another port.
 
 **The pack lands whole, and that is quiver's** (QUIVER §"The generation lands whole"). Nothing here stages or swaps: the directory belongs to `build`, and a caller cannot close a window inside it. What is left here is the trigger: a burst of watcher events collapsed to one repack, the work tree and `dist/` filtered out of the watch so a watcher seeing its own writes does not repack forever, and a queue that serializes packs without ending on the first failure, a quiver mid-edit being invalid as often as not. A close ends both halves in the teardown's order, the watch first and then the burst still settling, so nothing packs into a tree the caller is done with. It always packs drafts (QUIVER §"The draft floor"): this is the author looking at their own quiver, where a quill under `0.1.0` is the likeliest thing on the screen.
 
 **The server is written rather than borrowed.** Two things a general-purpose static server gets wrong for this: `.wasm` must be served as `application/wasm`, since wasm-bindgen's web target instantiates by streaming and `WebAssembly.instantiateStreaming` refuses any other type; and a path escaping its root must be refused, checked on the resolved path so `%2e%2e`, a doubled separator and a plain `..` collapse into one answer. Mounts sharing a prefix fall through in order, which is how the app's staged files stand behind its client. The live loop caches nothing, a cache answering about the last generation, and for studio it streams one thing a static host does not: a server-sent `repacked` at `/.quillkit/events` after each repack lands, named by an `x-quillkit-events` header on every file it serves so the page finds it off a HEAD of itself rather than by asking a deployed host for a path it would 404. No other target and no `preview` serves a stream. The repack is also what a borrowed server has no reason to survive: it takes a file out from under a request between the stat and the open, and a read that fails there destroys the response rather than ending the session.
-
-**Nothing renders on the server.** The WASM boundary and the paint loop are browser concerns, which is what keeps this half a packer and a file watcher.
 
 ## The deploy layout
 
@@ -89,9 +87,9 @@ The verb is the whole encapsulation, which is why there is no workflow beside it
 
 **The floor is the default, and `--drafts` lifts it.** A deploy is a deployment, so it takes quiver's floor; a quiver whose studio is where reviewers preview its prototypes asks for the draft space with `--drafts`.
 
-**What the layout cannot assert is the host's, and it is four rules**: `assets/*` immutable, no edge cache on `quiver/quiver.json`, a missing path answered as a 404, and https. The first is the client's own content-hashed bundle; the second is the edge alone, the browser layer being closed by the fetch mode the loader picks for each name (QUIVER §"The index"). The last two are what a static host's defaults get wrong, and both surface as something other than themselves: a file refused as not the one it was named, and bytes nothing checked. `preview` serves a build under the first three, every path outside `assets/` sent `no-cache`, so a deploy is looked at locally under the rules it will meet. The README carries them with the host recipes.
+**What the layout cannot assert is the host's, and it is four rules**: `assets/*` immutable, no edge cache on `quiver/quiver.json`, a missing path answered as a 404, and https. The first is the client's own content-hashed bundle; the second is the edge alone, the browser layer being closed by the fetch mode the loader picks for each name (QUIVER §"The index"). The last two are what a static host's defaults get wrong, and both surface as something other than themselves: a file refused as not the one it was named, and bytes nothing checked. `preview` serves a build under the first three, every path outside `assets/` sent `no-cache`, so a deploy is looked at locally under the rules it will meet.
 
-**The gate is the recipe's, not this verb's.** The packer stats each `Quill.yaml` as a sentinel and parses none, and the app target loads the quills it pins but renders none, so a quill whose plate does not compile builds cleanly; the verb that renders is `check`, and every documented recipe runs it first. Putting it inside `build` would buy the author who does not read, at the price of a second gate for every pipeline already running one.
+**The gate is the recipe's, not this verb's.** The packer stats each `Quill.yaml` as a sentinel and parses none, and the app target loads the quills it pins but renders none, so a quill whose plate does not compile builds cleanly; the verb that renders is `check`, and every documented recipe runs it first.
 
 **It clears what it writes**, so an `--out` holding the quiver or the working directory is refused. An `--out` nested inside the quiver is the ordinary layout, `dist/`, and nothing of the source is read after the clear.
 

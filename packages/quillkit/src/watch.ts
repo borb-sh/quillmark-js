@@ -1,8 +1,6 @@
 /**
  * The repack trigger: what counts as a source change, and how many changes one repack
- * answers. The pack itself is quiver's `build`, which lands a generation whole
- * (QUIVER §"The generation lands whole"), so nothing here needs to know a client is
- * reading the tree it writes.
+ * answers. The pack is quiver's `build`, which lands whole (QUIVER §"The generation lands whole").
  */
 
 import { watch } from 'node:fs';
@@ -12,9 +10,8 @@ import { within } from './paths.js';
 /** One repack per settled burst: an editor's save arrives as several watcher events. */
 const SETTLE_MS = 80;
 
-/** Call `fn` once a burst of calls stops arriving. `cancel` drops a call still
- *  waiting: a teardown that only unregisters leaves the scheduled half to run
- *  (`core/teardown.ts`), and it holds the event loop open until it does. */
+/** Call `fn` once a burst of calls stops arriving. `cancel` drops a call still waiting,
+ *  which would otherwise run after teardown and hold the event loop open. */
 export interface Settled {
 	(): void;
 	cancel(): void;
@@ -33,17 +30,15 @@ export function settle(ms: number, fn: () => void): Settled {
 	return fire;
 }
 
-export interface Watcher {
+interface Watcher {
 	close(): void;
 }
 
 /**
  * Watch a collection's source and call `onChange` once each burst settles.
  *
- * The pack's own output is filtered out: the default output lives under the collection's
- * `node_modules`, so a watcher seeing its own writes would repack forever. That
- * directory and `.git` are excluded outright, a quiver's authored source being in
- * neither.
+ * The pack's own output is filtered out, or a watcher seeing its own writes would repack
+ * forever. `node_modules` and `.git` are excluded outright.
  */
 export function watchCollection(
 	collection: string,
@@ -65,12 +60,10 @@ export function watchCollection(
 
 	const fire = settle(SETTLE_MS, onChange);
 	const watcher = watch(root, { recursive: true }, (_event, filename) => {
-		// A null filename carries no path to filter on, so it counts as a change: missing
-		// a real edit costs an author the repack they asked for.
+		// A null filename carries no path to filter on, so it counts as a change.
 		if (filename === null || !isOwnWrite(filename)) fire();
 	});
-	// Unregister, then cancel, in that order (`core/teardown.ts`): cancelling first
-	// leaves a watcher that can re-arm the timer.
+	// Unregister before cancelling, or the watcher can re-arm the timer.
 	return {
 		close: () => {
 			watcher.close();

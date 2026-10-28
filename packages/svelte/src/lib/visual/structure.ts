@@ -1,9 +1,5 @@
-// The schema × payload join, done by the editor (VISUAL_EDITOR §Structure). Pure
-// functions only (no runes, no Document reads) so the ordering, control
-// dispatch, group layout, titles, ghosts, and session-identity bookkeeping
-// are unit-testable in isolation (tests/visual/structure.test.ts). The reactive
-// orchestration (revision counter, live doc reads) lives in VisualEditor.svelte;
-// this module is the projection math it feeds.
+// The schema × payload join, as pure functions (VISUAL_EDITOR §Structure). The reactive
+// orchestration lives in VisualEditor.svelte.
 import {
 	VARIANT_DISCRIMINANT_KEY,
 	type Content,
@@ -20,16 +16,16 @@ import { core } from '../core/lifecycle.js';
 
 /** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
 export type ControlKind =
-	| 'prose' // richtext / text → a codec prose leaf
-	| 'text' // a type this build does not know → a text input
-	| 'enum' // type:'enum' → select
-	| 'variant' // type:'enum' + variants: → select, plus the live world's cells
-	| 'number' // number / integer
-	| 'boolean' // boolean → toggle
-	| 'date' // date / datetime → native date control
-	| 'array' // add/remove repeater
-	| 'object' // nested subform
-	| 'matrix'; // ticks over a roster, columns under a held member
+	| 'prose'
+	| 'text'
+	| 'enum'
+	| 'variant'
+	| 'number'
+	| 'boolean'
+	| 'date'
+	| 'array'
+	| 'object'
+	| 'matrix';
 
 /** The container controls: the ones a nested address walks into and a deep
  *  diagnostic routes through. */
@@ -42,19 +38,15 @@ export interface FieldModel {
 	name: string;
 	schema: QuillFieldSchema;
 	control: ControlKind;
-	/** `ui.group` (undefined = ungrouped). */
 	group: string | undefined;
 	/** Asks to share a row with adjacent compacts: `ui.compact` when declared, else
 	 * {@link packsByDefault}. A request, not a guarantee: `placeFields` declines it for
 	 * the shapes that grow (see `packable`). */
 	compact: boolean;
-	/** Display label: `title` when set, else the humanized field name. */
 	label: string;
-	/** Schema `description`: authoring help rendered beside the label,
-	 * undefined when the field declares none. Chrome-only; never gates. */
+	/** Chrome-only; never gates. */
 	description: string | undefined;
-	/** Prose-leaf flags (only meaningful when `control === 'prose'` / array items):
-	 * one line (`oneLine`), and the literal codec (`literalText`). */
+	/** Prose-leaf flags: {@link oneLine} and {@link literalText}. */
 	inline: boolean;
 	plaintext: boolean;
 }
@@ -71,13 +63,9 @@ export interface GroupSection {
 	head?: FieldModel;
 }
 
-/**
- * One card instance projected for rendering: the schema × payload join result
- * the VisualEditor's `$derived` produces and hands to `<Card>`. Positional
- * identity is carried by `id` (a session key), not by array index.
- */
+/** One card instance projected for rendering. Identity is `id` (a session key), not array index. */
 export interface CardModel {
-	/** Stable session id (`'main'` for the main card). */
+	/** `'main'` for the main card. */
 	id: string;
 	isMain: boolean;
 	kind: string;
@@ -94,7 +82,6 @@ export interface CardModel {
 	/** The header an unrenamed card shows ({@link cardTitle} below its rename rung),
 	 *  which the rename input ghosts (composable cards). */
 	titlePlaceholder: string;
-	/** Field name → current stored value (absent fields missing). */
 	values: Record<string, unknown>;
 	/**
 	 * Field name → its resolved provenance row (`{ value, source }`), parallel to
@@ -115,34 +102,23 @@ export interface CardModel {
 	bodyGhost?: string;
 }
 
-/**
- * A card's resolved rows keyed by field name: the provenance channel parallel to
- * {@link CardModel.values}. `resolve` returns rows in declaration order; the
- * editor keys them the same way `values` keys its payload walk, so a field's value
- * and its provenance resolve under one name.
- */
+/** A card's resolved rows keyed by field name, parallel to {@link CardModel.values}. */
 export function provenanceMap(fields: ResolvedField[]): Record<string, ResolvedField> {
 	return Object.fromEntries(fields.map((f) => [f.name, f]));
 }
 
-/** A card's resolved rows: its declared fields, and the `body` sibling `resolve`
- * hangs off each card. */
+/** A card's resolved fields and its `body` sibling. */
 export interface ResolvedCardRows {
 	fields: ResolvedField[];
 	body: ResolvedField | null;
 }
 
-/** The empty rows a card with no resolve entry reads: a shared constant so the
- * per-card miss allocates nothing. */
+/** Shared so a per-card miss allocates nothing. */
 export const NO_RESOLVED_ROWS: ResolvedCardRows = { fields: [], body: null };
 
 /**
- * Composable cards' resolved rows keyed by document index (`ResolvedCard.index`,
- * not array position, so it holds whatever order the resolve view returns): built
- * once per derive, so the per-card provenance join is O(1). Both channels ride one
- * entry: a card reads its fields and its body from a single lookup. Empty map when
- * `resolved` is absent (a `resolve` failure degrades to no ghosts, never a blank
- * form).
+ * Resolved rows keyed by `ResolvedCard.index`, not array position. Empty when `resolved` is absent:
+ * a `resolve` failure degrades to no ghosts, never a blank form.
  */
 export function resolvedByCardIndex(resolved: Resolved | undefined): Map<number, ResolvedCardRows> {
 	return new Map((resolved?.cards ?? []).map((c) => [c.index, { fields: c.fields, body: c.body }]));
@@ -155,9 +131,10 @@ export function ghostDefault(row: ResolvedField | undefined): unknown {
 	return row?.source === 'default' ? row.value : undefined;
 }
 
-/** A stored `boolean` cell as the render reads it: a boolean, `true` or `false` in any
- * case, or a number by whether it is non-zero; undefined where the render refuses the
- * value. Quillmark's coercion, restated, so the suite holds it to `reader.resolve()`. */
+/**
+ * A stored `boolean` cell as the render reads it (Quillmark's coercion, held to `reader.resolve()`
+ * by the suite); undefined where the render refuses it.
+ */
 export function renderedBoolean(value: unknown): boolean | undefined {
 	if (typeof value === 'boolean') return value;
 	if (typeof value === 'number') return value !== 0;
@@ -166,10 +143,10 @@ export function renderedBoolean(value: unknown): boolean | undefined {
 	return undefined;
 }
 
-/** A ghost value's string form, or undefined for null/object (only text ghosts
- * render a placeholder). A scalar's resolved default reads through it; a content
- * field's resolves as `Content`, which a prose leaf reads by its text instead
- * ({@link titleText}). */
+/**
+ * A ghost value's string form, or undefined for null/object. A content field's default resolves as
+ * `Content` and is read by its text ({@link titleText}).
+ */
 export function stringifyGhost(ghost: unknown): string | undefined {
 	return ghost != null && typeof ghost !== 'object' ? String(ghost) : undefined;
 }
@@ -221,8 +198,10 @@ export function optionalCell(f: QuillFieldSchema): boolean {
 	return f.type.endsWith('?');
 }
 
-/** The type a cell's control reads: the declared one, an optional cell's `?` stripped.
- *  The `?` moves the render floor and nothing else, so every read of a type is this. */
+/**
+ * The declared type with an optional cell's `?` stripped; the `?` moves the render floor and
+ * nothing else.
+ */
 export function baseType(f: QuillFieldSchema): QuillFieldType {
 	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as QuillFieldType;
 }
@@ -233,7 +212,7 @@ export function oneLine(f: QuillFieldSchema): boolean {
 	return f.multiline !== true;
 }
 
-/** Whether a content field's codec is the literal one, its value text with no marks: `text`. */
+/** Whether a content field's codec is the literal one: `text`. */
 export function literalText(f: QuillFieldSchema): boolean {
 	return baseType(f) === 'text';
 }
@@ -296,8 +275,7 @@ export function mountKey(name: string, f: QuillFieldSchema): string {
 	].join('\u0000');
 }
 
-/** Map a field schema to its control. An array's element control is this over `items`;
- *  a type this build does not know takes the text input. */
+/** An array's element control is this over `items`; an unknown type takes the text input. */
 export function controlKind(f: QuillFieldSchema): ControlKind {
 	switch (baseType(f)) {
 		case 'richtext':
@@ -433,7 +411,6 @@ export function matrixId(id: string): boolean {
 	return /^[a-z][a-z0-9_]*$/.test(id);
 }
 
-/** Whether `id` is on the roster. */
 export function onRoster(matrix: QuillFieldSchema, id: string): boolean {
 	return matrix.members != null && Object.hasOwn(matrix.members, id);
 }
@@ -556,8 +533,9 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
 
 // ── Row summaries and layouts ────────────────────────────────────────────────
 
-/** Whether a cell is one line tall by declaration: the shape a table column and a row
- *  summary can hold. A prose cell is one where it is {@link oneLine}. */
+/**
+ * Whether a cell is one line tall by declaration: what a table column and a row summary can hold.
+ */
 export function shortCell(sub: QuillFieldSchema): boolean {
 	const kind = controlKind(sub);
 	if (kind === 'prose') return oneLine(sub);
@@ -567,11 +545,8 @@ export function shortCell(sub: QuillFieldSchema): boolean {
 }
 
 /**
- * The first short text cell's words — the first one-line `text` or `richtext`, in
- * declaration order — read through {@link titleText}; `undefined` where
- * there is no such cell or it is empty. The cell is picked by the schema alone, so an
- * instance is named by one cell whatever the others hold. What names an instance from
- * its own values: a collapsed row, and a card whose kind declares no `title`.
+ * The words of the first one-line `text` or `richtext` cell in declaration order, picked by schema
+ * alone so one cell names an instance whatever the others hold.
  */
 function firstShortText(
 	cells: Record<string, QuillFieldSchema> | undefined,
@@ -585,16 +560,13 @@ function firstShortText(
 	return titleText(ownValue(values, named[0])).trim() || undefined;
 }
 
-/** A collapsed row's own words ({@link firstShortText}); `undefined` while the row has
- *  nothing to say for itself. */
+/** A collapsed row's own words ({@link firstShortText}). */
 export function rowSummary(items: QuillFieldSchema | undefined, row: unknown): string | undefined {
 	return firstShortText(items?.properties, (row ?? {}) as Record<string, unknown>);
 }
 
 /** How an `array` draws its elements. */
-export type ArrayLayout =
-	| 'list' // one row per element, an `object` row collapsing to a summary
-	| 'table'; // a grid over an `object` row's cells, a column per property
+export type ArrayLayout = 'list' | 'table';
 
 /**
  * The layout an array takes: `'table'` where the array's own `ui.layout` asks for it
@@ -651,7 +623,7 @@ export function commitDiscriminant(
 	return Object.keys(next).length ? next : undefined;
 }
 
-/** `foo_bar` → `Foo bar`: the label fallback when a field declares no `title`. */
+/** `foo_bar` → `Foo bar`. */
 export function humanize(name: string): string {
 	const spaced = name.replace(/_/g, ' ').trim();
 	return spaced ? spaced[0].toUpperCase() + spaced.slice(1) : spaced;
@@ -686,10 +658,8 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 }
 
 /**
- * Group-section order (VISUAL_EDITOR §"Structure mirrors the schema"): the schema's `ui.groups` registry
- * key order when present: `QuillCardUi.groups` is a typed `Record` at the
- * boundary, so this reads it uncast: else the first-appearance order of each
- * field's `ui.group`.
+ * Group-section order (VISUAL_EDITOR §"Structure mirrors the schema"): the `ui.groups` key order,
+ * else first appearance of each field's `ui.group`.
  */
 export function groupOrder(cardSchema: QuillCardSchema): string[] {
 	const groups = cardSchema.ui?.groups;
@@ -702,21 +672,14 @@ export function groupOrder(cardSchema: QuillCardSchema): string[] {
 	return order;
 }
 
-/**
- * A group's display label: the `ui.groups[g].title` override when the registry
- * declares one, else the humanized id (`memo_for` → "Memo for"): the same
- * id-derives-the-label rule a field's key follows.
- */
+/** A group's `ui.groups[g].title`, else the humanized id. */
 export function groupLabel(cardSchema: QuillCardSchema, group: string): string {
 	return cardSchema.ui?.groups?.[group]?.title ?? humanize(group);
 }
 
 /**
- * Sort field models into ordered group sections. Declared groups first (in
- * `order`), each carrying its fields in declaration order; then any remaining
- * groups (including the ungrouped bucket) in first-appearance order. `labelFor`
- * resolves a group id to its display label: always {@link groupLabel} bound to
- * the card schema, which falls back to {@link humanize} itself.
+ * Declared groups first (in `order`), then any remaining groups, including the ungrouped bucket, in
+ * first-appearance order.
  */
 export function groupSections(
 	fields: FieldModel[],
@@ -778,27 +741,16 @@ export function cardSections(cardSchema: QuillCardSchema): GroupSection[] {
 }
 
 /**
- * The group section a card's accordion opens on first mount: the first in
- * order, or `null` when the card declares none. Ungrouped fields render outside
- * the accordion, so only `group != null` sections count.
- *
- * A card opens on fields. All-collapsed paints as a stack of chevrons that name
- * their sections and disclose nothing of what is behind them, and a body leaf is
- * no substitute: on a card carrying both, the fields are what the card is for.
- * The first section is the one `ui.groups` already ranks highest, and it is the
- * same section on every mount: a rule keyed on document state would move the
- * opening under a user as they fill.
- *
- * State is ephemeral session state the Card owns; this only seeds it.
+ * The group section a card's accordion opens on first mount, or `null` when the card declares none.
+ * All-collapsed would disclose nothing of what is behind the chevrons, and a rule keyed on document
+ * state would move the opening under a user as they fill.
  */
 export function initialExpandedGroup(sections: GroupSection[]): string | null {
 	return sections.find((s) => s.group != null)?.group ?? null;
 }
 
 /** How wide a field sits in its section grid. */
-export type FieldSpan =
-	| 'cell' // one column, auto-placed among its neighbours
-	| 'full'; // the whole grid, its own row
+export type FieldSpan = 'cell' | 'full';
 
 export interface PlacedField {
 	field: FieldModel;
@@ -833,15 +785,9 @@ function packable(f: FieldModel): boolean {
 }
 
 /**
- * Assign each field its span in the section grid. Consecutive packable fields are
- * `cell`s the grid auto-places: capacity and wrapping are the container query's
- * business, so a trailing orphan keeps its column width rather than growing to fill.
- * A run of one is stranded — nothing packed beside it, and no row above to align to —
- * so it is `full` like the shapes that declined: a lone narrow track reads as truncated
- * against the width it leaves empty, and sharing was the whole of what asked for it.
- * Everything else is `full`.
- *
- * Pure, and stays pure: no width, no measurement, nothing to re-derive on resize.
+ * Consecutive packable fields are `cell`s the grid auto-places; a trailing orphan keeps its column
+ * width. A run of one is `full`: a lone narrow track reads as truncated against the width it leaves
+ * empty. Everything else is `full`. No width is measured.
  */
 export function placeFields(fields: FieldModel[]): PlacedField[] {
 	const out: PlacedField[] = [];
@@ -915,7 +861,6 @@ export function cardTitle(
 	return firstShortText(cardSchema?.fields, values) ?? humanize(kind);
 }
 
-/** Whether a card kind renders a body leaf: gated by `body.enabled !== false`. */
 export function bodyEnabled(cardSchema: QuillCardSchema | undefined): boolean {
 	return cardSchema?.body?.enabled !== false;
 }
@@ -926,10 +871,10 @@ export function bodyEnabled(cardSchema: QuillCardSchema | undefined): boolean {
 // derive): it is a session id held in a parallel array, reordered in lockstep
 // with the structure ops and resolved to an index only at the mutation boundary.
 
-/** A monotonic per-session id source. Ids are opaque strings, stable for the
- * session; a fresh array for N existing instances is `seq.take(N)`, and an id
- * resolves to its current index by `ids.indexOf(id)` (-1 once the instance is
- * gone): read at the mutation boundary, never cached. */
+/**
+ * A monotonic per-session id source of opaque strings. An id resolves to its index by
+ * `ids.indexOf(id)` at the mutation boundary, never cached.
+ */
 export class IdSeq {
 	#n = 0;
 	next(): string {

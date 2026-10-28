@@ -3,11 +3,6 @@
 // diagnosis rather than resolution: what a consumer holding a tarball nobody can `npm ls`
 // needs in a bug report is which copies are in there.
 //
-// The version as its manifest states it, for each. Whether a checkout sits ahead of
-// the tag that version names is a question about a working tree, and a published tarball
-// is not one — `release.yml` builds from the merge commit it tags, so the manifest and the
-// bytes agree by construction.
-//
 // One mint, at the build. quillkit's `vite.config.ts` defines `__CARRIED__` and writes
 // `dist/client/carried.json` beside the bundle: the define lets a running client name
 // itself in a bug report, the file lets a consumer read the tarball without running

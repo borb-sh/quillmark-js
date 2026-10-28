@@ -6,7 +6,6 @@
 // a mount that swaps nothing reports nothing.
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { mount, unmount, flushSync } from 'svelte';
-import type { LiveSession } from '@quillmark/wasm';
 import type { EditorError } from '$lib/core';
 import Preview from '$lib/preview/Preview.svelte';
 import RebindHost from './RebindHost.svelte';

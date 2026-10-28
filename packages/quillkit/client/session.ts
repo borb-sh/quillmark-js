@@ -1,6 +1,5 @@
 // One quill, one document, one `LiveSession`: what the surfaces are mounted over, and
-// what a repack replaces. The handle lifecycle lives here rather than in the
-// component, because it is the one thing in studio that is not chrome.
+// what a repack replaces.
 import type {
 	Diagnostic,
 	Document,
@@ -14,15 +13,14 @@ import { openExample } from './examples';
 import { diagnosticsOf, messageOf } from './notes';
 
 /** How the document got here, and what the landing cost. */
-export interface Carry {
+interface Carry {
 	/** `seeded`: the schema's seed, for a first open or a different quill picked.
 	 *  `example`: the quill's example document, in the seed's stead.
 	 *  `carried`: the previous document, landed under the schema in hand.
 	 *  `reseeded`: the previous document was refused, so the seed stands in. */
 	how: 'seeded' | 'example' | 'carried' | 'reseeded';
 	/** The `conform::*` diagnostics for the values the schema in hand will not take,
-	 *  or the one refusal that dropped the document or the example. The point of the
-	 *  surface rather than an error to swallow. */
+	 *  or the one refusal that dropped the document or the example. */
 	stranded: Diagnostic[];
 }
 
@@ -48,11 +46,9 @@ export interface Opened {
  * surfaces were holding, or `undefined` for a fresh document: the quill's example
  * where `examples` holds and the quill ships one, else the seed.
  *
- * Carrying is what makes a repack an edit to the quill rather than a reset of the
- * work: a plate-only change lands the same document verbatim, an additive schema
- * change keeps it and defaults the new fields, and an incompatible one leaves what the
- * schema will not take as authored, with a `conform::*` diagnostic naming each value it
- * would not commit.
+ * A plate-only change lands the same document verbatim, an additive schema change keeps
+ * it and defaults the new fields, and an incompatible one leaves what the schema will not
+ * take as authored, with a `conform::*` diagnostic naming each value.
  *
  * A card kind the schema does not declare strands nothing and produces no such
  * diagnostic: conform keeps the card whole, `quill.validate` names it, and `Engine.open`
@@ -65,10 +61,7 @@ export async function openRef(
 	carry: string | undefined,
 	examples: boolean
 ): Promise<Opened> {
-	// Borrowed: `getQuill` caches one quill per canonical ref and hands it to every
-	// caller for the quiver's lifetime, so studio holds it and frees nothing (QUIVER
-	// §getQuill). Studio rewrites no quill bytes, so it needs no quill of its own and
-	// pays for no second materialization.
+	// Borrowed: `getQuill` hands every caller one quill per ref for the quiver's lifetime.
 	const quill = await quiver.getQuill(ref);
 	const formats = await engine.supportedFormats(quill);
 
@@ -76,9 +69,7 @@ export async function openRef(
 	let landed: Carry = { how: 'seeded', stranded: [] };
 	if (carry !== undefined) {
 		try {
-			// The bound ingestion door: parse, then conform against the schema in hand,
-			// landing every declared field at its canonical rest. The `conform::*`
-			// diagnostics for the values that would not commit arrive on `warnings`.
+			// Parse conforms against the schema in hand; `warnings` holds the `conform::*` set.
 			doc = quill.parse(carry);
 			landed = { how: 'carried', stranded: doc.warnings };
 		} catch (err) {

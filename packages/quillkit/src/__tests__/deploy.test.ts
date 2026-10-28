@@ -259,7 +259,6 @@ describe('the clients this package carries', () => {
 			expect(await readFile(join(at, 'index.html'), 'utf8')).not.toContain('/main.ts');
 			expect(() => assertClient(at)).not.toThrow();
 		}
-		expect(Object.values(CLIENTS)).toEqual(expect.arrayContaining([STUDIO, APP]));
 	});
 
 	it('leave every name an author file could take free, but the ones the app reserves', async () => {

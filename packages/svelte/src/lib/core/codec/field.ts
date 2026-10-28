@@ -1,18 +1,12 @@
-// The prose leaf: `createField` (VISUAL_EDITOR §Surface). One content field, one
-// PM `EditorState`/`EditorView`, wired to the WASM edit surface. It reads the
-// leaf's `Content`, decodes to a PM state, mounts a view + plugin stack (history,
-// keymap, input rules, the anchor-position plugin), and `dispatchTransaction`:
-//   (a) apply optimistically to the view,
-//   (b) lower the tr to a `ChangeBundle` (or `overwrite` for a field not yet at
-//       content rest, which has nothing to splice),
-//   (c) commit via `doc.applyChange(addr, bundle)`, or a `text` leaf's whole text
-//       through the typed writer,
-//   (d) fire `onChange` when the transaction committed, then `onCaretMove` with
-//       the new USV caret, which a bare selection move fires on its own.
-// On an `applyChange` throw the optimistic PM state stays and the failure reports
-// through `onError`: never a crash. Caret continuity across own-edits is the PM
-// `StepMap`; an external content change re-hydrates through `applyExternal`, gated
-// by `reconcile` except where the hold it re-evaluates flips.
+// The prose leaf: `createField` (VISUAL_EDITOR §Surface). One content field, one PM view wired to
+// the WASM edit surface.
+//
+// `dispatchTransaction` applies the transaction optimistically, lowers it to a `ChangeBundle` (or
+// `overwrite` for a field not yet at content rest, which has nothing to splice), commits via
+// `doc.applyChange` (a `text` leaf's whole text through the typed writer), then fires `onChange` if
+// it committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through
+// `onError`. An external change re-hydrates through `applyExternal`, gated by `reconcile` except
+// where the hold it re-evaluates flips.
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
@@ -72,9 +66,10 @@ import {
 /** Options for {@link createField}. */
 export interface CreateFieldOpts {
 	doc: Document;
-	/** The schema the leaf reads through: `quill.reader(doc).getContent` decodes by
-	 *  declared type, which is the only thing that says whether a stored string is
-	 *  markdown or literal text. */
+	/**
+	 * The schema the leaf reads through: the declared type decides whether a stored string is
+	 * markdown or literal text.
+	 */
 	quill: Quill;
 	addr: Addr;
 	container: HTMLElement;
@@ -87,53 +82,44 @@ export interface CreateFieldOpts {
 	 *  `aria-describedby` while it holds. */
 	heldNoteId?: string;
 	/**
-	 * Fired when the leaf holds or releases, and at mount when it mounts held. A one-line
-	 * leaf, or a `text` one, is held over a value its schema cannot
-	 * hold (`fitsLeaf`, upstream's `isInline` and `isPlain`): the decode would join lines
-	 * and drop containers and islands for the first commit to store. Any leaf is held
-	 * over what is read and not edited: a font family, a footnote and an equation (CODEC
-	 * §Decode). A held leaf draws
-	 * its content on the block schema, read-only, and commits nothing. Judged of the value
-	 * each mount and re-hydrate reads, so {@link FieldController.applyExternal} is what
-	 * re-evaluates it.
+	 * Fired when the leaf holds or releases, and at mount when it mounts held. A one-line or `text`
+	 * leaf is held over a value its schema cannot hold (`fitsLeaf`): the decode would join lines
+	 * and drop containers and islands. Any leaf is held over what is read and not edited: a font
+	 * family, a footnote, an equation (CODEC §Decode). A held leaf draws on the block schema,
+	 * read-only, and commits nothing. Judged on each mount and re-hydrate ({@link
+	 * FieldController.applyExternal}).
 	 */
 	onHold?(held: boolean): void;
 	/** Suppress the markdown-shorthand input rules. */
 	noInputRules?: boolean;
-	/** The island chrome's wording, read live (per render) so a consumer swapping
-	 *  locale mid-session re-renders rather than freezing it at mount. Absent leaves
-	 *  the package's English; an inline leaf never asks (it holds no island). */
+	/**
+	 * The island chrome's wording, read live so a locale swap re-renders. Absent leaves the
+	 * package's English.
+	 */
 	tableStrings?: () => TableChromeStrings;
 	/**
-	 * The slash menu's live state, or `undefined` when it is closed: the channel the
-	 * chrome draws from (`visual/SlashMenu.svelte`).
-	 *
-	 * Its presence is what mounts the menu at all. The trigger and its keys are the
-	 * leaf's, but a surface only a keyboard can reach (claiming Enter, Escape and the
-	 * arrows with nothing on screen) is worse than no surface, so the door exists
-	 * exactly where something can draw it. A constrained inline leaf never has one:
-	 * it holds no island and no block to convert.
+	 * The slash menu's live state, or `undefined` when it is closed: the channel the chrome draws
+	 * from (`visual/SlashMenu.svelte`). Its presence is what mounts the menu, so the keys never
+	 * claim Enter, Escape and the arrows with nothing on screen. A constrained inline leaf never
+	 * has one.
 	 */
 	onSlash?(state: SlashState | undefined): void;
-	/** The slash surface's wording, read per decoration pass. Absent leaves the
-	 *  package's English; read only beside {@link onSlash}, the hint being the menu's. */
+	/** The slash surface's wording, read per decoration pass; read only beside {@link onSlash}. */
 	slashStrings?: () => SlashStrings;
-	/** Accessible name → `aria-label` on the `contenteditable`. For a leaf nothing
-	 * else names: an array element (the field label plus its 1-based index), the
-	 * card body (no visible label at all). A leaf with a field label takes
-	 * `labelledBy` instead: `for` cannot reach a `contenteditable`, which is not a
-	 * labelable element, so the association runs the other way. */
+	/**
+	 * Accessible name → `aria-label` on the `contenteditable`, for a leaf nothing else names (an
+	 * array element, the card body). A leaf with a field label takes `labelledBy` instead: `for`
+	 * cannot reach a `contenteditable`.
+	 */
 	label?: string;
 	/** The field label's own id → `aria-labelledby`, which supersedes `label`. */
 	labelledBy?: string;
 	/** The parked `description` → `aria-describedby`; announced after the name. */
 	describedBy?: string;
 	/**
-	 * The resolved `default:` where it prints: the content an unset field's leaf holds,
-	 * marked `data-default` on the editable for the default rung. Nothing is written
-	 * until an edit, which commits the whole leaf as authored: the default taken, with
-	 * the edit in it. The initial value; {@link FieldController.setFallback} moves it
-	 * after mount.
+	 * The resolved `default:` where it prints: the content an unset field's leaf holds, marked
+	 * `data-default`. Nothing is written until an edit, which commits the whole leaf with the edit
+	 * in it. Initial value; {@link FieldController.setFallback} moves it.
 	 */
 	fallback?: Content;
 	/** Ghost text shown on the empty leaf: the `none` an unset optional field prints, or
@@ -154,15 +140,10 @@ export interface CreateFieldOpts {
 	/** Fired with the new USV caret after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
 	/**
-	 * Fired after an edit committed to the document: the leaf's change signal, and
-	 * the reason it is not `onCaretMove`. That one also fires on a bare selection
-	 * move, so a host driving a recompile off it recompiles on every arrow key.
-	 *
-	 * Fires for every commit regardless of which branch it took (`applyChange`, the
-	 * first-edit `overwrite`, the fallback `overwrite`, a `text` leaf's typed write)
-	 * and for an anchor mutation,
-	 * which changes no text. A commit that failed outright (`commit-lost`) does not
-	 * fire it: nothing landed.
+	 * Fired after an edit committed to the document: the leaf's change signal. Unlike `onCaretMove`
+	 * it does not fire on a bare selection move. Fires for every commit branch and for an anchor
+	 * mutation (which changes no text); a commit that failed outright (`commit-lost`) does not fire
+	 * it.
 	 */
 	onChange?(addr: Addr): void;
 	/** Recovered failures on the commit path ({@link EditorErrorHandler}). */
@@ -180,12 +161,9 @@ export interface FieldController {
 	 *  re-evaluate its hold against the value now stored. */
 	applyExternal(): void;
 	/**
-	 * Move the empty-leaf ghost after mount: a card retyped to another kind takes
-	 * its new kind's wording without remounting, which it must not do (the leaf key
-	 * is the card's session id, so a remount would cost the caret).
-	 *
-	 * Refreshes the decoration without a transaction: a placeholder is chrome, and
-	 * a transaction would fire `onCaretMove` at a moment the caret did not move.
+	 * Move the empty-leaf ghost after mount (a card retyped to another kind takes its new wording;
+	 * a remount would cost the caret). Refreshes the decoration without a transaction, which would
+	 * fire `onCaretMove` with no caret move.
 	 */
 	setPlaceholder(text: string | undefined): void;
 	/** Move the default an unset leaf holds after mount: a retype or a quill swap
@@ -195,11 +173,9 @@ export interface FieldController {
 	/** The current stored content for this addr (for tests / reconcile). */
 	getContent(): Content;
 	/**
-	 * Insert an identity anchor `id` at USV `pos`: the seam that gives
-	 * `anchor` the toggle the six formatting marks have. Zero-width; it folds into the
-	 * plugin's position set and commits through the mark-diff `anchor` op, so it
-	 * survives later edits like any anchor. The id is caller-supplied and must be
-	 * unique + invariant (the 0.97 anchor-id policy); a duplicate id is a no-op.
+	 * Insert an identity anchor `id` at USV `pos`. Zero-width; it folds into the plugin's position
+	 * set and commits through the mark-diff `anchor` op. The id is caller-supplied and must be
+	 * unique and invariant; a duplicate id is a no-op.
 	 */
 	insertAnchor(id: string, pos: number): void;
 	/** Remove the identity anchor `id` (the inverse of {@link insertAnchor}); a no-op if absent. */
@@ -207,9 +183,8 @@ export interface FieldController {
 	/** Ids of the anchors within USV range `[from, to]`: a selection's anchor state. */
 	anchorsInRange(from: number, to: number): string[];
 	/**
-	 * Move the slash menu's cursor onto the command `name`: what a pointer entering an
-	 * item calls. The keyboard cursor and the pointer's highlight are one state, so the
-	 * chrome moves the one the keys already drive rather than painting a second.
+	 * Move the slash menu's cursor onto the command `name` (a pointer entering an item): the
+	 * keyboard cursor and the pointer highlight are one state.
 	 */
 	slashFocus(name: string): void;
 	/** Run the command `name` (a click on its item): the same path Enter takes. A no-op
@@ -221,13 +196,11 @@ export interface FieldController {
 }
 
 /**
- * The ProseMirror handles a chrome surface reaches a mounted leaf through. Not part
- * of {@link FieldController}: they are PM internals, and a consumer's contract is the
- * controller's verbs. The format popover is the one caller and it needs both:
- * `view` to name the leaf's own document, `focusedView` to act on wherever the caret
- * actually is, which inside a table island is a nested cell view (`table-view.ts`).
- * The two being different is exactly what tells the popover to withhold its
- * `anchor` button: an anchor is the field's coordinate space, and a cell is not in it.
+ * The ProseMirror handles a chrome surface reaches a mounted leaf through; not part of {@link
+ * FieldController}. The format popover needs both: `view` names the leaf's own document,
+ * `focusedView` acts wherever the caret is, which inside a table island is a nested cell view
+ * (`table-view.ts`). Their differing is what tells the popover to withhold its `anchor` button: a
+ * cell is not in the field's coordinate space.
  */
 export interface LeafViews {
 	view: EditorView;
@@ -238,11 +211,11 @@ export interface LeafViews {
 
 const anchorKey = new PluginKey<AnchorPos[]>('quill-anchors');
 
-/** An anchor mutation carried on a transaction's `anchorKey` meta: the seam that
- * folds a new identity anchor (or a removal) into the plugin's position set, so
- * the next commit lowers it through the mark diff exactly as a toggled formatting
- * mark does. Ids are caller-supplied, unique, invariant (the 0.97
- * anchor-id policy); `pos` is a PM position. */
+/**
+ * An anchor mutation carried on a transaction's `anchorKey` meta, folded into the plugin's position
+ * set so the next commit lowers it through the mark diff like a toggled mark. `pos` is a PM
+ * position.
+ */
 type AnchorEdit = { op: 'add'; id: string; pos: number } | { op: 'remove'; id: string };
 
 /** Plugin-held anchor positions (PM coords), mapped through every edit's `StepMap`
@@ -269,27 +242,19 @@ function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorPos[]> {
 	});
 }
 
-/** Read the leaf's `Content` for `addr`: `reader.getContent` (DOCUMENT_MODEL),
- * the schema-plane read that decodes through the codec the field's declared type
- * names. A field value, or the body `Content` when `addr.field` is absent, without
- * materializing the whole card. Reads are total over the field axis, so an absent
- * field, a default-only richtext field (e.g. `tag_line`, no stored value until
- * first edited), reads `undefined`; decode an empty content rather than crash, and
- * the first edit overwrites it. Only an out-of-range `addr.card` throws, unreachable
- * here: a removed card unmounts its keyed leaf before a stale index is read.
- *
- * Bound rather than verbatim, because the storage form is not the leaf's business
- * and the verbatim read cannot answer it alone. A field the editor committed rests
- * as `Content`; a field a markdown parse left rests as the authored string, and
- * what that string means is the declared type's to say: `richtext` is markdown,
- * `text` is literal text, and reading one as the other silently eats every `*` the
- * author typed. */
+/**
+ * Read the leaf's `Content` for `addr` through `reader.getContent` (DOCUMENT_MODEL): the body when
+ * `addr.field` is absent. Bound by the declared type rather than a verbatim read, since a string a
+ * markdown parse left means markdown for `richtext` and literal text for `text`; reading one as the
+ * other eats every `*` the author typed. An absent field (a default-only richtext field before its
+ * first edit) reads `undefined` and decodes empty; the first edit overwrites it. Only an
+ * out-of-range `addr.card` throws, unreachable since a removed card unmounts its keyed leaf.
+ */
 function readLeaf(reader: DocumentReader, addr: Addr): Content {
 	return reader.getContent(addr) ?? emptyContent();
 }
 
-/** The canonical empty `Content`: one empty `para` line. The empty a prose
- * leaf (or an array's prose element) seeds from. */
+/** The canonical empty `Content`: one empty `para` line. */
 export function emptyContent(): Content {
 	return { text: '', lines: [{ containers: [], kind: 'para' }], marks: [], islands: [] };
 }
@@ -299,25 +264,22 @@ export function isEmptyContent(rt: Content): boolean {
 	return contentEqual(rt, emptyContent());
 }
 
-/** Whether ops may commit here: the stored value is a `Content` object, so
- * `applyChange` splices exactly the content the leaf read and PM is showing.
- *
- * The two other rest forms both take `overwrite` instead. An unset field (`undefined`;
- * a default-only richtext field before its first edit) has nothing to splice, and an
- * authored string nothing to lose: content-only marks do not survive markdown, so a
- * string carries no anchors to pay. A body always rests as `Content`. A `text` leaf
- * never asks: it commits through the writer ({@link createField}). */
+/**
+ * Whether ops may commit here: the stored value is a `Content` object, so `applyChange` splices
+ * exactly what PM shows. The other rest forms take `overwrite`: an unset field has nothing to
+ * splice, and an authored string carries no anchors to pay. A body always rests as `Content`; a
+ * `text` leaf commits through the writer ({@link createField}).
+ */
 function opsCommittable(doc: Document, addr: Addr): boolean {
 	const stored = doc.getStored(addr);
 	return stored !== null && typeof stored === 'object';
 }
 
-/** The naming attributes for the `contenteditable`, shared by every prose leaf
- * (`ProseValue` takes it too, so an addressed leaf and a by-value one name their
- * regions by one rule). `aria-labelledby` supersedes `aria-label`: a leaf carrying
- * both is the ambiguity where implementations disagree about which wins, and
- * `undefined` is returned whole when a leaf takes neither, since ProseMirror reads
- * the absence, not an empty object. */
+/**
+ * The naming attributes for the `contenteditable`, shared with `ProseValue`. `aria-labelledby`
+ * supersedes `aria-label`, and `undefined` is returned whole when a leaf takes neither, since
+ * ProseMirror reads the absence.
+ */
 export function proseAttributes(opts: {
 	label?: string;
 	labelledBy?: string;
@@ -350,13 +312,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const { doc, addr, container } = opts;
 	const inline = !!opts.inline;
 	const plaintext = !!opts.plaintext;
-	// The declared type picks the schema, and the schema is the whole of what
-	// `plaintext` suppresses: no mark types to toggle, to paste in, or to mint a
-	// shorthand with (`schema.ts`).
+	// The declared type picks the schema; `plaintext` suppresses every mark (`schema.ts`).
 	const schema: Schema = leafSchema({ plaintext, inline });
 	const block = isBlockSchema(schema);
-	// Bound once and held: the reader is a `{quill, doc}` pair that reads live, so
-	// every read below sees the commit before it.
+	// Bound once: the reader reads live, so every read sees the commit before it.
 	const reader: DocumentReader = opts.quill.reader(doc);
 	const writer: DocumentWriter = opts.quill.writer(doc);
 
@@ -377,14 +336,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// assignment plus a re-render rather than a rebuilt plugin stack.
 	let placeholderText = opts.placeholder;
 
-	// The views nested inside this leaf: one per table cell (`table-view.ts`). The
-	// leaf holds the set because chrome asks the leaf, not the island, which view
-	// holds the caret: the format popover raises over a cell exactly as over the
-	// body, and only the leaf knows both.
+	// The views nested inside this leaf, one per table cell (`table-view.ts`): chrome asks the leaf
+	// which view holds the caret.
 	const nested = new Set<EditorView>();
 
-	// The menu's report channel, and the whole of what a leaf holds of it: the
-	// vocabulary is the codec's own constant (`slash.ts`), not a wording to derive.
+	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
 
 	// Judged of the value being mounted rather than read off a diagnostic: a routed set
@@ -400,13 +356,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const state = seeded.state;
 	index = seeded.index;
 
-	// The clearance PM's reveal keeps around the caret, in this leaf's own line box.
-	// Its default is 5px, which is a caret visible and unusable: the next line typed
-	// lands past the fold, the reason the preview's own scroll clears a target by the
-	// target's height (PREVIEW.md §"Follow-the-caret scroll"). Measured off the
-	// mounted box rather than restated from the rung, and dropped where the
-	// derivation is out of reach (jsdom), a fallback there being the scale written
-	// where `check:style` cannot read it.
+	// The clearance PM's reveal keeps around the caret, in this leaf's own line box: PM's 5px
+	// default leaves the next typed line past the fold. Measured off the mounted box and dropped
+	// where the derivation is out of reach (jsdom).
 	const lineBox = Number.parseFloat(getComputedStyle(container).lineHeight);
 	const clearance = Number.isFinite(lineBox) ? lineBox : undefined;
 
@@ -429,9 +381,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 							nested.add(cellView);
 							return () => nested.delete(cellView);
 						},
-						// A focus event does not bubble, so the leaf's own `focus` handler
-						// never fires for a cell: without this the active address would not
-						// follow a caret clicked straight into a table.
+						// A focus event does not bubble, so the leaf's `focus` handler never fires
+						// for a cell.
 						onCellFocus: () => opts.onFocus?.(addr),
 						clearance
 					})
@@ -446,24 +397,19 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			// mark goes in the same update that draws the edit.
 			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) defaulted = false;
 			view.updateState(next); // (a) optimistic
-			// One walk per structural change: the index and the projection the commit
-			// diffs both come off it. A selection-only transaction leaves the document
-			// it was built from, so the index over it still holds.
+			// One walk per structural change; a selection-only transaction leaves the document, so
+			// the index still holds.
 			const scan = tr.docChanged ? scanDoc(next.doc) : undefined;
 			if (scan) index = lineIndexOf(scan);
 
-			// Commit a content edit or an anchor mutation. An anchor insert/remove is
-			// zero-width, so `docChanged` is false: the `anchorKey` meta is what
-			// routes it through the same commit path (the diff emits the anchor op).
+			// Commit a content edit or an anchor mutation; an anchor edit is zero-width
+			// (`docChanged` false), so the `anchorKey` meta routes it.
 			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) {
 				// (d) the change signal, only for what actually landed.
 				const newRt = scan ? scanContent(scan) : pmToContent(next.doc);
 				if (commitEdit(oldRt, newRt)) opts.onChange?.(addr);
 			}
-			// The caret, for both structural and selection-only changes: a host
-			// following the caret wants an arrow key, and a host recompiling wants
-			// `onChange`. Reported after the commit, so the edit has landed by the
-			// time the caret names where it is.
+			// The caret, for structural and selection-only changes, reported after the commit.
 			opts.onCaretMove?.(addr, pmToUsv(index, next.selection.head));
 		},
 		handleDOMEvents: {
@@ -474,8 +420,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		}
 	});
 
-	/** The state, and the index over the document it was built from: the seed reads one
-	 *  and every caller wants the same one, and `buildLineIndex` is a whole walk. */
+	/**
+	 * The state, and the index over the document it was built from (`buildLineIndex` is a whole
+	 * walk).
+	 */
 	function buildState(rt: Content): { state: EditorState; index: LineIndex } {
 		if (held) {
 			const pmDoc = decode(rt, blockSchema);
@@ -510,24 +458,21 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		return { state: built, index: seedIndex };
 	}
 
-	// (b)+(c): lower the edit to ops and commit, or `overwrite` a field not yet at
-	// content rest. Keep the optimistic PM on throw.
-	// Returns whether anything landed: the caller's change signal, which must not
-	// be a property of which branch the commit took.
+	// (b)+(c): lower the edit to ops and commit, or `overwrite` a field not yet at content rest.
+	// Keeps the optimistic PM on throw. Returns whether anything landed, independent of which
+	// branch ran.
 	function commitEdit(oldRt: Content, newRt: Content): boolean {
 		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
 			return commitUnset();
 		if (plaintext) return commitPlain(newRt.text);
-		// The text splice, computed once per keystroke: the gate below, both overwrite
-		// fallbacks, and `lower` all read this one `edit`. The projection is the
-		// caller's, off the same walk that rebuilt the index.
+		// The text splice, computed once per keystroke and shared by the gate, both overwrite
+		// fallbacks and `lower`.
 		const edit = contentEdit(oldRt, newRt);
 		try {
-			// A field not yet at content rest is the only edit that overwrites by choice:
-			// `applyChange` throws on an absent declared field (verified), and neither an
-			// absent field nor an authored string has anchors to lose (`opsCommittable`).
-			// Every structural edit lowers, island creation included: the island channel
-			// places a slot the `delta` may not carry.
+			// Only a field not yet at content rest overwrites by choice: `applyChange` throws on an
+			// absent declared field, and neither it nor an authored string has anchors to lose
+			// (`opsCommittable`). Every structural edit lowers; the island channel places a slot
+			// the `delta` may not carry.
 			if (!opsCommittable(doc, addr)) {
 				doc.overwrite(addr, edit.newRt); // brings the field to content rest
 			} else {
@@ -538,10 +483,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			reconciler.commit(readLeaf(reader, addr));
 			return true;
 		} catch (e) {
-			// Bound the damage: an op path the gates missed leaves the store stale
-			// while PM keeps the edit; and because the reconciler then re-diffs
-			// from that stale content, every later edit re-throws and the field
-			// silently stops persisting. Install the full projection instead
+			// Bound the damage: after an op path the gates missed, the reconciler re-diffs from
+			// stale content and every later edit would re-throw. Install the full projection
 			// (correct store, pays this field's anchors).
 			reportError(opts.onError, {
 				code: 'commit-fallback',
@@ -567,14 +510,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	}
 
 	/**
-	 * A `text` leaf's commit: its whole text through the typed writer, which rests the
-	 * field as that literal string (CODEC §Inline mode). A content object is the
-	 * other rest form, and `toMarkdown` emits one as markdown: a break spelled as a
-	 * backslash, a `*` and a trailing space escaped, a blank line doubled, so the value
-	 * reads back changed. The leaf carries no anchors, so the op path has none to keep.
-	 *
-	 * A refusal lands nothing and has no fallback, the other rest form being the
-	 * corruption; the next edit writes the whole text again.
+	 * A `text` leaf's commit: its whole text through the typed writer, resting the field as that
+	 * literal string (CODEC §Inline mode). The content-object rest form would emit markdown
+	 * (escaped `*`, backslash breaks) and read back changed. A refusal lands nothing and has no
+	 * fallback; the next edit writes the whole text again.
 	 */
 	function commitPlain(text: string): boolean {
 		try {
@@ -624,17 +563,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		el: container,
 		setCaret(pos: number): void {
 			const pm = usvToPM(index, pos);
-			// `Selection.near`, not `TextSelection.create`: the mapped position can
-			// be non-inline (before an island/rule block, or doc-level in an empty
-			// nested textblock), where a raw TextSelection is invalid.
+			// `Selection.near`: the mapped position can be non-inline, where a raw TextSelection is
+			// invalid.
 			const sel = Selection.near(view.state.doc.resolve(pm));
-			// Focus first, then the caret: the order a click's own pair arrives in, and the
-			// one a consumer that ends its caret follow on the arrival needs — the other
-			// way round, the arrival ends the follow this call just started.
-			//
-			// Flagged, because PM focuses with `preventScroll` and a landing is a caret
-			// move like any other: unflagged, the caret an arrow key would have revealed
-			// is left off screen by the click that placed it.
+			// Focus first, then the caret, the order a click arrives in: the other way round the
+			// arrival ends the follow this call just started. Flagged, since PM focuses with
+			// `preventScroll` and an unflagged landing leaves the caret off screen.
 			view.focus();
 			view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 		},
@@ -673,9 +607,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		},
 		focus(): void {
 			view.focus();
-			// The placement rung's reveal: no caret to flag a transaction with, so the
-			// trip is the element's, `nearest` and no clearance — the one the control
-			// lane's own focus takes, for the landing that means the same thing there.
+			// The placement rung's reveal: no caret to flag a transaction with, so the trip is the
+			// element's, `nearest`, no clearance.
 			view.dom.scrollIntoView({ block: 'nearest' });
 		},
 		getContent(): Content {
@@ -685,9 +618,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			// A text field carries no marks (§Inline mode), and a held one commits nothing.
 			if (plaintext || held) return;
 			if (heldAnchors().some((a) => a.id === id)) return; // ids are unique + invariant (0.97 policy)
-			// An anchor commits through `applyChange`, so the field is brought to content
-			// rest first; else the commit's overwrite branch (value semantics) would drop
-			// the just-added anchor.
+			// An anchor commits through `applyChange`, so the field is brought to content rest
+			// first or the overwrite branch would drop it.
 			if (!opsCommittable(doc, addr)) doc.overwrite(addr, reconciler.last);
 			const pm = usvToPM(index, pos);
 			view.dispatch(view.state.tr.setMeta(anchorKey, { op: 'add', id, pos: pm } as AnchorEdit));
@@ -722,8 +654,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			view.destroy();
 		}
 	};
-	// The underlying views, exposed as available (undocumented) handles: the
-	// VisualEditor composes views, and tests drive edits through them.
+	// The underlying views, exposed for VisualEditor and tests.
 	const handles = controller as FieldController & LeafViews;
 	handles.view = view;
 	handles.nestedViews = () => [...nested];
@@ -736,38 +667,28 @@ export function createField(opts: CreateFieldOpts): FieldController {
 }
 
 /**
- * The prose-leaf plugin stack (VISUAL_EDITOR §Surface): shared by
- * {@link createField} and the by-value editor (`ProseValue`), so the two
- * never fork the keymap/plugin ordering. History first, with the plugin that starts an
- * undo step at each block-moving edit (`undo.ts`), then any leaf-specific
- * plugins (`afterHistory`: the addressed leaf passes its anchor-position plugin;
- * a by-value leaf passes none), then {@link linebreakPlugin}, which normalizes what
- * the rest of the stack leaves, then the markdown-shorthand input rules and the
- * Backspace that takes one back, the field keymap over the base keymap, the URL paste
- * that links a selection (`link-paste.ts`), and last the ones that answer to a block
- * leaf's own shapes: the gap cursor, {@link pastAtomPlugin}, the island paste pass
- * (`islands.ts`), the table paste (`table-paste.ts`), the markdown paste
- * (`markdown-paste.ts`) and the task item's checkbox (`tasks.ts`). A one-line leaf's
- * paste joins its lines (`line-paste.ts`).
+ * The prose-leaf plugin stack (VISUAL_EDITOR §Surface), shared by {@link createField} and
+ * `ProseValue` so the two never fork the plugin ordering. History first with the step-splitting
+ * plugin (`undo.ts`), then `afterHistory` plugins (the addressed leaf's anchor plugin), {@link
+ * linebreakPlugin}, the markdown-shorthand input rules and their Backspace, the field keymap over
+ * the base keymap, the URL paste that links a selection (`link-paste.ts`), and last the block
+ * leaf's own shapes: the gap cursor, {@link pastAtomPlugin}, the island paste (`islands.ts`), table
+ * paste (`table-paste.ts`), markdown paste (`markdown-paste.ts`) and the task checkbox
+ * (`tasks.ts`). A one-line leaf's paste joins its lines (`line-paste.ts`).
  *
- * Every mark-shaped plugin reads the schema rather than a flag: over either mark-free
- * schema the shorthand rules build nothing (each is guarded on its mark type), the
- * toggles bind no key and a pasted URL stays text, so a `**bold**` keeps the delimiters
- * its author typed without a second rule saying so.
+ * Mark-shaped plugins read the schema rather than a flag: over a mark-free schema the shorthand
+ * rules build nothing, the toggles bind no key and a pasted URL stays text.
  */
 export function proseLeafPlugins(
 	schema: Schema,
 	opts: {
 		inline: boolean;
-		/** The slash menu's report channel; absent mounts no menu and leaves
-		 *  Enter/Escape/the arrows to the links below (`keymap.ts`). */
+		/** The slash menu's report channel; absent mounts no menu (`keymap.ts`). */
 		slash?: (state: SlashState | undefined) => void;
 		/** The empty line's hint, read live; drawn only beside `slash`. */
 		slashHint?: () => string | undefined;
 		noInputRules?: boolean;
-		/** Read live, not captured: the ghost can move after mount
-		 *  ({@link FieldController.setPlaceholder}), and a re-hydration rebuilds this
-		 *  stack, so the plugin must ask rather than hold. */
+		/** Read live: the ghost can move after mount and a re-hydration rebuilds this stack. */
 		placeholder?: () => string | undefined;
 		/** {@link CreateFieldOpts.placeholderUntilEdit}. */
 		placeholderUntilEdit?: boolean;
@@ -789,8 +710,7 @@ export function proseLeafPlugins(
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));
 	if (schema.marks.link) list.push(linkPastePlugin(schema.marks.link));
-	// Each answers to something only the block schema holds: any other leaf is
-	// textblocks alone, with no island and no gap to put a cursor in.
+	// Each answers to something only the block schema holds.
 	if (isBlockSchema(schema))
 		list.push(
 			gapCursor(),
@@ -811,10 +731,8 @@ export function proseLeafPlugins(
 }
 
 /**
- * A plain leaf's clipboard text is literal, one line per `\n` both ways. Upstream's
- * defaults read pasted text as blocks split on any run of newlines, which drops a
- * blank line the value holds as content, and write a copy's blocks joined by a blank
- * line and its breaks as nothing.
+ * A plain leaf's clipboard text is literal, one line per `\n` both ways; upstream's defaults split
+ * pasted text on any run of newlines and write a copy's blocks joined by a blank line.
  */
 function plainClipboardPlugin(): Plugin {
 	const { paragraph } = plainSchema.nodes;
@@ -837,18 +755,11 @@ function plainClipboardPlugin(): Plugin {
 }
 
 /**
- * A printable key over a selected atom writes past it. A selection is the subject
- * of the next command, never a thing armed for
- * replacement: Backspace deletes it, Mod-C copies it, and a character lands beside
- * it. A block island takes the empty paragraph after it, or a new one where there is
- * none; an inline one the caret after the image in the same line: one rule, both node
- * types. Only a paragraph is reused, since an empty heading or fence would set the
- * text in a shape the key never asked for.
- *
- * PM routes text input over a non-`TextSelection` through `handleTextInput` before
- * falling back to replacing the selection, so this one prop is the whole of it.
- * Paste keeps replacing: a paste is deliberate, and it is the gesture that swaps one
- * island for another.
+ * A printable key over a selected atom writes past it: a selection is the subject of the next
+ * command, not armed for replacement. A block island takes the empty paragraph after it, or a new
+ * one; an inline one the caret after the image. Only a paragraph is reused. PM routes text input
+ * over a non-`TextSelection` through `handleTextInput`, so this one prop is the whole of it. Paste
+ * keeps replacing, as the gesture that swaps one island for another.
  */
 function pastAtomPlugin(): Plugin {
 	return new Plugin({
@@ -876,17 +787,11 @@ function pastAtomPlugin(): Plugin {
 }
 
 /**
- * The empty leaf's ghost. A node decoration stamps the sole empty textblock with a
- * class and the ghost text, which `prose.css` draws from the attribute: so the text
- * never enters the document, the caret path, or a `pmToContent` export, and it
- * vanishes the instant the leaf holds any content (the emptiness test fails).
- *
- * Under `placeholderUntilEdit` it is stamped only until the state's first edit, after
- * which the leaf has been answered. An inline leaf's ghost keeps to the one line the
- * leaf is (`qm-prose-placeholder-line`).
- *
- * The text is read per decoration pass rather than closed over, so moving the ghost is
- * a re-render and never a document edit.
+ * The empty leaf's ghost: a node decoration stamps the sole empty textblock with a class and the
+ * ghost text, which `prose.css` draws from the attribute, so the text never enters the document or
+ * a `pmToContent` export. Under `placeholderUntilEdit` it is stamped only until the state's first
+ * edit. An inline leaf's ghost keeps to one line (`qm-prose-placeholder-line`). The text is read
+ * per decoration pass, so moving the ghost is a re-render.
  */
 function ghostPlugin(opts: {
 	inline: boolean;
@@ -923,15 +828,12 @@ function ghostPlugin(opts: {
 }
 
 /**
- * The field's keymap: history, mark toggles, and the body's structural keys; Enter
- * suppressed inline. The toggles are bound per mark type the schema declares, so a
- * `text` leaf leaves the mark chords to the browser.
+ * The field's keymap: history, mark toggles (bound per mark type the schema declares), and the
+ * body's structural keys; Enter suppressed inline.
  *
- * Tab forks on the leaf's role, not on the caret's position. A one-line or `text`
- * leaf is a form field: Tab stays unbound, so field navigation is open for a shell
- * keymap (VISUAL_EDITOR §Settled and open). A block-schema body is a document: Tab
- * is structural, a chain each nested surface prepends to (`keymap.ts`). One key
- * never means two things within one surface.
+ * Tab forks on the leaf's role: a one-line or `text` leaf is a form field, Tab unbound so field
+ * navigation is open for a shell keymap (VISUAL_EDITOR §Settled and open); a block-schema body
+ * takes Tab structurally, a chain each nested surface prepends to (`keymap.ts`).
  */
 function editorKeymap(schema: Schema, inline: boolean, slash?: boolean): Record<string, Command> {
 	const map: Record<string, Command> = {
@@ -945,10 +847,8 @@ function editorKeymap(schema: Schema, inline: boolean, slash?: boolean): Record<
 	if (schema.marks.strike) map['Mod-Shift-x'] = toggleMark(schema.marks.strike);
 	if (schema.marks.code) map['Mod-e'] = toggleMark(schema.marks.code);
 	if (inline) {
-		// One textblock only: swallow Enter so no second block is attempted. One *line*
-		// only too (`Content::is_inline`), so Shift-Enter goes with it: the schema
-		// declares no break node, and a declined key is the browser's, whose native
-		// `<br>` is the one thing that could put a second line in a field that holds one.
+		// One textblock only: swallow Enter, and Shift-Enter with it (the schema declares no break
+		// node; a declined key is the browser's native `<br>`).
 		map['Enter'] = () => true;
 		map['Shift-Enter'] = () => true;
 	} else {

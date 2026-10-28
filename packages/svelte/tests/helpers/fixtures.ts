@@ -1,7 +1,5 @@
-// Node-side fixture loading for Vitest: walk a quill directory into the
-// `Map<string, Uint8Array>` `Quill.fromTree` accepts. The playground reads the same
-// tree through a built quiver over HTTP; this is the filesystem twin, so a test
-// builds the reference quill with no server and no pack step.
+// Node-side fixture loading for Vitest: walk a quill directory into the `Map<string, Uint8Array>`
+// `Quill.fromTree` accepts.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, sep } from 'node:path';
@@ -10,30 +8,22 @@ import { init, type Document, type Quill } from '@quillmark/wasm';
 /** The core surface, for the classes and free functions `init` is the only door to. */
 export const core = await init();
 
-// `fixtures/` is the workspace's, not this package's: the playground reads the same
-// tree, so it sits above both.
+// `fixtures/` is the workspace's, shared with the playground.
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..', '..', '..');
 
 /**
- * The reference quiver's quills (dev fixtures, never published). `showcase` is the
- * workspace's own and is what a suite drives unless it says otherwise; `usaf_memo` is
- * a copy of a shipped quill, held at `0.0.0` (fixtures/Quiver.yaml).
+ * The reference quiver's quills (fixtures/Quiver.yaml). `showcase` is the default; `usaf_memo` is a
+ * copy of a shipped quill.
  */
 const ROOTS = {
 	showcase: join(REPO_ROOT, 'fixtures', 'quills', 'showcase', '1.0.0'),
 	usaf_memo: join(REPO_ROOT, 'fixtures', 'quills', 'usaf_memo', '0.0.0')
 } as const;
 
-/** Which fixture quill: the default is `showcase` everywhere it is not named. */
 export type FixtureName = keyof typeof ROOTS;
 
-/**
- * A fixture quill's tree, keyed by `"/"`-joined paths relative to its root; binary
- * bytes intact (the fonts, the letterhead mark and the seals are read as raw
- * `Uint8Array`, never decoded). The version directory is quill content throughout,
- * so there is nothing here to skip.
- */
+/** A fixture quill's tree, keyed by `"/"`-joined paths relative to its root, bytes undecoded. */
 export function loadFixtureTree(name: FixtureName = 'showcase'): Map<string, Uint8Array> {
 	const root = ROOTS[name];
 	const tree = new Map<string, Uint8Array>();
@@ -52,10 +42,8 @@ export function loadFixtureTree(name: FixtureName = 'showcase'): Map<string, Uin
 }
 
 /**
- * A fixture quill, parsed once per worker. `Quill.fromTree` re-parses the whole
- * fixture tree, and a suite only ever reads its schema or opens fresh documents off
- * it; so the handle is shared and never freed, rather than each suite keeping its own
- * copy of this cache.
+ * A fixture quill, parsed once per worker and never freed: suites only read its schema or open
+ * documents off it.
  */
 const cached = new Map<FixtureName, Quill>();
 export function quill(name: FixtureName = 'showcase'): Quill {
@@ -65,9 +53,8 @@ export function quill(name: FixtureName = 'showcase'): Quill {
 }
 
 /**
- * A fixture quill's example document, its root `example.md`, conformed against it:
- * every field and body filled, which a seed leaves empty. A fresh `Document` per call,
- * the caller's to free.
+ * A fixture quill's example document, every field and body filled. A fresh `Document` per call, the
+ * caller's to free.
  */
 export function example(name: FixtureName = 'showcase'): Document {
 	const doc = quill(name).exampleDocument();
@@ -76,10 +63,9 @@ export function example(name: FixtureName = 'showcase'): Document {
 }
 
 /**
- * A quill of its `Quill.yaml` alone, over a one-line plate: the probe a suite declares
- * when the reference quill has no field of the shape under test. Fresh per call. The
- * bytes are re-wrapped in this realm's `Uint8Array`: under jsdom the encoder's output
- * comes from another realm, and the boundary refuses it by identity.
+ * A quill of its `Quill.yaml` alone over a one-line plate, for a field shape the reference quill
+ * lacks. Fresh per call. Bytes are re-wrapped in this realm's `Uint8Array` because under jsdom the
+ * encoder's output is from another realm and the boundary refuses it.
  */
 export function quillFromYaml(yaml: string): Quill {
 	const bytes = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));

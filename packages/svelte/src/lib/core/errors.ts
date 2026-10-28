@@ -1,26 +1,20 @@
-// The error channel: what a surface reports when it recovered from a failure.
+// The error channel: what a surface reports when it recovered from a failure. Every site behind
+// these codes declines to crash: a refused commit falls back, a failed paint shows a message, a
+// failed resolve drops the ghosts. Nothing gates on the handler, and an absent handler logs.
 //
-// Every site behind these codes declines to crash: a refused commit falls back, a
-// failed paint shows a message, a failed resolve drops the ghosts. The hook exists
-// because a `console.error` is not something an app can route, filter or count.
-// Nothing gates on the handler, and an absent handler logs.
+// Two axes route it, and neither is the code. `severity` splits a contract violation aimed at
+// whoever wired the surface (`dev`) from a runtime failure an app counts (`error`). Every runtime
+// code leaves the document as it found it except `commit-lost`, which leaves one field's store
+// stale behind an optimistic view and is the only one with anything to say to the person typing.
 //
-// **Two axes route it, and neither is the code.** `severity` splits a contract
-// violation aimed at whoever wired the surface (`dev`) from a runtime failure an app
-// counts (`error`). Damage splits the runtime ones: every code below leaves the
-// document as it found it except `commit-lost`, which leaves one field's store stale
-// behind an optimistic view. So `commit-lost` is the only one with anything to say to
-// the person typing, and the rest are telemetry.
-//
-// It is not the diagnostics channel. A `Diagnostic` is about the document and is
-// drawn on the field it belongs to; an `EditorError` is about the surface and is
-// drawn nowhere. A refused scalar commit produces both, deliberately: the
-// diagnostic pins to the field, the error reaches the app's sink.
+// It is not the diagnostics channel: a `Diagnostic` is about the document and drawn on its field;
+// an `EditorError` is about the surface and drawn nowhere. A refused scalar commit produces both,
+// deliberately.
 import type { DocPath } from './address.js';
 
 /**
- * What failed. Stable strings rather than an enum: a consumer switches on them,
- * and a new surface adds a code without moving the ones an app already handles.
+ * What failed. Stable strings rather than an enum: a consumer switches on them, and a new surface
+ * adds a code without moving the ones an app handles.
  */
 export type EditorErrorCode =
 	/** A scalar/array/object write the boundary refused. Also pinned as a
@@ -46,28 +40,18 @@ export type EditorErrorCode =
 	/** A tip's markdown did not render: the tip shows as literal text. */
 	| 'tip-render-failed'
 	/**
-	 * A prop a surface binds once was swapped in place, and the surface neither
-	 * re-keyed on it nor observed it. The mounted surface still names the previous
-	 * handle. `dev` throughout: the fix is a remount at the call site, so this is
-	 * aimed at whoever wired it and never at a running app's telemetry.
-	 *
-	 * The one code that is also thrown, in a dev build, once reported: a swapped
-	 * `onError` is itself a rebind, so the handler this arrives at may be the one the
-	 * consumer just replaced (`rebind.svelte.ts`).
+	 * A prop a surface binds once was swapped in place, and the surface neither re-keyed on it nor
+	 * observed it. `dev`: the fix is a remount at the call site. Also thrown, in a dev build, once
+	 * reported; a swapped `onError` is itself a rebind, so the handler this arrives at may be the
+	 * one just replaced (`rebind.svelte.ts`).
 	 */
 	| 'rebind-ignored'
 	/**
-	 * A landing named a card or a field the surface does not hold: a `cardId` from a
-	 * previous session or an already-removed card, or a `DocPath` naming no declared
-	 * field — an array element path included, where the array itself is undeclared or
-	 * unmounted. The call is a no-op and the document is untouched.
-	 *
-	 * `dev`, because the fix is at the call site: a host driving the instance verbs
-	 * from outside, or a preview pick the editor has no field to route to. Every
-	 * mounted field is a target, prose leaf and form control alike, and an array's
-	 * elements are targets through it, so this is not how a scalar or an element
-	 * reports. The preview never reports it at all: a field it places nothing for is
-	 * `scrollToField` returning `false`.
+	 * A landing named a card or a field the surface does not hold: a stale `cardId`, or a `DocPath`
+	 * naming no declared field (an array element path included where the array is undeclared or
+	 * unmounted). The call is a no-op. `dev`: the fix is at the call site, a host driving the
+	 * instance verbs or a preview pick the editor has no field to route to. The preview never
+	 * reports it: a field it places nothing for is `scrollToField` returning `false`.
 	 */
 	| 'target-unknown';
 
@@ -75,9 +59,8 @@ export type EditorErrorCode =
 export interface EditorError {
 	code: EditorErrorCode;
 	/**
-	 * `error` is a runtime failure an app routes to telemetry; `dev` is a contract
-	 * violation aimed at whoever is building against the package. Without the
-	 * split every consumer's sink filters the dev codes by hand.
+	 * `error` is a runtime failure an app routes to telemetry; `dev` a contract violation aimed at
+	 * whoever builds against the package.
 	 */
 	severity: 'error' | 'dev';
 	/** English, for a log. Not for display: nothing here has a place on screen. */
@@ -94,12 +77,8 @@ export interface EditorError {
 export type EditorErrorHandler = (err: EditorError) => void;
 
 /**
- * Report `err`, or log it when nothing is listening: a failure the package
- * recovered from is worth seeing in a console.
- *
- * A throwing handler is the consumer's bug and must not become the package's: it
- * is caught, because every call site sits on a recovery path where a second throw
- * would undo the recovery.
+ * Report `err`, or log it when nothing is listening. A throwing handler is caught: every call site
+ * sits on a recovery path where a second throw would undo the recovery.
  */
 export function reportError(handler: EditorErrorHandler | undefined, err: EditorError): void {
 	if (!handler) {

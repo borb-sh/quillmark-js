@@ -1,15 +1,13 @@
-// Encode: PM → a `ChangeBundle` for `applyChange` (CODEC §Encode). Content is truth,
-// PM its projection, and an edit lowers to `{ delta?, islandOps?, lineOps?, markOps? }`
-// rather than re-`overwrite`ing, so identity anchors rebase through the splice.
+// Encode: PM → a `ChangeBundle` for `applyChange` (CODEC §Encode). Content is truth, PM its
+// projection, and an edit lowers to `{ delta?, islandOps?, lineOps?, markOps? }` rather than
+// re-`overwrite`ing, so identity anchors rebase through the splice.
 //
-// `pmToContent` is decode's pure inverse; `lower` diffs old→new into ops. A raw `\n`
-// in the `delta` splits a line and a deleted `\n` joins: so all text routes through
-// `delta`, `lineOps` carry per-line `setKind` /
-// `setContainers` / `setContinues` metadata, and an island's payload rides
-// `islandOps`, the one channel that reaches it. Every op reads in one coordinate
-// space, the final USV content (delta then island ops applied). `applyChange`
-// auto-rebases the marks already in the field; `mapMarks` answers where that leaves
-// them, so `markOps` are the difference from that answer and stay coverage-precise.
+// `pmToContent` is decode's pure inverse; `lower` diffs old→new into ops. A raw `\n` in the `delta`
+// splits a line and a deleted `\n` joins, so all text routes through `delta`, `lineOps` carry
+// per-line `setKind` / `setContainers` / `setContinues`, and an island's payload rides `islandOps`,
+// the one channel that reaches it. Every op reads in the final USV content (delta then island ops
+// applied). `applyChange` auto-rebases the marks already in the field and `mapMarks` answers where
+// that leaves them, so `markOps` are the difference from that answer.
 import type { Mark, Node as PMNode } from 'prosemirror-model';
 import type {
 	ChangeBundle,
@@ -48,11 +46,11 @@ export interface Scan {
 	usvEnd: number;
 }
 
-/** A working accumulator threaded through the walk. `usvEnd` is the running USV
- * length of `text`: every run's `usvStart` reads it and every append advances it.
- * It is a counter rather than a measurement of `text` because the walk runs twice
- * per keystroke and `usvLength` is O(n): measuring per run makes the scan
- * quadratic in the field's length. */
+/**
+ * A working accumulator threaded through the walk. `usvEnd` is the running USV length of `text`, a
+ * counter because `usvLength` is O(n) and measuring per run would make the twice-per-keystroke scan
+ * quadratic.
+ */
 interface Acc extends Scan {
 	rawMarks: ContentMark[]; // per-text-node marks, merged into `marks` at the end
 	lastContentEndPm: number; // PM position after the previous content line's content
@@ -65,9 +63,8 @@ function appendText(acc: Acc, s: string): void {
 }
 
 /**
- * Walk a PM document once, producing the content projection and the position-map
- * runs (they share the traversal so they can never disagree). This is the single
- * source both `pmToContent` and the position map draw from.
+ * Walk a PM document once, producing the content projection and the position-map runs; sharing the
+ * traversal means they cannot disagree.
  */
 export function scanDoc(doc: PMNode): Scan {
 	const acc: Acc = {
@@ -85,8 +82,10 @@ export function scanDoc(doc: PMNode): Scan {
 	return acc;
 }
 
-/** The content projection a scan carries (drops the position runs): what a caller
- *  holding a `Scan` reads instead of walking the document a second time. */
+/**
+ * The content projection a scan carries, for a caller holding a `Scan` that would otherwise walk
+ * again.
+ */
 export function scanContent(s: Scan): Content {
 	const { text, lines, marks, islands } = s;
 	return { text, lines, marks, islands };
@@ -97,11 +96,12 @@ export function pmToContent(doc: PMNode): Content {
 	return scanContent(scanDoc(doc));
 }
 
-/** Walk a block-content fragment; `contentStart` is the PM pos before its first child.
- * Two container siblings of one run shape read as a single container — contiguity plus
- * an equal path is what the store means by "the same one" — so each alternates its
- * `instance` against the sibling before it. Sibling adjacency is the whole scope: a
- * container one level in has a differing path above it, which already tells it apart. */
+/**
+ * Walk a block-content fragment; `contentStart` is the PM pos before its first child. Two container
+ * siblings of one run shape read as a single container (contiguity plus an equal path is the
+ * store's "same one"), so each alternates its `instance` against the sibling before it; a container
+ * one level in already differs in path above it.
+ */
 function scanBlocks(
 	acc: Acc,
 	parent: PMNode,
@@ -120,9 +120,10 @@ function scanBlocks(
 	});
 }
 
-/** A block's container run shape, `ordinal` and `instance` aside; null where it opens
- * no container. A list's `start` is not in it — the store welds two runs differing only
- * there. */
+/**
+ * A block's container run shape, `ordinal` and `instance` aside; null where it opens no container.
+ * A list's `start` is not in it: the store welds two runs differing only there.
+ */
 function runShape(node: PMNode): string | null {
 	switch (node.type.name) {
 		case 'blockquote':
@@ -221,9 +222,10 @@ function textblockKind(node: PMNode): ContentLineKind {
 	return { kind: 'para' };
 }
 
-/** A container with its run `instance`, spelled only where it is not the zero a
- * canonical read omits: the projection is compared against such a read
- * (`lineMetaEqual`), so the two have to spell one container one way. */
+/**
+ * A container with its run `instance`, spelled only where it is not the zero a canonical read
+ * omits, so the projection and `lineMetaEqual` spell one container one way.
+ */
 function withInstance<T extends ContentContainer>(container: T, instance: number): T {
 	return instance === 0 ? container : { ...container, instance };
 }
@@ -260,11 +262,9 @@ function scanInline(
 		if (child.isText) {
 			const text = child.text ?? '';
 			emitText(acc, text, pm, child.marks);
-			// A `\n` in a textblock that is not `whitespace: 'pre'` is the same line
-			// boundary a hard break is: `paragraph` is `inline*`, so the schema admits
-			// one, and `joinTextblocksAround` — a bare `replaceStep` running neither
-			// `clearIncompatible` nor `replaceNewlines` — leaves one. It rides the text
-			// run, where PM and USV advance together.
+			// A `\n` in a textblock that is not `whitespace: 'pre'` is the same line boundary a
+			// hard break is: `joinTextblocksAround` (a bare `replaceStep`) leaves one. It rides the
+			// text run, where PM and USV advance together.
 			const breaks = text.split('\n').length - 1;
 			for (let i = 0; i < breaks; i++) acc.lines.push({ containers, continues: true, ...kind });
 		} else if (child.type.name === 'hard_break') {
@@ -293,10 +293,8 @@ function emitText(acc: Acc, s: string, pmStart: number, marks: readonly Mark[]):
 }
 
 /**
- * Merge adjacent/overlapping same-descriptor marks into maximal ranges: the
- * per-text-node marks the walk emits, folded into the content's normalized form.
- * Same two primitives the mark diff runs on (`groupFormatting` + `union`), so the
- * projection and the diff group and merge by one rule.
+ * Merge adjacent/overlapping same-descriptor marks into maximal ranges, by the same primitives the
+ * mark diff runs on (`groupFormatting` + `union`).
  */
 function mergeMarks(raw: ContentMark[]): ContentMark[] {
 	const out: ContentMark[] = [];
@@ -316,16 +314,11 @@ interface LowerOpts {
 }
 
 /**
- * One old→new content edit with the text splice it implies. Both sides are content,
- * never a PM doc: the projection of the new doc (`pmToContent`) is the caller's to
- * hold, because a doc-taking overload re-walks the whole tree, once per keystroke,
- * for a value the caller has in hand.
- *
- * The splice rides along because `diffText` allocates a code-point array per side
- * and the commit path holds the edit across the lowering. `contentEdit` being its
- * only constructor is what keeps a `delta` from disagreeing with the contents it
- * was diffed from; `lower` is where a slot inside that splice moves to the island
- * channel, so this `delta` is the raw splice, not always the one committed.
+ * One old→new content edit with the text splice it implies. Both sides are content, never a PM doc:
+ * a doc-taking overload would re-walk the tree per keystroke for a projection the caller holds. The
+ * splice rides along because `diffText` allocates a code-point array per side. `contentEdit` is its
+ * only constructor, which keeps a `delta` agreeing with the contents it was diffed from; `lower`
+ * moves a slot inside the splice to the island channel, so this `delta` is the raw splice.
  */
 export interface ContentEdit {
 	readonly oldRt: Content;
@@ -377,12 +370,10 @@ function diffText(oldText: string, newText: string): Delta | undefined {
 }
 
 /**
- * Whether the splice moves a line boundary — a `\n` deleted, or one inserted. Where
- * it does not, every line keeps the metadata it had and equal metadata on both sides
- * is the whole story. Where it does, the store's split/join inheritance decides what
- * each line ends up carrying, and an array that still matches position for position
- * says nothing about it: one splice that both joins a boundary and opens another
- * leaves the line count and the metadata array unchanged while the kinds slide.
+ * Whether the splice moves a line boundary (a `\n` deleted or inserted). Where it does not, equal
+ * metadata on both sides is the whole story. Where it does, the store's split/join inheritance
+ * decides what each line carries: one splice that joins a boundary and opens another leaves the
+ * line count and metadata array unchanged while the kinds slide.
  */
 function movesBoundary(oldText: string, delta: Delta | undefined): boolean {
 	if (!delta) return false;
@@ -406,11 +397,8 @@ function movesBoundary(oldText: string, delta: Delta | undefined): boolean {
 function diffLines(oldRt: Content, newRt: Content, delta: Delta | undefined): LineOp[] {
 	if (!movesBoundary(oldRt.text, delta) && lineMetaEqual(oldRt.lines, newRt.lines)) return [];
 	const ops: LineOp[] = [];
-	// Force every new line's metadata. Redundant ops are safe no-ops (verified),
-	// so this is correct regardless of how the delta's split/join inheritance left
-	// the intermediate metadata. `continues` is a boundary property of the `\n`
-	// preceding a line: line 0 has no predecessor, never carries it, and the op
-	// rejects it there, so it's set only for lines ≥ 1.
+	// Force every new line's metadata; redundant ops are safe no-ops. `continues` is a property of
+	// the `\n` preceding a line, so line 0 never carries it and it is set only for lines ≥ 1.
 	for (let i = 0; i < newRt.lines.length; i++) {
 		const l = newRt.lines[i];
 		ops.push({ op: 'setContainers', line: i, containers: l.containers });
@@ -420,9 +408,10 @@ function diffLines(oldRt: Content, newRt: Content, delta: Delta | undefined): Li
 	return ops;
 }
 
-/** A line minus its `containers` / `continues` envelope: exactly `setKind`'s
- * payload, which the boundary names `ContentLineKind`. Lifting it whole is what keeps
- * this arm-agnostic, so an arm added upstream reaches the op by construction. */
+/**
+ * A line minus its `containers` / `continues` envelope: exactly `setKind`'s payload
+ * (`ContentLineKind`). Lifted whole, so an arm added upstream reaches the op by construction.
+ */
 function kindPart(l: ContentLine): ContentLineKind {
 	const { containers: _containers, continues: _continues, ...kind } = l;
 	return kind;
@@ -442,9 +431,10 @@ function lineMetaEqual(a: ContentLine[], b: ContentLine[]): boolean {
 	return true;
 }
 
-/** A line kind's comparison key: key-order-insensitive at every depth, because the two
- * sides come from different producers (a WASM read and this scan) and a kind carries a
- * nested `attrs` bag. */
+/**
+ * A line kind's comparison key, key-order-insensitive at every depth: the sides come from different
+ * producers (a WASM read and this scan) and a kind carries a nested `attrs` bag.
+ */
 function kindKey(l: ContentLine): string {
 	return canonicalJson(kindPart(l));
 }
@@ -460,21 +450,15 @@ interface IslandSplit {
 }
 
 /**
- * Split the edit's islands off the text splice. `applyChange` throws
- * `IslandSlotInInsert` on a `delta` that types a slot, so a slot never rides the
- * delta: every slot inside the splice's inserted region is stripped from it and
- * placed by `{ op: 'insert', at }`, which carries the backing entry in the same
- * op. Every other island kept its slot, so a changed payload is `{ op: 'set' }`,
- * addressed by the id both sides carry. A deleted island needs no op at all: the
- * delta that removes its slot drops the entry.
+ * Split the edit's islands off the text splice. `applyChange` throws `IslandSlotInInsert` on a
+ * `delta` that types a slot, so every slot inside the splice's inserted region is stripped from it
+ * and placed by `{ op: 'insert', at }`, which carries the backing entry. Every other island kept
+ * its slot, so a changed payload is `{ op: 'set' }` by the id both sides carry. A deleted island
+ * needs no op: the delta that removes its slot drops the entry.
  *
- * `at` is the slot's position in the final text: inserts apply left to right, so
- * by the time the k-th lands, the k slots before it are back in place.
- *
- * The pairing is positional for `insert` and by id for `set`, which is what each
- * addresses by. An id the store does not carry emits nothing rather than a `set`
- * that would throw `UnknownIslandId`: nothing mints or renames an island id, so
- * it is unreachable.
+ * `at` is the slot's position in the final text: inserts apply left to right, so by the k-th, the k
+ * slots before it are in place. An id the store does not carry emits nothing (it would throw
+ * `UnknownIslandId`); nothing mints or renames an island id, so that is unreachable.
  */
 function splitIslands(edit: ContentEdit): IslandSplit {
 	const { oldRt, newRt, delta } = edit;
@@ -496,8 +480,7 @@ function splitIslands(edit: ContentEdit): IslandSplit {
 	return { delta: inserts && delta ? withoutSlots(delta) : delta, islandOps };
 }
 
-/** The USV positions of `text`'s island slots, in document order: the i-th is the
- *  i-th island's, since the scan appends an entry per slot it writes. */
+/** The USV positions of `text`'s island slots, in document order: the i-th is the i-th island's. */
 function slotPositions(text: string): number[] {
 	const out: number[] = [];
 	let usv = 0;
@@ -508,9 +491,10 @@ function slotPositions(text: string): number[] {
 	return out;
 }
 
-/** The splice's inserted region `[start, end)` in final coords. `diffText` emits
- *  one `[retain?][delete?][insert?][retain?]`, so the leading retain is where the
- *  insert lands and its length is how far it reaches. */
+/**
+ * The splice's inserted region `[start, end)` in final coords: `diffText` emits one
+ * `[retain?][delete?][insert?][retain?]`, so the leading retain is where the insert lands.
+ */
 function insertedRegion(delta: Delta | undefined): { start: number; end: number } {
 	if (!delta) return { start: 0, end: 0 };
 	const lead = delta.ops[0];
@@ -519,9 +503,10 @@ function insertedRegion(delta: Delta | undefined): { start: number; end: number 
 	return { start, end: start + (insert ? usvLength(insert.insert) : 0) };
 }
 
-/** The delta with every island slot removed from its insert, or `undefined` when
- *  that leaves nothing but retains. Retain/delete arithmetic reads the old text,
- *  so dropping inserted characters leaves the rest of the splice intact. */
+/**
+ * The delta with every island slot removed from its insert, or `undefined` when only retains
+ * remain.
+ */
 function withoutSlots(delta: Delta): Delta | undefined {
 	const ops: Delta['ops'] = [];
 	let splices = false;
@@ -547,9 +532,10 @@ interface Interval {
 	end: number;
 }
 
-/** Formatting marks → add/remove ops; anchors → add/removeAnchor by id. A `MarkOp`'s
- * `add` / `remove` is a `ContentMark` under an op, so a descriptor spreads in whole and
- * the wire's `attrs` spelling is the one a checker admits. */
+/**
+ * Formatting marks → add/remove ops; anchors → add/removeAnchor by id. A descriptor spreads in
+ * whole, so the wire's `attrs` spelling is the one a checker admits.
+ */
 function diffMarks(oldRt: Content, newRt: Content, moved: ChangeBundle, opts: LowerOpts): MarkOp[] {
 	const ops: MarkOp[] = [];
 	// The store's answer for where `moved`'s text channels leave the field's marks;

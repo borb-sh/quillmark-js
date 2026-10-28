@@ -1,9 +1,5 @@
-// `createPreview` wires paint.ts, bridge.ts and viewport.ts over one `LiveSession`
-// and `opts.container`, and is the only thing that composes them: the paint loop
-// owns the page slots; the bridge attaches its own listeners to those same
-// slots; the viewport sets the one scale they are drawn at. A pure view: never calls
-// `session.apply`, never mutates the session; the consumer drives edits and hands the
-// resulting `ChangeSet` to `refresh`.
+// `createPreview` composes paint.ts, bridge.ts and viewport.ts over one `LiveSession`. A pure view:
+// it never calls `session.apply`; the consumer hands the resulting `ChangeSet` to `refresh`.
 import type { LiveSession, ChangeSet } from '@quillmark/wasm';
 import type { DocPath, Landing, Place } from '../core/address.js';
 import { reportError, errorMessage, type EditorErrorHandler } from '../core/errors.js';
@@ -17,15 +13,18 @@ export interface PreviewOptions {
 	container: HTMLElement;
 	/** Pages kept painted beyond the visible band. Default 1. */
 	margin?: number;
-	/** A click resolved to an address ({@link Landing}): a caret where the compile
-	 *  tracks the content under the point, the field alone where it tracks only the
-	 *  placement. The hook does not fire where the compile tracks neither. */
+	/**
+	 * A click resolved to an address ({@link Landing}): a caret where the compile tracks the
+	 * content under the point, the field alone where it tracks only the placement. Does not fire
+	 * where it tracks neither.
+	 */
 	onPick?(at: Landing): void;
-	/** A page paint the backend refused ({@link EditorErrorHandler}). The preview
-	 *  shows its error message state either way; this routes it to an app's sink. */
+	/**
+	 * A page paint the backend refused ({@link EditorErrorHandler}); the error message state shows
+	 * either way.
+	 */
 	onError?: EditorErrorHandler;
-	/** The surface's strings, keyed and partial: unset keys take the package's
-	 *  English. */
+	/** The surface's strings; unset keys take the package's English. */
 	strings?: PreviewStringsInput;
 }
 
@@ -34,45 +33,32 @@ export interface PreviewController {
 	 *  apply-driven hop. */
 	refresh(change: ChangeSet): void;
 	/**
-	 * Scroll `field`'s first box into view, and end any follow it outranks. `false`
-	 * when this compile places nothing at that address — an answer, not a failure: the
-	 * plate places plenty it does not track, and the preview carries no schema to tell
-	 * that from a field the host misnamed. The editor's `focusField` is what
-	 * distinguishes them.
+	 * Scroll `field`'s first box into view, and end any follow it outranks. `false` when this
+	 * compile places nothing at that address; the preview has no schema to tell that from a
+	 * misnamed field.
 	 */
 	scrollToField(field: DocPath): boolean;
 	/**
-	 * Bring the caret at `at` into view: the pane moves only when the caret has left
-	 * the fold.
-	 *
-	 * Takes the editor's own `onCaretMove` payload, so the editor→preview half of
-	 * the bridge is `onCaretMove={preview.focusPosition}` and translates nothing. A
-	 * `ContentHit` carries both members and fits here too.
+	 * Bring the caret at `at` into view; the pane moves only when the caret has left the fold.
+	 * Takes the editor's `onCaretMove` payload, so `onCaretMove={preview.focusPosition}` wires it.
 	 */
 	focusPosition(at: Place): void;
 	/**
-	 * End the follow: the pane stays where the user left it until the next
-	 * `focusPosition`. A `scrollToField` that placed its target ends one too.
-	 *
-	 * The editor's `onActiveLeafChange` is the signal, firing for a form control as for
-	 * a prose leaf: `onActiveLeafChange={preview.endFollow}`. A control has no caret
-	 * coordinate to report, so unwired the follow keeps naming the leaf the focus left
-	 * and every recompile pulls the pane back there. A prose leaf restarts it with its
-	 * own next caret.
+	 * End the follow: the pane stays where the user left it until the next `focusPosition`. Wire
+	 * `onActiveLeafChange={preview.endFollow}`; a form control reports no caret, so unwired the
+	 * follow keeps pulling the pane back to the leaf the focus left.
 	 */
 	endFollow(): void;
 	/**
-	 * Draw every page at `zoom`, a fraction of actual size (`1` is 100%), held between
-	 * the pane's floor and 200%; `undefined` is the default, the widest page fitting the
-	 * pane's width up to 125%. The reader's own gestures move the same zoom.
+	 * Draw every page at `zoom`, a fraction of actual size (`1` is 100%), held between the pane's
+	 * floor and 200%; `undefined` is the default, the widest page fitting the pane's width up to
+	 * 125%.
 	 */
 	setZoom(zoom: number | undefined): void;
 	destroy(): void;
 }
 
 const CONTAINER_CLASS = 'qm-preview';
-// The message states share one element; each carries `MESSAGE_CLASS` plus a state
-// class, the hooks a consumer and the tests target.
 const MESSAGE_CLASS = 'qm-preview-message';
 const EMPTY_CLASS = 'qm-preview-empty';
 const ERROR_CLASS = 'qm-preview-error';
@@ -83,8 +69,7 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 	const t = mergePreviewStrings(opts.strings);
 	container.classList.add(CONTAINER_CLASS);
 
-	// One element, restamped: the non-paint states (empty, a paint that
-	// threw) are mutually exclusive.
+	// One element, restamped: the message states are mutually exclusive.
 	let message: HTMLElement | undefined;
 	function showMessage(text: string, state: string): void {
 		if (!message) {
@@ -99,12 +84,8 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		message = undefined;
 	}
 
-	// The paint loop is safe at any page count: zero pages reconciles to zero
-	// slots and never calls the `paint`/`pageSize` verbs the boundary refuses
-	// there. A paint that unexpectedly throws is caught per-slot and surfaced
-	// through the shared message rather than aborting the observer callback
-	// mid-sweep (a paint is the one surface that can still refuse a counted page;
-	// brittle to leave uncaught).
+	// A paint that throws is caught per slot and surfaced through the message rather than aborting
+	// the observer callback mid-sweep.
 	const paintLoop: PaintLoop = createPaintLoop(session, container, margin, (page, err) => {
 		reportError(opts.onError, {
 			code: 'paint-failed',
@@ -115,14 +96,10 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		});
 		showMessage(t.renderFailed, ERROR_CLASS);
 	});
-	// The bridge lives and dies with the slot set, so it is held until `render` finds
-	// a compile paintable. Rebuilt rather than patched whenever the count changes: the
-	// slots array is a stable identity but its members are swapped on reconcile, and
-	// the listeners are per slot.
+	// Rebuilt whenever the page count changes: the listeners are per slot and slots are swapped on
+	// reconcile.
 	let bridge: BridgeController | undefined;
-	// Outlives that rebuild, so a trip held for a pane with no box crosses it. Only the
-	// follow is re-asserted after a recompile, and a `scrollToField` the pane could not
-	// run has nothing else that would ask again for it.
+	// Outlives the bridge rebuild, so a trip held for a pane with no box crosses it.
 	const held: HeldTrip = {};
 
 	function attach(): void {
@@ -133,9 +110,6 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		bridge = undefined;
 	}
 
-	// Called at construction and after every `apply`, so a 0-page compile that later
-	// gains pages recovers. A counted page is the whole condition: every backend
-	// paints, and `paint`/`pageSize` refuse only a page the count excludes.
 	function render(pageCount: number, dirtyPages: readonly number[]): void {
 		if (pageCount === 0) {
 			paintLoop.refresh([], 0);
@@ -143,48 +117,37 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 			showMessage(t.noPages, EMPTY_CLASS);
 			return;
 		}
-		// Read the count against the current slots before reconcile moves it, and
-		// clear any prior message before painting so a paint that throws mid-refresh
-		// leaves its error surfaced rather than have `hideMessage` clobber it.
+		// Clear the message before painting so an error from this paint is not clobbered.
 		const countChanged = pageCount !== paintLoop.slots.length;
 		hideMessage();
 		paintLoop.refresh(dirtyPages, pageCount);
-		// The slot set moved under the bridge's feet, or we are leaving a message state.
 		if (countChanged || !bridge) {
 			detach();
 			attach();
 		}
 	}
 
-	// Built before the first bridge, so its ResizeObserver is the earlier one and a pane
-	// shown again re-fits before the bridge runs the trip it held at the old scale.
+	// Built before the first bridge so its ResizeObserver fires first: a re-shown pane re-fits
+	// before the bridge runs a held trip.
 	const viewport = createViewport(container, paintLoop.slots, paintLoop.setScale, t.resetZoom);
 	render(session.pageCount, []);
 	viewport.update();
 
-	// The last place the editor put the caret, re-located after every recompile and
-	// dropped on a focus change or a discrete hop. `session.locate` answers against the
-	// last compiled layout and a consumer debounces `update`, so a caret typed past that
-	// layout's content is off-content for the whole burst: `focusPosition` no-ops and
-	// the pane sits still, and a caret event is otherwise the only thing that asks
-	// again. The re-locate is the preview's, not the consumer's: the staleness sits
-	// between two session queries this module owns both ends of.
+	// The last caret the editor reported, re-located after every recompile: `session.locate`
+	// answers against the last compiled layout, so a caret typed past it no-ops until the recompile
+	// lands.
 	let followed: Place | undefined;
 
 	return {
 		refresh(change) {
 			render(change.pageCount, change.dirtyPages);
-			// The default fits the widest page, which a recompile can move.
 			viewport.update();
-			// Guarded like any other caret hop, so a caret already clear of the fold
-			// leaves a pane the user scrolled where they left it.
 			if (followed) bridge?.focusPosition(followed.field, followed.pos);
 		},
 		scrollToField(field) {
 			const placed = bridge?.scrollToField(field) ?? false;
-			// The discrete hop outranks the follow: a caret re-asserted at the next
-			// recompile would pull the pane straight off the field a host just asked
-			// for. A hop that placed nothing moved nothing, so the follow stands.
+			// The hop outranks the follow, which would otherwise pull the pane back at the next
+			// recompile.
 			if (placed) followed = undefined;
 			return placed;
 		},

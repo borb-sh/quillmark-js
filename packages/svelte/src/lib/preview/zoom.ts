@@ -1,29 +1,29 @@
-// The one scale every page is drawn at, as a fraction of actual size: pure, so the
-// rules a gesture lands on are reachable without a layout (tests/preview/zoom.test.ts).
-// `viewport.ts` measures the pane and applies the answer.
+// The one scale every page is drawn at, as a fraction of actual size. Pure; `viewport.ts` measures
+// the pane and applies the answer.
 import type { PageSize } from '@quillmark/wasm';
 
-/** CSS px per PDF pt at 100%: 96 CSS px to the inch over 72 pt, a PDF viewer's actual
- *  size. */
+/** CSS px per PDF pt at 100%: 96 CSS px to the inch over 72 pt. */
 export const ACTUAL = 96 / 72;
 
-/** The default never draws a page larger than this, so a wide pane shows a sheet at a
- *  size print would recognise rather than one stretched to the pane. */
+/** The default never draws a page larger than this. */
 const FIT_CAP = 1.25;
 
 /** The furthest a gesture zooms in. */
 export const MAX_ZOOM = 2;
 
-/** How much of the pane the page still fills, on its limiting axis, at the furthest a
- *  gesture zooms out: the whole page in view with a thin margin, and never a stamp. */
+/**
+ * How much of the pane the page still fills, on its limiting axis, at the furthest a gesture zooms
+ * out.
+ */
 const FLOOR_FILL = 0.9;
 
-/** What `Mod +` and `Mod −` step through: a subset of the levels a browser's own zoom
- *  keys land on, so a step lands somewhere a reader has been before. */
+/** What `Mod +` and `Mod −` step through. */
 export const STEPS = [0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const;
 
-/** How far, as a log of the zoom's ratio to a hold, a continuous gesture carries past it
- *  before it leaves it: a ratio, so a hold is as wide at a phone's fit as at 100%. */
+/**
+ * How far, as a log of the zoom's ratio to a hold, a continuous gesture carries past it before it
+ * leaves it.
+ */
 const DETENT = 0.04;
 
 const near = (zoom: number, hold: number): boolean => Math.abs(Math.log(zoom / hold)) <= DETENT;
@@ -34,16 +34,16 @@ export interface Pane {
 	height: number;
 }
 
-/** The default: the widest page fits the pane's width, capped at {@link FIT_CAP}. A
- *  portrait-only document lands at the pane's width, as a narrow pane always drew it. */
+/** The default: the widest page fits the pane's width, capped at {@link FIT_CAP}. */
 export function fitZoom(pages: readonly PageSize[], pane: Pane): number {
 	const widest = Math.max(...pages.map((p) => p.widthPt));
 	return Math.min(pane.width / (widest * ACTUAL), FIT_CAP);
 }
 
-/** The furthest a gesture zooms out: every page fits the pane whole with
- *  {@link FLOOR_FILL} of it filled on the page's limiting axis, and never past the
- *  default, which on a pane past the cap is already smaller than that. */
+/**
+ * The furthest a gesture zooms out: every page fits the pane whole with {@link FLOOR_FILL} filled
+ * on its limiting axis, and never past the default.
+ */
 export function floorZoom(pages: readonly PageSize[], pane: Pane): number {
 	const whole = Math.min(
 		...pages.map((p) => Math.min(pane.width / p.widthPt, pane.height / p.heightPt))
@@ -55,17 +55,17 @@ export function clampZoom(zoom: number, floor: number): number {
 	return Math.min(MAX_ZOOM, Math.max(floor, zoom));
 }
 
-/** The levels a step lands on: `STEPS` with `fit` among them, which takes the
- *  place of any level within {@link DETENT} of it, since fit is the one that follows the
- *  pane. */
+/**
+ * The levels a step lands on: `STEPS` with `fit` replacing any level within {@link DETENT} of it.
+ */
 function stops(fit: number): number[] {
 	return [...STEPS.filter((s) => !near(s, fit)), fit].sort((a, b) => a - b);
 }
 
-/** The next level in `dir` from `zoom`, `fit` among them, skipping levels under `floor`.
- *  From between two levels the first press lands on the nearer one in that direction;
- *  past the last level above the floor, the floor. Half a percent of slack, so a zoom
- *  shown as a level is at it. */
+/**
+ * The next level in `dir` from `zoom`, skipping levels under `floor`; past the last, the floor.
+ * Half a percent of slack, so a zoom shown as a level is at it.
+ */
 export function stepZoom(zoom: number, dir: 1 | -1, floor: number, fit: number): number {
 	const levels = stops(fit);
 	const next =
@@ -76,11 +76,8 @@ export function stepZoom(zoom: number, dir: 1 | -1, floor: number, fit: number):
 }
 
 /**
- * A continuous gesture's run: the zoom its events have asked for (`raw`), what it shows,
- * and, while it shows a hold, how far past the hold the events have carried (`slack`, a
- * log of the ratio). The run moves `shown` by each event's ratio rather than snapping
- * `raw`, so a trackpad's small deltas carry it out of a hold as smoothly as they carried
- * it in.
+ * A continuous gesture's run: the zoom its events asked for (`raw`), what it shows, and while it
+ * shows a hold, how far past it the events have carried (`slack`, a log of the ratio).
  */
 export interface Glide {
 	raw: number;
@@ -88,11 +85,11 @@ export interface Glide {
 	slack: number;
 }
 
-/** One event of a continuous gesture, carrying the run to `raw`. It stops at `fit` or
- *  100% when it crosses one, at the first it meets, so one wheel notch across either
- *  stops there; it leaves a hold once carried {@link DETENT} past, moving on from the
- *  hold rather than jumping to where the events would have put it. 100% gives way to a
- *  `fit` within the detent of it: two holds that close would pin the run between them. */
+/**
+ * One event of a continuous gesture, carrying the run to `raw`. It stops at the first of `fit` or
+ * 100% it crosses, and leaves a hold once carried {@link DETENT} past. 100% gives way to a `fit`
+ * within the detent of it.
+ */
 export function glide(run: Glide, raw: number, floor: number, fit: number): Glide {
 	const holds = near(fit, 1) ? [fit] : [fit, 1];
 	const step = Math.log(raw / run.raw);

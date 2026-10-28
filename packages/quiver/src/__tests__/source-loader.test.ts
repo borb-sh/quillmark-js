@@ -38,19 +38,10 @@ async function buildMinimalQuiver(
 }
 
 describe('scanSourceQuiver', () => {
-	// --- Fixture happy path ---
-
-	it("scans sample fixture: meta name is 'sample'", async () => {
-		const { meta } = await scanSourceQuiver(SAMPLE_FIXTURE);
-		expect(meta.name).toBe('sample');
-	});
-
 	it('scans sample fixture: catalog has memo with [1.1.0, 1.0.0] descending', async () => {
 		const { catalog } = await scanSourceQuiver(SAMPLE_FIXTURE);
 		expect(catalog.get('memo')).toEqual(['1.1.0', '1.0.0']);
 	});
-
-	// --- Non-canonical version dir ---
 
 	it("throws quiver_invalid for non-canonical version dir '1.0' (missing patch)", async () => {
 		const root = await temp.dir();

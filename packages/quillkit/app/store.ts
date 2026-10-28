@@ -1,6 +1,5 @@
-// The documents a browser keeps for one app: IndexedDB, one database per app base URL, so
-// two apps on one origin never read each other's (APP §"Documents"). Each document is a
-// record of its own; beside them sits which one was open, so a reload reopens it.
+// The documents a browser keeps for one app: IndexedDB, one database per app base URL
+// (APP §"Documents"), plus which document was open.
 
 import { readRecord, toStored, type DocRecord } from './records';
 

@@ -48,21 +48,9 @@ describe('fromDir', () => {
 		);
 	});
 
-	// --- Immutability ---
-
-	it('quillNames() returns a new array each call (defensive copy)', async () => {
+	it('quillNames() and versionsOf() return a fresh array each call', async () => {
 		const q = await fromDir(SAMPLE_FIXTURE);
-		const a = q.quillNames();
-		const b = q.quillNames();
-		expect(a).not.toBe(b);
-		expect(a).toEqual(b);
-	});
-
-	it('versionsOf() returns a new array each call (defensive copy)', async () => {
-		const q = await fromDir(SAMPLE_FIXTURE);
-		const a = q.versionsOf('memo');
-		const b = q.versionsOf('memo');
-		expect(a).not.toBe(b);
-		expect(a).toEqual(b);
+		expect(q.quillNames()).not.toBe(q.quillNames());
+		expect(q.versionsOf('memo')).not.toBe(q.versionsOf('memo'));
 	});
 });

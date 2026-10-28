@@ -1,18 +1,15 @@
-/* The endorsed look: the rules a host draws around a mounted surface, as classes it puts
-   on its own elements; the shell it mounts one in is `shell.css` beside this, and an
-   app's own chrome is `app.css`. The rungs beside this in
-   `scale.css` are the invisible half (a scale alone still leaves a consumer writing
-   every declaration before anything on the page looks like anything), so the recipes
-   are what the preset is for. This file mints nothing; `check:style` runs its axes here.
-
-   These are host classes. They land on the consumer's DOM, never on a mounted root, so
-   they freeze nothing about the surfaces' interior: the reason the package withholds
-   its own internal classes does not reach them.
-
-   Unlayered, deliberately: a layer of the preset's own would put a name in the contract,
-   and unlayered a consumer's rules win over these by ordinary precedence. Ordinary
-   specificity too, not the surfaces' `:where()` zero: a consumer takes these classes on
-   purpose, so a rule of their own beside one is aimed rather than incidental. */
+/*
+ * The endorsed look: the rules a host draws around a mounted surface, as classes it puts on its
+ * own elements. The shell is `shell.css` and an app's chrome `app.css`; the rungs in `scale.css`
+ * are the invisible half. This file mints nothing; `check:style` runs its axes here.
+ *
+ * These are host classes: they land on the consumer's DOM, never on a mounted root, so they freeze
+ * nothing about the surfaces' interior.
+ *
+ * Unlayered, at ordinary specificity (not the surfaces' `:where()` zero): a consumer takes these
+ * classes on purpose, so a rule of their own beside one is aimed rather than incidental, and a
+ * layer of the preset's own would put a name in the contract.
+ */
 
 /* ── The page ──────────────────────────────────────────────────────────────── */
 

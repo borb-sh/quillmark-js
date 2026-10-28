@@ -1,9 +1,5 @@
-// The one shared pixel<->PDF-pt transform, and the one rule for which rects an
-// address has. Both the forward direction (a FieldRegion rect -> CSS % of the page
-// box, what the scroll marker is placed at) and the inverse (a CSS px click ->
-// PDF-pt for `positionAt`) derive from `PageSize` alone here, so they can never
-// drift apart; the correctness seam PREVIEW.md calls out. Pure: no DOM, no session;
-// safe to unit-test against known geometry (tests/preview/geometry.test.ts).
+// The one pixel<->PDF-pt transform, and the rule for which rects an address has. Pure: no DOM, no
+// session.
 import type { FieldRegion, PageSize } from '@quillmark/wasm';
 
 /** A page rect in PDF points, `[x0, y0, x1, y1]`, bottom-left origin (`FieldRegion.rect`'s shape). */
@@ -24,22 +20,13 @@ export interface PdfPoint {
 }
 
 /**
- * An address's boxes: `fieldBoxes`'s union, else every `regions()` rect at or under it.
- * What the scroll reads, so an address `regions()` names is never one the preview
- * cannot place (PREVIEW.md §"Two responsibilities").
+ * An address's boxes: `fieldBoxes`'s union, else every `regions()` rect at or under it
+ * (PREVIEW.md §"Two responsibilities"). `fieldBoxes` answers `[]` for a scalar reference
+ * the plate places without tracking its content and for an array itself; the fallback
+ * takes the address and its descendants, matched at a path boundary (`.` or `[`):
+ * `main.keywords` matches `main.keywords[0]`, not `main.keywords_note`.
  *
- * `fieldBoxes` answers `[]` for a scalar reference the plate places without tracking
- * its content and for an array itself; runtime.d.ts says what such a field's box is, a
- * single `regions()` rect. The second rung takes an address and its descendants
- * together, since a container holds both: a plate composing an array's presentation
- * regions the array on the ink it composed — a separator, a heading — where each
- * element regions the ink it carries itself, and the field is placed at all of it. The
- * boundary character (`.` for a nested field, `[` for an array element) keeps the
- * prefix a path boundary: `main.keywords` matches `main.keywords[0]`, not
- * `main.keywords_note`.
- *
- * `regions` is a thunk because the first rung answers without it, and taking it
- * marshals every placement in the compile across the WASM boundary.
+ * `regions` is a thunk because taking it marshals every placement across the WASM boundary.
  */
 export function boxesForField(
 	field: string,
@@ -53,9 +40,8 @@ export function boxesForField(
 }
 
 /**
- * Forward: a PDF-pt rect -> CSS % of the page box. Percent positioning tracks
- * the page's displayed size across DPR and container resize for free, so the
- * scroll's measurement needs no zoom or DPR term of its own (bridge.ts).
+ * Forward: a PDF-pt rect -> CSS % of the page box, which tracks the displayed size without a zoom
+ * or DPR term.
  */
 export function rectToPercent(rect: PdfRect, pageSize: PageSize): PercentRect {
 	const [x0, y0, x1, y1] = rect;
@@ -68,11 +54,7 @@ export function rectToPercent(rect: PdfRect, pageSize: PageSize): PercentRect {
 	};
 }
 
-/**
- * Position `el` absolutely at `pct` (the % rect this module produces): the one
- * `PercentRect` → `element.style` write, so the positioning convention lives beside
- * the transform that produces it rather than at the caller placing a marker.
- */
+/** Position `el` absolutely at `pct`. */
 export function applyPercentRect(el: HTMLElement, pct: PercentRect): void {
 	Object.assign(el.style, {
 		position: 'absolute',
@@ -84,23 +66,16 @@ export function applyPercentRect(el: HTMLElement, pct: PercentRect): void {
 }
 
 /**
- * A CSS-px length on a page element of CSS width `cssW` -> the PDF-pt length it spans.
- * Width alone, because that is the scale the slot is drawn at: `paint.ts` sizes a slot
- * by width under a locked aspect ratio, so {@link clickToPdfPt}'s two ratios are one
- * number and a length has one to convert through. What the click bridge reads its
- * pointer slack in points through.
+ * A CSS-px length on a page element of CSS width `cssW` -> PDF-pt. Width alone, since `paint.ts`
+ * locks the aspect ratio.
  */
 export function pxToPt(px: number, cssW: number, pageSize: PageSize): number {
 	return (px / cssW) * pageSize.widthPt;
 }
 
 /**
- * Inverse: a click at CSS px `(px, py)` within a page element of CSS size
- * `(cssW, cssH)` -> PDF-pt. The exact inverse of {@link rectToPercent}: the
- * fraction `rectToPercent` would place a point's box corner at is the same
- * fraction this reads back from `px/cssW`, `py/cssH`; DPR-independent, since
- * the page element's CSS size (not its canvas backing store) is the only input.
- * This is what the click bridge feeds `session.positionAt`/`fieldAt` (bridge.ts).
+ * Inverse of {@link rectToPercent}: a click at CSS px `(px, py)` within a page element of CSS size
+ * `(cssW, cssH)` -> PDF-pt.
  */
 export function clickToPdfPt(
 	px: number,

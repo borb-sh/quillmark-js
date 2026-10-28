@@ -29,7 +29,7 @@ The **consumer** owns the session and the handles, and drives every edit; the su
 import { Engine } from '@quillmark/wasm';
 import { init } from '@quillmark/svelte/core';
 
-// Quill and Document are exported only through init(), which loads the wasm once.
+// Quill and Document are exported only through init().
 const { Quill, Document } = await init();
 
 const quill = Quill.fromTree(tree); // tree: Map<string, Uint8Array> of the quill dir
@@ -120,7 +120,7 @@ In Svelte, `<Preview {session} onPick={…} />` exposes the same verbs (`refresh
 />
 ```
 
-Hand it a different `doc` and the editor **re-keys itself**: every leaf remounts against the new handle, and the id state, the commit-error map and the active address seed fresh. Nothing to key at the call site. `quill` is not part of that key — the schema is re-read on every derive, so a quill swap re-projects on its own; swapping it _without_ the doc reports `rebind-ignored`.
+Hand it a different `doc` and the editor **re-keys itself**: every leaf remounts against the new handle, and the id state, the commit-error map and the active address seed fresh. `quill` is not part of that key — the schema is re-read on every derive, so a quill swap re-projects on its own; swapping it _without_ the doc reports `rebind-ignored`.
 
 ### Driving it from outside
 
@@ -213,7 +213,7 @@ function recompileNow() {
 
 `session.warnings` is a **getter on a handle Svelte does not track**: pull it per apply, or the editor shows the previous compile's errors.
 
-This shell layer is deliberately yours: the debounce value, what applies at once, and which surfaces refresh are host policy, so the package ships no scheduler over them. Three obligations ride with that: an edit of your own (an import, an undo, a direct `doc` write) recompiles by the same calls, since nothing polls the document; a compile owes the diagnostics re-read above, since nothing polls the session; and teardown clears the timer **before** freeing the handles, so a pending recompile never touches a freed session.
+The schedule is host policy, so the package ships no scheduler. Obligations: an edit of your own (an import, an undo, a direct `doc` write) recompiles by the same calls, since nothing polls the document; a compile re-reads the diagnostics; and teardown clears the timer **before** freeing the handles.
 
 ## The caret bridge
 
@@ -237,7 +237,7 @@ A consumer holding an `Addr` of its own maps it with `fieldPathForAddr` (from `@
 
 ## Errors
 
-Every surface takes `onError`. It reports failures the surface **recovered from**: a commit the boundary refused, a card operation that threw, a page paint that failed, a serialize that threw. None of them stop editing. Wire nothing and each lands in the console, which an app cannot route, filter or count.
+Every surface takes `onError`. It reports failures the surface **recovered from**: a commit the boundary refused, a card operation that threw, a page paint that failed, a serialize that threw. None of them stop editing. Wire nothing and each lands in the console.
 
 ```ts
 onError: (err) => {
@@ -258,8 +258,6 @@ This is not the diagnostics channel. A `Diagnostic` is about the **document** an
 el.textContent = doc.toMarkdown();
 ```
 
-A worked one holds the scroll across the swap and shows a throw in place; the call under it is still the one line above.
-
 ## Theming
 
 The surfaces carry the behavior against a neutral, overridable visual baseline: a set of `--qm-*` CSS custom properties you override on any ancestor. See [`THEMING.md`](THEMING.md).
@@ -270,7 +268,7 @@ This package is one workspace of [`quillmark-js`](../..); the gates are the root
 
 ```sh
 npm run build -w packages/svelte   # svelte-package → dist/
-npm run test  -w packages/svelte   # Vitest (codec, diagnostics, geometry, chain)
+npm run test  -w packages/svelte   # Vitest
 npm run check -w packages/svelte   # svelte-check
 npm run dev                        # the playground, from the root
 ```

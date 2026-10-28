@@ -1,5 +1,4 @@
-// The zoom's rules as relations over a pane and a set of page sizes, so a retuned cap,
-// fill or step list leaves them green.
+// The zoom's rules as relations over a pane and page sizes, so retuned constants leave them green.
 import { describe, it, expect } from 'vitest';
 import {
 	ACTUAL,

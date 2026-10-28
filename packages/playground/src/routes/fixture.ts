@@ -1,11 +1,7 @@
-// Where the playground's quills come from: a built quiver served under `/quiver/`,
-// packed from the workspace fixture tree by `scripts/build-quiver.mjs`. `quiver.json` →
-// content-addressed `.quill` bundle, the browser consumer path in full
-// (PLAYGROUND §"Quiver, not bundler").
-//
-// One `Quiver` for the page. Its quill cache is per canonical ref and lives as long
-// as the quiver does, so routes share one materialization across client-side
-// navigation instead of paying for their own.
+// The playground's quills come from a built quiver served under `/quiver/`, packed by
+// `packages/playground/scripts/build-quiver.mjs` (PLAYGROUND §"Quiver, not bundler"). One `Quiver`
+// serves the
+// page, so routes share its quill cache across client-side navigation.
 import { Quiver } from '@quillmark/quiver';
 import { resolve } from '$app/paths';
 
@@ -23,13 +19,7 @@ function quiver(): Promise<Quiver> {
 	}));
 }
 
-/**
- * Every quill the served quiver holds, which is the pack's call rather than this
- * module's (PLAYGROUND §"Which quill, and what is seeded into it").
- *
- * Sync on the quiver, which materializes its catalog as it loads, so a picker over
- * this needs no loading state past the one its route already has.
- */
+/** Every quill the served quiver holds (PLAYGROUND §"Which quill, and what is seeded into it"). */
 export async function fixtureNames(): Promise<string[]> {
 	return (await quiver()).quillNames();
 }

@@ -1,16 +1,13 @@
-// The block shapes, as commands. A markdown shorthand and a slash pick are two doors
-// onto one construct, with one implementation behind them: `inputrules.ts` runs these
-// under a regexp, `slash.ts` under a name.
+// The block shapes, as commands. A markdown shorthand and a slash pick are two doors onto one
+// implementation: `inputrules.ts` runs these under a regexp, `slash.ts` under a name.
 //
-// A shorthand's `^` anchors it to the head of a textblock, so every command here
-// declines anywhere else, and a pick does what the shorthand would have done there —
-// the run consumed, the caret at the block's head. A list pick is the exception
-// (§`pickList`). The menu asks each command whether it would run rather than restating
-// its guards (§`slashItems`).
+// A shorthand's `^` anchors it to the head of a textblock, so every command here declines anywhere
+// else, and a pick does what the shorthand would have done there: the run consumed, the caret at
+// the block's head. A list pick is the exception (§`pickList`). The menu asks each command whether
+// it would run rather than restating its guards (§`slashItems`).
 //
-// `blockKeymap` is the other half of the file and answers to no door: the Enter cases
-// that are about the body rather than about any block in it, and the Backspace and
-// Delete that are about the caret's own line, outermost of the leaf's key chains
+// `blockKeymap` answers to no door: the Enter cases about the body rather than any block in it, and
+// the Backspace and Delete about the caret's own line, outermost of the leaf's key chains
 // (`keymap.ts`).
 import type { Attrs, NodeType, ResolvedPos, Schema } from 'prosemirror-model';
 import { Selection } from 'prosemirror-state';
@@ -22,8 +19,7 @@ import { withinNesting } from './nesting.js';
 import { takesLineBreak } from './schema.js';
 import { joinLists } from './touching.js';
 
-/** The head of a textblock: where a shorthand fires, and where a pick lands once its
- *  run is consumed. */
+/** The head of a textblock: where a shorthand fires and a pick lands once its run is consumed. */
 function atHead(state: EditorState): boolean {
 	const { $from, empty } = state.selection;
 	return empty && $from.parent.isTextblock && $from.parentOffset === 0;
@@ -36,11 +32,9 @@ function fits($from: ResolvedPos, type: NodeType): boolean {
 }
 
 /**
- * The first block of an item that already exists: where a list gesture retypes the
- * item's list rather than wrapping the block, which would mint an item whose only
- * content is another item, a level with nothing on it. Tab is the indent gesture. A
- * later block of the item is not this case: wrapping a continuation paragraph is how a
- * sub-list opens under text.
+ * The first block of an item that already exists: where a list gesture retypes the item's list
+ * rather than wrapping the block, which would mint an item whose only content is another item.
+ * Wrapping a later block is how a sub-list opens under text.
  */
 function openingAnItem($from: ResolvedPos, item: NodeType | undefined): boolean {
 	if (!item || $from.depth < 2) return false;
@@ -59,12 +53,12 @@ function retype(name: string, attrs?: Attrs): Command {
 	};
 }
 
-/** Replace every `hard_break` in the caret's block with a space, ahead of a retype into
- *  a type that holds none. `setBlockType` clears what the new type cannot hold by
- *  deleting it, which joins the text either side with nothing and glues the words; a
- *  space is what the break becomes at every other door (`breaks.ts`, `decode.ts`). A
- *  break and a space are both one position wide, so an earlier replacement leaves every
- *  later one addressed. */
+/**
+ * Replace every `hard_break` in the caret's block with a space, ahead of a retype into a type that
+ * holds none: `setBlockType` would delete them and glue the words (`breaks.ts`, `decode.ts` make
+ * the same space). Break and space are both one position wide, so later replacements stay
+ * addressed.
+ */
 function spaceBreaks(tr: Transaction, $from: ResolvedPos, type: NodeType): void {
 	const br = tr.doc.type.schema.nodes.hard_break;
 	if (!br || takesLineBreak(type)) return;
@@ -80,11 +74,11 @@ function spaceBreaks(tr: Transaction, $from: ResolvedPos, type: NodeType): void 
 	});
 }
 
-/** `wrappingInputRule`'s body: wrap the block range at `pos`, then join a sibling of
- *  the same type — the boundaries the wrap itself opens (`lists.ts` §cleanup:
- *  command-local, never a global pass). A list joins on both sides (`touching.ts`), a
- *  quote the one above. False where no wrap fits, or where the one that does nests past
- *  `MAX_NESTING_DEPTH` (`nesting.ts`). */
+/**
+ * `wrappingInputRule`'s body: wrap the block range at `pos`, then join a sibling of the same type
+ * (a list on both sides, a quote the one above; `touching.ts`). False where no wrap fits or it
+ * nests past `MAX_NESTING_DEPTH` (`nesting.ts`).
+ */
 function wrapAt(tr: Transaction, pos: number, type: NodeType, attrs: Attrs | null): boolean {
 	const range = tr.doc.resolve(pos).blockRange();
 	const wrapping = range && findWrapping(range, type, attrs);
@@ -97,16 +91,19 @@ function wrapAt(tr: Transaction, pos: number, type: NodeType, attrs: Attrs | nul
 	return withinNesting(tr.doc);
 }
 
-/** `# `: the heading `level` deep. `list_item` is `block+`, so one inside an item is a
- *  shape the content holds and `importMarkdown` produces from `- # title`. */
+/**
+ * `# `: the heading `level` deep. `list_item` is `block+`, so a heading inside an item is a shape
+ * `importMarkdown` produces from `- # title`.
+ */
 export function toHeading(level: number): Command {
 	return retype('heading', { level });
 }
 
-/** A fence, carrying `attrs` (its `lang`). The exit paragraph after it is the one a
- *  block island mints for the same reason, sharpened: a code block is the one block a
- *  gap cursor will not sit beside either, so a fence at the end of a body leaves the
- *  caret nowhere to go. The caret stays in the fence, not in the exit it minted. */
+/**
+ * A fence, carrying `attrs` (its `lang`). The exit paragraph after it exists because a gap cursor
+ * will not sit beside a code block, so a fence at the end of a body would leave the caret nowhere
+ * to go. The caret stays in the fence.
+ */
 export function toCodeBlock(attrs?: Attrs): Command {
 	return (state, dispatch) => {
 		const { code_block: code, paragraph } = state.schema.nodes;
@@ -120,10 +117,11 @@ export function toCodeBlock(attrs?: Attrs): Command {
 	};
 }
 
-/** `---`. A divider is a whole block, so this replaces its textblock rather than
- *  retyping one: `horizontal_rule` holds no content to retype into, and an empty block
- *  is the whole of what it may replace — anything else in one is a paragraph being
- *  edited, which a replace would eat. */
+/**
+ * `---`. A divider is a whole block, so this replaces its textblock: `horizontal_rule` holds no
+ * content to retype into, and only an empty block may be replaced, anything else being a paragraph
+ * being edited.
+ */
 export function insertDivider(): Command {
 	return (state, dispatch) => {
 		const { horizontal_rule: rule, paragraph } = state.schema.nodes;
@@ -140,9 +138,9 @@ export function insertDivider(): Command {
 	};
 }
 
-/** `> `. No item guard: what this wraps an item's first block in is a container the
- *  content holds, where a list wrapping one mints an item whose only content is an
- *  item. */
+/**
+ * `> `. No item guard: wrapping an item's first block in a quote is a container the content holds.
+ */
 export function wrapInQuote(): Command {
 	return (state, dispatch) => {
 		const quote = state.schema.nodes.blockquote;
@@ -155,10 +153,11 @@ export function wrapInQuote(): Command {
 	};
 }
 
-/** `- ` / `1. `. Beside a list of its kind the line joins it, whatever `N` is typed: a
- *  number comes from position. Elsewhere `N. ` is the number the new list counts from,
- *  and at the head of an item the shorthand is the item's (§`listAtItem`), `N` reading
- *  the same way; a marker the item already shows is taken as typed and changes nothing. */
+/**
+ * `- ` / `1. `. Beside a list of its kind the line joins it, whatever `N` is typed: a number comes
+ * from position. Elsewhere `N. ` is the number the new list counts from; at the head of an item the
+ * shorthand is the item's (§`listAtItem`), and a marker the item already shows changes nothing.
+ */
 export function wrapInList(ordered: boolean, attrs: Attrs | null = null): Command {
 	return (state, dispatch) => {
 		if (!atHead(state)) return false;
@@ -174,11 +173,10 @@ export function wrapInList(ordered: boolean, attrs: Attrs | null = null): Comman
 }
 
 /**
- * `a. `, `(1) `, `(a) `: the markers a nested level draws, typed at the head of a nested
- * item's first line, where the item already is the thing typed. Taken as typed and
- * changing nothing, as `N. ` on an item of a numbered list is: the marker comes from the
- * item's position and the quill's style for its depth, never from the text. Anywhere
- * else these stay text, being no markdown list marker.
+ * `a. `, `(1) `, `(a) `: the markers a nested level draws, typed at the head of a nested item's
+ * first line, where the item already is the thing typed. Taken as typed and changing nothing: the
+ * marker comes from the item's position and the quill's style for its depth. Anywhere else these
+ * stay text.
  */
 export function takeNestedMarker(): Command {
 	return (state, dispatch) => {
@@ -192,21 +190,16 @@ export function takeNestedMarker(): Command {
 }
 
 /**
- * A list gesture in an item's first block. On a list's first item it retypes the list,
- * every item with it: a list is one kind, and that item is where a writer changes it.
- * `number` is the shorthand's `N`, the list's `start`, the one door back to 1 for a list
- * that arrived counting from elsewhere. On a later item, a list of the other kind is a
- * sub-list: the item sinks under the one above, as Tab sinks it, into a list of that
- * kind — `- ` in a new numbered paragraph is its first lettered subparagraph, never the
- * whole memo turned to bullets. A sub-list already standing there of that kind takes the
- * item as its next.
+ * A list gesture in an item's first block. On a list's first item it retypes the whole list;
+ * `number` is the shorthand's `N`, the list's `start`, the one door back to 1 for a list that
+ * arrived counting from elsewhere. On a later item, a list of the other kind is a sub-list: the
+ * item sinks under the one above, as Tab sinks it, into a list of that kind (`- ` in a numbered
+ * paragraph is its first lettered subparagraph). A sub-list already standing there takes the item
+ * as its next.
  *
- * A gesture that changes nothing — the kind the item's list already is, and on a first
- * item the number it already counts from — goes unoffered as a pick. As a shorthand
- * (`take`) it is claimed and changes nothing, so the run is consumed: a writer typing
- * `2. Second` into the second item meant the number the item already shows, and an item
- * reading `2. 2. Second` is the one outcome no writer typed for. Backspace on the press
- * after gives the text back.
+ * A gesture that changes nothing goes unoffered as a pick. As a shorthand (`take`) it is claimed
+ * and consumes the run, since `2. 2. Second` is an outcome no writer typed for; Backspace on the
+ * press after gives the text back.
  */
 function listAtItem(ordered: boolean, number: number | null, take = false): Command {
 	return (state, dispatch) => {
@@ -244,13 +237,12 @@ function listAtItem(ordered: boolean, number: number | null, take = false): Comm
 }
 
 /**
- * A list pick, at whatever caret the writer has. `atHead` is the shorthand's guard,
- * where a prefix firing mid-sentence would eat a dash; a pick is a gesture at the caret.
+ * A list pick, at whatever caret the writer has. `atHead` is the shorthand's guard against a prefix
+ * eating a dash mid-sentence; a pick is a gesture at the caret.
  *
- * At the end of a non-empty block it opens a fresh empty item below it, Enter then `- `
- * as one gesture. Anywhere else it wraps the whole block, the smaller surprise: a writer
- * who meant to split presses Enter first. In an item's first block it is the shorthand's
- * item gesture (§`listAtItem`), offered only where that changes something.
+ * At the end of a non-empty block it opens a fresh empty item below (Enter then `- ` as one
+ * gesture); anywhere else it wraps the whole block. In an item's first block it is the item gesture
+ * (§`listAtItem`), offered only where that changes something.
  */
 export function pickList(ordered: boolean): Command {
 	return (state, dispatch) => {
@@ -277,10 +269,9 @@ function itemDepth($pos: ResolvedPos, item: NodeType): number {
 }
 
 /**
- * The bullet pick where it puts a line under an item one level deeper than the caret
- * stood, and nowhere else: the pick a subparagraph names. Outside every item the bullet
- * it would mint stands at the first level, and on a list's first item the bullet pick
- * retypes the list instead.
+ * The bullet pick where it puts a line under an item one level deeper than the caret stood, and
+ * nowhere else: the subparagraph pick. Elsewhere the bullet would mint a first-level list, or on a
+ * list's first item retype it.
  */
 export function pickSubList(): Command {
 	const pick = pickList(false);
@@ -296,9 +287,10 @@ export function pickSubList(): Command {
 	};
 }
 
-/** Wrap the caret's whole block in a list, wherever in the block the caret sits: the
- *  wrap opens at the block's head, so it joins the lists beside it as the shorthand's
- *  does. */
+/**
+ * Wrap the caret's whole block in a list wherever the caret sits; the wrap opens at the block's
+ * head, so it joins neighbouring lists as the shorthand does.
+ */
 function wrapBlock(
 	state: EditorState,
 	dispatch: ((tr: Transaction) => void) | undefined,
@@ -312,9 +304,8 @@ function wrapBlock(
 	if (openingAnItem($from, item)) return listAtItem(ordered, null)(state, dispatch);
 	const pos = $from.start();
 	const tr = state.tr;
-	// A paragraph item wherever this fires: `# ` inside the item is the gesture that
-	// mints `list_item > heading`, and a wrap keeping the heading is a second door onto
-	// that shape. Positions survive the retype — same content, same size.
+	// A paragraph item wherever this fires: a wrap keeping a heading would be a second door onto
+	// the `list_item > heading` shape `# ` mints. Positions survive the retype.
 	if ($from.parent.type !== paragraph) tr.setBlockType(pos, pos, paragraph);
 	if (!wrapAt(tr, pos, list, attrs)) return false;
 	dispatch?.(tr);
@@ -322,14 +313,9 @@ function wrapBlock(
 }
 
 /**
- * Run `command` in place of the text at `[from, to)`: one transaction carrying the
- * delete and the command's own steps. One rather than two because two would be two
- * commits, two undo steps and two recompiles for one gesture; the command is built
- * against the state the delete leaves, which is exactly what its steps were computed
- * for.
- *
- * `null` is a command that declined, and nothing is consumed: the shorthand stays the
- * text it was typed as.
+ * Run `command` in place of the text at `[from, to)` as one transaction carrying the delete and the
+ * command's steps: two would be two commits, undo steps and recompiles for one gesture. `null` is a
+ * command that declined; nothing is consumed and the shorthand stays text.
  */
 export function consuming(
 	state: EditorState,
@@ -348,25 +334,21 @@ export function consuming(
 	return { tr, produced };
 }
 
-/** The head of the body's first block: one position per open token above the caret,
- *  and nothing before it. */
+/** The head of the body's first block: one position per open token above the caret. */
 function atBodyStart($from: ResolvedPos): boolean {
 	return $from.pos === $from.depth;
 }
 
 /**
- * Enter at the very start of a body whose first block takes no caret above it → an
- * empty paragraph there, the caret staying with the text it pushed down.
+ * Enter at the very start of a body whose first block takes no caret above it → an empty paragraph
+ * there, the caret staying with the text it pushed down.
  *
- * A code block and a quote are blocks `prosemirror-gapcursor` declines to sit beside,
- * and nothing else mints a block above one: two keystrokes on an empty body (` ``` `,
- * `> `) put one first, and a document carrying one there could never be given a title.
+ * `prosemirror-gapcursor` declines to sit beside a code block or a quote, and two keystrokes on an
+ * empty body (` ``` `, `> `) put one first, leaving a document that could never be given a title.
  *
- * Declines wherever the first block is a plain textblock, whose Enter-split already
- * leaves a paragraph above, and on an empty one, which the links after it answer. An
- * item's first line of prose declines too: Enter at its head is the list's new first
- * item, as at every item, and the empty item's own Enter lifts it out to the paragraph a
- * title takes. A fence opening that item is the fence case and takes the paragraph.
+ * Declines where the first block is a plain textblock (its Enter-split leaves a paragraph above) or
+ * empty (the links after answer). An item's first line of prose declines too: Enter there is the
+ * list's new first item. A fence opening that item takes the paragraph.
  */
 const paragraphAtBodyStart: Command = (state, dispatch) => {
 	const { paragraph, list_item: item } = state.schema.nodes;
@@ -381,16 +363,10 @@ const paragraphAtBodyStart: Command = (state, dispatch) => {
 };
 
 /**
- * Enter in an empty fence that opens the body → the fence, retyped to a paragraph.
- *
- * An empty first item exits its list and an empty first quoted paragraph lifts out of
- * the quote, each leaving the one paragraph a caret above needs. A fence answers with
- * `newlineInCode` instead — a line inside the block, in the direction already open —
- * so the empty fence a body's first ` ``` ` mints holds a caret with nothing above it
- * and no key that mints one.
- *
- * Retyping rather than inserting above, for the reason those exits leave one paragraph
- * and not two: an empty fence carries nothing to keep.
+ * Enter in an empty fence that opens the body → the fence, retyped to a paragraph. An empty first
+ * item exits its list and an empty first quoted paragraph lifts out of the quote, each leaving the
+ * one paragraph a caret above needs; a fence would answer `newlineInCode` and leave no key that
+ * mints one. Retyped rather than inserted above: an empty fence carries nothing to keep.
  */
 const paragraphFromEmptyFence: Command = (state, dispatch) => {
 	const paragraph = state.schema.nodes.paragraph;
@@ -403,15 +379,10 @@ const paragraphFromEmptyFence: Command = (state, dispatch) => {
 };
 
 /**
- * Enter over a selection spanning two textblocks: take the selection, then split
- * what is left, both in one transaction.
- *
- * The edit upstream's `splitBlock` means, computed against a document that exists.
- * It deletes the selection inside its own transaction and then reads the default
- * block's fit off the *pre-delete* document — `$from.node(splitDepth - 1)` against an
- * index resolved in the new one — so where the range starts at the head of a
- * `defining` block and ends inside a list, it retypes a `list_item` to a paragraph
- * and throws `RangeError` out of the keystroke.
+ * Enter over a selection spanning two textblocks: take the selection, then split what is left, in
+ * one transaction. Upstream's `splitBlock` reads the default block's fit off the pre-delete
+ * document, so where the range starts at the head of a `defining` block and ends inside a list it
+ * retypes a `list_item` to a paragraph and throws `RangeError`.
  */
 const splitAcrossBlocks: Command = (state, dispatch) => {
 	const { $from, $to, empty } = state.selection;
@@ -427,21 +398,14 @@ const splitAcrossBlocks: Command = (state, dispatch) => {
 };
 
 /**
- * Delete on an empty textblock → take the line, whatever stands below moving up
- * whole and keeping what it is.
+ * Delete on an empty textblock → take the line, whatever stands below moving up whole and keeping
+ * what it is. The links below leave the line standing: the base keymap joins the block below into
+ * it (a list's first item loses its marker), and upstream takes the line only where the sibling
+ * holds the same kind of content.
  *
- * The links below it leave the line standing: the base keymap joins the block below
- * into it — a list's first item lifted out to fill it, its marker gone — and the atom
- * link arms an island for the press after. Upstream takes the line only where the
- * sibling holds the same kind of content, so a heading below keeps its level where a
- * bullet loses its marker.
- *
- * Declines where the parent cannot spare the block: an empty item and an empty quote
- * are the whole of what holds them, and the key is whichever link answers a construct
- * with nothing in it. An empty fence is not that case — the doc spares it, and it
- * carries no text to lose. Declines with nothing after it too: a line with no next
- * line is Backspace's. The line was the one thing between two lists of a kind, they
- * are one list after it.
+ * Declines where the parent cannot spare the block (an empty item or quote is the whole of what
+ * holds it; an empty fence is spared) and with nothing after it, which is Backspace's. The line may
+ * have been the one thing between two lists of a kind; they are one list after it.
  */
 const takeEmptyLine: Command = (state, dispatch) => {
 	const { $from, empty } = state.selection;
@@ -458,10 +422,9 @@ const takeEmptyLine: Command = (state, dispatch) => {
 };
 
 /**
- * Backspace at a heading's head → a paragraph, where it stands, and the press after is
- * the join. The first press takes off the block's own shape, which is the whole of what
- * it edits: the base keymap's join would merge the heading's text into the block above
- * and lose the heading with it, and at the body's start it does nothing at all.
+ * Backspace at a heading's head → a paragraph, where it stands; the press after is the join. The
+ * base keymap's join would merge the heading's text into the block above and lose the heading, and
+ * at the body's start does nothing.
  */
 const unheading: Command = (state, dispatch) => {
 	const paragraph = state.schema.nodes.paragraph;
@@ -472,9 +435,10 @@ const unheading: Command = (state, dispatch) => {
 	return true;
 };
 
-/** The body-wide link of the leaf's key chains: `{}` for a schema with no paragraph
- *  to mint. Outermost of the structural links, being about the body, or about the
- *  caret's own line, rather than about the surface either stands in. */
+/**
+ * The body-wide link of the leaf's key chains: `{}` for a schema with no paragraph to mint.
+ * Outermost of the structural links.
+ */
 export function blockKeymap(schema: Schema): Record<string, Command> {
 	if (!schema.nodes.paragraph) return {};
 	return {

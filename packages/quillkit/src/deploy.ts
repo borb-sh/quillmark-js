@@ -32,7 +32,7 @@ export function targetOf(word: string | undefined, verb: string): Target {
 	throw new Error(`quillkit ${verb} has no target "${word}": ${TARGETS.join(', ')}`);
 }
 
-export interface LayOptions {
+interface LayOptions {
 	target: Target;
 	/** The quiver: `Quiver.yaml` at its root. */
 	root: string;
@@ -40,17 +40,13 @@ export interface LayOptions {
 	out: string;
 	/** Pack the draft space too (QUIVER §"The draft floor"). */
 	drafts?: boolean;
-	/** Defaults to the client the target ships, which is the only one a verb lays. What this
-	 *  is for is the suite, which asserts the layout over a stub rather than waiting on a
-	 *  Vite build to prove a copy. */
+	/** Defaults to the client the target ships; the suite passes a stub. */
 	client?: string;
 }
 
 /**
  * The out is cleared before it is written, so an out that is or contains the quiver or the
- * working directory deletes what is being laid out. An out nested inside the quiver stays
- * allowed: `dist/` under the quiver root is the ordinary layout, and nothing of the source
- * is read after the clear.
+ * working directory is refused. An out nested inside the quiver, like `dist/`, is allowed.
  */
 export function assertSafeOut(root: string, out: string): void {
 	const at = resolve(out);

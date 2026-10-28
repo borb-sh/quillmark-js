@@ -1,6 +1,5 @@
-// `app.json`, read at boot, and the three things it says about the page before anything
-// mounts: what the tab is called, its icon, and the author's stylesheet, which lands after
-// the client's own so a rule of equal rank is the author's (APP §"Boot").
+// `app.json`, read at boot (APP §"Boot"): the tab's title and icon, and the author's
+// stylesheet, linked after the client's own.
 import type { AppConfig } from './records';
 
 const at = (path: string): string => new URL(path, document.baseURI).href;
@@ -9,8 +8,7 @@ function sheet(href: string): Promise<void> {
 	const link = document.createElement('link');
 	link.rel = 'stylesheet';
 	link.href = href;
-	// Settled either way: a stylesheet that will not load leaves the app in its own look,
-	// which is a page still worth showing.
+	// Settled either way: a sheet that will not load leaves the app in its own look.
 	const loaded = new Promise<void>((ok) => {
 		link.onload = () => ok();
 		link.onerror = () => ok();

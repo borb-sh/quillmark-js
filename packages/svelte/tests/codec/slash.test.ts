@@ -115,32 +115,16 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		press(view, 'Enter');
 	}
 
-	it('`/quote` wraps the block, the container `> ` opens', () => {
+	it.each([
+		['quote', [{ container: 'quote' }]],
+		['list', [{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }]],
+		['numbered-list', [{ container: 'list_item', attrs: { ordered: true, start: 1, ordinal: 0 } }]]
+	])('`/%s` wraps the block in the container its shorthand opens', (name, containers) => {
 		const { field, view } = leaf('alpha');
-		pick(field, view, 0, 'quote');
+		pick(field, view, 0, name);
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha');
-		expect(stored.lines[0].containers).toEqual([{ container: 'quote' }]);
-		field.destroy();
-	});
-
-	it('`/list` mints the paragraph item `- ` does', () => {
-		const { field, view } = leaf('alpha');
-		pick(field, view, 0, 'list');
-		const stored = field.getContent();
-		expect(stored.text).toBe('alpha');
-		expect(stored.lines[0].containers).toEqual([
-			{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }
-		]);
-		field.destroy();
-	});
-
-	it('`/numbered-list` mints the ordered one, numbered from 1', () => {
-		const { field, view } = leaf('alpha');
-		pick(field, view, 0, 'numbered-list');
-		expect(field.getContent().lines[0].containers).toEqual([
-			{ container: 'list_item', attrs: { ordered: true, start: 1, ordinal: 0 } }
-		]);
+		expect(stored.lines[0].containers).toEqual(containers);
 		field.destroy();
 	});
 

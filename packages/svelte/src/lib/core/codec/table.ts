@@ -1,19 +1,16 @@
-// The table island's model: the cell codec (a `TableCell` ↔ one inline-schema PM
-// doc) and the rectangularizing constructors every row and column op goes through
-// (CODEC §Islands, §"The table island").
+// The table island's model: the cell codec (a `TableCell` ↔ one inline-schema PM doc) and the
+// rectangularizing constructors every row and column op goes through (CODEC §Islands, §"The table
+// island").
 //
-// `TableProps` normalizes to one column count shared by `header`, every row, `aligns`
-// and `widths`, so a ragged table is not a state the content can hold. The editor keeps
-// its optimistic PM and re-hydrates only on an external change (CODEC
-// §Reconciliation), so an op that emitted a ragged table would leave the store
-// rectangularized and PM ragged with no error channel and no repair. Every
-// constructor here therefore ends in {@link normalizeTable}, and a caller reaches
-// the shape only through them.
+// `TableProps` normalizes to one column count shared by `header`, every row, `aligns` and `widths`.
+// The editor keeps its optimistic PM and re-hydrates only on an external change (CODEC
+// §Reconciliation), so an op that emitted a ragged table would leave the store rectangularized and
+// PM ragged with no repair. Every constructor therefore ends in {@link normalizeTable}, and a
+// caller reaches the shape only through them.
 //
-// A cell is its own content unit: `marks` are USV offsets into that cell's `text`,
-// not into `Content.text`. That is the second coordinate space, and a cell is one
-// paragraph with no containers and no islands, a `\n` in its text being a hard break,
-// so it decodes and projects through the machinery a field does (`cellSchema`).
+// A cell is its own content unit: `marks` are USV offsets into that cell's `text`, not
+// `Content.text`. A cell is one paragraph with no containers and no islands, a `\n` in its text
+// being a hard break, so it decodes and projects through the machinery a field does (`cellSchema`).
 import type { Content, TableCell, TableProps } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { core } from '../lifecycle.js';
@@ -34,11 +31,9 @@ export function emptyCell(): TableCell {
 }
 
 /**
- * The row index space the chrome and the ops share: **0 is the header**, 1…n the body
- * rows. The split is how a table is stored, not a rank the ops answer to: a row op
- * works {@link allRows} and whichever row lands at index 0 is the header afterwards,
- * so index 0 moves and deletes like any other. The one row the model refuses is the
- * last, there being no table under it.
+ * The row index space the chrome and the ops share: **0 is the header**, 1…n the body rows. A row
+ * op works {@link allRows}, and whichever row lands at index 0 is the header afterwards. The one
+ * row the model refuses is the last, there being no table under it.
  */
 export function rowCount(props: TableProps): number {
 	return props.rows.length + 1;
@@ -49,8 +44,10 @@ export function rowCells(props: TableProps, r: number): TableCell[] {
 	return r === 0 ? props.header : (props.rows[r - 1] ?? []);
 }
 
-/** Whether a row holds no text, which is what tells a row on offer from one taken up
- *  (`table-view.ts` §`step`). Text alone: a mark over none is nothing a writer can see. */
+/**
+ * Whether a row holds no text, telling a row on offer from one taken up (`table-view.ts` §`step`).
+ * Text alone: a mark over none is invisible.
+ */
 export function rowEmpty(props: TableProps, r: number): boolean {
 	return rowCells(props, r).every((cell) => cell.text === '');
 }
@@ -66,11 +63,9 @@ export function columnCount(props: TableProps): number {
 }
 
 /**
- * The rectangularizing constructor: one column count across `header`, every row,
- * `aligns` and `widths`, padding with empty cells, `none` and auto-fit. The column
- * count is the widest thing present, so a caller that appended to one axis alone still
- * gets a rectangle back, and a table is never narrower than one column. The layout
- * keys ride through, each absent at its default as the store writes it.
+ * The rectangularizing constructor: one column count (the widest thing present, at least one)
+ * across `header`, every row, `aligns` and `widths`, padding with empty cells, `none` and auto-fit.
+ * The layout keys ride through, each absent at its default as the store writes it.
  */
 export function normalizeTable(props: TableProps): TableProps {
 	const cols = Math.max(
@@ -116,12 +111,11 @@ function spanKey(cell: TableCell, key: (typeof SPAN_KEYS)[number]): number {
 }
 
 /**
- * Per row of {@link allRows} and per cell, the extent a drawn cell spans, or `null` for
- * a slot another's span covers: the rule upstream draws and stores by. Cells claim slots
- * in reading order, so an earlier span wins. A span takes the columns to its right, then
- * the rows below, while each slot it would cover holds a cell with no text and no mark
- * that no other span covers, stopping at the grid's edge and at the end of its own
- * section, the header rows or the body.
+ * Per row of {@link allRows} and per cell, the extent a drawn cell spans, or `null` for a slot
+ * another's span covers: the rule upstream draws and stores by. Cells claim slots in reading order,
+ * so an earlier span wins. A span takes the columns to its right, then the rows below, while each
+ * slot it would cover holds a cell with no text and no mark that no other span covers, stopping at
+ * the grid's edge and at the end of its own section (header rows or body).
  */
 function spansOf(rows: TableCell[][], head: number): (Span | null)[][] {
 	const top = Math.min(head, rows.length);
@@ -154,8 +148,10 @@ export function spanGrid(props: TableProps): (Span | null)[][] {
 	return spansOf(allRows(props), headRows(props));
 }
 
-/** The drawn cell whose span covers `(r, c)`, which is the slot itself where nothing
- *  covers it; the slot itself outside the grid. */
+/**
+ * The drawn cell whose span covers `(r, c)`; the slot itself where nothing covers it or it lies
+ * outside the grid.
+ */
 export function anchorAt(
 	grid: (Span | null)[][],
 	r: number,
@@ -179,9 +175,11 @@ function withSpan(cell: TableCell, span: Span): TableCell {
 	};
 }
 
-/** Each span written as the cell can cover it, absent at 1, and a covered cell's span keys
- *  dropped, its alignment kept: what the store settles a table to. A key holding no whole
- *  number from 1 stays as written and reads as 1. */
+/**
+ * Each span written as the cell can cover it, absent at 1, and a covered cell's span keys dropped,
+ * its alignment kept: what the store settles a table to. A key holding no whole number from 1 stays
+ * as written and reads as 1.
+ */
 function settleSpans(rows: TableCell[][], head = 1): TableCell[][] {
 	const spans = spansOf(rows, head);
 	return rows.map((row, r) =>
@@ -216,25 +214,24 @@ function respan(rows: TableCell[][], r: number, c: number, span: Span): TableCel
 }
 
 /**
- * The rows as one list, header first: the space a row op works in. `header` is a
- * separate field because a table always has one and `header: []` is not a table — a
- * storage shape, not a rank a row op has to know about. Reading it as one list is what
- * lets move and delete treat every row alike, and {@link fromRows} splits it back.
+ * The rows as one list, header first: the space a row op works in, so move and delete treat every
+ * row alike. `header` is a separate field because a table always has one; {@link fromRows} splits
+ * it back.
  */
 export function allRows(props: TableProps): TableCell[][] {
 	return [props.header, ...props.rows];
 }
 
-/** A flat list back into the stored shape: whatever sits at index 0 is the header, by
- *  position rather than by having been one. No caller passes an empty list — every op
- *  that could reach one refuses the last row first. */
+/**
+ * A flat list back into the stored shape: whatever sits at index 0 is the header. No caller passes
+ * an empty list; every op that could reach one refuses the last row first.
+ */
 function fromRows(props: TableProps, rows: TableCell[][]): TableProps {
 	const [header = [], ...rest] = rows;
 	return normalizeTable({ ...props, header, rows: rest });
 }
 
-/** A fresh table: a header plus `bodyRows` empty rows, every column unaligned.
- *  Growth is cheap (Tab at the last cell appends a row), so the default is small. */
+/** A fresh table: a header plus `bodyRows` empty rows, every column unaligned. */
 export function newTable(cols = 3, bodyRows = 2): TableProps {
 	return normalizeTable({
 		header: Array.from({ length: cols }, emptyCell),
@@ -264,9 +261,10 @@ export function insertRow(props: TableProps, r: number): TableProps {
 	return fromRows(props, [...rows.slice(0, at + 1), fresh, ...rows.slice(at + 1)]);
 }
 
-/** Drop row `r`, the header included: the row left at index 0 is the header, which is
- *  how a table whose first row went still has one. A no-op at the last row, that being
- *  the removal of the table rather than of a row, and the island's own to answer. */
+/**
+ * Drop row `r`, the header included: the row left at index 0 becomes the header. A no-op at the
+ * last row, which is the removal of the table and the island's to answer.
+ */
 export function deleteRow(props: TableProps, r: number): TableProps {
 	let rows = allRows(props);
 	if (rows.length <= 1 || r < 0 || r >= rows.length) return normalizeTable(props);
@@ -275,8 +273,8 @@ export function deleteRow(props: TableProps, r: number): TableProps {
 		const shorter = { ...span, rowspan: span.rowspan - 1 };
 		if (y < r) rows = respan(rows, y, c, shorter);
 		else if (span.rowspan > 1) {
-			// The drawn cell goes with its row, so the one under it takes its text and the
-			// rest of the span.
+			// The drawn cell goes with its row, so the one under it takes its text and the rest of
+			// the span.
 			const moved = withSpan(rows[y]![c]!, shorter);
 			rows = rows.map((row, i) =>
 				i === y + 1 ? row.map((cell, x) => (x === c ? moved : cell)) : row
@@ -339,11 +337,10 @@ function transpose<T>(xs: T[][]): T[][] {
 }
 
 /**
- * `lines` with a span released wherever moving line `from` to `to` would leave the lines
- * it covers out of order or apart. `lines` are rows or columns, and each span names its
- * drawn cell by `line` and its place `at` along it, and the `length` it runs across the
- * lines under `key`. A span whose lines keep their order and stay together keeps it, its
- * covered cells travelling with their lines.
+ * `lines` with a span released wherever moving line `from` to `to` would leave the lines it covers
+ * out of order or apart. Each span names its drawn cell by `line` and its place `at` along it, and
+ * the `length` it runs across the lines under `key`; a span whose lines keep their order and stay
+ * together keeps it.
  */
 function unspan(
 	lines: TableCell[][],
@@ -377,8 +374,10 @@ function unspan(
 	return out;
 }
 
-/** One element moved within an array, out of place. The whole of what both move ops
- *  do to their axis, which is why they can only disagree about the index. */
+/**
+ * One element moved within an array, out of place: the whole of what both move ops do to their
+ * axis.
+ */
 function move<T>(xs: T[], from: number, to: number): T[] {
 	const next = [...xs];
 	const [moved] = next.splice(from, 1);
@@ -386,10 +385,10 @@ function move<T>(xs: T[], from: number, to: number): T[] {
 	return next;
 }
 
-/** Row `r` moved by `by` places, clamped: a drag that leaves the rectangle is a no-op
- *  rather than an error, since the drop target is geometry and geometry runs past the
- *  last row. The header travels like any other row, and so does the row that displaces
- *  it: being the header is holding index 0, which a move is free to hand over. */
+/**
+ * Row `r` moved by `by` places, clamped: a drag past the rectangle is a no-op, not an error. The
+ * header travels like any other row; being the header is holding index 0.
+ */
 export function moveRow(props: TableProps, r: number, by: number): TableProps {
 	const rows = allRows(props);
 	const to = Math.max(0, Math.min(r + by, rows.length - 1));
@@ -402,9 +401,10 @@ export function moveRow(props: TableProps, r: number, by: number): TableProps {
 	return fromRows(props, move(unspan(rows, spans, 'rowspan', r, to), r, to));
 }
 
-/** Column `c` moved by `by` places, clamped. `aligns` and `widths` travel with the
- *  column: each is the column's property, so a move that left it behind would retint
- *  or resize the column that took the index. */
+/**
+ * Column `c` moved by `by` places, clamped. `aligns` and `widths` travel with the column, being its
+ * properties.
+ */
 export function moveColumn(props: TableProps, c: number, by: number): TableProps {
 	const to = Math.max(0, Math.min(c + by, columnCount(props) - 1));
 	if (c === to || c < 0 || c >= columnCount(props)) return normalizeTable(props);
@@ -427,13 +427,9 @@ export function moveColumn(props: TableProps, c: number, by: number): TableProps
 }
 
 /**
- * Every cell in the inclusive rectangle emptied, alignment kept: what a delete gesture
- * means over a block of cells that covers no whole rank. A rectangle spanning one axis
- * covers ranks and deletes them, and one spanning both is the table itself, so what
- * reaches here is a proper sub-rectangle and the shape it leaves is the shape it found.
- *
- * A cell keeps its own alignment, and a column its alignment and width: what a clear
- * empties is text.
+ * Every cell in the inclusive rectangle emptied, alignment kept (a cell its own, a column its
+ * alignment and width): a delete over a block covering no whole rank. A rectangle spanning one axis
+ * deletes ranks and one spanning both is the table, so what reaches here is a proper sub-rectangle.
  */
 export function clearCells(
 	props: TableProps,
@@ -453,8 +449,10 @@ export function clearCells(
 	});
 }
 
-/** Set column `c`'s alignment and clear its cells' own `align`, which would outrank it:
- *  what the held column's cluster and Shift+arrow write (`table-view.ts`). */
+/**
+ * Set column `c`'s alignment and clear its cells' own `align`, which would outrank it
+ * (`table-view.ts`).
+ */
 export function setAlign(props: TableProps, c: number, align: TableAlign): TableProps {
 	const release = (cells: TableCell[]): TableCell[] =>
 		cells.map((cell, i) => {
@@ -470,8 +468,7 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
 	});
 }
 
-/** Draw the top `head` rows as header rows: what the header toggle writes
- *  (`table-view.ts`). */
+/** Draw the top `head` rows as header rows (`table-view.ts`). */
 export function setHead(props: TableProps, head: number): TableProps {
 	return normalizeTable({ ...props, head });
 }
@@ -484,8 +481,7 @@ export interface CellBlock {
 	c1: number;
 }
 
-/** `block` grown until every drawn cell it touches lies wholly inside it: the block a
- *  selection over merged cells holds. */
+/** `block` grown until every drawn cell it touches lies wholly inside it. */
 export function closeBlock(props: TableProps, block: CellBlock): CellBlock {
 	const grid = spanGrid(props);
 	let { r0, c0, r1, c1 } = block;
@@ -509,8 +505,9 @@ export function closeBlock(props: TableProps, block: CellBlock): CellBlock {
 	return { r0, c0, r1, c1 };
 }
 
-/** Whether `block` can be one cell: it holds more than one drawn cell and stays inside
- *  the header rows or the body, a span ending at the section's edge. */
+/**
+ * Whether `block` can be one cell: more than one drawn cell, inside the header rows or the body.
+ */
 export function canMerge(props: TableProps, block: CellBlock): boolean {
 	const { r0, c0, r1, c1 } = closeBlock(props, block);
 	const head = headRows(props);
@@ -520,10 +517,9 @@ export function canMerge(props: TableProps, block: CellBlock): boolean {
 }
 
 /**
- * The block's cells as one, at its top-left: the text of each drawn cell holding any, in
- * reading order, a line apiece, and every other slot an empty one the span covers, its
- * alignment kept. The top-left cell's own alignment is the merged cell's. A block
- * {@link canMerge} refuses comes back as it was.
+ * The block's cells as one, at its top-left: the text of each drawn cell holding any, in reading
+ * order, a line apiece, every other slot an empty one the span covers, alignment kept. The top-left
+ * cell's alignment is the merged cell's. A block {@link canMerge} refuses comes back as it was.
  */
 export function mergeCells(props: TableProps, block: CellBlock): TableProps {
 	if (!canMerge(props, block)) return normalizeTable(props);
@@ -552,24 +548,26 @@ export function mergeCells(props: TableProps, block: CellBlock): TableProps {
 	return fromRows(props, merged);
 }
 
-/** The merged cell covering `(r, c)` back to the cells under it: its text stays in the
- *  top-left one, and the rest are the empty cells the span covered. */
+/**
+ * The merged cell covering `(r, c)` back to the cells under it: its text stays top-left, the rest
+ * are the empty cells it covered.
+ */
 export function splitCell(props: TableProps, r: number, c: number): TableProps {
 	const a = anchorAt(spanGrid(props), r, c);
 	return fromRows(props, respan(allRows(props), a.r, a.c, { colspan: 1, rowspan: 1 }));
 }
 
-/** Set or clear the column weights: what a border drag and its double-click write
- *  (`table-view.ts`). `undefined` returns every column to auto-fit. */
+/**
+ * Set or clear the column weights (`table-view.ts`); `undefined` returns every column to auto-fit.
+ */
 export function setWidths(props: TableProps, widths: (number | null)[] | undefined): TableProps {
 	return normalizeTable({ ...props, widths });
 }
 
 /**
- * Each column's share of the table's width, summing to 1, or `undefined` for a table
- * that auto-fits throughout. An auto-fit column beside weighted ones takes the mean
- * weight: the page sizes it to its content, which the editor's grid, laid out fixed so
- * the weights hold, cannot ask.
+ * Each column's share of the table's width, summing to 1, or `undefined` for a table that auto-fits
+ * throughout. An auto-fit column beside weighted ones takes the mean weight, since the editor's
+ * fixed-layout grid cannot size it to content as the page does.
  */
 export function columnShares(props: TableProps): number[] | undefined {
 	const set = props.widths?.filter((w): w is number => w !== null);
@@ -583,10 +581,8 @@ export function columnShares(props: TableProps): number[] | undefined {
 // ── The cell codec ──────────────────────────────────────────────────────────
 
 /**
- * A cell as a one-paragraph `Content`: what `decode` takes under `cellSchema`. Each
- * `\n` in the text opens a `continues` line, which is the hard break it decodes to and
- * the one USV `pmToContent` projects a break back to. The cell's marks are that
- * content's marks, both being offsets into the same text.
+ * A cell as a one-paragraph `Content` for `decode` under `cellSchema`: each `\n` opens a
+ * `continues` line, the hard break it decodes to. The cell's marks are that content's marks.
  */
 export function cellContent(cell: TableCell): Content {
 	const breaks = cell.text.split('\n').length - 1;
@@ -608,14 +604,11 @@ export function cellContent(cell: TableCell): Content {
 /**
  * The cell a nested PM doc projects, carrying `prior`'s identity anchors through.
  *
- * Anchors inside a cell are **preserved verbatim, never minted**: they are not in
- * the field plugin's coordinate space (the field's position map holds one `atom`
- * run for the whole table), so nothing here can mint one and the popover withholds
- * its `anchor` button while the caret is in a cell. Preserving them still means
- * rebasing: a cell edit is a splice like any other, so `mapMarks` carries each held
- * anchor through the cell's own delta by the rule the store applies to a field's,
- * and a mark the splice deleted through lands where the splice left it rather than
- * pointing past the text.
+ * Anchors inside a cell are preserved verbatim, never minted: they are not in the field plugin's
+ * coordinate space (its position map holds one `atom` run for the whole table), so the popover
+ * withholds its `anchor` button in a cell. Preserving still means rebasing: `mapMarks` carries each
+ * held anchor through the cell's delta by the store's rule, and a mark the splice deleted through
+ * lands where the splice left it.
  */
 export function cellFromDoc(doc: PMNode, prior: TableCell): TableCell {
 	const projected = pmToContent(doc);
@@ -641,9 +634,10 @@ function cellLayout(cell: TableCell): Omit<TableCell, 'text' | 'marks'> {
 	return layout;
 }
 
-/** Whether two cells are the same value: what tells an own edit (the projection the
- *  view just produced) from an external one (an undo, a re-hydrate) without a flag.
- *  The marks structurally, for the reason `reconcile.ts` states. */
+/**
+ * Whether two cells are the same value, telling an own edit from an external one (an undo, a
+ * re-hydrate) without a flag. Marks compare structurally, as `reconcile.ts` states.
+ */
 export function cellEqual(a: TableCell, b: TableCell): boolean {
 	return a.text === b.text && valueEqual(a.marks, b.marks);
 }
