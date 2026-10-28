@@ -12,6 +12,9 @@ import { core, quillFromYaml } from '../helpers/fixtures.js';
 import { mountInner, settle, unmountAll, type InnerRef } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
 
 const YAML = `quill:
   name: font_probe
@@ -170,6 +173,5 @@ describe('the library’s faces', () => {
 		expect(held.size).toBe(2);
 		release();
 		expect(held.size).toBe(0);
-		vi.unstubAllGlobals();
 	});
 });

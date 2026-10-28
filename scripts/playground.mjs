@@ -99,8 +99,17 @@ await stopPrevious();
 if (await answers())
 	throw new Error(`something else answers at ${url}; stop it, or pass --port <n>`);
 
-say('building @quillmark/quiver and @quillmark/svelte');
-await run('npm', ['run', 'build', '-w', 'packages/quiver', '-w', 'packages/svelte']);
+say('building @quillmark/quiver, @quillmark/svelte and @quillmark/fonts');
+await run('npm', [
+	'run',
+	'build',
+	'-w',
+	'packages/quiver',
+	'-w',
+	'packages/svelte',
+	'-w',
+	'packages/fonts'
+]);
 
 for (const cache of CACHES) rmSync(cache, { recursive: true, force: true });
 say('dropped the Vite and SvelteKit caches');
