@@ -5,7 +5,7 @@
 			"name": "TeXGyreTermes",
 			"license": "LicenseRef-GUST-Font-License",
 			"licenseFile": "TeXGyreTermes-GUST.txt",
-			"source": "https://files.pythonhosted.org/packages/b9/15/82225ab8b159aba51073b61ee35955aac8e3b340ff7c6612be8f356e3a27/rinoh_typeface_texgyretermes-0.1.1-py3-none-any.whl",
+			"source": "https://www.gust.org.pl/projects/e-foundry/tex-gyre/termes/qtm2.004otf.zip",
 			"faces": [
 				{
 					"weight": 400,
@@ -13,7 +13,7 @@
 					"file": "TeXGyreTermes-Regular.bb30035ec45d518e.otf",
 					"sha256": "bb30035ec45d518e778784e0b9334d12c64d839b747915f7171c595eee4e5ea2",
 					"upstream": {
-						"file": "rinoh_typeface_texgyretermes/texgyretermes-regular.otf",
+						"file": "texgyretermes-regular.otf",
 						"sha256": "cc3fe7c707b81428d23d54df3eadd9228a2bf6a4d43125d94df56f5f63134659"
 					}
 				},
@@ -23,7 +23,7 @@
 					"file": "TeXGyreTermes-Italic.7ddc0ba237c4ade9.otf",
 					"sha256": "7ddc0ba237c4ade96de1d2b19bbd3283373519ac557226fbc7ca806844aebd66",
 					"upstream": {
-						"file": "rinoh_typeface_texgyretermes/texgyretermes-italic.otf",
+						"file": "texgyretermes-italic.otf",
 						"sha256": "6dd103a1672e50568cd2f8a706ccd48443d44d7d073a59d2286f4e6f746575d6"
 					}
 				},
@@ -33,7 +33,7 @@
 					"file": "TeXGyreTermes-Bold.4b540f231f155b6a.otf",
 					"sha256": "4b540f231f155b6a138bcad55d959ae13790873b15d1c5e88db99a3bac12fbde",
 					"upstream": {
-						"file": "rinoh_typeface_texgyretermes/texgyretermes-bold.otf",
+						"file": "texgyretermes-bold.otf",
 						"sha256": "2fb3e952065fa153c7e4e64e04b98b9d79225739b6025aa3f0f0782d299ff61e"
 					}
 				},
@@ -43,7 +43,7 @@
 					"file": "TeXGyreTermes-BoldItalic.0dd9cbf614b20345.otf",
 					"sha256": "0dd9cbf614b20345f4fea9116b7e6a69a9d2b2efd732ad4170439c94b6178189",
 					"upstream": {
-						"file": "rinoh_typeface_texgyretermes/texgyretermes-bolditalic.otf",
+						"file": "texgyretermes-bolditalic.otf",
 						"sha256": "1bf6af99cb0e26c12951317032d79b96ae009551e59ccf02a5b24f325ecfec87"
 					}
 				}
