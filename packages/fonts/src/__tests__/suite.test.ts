@@ -4,7 +4,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init, Engine } from '@quillmark/wasm';
-import { FAMILIES, loadSuite } from '../node.js';
+import { FAMILIES, LABELS, loadSuite } from '../node.js';
 import { loadSuite as fetchSuite } from '../index.js';
 
 const core = await init();
@@ -12,6 +12,7 @@ const core = await init();
 interface Manifest {
 	families: {
 		name: string;
+		label?: string;
 		faces: { weight: number; style: string; file: string; sha256: string }[];
 	}[];
 }
@@ -50,6 +51,12 @@ describe('loadSuite (node)', () => {
 	it('names the families the manifest lists', () => {
 		expect([...FAMILIES]).toEqual(manifest.families.map((f) => f.name));
 	});
+
+	it('labels the families the manifest gives a label', () => {
+		expect(LABELS).toEqual(
+			Object.fromEntries(manifest.families.filter((f) => f.label).map((f) => [f.name, f.label]))
+		);
+	});
 });
 
 describe('loadSuite (browser)', () => {
@@ -62,7 +69,7 @@ describe('loadSuite (browser)', () => {
 
 	it('rejects naming the file that would not load', async () => {
 		vi.stubGlobal('fetch', async () => new Response(null, { status: 404 }));
-		await expect(fetchSuite()).rejects.toThrow(/\.ttf answered 404/);
+		await expect(fetchSuite()).rejects.toThrow(/\.(ttf|otf) answered 404/);
 	});
 });
 

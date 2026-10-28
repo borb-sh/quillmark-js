@@ -4,4 +4,4 @@
 
 ## Unreleased
 
-**The suite: Tinos, Arimo, Cousine, Caladea and Libertinus Serif**, each in regular, italic, bold and bold italic, subset to Latin and licensed under OFL 1.1. `loadSuite()` answers the twenty files as `new Engine({ fonts })` takes them, fetched beside the module from the main entry and read off disk from `/node`. `FAMILIES` names the five, and `manifest.json` each face's file, hash, licence and upstream source.
+**The suite: TeXGyreTermes, Arimo, Cousine, Caladea, Gelasio, Libertinus Serif, Spectral SC, Cinzel, DejaVu Sans and Inter**, each in regular, italic, bold and bold italic (Cinzel in regular and bold), subset to Latin, under OFL 1.1, the GUST Font License or the Bitstream Vera licence. `loadSuite()` answers the thirty-eight files as `new Engine({ fonts })` takes them, fetched beside the module from the main entry and read off disk from `/node`. `FAMILIES` names the ten, `LABELS` the name a picker shows for one whose own reads badly (TeXGyreTermes as Termes), and `manifest.json` each face's file, hash, licence and upstream source.

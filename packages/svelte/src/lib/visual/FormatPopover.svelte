@@ -89,8 +89,10 @@
 		getActiveLeaf: () => ActiveProse | undefined;
 		/** The families the host's font library offers, in its order. */
 		families?: string[];
+		/** The name the picker shows for a family, where it is not the family itself. */
+		fontLabels?: Readonly<Record<string, string>>;
 	}
-	let { getActiveLeaf, families = [] }: Props = $props();
+	let { getActiveLeaf, families = [], fontLabels = {} }: Props = $props();
 
 	const SETTLE_MS = 450;
 	/** The six content formatting marks. `anchor` is withheld: it draws nothing until
@@ -489,7 +491,7 @@
 										{/if}
 										<option value="">{t.strings.fontDefault}</option>
 										{#each familyOptions as name (name)}
-											<option value={name}>{name}</option>
+											<option value={name}>{fontLabels[name] ?? name}</option>
 										{/each}
 									</select>
 								{/if}

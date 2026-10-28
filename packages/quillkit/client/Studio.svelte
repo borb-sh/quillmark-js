@@ -51,7 +51,7 @@
 	import { askedRef, sayRef } from './link';
 	import { catalogOf, followRepacks, openQuiver, type Catalog } from './quiver';
 	import { close, openRef, openSession, type Opened } from './session';
-	import { engineOverSuite, facesFor } from './engine';
+	import { engineOverSuite, facesFor, fontLabels } from './engine';
 	import { collect, diagnosticsOf, messageOf, placeOf } from './notes';
 
 	/** The dev server's signal that a repack landed. */
@@ -575,6 +575,7 @@
 						onChange={handleChange}
 						onError={handleSurfaceError}
 						{fonts}
+						{fontLabels}
 					/>
 				</section>
 				<section class="pane paint" aria-label="Preview">
