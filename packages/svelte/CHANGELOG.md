@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Select-all raises the selection popover**, in a leaf and in a table cell, once it stands still as any keyboard selection does. Mod-A selected the whole leaf and raised nothing.
+
 **A table draws and edits merged cells.** A cell's `colspan` and `rowspan` draw as the span they say, and a sweep of several cells offers Merge, which joins their texts a line each, while a merged cell offers Split. Row and column ops keep a span whose lines stay together, a copy carries the spans, and the caret walks a merged cell as one stop. The grips and column borders hang off rails of no size before the first row and column, where they hung off the first row's and column's cells.
 
 **`@quillmark/wasm` 0.132.0 is the floor.** A table's header rows are its `head`: the header toggle writes `head` 0 or 1 where it wrote `headless`, and a table whose `head` is past 1 draws that many rows as its header. A field holding a `font_family` mark, which no editor mark draws yet, is held read-only rather than edited into a value without it. A field holding a `qm-<name>` element or a definition list is edited, where it was held read-only: the element imports as what it wraps and the list as one paragraph.

@@ -7,12 +7,13 @@
 // held leaf announces nothing, so neither raises it. A field's own leaf answers through
 // its controller's views. Over every leaf the surface draws the six mark buttons and
 // withholds the anchor's, an anchor drawing nothing until comments do. Mod-K is a press
-// of the Link button wherever the button stands, a table island's cell included. The
+// of the Link button wherever the button stands, a table island’s cell included. A
+// select-all raises it as any range does, in a leaf and in a cell. The
 // probe is its own quill.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { toggleMark } from 'prosemirror-commands';
-import { TextSelection } from 'prosemirror-state';
+import { AllSelection, TextSelection } from 'prosemirror-state';
 import type { Content, Document, PathStep } from '@quillmark/wasm';
 import { hasMarks } from '$lib/core/codec';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual';
@@ -150,6 +151,22 @@ async function surface(): Promise<HTMLElement | null> {
 	flushSync();
 	await settle();
 	return document.querySelector<HTMLElement>('.qm-format-popover');
+}
+/** Mod-A at `el`, as the keyboard presses it: the leaf's keymap takes it, and the
+ *  `selectionchange` the browser fires follows. */
+function modA(el: Element): void {
+	el.dispatchEvent(
+		new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true })
+	);
+	document.dispatchEvent(new Event('selectionchange'));
+	flushSync();
+}
+/** Press the surface's Bold button. */
+function bold(popover: HTMLElement | null): void {
+	popover!
+		.querySelector<HTMLButtonElement>(`[aria-label="${DEFAULT_VISUAL_STRINGS.formatBold}"]`)!
+		.click();
+	flushSync();
 }
 const labels = (popover: HTMLElement): (string | null)[] =>
 	[...popover.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
@@ -364,6 +381,59 @@ describe('the formatting popover over a field’s own leaf', () => {
 		}
 		select(intro, 2, 2, false);
 		expect((await surface())?.dataset.state ?? 'closed').toBe('closed');
+	});
+
+	it('rises over a select-all once it stands still, and its bold covers the leaf', async () => {
+		const q = probe();
+		const doc = load();
+		const { editor } = mountInner(q, doc);
+		const intro = await land(editor, 'main.intro');
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		try {
+			modA(intro);
+			expect(editor.getActiveLeaf()!.views.view.state.selection).toBeInstanceOf(AllSelection);
+			expect(await surface()).toBeNull();
+			vi.advanceTimersByTime(450);
+			bold(await surface());
+		} finally {
+			vi.useRealTimers();
+		}
+		expect(q.reader(doc).getContent({ field: 'intro' })?.marks).toEqual([
+			{ type: 'strong', start: 0, end: 'Intro words'.length }
+		]);
+	});
+
+	it('rises over a select-all in a table cell', async () => {
+		const q = probe();
+		const doc = core.Document.fromMarkdown(
+			[
+				'~~~',
+				'$quill: value_popover@1.0.0',
+				'~~~',
+				'',
+				'| aa | bb |',
+				'|---|---|',
+				'| 1 | 2 |',
+				''
+			].join('\n')
+		);
+		const mounted = mountInner(q, doc);
+		await land(mounted.editor, 'main.body');
+		const cell = mounted.target.querySelector<HTMLElement>('.qm-table-cell-host .ProseMirror')!;
+		cell.focus();
+		flushSync();
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		try {
+			modA(cell);
+			expect(mounted.editor.getActiveLeaf()!.views.focusedView().state.selection).toBeInstanceOf(
+				AllSelection
+			);
+			await surface();
+			vi.advanceTimersByTime(450);
+			expect(await surface()).not.toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('finds none once a form control takes the focus', async () => {
