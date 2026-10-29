@@ -168,7 +168,7 @@ export class Quiver {
 	 *
 	 * The returned quill is materialized from the `@quillmark/wasm` root export
 	 * — it is engine-free, portable data suitable for schema inspection,
-	 * validation, blueprint access, and document seeding.
+	 * validation, authoring-schema access, and document seeding.
 	 *
 	 * A core `Quill` renders directly: pass it to `engine.render(quill, doc)`.
 	 *

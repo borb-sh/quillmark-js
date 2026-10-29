@@ -101,18 +101,21 @@ describe('quillkit check', () => {
 	});
 
 	it(
-		'fails a quill whose example will not open, and passes the rest',
+		'warns on a root example.md the quill does not read, and fails on it under --strict',
 		async () => {
 			const source = await temp.collection();
-			const example = join(source, 'quills', 'showcase', '1.0.0', 'example.md');
-			const md = await readFile(example, 'utf8');
-			await writeFile(example, md.replace('$quill: showcase\n', '$quill: showcase@1.0\n'));
+			await writeFile(
+				join(source, 'quills', 'showcase', '1.0.0', 'example.md'),
+				'~~~\n$quill: showcase\n~~~\n'
+			);
 
-			const failure = await refused(['check'], source);
+			const { stdout } = await run(process.execPath, [BIN, 'check'], { cwd: source });
+			expect(stdout).toMatch(
+				/pass {2}showcase@1\.0\.0 \(seed, example\)\n(?: {2}.*\n)* {2}\[WARN\] example\.md is an ordinary file/
+			);
 
-			// A `FAIL` line is the gate's stderr, which the rejection's message carries.
-			expect(failure.message).toContain('FAIL  showcase@1.0.0');
-			expect(failure.stdout).toContain('pass  usaf_memo@0.0.0');
+			const failure = await refused(['check', '--strict'], source);
+			expect(failure.message).toContain('FAIL  showcase@1.0.0 — warnings under --strict');
 		},
 		RENDER_MS
 	);
@@ -181,12 +184,12 @@ describe('quillkit check, on what a quill says', () => {
 		"prints an example's diagnostic with its hint",
 		async () => {
 			const at = await starter([]);
-			const example = join(at, 'quills', 'letter', '0.1.0', 'example.md');
-			const md = await readFile(example, 'utf8');
-			await writeFile(example, md.replace('$quill: letter\n', '$quill: letter\ntitel: hi\n'));
+			const yaml = join(at, 'quills', 'letter', '0.1.0', 'Quill.yaml');
+			const declared = await readFile(yaml, 'utf8');
+			await writeFile(yaml, declared.replace('example: regards', 'example: cheers'));
 
 			const failure = await refused(['check'], at);
-			expect(failure.message).toMatch(/FAIL {2}letter@0\.1\.0 — example is not clean\n.*titel/);
+			expect(failure.message).toMatch(/FAIL {2}letter@0\.1\.0\n.*cheers/);
 			expect(failure.message).toMatch(/^ +hint: /m);
 		},
 		RENDER_MS

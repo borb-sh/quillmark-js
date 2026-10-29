@@ -1,7 +1,5 @@
 // The quill's example document, opened in the blank seed's stead, for a quill author
 // judging a page the seed cannot show them (STUDIO §"The document is the blueprint's").
-import type { Diagnostic, Document, Quill } from '@quillmark/wasm';
-import { diagnosticsOf } from './notes';
 
 /** A preference, so it outlives the tab. Absent is on. */
 const KEY = 'quillkit.studio.examples';
@@ -21,19 +19,5 @@ export function sayExamples(on: boolean): void {
 		else localStorage.setItem(KEY, 'off');
 	} catch {
 		// Held for this tab alone.
-	}
-}
-
-/**
- * The quill's root `example.md`, conformed against it, with what the conform stranded;
- * no `doc` where the quill ships none. One that will not open strands its refusal
- * rather than dropping it, and the caller seeds in its place.
- */
-export function openExample(quill: Quill): { doc?: Document; stranded: Diagnostic[] } {
-	try {
-		const doc = quill.exampleDocument();
-		return { doc, stranded: doc?.warnings ?? [] };
-	} catch (err) {
-		return { stranded: diagnosticsOf(err) };
 	}
 }

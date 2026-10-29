@@ -20,6 +20,15 @@ main:
         title: Metadata
       imprint:
         title: Print run
+  body:
+    example: |
+      The body is a full block leaf: paragraphs, emphasis, and the containers the codec round-trips.
+
+      - A bullet, to place a list container.
+
+      - A second one, so the list has a sibling to nest against.
+
+      A closing paragraph, far enough down the page that the body's boxes are two disjoint segments rather than one run.
   fields:
     colophon:
       type: richtext
@@ -32,6 +41,7 @@ main:
       multiline: false
       ui:
         group: identity
+      example: The Showcase Quill
       description: The document's title. Placed in the letterhead and again on the colophon page, so its regions span pages.
 
     subtitle:
@@ -40,6 +50,7 @@ main:
       ui:
         group: identity
         compact: true
+      example: A reference document
       description: Literal text, so markdown delimiters typed here are the text rather than markup.
 
     authors:
@@ -51,6 +62,9 @@ main:
       ui:
         group: identity
         compact: true
+      example:
+        - Ada Lovelace
+        - Grace Hopper
       description: "One-line text elements. Asks for `ui.compact` and is declined: an array grows with the document, and a row is as tall as its tallest cell. The one array declaring a literal `default:`, and a list ghosts nothing — the line prints only while the field is unset."
 
     contact:
@@ -84,6 +98,9 @@ main:
         type: text
       ui:
         group: identity
+      example:
+        - A. LOVELACE
+        - Author
       description: Signed by. Placed through the helper's `signature-field`, so its region comes from a widget rather than from glyph spans.
 
     contributors:
@@ -113,6 +130,13 @@ main:
       ui:
         group: identity
         layout: table
+      example:
+        - name: Ada Lovelace
+          role: author
+          since: "2025-11-03"
+          lead: true
+        - name: Grace Hopper
+          role: reviewer
       description: "Who worked on it. An `array` of `object` whose every cell is one line tall, asking for `ui.layout: table` on the array's own `ui` and granted it: a column per property under a header, each row carrying its remove alone. Capped at `max: 3`, so the add chip disables at three and the count beside it says why. `name` is a content cell and regions through the plate's loop; the scalar cells reach the preview through the array's own region."
 
     abstract:
@@ -120,6 +144,7 @@ main:
       multiline: true
       ui:
         group: content
+      example: "A block richtext leaf: it holds paragraphs, so it never shares a row however compact it asks to be."
       description: "The standing summary. Block richtext — `multiline: true`, so the leaf takes the block floor."
 
     keywords:
@@ -130,6 +155,9 @@ main:
       default: []
       ui:
         group: content
+      example:
+        - "*Schema* shapes"
+        - "**Regions** and geometry"
       description: An array whose items are themselves richtext. Each element is tracked as its own region (`main.keywords[0]`); the array itself is named by none.
 
     errata:
@@ -140,6 +168,9 @@ main:
       default: []
       ui:
         group: content
+      example:
+        - Fig. 2 is mislabelled — the **asterisks** here are the text, not emphasis.
+        - Page 4 gives the wrong year.
       description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text; `multiline: true`, so a row holds lines."
 
     epigraph:
@@ -178,6 +209,18 @@ main:
       default: []
       ui:
         group: content
+      example:
+        - title: Sources
+          entries:
+            - label: Primary
+              page: 12
+              note: Where the *claims* come from.
+            - label: Secondary
+              page: 14
+        - title: Glossary
+          entries:
+            - label: Terms
+              page: 20
       description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed appendix is summarized by its `title` cell and a collapsed entry by its `label`, the first one-line text cell of each. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
 
     columns:
@@ -227,6 +270,7 @@ main:
       ui:
         group: meta
         compact: true
+      example: draft
       description: "Where the document is in its life. Which stage this is remains a human's call, so the field declares no `default:` and asks."
 
     distribution:
@@ -347,6 +391,25 @@ main:
       default: []
       ui:
         group: meta
+      example:
+        - note: Fig. 2 relabelled
+          pages: 1
+          detail: The caption named the wrong figure.
+          rationale: |
+            Two plates shared one caption:
+
+            - the second was captioned as the first;
+            - the list of figures repeated it.
+          passage: |-
+            Figure 2. The region table,
+            drawn over the second page.
+        - note: Margins widened
+          pages: 2
+          rationale: |
+            | Edge | Was | Is |
+            | --- | --- | --- |
+            | Inner | 18pt | 24pt |
+            | Outer | 18pt | 20pt |
       description: "The revision log. An array of objects: each element collapses to a summary row titled by its own `note`, and opens onto a subform. The content cells region — `main.revisions[0].detail` is the fixture's one-rung nested-row address — and the scalar cells beside them reach the preview through the array's own region."
 
     checks:
@@ -373,6 +436,12 @@ main:
       ui:
         group: meta
         compact: true
+      example:
+        spelling:
+          note: Two *typos* in the abstract.
+        kerning_pairs:
+          title: Kerning pairs
+          severity: major
       description: "The review checklist: a `matrix`, a vocabulary someone ticks. Six members on one flat roster, set abreast by `ui.compact`, and `open: true`, so a document adds its own items beside them, each a snake_case key carrying a `title`. Two columns, one of them prose, unfold under a held member. A member is held by being present, and an unticked one is absent. It declares no `default:`, so it seeds empty. `note` is a content cell, so a held member's regions at `main.checks.spelling.note`, and a member's own address is its tick."
 
     imprint:
@@ -398,12 +467,16 @@ card_kinds:
         structure: {}
         style:
           title: Set in
+    body:
+      example: |
+        Section bodies are leaves of their own, addressed per card.
     fields:
       heading:
         type: text
         ui:
           group: structure
           compact: true
+        example: Findings
         description: The section's heading, and the card's own title.
       lead:
         type: richtext
@@ -411,6 +484,7 @@ card_kinds:
         default: ""
         ui:
           group: structure
+        example: What the section *found*, in one line.
         description: A standfirst under the heading.
       layout:
         type: enum
@@ -466,6 +540,9 @@ card_kinds:
         type: array
         items:
           type: text
+        example:
+          - G. HOPPER
+          - Reviewer
         description: "Line 1: name as signed. Line 2: role."
       signed_on:
         type: date
@@ -477,6 +554,9 @@ card_kinds:
   figure:
     title: Figure
     description: A placed figure.
+    body:
+      example: |
+        The figure's own note, which stands in for the figure.
     fields:
       placement:
         type: enum
@@ -493,11 +573,13 @@ card_kinds:
                 - end
               default: end
               description: Which margin the figure floats to.
+        example: float
         description: How the figure sits in the flow. The one variant-bearing enum on a card kind.
       caption:
         type: richtext
         multiline: false
         default: ""
+        example: "A figure's *caption*."
         description: Set under the figure.
 
   credits:

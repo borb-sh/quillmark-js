@@ -115,7 +115,7 @@ async function init(args: string[]): Promise<void> {
 		'npx quillkit serve --open'
 	];
 	console.log(`quillkit init: ${at}`);
-	console.log('  quills/letter/0.1.0/ is the quill: Quill.yaml, plate.typ, example.md.');
+	console.log('  quills/letter/0.1.0/ is the quill: Quill.yaml and plate.typ.');
 	console.log(`\nNext:\n${steps.map((s) => `  ${s}`).join('\n')}`);
 }
 
