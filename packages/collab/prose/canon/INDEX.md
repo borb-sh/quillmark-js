@@ -12,7 +12,7 @@ Island ids are client-unique. An island the store minted positionally (`isl-0`) 
 
 ## The two directions
 
-**Y → Document** (`project.ts`) is a pure function of the Y state, and a remote transaction lands as `doc.overwrite` with its result. A table slot that a merge left sharing its line is the one state no `Content` holds; the projection splits the line around it and the binding writes the split back. The fuzz suite counts how often that happens.
+**Y → Document** (`project.ts`) is a pure function of the Y state, and a remote transaction lands as `doc.reviseContent` with its result, which carries the Document's own anchors through the change since the projection holds none; an engine without `reviseContent` takes `overwrite`, which drops them. The host's `onRemote` gets the Y change's own delta in USV, which places a character typed into a run of the same character where it was typed, where a diff of the two values cannot. A table slot that a merge left sharing its line is the one state no `Content` holds; the projection splits the line around it and the binding writes the split back. The fuzz suite counts how often that happens.
 
 **Document → Y** (`write.ts`) diffs: after a local commit `push` writes one text splice and then only the attributes that differ. Containers are reassigned their old identities wherever their run survived the edit (`assignIds`), so the codec restating every line's containers with renumbered ordinals writes nothing for the lines that did not move.
 
@@ -20,4 +20,4 @@ Island ids are client-unique. An island the store minted positionally (`isl-0`) 
 
 ## Not yet
 
-Anchors are dropped by a remote overwrite. Fields other than the main body, cards, scalars, arrays and `$ext` have no Y form. A table's props are one last-writer-wins value. There is no persistence, no server, and no remote caret.
+Anchors are kept on the client that made them and are not shared. The writer still diffs, so a local edit inside a run of one character can land in Y at the other end of the run. Fields other than the main body, cards, scalars, arrays and `$ext` have no Y form. A table's props are one last-writer-wins value. There is no persistence, no server, and no remote caret.

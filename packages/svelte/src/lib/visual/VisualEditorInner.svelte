@@ -37,6 +37,7 @@
 	import type {
 		Addr,
 		CardAddr,
+		Delta,
 		Diagnostic,
 		PathStep,
 		PayloadItem,
@@ -831,12 +832,13 @@
 		if (span.alive) bloom(box);
 	}
 	/** Draw a change the host wrote to the document under the prose leaf at `field`: the
-	 *  leaf takes it as one step outside its history, so its caret and undo stay its own. */
-	export function applyExternal(field: DocPath): void {
+	 *  leaf takes it as one step outside its history, so its caret and undo stay its own.
+	 *  `delta` is the write's receipt, which the caret maps through where it is given. */
+	export function applyExternal(field: DocPath, delta?: Delta): void {
 		const target = leafTargetFor(field);
 		const prose = target && !target.steps ? leaves.prose(target.key) : undefined;
 		if (!prose) return missed(`no mounted prose leaf at ${field}`, field);
-		prose.applyExternal();
+		prose.applyExternal(delta);
 	}
 	/** Seed a card of `kind` and insert it at `at` (default: the end). Returns the new
 	 *  card's session key, or `undefined` when the quill seeds no card of that kind. */

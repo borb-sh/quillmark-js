@@ -27,6 +27,7 @@
 	import { reportRebindIgnored } from '../core/rebind.svelte.js';
 	import type { DocPath, Landing } from '../core/address.js';
 	import type { CardId } from './signals.js';
+	import type { Delta } from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
 	import VisualEditorInner from './VisualEditorInner.svelte';
 
@@ -75,8 +76,8 @@
 		await inner?.focusField(field);
 	}
 	/** Draw a change the host wrote to the document under the prose leaf at `field`. */
-	export function applyExternal(field: DocPath): void {
-		inner?.applyExternal(field);
+	export function applyExternal(field: DocPath, delta?: Delta): void {
+		inner?.applyExternal(field, delta);
 	}
 	/** Seed a card of `kind` at `at` (default: the end); the new card's session key. */
 	export function insertCard(kind: string, at?: number): CardId | undefined {

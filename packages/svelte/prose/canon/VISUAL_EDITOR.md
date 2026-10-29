@@ -238,7 +238,7 @@ The instance surface, reached by that `bind:this`:
 ```ts
 setCaret(at: Landing): Promise<void>;          // preview → editor; a caret where the pick has one
 focusField(field: DocPath): Promise<void>;     // any mounted field: reveal + focus, no caret
-applyExternal(field: DocPath): void;           // a host's write under a prose leaf, drawn outside its history
+applyExternal(field: DocPath, delta?: Delta): void;  // a host's write under a prose leaf, drawn outside its history
 insertCard(kind: string, at?: number): CardId | undefined;  // the new card's key
 removeCard(cardId: CardId): void;
 moveCard(cardId: CardId, dir: -1 | 1): void;   // one slot; a no-op at either edge

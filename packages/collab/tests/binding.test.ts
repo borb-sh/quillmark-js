@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Content } from '@quillmark/wasm';
+import { bindField } from '../src/index.js';
 import { body, core, deliver, edit, markdown, peers, settle, yText } from './helpers.js';
 
 const SAMPLE = [
@@ -115,5 +116,35 @@ describe('the Y projection', () => {
 		expect(yText(b)).toBe(body(b).text);
 		expect(a.doc.toMarkdown()).toContain('| h |');
 		expect(a.doc.toMarkdown()).toContain('typed');
+	});
+
+	const revises = 'reviseContent' in core.Document.prototype;
+
+	it.runIf(revises)("keeps a peer's own anchor through a remote edit", () => {
+		const [a, b] = peers(2, 'hello world');
+		const at = Array.from(body(a).text).indexOf('w');
+		expect(
+			edit(a, {
+				markOps: [{ op: 'add', type: 'anchor', attrs: { id: 'c1' }, start: at, end: at + 5 }]
+			})
+		).toBe(true);
+		expect(edit(b, { delta: { ops: [{ insert: 'Oh, ' }] } })).toBe(true);
+		settle([a, b]);
+		const anchor = body(a).marks.find((m) => m.type === 'anchor');
+		expect(anchor && Array.from(body(a).text).slice(anchor.start, anchor.end).join('')).toBe(
+			'world'
+		);
+		expect(a.doc.toMarkdown()).toBe(b.doc.toMarkdown());
+	});
+
+	it('hands the host the delta the Y change made, not one diffed after it', () => {
+		const deltas: unknown[] = [];
+		const [a, b] = peers(2, 'aa');
+		a.binding.destroy();
+		a.binding = bindField({ doc: a.doc, ydoc: a.ydoc, onRemote: (d) => deltas.push(d) });
+		// A third `a` at the start: a diff of `aa` → `aaa` would place it at the end.
+		b.ydoc.getText('main.body').insert(0, 'a');
+		settle([a, b]);
+		expect(deltas).toEqual([{ ops: [{ insert: 'a' }] }]);
 	});
 });

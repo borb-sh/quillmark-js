@@ -4,7 +4,7 @@
 // whole Y state, and from then on each Y update is posted as it happens. Each tab seeds the body
 // with the same deterministic update (`seedUpdate`), so tabs opened on one quill's example start
 // from one copy rather than two.
-import type { Content, Document } from '@quillmark/wasm';
+import type { Content, Delta, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
 import { bindField, seedUpdate } from '@quillmark/collab';
 
@@ -14,7 +14,11 @@ export interface Room {
 	close(): void;
 }
 
-export function joinRoom(doc: Document, room: string, onRemote: () => void): Room {
+export function joinRoom(
+	doc: Document,
+	room: string,
+	onRemote: (delta: Delta | undefined) => void
+): Room {
 	const ydoc = new Y.Doc();
 	const channel = new BroadcastChannel(`qm-collab:${room}`);
 	Y.applyUpdate(ydoc, seedUpdate(doc.getStored({}) as Content), channel);

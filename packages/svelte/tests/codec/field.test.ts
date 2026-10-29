@@ -8,7 +8,7 @@ import { EditorView } from 'prosemirror-view';
 import { Selection, TextSelection } from 'prosemirror-state';
 import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
-import type { Document, TableProps } from '@quillmark/wasm';
+import type { Delta, Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
 import { mount, quill, example, normalize, contentEqual, md, viewOf, press } from './_util.js';
 
@@ -122,6 +122,20 @@ describe('field-level reconciliation', () => {
 		expect(view.state.doc.textContent).not.toContain('MINE');
 		expect(view.state.doc.textContent.startsWith('THEIRS ')).toBe(true);
 		expect((field.getContent() as { text: string }).text).not.toContain('MINE');
+		field.destroy();
+	});
+
+	it('maps the caret through the writer’s delta where the diff cannot tell', () => {
+		const doc = example();
+		doc.overwrite({}, md('aa'));
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		field.setCaret(1);
+		// A third `a` typed ahead of the caret: diffed, `aa` → `aaa` reads as an insert at the
+		// end, past the caret; the writer's delta says it went in at 0.
+		doc.overwrite({}, md('aaa'));
+		const delta: Delta = { ops: [{ insert: 'a' }] };
+		field.applyExternal(delta);
+		expect(field.selectionRange()).toEqual({ from: 2, to: 2 });
 		field.destroy();
 	});
 });

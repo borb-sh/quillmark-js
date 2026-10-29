@@ -66,6 +66,7 @@
 		Document,
 		LiveSession,
 		ChangeSet,
+		Delta,
 		Diagnostic,
 		FontFace,
 		OutputFormat
@@ -104,8 +105,8 @@
 
 	// Surface handles for the imperative bridge hops.
 	let editorRef:
-		{ setCaret(at: Landing): Promise<void>; applyExternal(field: string): void } | undefined =
-		$state();
+		| { setCaret(at: Landing): Promise<void>; applyExternal(field: string, delta?: Delta): void }
+		| undefined = $state();
 	// The live room `?collab=<room>` joins, for the open in force.
 	let room: Room | undefined;
 	let previewRef: ReturnType<typeof Preview> | undefined = $state();
@@ -418,8 +419,8 @@
 			}
 			const roomName = params.get('collab');
 			if (roomName)
-				room = joinRoom(doc, roomName, () => {
-					editorRef?.applyExternal('main.body');
+				room = joinRoom(doc, roomName, (delta) => {
+					editorRef?.applyExternal('main.body', delta);
 					scheduleRecompile();
 				});
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font

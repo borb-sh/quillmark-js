@@ -53,7 +53,7 @@ What is in the list is the **pack's call**, not the route's. `usaf_memo` is held
 
 Two branches are not a schema's to declare — a guidance channel a consumer supplies, and a card whose kind the schema cannot project — and those are **query flags on `/playground`**, read once per open and applied to the opened document: `?tips`, `?foreign`. They carry no chrome, because the only reader is a hand driving the harness, and a switch for one would be a control on the landing page for everyone else.
 
-`?collab=<room>` shares the main body live between every tab of one browser open on the same room (`collab.ts`, over `@quillmark/collab`): a `BroadcastChannel` carries the Y updates, a remote change lands in the editor through `applyExternal('main.body')` and recompiles, and each local commit pushes. Two tabs are the manual check for a remote edit's caret, undo and composition.
+`?collab=<room>` shares the main body live between every tab of one browser open on the same room (`collab.ts`, over `@quillmark/collab`): a `BroadcastChannel` carries the Y updates, a remote change lands in the editor through `applyExternal('main.body', delta)` and recompiles, and each local commit pushes. Two tabs are the manual check for a remote edit's caret, undo and composition.
 
 `?foreign` draws the recovery shell: the engine renders past a kind the schema does not declare and warns `validation::unknown_card`, so the preview leaves the card out and the shell is the one surface that reaches it. The retype it offers puts the card on the page.
 

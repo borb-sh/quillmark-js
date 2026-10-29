@@ -28,9 +28,11 @@ import type {
 	DocumentWriter,
 	Content,
 	Addr,
+	Delta,
 	Quill
 } from '@quillmark/wasm';
 import type { EditorErrorHandler } from '../errors.js';
+import { core } from '../lifecycle.js';
 import { reportError, errorMessage } from '../errors.js';
 import { decode, fitsLeaf } from './decode.js';
 import { usvToPM, pmToUsv, buildLineIndex, lineIndexOf, type LineIndex } from './positions.js';
@@ -159,8 +161,11 @@ export interface FieldController {
 	setCaret(pos: number): void;
 	/** External content change → re-hydrate this leaf (gated by reconcile), and
 	 *  re-evaluate its hold against the value now stored. The change lands as one step outside
-	 *  history, so the caret and undo stay the leaf's own; a hold that flips rebuilds the view. */
-	applyExternal(): void;
+	 *  history, so the caret and undo stay the leaf's own; a hold that flips rebuilds the view.
+	 *  `delta` is the writer's own receipt for the change (`doc.reviseContent`): given, the
+	 *  selection maps through it rather than through the step the leaf diffs for itself, which
+	 *  cannot tell where a character typed into a run of the same character went. */
+	applyExternal(delta?: Delta): void;
 	/**
 	 * Move the empty-leaf ghost after mount (a card retyped to another kind takes its new wording;
 	 * a remount would cost the caret). Refreshes the decoration without a transaction, which would
@@ -475,7 +480,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	 * the way it skips any step not the leaf's own. Returns false where the step would not land
 	 * the decoded document exactly, and the caller rebuilds instead.
 	 */
-	function applyRemote(rt: Content): boolean {
+	function applyRemote(rt: Content, delta: Delta | undefined): boolean {
 		const fresh = decode(rt, schema);
 		const old = view.state.doc;
 		const start = old.content.findDiffStart(fresh.content);
@@ -493,6 +498,16 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			return false;
 		}
 		if (!tr.doc.eq(fresh)) return false;
+		if (delta) {
+			const { anchor, head } = view.state.selection;
+			const at = buildLineIndex(fresh);
+			const mapped = (pm: number) => usvToPM(at, core().mapPos(delta, pmToUsv(index, pm), 'after'));
+			const $anchor = tr.doc.resolve(mapped(anchor));
+			const $head = tr.doc.resolve(mapped(head));
+			tr.setSelection(
+				$anchor.pos === $head.pos ? Selection.near($head) : TextSelection.between($anchor, $head)
+			);
+		}
 		view.dispatch(tr.setMeta('addToHistory', false).setMeta(remoteKey, true));
 		return true;
 	}
@@ -611,7 +626,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			view.focus();
 			view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 		},
-		applyExternal(): void {
+		applyExternal(delta?: Delta): void {
 			const current = shown();
 			const flipped = holds(current) !== held;
 			const wasDefaulted = defaulted;
@@ -622,11 +637,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				return;
 			}
 			if (flipped) held = !held;
-			else if (!held && applyRemote(current)) {
+			else if (!held && applyRemote(current, delta)) {
 				reconciler.commit(current);
 				return;
 			}
-			const caretUsv = pmToUsv(index, view.state.selection.head);
+			const headUsv = pmToUsv(index, view.state.selection.head);
+			const caretUsv = delta ? core().mapPos(delta, headUsv, 'after') : headUsv;
 			const fresh = buildState(current);
 			index = fresh.index;
 			// Best-effort caret continuity across an external change: keep the USV. Set
