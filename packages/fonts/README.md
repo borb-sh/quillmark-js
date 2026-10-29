@@ -74,7 +74,7 @@ quillmark render ./my-quill doc.md $(for f in node_modules/@quillmark/fonts/file
 
 ## What a version promises
 
-A family name is a promise to every document that sets text in it, so the suite only grows. A family is never removed or renamed. A face's file changes only in a major version, since new metrics can reflow a stored document; a new family is a minor one. `FAMILIES` names the suite's families, `LABELS` the display names, which can change in any version, and `manifest.json` (importable as `@quillmark/fonts/manifest.json`) each face's weight, style, file and sha256.
+A family name is a promise to every document that sets text in it, so a family is removed or renamed, and a face's file changed, only in a breaking version: a major one, or a minor one while the major is 0. New metrics can reflow a stored document. A new family is a minor version, or a patch while the major is 0. `FAMILIES` names the suite's families, `LABELS` the display names, which can change in any version, and `manifest.json` (importable as `@quillmark/fonts/manifest.json`) each face's weight, style, file and sha256.
 
 ## Licences and provenance
 

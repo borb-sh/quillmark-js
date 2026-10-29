@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**JetBrains Mono and TeXGyreSchola join the suite, and Spectral SC leaves it.** JetBrains Mono is a code monospace beside Cousine's Courier metrics; TeXGyreSchola matches Century Schoolbook's metrics and shows as "Schola". A run set in Spectral SC falls back to the surrounding font with a `typst::unknown_font_family` warning; a quill that wants it bundles its own copy.
+**Breaking: Spectral SC leaves the suite, and JetBrains Mono and TeXGyreSchola join it.** JetBrains Mono is a code monospace beside Cousine's Courier metrics; TeXGyreSchola matches Century Schoolbook's metrics and shows as "Schola". A run set in Spectral SC falls back to the surrounding font with a `typst::unknown_font_family` warning; a quill that wants it bundles its own copy. A family now leaves the suite, and a face's bytes change, only in a breaking version: a minor while the major is 0, a major after.
 
 ## v0.1.0 - 2026-10-29
 

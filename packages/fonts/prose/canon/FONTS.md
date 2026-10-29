@@ -50,10 +50,10 @@ Noto CJK is tens of MB a weight, and New Computer Modern, also under the GUST li
 
 A family name in the suite is a promise to every document that uses it, so the package changes only in ways that keep an old document rendering the same.
 
-- **Append-only.** A family is never removed or renamed. Removing one sets every run that names it in the surrounding font, with a `typst::unknown_font_family` warning.
-- **Pinned bytes.** A face's file changes only in a major version, since new metrics or a new subset can reflow a stored document. Adding a family is a minor version.
+- **Append-only within a line.** A family is removed or renamed only in a breaking version, where the leading nonzero component of the version moves: a major, or a minor while the major is 0. Removing one sets every run that names it in the surrounding font, with a `typst::unknown_font_family` warning.
+- **Pinned bytes.** A face's file changes only in a breaking version, since new metrics or a new subset can reflow a stored document. Adding a family is not breaking.
 - **TTF/OTF only.** The engine's library refuses WOFF and WOFF2 (`engine::font_unsupported`), so the package never ships them.
-- **A check enforces it.** `check:fonts` (`scripts/check-fonts.mjs`) holds every file to its manifest hash and its name, reads its format off its magic and holds its extension to it, holds each family to an admitted licence with its text beside its files and `src/suite.ts` to the manifest. Run where a release is cut, with `--published`, it also holds the family list and every published face's bytes against the registry's latest release.
+- **A check enforces it.** `check:fonts` (`scripts/check-fonts.mjs`) holds every file to its manifest hash and its name, reads its format off its magic and holds its extension to it, holds each family to an admitted licence with its text beside its files and `src/suite.ts` to the manifest. Run where a release is cut, with `--published`, it also holds the family list and every published face's bytes against the registry's latest release, unless the version being cut breaks from it.
 
 ## Size and loading
 
