@@ -42,6 +42,25 @@ Mount the editor over `session.doc`, and push each local edit after it commits:
 
 `localLog` keeps the room in `localStorage`, so every tab of one origin shares it and a reload rejoins. A server keeps the same `SessionLog` protocol: `current`, `open`, `end`, `append`, `touch`, `since`, `subscribe`, `load` and `save`.
 
+## A slow writer
+
+A model answering a request reads the document at one revision and answers after people have typed past it. `writeFrom` makes its edit on the state it read, and the update merges with what came after:
+
+```ts
+const { snapshot } = session.revision();
+// … the model answers …
+const { update, conflicts } = writeFrom({
+	history: session.ydoc,
+	base: snapshot,
+	quill,
+	doc: session.doc,
+	edit: (doc) => void quill.writer(doc).reviseField('summary', markdown)
+});
+if (!conflicts.length) undoAi = session.apply(update, 'ai:run-1');
+```
+
+`conflicts` lists what changed since the revision at a place the edit changed too, such as a field someone rewrote meanwhile. `session.apply` appends the update under its writer and returns a `Y.UndoManager` that takes it back alone. A server with no editor open does the same through the log: `readLog({ log, quill })` returns the Document and its revision, and `writeLog({ log, quill, base, writer, edit })` appends the edit and saves, or answers `conflict` or `stale`. `changesSince` says what moved between a revision and now, cards matched by identity, to tell a writer what changed since it last read.
+
 ## Without a session
 
 `bindDocument({ doc, quill, ydoc, onRemote })` binds a Document to any `Y.Doc` and leaves the transport to the host. `seedDocument(doc, quill)` is the update a Y state starts from, the same bytes on every client that seeds the same Document.

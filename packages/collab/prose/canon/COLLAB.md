@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Several clients edit one Quillmark document at once and end holding the same content. Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to a shared Yjs state in both directions. A session is one stretch of live editing over the saved Document, carried by a log of Y updates that `joinSession` reads and writes through a `SessionLog` the host provides. The saved Document (`doc.toStored()`) stays the record; the Y state lasts one session. The package knows nothing of the editor: the host wires `onRemote` to the editor's host verbs (VISUAL_EDITOR §Surface).
+Several clients edit one Quillmark document at once and end holding the same content. Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to a shared Yjs state in both directions. A session is one stretch of live editing over the saved Document, carried by a log of Y updates that `joinSession` reads and writes through a `SessionLog` the host provides. The saved Document (`doc.toStored()`) stays the record; the Y state lasts one session. The package knows nothing of the editor: the host wires `onRemote` to the editor's host verbs (VISUAL_EDITOR §Surface). A writer that answers late, a model above all, writes from the revision it read (`writeFrom`), and its edit merges with whatever was typed since.
 
 ## Invariants
 
@@ -14,6 +14,7 @@ Several clients edit one Quillmark document at once and end holding the same con
 - **I6** After every transaction the Y text of each content root equals the Document's text for that field.
 - **I7** Updates from two sessions never meet: every log entry belongs to one epoch, and a client applies only entries of the epoch it joined.
 - **I8** Seeding a Document and projecting it back is lossless for everything that has a Y form.
+- **I9** A write from a revision is made on the Y state at that revision and merged as a concurrent edit, never applied to the live Document: what anyone wrote since stays wherever the write leaves it.
 
 ## The Y shape
 
@@ -47,7 +48,7 @@ interface SessionLog {
 	current(): Promise<Opened | undefined>; // { epoch, seed }
 	open(seed: Uint8Array): Promise<Opened>;
 	end(epoch: string): Promise<void>;
-	append(epoch: string, update: Uint8Array): Promise<boolean>;
+	append(epoch: string, update: Uint8Array, writer?: string): Promise<boolean>;
 	touch(epoch: string): Promise<void>;
 	since(epoch: string, cursor?: unknown): Promise<{ updates; cursor; touched } | undefined>;
 	subscribe(onChange: () => void): () => void;
@@ -58,12 +59,21 @@ interface SessionLog {
 
 - **Open.** A session opens with its seed in one write: `open(seed)` returns the session already open where there is one. Every client applies that seed and none writes its own, so an epoch never holds two seeds, which under one client id would leave clients that received them in different orders apart for good. A room with no save takes the host's initial Document as its first, and a Document under another quill than the host's is refused (`QuillMismatch`).
 - **Join.** Apply the seed and every entry, then bind the saved Document. A save the log has moved past is fine: cards that do not line up with Y's leave, and Y's are projected in. Remote changes reach `onRemote` only once `joinSession` has returned.
-- **Edit.** Every local Y update is appended. An update that does not reach the log, refused because the epoch closed or failed in the store, ends the session, since every later update builds on it; `onEnded(lost)` says an edit made here is not in the log.
+- **Edit.** Every local Y update is appended, under the session's `writer` where the host named one. An update that does not reach the log, refused because the epoch closed or failed in the store, ends the session, since every later update builds on it; `onEnded(lost)` says an edit made here is not in the log.
 - **Save.** Each client saves what it holds a delay after its last change, with the Y snapshot it reflects, state vector and delete set both: a deletion moves no state vector. A store keeps a save of the same epoch only when it covers the held one and the held one does not cover it, so a stale tab never overwrites a newer save, and refuses a save of an epoch that is not open.
 - **End.** Each client touches the log while it is in the session. A join that finds nobody appending or present within the lease, and the save covering the seed and every entry, ends the epoch; the next one opens from the save. Ending is decided by the lease and the save, never by a disconnect, which a stateless store cannot see; a tab asleep through the lease wakes to a session that has ended.
 - **Refusals.** A remote value the Document refuses leaves its field or card held: a push writes nothing there, so the refusal does not revert anyone's edit, and the next remote value that lands releases it. A card-list change the Document refuses stops the binding (`Diverged`) and the session ends.
 
 `localLog({ room })` is the Web Storage store: the open session is one key holding its epoch and seed; one key per entry under `qm-collab:<room>:log:<epoch>:<writer>:<n>`, base64, so tabs append without a lock; the `storage` event is the wake-up; an epoch past `compactAt` entries is merged into one entry, written before the keys it merged are deleted, and a read that finds a listed key gone lists again. Web Storage has no transactions, so two tabs opening a session at once each write one and the later stands: the other's session ends at its first append, having lost nothing but that append. `sessionStorage` cannot carry a session: it is private to one tab. A server store keeps the same protocol with `open`, the save and the epoch check each in one transaction beside the document's row.
+
+## Writes from a revision
+
+A writer that takes seconds to answer reads the document at one revision and answers after people have moved past it. A revision is `{ epoch, snapshot }`, the snapshot `Y.encodeSnapshot` of the state read; `session.revision()` takes one. The session's `Y.Doc` keeps its history (garbage collection off), since a state at an older snapshot is rebuilt from content deleted since.
+
+`writeFrom({ history, base, quill, doc, edit })` rebuilds the Y state at `base`, binds a scratch Document to it over `doc`'s parts with no Y form, runs `edit` there, and pushes it, so the edit is written as the fewest operations that carry it (I2): a whole body rewritten from its old text writes only the paragraphs that differ. It returns the update, the `changes` the edit made from `base`, and the `conflicts`: the changes made in `history` since `base` at a place the edit changed too, a field both wrote, a card both moved, or a card one side removed or retyped that the other wrote. A conflict merges, but a writer that rewrote a field from its old text would merge into text it never read; the host decides whether to apply. `edit` returns the card operation it was, which a card list diff cannot tell (§"The binding"). `changesSince` is the same comparison alone: cards are matched by their Y ids, so a move reads as a move, and each changed field carries its value before and after in the authoring form.
+
+- **In a session.** `session.apply(update, writer)` applies the update as an edit by `writer`: it is appended under that name, and the Document hears it through `onRemote` like any other. It returns a `Y.UndoManager` that takes back that update alone, as an edit by this client.
+- **Through the log.** A writer with no session, a server answering a tool call, reads with `readLog`, which opens a session where none is and returns the Document and its revision. `writeLog` rebuilds the log's history, refuses a revision whose epoch is not the open one or that the log does not hold (`stale`) and, unless forced, an edit with conflicts (`conflict`); otherwise it appends the edit under its writer and saves the Document the log then projects to, so the save follows the write with no client open.
 
 ## Pitfalls
 
@@ -71,8 +81,10 @@ interface SessionLog {
 - Anything with no Y form survives a session only through the saved Document, and a save is one client's Document: another client's anchors and tips state are not in it. A field type that gains a Y form needs a round-trip test (I8).
 - A change of quill reference is not a field edit. A Document under another quill than `$session.quill` is reported through `onError`; the host ends the session and every client rejoins.
 - `push` reads every card on each call, so its cost grows with the document. A host with large documents debounces it.
+- A conflict-free write can still interleave with text typed into a span it deletes: a word typed into a sentence the write replaces survives beside the new sentence. A writer scoped to the field it means to change keeps that span small.
+- A session's history grows with every edit until the session ends; a server holds it only for the length of a `readLog` or `writeLog`.
 - The host owns `session.doc` and frees it after `leave`. `joinSession` frees the Document `initial()` returns.
 
 ## Testing
 
-Vitest under Node, real WASM and real Yjs. `fuzz.test.ts` runs three peers over the reference quill through random concurrent edits and random delivery, and asserts one Document, no errors, I6, and a canonical projection, over 120 seeds. `binding.test.ts` holds the cases one at a time, `roundtrip.test.ts` I8, and `session.test.ts` the session protocol over a fake origin's storage: saves that delete, a joiner behind the log, a session ended under a tab, a full store. The editor half is checked in the playground under `?collab=` (PLAYGROUND §"Live editing").
+Vitest under Node, real WASM and real Yjs. `fuzz.test.ts` runs three peers over the reference quill through random concurrent edits and random delivery, and asserts one Document, no errors, I6, and a canonical projection, over 120 seeds. `binding.test.ts` holds the cases one at a time, `roundtrip.test.ts` I8, `fork.test.ts` writes from a revision, and `session.test.ts` the session protocol over a fake origin's storage: saves that delete, a joiner behind the log, a session ended under a tab, a full store, and writes applied in a session and through the log. The fuzz makes some of its edits from a revision a peer held earlier. The editor half is checked in the playground under `?collab=` (PLAYGROUND §"Live editing").

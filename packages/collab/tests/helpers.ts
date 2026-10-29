@@ -54,14 +54,14 @@ export interface Peer {
 	errors: unknown[];
 }
 
-/** `n` peers over one starting Document, each joining from the same seed. */
+/** `n` peers over one starting Document, each joining from the same seed, history kept. */
 export function peers(n: number, start: () => Document, q: Quill = quill()): Peer[] {
 	const first = start();
 	const seed = seedDocument(first, q);
 	first.free();
 	const all: Peer[] = [];
 	for (let i = 0; i < n; i++) {
-		const ydoc = new Y.Doc();
+		const ydoc = new Y.Doc({ gc: false });
 		ydoc.clientID = i + 1;
 		Y.applyUpdate(ydoc, seed, 'net');
 		const doc = start();

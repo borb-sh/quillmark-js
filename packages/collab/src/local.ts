@@ -6,7 +6,8 @@
 // wake-up. Once an epoch passes `compactAt` entries, the appending tab merges them into one entry,
 // writing it before deleting the keys it merged, and a reader that finds a key it listed gone
 // lists again. Web Storage has no transactions: two tabs opening a session at once each write
-// one, the later write stands, and the other tab's session ends at its first append.
+// one, the later write stands, and the other tab's session ends at its first append. An entry's
+// `writer` is not kept: every tab of an origin is one person.
 import * as Y from 'yjs';
 import { covers, type Opened, type Saved, type SessionLog } from './session.js';
 

@@ -18,6 +18,7 @@ import {
 	type DocumentBinding,
 	type RemoteChange
 } from './document.js';
+import type { Revision } from './fork.js';
 
 /** A saved Document, with the session and the Y state it reflects. */
 export interface Saved {
@@ -42,8 +43,9 @@ export interface SessionLog {
 	open(seed: Uint8Array): Promise<Opened>;
 	/** Close `epoch` and drop its entries, when it is still the open one. */
 	end(epoch: string): Promise<void>;
-	/** Add an entry to `epoch`'s log; false when `epoch` is no longer open. */
-	append(epoch: string, update: Uint8Array): Promise<boolean>;
+	/** Add an entry to `epoch`'s log, made by `writer` where the host named one; false when
+	 *  `epoch` is no longer open. */
+	append(epoch: string, update: Uint8Array, writer?: string): Promise<boolean>;
 	/** Mark a client present in `epoch`, so the session is not idle while it is open. */
 	touch(epoch: string): Promise<void>;
 	/**
@@ -71,6 +73,8 @@ export interface JoinSessionOpts {
 	quill: Quill;
 	/** The Document a room starts from when it holds no saved one. Read once, and freed. */
 	initial(): Document;
+	/** Who this client's edits are by, passed to every `append` they make. */
+	writer?: string;
 	/** How long a session stays open with nobody appending or present, in ms. */
 	lease?: number;
 	/** How long after the last change a client saves, in ms. */
@@ -93,6 +97,14 @@ export interface Session {
 	readonly binding: DocumentBinding;
 	/** `binding.push`: write a local edit to the session. */
 	push(op?: CardOp): Addr[];
+	/** The point the session stands at now, for a writer to read from and later write from. */
+	revision(): Revision;
+	/**
+	 * Apply an update made elsewhere for this session, such as `writeFrom`'s, as an edit by
+	 * `writer`: it is appended under that name, and the Document hears it through `onRemote`.
+	 * The undo manager returned takes back this update alone, as an edit by this client.
+	 */
+	apply(update: Uint8Array, writer: string): Y.UndoManager;
 	/** Save now rather than after the delay. */
 	save(): Promise<boolean>;
 	/** Save, and stop taking entries. */
@@ -175,7 +187,8 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	const read = await log.since(epoch);
 	if (!read) throw new Error('the session closed while joining');
 
-	const ydoc = new Y.Doc();
+	// History is kept, so a writer can work from an older revision (`writeFrom`).
+	const ydoc = new Y.Doc({ gc: false });
 	Y.applyUpdate(ydoc, Y.mergeUpdates([opened.seed, ...read.updates]), LOG);
 	let cursor = read.cursor;
 	const doc = Document.fromStored(saved.stored);
@@ -214,14 +227,17 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 
 	// An update this client made reaches the log, or the session ends: every later update builds
 	// on it, so one missing would hold all of them back from every other client.
+	const writers = new WeakMap<object, string>();
 	let appending = Promise.resolve();
 	const onUpdate = (update: Uint8Array, origin: unknown) => {
 		schedule();
 		if (origin === LOG) return;
+		const writer =
+			(origin !== null && typeof origin === 'object' && writers.get(origin)) || opts.writer;
 		appending = appending.then(async () => {
 			if (ended) return void (lost = true);
 			try {
-				if (await log.append(epoch, update)) return;
+				if (await log.append(epoch, update, writer)) return;
 			} catch (e) {
 				report(e);
 			}
@@ -295,6 +311,15 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		ydoc,
 		binding: bound,
 		push: (op) => bound.push(op),
+		revision: () => ({ epoch, snapshot: Y.encodeSnapshot(Y.snapshot(ydoc)) }),
+		apply(update, writer) {
+			const by = { writer };
+			writers.set(by, writer);
+			const undo = new Y.UndoManager(ydoc, { trackedOrigins: new Set([by]) });
+			Y.applyUpdate(ydoc, update, by);
+			undo.trackedOrigins.delete(by);
+			return undo;
+		},
 		save,
 		async leave() {
 			await appending;

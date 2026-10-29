@@ -3,9 +3,11 @@
 // after each, exchange Y updates at random times and in random order, and must end holding one
 // Document. The mix leans on where the content model fights a CRDT: items inserted into one list
 // (positional ordinals), tables edited and typed around (slots), and cards moved and edited at once.
+// Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are.
 import { describe, expect, it } from 'vitest';
 import type { Addr, ChangeBundle, Content, ContentContainer, Quill } from '@quillmark/wasm';
-import type { CardOp } from '../src/index.js';
+import { writeFrom, type CardOp } from '../src/index.js';
+import * as Y from 'yjs';
 import { project } from '../src/project.js';
 import { contentRoot, contentTypes, readField } from '../src/shape.js';
 import { core, deliver, peers, quill, settle, snapshot, canonical, type Peer } from './helpers.js';
@@ -306,17 +308,46 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 	return true;
 }
 
-function run(seed: number, q: Quill): { all: Peer[]; edits: number } {
+/** One random edit made from a revision `p` held earlier, applied to `p`; whether it landed. */
+function staleEdit(r: Rng, q: Quill, p: Peer, base: Uint8Array): boolean {
+	let landed = false;
+	const { update } = writeFrom({
+		history: p.ydoc,
+		base,
+		quill: q,
+		doc: p.doc,
+		edit(doc) {
+			let op: CardOp | undefined;
+			const scratch = { doc, binding: { push: (o?: CardOp) => void (op = o) } } as unknown as Peer;
+			landed = edit(r, q, scratch);
+			return op;
+		}
+	});
+	Y.applyUpdate(p.ydoc, update, 'writer');
+	return landed;
+}
+
+function run(seed: number, q: Quill): { all: Peer[]; edits: number; errors: string[] } {
 	const r = rng(seed);
 	const all = peers(3, () => q.exampleDocument()!, q);
+	const bases = new Map<Peer, Uint8Array>();
+	const errors: string[] = [];
 	let edits = 0;
 	for (let step = 0; step < STEPS; step++) {
 		const p = r.pick(all);
-		if (r.next() < 0.65) edits += edit(r, q, p) ? 1 : 0;
+		const roll = r.next();
+		if (roll < 0.1) bases.set(p, Y.encodeSnapshot(Y.snapshot(p.ydoc)));
+		else if (roll < 0.2 && bases.has(p)) {
+			try {
+				edits += staleEdit(r, q, p, bases.get(p)!) ? 1 : 0;
+			} catch (e) {
+				errors.push(`seed ${seed}: writeFrom threw ${String(e)}`);
+			}
+		} else if (roll < 0.7) edits += edit(r, q, p) ? 1 : 0;
 		else deliver(p, (n) => r.int(n), 1 + r.int(4));
 	}
 	settle(all);
-	return { all, edits };
+	return { all, edits, errors };
 }
 
 describe('three peers, random concurrent edits', () => {
@@ -327,6 +358,7 @@ describe('three peers, random concurrent edits', () => {
 		for (let seed = 1; seed <= SEEDS; seed++) {
 			const out = run(seed, q);
 			edits += out.edits;
+			failures.push(...out.errors);
 			const [a, ...rest] = out.all;
 			const want = snapshot(a.doc);
 			for (const p of rest)
