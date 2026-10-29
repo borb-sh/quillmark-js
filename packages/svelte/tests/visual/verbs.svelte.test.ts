@@ -41,7 +41,8 @@ describe('the card verbs', () => {
 		expect(changes.at(-1)).toEqual({
 			source: 'structure',
 			cardId: newId,
-			path: `cards.section[${seeded}]`
+			path: `cards.section[${seeded}]`,
+			op: { op: 'insert', at: seeded }
 		});
 
 		editor.moveCard(id!, -1);
@@ -49,7 +50,8 @@ describe('the card verbs', () => {
 		expect(changes.at(-1)).toEqual({
 			source: 'structure',
 			cardId: newId,
-			path: `cards.section[${seeded - 1}]`
+			path: `cards.section[${seeded - 1}]`,
+			op: { op: 'move', from: seeded, to: seeded - 1 }
 		});
 		expect(leafKeys(slots(target)[seeded - 1])).toContain(`${newId}:$body`);
 
@@ -59,7 +61,12 @@ describe('the card verbs', () => {
 
 		editor.removeCard(id!);
 		flushSync();
-		expect(changes.at(-1)).toEqual({ source: 'structure', cardId: newId, path: undefined });
+		expect(changes.at(-1)).toEqual({
+			source: 'structure',
+			cardId: newId,
+			path: undefined,
+			op: { op: 'remove', at: seeded - 1 }
+		});
 		expect(slots(target)).toHaveLength(seeded);
 		expect(leafKeys(slots(target)[0])).toContain('c0:$body');
 	});
@@ -140,7 +147,12 @@ describe('a reorder through the card control', () => {
 
 		moveDown(slots(target)[0]);
 		// The path names the card, not the body leaf inside it: a card op is about the card.
-		expect(changes.at(-1)).toEqual({ source: 'structure', cardId: 'c0', path: 'cards.section[1]' });
+		expect(changes.at(-1)).toEqual({
+			source: 'structure',
+			cardId: 'c0',
+			path: 'cards.section[1]',
+			op: { op: 'move', from: 0, to: 1 }
+		});
 
 		const after = slots(target);
 		const staleIndex = addrForFieldPath(captured.field)!.card!;

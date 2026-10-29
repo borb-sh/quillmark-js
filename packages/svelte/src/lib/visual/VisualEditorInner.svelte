@@ -37,6 +37,7 @@
 	import type {
 		Addr,
 		CardAddr,
+		Delta,
 		Diagnostic,
 		PathStep,
 		PayloadItem,
@@ -46,7 +47,7 @@
 	} from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
 	import { mergeStrings, setWording } from './strings.js';
-	import type { CardId, ChangeSource } from './signals.js';
+	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import type { FieldController, LeafViews } from '../core/codec/index.js';
 	import {
 		IdSeq,
@@ -157,12 +158,15 @@
 	 * addressable against the tree the bump re-derived: an insert's card does not exist
 	 * in the previous one, and a retype's kind is the previous kind.
 	 */
-	function bump(source: ChangeSource, cardId?: CardId, at?: Addr | number): void {
-		revision++;
-		liveTitles = {};
+	function bump(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
+		rederive();
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
-		onChange?.({ source, cardId, path });
+		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
+	}
+	function rederive(): void {
+		revision++;
+		liveTitles = {};
 	}
 	/** Read at the mutation boundary, never cached (VISUAL_EDITOR §"The address is the
 	 * spine"). */
@@ -420,7 +424,7 @@
 			const id = seq.next();
 			arm.arm();
 			cardIds = [...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)];
-			bump('structure', id, atIndex);
+			bump('structure', id, atIndex, { op: 'insert', at: atIndex });
 			// Centred: the new card is the subject, and the neighbours it landed between
 			// are what say where it went.
 			const scrolled = scrollCardIntoView(id, 'center');
@@ -483,7 +487,7 @@
 		const [x] = w.splice(from, 1);
 		w.splice(to, 0, x);
 		cardIds = w;
-		bump('structure', id, to);
+		bump('structure', id, to, { op: 'move', from, to });
 		// `nearest`: the card was already in view and only needs to stay there, so one
 		// that never left the viewport moves it not at all.
 		void scrollCardIntoView(id, 'nearest');
@@ -498,20 +502,23 @@
 		doc.removeCard(i);
 		arm.arm();
 		cardIds = cardIds.filter((_, k) => k !== i);
+		forget(id);
+		// No addr: the removed card has none left and every survivor's shifted. The
+		// stack changed, not a leaf, and the id is the only handle the removal leaves.
+		bump('structure', id, undefined, { op: 'remove', at: i });
+		if (held) void focusAfterRemove(i);
+	}
+	/** Drop what the surface holds for a removed card. Ids are never reused, so an entry
+	 *  keyed to the gone card is unreachable rather than mis-attributed to whichever card
+	 *  takes this position: it needs dropping because nothing else will ever clear it. */
+	function forget(id: CardId): void {
 		if (activeCardId === id) {
 			activeCardId = undefined;
 			activeAddr = undefined;
 		}
-		// Ids are never reused, so an entry keyed to the gone card is unreachable rather
-		// than mis-attributed to whichever card takes this position: it needs dropping
-		// because nothing else will ever clear it.
 		const prefix = `${id}:`;
 		const stale = [...commitErrors.keys()].filter((k) => k.startsWith(prefix));
 		for (const k of stale) commitErrors.delete(k);
-		// No addr: the removed card has none left and every survivor's shifted. The
-		// stack changed, not a leaf, and the id is the only handle the removal leaves.
-		bump('structure', id);
-		if (held) void focusAfterRemove(i);
 	}
 	/** Hand the focus a removed card held to the title of the card before it, else the
 	 *  one that took its place, else the strip that adds one: a focused node the flush
@@ -847,6 +854,38 @@
 	export function setKind(cardId: CardId, kind: string): void {
 		if (!holds(cardId)) return;
 		retypeCardById(cardId, kind);
+	}
+
+	// ── Changes the host made ───────────────────────────────────────────────────
+	// A live session writes another client's edits into the document itself and then
+	// says what it moved. The surface re-reads, keeps every mounted leaf and caret it can,
+	// and reports none of it through `onChange`: the edit is not this surface's.
+
+	/** Re-read the prose leaf at `field` from the document, landing the difference as one
+	 *  step outside its undo history; `delta`, the change's text delta over what the leaf
+	 *  held, carries the caret. */
+	export function applyExternal(field: DocPath, delta?: Delta): void {
+		if (!span.alive) return;
+		const target = leafTargetFor(field);
+		if (target && !target.steps) leaves.prose(target.key)?.applyExternal(delta);
+		rederive();
+	}
+	/** Re-read the cards' kinds, titles and form fields from the document. */
+	export function refresh(): void {
+		if (span.alive) rederive();
+	}
+	/** Move the card keys in step with card-list changes the document already holds, in the
+	 *  order it applied them, so every card that stays keeps its leaves. */
+	export function applyCardOps(ops: readonly CardOp[]): void {
+		if (!span.alive) return;
+		const ids = cardIds.slice();
+		for (const op of ops) {
+			if (op.op === 'insert') ids.splice(op.at, 0, seq.next());
+			else if (op.op === 'remove') forget(ids.splice(op.at, 1)[0]);
+			else ids.splice(op.to, 0, ...ids.splice(op.from, 1));
+		}
+		cardIds = ids;
+		rederive();
 	}
 
 	function holds(cardId: CardId): boolean {

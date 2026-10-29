@@ -20,6 +20,7 @@ on:
           - svelte
           - quiver
           - fonts
+          - collab
           - quillkit
       bump:
         description: Version bump

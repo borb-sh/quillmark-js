@@ -35,7 +35,7 @@ Two, because the site has two readers.
 
 Both surfaces run on the front page too, each over its own document. No apply loop runs there, so one document across two steps would let typing in the editor desynchronize the page painted above it. `/playground` is where the two are wired together.
 
-Two guardrails hold across both: the playground consumes only the public subpath API (a needed internal is an API gap to fix), and it stays a harness, not a product: no auth, persistence, or multi-doc management.
+Two guardrails hold across both: the playground consumes only the public subpath API (a needed internal is an API gap to fix), and it stays a harness, not a product: no auth, no multi-doc management, and no persistence but a `?collab=` room's.
 
 ## Which quill, and what is seeded into it
 
@@ -57,6 +57,14 @@ Two branches are not a schema's to declare — a guidance channel a consumer sup
 
 The host font library is not a flag: every open builds the engine over `@quillmark/fonts`' suite as its `fonts`, as an app builds it (FONTS §"The suite"), and the editor takes `engine.fontFaces(quill)` as its `fonts`, so the format popover offers each family and a run set in one draws in it on both panes. The faces arrive behind the editor, as the session does, listing them loading the render build.
 
+## Live editing
+
+`?collab=<room>` opens the document as a live session (`@quillmark/collab`), with `localStorage` as the database: every tab of the origin on the same room edits one document, and a reload rejoins it. The room's saved Document is the record; the first tab into an empty room saves the document the open stands on and seeds the session from it, and each tab saves what it holds a second after it last changed and when the page hides. A session ends once no tab has been in it for five minutes and its last change is saved, and the next tab in opens a new one from the save. The strip's `room` readout names the room and its epoch. The quill and the seed flags apply only to a room's first open: after that the room's save is the document, and a room opened under another quill reopens under the one its save names.
+
+Each local edit is pushed with the card op its `EditorChange` carries, and the leaves whose new islands took minted ids are re-read. A remote change lands as the editor's host verbs take it: `applyCardOps` for the card list, `refresh` for kinds, titles and form fields, `applyExternal` with the change's delta for each prose leaf. Either way the preview recompiles as for any edit. A tab whose session ended reopens, and says on the strip when an edit it made never reached the session.
+
+A room is reached by loading `/playground?collab=<room>` directly, so the route answers a direct load on every host: Pages from the `playground.html` shell `deploy-playground.yml` writes, a Vercel preview through the rewrite in `vercel.json`.
+
 ## Quiver, not bundler
 
 Every route opens its session over a quill from a **quiver**, not from the bundler: no Typst source or font bytes in the JS bundle. The front page opens the reference quill; `/playground` opens whichever its picker holds. This is the workspace's one edge to `@quillmark/quiver`; the library has none, so the app is where the two tiers meet.
@@ -65,7 +73,7 @@ One `Quiver` serves the page. Its quill cache is per canonical ref and lives as 
 
 ## Reaching it from source
 
-What a unit test cannot reach is here — canvas paint, scroll virtualization, DPR, the click round-trip, and every CSS-level fact jsdom computes no layout for — and reaching it means serving the working tree, which is not what a dev server does unaided. The app resolves `@quillmark/svelte`, `@quillmark/quiver` and `@quillmark/fonts` through the workspace symlink to each one's `dist`, so what it serves is the last build. The partial sequences all fail silently: HMR alone, `--force` alone, and a rebuild without a restart each serve the previous CSS with no error, the scope hash on the served rule still matching while its body is the old one. So the sequence is one verb — `npm run dev` (`scripts/playground.mjs`) rebuilds the three siblings, drops the Vite and SvelteKit caches, and restarts the server on a port it owns by pid, a name pattern being the wrong handle for a kill (`pkill -f vite` matches the shell that ran it).
+What a unit test cannot reach is here — canvas paint, scroll virtualization, DPR, the click round-trip, and every CSS-level fact jsdom computes no layout for — and reaching it means serving the working tree, which is not what a dev server does unaided. The app resolves `@quillmark/svelte`, `@quillmark/quiver`, `@quillmark/fonts` and `@quillmark/collab` through the workspace symlink to each one's `dist`, so what it serves is the last build. The partial sequences all fail silently: HMR alone, `--force` alone, and a rebuild without a restart each serve the previous CSS with no error, the scope hash on the served rule still matching while its body is the old one. So the sequence is one verb — `npm run dev` (`scripts/playground.mjs`) rebuilds the four siblings, drops the Vite and SvelteKit caches, and restarts the server on a port it owns by pid, a name pattern being the wrong handle for a kill (`pkill -f vite` matches the shell that ran it).
 
 `npm run probe -- '<expr>'` is the same sequence with a question at the end, evaluated in a real browser against the served page and printed as JSON. It is how a CSS-level fact about a mounted surface is asked at all: jsdom computes no layout, so `@quillmark/svelte`'s own suite cannot see `position`, whether a `@container` rule matched, a clip, or which of two rules won. What an answer may then be committed as is one of the two shapes in TESTING.md §Assertions; what the probe is for is the pass before that, where what is wrong is not yet known.
 

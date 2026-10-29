@@ -5,6 +5,7 @@
 import { closeHistory, isHistoryTransaction } from 'prosemirror-history';
 import { Plugin } from 'prosemirror-state';
 import { mayNest } from './nesting.js';
+import { isRemote } from './remote.js';
 
 /** Marks each block-moving transaction as the start of an undo step. `filterTransaction`
  *  is the one hook that sees a transaction before history's `apply` does; it passes
@@ -12,7 +13,12 @@ import { mayNest } from './nesting.js';
 export function undoStepPlugin(): Plugin {
 	return new Plugin({
 		filterTransaction: (tr) => {
-			if (!tr.docChanged || isHistoryTransaction(tr) || tr.getMeta('appendedTransaction'))
+			if (
+				!tr.docChanged ||
+				isHistoryTransaction(tr) ||
+				isRemote(tr) ||
+				tr.getMeta('appendedTransaction')
+			)
 				return true;
 			if (mayNest(tr)) closeHistory(tr);
 			return true;

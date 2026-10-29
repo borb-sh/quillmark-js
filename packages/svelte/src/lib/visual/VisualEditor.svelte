@@ -26,7 +26,8 @@
 	import { untrack } from 'svelte';
 	import { reportRebindIgnored } from '../core/rebind.svelte.js';
 	import type { DocPath, Landing } from '../core/address.js';
-	import type { CardId } from './signals.js';
+	import type { Delta } from '@quillmark/wasm';
+	import type { CardId, CardOp } from './signals.js';
 	import type { VisualEditorProps } from './props.js';
 	import VisualEditorInner from './VisualEditorInner.svelte';
 
@@ -87,6 +88,19 @@
 	}
 	export function setKind(cardId: CardId, kind: string): void {
 		inner?.setKind(cardId, kind);
+	}
+	/** Re-read the prose leaf at `field` after the host changed it in the document, as one
+	 *  step outside its undo history; `delta` carries the caret. */
+	export function applyExternal(field: DocPath, delta?: Delta): void {
+		inner?.applyExternal(field, delta);
+	}
+	/** Re-read the cards' kinds, titles and form fields after the host changed them. */
+	export function refresh(): void {
+		inner?.refresh();
+	}
+	/** Move the card keys in step with card-list changes the host made in the document. */
+	export function applyCardOps(ops: readonly CardOp[]): void {
+		inner?.applyCardOps(ops);
 	}
 </script>
 

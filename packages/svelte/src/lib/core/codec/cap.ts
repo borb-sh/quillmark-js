@@ -7,6 +7,7 @@ import { Plugin } from 'prosemirror-state';
 import { usvLength } from './decode.js';
 import { scanDoc } from './encode.js';
 import { ISLAND_SLOT } from './islands.js';
+import { isRemote } from './remote.js';
 
 /** A leaf's character cap: the schema's `max:`, and whether the count drops trailing
  *  whitespace, which a one-line `text` does and nothing else. */
@@ -35,7 +36,7 @@ export function capPlugin(cap: TextCap): Plugin {
 	const count = (doc: PMNode): number => capCount(doc, cap.trimEnd);
 	return new Plugin({
 		filterTransaction: (tr) => {
-			if (!tr.docChanged || isHistoryTransaction(tr)) return true;
+			if (!tr.docChanged || isHistoryTransaction(tr) || isRemote(tr)) return true;
 			const after = count(tr.doc);
 			return after <= cap.max || after <= count(tr.before);
 		},

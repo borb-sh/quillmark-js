@@ -3,6 +3,7 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { Plugin, type Transaction } from 'prosemirror-state';
 import { ReplaceAroundStep, ReplaceStep } from 'prosemirror-transform';
+import { isRemote } from './remote.js';
 
 /** The store's bound on the containers around one line: a commit nesting past it is
  *  refused, and `@quillmark/wasm` exports no constant to read it from. */
@@ -57,7 +58,7 @@ export function mayNest(tr: Transaction): boolean {
 export function nestingPlugin(): Plugin {
 	return new Plugin({
 		filterTransaction: (tr) => {
-			if (!tr.docChanged || !mayNest(tr)) return true;
+			if (!tr.docChanged || isRemote(tr) || !mayNest(tr)) return true;
 			const after = nestingDepth(tr.doc);
 			return after <= MAX_NESTING_DEPTH || after <= nestingDepth(tr.before);
 		}

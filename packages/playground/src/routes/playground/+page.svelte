@@ -49,6 +49,12 @@
   Beside them is the one lane the canvas paint does not run: `session.render` writes
   the document out as a file, and the strip says what it cost or what refused it.
 
+  `?collab=<room>` opens the document as a live session over `localStorage`, so every tab
+  on the room edits one document (PLAYGROUND §"Live editing"):
+
+    edit ─► live.push(change.op) ─► editor.applyExternal(path)   (a minted island id)
+    remote ─► editor.applyCardOps / refresh / applyExternal(path, delta) ─► recompile
+
   Which quill is a control, since the answer changes what both surfaces are: picking
   tears the shell down and stands it back up. `examples` is whether an open stands on the
   quill's example document rather than its seed, said in the URL as `?examples=off`
@@ -68,10 +74,12 @@
 		ChangeSet,
 		Diagnostic,
 		FontFace,
-		OutputFormat
+		OutputFormat,
+		Delta
 	} from '@quillmark/wasm';
-	import type { Landing, Place, EditorError } from '@quillmark/svelte/core';
-	import type { ActiveLeaf, EditorChange } from '@quillmark/svelte/visual';
+	import type { Landing, Place, EditorError, DocPath } from '@quillmark/svelte/core';
+	import type { ActiveLeaf, CardOp, EditorChange } from '@quillmark/svelte/visual';
+	import type { RemoteChange, Session } from '@quillmark/collab';
 	import { Preview } from '@quillmark/svelte/preview';
 	import { LABELS as fontLabels, loadSuite } from '@quillmark/fonts';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
@@ -102,7 +110,18 @@
 	let refused = $state<string | undefined>();
 
 	// Surface handles for the imperative bridge hops.
-	let editorRef: { setCaret(at: Landing): Promise<void> } | undefined = $state();
+	let editorRef:
+		| {
+				setCaret(at: Landing): Promise<void>;
+				applyExternal(field: DocPath, delta?: Delta): void;
+				refresh(): void;
+				applyCardOps(ops: readonly CardOp[]): void;
+		  }
+		| undefined = $state();
+
+	// The live session under `?collab=`, and what the strip says of it.
+	let live: Session | undefined;
+	let room = $state('none');
 	let previewRef: ReturnType<typeof Preview> | undefined = $state();
 
 	// Which of the split's two tracks is showing. It is read only under the preset's
@@ -260,8 +279,23 @@
 	// lag.
 	function handleChange(change: EditorChange): void {
 		lastChangeSource = change.source;
+		if (live) {
+			const doc = live.doc;
+			for (const addr of live.push(change.op)) editorRef?.applyExternal(doc.pathFor(addr));
+		}
 		if (change.source === 'structure') void recompileNow();
 		else scheduleRecompile();
+	}
+	// Another tab's edit, already in the document: the editor re-reads what it moved.
+	function handleRemote(change: RemoteChange): void {
+		if (!live) return;
+		const doc = live.doc;
+		if (change.cards.length) editorRef?.applyCardOps(change.cards);
+		if (change.fields.length) editorRef?.refresh();
+		for (const { addr, delta } of change.content)
+			editorRef?.applyExternal(doc.pathFor(addr), delta);
+		lastChangeSource = 'remote';
+		scheduleRecompile();
 	}
 	function handleError(err: EditorError): void {
 		lastError = `${err.code}: ${err.message}`;
@@ -347,6 +381,8 @@
 		quillHandle = undefined;
 		docHandle = undefined;
 		engineHandle = undefined;
+		live = undefined;
+		room = 'none';
 		fonts = [];
 		refused = undefined;
 		editorRef = undefined;
@@ -404,15 +440,51 @@
 					]
 				});
 			}
+			// A room's save is its document once it has one, under the quill it names; this
+			// open's document is what an empty room starts from.
+			const roomName = params.get('collab');
+			let joined: Session | undefined;
+			if (roomName) {
+				const { joinSession, localLog, QuillMismatch } = await import('@quillmark/collab');
+				let session: Session;
+				try {
+					session = await joinSession({
+						log: localLog({ room: roomName }),
+						quill,
+						initial: () => doc.clone(),
+						onRemote: handleRemote,
+						onError: (e) => (lastError = `collab: ${e instanceof Error ? e.message : String(e)}`),
+						onEnded: (lost) => {
+							if (lost) lastError = 'collab: the session ended before the last edit reached it';
+							if (mine === generation) void open(fixture);
+						}
+					});
+				} catch (e) {
+					const named = e instanceof QuillMismatch ? e.quillRef.split('@')[0] : undefined;
+					if (!named || named === name || !fixtures.includes(named)) throw e;
+					for (const h of created) h.free();
+					if (mine === generation) {
+						fixture = named;
+						void open(named);
+					}
+					return;
+				}
+				joined = session;
+				created.unshift({ free: () => void session.leave().finally(() => session.doc.free()) });
+			}
 			if (mine !== generation) {
 				for (const h of created) h.free();
 				return;
+			}
+			if (joined) {
+				live = joined;
+				room = `${roomName} · ${joined.epoch}`;
 			}
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
 			// suite and the render build; the engine and the session follow behind it.
 			VisualEditor = visual.VisualEditor;
 			quillHandle = quill;
-			docHandle = doc;
+			docHandle = joined?.doc ?? doc;
 			syncDiagnostics();
 			lastOpened = example ? 'example' : 'seed';
 			toFree = created;
@@ -477,6 +549,9 @@
 	});
 </script>
 
+<!-- A reload rejoins from the save, so the save goes before the page does. -->
+<svelte:window onpagehide={() => void live?.save()} />
+
 <svelte:head><title>Playground · quillmark</title></svelte:head>
 
 <main class="pg-width page">
@@ -539,6 +614,12 @@
 				><span class="qm-label">doc</span>
 				<span class="qm-readout" data-testid="last-opened">{lastOpened}</span></span
 			>
+			{#if room !== 'none'}
+				<span class="stat"
+					><span class="qm-label">room</span>
+					<span class="qm-readout" data-testid="room">{room}</span></span
+				>
+			{/if}
 			<span class="stat"
 				><span class="qm-label">error</span>
 				<!-- The one reading on the strip that is a failure rather than a fact, so it

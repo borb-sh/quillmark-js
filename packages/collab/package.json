@@ -1,0 +1,60 @@
+{
+	"name": "@quillmark/collab",
+	"version": "0.1.0",
+	"description": "Live editing for Quillmark documents: a WASM Document bound to a shared Yjs state, and the session log clients merge through.",
+	"type": "module",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/borb-sh/quillmark-js.git",
+		"directory": "packages/collab"
+	},
+	"bugs": {
+		"url": "https://github.com/borb-sh/quillmark-js/issues"
+	},
+	"homepage": "https://github.com/borb-sh/quillmark-js/tree/main/packages/collab#readme",
+	"keywords": [
+		"quillmark",
+		"yjs",
+		"crdt",
+		"collaboration"
+	],
+	"author": "Quillmark Contributors",
+	"engines": {
+		"node": ">=22"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"NOTICE"
+	],
+	"peerDependencies": {
+		"@quillmark/wasm": ">=0.133.0-0",
+		"yjs": "^13.6.0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.19.1",
+		"publint": "^0.3.25",
+		"typescript": "^6.0.0",
+		"vitest": "^5.0.0",
+		"yjs": "^13.6.33"
+	},
+	"scripts": {
+		"build": "tsc",
+		"prepare": "npm run build",
+		"prepack": "rm -rf dist && npm run build",
+		"test": "vitest run",
+		"check": "tsc --noEmit -p tsconfig.check.json",
+		"check:pack": "publint"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}
