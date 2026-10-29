@@ -1,6 +1,6 @@
 {
 	"name": "quillkit",
-	"version": "0.20.0",
+	"version": "0.21.0",
 	"description": "The quill author's toolchain: start a quiver, gate it, and build it into a studio for its authors or a standalone app for the people filling it in. Carries the wasm, the quiver and both clients.",
 	"type": "module",
 	"license": "Apache-2.0",
