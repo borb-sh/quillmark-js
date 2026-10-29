@@ -2,20 +2,21 @@
 
 The font suite every Quillmark client hands its engine: openly licensed families a stored document can name and find again in any client that loads the suite.
 
-| Family           | Role                                       |
-| ---------------- | ------------------------------------------ |
-| TeXGyreTermes    | Times New Roman metrics, shown as "Termes" |
-| Arimo            | Arial and Helvetica metrics                |
-| Cousine          | Courier New metrics                        |
-| Caladea          | Cambria metrics                            |
-| Gelasio          | Georgia metrics                            |
-| Libertinus Serif | Typst's default text face                  |
-| Spectral SC      | small-capital serif                        |
-| Cinzel           | inscriptional capitals                     |
-| DejaVu Sans      | wide humanist sans                         |
-| Inter            | screen-first UI sans                       |
+| Family           | Role                                          |
+| ---------------- | --------------------------------------------- |
+| TeXGyreTermes    | Times New Roman metrics, shown as "Termes"    |
+| Arimo            | Arial and Helvetica metrics                   |
+| Cousine          | Courier New metrics                           |
+| Caladea          | Cambria metrics                               |
+| Gelasio          | Georgia metrics                               |
+| Libertinus Serif | Typst's default text face                     |
+| Cinzel           | inscriptional capitals                        |
+| DejaVu Sans      | wide humanist sans                            |
+| Inter            | screen-first UI sans                          |
+| JetBrains Mono   | code monospace                                |
+| TeXGyreSchola    | Century Schoolbook metrics, shown as "Schola" |
 
-Each in regular, italic, bold and bold italic (Cinzel, drawn in capitals, in regular and bold), subset to Latin, about 2.5 MB in all. A character outside the subset falls back to the surrounding font.
+Each in regular, italic, bold and bold italic (Cinzel, drawn in capitals, in regular and bold), subset to Latin, about 2.6 MB in all. A character outside the subset falls back to the surrounding font.
 
 ## Install
 
@@ -77,7 +78,7 @@ A family name is a promise to every document that sets text in it, so the suite 
 
 ## Licences and provenance
 
-The package's code is Apache-2.0. Every font file is a subset of an upstream release, its licence text beside it as `files/<Family>-<Licence>.txt`: the SIL Open Font License 1.1 for eight families, the GUST Font License (LPPL 1.3c) for TeXGyreTermes and the Bitstream Vera licence for DejaVu Sans. Each lets a subset keep its family's name. The names are trademarks of their holders, used here to name their fonts.
+The package's code is Apache-2.0. Every font file is a subset of an upstream release, its licence text beside it as `files/<Family>-<Licence>.txt`: the SIL Open Font License 1.1 for eight families, the GUST Font License (LPPL 1.3c) for TeXGyreTermes and TeXGyreSchola, and the Bitstream Vera licence for DejaVu Sans. Each lets a subset keep its family's name. The names are trademarks of their holders, used here to name their fonts.
 
 `manifest.json` records each family's upstream source, a repository at a commit or a release archive, and each face's upstream file and its sha256. Each file was cut from that upstream file with fontTools 4.68.0, DejaVu Sans's regular face with `--drop-tables+=MATH` as well:
 
