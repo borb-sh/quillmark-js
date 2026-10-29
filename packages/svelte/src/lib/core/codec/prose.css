@@ -58,29 +58,17 @@ li.ProseMirror-selectednode::after {
 /* One rhythm between sibling blocks, in place of the UA's collapsed pair. Scoped by
    parent rather than by tag, which is what keeps it true as the schema grows: the
    containers below are every node whose children are blocks (`schema.ts`), whatever
-   kinds exist; a task item holds its blocks in a body past its checkbox (`tasks.ts`),
-   so the body is the container rather than the item. A list and an item are
-   containers like any other: an item stands off its neighbours as a paragraph does, a
-   list nested under an item stands off the item's text, and an item's unnumbered line
-   has the gap below it that the next item draws above, where a tight run would read it
-   as the head of the next item.
+   kinds exist. A list is the exception: the whole list is one block among its
+   siblings, so it stands off them by the gap and its insides are tight: items, an
+   item's unnumbered lines, a task item's body and a sub-list all sit flush, told
+   apart by marker and indent rather than by space.
 
    A line box is ~22px at the paper size and the body leading, so the rung is a
    little over half a line: enough that a break reads as a break, short of the full
    blank line that doubles the leading and makes a short document read as a list of
    fragments. */
 .ProseMirror > * + *,
-.ProseMirror
-	:is(
-		blockquote,
-		ul,
-		ol,
-		li:not([data-qm-checked]),
-		[data-qm-task-body],
-		[data-qm-unknown-container]
-	)
-	> *
-	+ * {
+.ProseMirror :is(blockquote, [data-qm-unknown-container]) > * + * {
 	margin-top: var(--_qm-space-3);
 }
 
