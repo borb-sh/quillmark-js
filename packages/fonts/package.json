@@ -1,6 +1,6 @@
 {
 	"name": "@quillmark/fonts",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "The font suite every Quillmark client hands its engine: openly licensed families a stored document can name and find again.",
 	"type": "module",
 	"license": "Apache-2.0 AND OFL-1.1 AND LicenseRef-GUST-Font-License AND Bitstream-Vera",
