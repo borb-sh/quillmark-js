@@ -43,7 +43,7 @@
 	},
 	"dependencies": {
 		"@quillmark/fonts": "0.0.0",
-		"@quillmark/quiver": "0.38.1",
+		"@quillmark/quiver": "0.39.0",
 		"@quillmark/wasm": "0.133.0",
 		"yaml": "^2.8.3"
 	},
