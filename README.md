@@ -7,6 +7,7 @@ The JavaScript tier downstream of the [`@quillmark/wasm`](https://github.com/bor
 | [`@quillmark/svelte`](packages/svelte) | Editing, live-preview and source surfaces over a session.                                                                   |
 | [`@quillmark/quiver`](packages/quiver) | Collections of quills, resolved and loaded.                                                                                 |
 | [`@quillmark/fonts`](packages/fonts)   | The font suite every client hands its engine, so a family a document names sets the same way everywhere.                    |
+| [`@quillmark/collab`](packages/collab) | Live editing: a `Document` bound to a shared Yjs state, and the session log its clients merge through.                      |
 | [`quillkit`](packages/quillkit)        | The quill author's toolchain: one bin over start, gate, look at, build and preview, and the studio and app clients it lays. |
 | [`playground`](packages/playground)    | The app that composes them, for a developer reading the library; deployed as the Pages site.                                |
 
@@ -20,7 +21,7 @@ A package whose JS a consumer imports peers `@quillmark/wasm` and never depends 
 npm install                # one install, every package
 npm run dev                # the playground at :5173
 npm run dev:studio         # the studio client at :5173
-npm run build              # quiver, svelte and fonts → quillkit and the playground, in that order
+npm run build              # quiver, svelte, fonts and collab → quillkit and the playground, in that order
 npm run site               # the fixture quiver's studio as a deploy serves it, into ./site
 npm test                   # every package's suite
 npm run check              # types, per package
@@ -39,4 +40,4 @@ Everything runs against the one reference quill, [`fixtures/quills/showcase/1.0.
 
 ## Canon
 
-The settled systems, per tier: [`svelte`'s](packages/svelte/prose/canon/INDEX.md), [`quiver`'s](packages/quiver/prose/canon/INDEX.md), [`fonts`'](packages/fonts/prose/canon/INDEX.md), [`quillkit`'s](packages/quillkit/prose/canon/INDEX.md) (the tool and both clients), [the playground's](packages/playground/prose/canon/INDEX.md). Work that is not settled lives in GitHub issues.
+The settled systems, per tier: [`svelte`'s](packages/svelte/prose/canon/INDEX.md), [`quiver`'s](packages/quiver/prose/canon/INDEX.md), [`fonts`'](packages/fonts/prose/canon/INDEX.md), [`collab`'s](packages/collab/prose/canon/INDEX.md), [`quillkit`'s](packages/quillkit/prose/canon/INDEX.md) (the tool and both clients), [the playground's](packages/playground/prose/canon/INDEX.md). Work that is not settled lives in GitHub issues.

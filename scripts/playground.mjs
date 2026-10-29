@@ -99,7 +99,7 @@ await stopPrevious();
 if (await answers())
 	throw new Error(`something else answers at ${url}; stop it, or pass --port <n>`);
 
-say('building @quillmark/quiver, @quillmark/svelte and @quillmark/fonts');
+say('building @quillmark/quiver, @quillmark/svelte, @quillmark/fonts and @quillmark/collab');
 await run('npm', [
 	'run',
 	'build',
@@ -108,7 +108,9 @@ await run('npm', [
 	'-w',
 	'packages/svelte',
 	'-w',
-	'packages/fonts'
+	'packages/fonts',
+	'-w',
+	'packages/collab'
 ]);
 
 for (const cache of CACHES) rmSync(cache, { recursive: true, force: true });

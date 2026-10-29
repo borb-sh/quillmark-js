@@ -8,7 +8,8 @@
 //      are siblings at one tier with no edge between them, in either direction; and a node
 //      reaching both is composing them, which is the only way the two meet. `fonts` stands
 //      beside them on the same terms: a client hands its files to the engine, and no
-//      library reaches it. Declared dependencies and source specifiers both, since either
+//      library reaches it. `collab` stands there too: it binds a Document to Yjs and knows no
+//      editor, and the host wires the two. Declared dependencies and source specifiers both, since either
 //      alone is half a check: an undeclared import resolves fine in a workspace, and a
 //      declared dependency nothing imports is still a promise.
 //
@@ -50,11 +51,12 @@ import { ROOT, filesUnder, packages, report } from './workspace.mjs';
 
 /** The graph. An edge absent from this table is a violation; an edge in it is optional. */
 const ALLOWED = {
-	playground: ['@quillmark/svelte', '@quillmark/quiver', '@quillmark/fonts'],
+	playground: ['@quillmark/svelte', '@quillmark/quiver', '@quillmark/fonts', '@quillmark/collab'],
 	quillkit: ['@quillmark/svelte', '@quillmark/quiver', '@quillmark/fonts'],
 	'@quillmark/svelte': [],
 	'@quillmark/quiver': [],
-	'@quillmark/fonts': []
+	'@quillmark/fonts': [],
+	'@quillmark/collab': []
 };
 
 const WASM = '@quillmark/wasm';
