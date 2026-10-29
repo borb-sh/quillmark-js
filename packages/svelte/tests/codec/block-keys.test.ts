@@ -177,12 +177,12 @@ describe('Delete on an empty line takes the line', () => {
 		);
 	});
 
-	// Enter on an empty middle item keeps the line as a continuation of the item above;
-	// Delete takes it, the caret already standing on it.
+	// Enter on an empty middle item takes the line out between the two halves of the list;
+	// Delete takes it, the caret already standing on it, and the halves join again.
 	it('takes the line an empty item’s Enter opened', () => {
 		const gap = press(atBlock(docOf(ul(li(p('a')), li(p()), li(p('c')))), 1), 'Enter');
 		expect(shape(gap)).toBe(
-			'doc(bullet_list(list_item(paragraph("a"), paragraph), list_item(paragraph("c"))))'
+			'doc(bullet_list(list_item(paragraph("a"))), paragraph, bullet_list(list_item(paragraph("c"))))'
 		);
 		expectPress(
 			gap,

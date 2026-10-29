@@ -253,18 +253,30 @@ describe('Enter', () => {
 });
 
 describe('Enter on an empty line inside a list', () => {
-	it('on an empty MIDDLE item, takes the marker off and keeps the line under the item above', () => {
-		expectPress(
+	it('on an empty MIDDLE item, takes the line out of the list to full width', () => {
+		const next = expectPress(
 			atBlock(docOf(ul(li(p('a')), li(p()), li(p('c')))), 1),
 			'Enter',
-			'doc(bullet_list(list_item(paragraph("a"), paragraph), list_item(paragraph("c"))))'
+			'doc(bullet_list(list_item(paragraph("a"))), paragraph, bullet_list(list_item(paragraph("c"))))'
 		);
+		expect(next.selection.$from.parent.type).toBe(n.paragraph);
+		expect(next.selection.$from.depth).toBe(1);
 	});
 
-	it('the numbers below close up: nothing splits the list', () => {
-		const next = press(press(after('1. a\n2. b\n3. c', 'a'), 'Enter'), 'Enter');
-		expect(next.doc.childCount).toBe(1);
-		expect(next.doc.child(0).childCount).toBe(3);
+	it('on an empty middle item, splits the list and the tail counts from 1', () => {
+		const ol = n.ordered_list.create({ start: 3 }, [li(p('a')), li(p()), li(p('c'))]);
+		const next = press(atBlock(docOf(ol), 1), 'Enter');
+		expect(next.doc.childCount).toBe(3);
+		expect(next.doc.child(0).attrs.start).toBe(3);
+		expect(next.doc.child(2).attrs.start).toBe(1);
+	});
+
+	it('on an empty nested middle item, lifts it one level', () => {
+		expectPress(
+			atBlock(docOf(ul(li(p('a'), ul(li(p('x')), li(p()), li(p('y')))))), 2),
+			'Enter',
+			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("x")))), list_item(paragraph, bullet_list(list_item(paragraph("y"))))))'
+		);
 	});
 
 	it('on an empty continuation line, puts the marker back on as the next item', () => {

@@ -85,13 +85,12 @@ function emptyItem(item: PMNode): boolean {
  * first item lifts out over the list instead.
  *
  * An empty item is spent rather than kept as an empty continuation line, the caret going to the end
- * of what stood above it. `keepEmpty` is Enter's reading, where the empty line is the one about to
- * be typed in.
+ * of what stood above it.
  *
  * Declines where the item is the first block of one with nothing above it in an item
  * (`list_item(ordered_list(…))`, a pasted shape).
  */
-function markerOff(itemType: NodeType, keepEmpty = false): Command {
+function markerOff(itemType: NodeType): Command {
 	return (state, dispatch) => {
 		const at = atItemStart(state, itemType);
 		if (!at) return false;
@@ -101,7 +100,7 @@ function markerOff(itemType: NodeType, keepEmpty = false): Command {
 		const list = $from.node(-2);
 		const itemStart = $from.before(-1);
 		const itemEnd = itemStart + item.nodeSize;
-		const spend = !keepEmpty && emptyItem(item);
+		const spend = emptyItem(item);
 		const tr = state.tr;
 		let into: number;
 		if (at.itemIndex > 0) {
@@ -188,18 +187,34 @@ function outdent(itemType: NodeType): Command {
 }
 
 /**
- * Enter on an empty item that has items after it → the marker off, the empty line kept as a
- * continuation of the item above. An empty last item still leaves the list (`liftListItem`), and a
- * first item has no item above to continue.
+ * Enter on an empty top-level item that has items after it → the line out of the list to full
+ * width, as an empty last item leaves it. The list splits there and the tail counts from 1. A
+ * nested middle item is `liftListItem`'s, one level a press.
  */
-function continueAbove(itemType: NodeType): Command {
-	const off = markerOff(itemType, true);
-	return (state, dispatch) => {
+function lineOutOfMiddle(itemType: NodeType): Command {
+	const lift = liftListItem(itemType);
+	return (state, dispatch, view) => {
 		const at = atItemStart(state, itemType);
 		const { $from } = state.selection;
-		if (!at || at.itemIndex === 0 || !emptyItem($from.node(-1))) return false;
+		if (!at || at.nested || !emptyItem($from.node(-1))) return false;
 		if (at.itemIndex === $from.node(-2).childCount - 1) return false;
-		return off(state, dispatch);
+		return lift(
+			state,
+			dispatch &&
+				((tr) => {
+					const $line = tr.selection.$from;
+					const tailPos = $line.after();
+					const tail = tr.doc.nodeAt(tailPos);
+					if (
+						tail?.firstChild?.type === itemType &&
+						tail.attrs.start != null &&
+						tail.attrs.start !== 1
+					)
+						tr.setNodeMarkup(tailPos, null, { ...tail.attrs, start: 1 });
+					dispatch(tr);
+				}),
+			view
+		);
 	};
 }
 
@@ -451,8 +466,8 @@ function sinkIntoList(itemType: NodeType): Command {
  * the list's last item. `Mod-Shift-7` / `Mod-Shift-8` are the list toggle (`list-toggle.ts`).
  * `Mod-Enter` ticks the task item around the caret (`toggleTask`).
  *
- * `Enter` is a chain in precedence order: the empty line above an unnumbered one, the marker off an
- * empty middle item and back on an empty continuation line, `splitListItem` (`splitTaskItem` for
+ * `Enter` is a chain in precedence order: the empty line above an unnumbered one, an empty top-level
+ * middle item out of the list, the marker back on an empty continuation line, `splitListItem` (`splitTaskItem` for
  * tasks), then `liftListItem`. The split link splits a non-empty item, and on an empty last item
  * either splits the wrapping item (a nested one, so Enter lifts one level) or bails so the last
  * link lifts a top-level one to a paragraph.
@@ -476,7 +491,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 		'Mod-Enter': toggleTask(itemType),
 		Enter: chainCommands(
 			lineAbove(itemType, paragraph),
-			continueAbove(itemType),
+			lineOutOfMiddle(itemType),
 			markerOn(itemType),
 			splitTaskItem(itemType),
 			liftListItem(itemType)
