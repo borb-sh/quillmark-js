@@ -1,11 +1,14 @@
 // A `SessionLog` in Web Storage, for every tab of one origin: the playground's database.
 //
-// Each entry has a key of its own, `qm-collab:<room>:log:<epoch>:<writer>:<n>`, written by one
-// tab alone, so tabs need no lock to append. The `storage` event, which fires in every other tab
-// of the origin, is the wake-up. Once an epoch passes `compactAt` entries, the appending tab
-// merges them into one entry, writing it before deleting the keys it merged.
+// The open session is one key, its epoch and its seed written together. Each entry has a key of
+// its own, `qm-collab:<room>:log:<epoch>:<writer>:<n>`, written by one tab alone, so tabs need no
+// lock to append. The `storage` event, which fires in every other tab of the origin, is the
+// wake-up. Once an epoch passes `compactAt` entries, the appending tab merges them into one entry,
+// writing it before deleting the keys it merged, and a reader that finds a key it listed gone
+// lists again. Web Storage has no transactions: two tabs opening a session at once each write
+// one, the later write stands, and the other tab's session ends at its first append.
 import * as Y from 'yjs';
-import { reflects, type Saved, type SessionLog } from './session.js';
+import { covers, type Opened, type Saved, type SessionLog } from './session.js';
 
 export interface LocalLogOpts {
 	room: string;
@@ -20,9 +23,9 @@ export interface LocalLogOpts {
 export function localLog(opts: LocalLogOpts): SessionLog {
 	const storage = opts.storage ?? globalThis.localStorage;
 	const events = opts.events ?? globalThis;
-	const prefix = `qm-collab:${opts.room}:`;
+	const prefix = `qm-collab:${encodeURIComponent(opts.room)}:`;
 	const key = {
-		epoch: `${prefix}epoch`,
+		open: `${prefix}open`,
 		saved: `${prefix}saved`,
 		touched: `${prefix}touched`,
 		log: (epoch: string) => `${prefix}log:${epoch}:`
@@ -38,7 +41,13 @@ export function localLog(opts: LocalLogOpts): SessionLog {
 		}
 		return out;
 	};
-	const isOpen = (epoch: string) => storage.getItem(key.epoch) === epoch;
+	const current = (): Opened | undefined => {
+		const raw = storage.getItem(key.open);
+		if (!raw) return undefined;
+		const { epoch, seed } = JSON.parse(raw) as Record<string, string>;
+		return { epoch, seed: fromBase64(seed) };
+	};
+	const isOpen = (epoch: string) => current()?.epoch === epoch;
 	const load = (): Saved | undefined => {
 		const raw = storage.getItem(key.saved);
 		if (!raw) return undefined;
@@ -47,23 +56,26 @@ export function localLog(opts: LocalLogOpts): SessionLog {
 	};
 	const write = (epoch: string, update: Uint8Array) =>
 		storage.setItem(`${key.log(epoch)}${writer}:${n++}`, toBase64(update));
+	const touch = () => storage.setItem(key.touched, String(Date.now()));
 
 	return {
-		async epoch() {
-			const open = storage.getItem(key.epoch);
-			if (open) return open;
-			storage.setItem(key.epoch, randomId());
-			return storage.getItem(key.epoch)!;
+		current: async () => current(),
+		async open(seed) {
+			const held = current();
+			if (held) return held;
+			storage.setItem(key.open, JSON.stringify({ epoch: randomId(), seed: toBase64(seed) }));
+			touch();
+			return current()!;
 		},
 		async end(epoch) {
 			if (!isOpen(epoch)) return;
-			storage.removeItem(key.epoch);
+			storage.removeItem(key.open);
 			for (const k of entries(epoch)) storage.removeItem(k);
 		},
 		async append(epoch, update) {
 			if (!isOpen(epoch)) return false;
 			write(epoch, update);
-			storage.setItem(key.touched, String(Date.now()));
+			touch();
 			const all = entries(epoch);
 			if (all.length > (opts.compactAt ?? 100)) {
 				const updates = all.flatMap((k) => {
@@ -75,21 +87,29 @@ export function localLog(opts: LocalLogOpts): SessionLog {
 			}
 			return true;
 		},
+		async touch(epoch) {
+			if (isOpen(epoch)) touch();
+		},
 		async since(epoch, cursor) {
-			if (!isOpen(epoch)) return undefined;
 			const seen = cursor instanceof Set ? (cursor as Set<string>) : new Set<string>();
-			const present = entries(epoch);
-			const updates: Uint8Array[] = [];
-			for (const k of present) {
-				if (seen.has(k)) continue;
-				const v = storage.getItem(k);
-				if (v !== null) updates.push(fromBase64(v));
+			for (;;) {
+				if (!isOpen(epoch)) return undefined;
+				const present = entries(epoch);
+				const updates: Uint8Array[] = [];
+				let vanished = false;
+				for (const k of present) {
+					if (seen.has(k)) continue;
+					const v = storage.getItem(k);
+					if (v === null) vanished = true;
+					else updates.push(fromBase64(v));
+				}
+				if (vanished) continue;
+				return {
+					updates,
+					cursor: new Set(present),
+					touched: Number(storage.getItem(key.touched) ?? 0)
+				};
 			}
-			return {
-				updates,
-				cursor: new Set(present),
-				touched: Number(storage.getItem(key.touched) ?? 0)
-			};
 		},
 		subscribe(onChange) {
 			const fn = (e: Event) => {
@@ -101,13 +121,15 @@ export function localLog(opts: LocalLogOpts): SessionLog {
 		},
 		load: async () => load(),
 		async save(saved: Saved) {
-			if (!isOpen(saved.epoch)) return false;
 			const held = load();
-			if (
-				held?.epoch === saved.epoch &&
-				(!reflects(saved.version, held.version) || reflects(held.version, saved.version))
-			)
-				return false;
+			if (held) {
+				if (!isOpen(saved.epoch)) return false;
+				if (
+					held.epoch === saved.epoch &&
+					(!covers(saved.version, held.version) || covers(held.version, saved.version))
+				)
+					return false;
+			}
 			storage.setItem(
 				key.saved,
 				JSON.stringify({

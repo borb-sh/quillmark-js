@@ -99,6 +99,12 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** The text event of the transaction in flight, per root, read by the pull. */
 	const events = new Map<string, Y.YTextEvent>();
 	const observed = new Map<Y.Text, (e: Y.YTextEvent) => void>();
+	/** Cards and fields, by Y name, whose last remote value the Document refused. A push leaves
+	 *  them as Y holds them: the Document's value is not one this client synced. */
+	const held = new Set<string>();
+	/** The card list a remote change could not be applied to: nothing more is pulled or pushed. */
+	let diverged = false;
+	let mismatchReported = false;
 
 	const report = (error: unknown) => opts.onError?.(error);
 	const nameOf = (c: CardRef): string => (c === MAIN ? MAIN : ids[c]);
@@ -149,6 +155,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	// ── Document → Y ─────────────────────────────────────────────────────────
 
 	function push(op?: CardOp): Addr[] {
+		if (diverged) return [];
 		const renames: { root: string; addr: Addr }[] = [];
 		ydoc.transact(() => {
 			if (op) applyOp(op);
@@ -204,8 +211,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 
 	function pushCard(c: CardRef, renames: { root: string; addr: Addr }[]): void {
-		const card = cardOf(c);
 		const name = nameOf(c);
+		if (held.has(name)) return;
+		const card = cardOf(c);
 		const map = ydoc.getMap<unknown>(name);
 		if (c !== MAIN && map.get(KIND) !== card.kind) map.set(KIND, card.kind);
 		const title = titleOf(card.ext);
@@ -223,6 +231,10 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			let form = declared(schema, item.key);
 			if (form === 'plain' && typeof item.value !== 'string') form = 'value';
 			const root = contentRoot(name, item.key);
+			if (held.has(root)) {
+				seen.add(item.key).add(present(item.key));
+				continue;
+			}
 			if (form === 'value') {
 				seen.add(item.key);
 				if (canonical(map.get(item.key)) !== canonical(item.value))
@@ -240,7 +252,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				if (content) pushContent(root, addr, content, renames);
 			}
 		}
-		for (const key of [...map.keys()]) if (!key.startsWith('$') && !seen.has(key)) map.delete(key);
+		for (const key of [...map.keys()]) {
+			if (key.startsWith('$') || seen.has(key)) continue;
+			if (held.has(contentRoot(name, key.startsWith('@') ? key.slice(1) : key))) continue;
+			map.delete(key);
+		}
 	}
 
 	/** Empty a root whose form is changing, so the new form is written over nothing. */
@@ -258,7 +274,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		renames: { root: string; addr: Addr }[]
 	): void {
 		const value = contentKey(content);
-		if (synced.get(root) === value) return;
+		if (held.has(root) || synced.get(root) === value) return;
 		watch(root);
 		const renamed = writeContent(contentTypes(ydoc, root), content, mint);
 		synced.set(root, value);
@@ -276,6 +292,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 
 	function pull(touched: Set<string> | 'all'): RemoteChange {
 		const change: RemoteChange = { cards: [], fields: [], content: [] };
+		if (diverged) return change;
 		const hit = (name: string) => touched === 'all' || touched.has(name);
 		const hitRoot = (root: string) => hit(root) || hit(`${root}#line0`);
 		const inserted = new Set<string>();
@@ -285,6 +302,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			touched.has(CARDS) ||
 			order.toArray().some((id) => !known.has(id) && touched.has(id));
 		if (listMoved) pullCards(change, inserted);
+		if (diverged) return change;
 		const reids: [Y.Map<unknown>, string][] = [];
 		for (const c of refs()) {
 			const name = nameOf(c);
@@ -304,8 +322,10 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				for (const [map, id] of reids) map.set('id', id);
 			}, origin);
 		const session = ydoc.getMap<unknown>(SESSION).get('quill');
-		if (typeof session === 'string' && session !== doc.quillRef)
+		if (typeof session === 'string' && session !== doc.quillRef && !mismatchReported) {
+			mismatchReported = true;
 			report(new Error(`the session is seeded under ${session}, the document is ${doc.quillRef}`));
+		}
 		return change;
 	}
 
@@ -339,7 +359,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 					markSynced(i);
 				}
 			} catch (e) {
-				report(e);
+				diverged = true;
+				report(new Diverged(e));
+				return;
 			}
 		}
 	}
@@ -409,9 +431,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				watchCard(name, schemaOf(c, kind));
 				moved = true;
 			} catch (e) {
-				report(e);
+				held.add(name);
+				return report(e);
 			}
 		}
+		held.delete(name);
 		const card = cardOf(c);
 		const title = map.get(TITLE);
 		if ((typeof title === 'string' ? title : undefined) !== titleOf(card.ext)) {
@@ -424,6 +448,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			const form = arrived(map, key);
 			const addr = addrOf(c, key);
 			const isLeaf = declared(schema, key) !== 'value';
+			const root = contentRoot(name, key);
 			try {
 				if (form === undefined) {
 					if (doc.getStored(addr) == null) continue;
@@ -439,9 +464,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 					doc.storeField(addr, value);
 					if (form === 'plain') synced.set(contentRoot(name, key), JSON.stringify(value));
 				}
+				held.delete(root);
 				if (isLeaf) change.content.push({ addr });
 				else moved = true;
 			} catch (e) {
+				held.add(root);
 				report(e);
 			}
 		}
@@ -470,12 +497,13 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			const value = yValue(name, field);
 			if (value === undefined || canonical(doc.getStored(addr)) === canonical(value)) return;
 			doc.storeField(addr, value);
+			held.delete(root);
 			synced.set(root, form === 'plain' ? JSON.stringify(value) : canonical(value));
 			if (declared(schema, field) === 'value') {
-				const ref = c;
-				if (!change.fields.includes(ref)) change.fields.push(ref);
+				if (!change.fields.includes(c)) change.fields.push(c);
 			} else change.content.push({ addr });
 		} catch (e) {
+			held.add(root);
 			report(e);
 		}
 	}
@@ -493,21 +521,25 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			reids.push(...projection.reids);
 			const before = storedContent(addr);
 			if (before && contentKey(before) === contentKey(projection.content)) {
+				held.delete(root);
 				synced.set(root, contentKey(before));
 				return;
 			}
 			const event = events.get(root);
 			if (!before) {
 				doc.overwrite(addr, projection.content);
+				held.delete(root);
 				synced.set(root, contentKey(storedContent(addr)));
 				change.content.push({ addr });
 				return;
 			}
 			const revised = doc.reviseContent(addr, projection.content);
+			held.delete(root);
 			synced.set(root, contentKey(storedContent(addr)));
 			const delta = event ? usvDelta(event, Array.from(before.text)) : revised.delta;
 			change.content.push({ addr, delta });
 		} catch (e) {
+			held.add(root);
 			report(e);
 		}
 	}
@@ -536,20 +568,25 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				touched.add(name);
 		if (!touched.size) return;
 		const change = pull(touched);
-		if (change.cards.length || change.fields.length || change.content.length)
+		if (!change.cards.length && !change.fields.length && !change.content.length) return;
+		try {
 			opts.onRemote?.(change);
+		} catch (e) {
+			report(e);
+		}
 	};
 
 	if (ydoc.getMap(SESSION).has('quill') || order.length > 0 || ydoc.getMap(MAIN).size > 0) {
 		// Adopt the Y ids by position where the kinds line up, so the cards keep what has no Y
 		// form (comments, other `$ext` namespaces, anchors), and project the rest in.
+		// Cards that do not line up are the Document's own and leave, so the list is Y's alone.
 		const target = order.toArray();
-		if (
+		const adopted =
 			target.length === doc.cardCount &&
-			target.every((id, i) => ydoc.getMap(id).get(KIND) === doc.card(i).kind)
-		)
-			ids = [...target];
-		for (const c of refs()) watchCard(nameOf(c), schemaOf(c));
+			target.every((id, i) => ydoc.getMap(id).get(KIND) === doc.card(i).kind);
+		ids = adopted ? [...target] : Array.from({ length: doc.cardCount }, (_, i) => `\0${i}`);
+		watchCard(MAIN, schemaOf(MAIN));
+		if (adopted) for (let i = 0; i < ids.length; i++) watchCard(ids[i], schemaOf(i));
 		pull('all');
 	} else {
 		ydoc.transact(() => {
@@ -588,6 +625,16 @@ export function seedDocument(doc: Document, quill: Quill): Uint8Array {
 	const update = Y.encodeStateAsUpdate(ydoc);
 	ydoc.destroy();
 	return update;
+}
+
+/** A remote card-list change the Document refused: this client can no longer follow the
+ *  session, and the binding stops. */
+export class Diverged extends Error {
+	constructor(readonly cause: unknown) {
+		super(
+			`the document refused a remote card change: ${cause instanceof Error ? cause.message : String(cause)}`
+		);
+	}
 }
 
 function formOf(type: string): Form {

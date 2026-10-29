@@ -56,7 +56,9 @@ export interface Peer {
 
 /** `n` peers over one starting Document, each joining from the same seed. */
 export function peers(n: number, start: () => Document, q: Quill = quill()): Peer[] {
-	const seed = seedDocument(start(), q);
+	const first = start();
+	const seed = seedDocument(first, q);
+	first.free();
 	const all: Peer[] = [];
 	for (let i = 0; i < n; i++) {
 		const ydoc = new Y.Doc();

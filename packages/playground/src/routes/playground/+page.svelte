@@ -440,22 +440,35 @@
 					]
 				});
 			}
-			// A room's save is its document once it has one; this open's document is what
-			// an empty room starts from.
+			// A room's save is its document once it has one, under the quill it names; this
+			// open's document is what an empty room starts from.
 			const roomName = params.get('collab');
 			let joined: Session | undefined;
 			if (roomName) {
-				const { joinSession, localLog } = await import('@quillmark/collab');
-				const session = await joinSession({
-					log: localLog({ room: roomName }),
-					quill,
-					initial: () => doc.clone(),
-					onRemote: handleRemote,
-					onError: (e) => (lastError = `collab: ${e instanceof Error ? e.message : String(e)}`),
-					onEnded: () => {
-						if (mine === generation) void open(fixture);
+				const { joinSession, localLog, QuillMismatch } = await import('@quillmark/collab');
+				let session: Session;
+				try {
+					session = await joinSession({
+						log: localLog({ room: roomName }),
+						quill,
+						initial: () => doc.clone(),
+						onRemote: handleRemote,
+						onError: (e) => (lastError = `collab: ${e instanceof Error ? e.message : String(e)}`),
+						onEnded: (lost) => {
+							if (lost) lastError = 'collab: the session ended before the last edit reached it';
+							if (mine === generation) void open(fixture);
+						}
+					});
+				} catch (e) {
+					const named = e instanceof QuillMismatch ? e.quillRef.split('@')[0] : undefined;
+					if (!named || named === name || !fixtures.includes(named)) throw e;
+					for (const h of created) h.free();
+					if (mine === generation) {
+						fixture = named;
+						void open(named);
 					}
-				});
+					return;
+				}
 				joined = session;
 				created.unshift({ free: () => void session.leave().finally(() => session.doc.free()) });
 			}

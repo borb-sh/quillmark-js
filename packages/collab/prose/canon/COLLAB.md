@@ -10,7 +10,7 @@ Several clients edit one Quillmark document at once and end holding the same con
 - **I2** A local commit is written to Y as the fewest operations that make Y project to the Document's value (`write.ts`), never as a whole-value replace.
 - **I3** Identity lives in Y, positions are derived. A list item, a list, a quote and an island carry ids; `ordinal` and `instance` are computed by the projection, so two clients inserting into one list never fight over a number.
 - **I4** An island slot the edit kept is never deleted and re-inserted. An island id is unique within its field: an id the store mints by position (`isl-0`) or one the field already holds is re-minted on write, and two slots that still meet one id after a merge are told apart by the projection (`id~1`), the first in text order keeping it.
-- **I5** A session is seeded once, by an update every client writes byte for byte the same (`seedDocument`: client id 0, ids minted from it), so two clients that race to seed land one copy.
+- **I5** A session has one seed, stored with its epoch when it opens, and every client starts from it. The seed is written by client id 0 with ids minted from it (`seedDocument`), so the same Document seeds the same bytes.
 - **I6** After every transaction the Y text of each content root equals the Document's text for that field.
 - **I7** Updates from two sessions never meet: every log entry belongs to one epoch, and a client applies only entries of the epoch it joined.
 - **I8** Seeding a Document and projecting it back is lossless for everything that has a Y form.
@@ -44,9 +44,11 @@ The writer diffs one field at a time. The island ids the edit kept, by longest c
 
 ```ts
 interface SessionLog {
-	epoch(): Promise<string>;
+	current(): Promise<Opened | undefined>; // { epoch, seed }
+	open(seed: Uint8Array): Promise<Opened>;
 	end(epoch: string): Promise<void>;
 	append(epoch: string, update: Uint8Array): Promise<boolean>;
+	touch(epoch: string): Promise<void>;
 	since(epoch: string, cursor?: unknown): Promise<{ updates; cursor; touched } | undefined>;
 	subscribe(onChange: () => void): () => void;
 	load(): Promise<Saved | undefined>;
@@ -54,19 +56,23 @@ interface SessionLog {
 }
 ```
 
-- **Join.** Read the saved Document, then the open epoch's log, in that order, so a log found empty was empty when the save was read and a seed is of the Document every seeder saw. A room with no save takes the host's initial Document as its first. An empty log takes the seed, then every entry is applied.
-- **Edit.** Every local Y update is appended; a log that refuses it says the epoch closed, and the session ends.
-- **Save.** Each client saves what it holds a delay after its last change, with the Y state vector it reflects. A store keeps a save of the same epoch only when it moves past the one held, so a stale tab never overwrites a newer save, and refuses a save of an epoch that is not open.
-- **End.** A join that finds the log idle past the lease, with the save reflecting every entry, ends the epoch; the next one opens from the save. A client whose epoch ends hears `onEnded` and rejoins. Ending is decided by the lease and the save, never by a disconnect, which a stateless store cannot see.
+- **Open.** A session opens with its seed in one write: `open(seed)` returns the session already open where there is one. Every client applies that seed and none writes its own, so an epoch never holds two seeds, which under one client id would leave clients that received them in different orders apart for good. A room with no save takes the host's initial Document as its first, and a Document under another quill than the host's is refused (`QuillMismatch`).
+- **Join.** Apply the seed and every entry, then bind the saved Document. A save the log has moved past is fine: cards that do not line up with Y's leave, and Y's are projected in. Remote changes reach `onRemote` only once `joinSession` has returned.
+- **Edit.** Every local Y update is appended. An update that does not reach the log, refused because the epoch closed or failed in the store, ends the session, since every later update builds on it; `onEnded(lost)` says an edit made here is not in the log.
+- **Save.** Each client saves what it holds a delay after its last change, with the Y snapshot it reflects, state vector and delete set both: a deletion moves no state vector. A store keeps a save of the same epoch only when it covers the held one and the held one does not cover it, so a stale tab never overwrites a newer save, and refuses a save of an epoch that is not open.
+- **End.** Each client touches the log while it is in the session. A join that finds nobody appending or present within the lease, and the save covering the seed and every entry, ends the epoch; the next one opens from the save. Ending is decided by the lease and the save, never by a disconnect, which a stateless store cannot see; a tab asleep through the lease wakes to a session that has ended.
+- **Refusals.** A remote value the Document refuses leaves its field or card held: a push writes nothing there, so the refusal does not revert anyone's edit, and the next remote value that lands releases it. A card-list change the Document refuses stops the binding (`Diverged`) and the session ends.
 
-`localLog({ room })` is the Web Storage store: one key per entry under `qm-collab:<room>:log:<epoch>:<writer>:<n>`, base64, so tabs append without a lock; the `storage` event is the wake-up; an epoch past `compactAt` entries is merged into one entry, written before the keys it merged are deleted. `sessionStorage` cannot carry a session: it is private to one tab. A server store keeps the same protocol with the save and the epoch check in one transaction beside the document's row.
+`localLog({ room })` is the Web Storage store: the open session is one key holding its epoch and seed; one key per entry under `qm-collab:<room>:log:<epoch>:<writer>:<n>`, base64, so tabs append without a lock; the `storage` event is the wake-up; an epoch past `compactAt` entries is merged into one entry, written before the keys it merged are deleted, and a read that finds a listed key gone lists again. Web Storage has no transactions, so two tabs opening a session at once each write one and the later stands: the other's session ends at its first append, having lost nothing but that append. `sessionStorage` cannot carry a session: it is private to one tab. A server store keeps the same protocol with `open`, the save and the epoch check each in one transaction beside the document's row.
 
 ## Pitfalls
 
 - A write to the saved Document while a session is open is overwritten by the session's next save. Route it through the session, or end the session first.
 - Anything with no Y form survives a session only through the saved Document, and a save is one client's Document: another client's anchors and tips state are not in it. A field type that gains a Y form needs a round-trip test (I8).
 - A change of quill reference is not a field edit. A Document under another quill than `$session.quill` is reported through `onError`; the host ends the session and every client rejoins.
+- `push` reads every card on each call, so its cost grows with the document. A host with large documents debounces it.
+- The host owns `session.doc` and frees it after `leave`. `joinSession` frees the Document `initial()` returns.
 
 ## Testing
 
-Vitest under Node, real WASM and real Yjs. `fuzz.test.ts` runs three peers over the reference quill through random concurrent edits and random delivery, and asserts one Document, no errors, I6, and a canonical projection, over 120 seeds. `binding.test.ts` holds the cases one at a time, `roundtrip.test.ts` I8, and `session.test.ts` the session protocol over a fake origin's storage. The editor half is checked in the playground under `?collab=` (PLAYGROUND §"Live editing").
+Vitest under Node, real WASM and real Yjs. `fuzz.test.ts` runs three peers over the reference quill through random concurrent edits and random delivery, and asserts one Document, no errors, I6, and a canonical projection, over 120 seeds. `binding.test.ts` holds the cases one at a time, `roundtrip.test.ts` I8, and `session.test.ts` the session protocol over a fake origin's storage: saves that delete, a joiner behind the log, a session ended under a tab, a full store. The editor half is checked in the playground under `?collab=` (PLAYGROUND §"Live editing").

@@ -21,7 +21,7 @@ const session = await joinSession({
 		for (const { addr, delta } of change.content)
 			editor.applyExternal(session.doc.pathFor(addr), delta);
 	},
-	onEnded: () => location.reload()
+	onEnded: (lost) => rejoin(lost)
 });
 ```
 
@@ -38,9 +38,9 @@ Mount the editor over `session.doc`, and push each local edit after it commits:
 />
 ```
 
-`push` takes the card operation the edit was, which `EditorChange.op` carries for an add, a move and a removal, and returns the fields whose new islands took a minted id. `onRemote` hears what another client's edit moved in `session.doc`: card-list operations by index, cards whose kind, title or values changed, and text and content fields, a revised one with the text delta from its previous text. `session.save()` saves at once, and `session.leave()` saves and stops.
+`push` takes the card operation the edit was, which `EditorChange.op` carries for an add, a move and a removal, and returns the fields whose new islands took a minted id. `onRemote` hears what another client's edit moved in `session.doc`: card-list operations by index, cards whose kind, title or values changed, and text and content fields, a revised one with the text delta from its previous text. `onRemote` is first called after `joinSession` returns. `session.save()` saves at once, and `session.leave()` saves and stops; the host frees `session.doc` after it. `onEnded` says the session closed under this client, and whether an edit made here never reached it; a Document under another quill than the one passed is refused with `QuillMismatch`, which names the room's quill.
 
-`localLog` keeps the room in `localStorage`, so every tab of one origin shares it and a reload rejoins. A server keeps the same `SessionLog` protocol: `epoch`, `end`, `append`, `since`, `subscribe`, `load` and `save`.
+`localLog` keeps the room in `localStorage`, so every tab of one origin shares it and a reload rejoins. A server keeps the same `SessionLog` protocol: `current`, `open`, `end`, `append`, `touch`, `since`, `subscribe`, `load` and `save`.
 
 ## Without a session
 

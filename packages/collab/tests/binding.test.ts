@@ -2,6 +2,8 @@
 // host hears back through `onRemote`.
 import { describe, expect, it } from 'vitest';
 import type { Content, ContentContainer, Document } from '@quillmark/wasm';
+import * as Y from 'yjs';
+import { bindDocument, Diverged, seedDocument } from '../src/index.js';
 import { core, deliver, peers, quill, settle, snapshot, type Peer } from './helpers.js';
 
 const example = () => quill().exampleDocument()!;
@@ -150,5 +152,62 @@ describe('cards', () => {
 		expect(a.doc.card(at).kind).toBe('section');
 		expect(a.errors).toEqual([]);
 		expect(b.errors).toEqual([]);
+	});
+});
+
+describe('a remote value the Document refuses', () => {
+	it('stays in Y as it is, and a local edit does not revert it', () => {
+		const [a, b] = peers(2, example);
+		b.ydoc.transact(() => b.ydoc.getMap('main').set('bad-name', 1));
+		settle([a, b]);
+		expect(a.errors).toHaveLength(1);
+		a.doc.applyChange({}, { delta: { ops: [{ insert: 'a ' }] } });
+		a.binding.push();
+		settle([a, b]);
+		expect(a.ydoc.getMap('main').get('bad-name')).toBe(1);
+		expect(b.ydoc.getMap('main').get('bad-name')).toBe(1);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+	});
+
+	it('in the card list stops the binding, which says so', () => {
+		const [a, b] = peers(2, example);
+		b.ydoc.transact(() => {
+			b.ydoc.getMap('bad').set('$kind', 'Not A Kind!');
+			b.ydoc.getArray<string>('$cards').insert(0, ['bad']);
+		});
+		deliver(a);
+		expect(a.errors.at(-1)).toBeInstanceOf(Diverged);
+		const before = Y.encodeStateVector(a.ydoc);
+		a.doc.applyChange({}, { delta: { ops: [{ insert: 'a ' }] } });
+		expect(a.binding.push()).toEqual([]);
+		expect(Y.encodeStateVector(a.ydoc)).toEqual(before);
+	});
+
+	it('a host that throws on a remote change hears it through onError, and keeps receiving', () => {
+		const q = quill();
+		const seed = seedDocument(example(), q);
+		const [x, y] = [new Y.Doc(), new Y.Doc()];
+		Y.applyUpdate(x, seed);
+		Y.applyUpdate(y, seed);
+		const errors: unknown[] = [];
+		const doc = example();
+		bindDocument({
+			doc,
+			quill: q,
+			ydoc: x,
+			onRemote: () => {
+				throw new Error('host');
+			},
+			onError: (e) => errors.push(e)
+		});
+		const other = example();
+		const binding = bindDocument({ doc: other, quill: q, ydoc: y });
+		for (const word of ['one ', 'two ']) {
+			other.applyChange({}, { delta: { ops: [{ insert: word }] } });
+			binding.push();
+			Y.applyUpdate(x, Y.encodeStateAsUpdate(y, Y.encodeStateVector(x)));
+		}
+		expect(errors.map((e) => (e as Error).message)).toEqual(['host', 'host']);
+		expect((doc.getStored({}) as Content).text.startsWith('two one ')).toBe(true);
 	});
 });

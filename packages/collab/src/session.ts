@@ -1,38 +1,54 @@
 // A session: one stretch of live editing over a saved Document, carried by a log of Y updates.
 //
-// The saved Document is the record. A session is identified by an epoch, and every entry of its
-// log belongs to it. A client joins by reading the saved Document, then the open epoch's log:
-// an empty log takes the seed of the saved Document first, which is the same bytes on every
-// client, so two that race to seed land one copy. Every Y update a client makes is appended,
-// every entry another client appends is applied, and each client saves what it holds, the save
-// carrying the Y state vector it reflects so the store keeps only the furthest one. A session
-// ends when its last entry is saved and nobody has appended within the idle lease: the next join
-// opens a new epoch from the saved Document.
+// The saved Document is the record. A session is identified by an epoch and opened with its
+// seed, the Y form of the save it opened from, in one write: every client that joins applies that
+// seed and never writes one of its own, so two clients can never start one epoch from two saves.
+// Every Y update a client makes is appended, and every entry another client appends is applied.
+// Each client saves what it holds, with the Y snapshot it reflects, and the store keeps only a
+// save that moves past the one held: a snapshot counts deletions, which a state vector does not.
+// A session ends at a join that finds nobody has appended or been present within the lease and
+// the save reflecting every entry: the next session opens from the save.
 import * as Y from 'yjs';
 import { init, type Addr, type Document, type Quill } from '@quillmark/wasm';
-import { bindDocument, seedDocument, type CardOp, type DocumentBinding } from './document.js';
-import type { RemoteChange } from './document.js';
+import {
+	bindDocument,
+	seedDocument,
+	Diverged,
+	type CardOp,
+	type DocumentBinding,
+	type RemoteChange
+} from './document.js';
 
 /** A saved Document, with the session and the Y state it reflects. */
 export interface Saved {
 	epoch: string;
 	/** `doc.toStored()`. */
 	stored: string;
-	/** `Y.encodeStateVector` of the state the save reflects. */
+	/** `Y.encodeSnapshot` of the state the save reflects. */
 	version: Uint8Array;
+}
+
+/** An open session: its epoch, and the update every client starts it from. */
+export interface Opened {
+	epoch: string;
+	seed: Uint8Array;
 }
 
 /** Where a room keeps its saved Document and its session's log. */
 export interface SessionLog {
-	/** The open session's epoch, opening one when none is. */
-	epoch(): Promise<string>;
+	/** The open session; `undefined` when none is. */
+	current(): Promise<Opened | undefined>;
+	/** Open a session from `seed` unless one is open already; the session open after. */
+	open(seed: Uint8Array): Promise<Opened>;
 	/** Close `epoch` and drop its entries, when it is still the open one. */
 	end(epoch: string): Promise<void>;
 	/** Add an entry to `epoch`'s log; false when `epoch` is no longer open. */
 	append(epoch: string, update: Uint8Array): Promise<boolean>;
+	/** Mark a client present in `epoch`, so the session is not idle while it is open. */
+	touch(epoch: string): Promise<void>;
 	/**
-	 * The entries of `epoch` after `cursor`, a value an earlier call returned, and when the log
-	 * last took an entry. `undefined` when `epoch` is no longer open.
+	 * The entries of `epoch` after `cursor`, a value an earlier call returned, and when a client
+	 * last appended or touched. `undefined` when `epoch` is no longer open.
 	 */
 	since(
 		epoch: string,
@@ -42,29 +58,36 @@ export interface SessionLog {
 	subscribe(onChange: () => void): () => void;
 	load(): Promise<Saved | undefined>;
 	/**
-	 * Keep `saved` unless the store holds a save of the same epoch that `saved` does not move
-	 * past, or `saved` names an epoch that is not open. Returns whether it was kept.
+	 * Keep `saved` when the store holds none, or when `saved` names the open epoch and moves past
+	 * a held save of that epoch ({@link covers}, one way and not the other). Returns whether it
+	 * was kept.
 	 */
 	save(saved: Saved): Promise<boolean>;
 }
 
 export interface JoinSessionOpts {
 	log: SessionLog;
+	/** The quill the room's Document is under. A Document under another quill is refused. */
 	quill: Quill;
-	/** The Document a room starts from when it holds no saved one. */
+	/** The Document a room starts from when it holds no saved one. Read once, and freed. */
 	initial(): Document;
-	/** How long a session stays open with no new entry, in ms. */
+	/** How long a session stays open with nobody appending or present, in ms. */
 	lease?: number;
 	/** How long after the last change a client saves, in ms. */
 	saveDelay?: number;
+	/** What another client's edit moved, after `joinSession` has returned. */
 	onRemote?(change: RemoteChange): void;
 	onError?(error: unknown): void;
-	/** The session this client joined is over: its edits no longer reach anyone. Rejoin. */
-	onEnded?(): void;
+	/**
+	 * The session this client joined is over, and nothing it does reaches anyone: rejoin. `lost`
+	 * is whether an edit made here never reached the log, an edit the rejoin does not hold.
+	 */
+	onEnded?(lost: boolean): void;
 }
 
 export interface Session {
 	readonly epoch: string;
+	/** The Document the session edits. The host frees it, after `leave`. */
 	readonly doc: Document;
 	readonly ydoc: Y.Doc;
 	readonly binding: DocumentBinding;
@@ -76,68 +99,96 @@ export interface Session {
 	leave(): Promise<void>;
 }
 
+/** The Document's quill and `quill` disagree: the room is under the quill this names. */
+export class QuillMismatch extends Error {
+	constructor(readonly quillRef: string) {
+		super(`the room's document is under ${quillRef}`);
+	}
+}
+
 const LOG = Symbol('session-log');
 
-/** Whether state vector `a` holds everything `b` does. */
-export function reflects(a: Uint8Array, b: Uint8Array): boolean {
-	const held = Y.decodeStateVector(a);
-	for (const [client, clock] of Y.decodeStateVector(b))
-		if ((held.get(client) ?? 0) < clock) return false;
+/** Whether snapshot `a` holds everything `b` does: every insert, and every deletion. */
+export function covers(a: Uint8Array, b: Uint8Array): boolean {
+	const x = Y.decodeSnapshot(a);
+	const y = Y.decodeSnapshot(b);
+	for (const [client, clock] of y.sv) if ((x.sv.get(client) ?? 0) < clock) return false;
+	for (const [client, items] of y.ds.clients)
+		for (const { clock, len } of items)
+			for (let c = clock; c < clock + len; c++)
+				if (!Y.isDeleted(x.ds, Y.createID(client, c))) return false;
 	return true;
 }
+
+function snapshotOf(updates: Uint8Array[]): Uint8Array {
+	const ydoc = new Y.Doc();
+	Y.applyUpdate(ydoc, Y.mergeUpdates(updates));
+	const out = Y.encodeSnapshot(Y.snapshot(ydoc));
+	ydoc.destroy();
+	return out;
+}
+
+const sameQuill = (ref: string, quill: Quill) => ref.split('@')[0] === quill.metadata.name;
 
 export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	const { log, quill } = opts;
 	const lease = opts.lease ?? 5 * 60_000;
 	const { Document } = await init();
 
-	// The saved Document is read before the log, so a log found empty was empty when the save
-	// was read too, and the seed is of the Document every other seeder saw.
 	let saved = await log.load();
 	if (!saved) {
 		const initial = opts.initial();
-		await log.save({
-			epoch: await log.epoch(),
+		const first: Saved = {
+			epoch: '',
 			stored: initial.toStored(),
-			version: Y.encodeStateVector(new Y.Doc())
-		});
+			version: Y.encodeSnapshot(Y.emptySnapshot)
+		};
 		initial.free();
-		saved = (await log.load())!;
+		await log.save(first);
+		saved = (await log.load()) ?? first;
 	}
-	let epoch = await log.epoch();
-	let read = await log.since(epoch);
-	if (read && read.updates.length && Date.now() - read.touched > lease) {
-		const merged = Y.mergeUpdates(read.updates);
-		if (saved.epoch === epoch && reflects(saved.version, Y.encodeStateVectorFromUpdate(merged))) {
-			await log.end(epoch);
-			saved = (await log.load())!;
-			epoch = await log.epoch();
-			read = await log.since(epoch);
+
+	let opened = await log.current();
+	if (opened) {
+		const read = await log.since(opened.epoch);
+		const idle = read && Date.now() - read.touched > lease;
+		const reflected =
+			read &&
+			(read.updates.length === 0 ||
+				(saved.epoch === opened.epoch &&
+					covers(saved.version, snapshotOf([opened.seed, ...read.updates]))));
+		if (!read || (idle && reflected)) {
+			if (read) await log.end(opened.epoch);
+			saved = (await log.load()) ?? saved;
+			opened = undefined;
 		}
 	}
+	const probe = Document.fromStored(saved.stored);
+	const ref = probe.quillRef;
+	if (!sameQuill(ref, quill)) {
+		probe.free();
+		throw new QuillMismatch(ref);
+	}
+	if (!opened) opened = await log.open(seedDocument(probe, quill));
+	probe.free();
+	const epoch = opened.epoch;
+	const read = await log.since(epoch);
 	if (!read) throw new Error('the session closed while joining');
 
 	const ydoc = new Y.Doc();
-	if (!read.updates.length) {
-		const fresh = Document.fromStored(saved.stored);
-		const seed = seedDocument(fresh, quill);
-		fresh.free();
-		await log.append(epoch, seed);
-		read = (await log.since(epoch)) ?? read;
-	}
-	if (read.updates.length) Y.applyUpdate(ydoc, Y.mergeUpdates(read.updates), LOG);
+	Y.applyUpdate(ydoc, Y.mergeUpdates([opened.seed, ...read.updates]), LOG);
 	let cursor = read.cursor;
-
 	const doc = Document.fromStored(saved.stored);
-	const report = (e: unknown) => opts.onError?.(e);
-	const binding = bindDocument({ doc, quill, ydoc, onRemote: opts.onRemote, onError: report });
 
 	let ended = false;
+	let lost = false;
+	let ready = false;
+	const report = (e: unknown) => opts.onError?.(e);
 	const end = () => {
 		if (ended) return;
 		ended = true;
 		stop();
-		opts.onEnded?.();
+		opts.onEnded?.(lost);
 	};
 
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -153,7 +204,7 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 			return await log.save({
 				epoch,
 				stored: doc.toStored(),
-				version: Y.encodeStateVector(ydoc)
+				version: Y.encodeSnapshot(Y.snapshot(ydoc))
 			});
 		} catch (e) {
 			report(e);
@@ -161,20 +212,38 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		}
 	}
 
+	// An update this client made reaches the log, or the session ends: every later update builds
+	// on it, so one missing would hold all of them back from every other client.
 	let appending = Promise.resolve();
 	const onUpdate = (update: Uint8Array, origin: unknown) => {
 		schedule();
 		if (origin === LOG) return;
 		appending = appending.then(async () => {
-			if (ended) return;
+			if (ended) return void (lost = true);
 			try {
-				if (!(await log.append(epoch, update))) end();
+				if (await log.append(epoch, update)) return;
 			} catch (e) {
 				report(e);
 			}
+			lost = true;
+			end();
 		});
 	};
 	ydoc.on('update', onUpdate);
+
+	let binding: DocumentBinding | undefined;
+	binding = bindDocument({
+		doc,
+		quill,
+		ydoc,
+		onRemote: (change) => {
+			if (ready) opts.onRemote?.(change);
+		},
+		onError: (e) => {
+			report(e);
+			if (e instanceof Diverged) end();
+		}
+	});
 
 	let pulling: Promise<void> | undefined;
 	let again = false;
@@ -199,23 +268,33 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		return pulling;
 	};
 	const unsubscribe = log.subscribe(() => void pull());
+
+	let beat: ReturnType<typeof setTimeout> | undefined;
+	const heartbeat = () => {
+		if (ended) return;
+		log.touch(epoch).catch(report);
+		beat = setTimeout(heartbeat, Math.max(lease / 3, 10));
+	};
+	heartbeat();
 	await pull();
+	ready = true;
+	const bound = binding;
 
 	function stop() {
 		unsubscribe();
 		clearTimeout(timer);
+		clearTimeout(beat);
 		ydoc.off('update', onUpdate);
-		binding.destroy();
+		binding?.destroy();
+		ydoc.destroy();
 	}
 
 	return {
-		get epoch() {
-			return epoch;
-		},
+		epoch,
 		doc,
 		ydoc,
-		binding,
-		push: (op) => binding.push(op),
+		binding: bound,
+		push: (op) => bound.push(op),
 		save,
 		async leave() {
 			await appending;
