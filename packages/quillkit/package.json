@@ -42,7 +42,7 @@
 		"check:pack": "publint"
 	},
 	"dependencies": {
-		"@quillmark/fonts": "0.0.0",
+		"@quillmark/fonts": "0.1.0",
 		"@quillmark/quiver": "0.39.0",
 		"@quillmark/wasm": "0.133.0",
 		"yaml": "^2.8.3"
