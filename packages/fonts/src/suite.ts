@@ -9,15 +9,17 @@ export const FAMILIES = [
 	'Caladea',
 	'Gelasio',
 	'Libertinus Serif',
-	'Spectral SC',
 	'Cinzel',
 	'DejaVu Sans',
-	'Inter'
+	'Inter',
+	'JetBrains Mono',
+	'TeXGyreSchola'
 ] as const;
 
 /** The name a picker shows for a family, where the manifest gives one other than its own. */
 export const LABELS: Readonly<Record<string, string>> = {
-	TeXGyreTermes: 'Termes'
+	TeXGyreTermes: 'Termes',
+	TeXGyreSchola: 'Schola'
 };
 
 /** Every face's file, in the manifest's order: one literal each, so a bundler emits each as
@@ -47,10 +49,6 @@ export const FILES: readonly URL[] = [
 	new URL('../files/LibertinusSerif-Italic.ecd29061b8cb8e80.ttf', import.meta.url),
 	new URL('../files/LibertinusSerif-Bold.0f044667fa361be1.ttf', import.meta.url),
 	new URL('../files/LibertinusSerif-BoldItalic.3fad1372216d19f2.ttf', import.meta.url),
-	new URL('../files/SpectralSC-Regular.3ed045c7bfd712c5.ttf', import.meta.url),
-	new URL('../files/SpectralSC-Italic.eae9c1c2b9644e15.ttf', import.meta.url),
-	new URL('../files/SpectralSC-Bold.80ed8968332130bf.ttf', import.meta.url),
-	new URL('../files/SpectralSC-BoldItalic.a0ab6e65964776ea.ttf', import.meta.url),
 	new URL('../files/Cinzel-Regular.28b8df13a36735ea.ttf', import.meta.url),
 	new URL('../files/Cinzel-Bold.0adc5e4ce481a8f7.ttf', import.meta.url),
 	new URL('../files/DejaVuSans-Regular.c03d708cf15633b1.ttf', import.meta.url),
@@ -60,5 +58,13 @@ export const FILES: readonly URL[] = [
 	new URL('../files/Inter-Regular.8dca5fc38e6dfa08.ttf', import.meta.url),
 	new URL('../files/Inter-Italic.009a3b40d13a3847.ttf', import.meta.url),
 	new URL('../files/Inter-Bold.c987a8bb69f6dff3.ttf', import.meta.url),
-	new URL('../files/Inter-BoldItalic.1370c12fb1e5d2d9.ttf', import.meta.url)
+	new URL('../files/Inter-BoldItalic.1370c12fb1e5d2d9.ttf', import.meta.url),
+	new URL('../files/JetBrainsMono-Regular.f00eb9956aa1277b.ttf', import.meta.url),
+	new URL('../files/JetBrainsMono-Italic.a5b69e521c4ac638.ttf', import.meta.url),
+	new URL('../files/JetBrainsMono-Bold.2b98f5448f2834f1.ttf', import.meta.url),
+	new URL('../files/JetBrainsMono-BoldItalic.e9ec966b6032ea35.ttf', import.meta.url),
+	new URL('../files/TeXGyreSchola-Regular.80bfca0e95301463.otf', import.meta.url),
+	new URL('../files/TeXGyreSchola-Italic.fb935cc655c9246d.otf', import.meta.url),
+	new URL('../files/TeXGyreSchola-Bold.ae45d133ef4fe8b7.otf', import.meta.url),
+	new URL('../files/TeXGyreSchola-BoldItalic.99d08773ca40a656.otf', import.meta.url)
 ];

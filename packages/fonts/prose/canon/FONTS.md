@@ -8,7 +8,7 @@
 
 ## The suite
 
-Ten families, each under a licence that allows redistribution in an app, embedding in a PDF and subsetting under the family's own name: OFL 1.1 for eight, the GUST Font License for TeXGyreTermes and the Bitstream Vera licence for DejaVu Sans. Each is in regular, italic, bold and bold italic, except Cinzel, which is drawn in capitals with no italic and ships regular and bold. The first five match the metrics of the Office fonts people paste from, so line breaks survive a move out of Word.
+Eleven families, each under a licence that allows redistribution in an app, embedding in a PDF and subsetting under the family's own name: OFL 1.1 for eight, the GUST Font License for TeXGyreTermes and TeXGyreSchola, and the Bitstream Vera licence for DejaVu Sans. Each is in regular, italic, bold and bold italic, except Cinzel, which is drawn in capitals with no italic and ships regular and bold. The first five and TeXGyreSchola match the metrics of the Office fonts people paste from, so line breaks survive a move out of Word.
 
 | Family | Role |
 | --- | --- |
@@ -18,19 +18,20 @@ Ten families, each under a licence that allows redistribution in an app, embeddi
 | Caladea | Cambria metrics |
 | Gelasio | Georgia metrics |
 | Libertinus Serif | Typst's default text face |
-| Spectral SC | small-capital serif for headings and letterheads |
 | Cinzel | inscriptional capitals for titles and certificates |
 | DejaVu Sans | wide humanist sans, the Linux desktop default |
 | Inter | screen-first UI sans |
+| JetBrains Mono | code monospace, for code blocks and listings |
+| TeXGyreSchola | Century Schoolbook metrics, the face court rules ask of briefs |
 
-**Family names are the engine's.** A family is listed under the name Typst reads from the face, which is the name a document saves and the name an upstream copy of the face is found by in any other client. TeX Gyre Termes is filed by Typst as `TeXGyreTermes`, so that is its name here. Where that name reads badly, the manifest gives the family an optional `label`, the name a picker shows; TeXGyreTermes shows as "Termes". A label is display only: the mark saves the family, and a label can change in any version.
+**Family names are the engine's.** A family is listed under the name Typst reads from the face, which is the name a document saves and the name an upstream copy of the face is found by in any other client. TeX Gyre Termes is filed by Typst as `TeXGyreTermes`, so that is its name here, and TeX Gyre Schola as `TeXGyreSchola`. Where that name reads badly, the manifest gives the family an optional `label`, the name a picker shows; TeXGyreTermes shows as "Termes" and TeXGyreSchola as "Schola". A label is display only: the mark saves the family, and a label can change in any version.
 
-**Subset to Latin.** Each file holds the Latin range Google Fonts serves as `latin`, every layout feature and every name record kept, which brings the suite to about 2.5 MB where the full files are near 13 MB. A character outside the subset falls back to the surrounding font. DejaVu Sans's regular face also drops its `MATH` table, which would file it as a math face no mark can set text in, and whose math glyphs the subset has already cut.
+**Subset to Latin.** Each file holds the Latin range Google Fonts serves as `latin`, every layout feature and every name record kept, which brings the suite to about 2.6 MB where the full files are near 14 MB. A character outside the subset falls back to the surrounding font. DejaVu Sans's regular face also drops its `MATH` table, which would file it as a math face no mark can set text in, and whose math glyphs the subset has already cut.
 
 **Every licence lets a subset keep its name.** A subset is a modified version under each licence the suite admits, so each must let a modified version keep the family's name:
 
 - **OFL 1.1** forbids a Modified Version to use a Reserved Font Name, so an OFL family ships only if it reserves no name it ships under. None of the eight reserves its own; Cinzel's licence reserves "Cinzel Decorative", a family the suite does not ship. Carlito (Calibri metrics) reserves "Carlito", and Source Serif 4 and Source Sans 3 reserve "Source", so they are out.
-- **The GUST Font License** is LPPL 1.3c with a request, not a requirement, that a modified font be renamed. TeXGyreTermes keeps its name; its subset files carry names apart from upstream's, and the manifest records what each was cut from.
+- **The GUST Font License** is LPPL 1.3c with a request, not a requirement, that a modified font be renamed. TeXGyreTermes and TeXGyreSchola keep their names; their subset files carry names apart from upstream's, and the manifest records what each was cut from.
 - **The Bitstream Vera licence** requires renaming only a modified font whose name contains "Bitstream" or "Vera", which "DejaVu Sans" does not.
 
 Noto CJK is tens of MB a weight, and New Computer Modern, also under the GUST licence, is left to Libertinus for the academic look.
@@ -49,10 +50,10 @@ Noto CJK is tens of MB a weight, and New Computer Modern, also under the GUST li
 
 A family name in the suite is a promise to every document that uses it, so the package changes only in ways that keep an old document rendering the same.
 
-- **Append-only.** A family is never removed or renamed. Removing one sets every run that names it in the surrounding font, with a `typst::unknown_font_family` warning.
-- **Pinned bytes.** A face's file changes only in a major version, since new metrics or a new subset can reflow a stored document. Adding a family is a minor version.
+- **Append-only within a line.** A family is removed or renamed only in a breaking version, where the leading nonzero component of the version moves: a major, or a minor while the major is 0. Removing one sets every run that names it in the surrounding font, with a `typst::unknown_font_family` warning.
+- **Pinned bytes.** A face's file changes only in a breaking version, since new metrics or a new subset can reflow a stored document. Adding a family is not breaking.
 - **TTF/OTF only.** The engine's library refuses WOFF and WOFF2 (`engine::font_unsupported`), so the package never ships them.
-- **A check enforces it.** `check:fonts` (`scripts/check-fonts.mjs`) holds every file to its manifest hash and its name, reads its format off its magic and holds its extension to it, holds each family to an admitted licence with its text beside its files and `src/suite.ts` to the manifest. Run where a release is cut, with `--published`, it also holds the family list and every published face's bytes against the registry's latest release.
+- **A check enforces it.** `check:fonts` (`scripts/check-fonts.mjs`) holds every file to its manifest hash and its name, reads its format off its magic and holds its extension to it, holds each family to an admitted licence with its text beside its files and `src/suite.ts` to the manifest. Run where a release is cut, with `--published`, it also holds the family list and every published face's bytes against the registry's latest release, unless the version being cut breaks from it.
 
 ## Size and loading
 

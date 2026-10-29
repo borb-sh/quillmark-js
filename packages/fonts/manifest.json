@@ -291,54 +291,6 @@
 			]
 		},
 		{
-			"name": "Spectral SC",
-			"license": "OFL-1.1",
-			"licenseFile": "SpectralSC-OFL.txt",
-			"source": "https://github.com/productiontype/Spectral/tree/dbc06862d7030eedb1b01b60cdad8f6102f4ddfa",
-			"faces": [
-				{
-					"weight": 400,
-					"style": "normal",
-					"file": "SpectralSC-Regular.3ed045c7bfd712c5.ttf",
-					"sha256": "3ed045c7bfd712c5ced927b718497104922b1305fe7583a0af04e5aa2fe4a1e0",
-					"upstream": {
-						"file": "fonts/ttf/SC/SpectralSC-Regular.ttf",
-						"sha256": "11b89ee8eff243c4068a9fc105650f8d90005b288f90c98c6d40fecd85a0306d"
-					}
-				},
-				{
-					"weight": 400,
-					"style": "italic",
-					"file": "SpectralSC-Italic.eae9c1c2b9644e15.ttf",
-					"sha256": "eae9c1c2b9644e156e53dd601d82c2716380819a8ad7df9482290444e3c1878e",
-					"upstream": {
-						"file": "fonts/ttf/SC/SpectralSC-Italic.ttf",
-						"sha256": "774281eb396b34b89b30ffc7779d32267299f275b050be6723c7cc252177e33d"
-					}
-				},
-				{
-					"weight": 700,
-					"style": "normal",
-					"file": "SpectralSC-Bold.80ed8968332130bf.ttf",
-					"sha256": "80ed8968332130bf8834c042674469dab8d9d13bf87635ab6a1bda1eab953697",
-					"upstream": {
-						"file": "fonts/ttf/SC/SpectralSC-Bold.ttf",
-						"sha256": "ddbd53f4b1fd856f5a9b6f5110c095a4a4f4382bdab6decfd79cffd15656dddc"
-					}
-				},
-				{
-					"weight": 700,
-					"style": "italic",
-					"file": "SpectralSC-BoldItalic.a0ab6e65964776ea.ttf",
-					"sha256": "a0ab6e65964776ea55e19dd5d00d69808f5a3f968f753cbe601ee7acf524f685",
-					"upstream": {
-						"file": "fonts/ttf/SC/SpectralSC-BoldItalic.ttf",
-						"sha256": "66d58379ac57b8cf25c4c7e45290934c39098533d3490259826e1e8f2f294caa"
-					}
-				}
-			]
-		},
-		{
 			"name": "Cinzel",
 			"license": "OFL-1.1",
 			"licenseFile": "Cinzel-OFL.txt",
@@ -458,6 +410,103 @@
 					"upstream": {
 						"file": "extras/ttf/Inter-BoldItalic.ttf",
 						"sha256": "948405a16cdc62701da5f4005ed068ca5f4d27061d98f7974ccfc37831d9581d"
+					}
+				}
+			]
+		},
+		{
+			"name": "JetBrains Mono",
+			"license": "OFL-1.1",
+			"licenseFile": "JetBrainsMono-OFL.txt",
+			"source": "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "JetBrainsMono-Regular.f00eb9956aa1277b.ttf",
+					"sha256": "f00eb9956aa1277ba83443ab9442eb65d51fb057eb679756a4df2f83ebacdf67",
+					"upstream": {
+						"file": "fonts/ttf/JetBrainsMono-Regular.ttf",
+						"sha256": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "JetBrainsMono-Italic.a5b69e521c4ac638.ttf",
+					"sha256": "a5b69e521c4ac638eafbebe94b5a3ec590f4d74f25107f0afbc61fdccf0da5f6",
+					"upstream": {
+						"file": "fonts/ttf/JetBrainsMono-Italic.ttf",
+						"sha256": "9d0a1f7a708e6af183f1193b7e81d40da294f5c67682c085d8401c60aac8ded4"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "JetBrainsMono-Bold.2b98f5448f2834f1.ttf",
+					"sha256": "2b98f5448f2834f166e3e9f29cf833846db48da5f4c1dadb542d4a76123e7bc0",
+					"upstream": {
+						"file": "fonts/ttf/JetBrainsMono-Bold.ttf",
+						"sha256": "5590990c82e097397517f275f430af4546e1c45cff408bde4255dad142479dcb"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "JetBrainsMono-BoldItalic.e9ec966b6032ea35.ttf",
+					"sha256": "e9ec966b6032ea3577b9f7db47beb802e5a6ae5a0d9fa1976531f1a1ca31b333",
+					"upstream": {
+						"file": "fonts/ttf/JetBrainsMono-BoldItalic.ttf",
+						"sha256": "4039d5ce0ed225bf9c8b2c8c6436290ae2f356b7e90d70fa666227238324aa3b"
+					}
+				}
+			]
+		},
+		{
+			"name": "TeXGyreSchola",
+			"label": "Schola",
+			"license": "LicenseRef-GUST-Font-License",
+			"licenseFile": "TeXGyreSchola-GUST.txt",
+			"source": "https://www.gust.org.pl/projects/e-foundry/tex-gyre/schola/qcs2.005otf.zip",
+			"faces": [
+				{
+					"weight": 400,
+					"style": "normal",
+					"file": "TeXGyreSchola-Regular.80bfca0e95301463.otf",
+					"sha256": "80bfca0e95301463aa19e1734e71f5abc838330b8f3ed7129df9326f496ad5b9",
+					"upstream": {
+						"file": "texgyreschola-regular.otf",
+						"sha256": "935b82e25f56b1d1276ca82793205e8ce254fbb37ebd38bedf7388cef21fbf44"
+					}
+				},
+				{
+					"weight": 400,
+					"style": "italic",
+					"file": "TeXGyreSchola-Italic.fb935cc655c9246d.otf",
+					"sha256": "fb935cc655c9246dc56fea49c2de9a6e621b3f3d1f380f5d5ff3fa6aa9b6cee3",
+					"upstream": {
+						"file": "texgyreschola-italic.otf",
+						"sha256": "2f45b8c394037951aaec73d947f0b0c3af715950f8f207c9f4290ba37a53a4d2"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "normal",
+					"file": "TeXGyreSchola-Bold.ae45d133ef4fe8b7.otf",
+					"sha256": "ae45d133ef4fe8b736f3109326c047872aca86fd234b0000c2ba46845ed6fc0f",
+					"upstream": {
+						"file": "texgyreschola-bold.otf",
+						"sha256": "988c7b2a0ff0eae77d1df3338751b3c47a5e759117734a375b8e7f9de80e698b"
+					}
+				},
+				{
+					"weight": 700,
+					"style": "italic",
+					"file": "TeXGyreSchola-BoldItalic.99d08773ca40a656.otf",
+					"sha256": "99d08773ca40a6561da03e1464c25a8dee038491eb03fbe94a0844a217012b70",
+					"upstream": {
+						"file": "texgyreschola-bolditalic.otf",
+						"sha256": "95f085da44c04817771f2a3a754b6eeb442b9a79e79f51dc3b0612e3cc0d75cc"
 					}
 				}
 			]

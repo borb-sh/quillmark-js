@@ -20,11 +20,14 @@
 //      `new URL` literal a face so a bundler emits each as an asset; `--write` rewrites it.
 //
 //   5. Append-only (`--published`). Every family the registry's latest release names is
-//      still here, under the same name.
+//      still here, under the same name, unless this version breaks from it.
 //
 //   6. Pinned bytes (`--published`). Every face that release shipped is here at the same
-//      weight and style with the same `sha256`, unless this version's major is above its
-//      major: new metrics or a new subset can reflow a stored document.
+//      weight and style with the same `sha256`, unless this version breaks from it: new
+//      metrics or a new subset can reflow a stored document.
+//
+// A version breaks from another where their leading nonzero components differ, as a caret
+// range reads them: 0.2.0 breaks from 0.1.3, 1.4.0 does not from 1.2.0.
 //
 // The registry pair runs where a release is prepared and cut (`release-prepare.yml`,
 // `release.yml`), not in `gate`: it needs the network, and the version it compares against
@@ -194,24 +197,31 @@ if (process.argv.includes('--published')) {
 	if (!last) compared = `, nothing of ${NAME} published to compare`;
 	else {
 		compared = `, against ${NAME}@${last.version}`;
-		const major = (v) => Number(v.split('.')[0]);
-		const repinned = major(version) > major(last.version);
+		const line = (v) => {
+			const parts = v.split('-')[0].split('.');
+			const lead = parts.findIndex((p) => Number(p) > 0);
+			return parts.slice(0, lead < 0 ? parts.length : lead + 1).join('.');
+		};
+		const breaking = line(version) !== line(last.version);
 		const here = new Map(manifest.families.map((f) => [f.name, f]));
 		for (const family of last.manifest.families) {
 			const now = here.get(family.name);
 			if (!now) {
-				fail(`"${family.name}" shipped in ${last.version} and is gone — a family is never removed`);
+				if (!breaking)
+					fail(
+						`"${family.name}" shipped in ${last.version} and is gone — a family is removed only in a breaking version`
+					);
 				continue;
 			}
 			for (const face of family.faces) {
 				const match = now.faces.find((f) => f.weight === face.weight && f.style === face.style);
-				if (!match)
+				if (!match && !breaking)
 					fail(
 						`"${family.name}" ${face.weight} ${face.style} shipped in ${last.version} and is gone`
 					);
-				else if (match.sha256 !== face.sha256 && !repinned)
+				else if (match && match.sha256 !== face.sha256 && !breaking)
 					fail(
-						`"${family.name}" ${face.weight} ${face.style}: its bytes changed since ${last.version} — a face's file changes only in a major`
+						`"${family.name}" ${face.weight} ${face.style}: its bytes changed since ${last.version} — a face's file changes only in a breaking version`
 					);
 			}
 		}
