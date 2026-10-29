@@ -1,9 +1,19 @@
 // Sessions over the Web Storage log, with tabs of one origin sharing a storage whose writes fire
 // `storage` in every other tab.
 import { describe, expect, it } from 'vitest';
-import type { Content } from '@quillmark/wasm';
+import type { Content, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
-import { joinSession, localLog, QuillMismatch, type Session } from '../src/index.js';
+import {
+	joinSession,
+	localLog,
+	QuillMismatch,
+	readLog,
+	writeFrom,
+	writeLog,
+	type Revision,
+	type Session,
+	type SessionLog
+} from '../src/index.js';
 import { quill, snapshot, type FixtureName } from './helpers.js';
 
 class Origin {
@@ -241,5 +251,203 @@ describe('sessions', () => {
 		expect(entries.length).toBeLessThanOrEqual(5);
 		const b = await open(origin).join();
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+});
+
+describe('writes from a revision', () => {
+	const abstract = (s: Session) => quill().toAuthoring(s.doc).fields?.abstract;
+	const rewrite = (doc: Document, words: string) =>
+		void quill().writer(doc).reviseField('abstract', words);
+	const logOf = (origin: Origin) => localLog({ room: 'r', ...origin.tab() });
+	const write = (log: SessionLog, base: Revision, words: string, extra: { key?: string } = {}) =>
+		writeLog({
+			log,
+			quill: quill(),
+			base,
+			writer: 'ai:1',
+			edit: (doc) => rewrite(doc, words),
+			...extra
+		});
+
+	it('applies an edit made from an older state under its writer', async () => {
+		const origin = new Origin();
+		const writers: (string | undefined)[] = [];
+		const base = logOf(origin);
+		const log: SessionLog = {
+			...base,
+			append: (epoch, update, opts) => {
+				writers.push(opts?.writer);
+				return base.append(epoch, update, opts);
+			}
+		};
+		const q = quill();
+		const a = await joinSession({
+			log,
+			quill: q,
+			writer: 'ada',
+			initial: () => q.exampleDocument()!,
+			saveDelay: 60_000
+		});
+		const b = await open(origin).join();
+		const at = a.snapshot();
+		type(a, 'Typed. ');
+		const { update, conflicts } = writeFrom({
+			history: a.ydoc,
+			base: at,
+			quill: q,
+			doc: a.doc,
+			edit: (doc) => rewrite(doc, 'Rewritten.')
+		});
+		expect(conflicts).toEqual([]);
+		a.apply(update, 'ai:1');
+		await settle();
+		expect(abstract(a)).toBe('Rewritten.');
+		expect(text(a).startsWith('Typed. ')).toBe(true);
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+		expect(writers).toEqual(['ada', 'ai:1']);
+	});
+
+	it('reads a room without changing it, and writes through its log', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		const log = logOf(origin);
+		const before = JSON.stringify([...origin.data]);
+		const read = await readLog({ log, quill: quill() });
+		expect(JSON.stringify([...origin.data])).toBe(before);
+		expect(read.revision.epoch).toBe(a.epoch);
+		expect(snapshot(read.doc)).toBe(snapshot(a.doc));
+		read.doc.free();
+		type(a, 'Typed. ');
+		await settle();
+		const written = await write(log, read.revision, 'Rewritten.');
+		expect(written).toMatchObject({ status: 'written', revision: { epoch: a.epoch, count: 2 } });
+		await settle();
+		expect(abstract(a)).toBe('Rewritten.');
+		expect(text(a).startsWith('Typed. ')).toBe(true);
+		expect((await log.load())?.stored).toBe(a.doc.toStored());
+	});
+
+	it('reads what changed since a revision, as hunks', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		const log = logOf(origin);
+		const first = await readLog({ log, quill: quill() });
+		first.doc.free();
+		type(a, 'Typed. ');
+		await settle();
+		const next = await readLog({ log, quill: quill(), since: first.revision });
+		next.doc.free();
+		expect(next.changes).toEqual([
+			expect.objectContaining({
+				type: 'field',
+				from: 'main',
+				hunk: {
+					line: 0,
+					before: expect.stringMatching(/^The body/),
+					after: expect.stringMatching(/^Typed\. The body/)
+				}
+			})
+		]);
+		expect(next.revision.count).toBe(first.revision.count + 1);
+	});
+
+	it('opens a session to write to a room that has none open, from the save it read', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		await a.leave();
+		const log = logOf(origin);
+		await log.end(a.epoch);
+		const read = await readLog({ log, quill: quill() });
+		read.doc.free();
+		expect(read.revision).toEqual({ epoch: '', count: 0 });
+		expect(await log.current()).toBeUndefined();
+		const written = await write(log, read.revision, 'Rewritten.');
+		expect(written.status).toBe('written');
+		const b = await open(origin).join();
+		expect(abstract(b)).toBe('Rewritten.');
+	});
+
+	it('lets one of two writes from one revision to one field through, and refuses the other', async () => {
+		const origin = new Origin();
+		await open(origin).join();
+		const log = logOf(origin);
+		const read = await readLog({ log, quill: quill() });
+		read.doc.free();
+		const out = await Promise.all([
+			write(log, read.revision, 'Alpha version.'),
+			write(logOf(origin), read.revision, 'Beta version.')
+		]);
+		expect(out.map((w) => w.status).sort()).toEqual(['conflict', 'written']);
+		const b = await open(origin).join();
+		expect(['Alpha version.', 'Beta version.']).toContain(abstract(b));
+	});
+
+	it('refuses a write that rewrites a field changed since its revision', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		const log = logOf(origin);
+		const read = await readLog({ log, quill: quill() });
+		read.doc.free();
+		rewrite(a.doc, 'By a person.');
+		a.push();
+		await settle();
+		expect(await write(log, read.revision, 'By the writer.')).toEqual({
+			status: 'conflict',
+			conflicts: [
+				expect.objectContaining({ type: 'field', field: 'abstract', after: 'By a person.' })
+			]
+		});
+		await settle();
+		expect(abstract(a)).toBe('By a person.');
+	});
+
+	it('writes a card insert once under a key, however often it is retried', async () => {
+		const origin = new Origin();
+		await open(origin).join();
+		const log = logOf(origin);
+		const read = await readLog({ log, quill: quill() });
+		read.doc.free();
+		const insert = () =>
+			writeLog({
+				log,
+				quill: quill(),
+				base: read.revision,
+				writer: 'ai:1',
+				key: 'call-1',
+				edit: (doc) => {
+					quill().writer(doc).addCard('note', { label: 'Once' }, '', 0);
+					return { op: 'insert', at: 0 };
+				}
+			});
+		expect((await insert()).status).toBe('written');
+		expect(await insert()).toEqual({ status: 'duplicate' });
+		const b = await open(origin).join();
+		expect(b.doc.cards.filter((c) => c.kind === 'note')).toHaveLength(2);
+	});
+
+	it('refuses a write from a session that has ended, or a revision that is not one', async () => {
+		const origin = new Origin();
+		const log = logOf(origin);
+		const a = await open(origin).join();
+		const read = await readLog({ log, quill: quill() });
+		read.doc.free();
+		expect(await write(log, { epoch: a.epoch, count: -1 }, 'Bad.')).toEqual({ status: 'stale' });
+		expect(await write(log, { epoch: a.epoch, count: 99 }, 'Ahead.')).toEqual({ status: 'stale' });
+		await a.leave();
+		await log.end(a.epoch);
+		expect(await write(log, read.revision, 'Late.')).toEqual({ status: 'stale' });
+	});
+
+	it('refuses a revision compaction has merged past', async () => {
+		const origin = new Origin();
+		const a = await open(origin, { compactAt: 3 }).join();
+		const log = localLog({ room: 'r', ...origin.tab(), compactAt: 3 });
+		type(a, 'one ');
+		await settle();
+		const read = await readLog({ log, quill: quill() });
+		read.doc.free();
+		for (let i = 0; i < 5; i++) type(a, `${i} `);
+		await settle();
+		expect(await write(log, read.revision, 'Late.')).toEqual({ status: 'stale' });
 	});
 });

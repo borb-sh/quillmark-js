@@ -34,6 +34,19 @@ export interface Opened {
 	seed: Uint8Array;
 }
 
+/** How an append went: kept, refused because the epoch is no longer open, refused because the
+ *  log moved past `after`, or a repeat of an entry already kept under its `key`. */
+export type Appended = 'appended' | 'closed' | 'moved' | 'duplicate';
+
+export interface AppendOpts {
+	/** Who the entry is by. */
+	writer?: string;
+	/** Append only when the epoch holds exactly this many entries, in the same transaction. */
+	after?: number;
+	/** Append only once under this key, for a writer that may retry. */
+	key?: string;
+}
+
 /** Where a room keeps its saved Document and its session's log. */
 export interface SessionLog {
 	/** The open session; `undefined` when none is. */
@@ -42,18 +55,27 @@ export interface SessionLog {
 	open(seed: Uint8Array): Promise<Opened>;
 	/** Close `epoch` and drop its entries, when it is still the open one. */
 	end(epoch: string): Promise<void>;
-	/** Add an entry to `epoch`'s log; false when `epoch` is no longer open. */
-	append(epoch: string, update: Uint8Array): Promise<boolean>;
+	/** Add an entry to `epoch`'s log. Entries are numbered from 1 in the order they are kept,
+	 *  with no gaps. */
+	append(epoch: string, update: Uint8Array, opts?: AppendOpts): Promise<Appended>;
 	/** Mark a client present in `epoch`, so the session is not idle while it is open. */
 	touch(epoch: string): Promise<void>;
 	/**
-	 * The entries of `epoch` after `cursor`, a value an earlier call returned, and when a client
-	 * last appended or touched. `undefined` when `epoch` is no longer open.
+	 * The entries of `epoch` after `cursor`, a value an earlier call returned, how many entries
+	 * the epoch holds, and when a client last appended or touched. `undefined` when `epoch` is no
+	 * longer open.
 	 */
 	since(
 		epoch: string,
 		cursor?: unknown
-	): Promise<{ updates: Uint8Array[]; cursor: unknown; touched: number } | undefined>;
+	): Promise<
+		{ updates: Uint8Array[]; cursor: unknown; count: number; touched: number } | undefined
+	>;
+	/**
+	 * The updates that make up `epoch`'s first `count` entries. `undefined` when `epoch` is no
+	 * longer open, or when compaction merged an entry past `count` with one before it.
+	 */
+	upTo(epoch: string, count: number): Promise<Uint8Array[] | undefined>;
 	/** Call `onChange` when the log may hold new entries. A hint: `since` is what reads them. */
 	subscribe(onChange: () => void): () => void;
 	load(): Promise<Saved | undefined>;
@@ -71,6 +93,8 @@ export interface JoinSessionOpts {
 	quill: Quill;
 	/** The Document a room starts from when it holds no saved one. Read once, and freed. */
 	initial(): Document;
+	/** Who this client's edits are by, passed to every `append` they make. */
+	writer?: string;
 	/** How long a session stays open with nobody appending or present, in ms. */
 	lease?: number;
 	/** How long after the last change a client saves, in ms. */
@@ -93,6 +117,14 @@ export interface Session {
 	readonly binding: DocumentBinding;
 	/** `binding.push`: write a local edit to the session. */
 	push(op?: CardOp): Addr[];
+	/** `Y.encodeSnapshot` of the state the session holds now, a base for `writeFrom`. */
+	snapshot(): Uint8Array;
+	/**
+	 * Apply an update made for this session from an older state, `writeFrom`'s, as an edit by
+	 * `writer`: it is appended under that name, and the Document hears it through `onRemote`.
+	 * Run the `writeFrom` and the `apply` in one task, so the conflicts it reported are current.
+	 */
+	apply(update: Uint8Array, writer: string): void;
 	/** Save now rather than after the delay. */
 	save(): Promise<boolean>;
 	/** Save, and stop taking entries. */
@@ -175,7 +207,8 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	const read = await log.since(epoch);
 	if (!read) throw new Error('the session closed while joining');
 
-	const ydoc = new Y.Doc();
+	// History is kept, so a writer can work from an older revision (`writeFrom`).
+	const ydoc = new Y.Doc({ gc: false });
 	Y.applyUpdate(ydoc, Y.mergeUpdates([opened.seed, ...read.updates]), LOG);
 	let cursor = read.cursor;
 	const doc = Document.fromStored(saved.stored);
@@ -214,14 +247,17 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 
 	// An update this client made reaches the log, or the session ends: every later update builds
 	// on it, so one missing would hold all of them back from every other client.
+	const writers = new WeakMap<object, string>();
 	let appending = Promise.resolve();
 	const onUpdate = (update: Uint8Array, origin: unknown) => {
 		schedule();
 		if (origin === LOG) return;
+		const writer =
+			(origin !== null && typeof origin === 'object' && writers.get(origin)) || opts.writer;
 		appending = appending.then(async () => {
 			if (ended) return void (lost = true);
 			try {
-				if (await log.append(epoch, update)) return;
+				if ((await log.append(epoch, update, { writer })) === 'appended') return;
 			} catch (e) {
 				report(e);
 			}
@@ -295,6 +331,12 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		ydoc,
 		binding: bound,
 		push: (op) => bound.push(op),
+		snapshot: () => Y.encodeSnapshot(Y.snapshot(ydoc)),
+		apply(update, writer) {
+			const by = { writer };
+			writers.set(by, writer);
+			Y.applyUpdate(ydoc, update, by);
+		},
 		save,
 		async leave() {
 			await appending;
