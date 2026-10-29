@@ -18,7 +18,6 @@ import {
 	type DocumentBinding,
 	type RemoteChange
 } from './document.js';
-import type { Revision } from './fork.js';
 
 /** A saved Document, with the session and the Y state it reflects. */
 export interface Saved {
@@ -35,6 +34,19 @@ export interface Opened {
 	seed: Uint8Array;
 }
 
+/** How an append went: kept, refused because the epoch is no longer open, refused because the
+ *  log moved past `after`, or a repeat of an entry already kept under its `key`. */
+export type Appended = 'appended' | 'closed' | 'moved' | 'duplicate';
+
+export interface AppendOpts {
+	/** Who the entry is by. */
+	writer?: string;
+	/** Append only when the epoch holds exactly this many entries, in the same transaction. */
+	after?: number;
+	/** Append only once under this key, for a writer that may retry. */
+	key?: string;
+}
+
 /** Where a room keeps its saved Document and its session's log. */
 export interface SessionLog {
 	/** The open session; `undefined` when none is. */
@@ -43,19 +55,27 @@ export interface SessionLog {
 	open(seed: Uint8Array): Promise<Opened>;
 	/** Close `epoch` and drop its entries, when it is still the open one. */
 	end(epoch: string): Promise<void>;
-	/** Add an entry to `epoch`'s log, made by `writer` where the host named one; false when
-	 *  `epoch` is no longer open. */
-	append(epoch: string, update: Uint8Array, writer?: string): Promise<boolean>;
+	/** Add an entry to `epoch`'s log. Entries are numbered from 1 in the order they are kept,
+	 *  with no gaps. */
+	append(epoch: string, update: Uint8Array, opts?: AppendOpts): Promise<Appended>;
 	/** Mark a client present in `epoch`, so the session is not idle while it is open. */
 	touch(epoch: string): Promise<void>;
 	/**
-	 * The entries of `epoch` after `cursor`, a value an earlier call returned, and when a client
-	 * last appended or touched. `undefined` when `epoch` is no longer open.
+	 * The entries of `epoch` after `cursor`, a value an earlier call returned, how many entries
+	 * the epoch holds, and when a client last appended or touched. `undefined` when `epoch` is no
+	 * longer open.
 	 */
 	since(
 		epoch: string,
 		cursor?: unknown
-	): Promise<{ updates: Uint8Array[]; cursor: unknown; touched: number } | undefined>;
+	): Promise<
+		{ updates: Uint8Array[]; cursor: unknown; count: number; touched: number } | undefined
+	>;
+	/**
+	 * The updates that make up `epoch`'s first `count` entries. `undefined` when `epoch` is no
+	 * longer open, or when compaction merged an entry past `count` with one before it.
+	 */
+	upTo(epoch: string, count: number): Promise<Uint8Array[] | undefined>;
 	/** Call `onChange` when the log may hold new entries. A hint: `since` is what reads them. */
 	subscribe(onChange: () => void): () => void;
 	load(): Promise<Saved | undefined>;
@@ -97,14 +117,14 @@ export interface Session {
 	readonly binding: DocumentBinding;
 	/** `binding.push`: write a local edit to the session. */
 	push(op?: CardOp): Addr[];
-	/** The point the session stands at now, for a writer to read from and later write from. */
-	revision(): Revision;
+	/** `Y.encodeSnapshot` of the state the session holds now, a base for `writeFrom`. */
+	snapshot(): Uint8Array;
 	/**
-	 * Apply an update made elsewhere for this session, such as `writeFrom`'s, as an edit by
+	 * Apply an update made for this session from an older state, `writeFrom`'s, as an edit by
 	 * `writer`: it is appended under that name, and the Document hears it through `onRemote`.
-	 * The undo manager returned takes back this update alone, as an edit by this client.
+	 * Run the `writeFrom` and the `apply` in one task, so the conflicts it reported are current.
 	 */
-	apply(update: Uint8Array, writer: string): Y.UndoManager;
+	apply(update: Uint8Array, writer: string): void;
 	/** Save now rather than after the delay. */
 	save(): Promise<boolean>;
 	/** Save, and stop taking entries. */
@@ -237,7 +257,7 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		appending = appending.then(async () => {
 			if (ended) return void (lost = true);
 			try {
-				if (await log.append(epoch, update, writer)) return;
+				if ((await log.append(epoch, update, { writer })) === 'appended') return;
 			} catch (e) {
 				report(e);
 			}
@@ -311,14 +331,11 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		ydoc,
 		binding: bound,
 		push: (op) => bound.push(op),
-		revision: () => ({ epoch, snapshot: Y.encodeSnapshot(Y.snapshot(ydoc)) }),
+		snapshot: () => Y.encodeSnapshot(Y.snapshot(ydoc)),
 		apply(update, writer) {
 			const by = { writer };
 			writers.set(by, writer);
-			const undo = new Y.UndoManager(ydoc, { trackedOrigins: new Set([by]) });
 			Y.applyUpdate(ydoc, update, by);
-			undo.trackedOrigins.delete(by);
-			return undo;
 		},
 		save,
 		async leave() {

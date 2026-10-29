@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
-import { bindDocument, changesSince, seedDocument, writeFrom } from '../src/index.js';
+import { bindDocument, changesSince, seedDocument, Unwritable, writeFrom } from '../src/index.js';
 import type { CardOp, DocumentBinding } from '../src/index.js';
 import { quill, snapshot } from './helpers.js';
 
@@ -117,6 +117,36 @@ describe('writeFrom', () => {
 		const written = write(a, base, (doc) => void q.writer(doc).card(0).set('heading', 'New'));
 		expect(written.conflicts).toEqual([{ type: 'remove', from: 0 }]);
 	});
+
+	it('refuses a card-list change made without its operation, writing nothing', () => {
+		const [a] = session();
+		const base = revision(a);
+		expect(() =>
+			write(a, base, (doc) => void q.writer(doc).addCard('note', { label: 'Lost' }, '', 0))
+		).toThrow(Unwritable);
+		expect(a.doc.cardCount).toBe(5);
+	});
+
+	it('writes past a value elsewhere in the session the Document refused', () => {
+		const [a] = session();
+		const errors: unknown[] = [];
+		a.binding.destroy();
+		a.binding = bindDocument({
+			doc: a.doc,
+			quill: q,
+			ydoc: a.ydoc,
+			onError: (e) => errors.push(e)
+		});
+		a.ydoc.transact(() => a.ydoc.getMap('main').set('not a name', 1), 'net');
+		expect(errors).toHaveLength(1);
+		const written = write(
+			a,
+			revision(a),
+			(doc) => void q.writer(doc).reviseField('abstract', 'Still.')
+		);
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		expect(authoring(a).fields?.abstract).toBe('Still.');
+	});
 });
 
 describe('changesSince', () => {
@@ -136,7 +166,15 @@ describe('changesSince', () => {
 			{ type: 'remove', from: 2 },
 			{ type: 'move', from: 3, at: 0 },
 			{ type: 'insert', at: 4, card: { kind: 'note', fields: { label: 'Last' }, body: '' } },
-			{ type: 'field', from: 0, at: 1, field: 'heading', before: 'Findings', after: 'Results' }
+			{
+				type: 'field',
+				from: 0,
+				at: 1,
+				field: 'heading',
+				before: 'Findings',
+				after: 'Results',
+				hunk: { line: 0, before: 'Findings', after: 'Results' }
+			}
 		]);
 	});
 
