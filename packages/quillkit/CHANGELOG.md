@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.21.0 - 2026-10-29
+
 **Studio, the app and `check` render over `@quillmark/fonts`.** Each builds its engine over the suite's ten families, from TeXGyreTermes to Inter, so a run a document sets in one of them prints in it on the page, in the gate and in any other client that loads the suite, where it fell back to the surrounding font with `typst::unknown_font_family`. The format popover in both clients offers the ten families, TeXGyreTermes under its label, Termes. quillkit depends on `@quillmark/fonts` at exactly its workspace version, and the bundle's `carried.json` names it beside the svelte surfaces, the quiver and the wasm.
 
 **The carried `@quillmark/wasm` is 0.133.0.** A `<qm-span family="…">` pair inside a line sets its text's font family, and a table writes as a pipe table or as HTML, which spells merged cells and the layout `qm-table` and `qm-cell` spelled before: markdown wrapping a table in either keeps the table and loses its widths, placement, header setting and cell alignment. Rewrite such a table as HTML. Any other `qm-<name>` element but `qm-anchor` imports as what it wraps, warning `qm-<name>`, and a definition list as one paragraph, so `check` fails a quill whose example holds one; a plate calling `qm.elements.update(..)` no longer compiles. A table cell breaks inside an email address or a dotted name, where one wider than its column ran into the next cell. Every PDF carries a title, the quill's `description` where neither the render nor the plate names one.
