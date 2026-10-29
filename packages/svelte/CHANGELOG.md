@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Enter on an empty middle item leaves the list** as a paragraph at full width, the list splitting there and the items below counting from 1; an empty nested middle item lifts one level. It took the marker off and kept the line as a continuation of the item above, and a second Enter put the marker back on, so Enter never left a list from its middle.
+
 **`.qm-frame` draws no sides or corners under the split's threshold**, where one track is the whole width: it keeps its top and bottom rules. On a phone the frame drew a vertical line down each side of the screen.
 
 **Text sets a font family from the host's library.** `VisualEditor` takes `fonts`, the faces `engine.fontFaces(quill)` lists over an engine built with the host's `fonts`, and the format popover offers each family in a picker, its default setting none. `fontLabels` names what the picker shows for a family, which otherwise shows as itself. The editor registers those faces with the page while mounted, so a run draws in the face the preview sets it in. A field holding a `font_family` mark, a table cell's included, edits and keeps it, and the picker offers a family the document sets though the library lacks it, so it can be cleared; with no library and no family under the selection the picker draws nothing. A pasted span styling `font-family` sets no family.
