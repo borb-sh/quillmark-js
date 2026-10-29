@@ -35,7 +35,7 @@ Two, because the site has two readers.
 
 Both surfaces run on the front page too, each over its own document. No apply loop runs there, so one document across two steps would let typing in the editor desynchronize the page painted above it. `/playground` is where the two are wired together.
 
-Two guardrails hold across both: the playground consumes only the public subpath API (a needed internal is an API gap to fix), and it stays a harness, not a product: no auth, persistence, or multi-doc management.
+Two guardrails hold across both: the playground consumes only the public subpath API (a needed internal is an API gap to fix), and it stays a harness, not a product: no auth, no multi-doc management, and no persistence but a `?collab=` room's.
 
 ## Which quill, and what is seeded into it
 
@@ -62,6 +62,8 @@ The host font library is not a flag: every open builds the engine over `@quillma
 `?collab=<room>` opens the document as a live session (`@quillmark/collab`), with `localStorage` as the database: every tab of the origin on the same room edits one document, and a reload rejoins it. The room's saved Document is the record; the first tab into an empty room saves the document the open stands on and seeds the session from it, and each tab saves what it holds a second after it last changed and when the page hides. A session left idle and saved for five minutes ends, and the next tab in opens a new one from the save. The strip's `room` readout names the room and its epoch. The quill and the seed flags apply only to a room's first open: after that the room's save is the document.
 
 Each local edit is pushed with the card op its `EditorChange` carries, and the leaves whose new islands took minted ids are re-read. A remote change lands as the editor's host verbs take it: `applyCardOps` for the card list, `refresh` for kinds, titles and form fields, `applyExternal` with the change's delta for each prose leaf. Either way the preview recompiles as for any edit. A tab whose session ended reopens.
+
+A room is reached by loading `/playground?collab=<room>` directly, so the route answers a direct load on every host: Pages from the `playground.html` shell `deploy-playground.yml` writes, a Vercel preview through the rewrite in `vercel.json`.
 
 ## Quiver, not bundler
 
