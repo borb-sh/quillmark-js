@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.28.0 - 2026-10-29
+
 **A list is tight inside and stands off its neighbours as one block.** Items, an item's unnumbered lines, a task item's body and a sub-list sit flush, told apart by marker and indent; the paragraph gap falls only before and after the list. Each of them stood off the next by the paragraph gap.
 
 **Enter on an empty middle item leaves the list** as a paragraph at full width, the list splitting there and the items below counting from 1; an empty nested middle item lifts one level. It took the marker off and kept the line as a continuation of the item above, and a second Enter put the marker back on, so Enter never left a list from its middle.
