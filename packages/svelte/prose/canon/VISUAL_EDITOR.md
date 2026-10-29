@@ -242,9 +242,14 @@ insertCard(kind: string, at?: number): CardId | undefined;  // the new card's ke
 removeCard(cardId: CardId): void;
 moveCard(cardId: CardId, dir: -1 | 1): void;   // one slot; a no-op at either edge
 setKind(cardId: CardId, kind: string): void;
+applyExternal(field: DocPath, delta?: Delta): void;  // re-read a prose leaf the host changed
+refresh(): void;                                // re-read kinds, titles and form fields
+applyCardOps(ops: readonly CardOp[]): void;     // card-list changes the document already holds
 ```
 
 **The verbs are the card header's own, and the door is the point.** A host toolbar, command palette or shortcut wants what the chrome has, and every call reports through `onChange` exactly as the click does, so a host that recompiles off the hook needs no second path for its own gestures. They speak the public vocabulary — a `CardId` for a card, a `DocPath` for a place — so a host drives them with what the hooks handed it, and a `bind:this` held across a document swap keeps working: the door delegates to the live mount, so a call landing between a swap and the incoming mount is a no-op.
+
+**The last three are the other direction: the host changed the document and says what moved.** A live session writes another client's edits into the `Document` itself, so nothing goes through a verb and nothing reports through `onChange`. `applyExternal` re-reads one prose leaf, landing the difference as one step outside its undo history with the caret carried through `delta` (CODEC §Reconciliation). `refresh` re-derives the card tree: kinds, titles and every form control. `applyCardOps` moves the card keys through inserts, removes and moves in the order the document applied them, so a card that stays keeps its key, its leaves and their carets; an inserted card takes a fresh key. A structure op's `EditorChange` carries the same `op` for an add, a move and a removal, which is what a host writing the edit to a session reads.
 
 A target the surface does not hold — a `cardId` from a previous session or an already-removed card, or a path naming no declared field — is a no-op reporting `target-unknown` at `dev`. `setCaret` reports it too, being the verb a preview click drives: a landing that resolved nothing is otherwise indistinguishable from one that landed, and a consumer wiring the bridge reads the difference off nothing else. It is not how the preview answers for a field it places nothing for ([PREVIEW.md](PREVIEW.md) §"Follow-the-caret scroll"): that is a compile answering honestly, not a contract violated.
 

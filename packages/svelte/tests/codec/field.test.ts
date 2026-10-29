@@ -69,8 +69,12 @@ describe('createField over a real showcase leaf', () => {
 });
 
 describe('field-level reconciliation', () => {
+	let doc: Document;
+	beforeEach(() => {
+		doc = example();
+	});
+
 	it('applyExternal re-hydrates on a foreign edit; own edit does not', () => {
-		const doc = example();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -100,6 +104,24 @@ describe('field-level reconciliation', () => {
 		field.applyExternal();
 		expect(view.state.doc.textContent.startsWith('EXT ')).toBe(true);
 		expect((field.getContent() as { text: string }).text.startsWith('EXT ')).toBe(true);
+		field.destroy();
+	});
+
+	it('lands a remote edit as one step outside history, the caret mapped through its delta', () => {
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const view = viewOf(field);
+		field.setCaret(4);
+		view.dispatch(view.state.tr.insertText('mine', view.state.selection.head));
+		const delta = { ops: [{ insert: 'theirs ' }] };
+		doc.applyChange({}, { delta });
+		const mounted = view.state;
+		field.applyExternal(delta);
+		expect(view.state).not.toBe(mounted);
+		expect(field.selectionRange()).toEqual({ from: 15, to: 15 });
+		undo(view.state, view.dispatch);
+		const text = field.getContent().text;
+		expect(text.startsWith('theirs ')).toBe(true);
+		expect(text.includes('mine')).toBe(false);
 		field.destroy();
 	});
 });

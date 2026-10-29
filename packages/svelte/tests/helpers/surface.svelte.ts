@@ -2,10 +2,10 @@
 // Each file declares `@vitest-environment jsdom` and registers `afterEach(unmountAll)` itself: a
 // hook registered here would bind to the first importer.
 import { mount, unmount, flushSync, tick, type Component } from 'svelte';
-import type { Document, Quill } from '@quillmark/wasm';
+import type { Delta, Document, Quill } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
 import type { EditorError } from '$lib/core';
-import type { ActiveLeaf, CardId, EditorChange } from '$lib/visual';
+import type { ActiveLeaf, CardId, CardOp, EditorChange } from '$lib/visual';
 import type { ActiveProse } from '$lib/visual/leaves';
 import type { VisualEditorProps } from '$lib/visual/props';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
@@ -35,6 +35,9 @@ export interface EditorRef {
 	removeCard(cardId: CardId): void;
 	moveCard(cardId: CardId, dir: -1 | 1): void;
 	setKind(cardId: CardId, kind: string): void;
+	applyExternal(field: string, delta?: Delta): void;
+	refresh(): void;
+	applyCardOps(ops: readonly CardOp[]): void;
 }
 
 /** `VisualEditorInner` also holds the active prose leaf. */

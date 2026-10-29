@@ -30,13 +30,18 @@ export type ChangeSource =
  * carries no card handle): it is minted at mount and dies with the surface, so it
  * does not survive a reload and a host persisting one is persisting a session key.
  *
- * The editor owns structural mutation for the session. The keys track the inserts,
- * moves and removals the editor performs; a host that mutates the card array behind
- * it (its own `doc.insertCard`) desyncs them, and the answer is to re-seed the
- * surface rather than expect the keys to follow. There is nothing document-side to
- * reconcile against, so this is a contract rather than a mechanism.
+ * The keys track the inserts, moves and removals the editor performs, and the ones a
+ * host reports through `applyCardOps` after making them itself (a live session's
+ * remote edits). A host that mutates the card array behind the editor and reports
+ * nothing desyncs them: there is nothing document-side to reconcile against.
  */
 export type CardId = string;
+
+/** A change to the composable card list, by index, as the document applied it. */
+export type CardOp =
+	| { op: 'insert'; at: number }
+	| { op: 'remove'; at: number }
+	| { op: 'move'; from: number; to: number };
 
 /** An edit that landed on the document, and which lane it came down. */
 export interface EditorChange {
@@ -56,6 +61,9 @@ export interface EditorChange {
 	 * dismissal, which is document-level chrome and names no card.
 	 */
 	cardId?: CardId;
+	/** The card-list change a structure op made: an add, a move or a removal. A retype
+	 *  and a rename leave the list as it was and carry none. */
+	op?: CardOp;
 }
 
 /** The leaf that has focus: where it sits, and which card holds it. */

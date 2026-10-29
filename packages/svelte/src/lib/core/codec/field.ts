@@ -28,8 +28,10 @@ import type {
 	DocumentWriter,
 	Content,
 	Addr,
+	Delta,
 	Quill
 } from '@quillmark/wasm';
+import { core } from '../lifecycle.js';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
 import { decode, fitsLeaf } from './decode.js';
@@ -42,6 +44,7 @@ import { contentEqual, createReconciler, type Reconciler } from './reconcile.js'
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
+import { remoteKey } from './remote.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { linePastePlugin } from './line-paste.js';
@@ -157,9 +160,13 @@ export interface FieldController {
 	readonly el: HTMLElement;
 	/** Place the caret at USV `pos` (preview onPick → usvToPM → here). */
 	setCaret(pos: number): void;
-	/** External content change → re-hydrate this leaf (gated by reconcile), and
-	 *  re-evaluate its hold against the value now stored. */
-	applyExternal(): void;
+	/**
+	 * External content change → re-hydrate this leaf (gated by reconcile), and re-evaluate its
+	 * hold against the value now stored. Where the hold stands, the difference lands as one
+	 * step outside the undo history, so the leaf keeps its own undo and its caret; `delta`, the
+	 * change's text delta over what the leaf held, places the caret where the change moved it.
+	 */
+	applyExternal(delta?: Delta): void;
 	/**
 	 * Move the empty-leaf ghost after mount (a card retyped to another kind takes its new wording;
 	 * a remount would cost the caret). Refreshes the decoration without a transaction, which would
@@ -216,7 +223,10 @@ const anchorKey = new PluginKey<AnchorPos[]>('quill-anchors');
  * set so the next commit lowers it through the mark diff like a toggled mark. `pos` is a PM
  * position.
  */
-type AnchorEdit = { op: 'add'; id: string; pos: number } | { op: 'remove'; id: string };
+type AnchorEdit =
+	| { op: 'add'; id: string; pos: number }
+	| { op: 'remove'; id: string }
+	| { op: 'reset'; anchors: AnchorPos[] };
 
 /** Plugin-held anchor positions (PM coords), mapped through every edit's `StepMap`
  * and mutated by an {@link AnchorEdit} meta (an insert/remove at a selection).
@@ -236,6 +246,7 @@ function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorPos[]> {
 				const edit = tr.getMeta(anchorKey) as AnchorEdit | undefined;
 				if (edit?.op === 'add') next = [...next, { id: edit.id, pos: edit.pos }];
 				else if (edit?.op === 'remove') next = next.filter((a) => a.id !== edit.id);
+				else if (edit?.op === 'reset') next = edit.anchors;
 				return next;
 			}
 		}
@@ -550,6 +561,51 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		}
 	}
 
+	/**
+	 * Land `rt` as one replace over the span where it differs from the leaf, outside history and
+	 * past the filters (`remote.ts`), with the anchors reset to the ones `rt` holds. False where
+	 * the replace does not fit, which a rebuild answers instead.
+	 */
+	function landRemote(rt: Content, delta: Delta | undefined): boolean {
+		const before = view.state;
+		const next = decode(rt, schema);
+		const tr = before.tr.setMeta('addToHistory', false).setMeta(remoteKey, true);
+		const start = before.doc.content.findDiffStart(next.content);
+		try {
+			if (start != null) {
+				let { a: endA, b: endB } = before.doc.content.findDiffEnd(next.content)!;
+				const overlap = start - Math.min(endA, endB);
+				if (overlap > 0) {
+					endA += overlap;
+					endB += overlap;
+				}
+				tr.replace(start, endA, next.slice(start, endB));
+			}
+			if (!tr.doc.eq(next)) return false;
+			const after = buildLineIndex(tr.doc);
+			if (delta && before.selection instanceof TextSelection) {
+				const { mapPos } = core();
+				const at = (pm: number) => usvToPM(after, mapPos(delta, pmToUsv(index, pm), 'after'));
+				tr.setSelection(
+					TextSelection.between(
+						tr.doc.resolve(at(before.selection.anchor)),
+						tr.doc.resolve(at(before.selection.head))
+					)
+				);
+			}
+			if (!plaintext)
+				tr.setMeta(anchorKey, {
+					op: 'reset',
+					anchors: anchorsFromContent(rt).map((a) => ({ id: a.id, pos: usvToPM(after, a.pos) }))
+				} as AnchorEdit);
+			view.updateState(before.apply(tr));
+			index = view.state.doc.eq(tr.doc) ? after : buildLineIndex(view.state.doc);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	/** The anchors the plugin currently holds (PM coords); `[]` before the first apply. */
 	const heldAnchors = (): AnchorPos[] => anchorKey.getState(view.state) ?? [];
 
@@ -572,13 +628,18 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			view.focus();
 			view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 		},
-		applyExternal(): void {
+		applyExternal(delta?: Delta): void {
 			const current = shown();
 			const flipped = holds(current) !== held;
 			const wasDefaulted = defaulted;
 			defaulted = unwritten();
 			if (!flipped && !reconciler.shouldRehydrate(current)) {
 				// Own edit / no change; a default written as itself changes the mark alone.
+				if (defaulted !== wasDefaulted) view.setProps({});
+				return;
+			}
+			if (!flipped && !held && landRemote(current, delta)) {
+				reconciler.commit(current);
 				if (defaulted !== wasDefaulted) view.setProps({});
 				return;
 			}

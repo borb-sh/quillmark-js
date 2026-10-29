@@ -40,4 +40,4 @@ export { patchEditorExt } from './ext.js';
 // the preview and the diagnostics already do, so the bridge is
 // `onCaretMove={preview.focusPosition}` and nothing here translates; the conversions
 // for a consumer holding an `Addr` of its own live in `/core`, beside the grammar.
-export type { ActiveLeaf, CardId, ChangeSource, EditorChange } from './signals.js';
+export type { ActiveLeaf, CardId, CardOp, ChangeSource, EditorChange } from './signals.js';
