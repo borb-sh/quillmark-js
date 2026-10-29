@@ -513,7 +513,7 @@ describe('the empty-leaf ghost', () => {
 		doc.insertCard(card!, doc.cardCount);
 		return doc;
 	}
-	/** The card just added: the last one, whatever the blueprint seeded ahead of it. */
+	/** The card just added: the last one, whatever the document held ahead of it. */
 	const cardBody = (doc: Document) => ({ card: doc.cardCount - 1 });
 
 	function emptyBody(doc: Document, placeholder?: string): FieldController {

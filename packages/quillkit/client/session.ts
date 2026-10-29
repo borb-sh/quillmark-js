@@ -9,7 +9,6 @@ import type {
 	Quill
 } from '@quillmark/wasm';
 import type { Quiver } from '@quillmark/quiver';
-import { openExample } from './examples';
 import { diagnosticsOf, messageOf } from './notes';
 
 /** How the document got here, and what the landing cost. */
@@ -79,10 +78,8 @@ export async function openRef(
 		}
 	}
 	if (!doc && examples) {
-		const example = openExample(quill);
-		doc = example.doc;
-		if (doc) landed = { how: 'example', stranded: example.stranded };
-		else landed.stranded.push(...example.stranded);
+		doc = quill.exampleDocument();
+		if (doc) landed = { how: 'example', stranded: [] };
 	}
 	doc ??= quill.seedDocument();
 

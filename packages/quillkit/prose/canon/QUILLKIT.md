@@ -42,7 +42,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **The gate loads and renders.** `fromDir`, then compile and render every quill's seed, `quill.seedDocument()`: one card per kind, every field absent and every body empty, so what the gate proves is that the plate renders the blank a reader starts from. The core is instantiated before the first render, so a setup fault fails the verb rather than printing as the first quill's.
 
-**What an author wrote is held to every diagnostic.** A quill's `example.md` fails on any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is the author's own to fix. The seed is the schema's, and answers for its render alone. The render's own warnings, the compile's among them, are the plate's, and the quill's load warnings its schema's: both print under the quill's `pass` line, once each, and fail it only under `--strict`.
+**What an author wrote is held to every diagnostic.** A quill's example document, the `example:` its fields and the `body.example` its kinds declare, fails on any diagnostic `quill.validate` raises, a warning included: every value in it is the author's own to fix. A root `example.md` left in a quill is an ordinary file the quill does not read, and its warning prints under the `pass` line. The seed is the schema's, and answers for its render alone. The render's own warnings, the compile's among them, are the plate's, and the quill's load warnings its schema's: both print under the quill's `pass` line, once each, and fail it only under `--strict`.
 
 **A failure prints as the CLI prints it.** Every diagnostic on a failure prints whole beneath the `FAIL` line, through the wasm's `formatDiagnostic`: severity, message, code, `file:line:col`, path and hint, so the gate an author is blocked on says no less than `quillmark render` does.
 
@@ -56,7 +56,7 @@ quillkit's runtime `dependencies` are `@quillmark/wasm` at the workspace's root 
 
 **The starter is a quiver the suite gates.** Carried as files, so `cli.integration.test.ts` lays it, runs `check` over it and builds it into an app: a scaffold that stops rendering fails CI before it fails an author on their first command.
 
-**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example.md` every field of which prints. It ships no font and declares `CC0-1.0`, so its first `build app` raises no licensing warning.
+**One shape, no options.** The quill is the smallest one worth reading rather than a tour of what a quill can hold, since the first thing an author does is rename and delete: a field of each kind an author copies by analogy (a `date`, a `text` that may be left blank, an `enum` whose id the plate maps to words), a body, one card kind, and an `example:` on every field and body, each of which prints. It ships no font and declares `CC0-1.0`, so its first `build app` raises no licensing warning.
 
 **One devDependency.** The written `package.json` ranges `quillkit` at its own version and nothing else (§"One pin"), with `serve`, `test`, `build` and `preview` scripts running `quillkit serve --open`, `quillkit check`, `quillkit build app` and `quillkit preview --open`, so `npm test` is the gate. `.gitignore` names `node_modules/` and `dist/`.
 

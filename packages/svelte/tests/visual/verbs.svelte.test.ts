@@ -26,7 +26,7 @@ describe('the card verbs', () => {
 		const q = quill();
 		const doc = example();
 		const { target, editor, changes } = mountEditor(q, doc);
-		// The blueprint seeds one card per declared kind; the verbs are asserted
+		// The example holds one card per declared kind; the verbs are asserted
 		// against that count rather than a number pinned to the fixture's inventory.
 		const seeded = slots(target).length;
 		expect(seeded).toBeGreaterThan(0);

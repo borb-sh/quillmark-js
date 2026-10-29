@@ -34,7 +34,7 @@ const { Quill, Document } = await init();
 
 const quill = Quill.fromTree(tree); // tree: Map<string, Uint8Array> of the quill dir
 
-// A NEW document: seeded from the quill's blueprint.
+// A NEW document: seeded from the quill's schema.
 const doc = quill.seedDocument();
 
 // An EXISTING document: parsed back from what you stored.

@@ -13,7 +13,7 @@ npm install
 npx quillkit serve --open
 ```
 
-`init` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`, `example.md`), and a `package.json` whose one devDependency is quillkit. The quill passes `quillkit check` and builds into an app as laid, declaring `CC0-1.0` as its `license` until you name your own; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
+`init` lays a new quiver: `Quiver.yaml`, one quill under `quills/letter/0.1.0/` (`Quill.yaml`, `plate.typ`), and a `package.json` whose one devDependency is quillkit. The quill passes `quillkit check` and builds into an app as laid, declaring `CC0-1.0` as its `license` until you name your own; rename it and edit from there. A directory already holding a `Quiver.yaml` or `quills/` is refused rather than merged into, and a `package.json` already there is left alone, with the install line printed instead.
 
 `@latest` names the release outright. An unversioned `npx quillkit` takes the newest release whose `engines` admits the running Node.
 
@@ -58,7 +58,7 @@ A verb refuses a flag it does not take, and `--help` anywhere prints the usage.
 }
 ```
 
-It loads the quiver, then renders every version of every quill, drafts included: its seed, the blank document its schema opens on, and its root `example.md` where it ships one. An example that will not parse, or whose `$quill` is not the quill's bare name, fails the quill, and so does any diagnostic its parse, its conform or `quill.validate` raises, a warning included: every value in it is yours to fix. With an `App.yaml` or an `app.css`, the app they describe resolves too, so an unknown key or a `url()` naming no file fails here before it fails a deploy.
+It loads the quiver, then renders every version of every quill, drafts included: its seed, the blank document its schema opens on, and its example document where it declares one: the seed with every field's `example:` and every kind's `body.example` committed. Any diagnostic `quill.validate` raises on the example fails the quill, a warning included: every value in it is yours to fix. A root `example.md` is an ordinary file the quill does not read, and the gate warns while one remains. With an `App.yaml` or an `app.css`, the app they describe resolves too, so an unknown key or a `url()` naming no file fails here before it fails a deploy.
 
 A failure prints every diagnostic as `quillmark render` does, with its code, `file:line:col` and hint. A pass prints the warnings it carried beneath it, a font the plate names but nothing bundles among them; `--strict` fails on them.
 

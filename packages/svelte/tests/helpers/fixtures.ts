@@ -58,7 +58,7 @@ export function quill(name: FixtureName = 'showcase'): Quill {
  */
 export function example(name: FixtureName = 'showcase'): Document {
 	const doc = quill(name).exampleDocument();
-	if (!doc) throw new Error(`fixture quill ${name} ships no example.md`);
+	if (!doc) throw new Error(`fixture quill ${name} declares no example`);
 	return doc;
 }
 

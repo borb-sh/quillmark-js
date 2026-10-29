@@ -10,28 +10,41 @@ typst:
 
 main:
   description: A letter from one person to another.
+  body:
+    example: |
+      I enclose my translation of Menabrea's paper, with the **notes** you suggested. They have grown longer than the paper itself, and I hope you will forgive me that.
+
+      Note G in particular sets out how the Engine might compute the numbers of Bernoulli. Please look it over before it goes to Taylor.
   fields:
     sender:
       type: text
+      example: Ada Lovelace
       description: Your name, as it appears in the letterhead and the signature.
     recipient:
       type: text
+      example: Mr. Babbage
       description: Who the letter is addressed to.
     date:
       type: date
       default: today
+      example: 1843-07-02
       description: YYYY-MM-DD, or today to date the letter when it is rendered.
     subject:
       type: text
       default: ""
+      example: Notes on the Analytical Engine
       description: One line naming what the letter is about. Leave blank for none.
     closing:
       type: enum
       values: [sincerely, regards, thanks]
       default: sincerely
+      example: regards
       description: The word before your signature.
 
 card_kinds:
   postscript:
     title: P.S.
     description: A short note after the signature.
+    body:
+      example: |
+        The diagrams follow by the evening post.

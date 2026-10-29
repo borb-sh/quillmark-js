@@ -1,6 +1,6 @@
 /**
- * `check`, the gate: every quill's seed renders, and so does its root `example.md` where it
- * ships one, through the wasm every deployed client renders through (QUILLKIT §"One pin").
+ * `check`, the gate: every quill's seed renders, and so does its example document where it
+ * declares one, through the wasm every deployed client renders through (QUILLKIT §"One pin").
  * With an `App.yaml` or an `app.css` beside the quiver, the app they describe resolves too.
  *
  * The only door onto the verdict: other runners spawn the bin rather than rebuild the loop.
@@ -23,6 +23,9 @@ export function message(err: unknown): string {
 	if (!(err instanceof Error)) return String(err);
 	return err.cause == null ? err.message : `${err.message}\n  ${message(err.cause)}`;
 }
+
+const EXAMPLE_MD = 'example.md';
+const EXAMPLE_MD_IGNORED = `[WARN] ${EXAMPLE_MD} is an ordinary file the quill does not read; its example is \`example:\` on fields and \`body.example\` on kinds in Quill.yaml`;
 
 const indent = (text: string): string => text.replace(/^/gm, '  ');
 
@@ -114,12 +117,7 @@ export async function gate(
 				const docs: [string, Document][] = [['seed', seed]];
 				const said: Diagnostic[] = [...quill.warnings, ...seed.warnings];
 				try {
-					let example: Document | undefined;
-					try {
-						example = quill.exampleDocument();
-					} catch (err) {
-						throw new Error('example does not open', { cause: err });
-					}
+					const example = quill.exampleDocument();
 					if (example) {
 						docs.push(['example', example]);
 						assertClean(quill, example, 'example');
@@ -128,10 +126,9 @@ export async function gate(
 				} finally {
 					for (const [, doc] of docs) doc.free();
 				}
-				return {
-					what: docs.map(([what]) => what).join(', '),
-					warnings: said.map((d) => formatDiagnostic(d))
-				};
+				const warnings = said.map((d) => formatDiagnostic(d));
+				if (quill.toTree().has(EXAMPLE_MD)) warnings.push(EXAMPLE_MD_IGNORED);
+				return { what: docs.map(([what]) => what).join(', '), warnings };
 			});
 		}
 	}
