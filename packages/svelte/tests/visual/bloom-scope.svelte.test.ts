@@ -72,3 +72,46 @@ describe('the arrival wash', () => {
 		expect(washHost(target)?.className).toContain('qm-array-rows');
 	});
 });
+
+// A wash on its own marks a change that arrived from elsewhere: the user's caret and
+// scroll are theirs, so the verb plays the wash and moves nothing.
+describe('washField', () => {
+	it('washes the field and leaves the caret where it was', async () => {
+		const q = quill();
+		const { target, editor, errors } = mountEditor(q, example());
+		const body = target.querySelector<HTMLElement>('[data-leaf-key$="$body"] [contenteditable]')!;
+		body.focus();
+
+		editor.washField('main.authors');
+		await tick();
+
+		expect(washHost(target)?.className).toContain('qm-array-rows');
+		expect(document.activeElement).toBe(body);
+		expect(errors).toHaveLength(0);
+	});
+
+	it('washes nothing in a closed group, and leaves it closed', async () => {
+		const q = quill();
+		const { target, editor, errors } = mountEditor(q, example());
+		const header = [...target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>
+			h.textContent?.includes('Metadata')
+		);
+		expect(header?.getAttribute('aria-expanded')).toBe('false');
+
+		editor.washField('main.tracking_id');
+		await tick();
+
+		expect(() => washHost(target)).toThrow('0 washes');
+		expect(header?.getAttribute('aria-expanded')).toBe('false');
+		expect(errors).toHaveLength(0);
+	});
+
+	it('reports a path naming no field', () => {
+		const q = quill();
+		const { editor, errors } = mountEditor(q, example());
+
+		editor.washField('main.nope');
+
+		expect(errors.map((e) => e.code)).toEqual(['target-unknown']);
+	});
+});

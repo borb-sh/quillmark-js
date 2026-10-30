@@ -836,6 +836,18 @@
 		const box = await land(found, undefined);
 		if (span.alive) bloom(box);
 	}
+	/** Play the arrival wash over the field at `field` and touch nothing else: no focus,
+	 *  no reveal, no scroll. A field in a closed panel is skipped, its box clipped to
+	 *  nothing; a nested address washes its field's box, a row being something only a
+	 *  landing opens. */
+	export function washField(field: DocPath): void {
+		if (!span.alive) return;
+		const target = leafTargetFor(field);
+		const control = target && leaves.control(target.key);
+		if (!control) return missed(`no mounted field at ${field}`, field);
+		for (let n: HTMLElement | null = control.el; n; n = n.parentElement) if (n.inert) return;
+		bloom(control.el);
+	}
 	/** Seed a card of `kind` and insert it at `at` (default: the end). Returns the new
 	 *  card's session key, or `undefined` when the quill seeds no card of that kind. */
 	export function insertCard(kind: string, at: number = cardIds.length): CardId | undefined {

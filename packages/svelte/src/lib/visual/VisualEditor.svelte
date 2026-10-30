@@ -75,6 +75,10 @@
 	export async function focusField(field: DocPath): Promise<void> {
 		await inner?.focusField(field);
 	}
+	/** Wash the field at `field` where it is on show, without focusing or revealing it. */
+	export function washField(field: DocPath): void {
+		inner?.washField(field);
+	}
 	/** Seed a card of `kind` at `at` (default: the end); the new card's session key. */
 	export function insertCard(kind: string, at?: number): CardId | undefined {
 		return inner?.insertCard(kind, at);
