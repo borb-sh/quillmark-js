@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.29.0 - 2026-10-30
+
 **The editor takes changes a host made to the document.** `VisualEditor` exposes `applyExternal(field, delta?)`, `refresh()` and `applyCardOps(ops)`: a live session writes another client's edits into the `Document` and says what moved, and the surface re-reads without reporting it through `onChange`. A prose leaf re-hydrates as one step outside its undo history, so undo takes back only the leaf's own edits, and `delta` carries the caret through the change; card ops move the card keys, so a card that stays keeps its leaves. `createField`'s `applyExternal` takes the same `delta`, and lands as one step wherever the hold stands, where it rebuilt the leaf's state and its history with it.
 
 **A structure op's `EditorChange` carries its `op`**, a `CardOp` for an add, a move or a removal, by index.
