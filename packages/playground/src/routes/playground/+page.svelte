@@ -54,6 +54,11 @@
 
     edit ─► live.push(change.op) ─► editor.applyExternal(path)   (a minted island id)
     remote ─► editor.applyCardOps / refresh / applyExternal(path, delta) ─► recompile
+           └► comments.reconcile(droppedAnchors)                (a thread's anchor, re-placed)
+
+  Comments stand beside the editor (`@quillmark/comments` over a memory store, one author):
+  the popover's Comment button starts a thread, the panel holds the threads, and a remote
+  edit that dropped an anchor hands its context back to the flow that re-places it.
 
   Which quill is a control, since the answer changes what both surfaces are: picking
   tears the shell down and stands it back up. `examples` is whether an open stands on the
@@ -80,15 +85,23 @@
 	import type { Landing, Place, EditorError, DocPath } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, CardOp, EditorChange } from '@quillmark/svelte/visual';
 	import type { RemoteChange, Session } from '@quillmark/collab';
+	import { createComments, MemoryCommentStore, type Comments } from '@quillmark/comments';
 	import { Preview } from '@quillmark/svelte/preview';
 	import { LABELS as fontLabels, loadSuite } from '@quillmark/fonts';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
+	type CommentPanelComponent = typeof import('@quillmark/svelte/visual').CommentPanel;
+	type CommentSeat = import('@quillmark/svelte/visual').CommentSeat;
 
 	let status = $state<Status>({ phase: 'loading' });
 	let VisualEditor = $state<VisualEditorComponent | undefined>();
+	let CommentPanel = $state<CommentPanelComponent | undefined>();
+	// The threads over the open document, in memory: a host persists them beside the
+	// document (HOSTING §Comments); here they last as long as the open does.
+	let comments = $state<Comments | undefined>();
+	let commentSeat = $state<CommentSeat | undefined>();
 
 	// Which quill the shell is over, and every one the served quiver holds — the pack's
 	// call rather than this route's.
@@ -116,8 +129,12 @@
 				applyExternal(field: DocPath, delta?: Delta): void;
 				refresh(): void;
 				applyCardOps(ops: readonly CardOp[]): void;
+				commentSeat(): CommentSeat;
 		  }
 		| undefined = $state();
+	$effect(() => {
+		commentSeat = editorRef?.commentSeat();
+	});
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -292,8 +309,18 @@
 		const doc = live.doc;
 		if (change.cards.length) editorRef?.applyCardOps(change.cards);
 		if (change.fields.length) editorRef?.refresh();
-		for (const { addr, delta } of change.content)
-			editorRef?.applyExternal(doc.pathFor(addr), delta);
+		for (const { addr, delta, droppedAnchors } of change.content) {
+			const path = doc.pathFor(addr);
+			// A thread whose anchor the pull dropped is placed again by its context as it
+			// stood before, with the delta so a quote the edit moved is still found.
+			if (comments && droppedAnchors?.length)
+				void comments.reconcile(doc, droppedAnchors, {
+					droppedAnchors,
+					deltas: delta ? { [path]: delta } : undefined
+				});
+			editorRef?.applyExternal(path, delta);
+		}
+		comments?.sync(doc);
 		lastChangeSource = 'remote';
 		scheduleRecompile();
 	}
@@ -387,6 +414,8 @@
 		refused = undefined;
 		editorRef = undefined;
 		previewRef = undefined;
+		comments?.destroy();
+		comments = undefined;
 		resetBridge();
 		await tick();
 		for (const h of toFree) h.free();
@@ -483,6 +512,12 @@
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
 			// suite and the render build; the engine and the session follow behind it.
 			VisualEditor = visual.VisualEditor;
+			CommentPanel = visual.CommentPanel;
+			comments = createComments({
+				store: new MemoryCommentStore(),
+				author: { id: 'you', name: 'You' },
+				onError: (e) => (lastError = `comments: ${e instanceof Error ? e.message : String(e)}`)
+			});
 			quillHandle = quill;
 			docHandle = joined?.doc ?? doc;
 			syncDiagnostics();
@@ -709,7 +744,7 @@
 		</div>
 
 		<div class="qm-split shell" data-qm-show={shown}>
-			<section class="qm-frame" aria-label="Visual editor">
+			<section class="qm-frame editing" aria-label="Visual editor">
 				{#if VisualEditor && docHandle && quillHandle}
 					<VisualEditor
 						class="qm-pane"
@@ -723,7 +758,11 @@
 						diagnostics={externalDiagnostics}
 						{fonts}
 						{fontLabels}
+						{comments}
 					/>
+				{/if}
+				{#if CommentPanel && commentSeat && comments}
+					<CommentPanel class="comments" seat={commentSeat} />
 				{/if}
 			</section>
 			<section class="qm-frame" aria-label="Live preview">
@@ -825,5 +864,27 @@
 	   split's pull on the height under the head and the strip, which is all of it. */
 	.shell {
 		flex: 1 1 0;
+	}
+
+	/* The editor's frame holds two columns: the editor takes the room, the comment panel a
+	   column at a reading width, each scrolling on its own under the frame's clip. Under
+	   the threshold the one track is the editor's alone. */
+	.editing {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+	}
+	.editing > :global(.comments) {
+		overflow: auto;
+		overscroll-behavior: contain;
+		padding: var(--qmh-space-4);
+		border-inline-start: var(--qmh-border-width) solid var(--qmh-border);
+	}
+	@media (width < 50rem), (height < 30rem) {
+		.editing {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.editing > :global(.comments) {
+			display: none;
+		}
 	}
 </style>

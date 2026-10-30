@@ -9,7 +9,9 @@
 //      reaching both is composing them, which is the only way the two meet. `fonts` stands
 //      beside them on the same terms: a client hands its files to the engine, and no
 //      library reaches it. `collab` stands there too: it binds a Document to Yjs and knows no
-//      editor, and the host wires the two. Declared dependencies and source specifiers both, since either
+//      editor, and the host wires the two. `comments` is the one sibling `svelte` reaches, as
+//      an optional peer: the editor speaks the controller's shape and imports none of its
+//      code, so a host without comments installs nothing for them. Declared dependencies and source specifiers both, since either
 //      alone is half a check: an undeclared import resolves fine in a workspace, and a
 //      declared dependency nothing imports is still a promise.
 //
@@ -51,12 +53,19 @@ import { ROOT, filesUnder, packages, report } from './workspace.mjs';
 
 /** The graph. An edge absent from this table is a violation; an edge in it is optional. */
 const ALLOWED = {
-	playground: ['@quillmark/svelte', '@quillmark/quiver', '@quillmark/fonts', '@quillmark/collab'],
+	playground: [
+		'@quillmark/svelte',
+		'@quillmark/quiver',
+		'@quillmark/fonts',
+		'@quillmark/collab',
+		'@quillmark/comments'
+	],
 	quillkit: ['@quillmark/svelte', '@quillmark/quiver', '@quillmark/fonts'],
-	'@quillmark/svelte': [],
+	'@quillmark/svelte': ['@quillmark/comments'],
 	'@quillmark/quiver': [],
 	'@quillmark/fonts': [],
-	'@quillmark/collab': []
+	'@quillmark/collab': [],
+	'@quillmark/comments': []
 };
 
 const WASM = '@quillmark/wasm';

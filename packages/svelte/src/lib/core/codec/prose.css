@@ -767,3 +767,21 @@ li.ProseMirror-selectednode::after {
 .qm-table-drop[data-axis='column'] {
 	width: var(--_qm-ring-width);
 }
+
+/* A comment thread's anchor (VISUAL_EDITOR §Comments): a tint over its run with the hue
+   under it, held stronger for the thread under the caret. A point anchor is a widget with
+   no text, drawn as a pin the width of a stroke and the height of the line. */
+.ProseMirror .qm-comment {
+	background: var(--_qm-comment-tint);
+	border-bottom: var(--_qm-border-width) solid var(--_qm-comment);
+}
+.ProseMirror .qm-comment-active {
+	background: var(--_qm-comment-held);
+}
+.ProseMirror .qm-comment.ProseMirror-widget {
+	display: inline-block;
+	width: calc(var(--_qm-border-width) * 2);
+	height: 1em;
+	vertical-align: text-bottom;
+	background: var(--_qm-comment);
+}

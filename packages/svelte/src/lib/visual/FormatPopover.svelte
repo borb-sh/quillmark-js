@@ -91,8 +91,12 @@
 		families?: string[];
 		/** The name the picker shows for a family, where it is not the family itself. */
 		fontLabels?: Readonly<Record<string, string>>;
+		/** Start a comment thread over the selection. Absent, no comment button draws; present,
+		 *  it draws over a leaf's own text and never over a table cell, which is outside the
+		 *  field's coordinate space (`LeafViews`). */
+		onComment?: () => void;
 	}
-	let { getActiveLeaf, families = [], fontLabels = {} }: Props = $props();
+	let { getActiveLeaf, families = [], fontLabels = {}, onComment }: Props = $props();
 
 	const SETTLE_MS = 450;
 	/** The six content formatting marks. `anchor` is withheld: it draws nothing until
@@ -117,6 +121,8 @@
 	let listable = $state(false);
 	/** Whether the leaf under the selection declares `font_family`: a `text` leaf does not. */
 	let markable = $state(false);
+	/** Whether the selection is in the leaf's own view, where an anchor can be placed. */
+	let commentable = $state(false);
 	/** The family the selection is set in, `''` for none and `null` for several. */
 	let family = $state<string | null>('');
 	/** Whether the picker draws: the leaf declares the mark, and there is a family to
@@ -199,6 +205,7 @@
 		portalTarget = view.dom.closest<HTMLElement>('[data-qm-root]') ?? undefined;
 		listable = !!view.state.schema.nodes.list_item;
 		markable = !!view.state.schema.marks.font_family;
+		commentable = !!onComment && view === getActiveLeaf()?.views.view;
 		family = familyInSelection(view.state);
 		surfaceView = view;
 		const { from, to } = view.state.selection;
@@ -507,6 +514,20 @@
 											onclick={() => toggleLines(l.ordered)}><Icon name={l.icon} /></button
 										>
 									{/each}
+								{/if}
+								{#if commentable}
+									<span class="qm-format-divider" aria-hidden="true"></span>
+									<button
+										type="button"
+										class="qm-icon-btn qm-mark-btn qm-focus-ring"
+										title={t.strings.formatComment}
+										aria-label={t.strings.formatComment}
+										onmousedown={keepFocus}
+										onclick={() => {
+											open = false;
+											onComment?.();
+										}}><Icon name="message-square" /></button
+									>
 								{/if}
 							</div>
 						{/if}

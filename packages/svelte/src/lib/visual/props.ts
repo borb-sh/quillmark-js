@@ -4,6 +4,7 @@
 // export a type without a module script, and a type imported across the two would
 // make the pair circular, so the shape lives beside them instead.
 import type { Document, Quill, Addr, Diagnostic, FontFace } from '@quillmark/wasm';
+import type { Comments } from '@quillmark/comments';
 import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
@@ -113,6 +114,16 @@ export interface VisualEditorProps {
 	 * render lanes need: their parameters exist only inside that English string.
 	 */
 	formatDiagnostic?: FormatDiagnostic;
+	/**
+	 * The comment controller over this document (`@quillmark/comments`, an optional peer).
+	 * Present, the popover offers a comment button over a selection, each thread's anchor
+	 * is drawn, and the editor keeps the index's `anchored` in step with its edits. The
+	 * threads themselves are read and written through the seat (`commentSeat()`), which
+	 * is what a `CommentPanel` mounts over (VISUAL_EDITOR §Comments).
+	 */
+	comments?: Comments;
+	/** The thread under the caret changed: its id, or `undefined` for none. */
+	onActiveThreadChange?: (id: string | undefined) => void;
 	/** Appended to the root's own class: the surface is a mounted element the
 	 * consumer positions, so it needs a handle for layout it owns. */
 	class?: string;

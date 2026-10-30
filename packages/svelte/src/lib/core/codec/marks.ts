@@ -1,6 +1,6 @@
 // Mark algebra: two content classes to two PM mechanisms.
 //   formatting (strong/emph/underline/strike/code/font_family/link)  ↔ PM marks
-//   identity   (anchor{id}, zero-width)                  ↔ decorations (see field.ts)
+//   identity   (anchor{id}, a range or a point)          ↔ decorations (see field.ts)
 // This module owns the type-name translation and the descriptor keying the mark
 // diff groups by; the anchor↔decoration bridge is field.ts, the mark ops are
 // encode.ts. `emph` is the content name; `em` the PM name: the one asymmetry.
@@ -72,19 +72,34 @@ export function markKey(descriptor: ContentMarkKind): string {
 	return descriptor.type;
 }
 
-/** A held anchor position: an identity id at a USV content offset (zero-width). */
+/** A held anchor: an identity id over a USV content range, `from === to` for a point. */
 export interface AnchorPos {
 	id: string;
-	pos: number;
+	from: number;
+	to: number;
 }
 
 /**
- * The identity anchors of a `Content` as `{ id, pos }` in USV: the seed for the
+ * The identity anchors of a `Content` as `{ id, from, to }` in USV: the seed for the
  * field's anchor-position plugin and the `oldAnchors` the mark diff rebases.
- * Anchors are zero-width, so `start` is the position.
  */
 export function anchorsFromContent(rt: { marks: ContentMark[] }): AnchorPos[] {
 	const out: AnchorPos[] = [];
-	for (const m of rt.marks) if (m.type === 'anchor') out.push({ id: m.attrs.id, pos: m.start });
+	for (const m of rt.marks)
+		if (m.type === 'anchor') out.push({ id: m.attrs.id, from: m.start, to: m.end });
 	return out;
+}
+
+/** The anchor marks `anchors` spell, folded over `marks` with its own anchors dropped:
+ *  what a whole-value write carries so the field's held anchors survive it. */
+export function withAnchors(marks: ContentMark[], anchors: readonly AnchorPos[]): ContentMark[] {
+	return [
+		...marks.filter((m) => m.type !== 'anchor'),
+		...anchors.map((a): ContentMark => ({
+			start: a.from,
+			end: a.to,
+			type: 'anchor',
+			attrs: { id: a.id }
+		}))
+	];
 }

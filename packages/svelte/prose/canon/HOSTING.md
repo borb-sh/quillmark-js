@@ -48,6 +48,12 @@ The bridge between the panes runs on addresses, and a field only has one where t
 
 **So a front-matter field a user types into is content and gets the caret for free**, `text` as much as `richtext`. The reference memo's `subject`, `memo_for` and `signature_block` are all caret-addressable, the array elements each at their own address (`main.memo_for[0]`), and `signature_block` reaches the field rung besides because the plate places a `signature-field` widget bound to it. A scalar a plate prints itself surfaces nothing: a preview click there does not land, and `scrollToField` returns `false`, until the plate prints it through `qm.ink` or claims it with `qm.region`. Which rung a field lands in is the quill's to decide, so a bridge that reaches too little is answered in the collection.
 
+## Comments
+
+**A host holding threads never reopens from markdown.** A thread's run is an anchor the document holds, and `Document.fromMarkdown` holds none: the reopen the text edge runs on an import or a source-mode keystroke drops every anchor, and the stored selectors are the only way back. So a host with comments persists the document as a `StoredDocument` beside its threads, or keeps the live document and revises it through the controller's flow, `comments.reviseDocument(doc, writer, markdown)`, which re-places each anchor the write dropped by its quote and context ([COMMENTS.md](../../../comments/prose/canon/COMMENTS.md) §"The reconcile flow"). `comments.recover(doc)` is the migration for a document that was reopened from markdown anyway.
+
+**The threads are the host's store.** The editor takes the controller as a prop and reads and writes threads through it; where they are kept, and whether several clients share them, is the store the host hands the controller. `comments.refresh(doc)` before a save stores the quote each anchor stands over now, so a save and its threads agree. A collab host hands each remote change's `droppedAnchors` to `comments.reconcile` with the change's delta ([COLLAB.md](../../../collab/prose/canon/COLLAB.md) §"The binding"); the playground is the reference wiring.
+
 ## Not owned here
 
 - The surfaces' own contracts, and which prop is once-bound: [VISUAL_EDITOR.md](VISUAL_EDITOR.md), [PREVIEW.md](PREVIEW.md).

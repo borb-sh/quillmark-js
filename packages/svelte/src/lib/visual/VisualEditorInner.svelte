@@ -18,7 +18,7 @@
  once per derive.
 -->
 <script lang="ts">
-	import { onDestroy, tick } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { DropdownMenu } from 'bits-ui';
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
@@ -36,6 +36,7 @@
 	import { spacePx } from '../core/rungs.js';
 	import type {
 		Addr,
+		AnchorContext,
 		CardAddr,
 		Delta,
 		Diagnostic,
@@ -48,7 +49,8 @@
 	import type { VisualEditorProps } from './props.js';
 	import { mergeStrings, setWording } from './strings.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
-	import type { FieldController, LeafViews } from '../core/codec/index.js';
+	import type { AnchorPos, FieldController, LeafViews } from '../core/codec/index.js';
+	import { setAnchorDraw, type CommentSeat, type CommentVerbs } from './comments.svelte.js';
 	import {
 		IdSeq,
 		controlKind,
@@ -105,9 +107,12 @@
 		fontLabels,
 		strings,
 		formatDiagnostic,
+		comments,
+		onActiveThreadChange,
+		commentSeat: seat,
 		class: className,
 		style
-	}: VisualEditorProps = $props();
+	}: VisualEditorProps & { commentSeat: CommentSeat } = $props();
 
 	// The wording, merged once and published to the tree. A getter pair rather than a
 	// snapshot: a consumer swapping locale mid-session re-renders every label,
@@ -159,6 +164,7 @@
 	 */
 	function bump(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		rederive();
+		comments?.sync(doc);
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
@@ -199,6 +205,163 @@
 	// going away as a whole, where a leaf's cleanup order relative to the parent's
 	// is Svelte's business and not something to depend on.
 	span.onEnd(() => leaves.clear());
+
+	// ── Comments (VISUAL_EDITOR §Comments) ──────────────────────────────────────
+	// The editor holds no thread: it places and finds anchors, draws each one the index
+	// names, and mirrors the index into the seat a panel reads. Every leaf reads the draw
+	// through context, so a thread's state changing redraws without a prop reaching it.
+	setAnchorDraw({
+		anchorClass(id) {
+			const active = seat.active === id;
+			if (seat.draft?.id === id) return 'qm-comment qm-comment-active';
+			const thread = comments?.thread(id);
+			if (!thread) return undefined;
+			if (thread.status === 'resolved' && !active) return undefined;
+			return active ? 'qm-comment qm-comment-active' : 'qm-comment';
+		}
+	});
+	$effect(() => {
+		const bound = comments;
+		seat.comments = bound;
+		if (!bound) {
+			seat.threads = [];
+			seat.drifted = [];
+			return;
+		}
+		const mirror = () => {
+			seat.threads = bound.threads;
+			seat.drifted = bound.drifted;
+		};
+		mirror();
+		untrack(() => bound.sync(doc));
+		return bound.subscribe(mirror);
+	});
+	// A redraw per index or active change: the decoration pass reads the draw itself.
+	$effect(() => {
+		void seat.threads;
+		void seat.active;
+		void seat.draft;
+		untrack(() => {
+			for (const leaf of leaves.proses()) leaf.redrawAnchors();
+		});
+	});
+	$effect(() => {
+		const id = seat.active;
+		untrack(() => onActiveThreadChange?.(id));
+	});
+	/** The leaf holding the anchor `id`, with the range it holds it over. */
+	function leafHolding(id: string): { leaf: FieldController; range: AnchorPos } | undefined {
+		for (const leaf of leaves.proses()) {
+			const range = leaf.anchorRanges().find((a) => a.id === id);
+			if (range) return { leaf, range };
+		}
+		return undefined;
+	}
+	/** The active field's own prose leaf, where the caret can be read as a USV range. */
+	function activeProse(): FieldController | undefined {
+		if (!activeAddr) return undefined;
+		const card = activeAddr.card != null ? activeCardId : undefined;
+		return leaves.prose(fieldKeyToString({ card, field: activeAddr.field }));
+	}
+	/** Whether the anchor `id` is one the seat shows: a thread's, or the draft's. */
+	const owned = (id: string): boolean => !!comments?.thread(id) || seat.draft?.id === id;
+	/** The thread under the leaf's selection, for the caret signal. */
+	function threadUnder(leaf: FieldController): string | undefined {
+		if (!comments) return undefined;
+		const { from, to } = leaf.selectionRange();
+		return leaf.anchorRanges().find((a) => a.from <= to && a.to >= from && owned(a.id))?.id;
+	}
+	/** Place an anchor for `id` over the active leaf's selection; the context it was placed
+	 *  at, or `undefined` where no leaf could take it (a held leaf, a `text` field). */
+	function placeAnchor(id: string): AnchorContext | undefined {
+		const leaf = activeProse();
+		if (!leaf) return undefined;
+		const { from, to } = leaf.selectionRange();
+		leaf.insertAnchor(id, from, to);
+		return doc.anchorContext(id);
+	}
+	function dropAnchor(id: string): void {
+		leafHolding(id)?.leaf.removeAnchor(id);
+	}
+	/** The popover's comment button, and a host's own: an anchor over the selection and a draft
+	 *  for the panel to fill in; the thread exists once the draft is submitted. */
+	export function startComment(): boolean {
+		if (!comments || !span.alive) return false;
+		verbs.discardDraft();
+		const id = crypto.randomUUID();
+		const context = placeAnchor(id);
+		if (!context) return false;
+		seat.draft = { id, quote: context.quote };
+		seat.active = id;
+		return true;
+	}
+	const verbs: CommentVerbs = {
+		startComment,
+		async focusThread(id) {
+			const hit = leafHolding(id);
+			if (!hit) {
+				seat.active = id;
+				return;
+			}
+			const field = pathFor(hit.leaf.addr);
+			if (field != null) await revealLeaf(field);
+			if (!span.alive) return;
+			const range = leafHolding(id)?.range ?? hit.range;
+			hit.leaf.selectRange(range.from, range.to);
+			seat.active = id;
+		},
+		async reanchorThread(id) {
+			if (!comments?.thread(id)) return false;
+			const was = leafHolding(id);
+			was?.leaf.removeAnchor(id);
+			const context = placeAnchor(id);
+			if (!context) {
+				if (was) was.leaf.insertAnchor(id, was.range.from, was.range.to);
+				return false;
+			}
+			const { path, quote, prefix, suffix } = context;
+			await comments.setAnchored(id, true, { path, quote, prefix, suffix });
+			seat.active = id;
+			return true;
+		},
+		async removeThread(id) {
+			if (!comments) return;
+			dropAnchor(id);
+			if (seat.active === id) seat.active = undefined;
+			await comments.remove(id);
+		},
+		async submitDraft(body) {
+			const draft = seat.draft;
+			if (!draft || !comments) return;
+			const context = doc.anchorContext(draft.id);
+			if (!context) {
+				seat.draft = undefined;
+				return;
+			}
+			try {
+				await comments.create(context, body);
+			} catch (e) {
+				dropAnchor(draft.id);
+				throw e;
+			} finally {
+				if (seat.draft?.id === draft.id) seat.draft = undefined;
+			}
+		},
+		discardDraft() {
+			const draft = seat.draft;
+			if (!draft) return;
+			dropAnchor(draft.id);
+			seat.draft = undefined;
+			if (seat.active === draft.id) seat.active = undefined;
+		}
+	};
+	$effect.pre(() => {
+		seat.verbs = verbs;
+		return () => {
+			if (seat.verbs === verbs) seat.verbs = undefined;
+		};
+	});
+
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
 	// cannot do, since which group is open is the card's state (Card §revealLeaf).
 	type CardHandle = {
@@ -275,8 +438,15 @@
 	let lastCaretField: DocPath | undefined;
 	let lastCaretPos: number | undefined;
 	function handleCaret(addr: Addr, pos: number): void {
-		const field = pathFor(normalize(addr));
+		const plain = normalize(addr);
+		const field = pathFor(plain);
 		if (field == null) return;
+		// The thread under the caret, read before the memo: an anchor placed at a caret that
+		// did not move is a change of thread with no change of place.
+		if (comments) {
+			const leaf = leaves.prose(fieldKeyToString({ card: cardIdOf(plain), field: plain.field }));
+			if (leaf) seat.active = threadUnder(leaf);
+		}
 		if (field === lastCaretField && pos === lastCaretPos) return;
 		lastCaretField = field;
 		lastCaretPos = pos;
@@ -289,6 +459,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
+		comments?.sync(doc);
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
 
@@ -898,6 +1069,28 @@
 		cardIds = ids;
 		rederive();
 	}
+	/** Select the thread's anchor and reveal the leaf holding it. */
+	export async function focusThread(id: string): Promise<void> {
+		if (span.alive) await verbs.focusThread(id);
+	}
+	/** Place the thread's anchor over the active leaf's selection. */
+	export async function reanchorThread(id: string): Promise<boolean> {
+		return span.alive ? verbs.reanchorThread(id) : false;
+	}
+	/** Drop the thread and its anchor. */
+	export async function removeThread(id: string): Promise<void> {
+		if (span.alive) await verbs.removeThread(id);
+	}
+	/** Every anchor the mounted leaves hold, each with the leaf's path: a host's gutter. */
+	export function anchorRanges(): (AnchorPos & { field: DocPath })[] {
+		const out: (AnchorPos & { field: DocPath })[] = [];
+		for (const leaf of leaves.proses()) {
+			const field = pathFor(leaf.addr);
+			if (field == null) continue;
+			for (const a of leaf.anchorRanges()) out.push({ ...a, field });
+		}
+		return out;
+	}
 
 	function holds(cardId: CardId): boolean {
 		if (cardIndexOf(cardId) >= 0) return true;
@@ -1024,7 +1217,12 @@
 	{/each}
 </div>
 
-<FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
+<FormatPopover
+	{getActiveLeaf}
+	families={fontFamilies}
+	{fontLabels}
+	onComment={comments ? startComment : undefined}
+/>
 
 <!-- The add affordance is gated on the schema declaring `card_kinds`, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to

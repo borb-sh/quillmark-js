@@ -1,0 +1,15 @@
+// The type check, which reaches what the build deliberately does not. `tsconfig.json`
+// excludes the tests because they must not be emitted into `dist`; running `check`
+// against that same config left every test file unchecked, and a boundary rename in
+// `@quillmark/wasm` would land in a test with nothing to catch it.
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		// Nothing is emitted, so the build's `src` root does not apply and the config
+		// files beside it come into the program.
+		"rootDir": "."
+	},
+	"include": ["src", "tests", "vitest.config.ts"],
+	"exclude": []
+}

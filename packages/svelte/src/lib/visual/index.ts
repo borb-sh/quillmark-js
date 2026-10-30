@@ -21,13 +21,20 @@ export type { VisualEditorProps } from './props.js';
 // The prose leaf: the vanilla mount API a non-Svelte consumer (or a custom
 // surface) builds on.
 export { createField } from '../core/codec/index.js';
-export type { CreateFieldOpts, FieldController } from '../core/codec/index.js';
+export type { AnchorPos, CreateFieldOpts, FieldController } from '../core/codec/index.js';
 
 // What the surface says, and how it words a diagnostic. `strings` is keyed and
 // partial (unset keys take the package's English) and `DEFAULT_VISUAL_STRINGS` is
 // that English, exported so a consumer can compose against it rather than restate
 // it. The empty body's per-card hook is the `bodyPlaceholder` key inside it.
 export { DEFAULT_VISUAL_STRINGS } from './strings.js';
+
+// Comments (VISUAL_EDITOR §Comments): the panel a host mounts beside the editor over
+// `editor.commentSeat()`, the seat's shape, and the panel's own wording. The threads
+// come from `@quillmark/comments`, an optional peer the editor takes as a prop.
+export { default as CommentPanel } from './CommentPanel.svelte';
+export { CommentSeat, DEFAULT_COMMENT_STRINGS } from './comments.svelte.js';
+export type { CommentDraft, CommentPanelStrings, CommentVerbs } from './comments.svelte.js';
 export type { VisualStrings, VisualStringsInput, FormatDiagnostic } from './strings.js';
 export type { BodyPlaceholder, BodyPlaceholderContext } from './structure.js';
 

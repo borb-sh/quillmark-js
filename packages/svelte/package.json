@@ -69,8 +69,14 @@
 		"check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
 	},
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.133.0-0",
+		"@quillmark/comments": ">=0.1.0",
+		"@quillmark/wasm": ">=0.134.0-0",
 		"svelte": "^5.33.0"
+	},
+	"peerDependenciesMeta": {
+		"@quillmark/comments": {
+			"optional": true
+		}
 	},
 	"dependencies": {
 		"@internationalized/date": "^3.12.2",
@@ -88,6 +94,7 @@
 		"prosemirror-view": "1.42.6"
 	},
 	"devDependencies": {
+		"@quillmark/comments": "0.1.0",
 		"@sveltejs/package": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@types/node": "^24.19.1",

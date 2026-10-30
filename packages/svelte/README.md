@@ -185,6 +185,28 @@ const engine = new Engine({ fonts: [carlito] });
 
 [`@quillmark/fonts`](../fonts) is the library every Quillmark client builds its engine over, so a family a document names sets the same way in each; a host's own files go after it. `fontFaces` loads the render build, as `open` does, so mount the editor first and let the faces arrive behind it. A family the document already sets edits with no library at all, and the picker offers it so it can be cleared.
 
+### Comments
+
+Hand the editor a controller from `@quillmark/comments`, an optional peer, and mount the panel over its seat:
+
+```svelte
+<script lang="ts">
+	import { createComments, MemoryCommentStore } from '@quillmark/comments';
+	import { CommentPanel, VisualEditor } from '@quillmark/svelte/visual';
+
+	const comments = createComments({
+		store: new MemoryCommentStore(),
+		author: { id: 'u1', name: 'Nibs' }
+	});
+	let editor: VisualEditor;
+</script>
+
+<VisualEditor bind:this={editor} {doc} {quill} {comments} />
+<CommentPanel seat={editor.commentSeat()} />
+```
+
+The format popover offers a Comment button over a selection; the panel holds the threads, the draft and the verbs over each. `startComment()`, `focusThread(id)`, `reanchorThread(id)` and `removeThread(id)` are instance exports for a host's own chrome, and `onActiveThreadChange` reports the thread under the caret. Where the threads are kept, and the rule a host with comments follows at the text edge, is [`HOSTING.md`](prose/canon/HOSTING.md) §Comments.
+
 ### Recompiling
 
 `onChange` is the signal to recompile, and it covers **all three lanes**: a prose keystroke, a scalar write, a card operation. `onCaretMove` is a _selection_ signal, not a change signal: it fires on a bare arrow key, so a recompile hung off it recompiles on every one.

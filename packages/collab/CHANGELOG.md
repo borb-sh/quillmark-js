@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A remote change names the anchors it dropped.** `RemoteChange.content[i].droppedAnchors` carries, for a content field revised in place, the context of each anchor the revise reported dropped, read before the pull: the selector a host holding comment threads hands `reattach`, or the comments package's reconcile flow, with the change's delta. A field that landed whole, and a `text` field, carry none.
+
 **Card operations from a whole-document revise.** `cardOps(from, count)` derives the card operations a `writeFrom` or `writeLog` edit returns from a `reviseDocument` receipt's `from`: the removals, then a move for each card outside the longest run both orders share, picked as `changesSince` picks it, and the inserts. A reorder, removal or insertion then keeps each card's identity, so what was typed into a moved card since stays in it, and the update moves exactly the cards the conflict check reads as moved. An alignment that names a card twice or past the list throws `RangeError`.
 
 ## v0.1.0 - 2026-10-30

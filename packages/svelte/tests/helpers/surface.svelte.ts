@@ -10,6 +10,7 @@ import type { ActiveProse } from '$lib/visual/leaves';
 import type { VisualEditorProps } from '$lib/visual/props';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
+import { CommentSeat } from '$lib/visual/comments.svelte.js';
 
 /**
  * What jsdom lacks and a mount reaches: scroll, animation (the arrival wash notes its host), caret
@@ -39,6 +40,10 @@ export interface EditorRef {
 	applyExternal(field: string, delta?: Delta): void;
 	refresh(): void;
 	applyCardOps(ops: readonly CardOp[]): void;
+	startComment(): boolean;
+	focusThread(id: string): Promise<void>;
+	reanchorThread(id: string): Promise<boolean>;
+	removeThread(id: string): Promise<void>;
 }
 
 /** `VisualEditorInner` also holds the active prose leaf. */
@@ -104,7 +109,10 @@ export const mountEditor = (q: Quill, doc: Document, extra: Partial<VisualEditor
 /** Mounted at `VisualEditorInner`, whose `getActiveLeaf` is the door an edit takes: jsdom
  *  drives no contenteditable, so one is a transaction dispatched into the leaf's view. */
 export const mountInner = (q: Quill, doc: Document, extra: Partial<VisualEditorProps> = {}) =>
-	mountWith<InnerRef>(VisualEditorInner as Component<VisualEditorProps>, q, doc, extra);
+	mountWith<InnerRef>(VisualEditorInner as unknown as Component<VisualEditorProps>, q, doc, {
+		commentSeat: new CommentSeat(),
+		...extra
+	} as Partial<VisualEditorProps>);
 
 /** The focused leaf's own view, for a transaction to be dispatched into. */
 export const activeView = (editor: InnerRef): EditorView => editor.getActiveLeaf()!.views.view;

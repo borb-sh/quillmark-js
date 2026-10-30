@@ -26,7 +26,13 @@ import type {
 import { core } from '../lifecycle.js';
 import { codePoints, usvLength } from './decode.js';
 import { ISLAND_SLOT, islandEntryFromNode, type IslandNodeAttrs } from './islands.js';
-import { anchorsFromContent, contentDescriptorFromPM, descriptorOf, markKey } from './marks.js';
+import {
+	anchorsFromContent,
+	contentDescriptorFromPM,
+	descriptorOf,
+	markKey,
+	type AnchorPos
+} from './marks.js';
 import { canonicalJson, valueEqual } from './reconcile.js';
 
 // ── Position-map runs (consumed by positions.ts) ────────────────────────────
@@ -308,9 +314,9 @@ function mergeMarks(raw: ContentMark[]): ContentMark[] {
 // ── Lowering: diff old→new into a ChangeBundle ──────────────────────────────
 
 interface LowerOpts {
-	/** Anchor decoration positions after the edit, in final (new) USV coords. The
-	 *  pre-edit set is `oldRt`'s own, so only the projection's is passed in. */
-	newAnchors?: { id: string; pos: number }[];
+	/** Anchor ranges after the edit, in final (new) USV coords. The pre-edit set is
+	 *  `oldRt`'s own, so only the projection's is passed in. */
+	newAnchors?: AnchorPos[];
 }
 
 /**
@@ -559,17 +565,17 @@ function diffMarks(oldRt: Content, newRt: Content, moved: ChangeBundle, opts: Lo
 			ops.push({ op: 'add', start: iv.start, end: iv.end, ...descriptor });
 	}
 
-	// Anchors: diff the decoration sets by id (positions already in final coords).
+	// Anchors: diff the held sets by id (ranges already in final coords).
 	if (opts.newAnchors) {
-		const oldA = new Map(anchorsFromContent({ marks: rebased }).map((a) => [a.id, a.pos]));
-		const newA = new Map(opts.newAnchors.map((a) => [a.id, a.pos]));
-		for (const [id, pos] of newA) {
-			if (!oldA.has(id) || oldA.get(id) !== pos) {
-				if (oldA.has(id)) ops.push({ op: 'removeAnchor', id });
-				ops.push({ op: 'add', start: pos, end: pos, type: 'anchor', attrs: { id } });
-			}
+		const oldA = new Map(anchorsFromContent({ marks: rebased }).map((a) => [a.id, a]));
+		for (const a of opts.newAnchors) {
+			const was = oldA.get(a.id);
+			if (was && was.from === a.from && was.to === a.to) continue;
+			if (was) ops.push({ op: 'removeAnchor', id: a.id });
+			ops.push({ op: 'add', start: a.from, end: a.to, type: 'anchor', attrs: { id: a.id } });
 		}
-		for (const id of oldA.keys()) if (!newA.has(id)) ops.push({ op: 'removeAnchor', id });
+		const kept = new Set(opts.newAnchors.map((a) => a.id));
+		for (const id of oldA.keys()) if (!kept.has(id)) ops.push({ op: 'removeAnchor', id });
 	}
 	return ops;
 }
