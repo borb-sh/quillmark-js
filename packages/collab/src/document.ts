@@ -48,6 +48,54 @@ export type CardOp =
 	| { op: 'remove'; at: number }
 	| { op: 'move'; from: number; to: number };
 
+/**
+ * The card operations that take a list of `count` cards to the one `from` describes: for each
+ * card of the new list, the index of the old card it is, or `null` for an inserted one, as
+ * `writer.reviseDocument`'s receipt reports. Removals come first, highest index first. Then the
+ * longest run of kept cards already in order stays put, the same run every time, and every
+ * other card is moved or inserted once, so no card reads as moved that a reorder did not need.
+ */
+export function cardOps(from: readonly (number | null)[], count: number): CardOp[] {
+	const kept = from.filter((i): i is number => i !== null);
+	const named = new Set(kept);
+	const ops: CardOp[] = [];
+	for (let i = count - 1; i >= 0; i--) if (!named.has(i)) ops.push({ op: 'remove', at: i });
+
+	const stays = increasing(kept);
+	const key = (j: number) => from[j] ?? -1 - j;
+	const list = [...kept].sort((x, y) => x - y);
+	from.forEach((i, j) => {
+		if (i !== null && stays.has(i)) return;
+		const at = i === null ? -1 : list.indexOf(i);
+		if (at >= 0) list.splice(at, 1);
+		const to = j === 0 ? 0 : list.indexOf(key(j - 1)) + 1;
+		list.splice(to, 0, key(j));
+		if (i === null) ops.push({ op: 'insert', at: to });
+		else ops.push({ op: 'move', from: at, to });
+	});
+	return ops;
+}
+
+/** The values of a longest increasing run of `seq`, whose values are distinct. */
+function increasing(seq: readonly number[]): Set<number> {
+	const tails: number[] = [];
+	const prev: number[] = [];
+	seq.forEach((v, p) => {
+		let lo = 0;
+		let hi = tails.length;
+		while (lo < hi) {
+			const mid = (lo + hi) >> 1;
+			if (seq[tails[mid]] < v) lo = mid + 1;
+			else hi = mid;
+		}
+		prev[p] = lo ? tails[lo - 1] : -1;
+		tails[lo] = p;
+	});
+	const run = new Set<number>();
+	for (let p = tails.at(-1) ?? -1; p >= 0; p = prev[p]) run.add(seq[p]);
+	return run;
+}
+
 /** A card by its place in the Document: the main card, or a composable card's index. */
 export type CardRef = 'main' | number;
 

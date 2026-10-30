@@ -59,7 +59,7 @@ const { update, conflicts } = writeFrom({
 if (!conflicts.length) session.apply(update, 'ai:run-1');
 ```
 
-`conflicts` lists what changed since `base` at a place the edit changed too, such as lines someone rewrote meanwhile. Run `writeFrom` and `session.apply` in one task. An edit that inserts, removes or moves cards returns those `CardOp`s. A server with no editor open goes through the log: `readLog({ log, quill, since })` returns the Document, its `Revision` (`{ epoch, count, check }`, short enough to hand a model, and to be handed back as it was read) and what changed since an earlier one, and `writeLog({ log, quill, base, writer, key, edit })` appends the edit and saves, or answers `conflict`, `stale` or `duplicate`.
+`conflicts` lists what changed since `base` at a place the edit changed too, such as lines someone rewrote meanwhile. Run `writeFrom` and `session.apply` in one task. An edit that inserts, removes or moves cards returns those `CardOp`s; a `reviseDocument` edit returns `cardOps(receipt.from, count)`, `count` the cards before it. A server with no editor open goes through the log: `readLog({ log, quill, since })` returns the Document, its `Revision` (`{ epoch, count, check }`, short enough to hand a model, and to be handed back as it was read) and what changed since an earlier one, and `writeLog({ log, quill, base, writer, key, edit })` appends the edit and saves, or answers `conflict`, `stale` or `duplicate`.
 
 ## Without a session
 

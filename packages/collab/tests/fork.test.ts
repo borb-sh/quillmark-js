@@ -3,7 +3,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
-import { bindDocument, changesSince, seedDocument, Unwritable, writeFrom } from '../src/index.js';
+import {
+	bindDocument,
+	cardOps,
+	changesSince,
+	seedDocument,
+	Unwritable,
+	writeFrom
+} from '../src/index.js';
 import type { CardOp, DocumentBinding } from '../src/index.js';
 import { quill, snapshot } from './helpers.js';
 
@@ -178,6 +185,36 @@ describe('writeFrom', () => {
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 
+	it('keeps a card a whole-document edit reordered as the card typed into since', () => {
+		const [a, b] = session();
+		const base = revision(a);
+		b.doc.applyChange({ card: 3 }, { delta: { ops: [{ insert: 'Typed. ' }] } });
+		b.binding.push();
+		const written = write(a, base, (doc) => {
+			const count = doc.cardCount;
+			const from: (number | null)[] = [...Array(count).keys()];
+			doc.removeCard(1);
+			from.splice(1, 1);
+			q.writer(doc).addCard('note', { label: 'Replaced' }, '', 1);
+			from.splice(1, 0, null);
+			doc.moveCard(3, 0);
+			from.splice(0, 0, ...from.splice(3, 1));
+			return cardOps(from, count);
+		});
+		expect(written.conflicts).toEqual([]);
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		expect(a.doc.cards.map((c) => c.kind)).toEqual([
+			'figure',
+			'section',
+			'note',
+			'signoff',
+			'credits'
+		]);
+		expect(authoring(a).cards?.[0].body).toMatch(/^Typed\. /);
+		expect(authoring(a).cards?.[2].fields).toEqual({ label: 'Replaced' });
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
 	it('reports a card removed since that the edit wrote', () => {
 		const [a] = session();
 		const base = revision(a);
@@ -215,6 +252,49 @@ describe('writeFrom', () => {
 		);
 		Y.applyUpdate(a.ydoc, written.update, 'ai');
 		expect(authoring(a).fields?.abstract).toBe('Still.');
+	});
+});
+
+describe('cardOps', () => {
+	/** Every list of `length` entries, each a distinct index below `count` or `null`. */
+	function* alignments(count: number, length: number): Generator<(number | null)[]> {
+		if (length === 0) return yield [];
+		for (const rest of alignments(count, length - 1))
+			for (const i of [null, ...Array(count).keys()])
+				if (i === null || !rest.includes(i)) yield [...rest, i];
+	}
+
+	/** How many entries of `seq` a longest increasing run of it keeps. */
+	function longestRun(seq: number[]): number {
+		const ending = seq.map(() => 1);
+		seq.forEach((v, p) => {
+			for (let k = 0; k < p; k++) if (seq[k] < v) ending[p] = Math.max(ending[p], ending[k] + 1);
+		});
+		return Math.max(0, ...ending);
+	}
+
+	it('takes every old card list to the new one, moving each card outside a longest run once', () => {
+		for (let count = 0; count <= 4; count++)
+			for (let length = 0; length <= 4; length++)
+				for (const from of alignments(count, length)) {
+					const ops = cardOps(from, count);
+					const list: (number | null)[] = [...Array(count).keys()];
+					for (const op of ops) {
+						if (op.op === 'insert') list.splice(op.at, 0, null);
+						else if (op.op === 'remove') list.splice(op.at, 1);
+						else list.splice(op.to, 0, ...list.splice(op.from, 1));
+					}
+					expect(list, JSON.stringify(from)).toEqual(from);
+					const kept = from.filter((i) => i !== null);
+					const moves = ops.filter((op) => op.op === 'move').length;
+					expect(moves, JSON.stringify(from)).toBe(kept.length - longestRun(kept));
+					const removes = ops.filter((op) => op.op === 'remove');
+					expect(ops.slice(0, removes.length)).toEqual(removes);
+				}
+	});
+
+	it('reads a card dragged to the front as one move', () => {
+		expect(cardOps([3, 0, 1, 2], 4)).toEqual([{ op: 'move', from: 3, to: 0 }]);
 	});
 });
 
