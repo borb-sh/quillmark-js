@@ -433,9 +433,9 @@
 	 the step between the two tones is the whole of its edge (ARCHITECTURE §"A plane is a
 	 tone"). The block half is the same rung as the gap: the payload stands that far off
 	 the card's edge and off the body below it. The header insets itself to the
-	 section-heading column (`.qm-card-header`). The inline half is the gutter, the
-	 width of the ground outside the edge, so the band between the edge and a section's
-	 stroke is the same band as the ground between two cards.
+	 section-heading column (`.qm-card-header`). The inline half stands a step tighter
+	 than the nesting rung the verticals inside keep: this edge closes the block rather
+	 than nesting one, and the rules it holds run that much further for it.
 
 	 Inside that inset is the card's one text column (`--_qm-column`), at both ends: the
 	 title, a field, a heading, the body's lines and the recovery note start on it, and a
@@ -443,7 +443,7 @@
 	 as one measure centred in its own edge. A section's nesting indents the start alone. */
 	.qm-card {
 		border-radius: var(--_qm-radius);
-		padding: var(--_qm-space-3) var(--_qm-gutter);
+		padding: var(--_qm-space-3) var(--_qm-card-inset);
 		background: var(--_qm-surface);
 		display: flex;
 		flex-direction: column;
@@ -455,13 +455,13 @@
 	 opens on its body keeps the full inset — prose is neither a heading nor a
 	 field row. */
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child) {
-		padding-top: calc(var(--_qm-gutter) - var(--_qm-space));
+		padding-top: calc(var(--_qm-card-inset) - var(--_qm-space));
 	}
 	/* A section heading leading it: the vertical starts at the content's
 	 top-left, so the top inset is the inline one and the tip is a square
 	 corner of the card. */
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child > .qm-groups:first-child) {
-		padding-top: var(--_qm-gutter);
+		padding-top: var(--_qm-card-inset);
 	}
 	.qm-card-header {
 		display: flex;
