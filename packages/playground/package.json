@@ -20,12 +20,13 @@
 	},
 	"dependencies": {
 		"@quillmark/collab": "*",
+		"@quillmark/comments": "*",
 		"@quillmark/fonts": "*",
 		"@quillmark/quiver": "*",
 		"@quillmark/svelte": "*"
 	},
 	"devDependencies": {
-		"@quillmark/wasm": ">=0.133.0-0",
+		"@quillmark/wasm": ">=0.134.0-0",
 		"@sveltejs/adapter-static": "^4.0.0",
 		"@sveltejs/kit": "^3.1.0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",

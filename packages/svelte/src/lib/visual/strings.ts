@@ -134,6 +134,9 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	formatAnchor: string;
 	/** Its hover title, which says what an anchor is; the name above only says what. */
 	formatAnchorTitle: string;
+	/** The comment button's accessible name; drawn only where the editor holds comments
+	 *  and the selection is in a leaf's own text rather than a table cell. */
+	formatComment: string;
 	linkPlaceholder: string;
 	linkApply: string;
 	/** Drawn only where the selection carries a link. */
@@ -255,6 +258,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	fontMixed: 'Mixed fonts',
 	formatAnchor: 'Anchor',
 	formatAnchorTitle: 'Anchor — an identity handle over the selection',
+	formatComment: 'Comment',
 	linkPlaceholder: 'https://…',
 	linkApply: 'Apply',
 	linkRemove: 'Remove',

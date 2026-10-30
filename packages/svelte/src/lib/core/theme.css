@@ -97,6 +97,12 @@
 	   figures are the host scale's (`preset/scale.css`), so a page's status line
 	   and a card's diagnostic carry one colour meaning error. */
 	--_qm-danger: var(--qm-danger, light-dark(#9e1518, #f9786c));
+	/* The second hue, spent on one thing: a comment thread's anchor, which has to read
+	   as a mark on the text and not as a state of the control around it. A pair, for
+	   the reason the danger pair is one: a tint mixed from a hue calibrated against
+	   white stains a dark card. Neither pole carries text; the ink over a tinted run
+	   stays the body's. */
+	--_qm-comment: var(--qm-comment, light-dark(#b45309, #fbbf24));
 	--_qm-font: var(--qm-font, ui-sans-serif, system-ui, sans-serif);
 	--_qm-font-mono: var(--qm-font-mono, ui-monospace, monospace);
 
@@ -208,6 +214,11 @@
 	   neutral hover rung would read as one more button. Mixed at the accent tint's
 	   strength, so a held tint is a held tint whichever hue it carries. */
 	--_qm-danger-tint: color-mix(in oklab, var(--_qm-danger) 12%, transparent);
+	/* The comment hue held under a run: a tint for every anchored thread, and a stronger
+	   one for the thread under the caret, so the active thread reads from the text as
+	   well as from the panel. Translucent, so a run's own marks still show through. */
+	--_qm-comment-tint: color-mix(in oklab, var(--_qm-comment) 22%, transparent);
+	--_qm-comment-held: color-mix(in oklab, var(--_qm-comment) 45%, transparent);
 	/* The label ink held: what a trigger fills with whose own ink never steps, so
 	   the fill arriving under it is that tone at a strength a surface reads
 	   through. */

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.134.0**, the release that carries anchor contexts and `reattach`, which the comment threads of `@quillmark/comments` stand on.
+
 ## v0.21.0 - 2026-10-29
 
 **Studio, the app and `check` render over `@quillmark/fonts`.** Each builds its engine over the suite's ten families, from TeXGyreTermes to Inter, so a run a document sets in one of them prints in it on the page, in the gate and in any other client that loads the suite, where it fell back to the surrounding font with `typst::unknown_font_family`. The format popover in both clients offers the ten families, TeXGyreTermes under its label, Termes. quillkit depends on `@quillmark/fonts` at exactly its workspace version, and the bundle's `carried.json` names it beside the svelte surfaces, the quiver and the wasm.

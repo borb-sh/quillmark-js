@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+**Comments on the visual editor.** `VisualEditor` takes a `comments` controller (`@quillmark/comments`, an optional peer) and, with one, offers a Comment button in the format popover over a selection in a leaf's own text: an anchor over the selection and a draft, which becomes a thread on submit. `CommentPanel`, exported from `/visual`, mounts over `editor.commentSeat()` and holds the threads, the draft, replies, status, and the verbs over a thread; `focusThread`, `reanchorThread`, `removeThread`, `startComment` and `anchorRanges` are instance exports too, and `onActiveThreadChange` reports the thread under the caret. Every open thread's anchor is drawn in the new `--qm-comment` hue, the active one stronger. The editor keeps each thread's `anchored` in step with its edits.
+
+**Anchors are ranges.** The codec's anchor seam goes from points to ranges: `insertAnchor(id, from, to = from)`, `AnchorPos` as `{ id, from, to }`, `anchorsInRange` as overlap, and `anchorRanges`, `redrawAnchors`, `selectRange` and `addr` on `FieldController`; `CreateFieldOpts.anchorClass` names how each anchor is drawn. The plugin maps a range as the store rebases a mark and resets from the stored content after every commit, and both overwrite paths fold the held anchors into what they write, so no path drops a field's anchors.
+
+**Requires `@quillmark/wasm` 0.134.0**, the release that carries anchor contexts and `reattach`.
+
 ## v0.29.2 - 2026-10-30
 
 **`VisualEditor` exposes `washField(field)`.** It plays the arrival wash over a mounted field and moves nothing: no focus, no reveal, no scroll. A field in a closed group washes nothing, and a nested address washes its field's box. A host marks a change it wrote into the document with it, leaving the user's caret where it was.

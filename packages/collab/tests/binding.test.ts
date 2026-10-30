@@ -104,6 +104,27 @@ describe('content', () => {
 		expect(core.mapPos(delta!, 5, 'after')).toBe(7);
 		expect(core.mapPos(delta!, 1, 'after')).toBe(1);
 	});
+
+	it('hands the host the context of each anchor a remote edit dropped, as it stood before', () => {
+		const [a, b] = peers(2, listDoc);
+		a.doc.applyChange(
+			{},
+			{ markOps: [{ op: 'add', start: 0, end: 3, type: 'anchor', attrs: { id: 'k1' } }] }
+		);
+		a.doc.applyChange(
+			{},
+			{ markOps: [{ op: 'add', start: 4, end: 7, type: 'anchor', attrs: { id: 'k2' } }] }
+		);
+		b.doc.applyChange({}, { delta: { ops: [{ retain: 4 }, { delete: 3 }, { insert: 'three' }] } });
+		b.binding.push();
+		deliver(a);
+		const [change] = a.changes;
+		const { droppedAnchors } = change.content.find((c) => c.addr.card === undefined)!;
+		expect(droppedAnchors).toEqual([
+			{ id: 'k2', path: 'main.body', quote: 'two', prefix: 'one\n', suffix: '' }
+		]);
+		expect(a.doc.anchorContext('k1')).toMatchObject({ quote: 'one', suffix: '\nthree' });
+	});
 });
 
 describe('cards', () => {

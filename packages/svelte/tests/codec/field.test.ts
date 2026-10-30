@@ -487,6 +487,73 @@ describe('anchor insertion', () => {
 		expect(field.anchorsInRange(0, 3)).toEqual([]);
 		field.destroy();
 	});
+
+	it('a range anchor is stored over its span and reported by anchorRanges', () => {
+		const doc = example();
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		field.insertAnchor('a1', 3, 8);
+		expect(bodyAnchors(doc)).toEqual([{ id: 'a1', start: 3, end: 8 }]);
+		expect(field.anchorRanges()).toEqual([{ id: 'a1', from: 3, to: 8 }]);
+		// Overlap, touching included: the selection's anchor state.
+		expect(field.anchorsInRange(0, 2)).toEqual([]);
+		expect(field.anchorsInRange(0, 3)).toEqual(['a1']);
+		expect(field.anchorsInRange(8, 12)).toEqual(['a1']);
+		field.destroy();
+	});
+
+	it('a range grows under text typed inside it and holds at either edge, as the store rebases it', () => {
+		const doc = example();
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		field.insertAnchor('a1', 3, 8);
+		const view = viewOf(field);
+		const at = (usv: number) => usv + 1; // PM 1 = USV 0 in the first paragraph
+		// Inside: the span grows by what was typed.
+		view.dispatch(view.state.tr.insertText('XY', at(5)));
+		expect(bodyAnchors(doc)).toEqual([{ id: 'a1', start: 3, end: 10 }]);
+		expect(field.anchorRanges()).toEqual([{ id: 'a1', from: 3, to: 10 }]);
+		// At the end: the text lands after the span.
+		view.dispatch(view.state.tr.insertText('Z', at(10)));
+		expect(bodyAnchors(doc)).toEqual([{ id: 'a1', start: 3, end: 10 }]);
+		// At the start: the text lands before the span.
+		view.dispatch(view.state.tr.insertText('Q', at(3)));
+		expect(bodyAnchors(doc)).toEqual([{ id: 'a1', start: 4, end: 11 }]);
+		expect(field.anchorRanges()).toEqual([{ id: 'a1', from: 4, to: 11 }]);
+		field.destroy();
+	});
+
+	it('draws each anchor with the class the caller names, and redraws on request', () => {
+		const doc = example();
+		let cls: string | undefined = 'qm-c';
+		const field = createField({
+			doc,
+			quill: quill(),
+			addr: {},
+			container: mount(),
+			anchorClass: () => cls
+		});
+		field.insertAnchor('a1', 3, 8);
+		field.insertAnchor('p1', 12);
+		const view = viewOf(field);
+		const drawn = () =>
+			[...view.dom.querySelectorAll('[data-anchor]')].map((el) => el.classList.contains('qm-c-on'));
+		expect(drawn()).toEqual([false, false]);
+		expect(view.dom.querySelector('[data-anchor="a1"]')?.textContent).toHaveLength(5);
+		cls = 'qm-c qm-c-on';
+		field.redrawAnchors();
+		expect(drawn()).toEqual([true, true]);
+		cls = undefined;
+		field.redrawAnchors();
+		expect(drawn()).toEqual([]);
+		field.destroy();
+	});
+
+	it('selectRange selects the span, which selectionRange reads back', () => {
+		const doc = example();
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		field.selectRange(3, 8);
+		expect(field.selectionRange()).toEqual({ from: 3, to: 8 });
+		field.destroy();
+	});
 });
 
 describe('createField accessible name (a11y follow-up)', () => {

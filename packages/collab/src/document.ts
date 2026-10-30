@@ -15,6 +15,7 @@
 import * as Y from 'yjs';
 import type {
 	Addr,
+	AnchorContext,
 	Card,
 	CardAddr,
 	CardInput,
@@ -91,10 +92,12 @@ export interface RemoteChange {
 	/** Cards, by their index after `cards`, whose kind, title or whole-value fields changed. */
 	fields: CardRef[];
 	/** Text and content fields that changed. A content field revised in place carries the delta
-	 *  from its previous text, which a host maps its selection through; one that landed whole,
-	 *  and a `text` field, carry none. A card `cards` inserted is new as a whole and is not
+	 *  from its previous text, which a host maps its selection through, and the anchors the
+	 *  revise dropped, each as its context before the pull: what a host holding comment threads
+	 *  hands `reattach`, or a reconcile flow, with the delta. One that landed whole, and a
+	 *  `text` field, carry neither. A card `cards` inserted is new as a whole and is not
 	 *  listed. */
-	content: { addr: Addr; delta?: Delta }[];
+	content: { addr: Addr; delta?: Delta; droppedAnchors?: AnchorContext[] }[];
 }
 
 export interface BindDocumentOpts {
@@ -573,11 +576,17 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				change.content.push({ addr });
 				return;
 			}
+			// Read ahead of the revise: a dropped anchor's context is gone with it.
+			const contexts = doc.anchorContexts();
 			const revised = doc.reviseContent(addr, projection.content);
 			held.delete(root);
 			synced.set(root, contentKey(storedContent(addr)));
 			const delta = event ? usvDelta(event, Array.from(before.text)) : revised.delta;
-			change.content.push({ addr, delta });
+			const droppedAnchors = revised.droppedAnchors.flatMap(({ id }) => {
+				const context = contexts.find((c) => c.id === id);
+				return context ? [context] : [];
+			});
+			change.content.push({ addr, delta, droppedAnchors });
 		} catch (e) {
 			held.add(root);
 			report(e);

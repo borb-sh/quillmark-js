@@ -1,0 +1,58 @@
+{
+	"name": "@quillmark/comments",
+	"version": "0.1.0",
+	"description": "Comment threads over a Quillmark document: the store contract, an in-memory store, and the controller that keeps each thread's anchor honest through every write.",
+	"type": "module",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/borb-sh/quillmark-js.git",
+		"directory": "packages/comments"
+	},
+	"bugs": {
+		"url": "https://github.com/borb-sh/quillmark-js/issues"
+	},
+	"homepage": "https://github.com/borb-sh/quillmark-js/tree/main/packages/comments#readme",
+	"keywords": [
+		"quillmark",
+		"comments",
+		"annotations",
+		"anchors"
+	],
+	"author": "Quillmark Contributors",
+	"engines": {
+		"node": ">=22"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"NOTICE"
+	],
+	"peerDependencies": {
+		"@quillmark/wasm": ">=0.134.0-0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.19.1",
+		"publint": "^0.3.25",
+		"typescript": "^6.0.0",
+		"vitest": "^5.0.0"
+	},
+	"scripts": {
+		"build": "tsc",
+		"prepare": "npm run build",
+		"prepack": "rm -rf dist && npm run build",
+		"test": "vitest run",
+		"check": "tsc --noEmit -p tsconfig.check.json",
+		"check:pack": "publint"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}

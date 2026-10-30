@@ -36,7 +36,7 @@
 		"NOTICE"
 	],
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.133.0-0",
+		"@quillmark/wasm": ">=0.134.0-0",
 		"yjs": "^13.6.0"
 	},
 	"devDependencies": {

@@ -26,6 +26,7 @@ export {
 	proseLeafPlugins
 } from './field.js';
 export type { CreateFieldOpts, FieldController, LeafViews } from './field.js';
+export type { AnchorPos } from './marks.js';
 export { capCount } from './cap.js';
 export { joinLines, pastedLines } from './line-paste.js';
 export type { TextCap } from './cap.js';

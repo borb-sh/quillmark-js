@@ -27,11 +27,17 @@
 	import { reportRebindIgnored } from '../core/rebind.svelte.js';
 	import type { DocPath, Landing } from '../core/address.js';
 	import type { Delta } from '@quillmark/wasm';
+	import type { AnchorPos } from '../core/codec/index.js';
 	import type { CardId, CardOp } from './signals.js';
 	import type { VisualEditorProps } from './props.js';
+	import { CommentSeat } from './comments.svelte.js';
 	import VisualEditorInner from './VisualEditorInner.svelte';
 
 	let props: VisualEditorProps = $props();
+
+	// The seat outlives the re-key: a panel mounted over it keeps its threads and its active
+	// id across a document swap, and the incoming mount binds fresh verbs onto it.
+	const seat = new CommentSeat();
 
 	let inner = $state<VisualEditorInner | undefined>();
 
@@ -106,8 +112,34 @@
 	export function applyCardOps(ops: readonly CardOp[]): void {
 		inner?.applyCardOps(ops);
 	}
+	/** The seat a `CommentPanel` mounts over: the index mirror, the active thread, the draft
+	 *  and the verbs. One per editor, held across document swaps. */
+	export function commentSeat(): CommentSeat {
+		return seat;
+	}
+	/** Place an anchor over the active leaf's selection and open a draft on it, as the
+	 *  popover's comment button does; false where no leaf could take it. */
+	export function startComment(): boolean {
+		return inner?.startComment() ?? false;
+	}
+	/** Select the thread's anchor and reveal the leaf holding it. */
+	export async function focusThread(id: string): Promise<void> {
+		await inner?.focusThread(id);
+	}
+	/** Place the thread's anchor over the active leaf's selection; false where none could. */
+	export async function reanchorThread(id: string): Promise<boolean> {
+		return (await inner?.reanchorThread(id)) ?? false;
+	}
+	/** Drop the thread and its anchor. */
+	export async function removeThread(id: string): Promise<void> {
+		await inner?.removeThread(id);
+	}
+	/** Every anchor the mounted leaves hold, with the path of the leaf holding it. */
+	export function anchorRanges(): (AnchorPos & { field: DocPath })[] {
+		return inner?.anchorRanges() ?? [];
+	}
 </script>
 
 {#key props.doc}
-	<VisualEditorInner bind:this={inner} {...props} />
+	<VisualEditorInner bind:this={inner} {...props} commentSeat={seat} />
 {/key}

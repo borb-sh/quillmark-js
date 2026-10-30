@@ -61,9 +61,13 @@ The host font library is not a flag: every open builds the engine over `@quillma
 
 `?collab=<room>` opens the document as a live session (`@quillmark/collab`), with `localStorage` as the database: every tab of the origin on the same room edits one document, and a reload rejoins it. The room's saved Document is the record; the first tab into an empty room saves the document the open stands on and seeds the session from it, and each tab saves what it holds a second after it last changed and when the page hides. A session ends once no tab has been in it for five minutes and its last change is saved, and the next tab in opens a new one from the save. The strip's `room` readout names the room and its epoch. The quill and the seed flags apply only to a room's first open: after that the room's save is the document, and a room opened under another quill reopens under the one its save names.
 
-Each local edit is pushed with the card op its `EditorChange` carries, and the leaves whose new islands took minted ids are re-read. A remote change lands as the editor's host verbs take it: `applyCardOps` for the card list, `refresh` for kinds, titles and form fields, `applyExternal` with the change's delta for each prose leaf. Either way the preview recompiles as for any edit. A tab whose session ended reopens, and says on the strip when an edit it made never reached the session.
+Each local edit is pushed with the card op its `EditorChange` carries, and the leaves whose new islands took minted ids are re-read. A remote change lands as the editor's host verbs take it: `applyCardOps` for the card list, `refresh` for kinds, titles and form fields, `applyExternal` with the change's delta for each prose leaf, and the anchors it dropped go to the comment controller's reconcile flow with that delta, so a thread whose run another tab rewrote is placed again where its quote is found. Either way the preview recompiles as for any edit. A tab whose session ended reopens, and says on the strip when an edit it made never reached the session.
 
 A room is reached by loading `/playground?collab=<room>` directly, so the route answers a direct load on every host: Pages from the `playground.html` shell `deploy-playground.yml` writes, a Vercel preview through the rewrite in `vercel.json`.
+
+## Comments
+
+The harness route mounts the editor over a comment controller (`@quillmark/comments`) on a memory store with one author, and a `CommentPanel` over the editor's seat in a column beside it: the popover's Comment button starts a thread, the panel holds the threads, and the editor draws every open one. The threads last as long as the open does; a host persists them beside the document (HOSTING §Comments). Under the split's threshold the column is not drawn, the one track being the editor's.
 
 ## Quiver, not bundler
 

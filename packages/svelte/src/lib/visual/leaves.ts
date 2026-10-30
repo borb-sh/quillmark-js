@@ -88,6 +88,8 @@ export interface LeafRegistry {
 	control(key: string): FieldControl | undefined;
 	/** The codec seam at `key`, `undefined` for a form control. */
 	prose(key: string): FieldController | undefined;
+	/** Every mounted prose leaf: what a verb naming an anchor walks to find the leaf holding it. */
+	proses(): FieldController[];
 	/** A by-value prose leaf under the field at `key`, by its views, on its focus. */
 	focusValue(key: string, leaf: LeafViews): void;
 	/** Dropped only by the leaf it names, so a leaf leaving takes no sibling's entry. */
@@ -124,6 +126,9 @@ export function createLeafRegistry(): LeafRegistry {
 		},
 		prose(key) {
 			return proses.get(key);
+		},
+		proses() {
+			return [...proses.values()];
 		},
 		focusValue(key, leaf) {
 			values.set(key, leaf);

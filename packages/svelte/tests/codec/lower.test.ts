@@ -53,7 +53,7 @@ function atHead(state: EditorState, index: number): EditorState {
 }
 
 interface AnchorOpts {
-	newAnchors?: { id: string; pos: number }[];
+	newAnchors?: { id: string; from: number; to: number }[];
 }
 
 /** The stored position of the identity anchor `id`. */
@@ -246,7 +246,7 @@ describe('identity anchor round-trip (op-based, survives edits)', () => {
 		const state = EditorState.create({ doc: decode(oldRt, blockSchema) });
 		const tr = state.tr.insertText('XX', 1); // insert before the anchor at USV 6
 		const bundle = lower(contentEdit(oldRt, pmToContent(tr.doc)), {
-			newAnchors: [{ id: 'a1', pos: 8 }] // rebased +2
+			newAnchors: [{ id: 'a1', from: 8, to: 8 }] // rebased +2
 		});
 		doc.applyChange({}, bundle);
 		const anchor = doc.main.body.marks.find((m) => m.type === 'anchor');
@@ -271,7 +271,7 @@ describe('identity anchor round-trip (op-based, survives edits)', () => {
 		const tr = state.tr.insertText('\n', 2); // a code-interior line before the anchor
 		const edit = contentEdit(oldRt, pmToContent(tr.doc));
 		const bundle = lower(edit, {
-			newAnchors: [{ id: 'c1', pos: 4 }] // the \n inserts before it → +1
+			newAnchors: [{ id: 'c1', from: 4, to: 4 }] // the \n inserts before it → +1
 		});
 		doc.applyChange({}, bundle);
 		const body = doc.main.body;
@@ -302,7 +302,7 @@ describe('identity anchor round-trip (op-based, survives edits)', () => {
 			const tr = mkTr(EditorState.create({ doc: oldDoc }));
 			const after = projected(oldDoc, tr, pos, bias);
 			const bundle = lower(contentEdit(oldRt, pmToContent(tr.doc)), {
-				newAnchors: [{ id: 'a1', pos: after }]
+				newAnchors: [{ id: 'a1', from: after, to: after }]
 			});
 			doc.applyChange({}, bundle);
 			return { stored: anchorAt(doc.main.body, 'a1'), projected: after, bundle };
@@ -404,7 +404,7 @@ describe('the island channel — an island edit lowers op-wise', () => {
 		const rt = md(TABLE_MD);
 		rt.marks.push({ start: 2, end: 2, type: 'anchor', attrs: { id: 'a1' } } as never);
 		const { doc, bundle } = lowerEdit(rt, (s) => retypeCell(s, 'HEAD'), {
-			newAnchors: [{ id: 'a1', pos: 2 }]
+			newAnchors: [{ id: 'a1', from: 2, to: 2 }]
 		});
 		doc.applyChange({}, bundle);
 		expect(anchorAt(doc.main.body, 'a1')).toBe(2);
@@ -421,7 +421,7 @@ describe('the island channel — an island edit lowers op-wise', () => {
 		const { doc, bundle } = lowerEdit(
 			rt,
 			(s) => s.tr.insert(s.doc.child(0).nodeSize, blockSchema.nodes.island_block.create(entry)),
-			{ newAnchors: [{ id: 'a1', pos: 1 }] }
+			{ newAnchors: [{ id: 'a1', from: 1, to: 1 }] }
 		);
 		// The delta opens the line and the island op places the slot; the island is what
 		// says the line is a block, which rests as a `para`.
