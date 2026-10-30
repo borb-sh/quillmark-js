@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.29.2 - 2026-10-30
+
 **`VisualEditor` exposes `washField(field)`.** It plays the arrival wash over a mounted field and moves nothing: no focus, no reveal, no scroll. A field in a closed group washes nothing, and a nested address washes its field's box. A host marks a change it wrote into the document with it, leaving the user's caret where it was.
 
 ## v0.29.1 - 2026-10-30
