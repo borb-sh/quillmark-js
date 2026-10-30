@@ -43,8 +43,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	cardTitle: string;
 
 	// ── The add affordance ────────────────────────────────────────────────────
-	/** The trailing strip's visible words, which are also every strip's accessible
-	 * name. One string over
+	/** The trailing strip's visible words, drawn after a `+` it adds itself, and every
+	 * strip's accessible name. One string over
 	 * one kind and many: the trigger seeds a card, and which kind is the menu's word
 	 * to say or the schema's to have already settled. */
 	addCard: string;
@@ -224,7 +224,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardMoveDown: 'Move down',
 	cardDelete: 'Delete card',
 	cardTitle: 'Card title',
-	addCard: 'Add card',
+	addCard: 'Add Card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
 	arrayDrag: 'Drag to move',

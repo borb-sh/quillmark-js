@@ -1014,6 +1014,8 @@
 
 <FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
 
+{#snippet appendLabel()}<span aria-hidden="true">{'+ '}</span>{merged.addCard}{/snippet}
+
 <!-- The add affordance is gated on the schema declaring `card_kinds`, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to
  a recovery shell inside <Card> (retype + delete), never gated away, so its content is
@@ -1028,16 +1030,16 @@
 		 on hover is the space the new card takes. -->
 		{@const marked = atIndex === model.cards.length}
 		<div class={['qm-add-card', { 'qm-add-card-marked': marked }]}>
-			<!-- Marked, the words are the accessible name and no `aria-label` doubles
-			 them; bare, the same words land as the label, the strip having no
-			 content to carry them. -->
+			<!-- Marked, the words are the accessible name, the `+` before them hidden from
+			 it, and no `aria-label` doubles them; bare, the same words land as the
+			 label, the strip having no content to carry them. -->
 			{#if kinds.length === 1}
 				<button
 					type="button"
 					class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
 					aria-label={marked ? undefined : merged.addCard}
 					onclick={() => addCard(atIndex, kinds[0], true)}
-					>{#if marked}{merged.addCard}{/if}</button
+					>{#if marked}{@render appendLabel()}{/if}</button
 				>
 			{:else}
 				<!-- Multi-kind add: pick the kind, then seed + insert. A menu rather than a
@@ -1049,7 +1051,7 @@
 					<DropdownMenu.Trigger
 						class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
 						aria-label={marked ? undefined : merged.addCard}
-						>{#if marked}{merged.addCard}{/if}</DropdownMenu.Trigger
+						>{#if marked}{@render appendLabel()}{/if}</DropdownMenu.Trigger
 					>
 					<DropdownMenu.Portal to={rootEl}>
 						<DropdownMenu.Content

@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The add strip between two cards draws no plus.** It rests invisible and fills its pill on hover or focus, its accessible name still `strings.addCard`; the strip past the last card keeps its words.
+**The add strip between two cards draws no plus.** It rests invisible and fills its pill on hover or focus, its accessible name still `strings.addCard`. The strip past the last card reads `+ Add Card`, the `+` drawn by the strip and kept out of its accessible name; `strings.addCard` defaults to `Add Card`.
 
 ## v0.29.0 - 2026-10-30
 
