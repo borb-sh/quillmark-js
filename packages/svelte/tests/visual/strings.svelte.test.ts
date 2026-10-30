@@ -53,13 +53,12 @@ describe('strings on the mounted surface', () => {
 			strings: { addCard: 'Ajouter une carte' }
 		});
 
-		// The strip queried is the one ahead of the first card, which draws a plus where
-		// the words would be, so the wording lands on it as an `aria-label`, and the
-		// glyph stays out of the name.
+		// The strip queried is the one ahead of the first card, which draws nothing where
+		// the words would be, so the wording lands on it as an `aria-label`.
 		const add = target.querySelector('.qm-add-btn');
 		expect(add?.getAttribute('aria-label')).toBe('Ajouter une carte');
 		expect(add?.textContent).toBe('');
-		expect(add?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+		expect(add?.querySelector('svg')).toBeNull();
 		// The append point states the words themselves, and draws no glyph beside them.
 		const append = [...target.querySelectorAll('.qm-add-btn')].at(-1);
 		expect(append?.textContent).toBe('Ajouter une carte');
