@@ -215,6 +215,27 @@ describe('writeFrom', () => {
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 
+	it('merges a whole-document reorder with a card moved since, holding each card once', () => {
+		const [a, b] = session();
+		const base = revision(a);
+		b.doc.moveCard(1, 4);
+		b.binding.push({ op: 'move', from: 1, to: 4 });
+		const written = write(a, base, (doc) => {
+			doc.moveCard(1, 0);
+			return cardOps([1, 0, 2, 3, 4], 5);
+		});
+		expect(written.conflicts).toEqual([]);
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		expect(a.doc.cards.map((c) => c.kind)).toEqual([
+			'section',
+			'signoff',
+			'figure',
+			'credits',
+			'note'
+		]);
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
 	it('reports a card removed since that the edit wrote', () => {
 		const [a] = session();
 		const base = revision(a);
@@ -273,24 +294,61 @@ describe('cardOps', () => {
 		return Math.max(0, ...ending);
 	}
 
+	/** The list `ops` leave of `count` cards, each kept card by its old index and each inserted
+	 *  one `null`, and the old indices of the cards they moved. */
+	function replay(ops: CardOp[], count: number) {
+		const list: (number | null)[] = [...Array(count).keys()];
+		const moved = new Set<number | null>();
+		for (const op of ops) {
+			if (op.op === 'insert') list.splice(op.at, 0, null);
+			else if (op.op === 'remove') list.splice(op.at, 1);
+			else {
+				const [card] = list.splice(op.from, 1);
+				moved.add(card);
+				list.splice(op.to, 0, card);
+			}
+		}
+		return { list, moved };
+	}
+
+	function* orders(cards: number[]): Generator<number[]> {
+		if (cards.length < 2) return yield cards;
+		for (const card of cards)
+			for (const rest of orders(cards.filter((c) => c !== card))) yield [card, ...rest];
+	}
+
 	it('takes every old card list to the new one, moving each card outside a longest run once', () => {
 		for (let count = 0; count <= 4; count++)
 			for (let length = 0; length <= 4; length++)
 				for (const from of alignments(count, length)) {
 					const ops = cardOps(from, count);
-					const list: (number | null)[] = [...Array(count).keys()];
-					for (const op of ops) {
-						if (op.op === 'insert') list.splice(op.at, 0, null);
-						else if (op.op === 'remove') list.splice(op.at, 1);
-						else list.splice(op.to, 0, ...list.splice(op.from, 1));
-					}
+					const { list, moved } = replay(ops, count);
 					expect(list, JSON.stringify(from)).toEqual(from);
 					const kept = from.filter((i) => i !== null);
-					const moves = ops.filter((op) => op.op === 'move').length;
-					expect(moves, JSON.stringify(from)).toBe(kept.length - longestRun(kept));
+					expect(moved.size, JSON.stringify(from)).toBe(kept.length - longestRun(kept));
 					const removes = ops.filter((op) => op.op === 'remove');
 					expect(ops.slice(0, removes.length)).toEqual(removes);
 				}
+	});
+
+	it('moves exactly the cards writeFrom reads as moved, over every order of the first four cards', () => {
+		const [a] = session();
+		const base = revision(a);
+		for (const order of orders([0, 1, 2, 3])) {
+			order.push(4);
+			const ops = cardOps(order, 5);
+			const written = write(a, base, (doc) => {
+				for (const op of ops) if (op.op === 'move') doc.moveCard(op.from, op.to);
+				return ops;
+			});
+			const read = written.changes.flatMap((c) => (c.type === 'move' ? [c.from] : []));
+			expect(new Set(read), JSON.stringify(order)).toEqual(replay(ops, 5).moved);
+		}
+	});
+
+	it('refuses an alignment naming a card twice or one past the list', () => {
+		expect(() => cardOps([1, 1], 2)).toThrow(RangeError);
+		expect(() => cardOps([2, 0, 1], 2)).toThrow(RangeError);
 	});
 
 	it('reads a card dragged to the front as one move', () => {
