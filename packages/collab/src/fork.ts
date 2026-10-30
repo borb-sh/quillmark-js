@@ -11,9 +11,17 @@
 // History is a `Y.Doc` with garbage collection off: a state at an older snapshot can only be
 // rebuilt from one that kept the content deleted since.
 import * as Y from 'yjs';
-import type { AuthoringCard, Document, Quill } from '@quillmark/wasm';
-import { bindDocument, canonical, Diverged, type CardOp, type CardRef } from './document.js';
-import { MAIN } from './shape.js';
+import type { Addr, AuthoringCard, Content, Document, Quill } from '@quillmark/wasm';
+import {
+	bindDocument,
+	canonical,
+	Diverged,
+	formOf,
+	type CardOp,
+	type CardRef
+} from './document.js';
+import { changedRuns, commonRun, meet, type Run } from './lines.js';
+import { MAIN, SLOT } from './shape.js';
 
 /** What differs between two states of one session, by the cards' place in each. A card moved
  *  is named by `from`, its index in the older state, and `at`, its index in the newer one. */
@@ -32,9 +40,9 @@ export type Change =
 			 *  field is. */
 			before?: unknown;
 			after?: unknown;
-			/** Where both values are text: the run of lines that differs, from line `line` of
+			/** Where both values are text: each run of lines that differs, from line `line` of
 			 *  `before`, for a reader that needs the change and not the whole field. */
-			hunk?: { line: number; before: string; after: string };
+			hunks?: { line: number; before: string; after: string }[];
 	  };
 
 export interface ForkOpts {
@@ -49,8 +57,9 @@ export interface ForkOpts {
 
 export interface WriteFromOpts extends ForkOpts {
 	/** Make the edit on the Document as it stood at `base`. An edit that inserts, removes or
-	 *  moves a card returns that operation, and makes no other card-list change. */
-	edit(doc: Document): CardOp | void;
+	 *  moves cards returns those operations, in the order it made them, and makes no other
+	 *  card-list change. */
+	edit(doc: Document): CardOp | CardOp[] | void;
 }
 
 export interface Written {
@@ -58,9 +67,10 @@ export interface Written {
 	update: Uint8Array;
 	/** What the edit changed, from `base`. */
 	changes: Change[];
-	/** What changed in `history` since `base` at a place the edit changed too: a field both
-	 *  wrote, a card both moved, or a card one side removed or retyped that the other wrote. A
-	 *  writer that rewrote a field from its old text would merge into text it never read. */
+	/** What changed in `history` since `base` at a place the edit changed too: lines of a text
+	 *  field both wrote, a field both set, a card both moved, or a card one side removed or
+	 *  retyped that the other wrote. A writer that rewrote lines from their old text would merge
+	 *  into text it never read. */
 	conflicts: Change[];
 }
 
@@ -82,14 +92,15 @@ export function writeFrom(opts: WriteFromOpts): Written {
 		base = bind(scratch, quill, opts.doc);
 		const before = state(base, quill);
 		const count = base.doc.cardCount;
-		const op = opts.edit(base.doc) ?? undefined;
+		const made = opts.edit(base.doc) ?? [];
+		const ops = Array.isArray(made) ? made : [made];
 		const step = base.doc.cardCount - count;
-		const named = op?.op === 'insert' ? 1 : op?.op === 'remove' ? -1 : 0;
+		const named = ops.reduce((n, o) => n + (o.op === 'insert' ? 1 : o.op === 'remove' ? -1 : 0), 0);
 		if (step !== named)
 			throw new Unwritable(
-				`the edit changed the card count by ${step} and named ${op ? `a ${op.op}` : 'no card operation'}`
+				`the edit changed the card count by ${step} and its card operations by ${named}`
 			);
-		base.binding.push(op);
+		base.binding.push(ops);
 		const changes = diff(before, state(base, quill));
 		const landed = diff(before, project(scratch, quill, opts.doc));
 		if (canonical(landed) !== canonical(changes))
@@ -165,15 +176,37 @@ function bind(ydoc: Y.Doc, quill: Quill, template: Document): Bound {
 	};
 }
 
-/** A Document's state as its cards' Y ids and authoring form, for comparing. */
+/** A Document's state as its cards' Y ids and authoring form, for comparing, and each text
+ *  field's lines as Y holds them, by `<card index>/<field>` (the body is `''`). */
 interface State {
 	ids: string[];
 	main: AuthoringCard;
 	cards: AuthoringCard[];
+	lines: Map<string, string[]>;
 }
 
 function state(bound: Bound, quill: Quill): State {
-	const a = quill.toAuthoring(bound.doc);
+	const { doc } = bound;
+	const a = quill.toAuthoring(doc);
+	const reader = quill.reader(doc);
+	const lines = new Map<string, string[]>();
+	for (const c of [MAIN, ...doc.cards.map((_, i) => i)] as CardRef[]) {
+		const card = c === MAIN ? doc.main : doc.card(c);
+		const at = c === MAIN ? {} : { card: c };
+		lines.set(`${c}/`, contentLines(card.body));
+		const schema = c === MAIN ? quill.schema.main : quill.schema.card_kinds?.[card.kind];
+		for (const [field, f] of Object.entries(schema?.fields ?? {})) {
+			const addr: Addr = { ...at, field };
+			const v = doc.getStored(addr);
+			if (v == null) continue;
+			const form = formOf(f.type);
+			if (form === 'plain' && typeof v === 'string') lines.set(`${c}/${field}`, textLines(v));
+			else if (form === 'content') {
+				const content = typeof v === 'object' ? (v as Content) : reader.getContent(addr);
+				if (content) lines.set(`${c}/${field}`, contentLines(content));
+			}
+		}
+	}
 	return {
 		ids: [...bound.binding.ids],
 		main: { kind: MAIN, fields: a.fields ?? {}, body: a.body ?? '' },
@@ -181,8 +214,47 @@ function state(bound: Bound, quill: Quill): State {
 			kind: c.kind,
 			fields: c.fields ?? {},
 			body: c.body ?? ''
-		}))
+		})),
+		lines
 	};
+}
+
+/** A plain text's lines, each up to and including its `\n`. */
+function textLines(text: string): string[] {
+	return text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+}
+
+/** Each line of `content` as one comparable value: its characters, an island slot as the island,
+ *  its kind and containers without the numbers derived from position, and its marks from its
+ *  start. Two lines with one value are one line to Y. */
+function contentLines(content: Content): string[] {
+	const chars = Array.from(content.text);
+	const out: string[] = [];
+	let start = 0;
+	let island = 0;
+	content.lines.forEach((line, k) => {
+		let end = start;
+		while (end < chars.length && chars[end] !== '\n') end++;
+		const text = chars
+			.slice(start, end)
+			.map((ch) => (ch === SLOT ? canonical(content.islands[island++] ?? null) : ch));
+		const containers = line.containers.map((c) =>
+			c.container === 'list_item'
+				? { c: c.container, ordered: c.attrs.ordered, checked: c.attrs.checked }
+				: { c: c.container }
+		);
+		const marks = content.marks
+			.filter((m) => m.type !== 'anchor' && m.start < end && m.end > start)
+			.map((m) => ({
+				...m,
+				start: Math.max(m.start, start) - start,
+				end: Math.min(m.end, end) - start
+			}));
+		const { containers: _, ...rest } = line;
+		out.push(canonical({ text, rest, containers, marks, last: k === content.lines.length - 1 }));
+		start = end + 1;
+	});
+	return out;
 }
 
 function project(ydoc: Y.Doc, quill: Quill, template: Document): State {
@@ -209,10 +281,10 @@ function diff(a: State, b: State): Change[] {
 	});
 	const kept = a.ids.filter((id) => inB.has(id));
 	const stay = new Set(
-		longestRun(
+		commonRun(
 			kept,
 			b.ids.filter((id) => inA.has(id))
-		)
+		).map(([i]) => kept[i])
 	);
 	b.ids.forEach((id, at) => {
 		const from = inA.get(id);
@@ -227,13 +299,30 @@ function diff(a: State, b: State): Change[] {
 		if (x.kind !== y.kind) out.push({ type: 'kind', from, at, before: x.kind, after: y.kind });
 		out.push(...fields(from, at, x, y));
 	});
+	for (const c of out) {
+		if (c.type !== 'field') continue;
+		const before = a.lines.get(`${c.from}/${c.field ?? ''}`);
+		const after = b.lines.get(`${c.at}/${c.field ?? ''}`);
+		if (before && after) runsOf.set(c, changedRuns(before, after));
+	}
 	return out;
 }
+
+/** The runs of lines a text field's change rewrote, by the lines of the state it came from. A
+ *  field change with none conflicts whole. */
+const runsOf = new WeakMap<Change, Run[]>();
 
 function fields(from: CardRef, at: CardRef, x: AuthoringCard, y: AuthoringCard): Change[] {
 	const out: Change[] = [];
 	if ((x.body ?? '') !== (y.body ?? ''))
-		out.push({ type: 'field', from, at, before: x.body, after: y.body, ...hunkOf(x.body, y.body) });
+		out.push({
+			type: 'field',
+			from,
+			at,
+			before: x.body,
+			after: y.body,
+			...hunksOf(x.body, y.body)
+		});
 	const xf = x.fields ?? {};
 	const yf = y.fields ?? {};
 	for (const field of new Set([...Object.keys(xf), ...Object.keys(yf)])) {
@@ -246,51 +335,27 @@ function fields(from: CardRef, at: CardRef, x: AuthoringCard, y: AuthoringCard):
 			field,
 			...(before === undefined ? {} : { before }),
 			...(after === undefined ? {} : { after }),
-			...hunkOf(before, after)
+			...hunksOf(before, after)
 		});
 	}
 	return out;
 }
 
-/** The lines two texts differ in, between their common leading and trailing lines. */
-function hunkOf(
+/** Each run of lines two texts differ in. */
+function hunksOf(
 	before: unknown,
 	after: unknown
-): { hunk?: { line: number; before: string; after: string } } {
+): { hunks?: { line: number; before: string; after: string }[] } {
 	if (typeof before !== 'string' || typeof after !== 'string') return {};
 	const a = before.split('\n');
 	const b = after.split('\n');
-	let p = 0;
-	while (p < a.length && p < b.length && a[p] === b[p]) p++;
-	let s = 0;
-	while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
 	return {
-		hunk: {
-			line: p,
-			before: a.slice(p, a.length - s).join('\n'),
-			after: b.slice(p, b.length - s).join('\n')
-		}
+		hunks: changedRuns(a, b).map((r) => ({
+			line: r.from,
+			before: a.slice(r.from, r.to).join('\n'),
+			after: b.slice(r.at, r.end).join('\n')
+		}))
 	};
-}
-
-/** The longest common subsequence of two orders of one set of ids. */
-function longestRun(a: string[], b: string[]): string[] {
-	const n = a.length;
-	const m = b.length;
-	const len = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
-	for (let i = n - 1; i >= 0; i--)
-		for (let j = m - 1; j >= 0; j--)
-			len[i][j] = a[i] === b[j] ? len[i + 1][j + 1] + 1 : Math.max(len[i + 1][j], len[i][j + 1]);
-	const out: string[] = [];
-	for (let i = 0, j = 0; i < n && j < m;) {
-		if (a[i] === b[j]) {
-			out.push(a[i]);
-			i++;
-			j++;
-		} else if (len[i + 1][j] >= len[i][j + 1]) i++;
-		else j++;
-	}
-	return out;
 }
 
 /** The changes in `theirs` at a place `mine` changed too. Both are from one base. */
@@ -298,11 +363,11 @@ function overlap(mine: Change[], theirs: Change[]): Change[] {
 	const written = new Set<CardRef>();
 	const whole = new Set<CardRef>();
 	const moved = new Set<CardRef>();
-	const fieldsOf = new Set<string>();
+	const fieldsOf = new Map<string, Change>();
 	for (const c of mine) {
 		if (c.type === 'field') {
 			written.add(c.from);
-			fieldsOf.add(`${c.from}/${c.field ?? ''}`);
+			fieldsOf.set(`${c.from}/${c.field ?? ''}`, c);
 		} else if (c.type === 'remove' || c.type === 'kind') {
 			written.add(c.from);
 			whole.add(c.from);
@@ -310,8 +375,13 @@ function overlap(mine: Change[], theirs: Change[]): Change[] {
 	}
 	return theirs.filter((c) => {
 		switch (c.type) {
-			case 'field':
-				return fieldsOf.has(`${c.from}/${c.field ?? ''}`) || whole.has(c.from);
+			case 'field': {
+				if (whole.has(c.from)) return true;
+				const m = fieldsOf.get(`${c.from}/${c.field ?? ''}`);
+				if (!m) return false;
+				const [x, y] = [runsOf.get(m), runsOf.get(c)];
+				return !x || !y || x.some((r) => y.some((q) => meet(r, q)));
+			}
 			case 'remove':
 				return written.has(c.from) || moved.has(c.from);
 			case 'kind':

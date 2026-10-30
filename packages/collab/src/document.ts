@@ -34,11 +34,13 @@ import {
 	contentRoot,
 	contentTypes,
 	present,
-	readField
+	readField,
+	utf16
 } from './shape.js';
 import { project } from './project.js';
 import { writeContent, type Mint } from './write.js';
 import { usvDelta } from './delta.js';
+import { changedRuns } from './lines.js';
 
 /** A change to the composable card list, by index, as the Document takes it. */
 export type CardOp =
@@ -73,18 +75,22 @@ export interface BindDocumentOpts {
 
 export interface DocumentBinding {
 	/**
-	 * Write the Document's committed state to Y, after a local edit. Pass the card operation the
-	 * edit was; anything else is found by comparing. Returns the content fields the write changed
-	 * in the Document in turn, where a new island took a minted id: the host redraws them.
+	 * Write the Document's committed state to Y, after a local edit. Pass the card operations the
+	 * edit was, in order; anything else is found by comparing. Returns the content fields the
+	 * write changed in the Document in turn, where a new island took a minted id: the host
+	 * redraws them.
 	 */
-	push(op?: CardOp): Addr[];
+	push(op?: CardOp | readonly CardOp[]): Addr[];
 	/** The Y id of each composable card, in Document order. */
 	readonly ids: readonly string[];
+	/** Whether a remote value the Document refused is held: the Document is then not the Y
+	 *  state's projection, and a save of it would leave that value out. */
+	readonly holding: boolean;
 	destroy(): void;
 }
 
 /** Which form a field takes in Y: a content root, a plain-text root, or a card-map value. */
-type Form = 'content' | 'plain' | 'value';
+export type Form = 'content' | 'plain' | 'value';
 
 export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	const { doc, quill, ydoc } = opts;
@@ -154,12 +160,13 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 
 	// ── Document → Y ─────────────────────────────────────────────────────────
 
-	function push(op?: CardOp): Addr[] {
+	function push(op?: CardOp | readonly CardOp[]): Addr[] {
 		if (diverged) return [];
+		const ops = op === undefined ? [] : Array.isArray(op) ? op : [op as CardOp];
 		const renames: { root: string; addr: Addr }[] = [];
 		ydoc.transact(() => {
-			if (op) applyOp(op);
-			else if (doc.cardCount !== ids.length) realign();
+			for (const o of ops) applyOp(o);
+			if (!ops.length && doc.cardCount !== ids.length) realign();
 			for (const c of refs()) pushCard(c, renames);
 		}, origin);
 		const rewritten: Addr[] = [];
@@ -603,6 +610,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		get ids() {
 			return ids;
 		},
+		get holding() {
+			return held.size > 0;
+		},
 		destroy() {
 			ydoc.off('afterTransaction', onAfter);
 			for (const [text, fn] of observed) text.unobserve(fn);
@@ -637,7 +647,7 @@ export class Diverged extends Error {
 	}
 }
 
-function formOf(type: string): Form {
+export function formOf(type: string): Form {
 	const base = type.endsWith('?') ? type.slice(0, -1) : type;
 	return base === 'richtext' ? 'content' : base === 'text' ? 'plain' : 'value';
 }
@@ -672,26 +682,41 @@ export function canonical(value: unknown): string {
 	);
 }
 
-/** Replace `text`'s content with `next` by one splice over the common prefix and suffix. */
+/** Replace `text`'s content with `next`: a splice over each run of lines that differs, over its
+ *  common prefix and suffix, so a change far from another leaves what lies between untouched. */
 function spliceText(text: Y.Text, next: string): void {
-	const a = text.toString();
-	let p = 0;
-	while (p < a.length && p < next.length && a[p] === next[p]) p++;
-	let s = 0;
-	while (
-		s < a.length - p &&
-		s < next.length - p &&
-		a[a.length - 1 - s] === next[next.length - 1 - s]
-	)
-		s++;
-	// Keep a surrogate pair whole on either side of the splice.
-	if (p > 0 && isHigh(a.charCodeAt(p - 1))) p--;
-	if (s > 0 && isLow(a.charCodeAt(a.length - s))) s--;
-	if (a.length - p - s > 0) text.delete(p, a.length - p - s);
-	if (next.length - p - s > 0) text.insert(p, next.slice(p, next.length - s));
+	const a = Array.from(text.toString());
+	const b = Array.from(next);
+	const x = linesOf(a);
+	const y = linesOf(b);
+	const at = (lines: number[], chars: string[], k: number) =>
+		k < lines.length ? lines[k] : chars.length;
+	const runs = changedRuns(
+		x.map((from, k) => a.slice(from, at(x, a, k + 1)).join('')),
+		y.map((from, k) => b.slice(from, at(y, b, k + 1)).join(''))
+	);
+	for (const run of runs.reverse()) {
+		const [a0, a1] = [at(x, a, run.from), at(x, a, run.to)];
+		const [b0, b1] = [at(y, b, run.at), at(y, b, run.end)];
+		let p = 0;
+		while (a0 + p < a1 && b0 + p < b1 && a[a0 + p] === b[b0 + p]) p++;
+		let s = 0;
+		while (s < a1 - a0 - p && s < b1 - b0 - p && a[a1 - 1 - s] === b[b1 - 1 - s]) s++;
+		const from = utf16(a, a0 + p);
+		const removed = utf16(a, a1 - s) - from;
+		if (removed) text.delete(from, removed);
+		if (b1 - s > b0 + p) text.insert(from, b.slice(b0 + p, b1 - s).join(''));
+	}
 }
-const isHigh = (u: number) => u >= 0xd800 && u <= 0xdbff;
-const isLow = (u: number) => u >= 0xdc00 && u <= 0xdfff;
+
+/** Where each line of `chars` starts: a line runs up to and including its `\n`. */
+function linesOf(chars: string[]): number[] {
+	const out = [0];
+	chars.forEach((ch, i) => {
+		if (ch === '\n' && i + 1 < chars.length) out.push(i + 1);
+	});
+	return chars.length ? out : [];
+}
 
 function minter(ydoc: Y.Doc): Mint {
 	const prefix = ydoc.clientID.toString(36);

@@ -40,7 +40,7 @@ Mount the editor over `session.doc`, and push each local edit after it commits:
 
 `push` takes the card operation the edit was, which `EditorChange.op` carries for an add, a move and a removal, and returns the fields whose new islands took a minted id. `onRemote` hears what another client's edit moved in `session.doc`: card-list operations by index, cards whose kind, title or values changed, and text and content fields, a revised one with the text delta from its previous text. `onRemote` is first called after `joinSession` returns. `session.save()` saves at once, and `session.leave()` saves and stops; the host frees `session.doc` after it. `onEnded` says the session closed under this client, and whether an edit made here never reached it; a Document under another quill than the one passed is refused with `QuillMismatch`, which names the room's quill.
 
-`localLog` keeps the room in `localStorage`, so every tab of one origin shares it and a reload rejoins. A server keeps the same `SessionLog` protocol: `current`, `open`, `end`, `append`, `touch`, `since`, `upTo`, `subscribe`, `load` and `save`.
+`localLog` keeps the room in `localStorage`, so every tab of one origin shares it and a reload rejoins. A server keeps the same `SessionLog` protocol: `current`, `open`, `end`, `append`, `touch`, `since`, `upTo`, `subscribe`, `load` and `save`, and leaves `save` out when it saves the log's projection itself. A failed append is retried (`retry`) before the session ends.
 
 ## A slow writer
 
@@ -59,7 +59,7 @@ const { update, conflicts } = writeFrom({
 if (!conflicts.length) session.apply(update, 'ai:run-1');
 ```
 
-`conflicts` lists what changed since `base` at a place the edit changed too, such as a field someone rewrote meanwhile. Run `writeFrom` and `session.apply` in one task. An edit that inserts, removes or moves a card returns that `CardOp`. A server with no editor open goes through the log: `readLog({ log, quill, since })` returns the Document, its `Revision` (`{ epoch, count }`, short enough to hand a model) and what changed since an earlier one, and `writeLog({ log, quill, base, writer, key, edit })` appends the edit and saves, or answers `conflict`, `stale` or `duplicate`.
+`conflicts` lists what changed since `base` at a place the edit changed too, such as lines someone rewrote meanwhile. Run `writeFrom` and `session.apply` in one task. An edit that inserts, removes or moves cards returns those `CardOp`s. A server with no editor open goes through the log: `readLog({ log, quill, since })` returns the Document, its `Revision` (`{ epoch, count, check }`, short enough to hand a model, and to be handed back as it was read) and what changed since an earlier one, and `writeLog({ log, quill, base, writer, key, edit })` appends the edit and saves, or answers `conflict`, `stale` or `duplicate`.
 
 ## Without a session
 

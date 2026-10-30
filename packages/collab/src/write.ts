@@ -1,7 +1,9 @@
 // The writer: a content field's `Content` → the fewest Y ops that make its Y state project to it.
 //
 // Island slots the edit kept are fixed points: the text between two of them is diffed on its own,
-// one splice per stretch (common prefix and suffix over USV characters), so a slot whose island
+// by line and then by character, the lines both sides hold whole kept and each run of changed lines
+// one splice (common prefix and suffix over USV characters). Two changes far apart in a field are
+// two splices, so an edit made meanwhile between them stays where it was typed; and a slot whose island
 // survived is never deleted and re-inserted. Re-inserting one would leave two slots holding its id
 // when two clients do it at once, and would drop a concurrent edit to its props. After the splices,
 // attributes are written only where Y differs: formatting runs, and line metadata on the lines whose
@@ -25,6 +27,7 @@ import {
 	type YContainer,
 	type YLine
 } from './shape.js';
+import { commonRun } from './lines.js';
 
 export type Mint = () => string;
 
@@ -43,17 +46,15 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 
 	const aSlots = slotsOf(a);
 	const bSlots = slotsOf(b);
-	const pairs = commonIds(
+	const pairs = commonRun(
 		cur.islands.map((m) => m.get('id') as string),
 		next.islands.map((i) => i.id)
 	);
 
-	// Each stretch between kept slots, and where its splice falls.
+	// Each stretch between kept slots, and where its splices fall.
 	const bToA: (number | undefined)[] = new Array(b.length);
 	const splices: { at: number; end: number; from: number; to: number }[] = [];
-	let a0 = 0;
-	let b0 = 0;
-	const stretch = (a1: number, b1: number) => {
+	const splice = (a0: number, a1: number, b0: number, b1: number) => {
 		let p = 0;
 		while (a0 + p < a1 && b0 + p < b1 && a[a0 + p] === b[b0 + p] && a[a0 + p] !== SLOT) p++;
 		let s = 0;
@@ -66,15 +67,26 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 			s++;
 		for (let i = 0; i < p; i++) bToA[b0 + i] = a0 + i;
 		for (let i = 0; i < s; i++) bToA[b1 - 1 - i] = a1 - 1 - i;
-		splices.push({ at: a0 + p, end: a1 - s, from: b0 + p, to: b1 - s });
+		if (a1 - s > a0 + p || b1 - s > b0 + p)
+			splices.push({ at: a0 + p, end: a1 - s, from: b0 + p, to: b1 - s });
 	};
+	const stretch = (a0: number, a1: number, b0: number, b1: number) => {
+		for (const [[x0, x1], [y0, y1]] of sameLines(a, a0, a1, b, b0, b1)) {
+			splice(a0, x0, b0, y0);
+			for (let i = 0; i < x1 - x0; i++) bToA[y0 + i] = x0 + i;
+			[a0, b0] = [x1, y1];
+		}
+		splice(a0, a1, b0, b1);
+	};
+	let a0 = 0;
+	let b0 = 0;
 	for (const [ka, kb] of pairs) {
-		stretch(aSlots[ka], bSlots[kb]);
+		stretch(a0, aSlots[ka], b0, bSlots[kb]);
 		bToA[bSlots[kb]] = aSlots[ka];
 		a0 = aSlots[ka] + 1;
 		b0 = bSlots[kb] + 1;
 	}
-	stretch(a.length, b.length);
+	stretch(a0, a.length, b0, b.length);
 
 	const ylines = assignIds(next, cur.lines, oldLines(a, b, bToA), mint);
 	const marks = markAttrs(next.marks, b.length);
@@ -174,26 +186,48 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 	return renamed;
 }
 
+/**
+ * The lines of `a[a0, a1)` and `b[b0, b1)` that both keep whole, as `[[from, to], [from, to]]`
+ * ranges in order: the longest common run of lines, a line holding a slot never counting as
+ * kept. A line is its characters up to and including its `\n`.
+ */
+function sameLines(
+	a: string[],
+	a0: number,
+	a1: number,
+	b: string[],
+	b0: number,
+	b1: number
+): [[number, number], [number, number]][] {
+	const split = (chars: string[], from: number, to: number, side: string) => {
+		const out: { key: string; from: number; to: number }[] = [];
+		for (let i = from; i < to;) {
+			let j = i;
+			while (j < to && chars[j] !== '\n') j++;
+			if (j < to) j++;
+			const line = chars.slice(i, j);
+			out.push({ key: line.includes(SLOT) ? `${side}${SLOT}${i}` : line.join(''), from: i, to: j });
+			i = j;
+		}
+		return out;
+	};
+	const x = split(a, a0, a1, 'a');
+	const y = split(b, b0, b1, 'b');
+	const pairs = commonRun(
+		x.map((l) => l.key),
+		y.map((l) => l.key)
+	);
+	return pairs.map(([i, j]) => [
+		[x[i].from, x[i].to],
+		[y[j].from, y[j].to]
+	]);
+}
+
 function slotsOf(chars: string[]): number[] {
 	const out: number[] = [];
 	chars.forEach((ch, i) => {
 		if (ch === SLOT) out.push(i);
 	});
-	return out;
-}
-
-/** The longest run of ids the two sequences share in order, as index pairs. */
-function commonIds(a: string[], b: string[]): [number, number][] {
-	const t = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
-	for (let i = a.length - 1; i >= 0; i--)
-		for (let j = b.length - 1; j >= 0; j--)
-			t[i][j] = a[i] === b[j] ? t[i + 1][j + 1] + 1 : Math.max(t[i + 1][j], t[i][j + 1]);
-	const out: [number, number][] = [];
-	for (let i = 0, j = 0; i < a.length && j < b.length;) {
-		if (a[i] === b[j]) out.push([i++, j++]);
-		else if (t[i + 1][j] >= t[i][j + 1]) i++;
-		else j++;
-	}
 	return out;
 }
 

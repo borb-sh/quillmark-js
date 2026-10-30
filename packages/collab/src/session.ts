@@ -28,10 +28,12 @@ export interface Saved {
 	version: Uint8Array;
 }
 
-/** An open session: its epoch, and the update every client starts it from. */
+/** An open session: its epoch, the update every client starts it from, and the quill
+ *  (`name@version`) it was opened under, which every client joining it runs. */
 export interface Opened {
 	epoch: string;
 	seed: Uint8Array;
+	quill?: string;
 }
 
 /** How an append went: kept, refused because the epoch is no longer open, refused because the
@@ -51,8 +53,9 @@ export interface AppendOpts {
 export interface SessionLog {
 	/** The open session; `undefined` when none is. */
 	current(): Promise<Opened | undefined>;
-	/** Open a session from `seed` unless one is open already; the session open after. */
-	open(seed: Uint8Array): Promise<Opened>;
+	/** Open a session from `seed` under `quill` unless one is open already; the session open
+	 *  after. */
+	open(seed: Uint8Array, quill?: string): Promise<Opened>;
 	/** Close `epoch` and drop its entries, when it is still the open one. */
 	end(epoch: string): Promise<void>;
 	/** Add an entry to `epoch`'s log. Entries are numbered from 1 in the order they are kept,
@@ -82,9 +85,10 @@ export interface SessionLog {
 	/**
 	 * Keep `saved` when the store holds none, or when `saved` names the open epoch and moves past
 	 * a held save of that epoch ({@link covers}, one way and not the other). Returns whether it
-	 * was kept.
+	 * was kept. A store that saves the log's projection itself, on a server, leaves it out, and
+	 * no client saves.
 	 */
-	save(saved: Saved): Promise<boolean>;
+	save?(saved: Saved): Promise<boolean>;
 }
 
 export interface JoinSessionOpts {
@@ -99,6 +103,9 @@ export interface JoinSessionOpts {
 	lease?: number;
 	/** How long after the last change a client saves, in ms. */
 	saveDelay?: number;
+	/** How long to wait before each retry of an append that failed, in ms. An append that
+	 *  fails past the last ends the session. */
+	retry?: readonly number[];
 	/** What another client's edit moved, after `joinSession` has returned. */
 	onRemote?(change: RemoteChange): void;
 	onError?(error: unknown): void;
@@ -116,7 +123,7 @@ export interface Session {
 	readonly ydoc: Y.Doc;
 	readonly binding: DocumentBinding;
 	/** `binding.push`: write a local edit to the session. */
-	push(op?: CardOp): Addr[];
+	push(op?: CardOp | readonly CardOp[]): Addr[];
 	/** `Y.encodeSnapshot` of the state the session holds now, a base for `writeFrom`. */
 	snapshot(): Uint8Array;
 	/**
@@ -131,7 +138,8 @@ export interface Session {
 	leave(): Promise<void>;
 }
 
-/** The Document's quill and `quill` disagree: the room is under the quill this names. */
+/** The Document's quill, or the open session's, and `quill` disagree: the room is under the
+ *  quill this names. */
 export class QuillMismatch extends Error {
 	constructor(readonly quillRef: string) {
 		super(`the room's document is under ${quillRef}`);
@@ -145,12 +153,43 @@ export function covers(a: Uint8Array, b: Uint8Array): boolean {
 	const x = Y.decodeSnapshot(a);
 	const y = Y.decodeSnapshot(b);
 	for (const [client, clock] of y.sv) if ((x.sv.get(client) ?? 0) < clock) return false;
-	for (const [client, items] of y.ds.clients)
-		for (const { clock, len } of items)
-			for (let c = clock; c < clock + len; c++)
-				if (!Y.isDeleted(x.ds, Y.createID(client, c))) return false;
+	for (const [client, items] of y.ds.clients) {
+		const held = [...(x.ds.clients.get(client) ?? [])].sort((p, q) => p.clock - q.clock);
+		for (const { clock, len } of items) {
+			let at = clock;
+			for (const r of held) {
+				if (r.clock > at) break;
+				if (r.clock + r.len > at) at = r.clock + r.len;
+				if (at >= clock + len) break;
+			}
+			if (at < clock + len) return false;
+		}
+	}
 	return true;
 }
+
+/**
+ * Whether `opened` is over for a writer: closed, or idle past `lease` with `saved` holding every
+ * entry, so the next session can open from the save.
+ */
+export async function settled(
+	log: SessionLog,
+	opened: Opened,
+	saved: Saved,
+	lease = LEASE
+): Promise<boolean> {
+	const read = await log.since(opened.epoch);
+	if (!read) return true;
+	if (Date.now() - read.touched <= lease) return false;
+	return (
+		read.updates.length === 0 ||
+		(saved.epoch === opened.epoch &&
+			covers(saved.version, snapshotOf([opened.seed, ...read.updates])))
+	);
+}
+
+const LEASE = 5 * 60_000;
+const RETRY = [500, 2000, 8000];
 
 function snapshotOf(updates: Uint8Array[]): Uint8Array {
 	const ydoc = new Y.Doc();
@@ -161,10 +200,11 @@ function snapshotOf(updates: Uint8Array[]): Uint8Array {
 }
 
 const sameQuill = (ref: string, quill: Quill) => ref.split('@')[0] === quill.metadata.name;
+const quillOf = (quill: Quill) => `${quill.metadata.name}@${quill.metadata.version}`;
 
 export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	const { log, quill } = opts;
-	const lease = opts.lease ?? 5 * 60_000;
+	const lease = opts.lease ?? LEASE;
 	const { Document } = await init();
 
 	let saved = await log.load();
@@ -176,24 +216,15 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 			version: Y.encodeSnapshot(Y.emptySnapshot)
 		};
 		initial.free();
-		await log.save(first);
+		await log.save?.(first);
 		saved = (await log.load()) ?? first;
 	}
 
 	let opened = await log.current();
-	if (opened) {
-		const read = await log.since(opened.epoch);
-		const idle = read && Date.now() - read.touched > lease;
-		const reflected =
-			read &&
-			(read.updates.length === 0 ||
-				(saved.epoch === opened.epoch &&
-					covers(saved.version, snapshotOf([opened.seed, ...read.updates]))));
-		if (!read || (idle && reflected)) {
-			if (read) await log.end(opened.epoch);
-			saved = (await log.load()) ?? saved;
-			opened = undefined;
-		}
+	if (opened && (await settled(log, opened, saved, lease))) {
+		if (await log.since(opened.epoch)) await log.end(opened.epoch);
+		saved = (await log.load()) ?? saved;
+		opened = undefined;
 	}
 	const probe = Document.fromStored(saved.stored);
 	const ref = probe.quillRef;
@@ -201,8 +232,10 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		probe.free();
 		throw new QuillMismatch(ref);
 	}
-	if (!opened) opened = await log.open(seedDocument(probe, quill));
+	if (!opened) opened = await log.open(seedDocument(probe, quill), quillOf(quill));
 	probe.free();
+	if (opened.quill !== undefined && opened.quill !== quillOf(quill))
+		throw new QuillMismatch(opened.quill);
 	const epoch = opened.epoch;
 	const read = await log.since(epoch);
 	if (!read) throw new Error('the session closed while joining');
@@ -232,7 +265,7 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	async function save(): Promise<boolean> {
 		clearTimeout(timer);
 		timer = undefined;
-		if (ended) return false;
+		if (ended || !log.save || binding?.holding) return false;
 		try {
 			return await log.save({
 				epoch,
@@ -246,25 +279,43 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	}
 
 	// An update this client made reaches the log, or the session ends: every later update builds
-	// on it, so one missing would hold all of them back from every other client.
+	// on it, so one missing would hold all of them back from every other client. Updates made
+	// while an append is out go together in the next, and a failed append is tried again: an
+	// update applied twice changes nothing, so a retry of one that landed unseen is harmless.
 	const writers = new WeakMap<object, string>();
-	let appending = Promise.resolve();
+	const queue: { writer?: string; updates: Uint8Array[] }[] = [];
+	let flushing: Promise<void> | undefined;
+	const delays = opts.retry ?? RETRY;
 	const onUpdate = (update: Uint8Array, origin: unknown) => {
 		schedule();
 		if (origin === LOG) return;
 		const writer =
 			(origin !== null && typeof origin === 'object' && writers.get(origin)) || opts.writer;
-		appending = appending.then(async () => {
+		const last = queue.at(-1);
+		if (last && last.writer === writer) last.updates.push(update);
+		else queue.push({ writer, updates: [update] });
+		flushing ??= flush().finally(() => (flushing = undefined));
+	};
+	async function flush(): Promise<void> {
+		for (let group = queue.shift(); group; group = queue.shift()) {
 			if (ended) return void (lost = true);
-			try {
-				if ((await log.append(epoch, update, { writer })) === 'appended') return;
-			} catch (e) {
-				report(e);
+			const update = group.updates.length === 1 ? group.updates[0] : Y.mergeUpdates(group.updates);
+			let appended: Appended | undefined;
+			for (let attempt = 0; appended === undefined; attempt++) {
+				try {
+					appended = await log.append(epoch, update, { writer: group.writer });
+				} catch (e) {
+					report(e);
+					if (attempt >= delays.length || ended) break;
+					await new Promise((r) => setTimeout(r, delays[attempt]));
+				}
 			}
+			if (appended === 'appended' || appended === 'duplicate') continue;
 			lost = true;
 			end();
-		});
-	};
+			return;
+		}
+	}
 	ydoc.on('update', onUpdate);
 
 	let binding: DocumentBinding | undefined;
@@ -339,7 +390,7 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		},
 		save,
 		async leave() {
-			await appending;
+			while (flushing) await flushing;
 			await save();
 			if (!ended) {
 				ended = true;

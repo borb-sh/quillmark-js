@@ -66,7 +66,7 @@ interface Tab {
 
 function open(
 	origin: Origin,
-	extra: { lease?: number; compactAt?: number; quill?: FixtureName } = {}
+	extra: { lease?: number; compactAt?: number; quill?: FixtureName; retry?: number[] } = {}
 ): Tab {
 	const q = quill(extra.quill);
 	const tab: Tab = { join: undefined!, ended: {}, errors: [], remote: 0 };
@@ -76,6 +76,7 @@ function open(
 			quill: q,
 			initial: () => q.exampleDocument()!,
 			lease: extra.lease,
+			retry: extra.retry,
 			saveDelay: 60_000,
 			onRemote: () => tab.remote++,
 			onEnded: (lost) => (tab.ended.lost = lost),
@@ -185,15 +186,49 @@ describe('sessions', () => {
 		expect(text(c).includes('stale')).toBe(false);
 	});
 
-	it('ends a session whose write failed, rather than leave its later edits stranded', async () => {
+	it('ends a session whose write failed past its retries, rather than leave its later edits stranded', async () => {
 		const origin = new Origin();
-		const tab = open(origin);
+		const tab = open(origin, { retry: [1] });
 		const a = await tab.join();
 		origin.full = true;
 		type(a, 'nowhere ');
-		await settle();
+		await wait(20);
 		expect(tab.ended.lost).toBe(true);
-		expect(tab.errors).toHaveLength(1);
+		expect(tab.errors).toHaveLength(2);
+	});
+
+	it('retries a failed write, and sends what was typed meanwhile with it', async () => {
+		const origin = new Origin();
+		const tab = open(origin, { retry: [20] });
+		const a = await tab.join();
+		const b = await open(origin).join();
+		origin.full = true;
+		type(a, 'one ');
+		await settle();
+		type(a, 'two ');
+		origin.full = false;
+		await wait(40);
+		expect(tab.ended.lost).toBeUndefined();
+		expect(text(b).startsWith('two one ')).toBe(true);
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
+	it('refuses a join from a client on another version of the quill the session runs', async () => {
+		const origin = new Origin();
+		await open(origin).join();
+		const opened = JSON.parse(origin.data.get('qm-collab:r:open')!);
+		origin.data.set('qm-collab:r:open', JSON.stringify({ ...opened, quill: 'showcase@0.9.0' }));
+		await expect(open(origin).join()).rejects.toThrow(QuillMismatch);
+	});
+
+	it('saves nothing while it holds a remote value its Document refused', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		a.ydoc.transact(() => a.ydoc.getMap('main').set('not a name', 1), 'net');
+		expect(a.binding.holding).toBe(true);
+		type(a, 'held ');
+		await settle();
+		expect(await a.save()).toBe(false);
 	});
 
 	it('joins from a save the log has moved past', async () => {
@@ -341,11 +376,13 @@ describe('writes from a revision', () => {
 			expect.objectContaining({
 				type: 'field',
 				from: 'main',
-				hunk: {
-					line: 0,
-					before: expect.stringMatching(/^The body/),
-					after: expect.stringMatching(/^Typed\. The body/)
-				}
+				hunks: [
+					{
+						line: 0,
+						before: expect.stringMatching(/^The body/),
+						after: expect.stringMatching(/^Typed\. The body/)
+					}
+				]
 			})
 		]);
 		expect(next.revision.count).toBe(first.revision.count + 1);
@@ -359,7 +396,7 @@ describe('writes from a revision', () => {
 		await log.end(a.epoch);
 		const read = await readLog({ log, quill: quill() });
 		read.doc.free();
-		expect(read.revision).toEqual({ epoch: '', count: 0 });
+		expect(read.revision).toEqual({ epoch: '', count: 0, check: '' });
 		expect(await log.current()).toBeUndefined();
 		const written = await write(log, read.revision, 'Rewritten.');
 		expect(written.status).toBe('written');
@@ -431,11 +468,75 @@ describe('writes from a revision', () => {
 		const a = await open(origin).join();
 		const read = await readLog({ log, quill: quill() });
 		read.doc.free();
-		expect(await write(log, { epoch: a.epoch, count: -1 }, 'Bad.')).toEqual({ status: 'stale' });
-		expect(await write(log, { epoch: a.epoch, count: 99 }, 'Ahead.')).toEqual({ status: 'stale' });
+		const { check } = read.revision;
+		expect(await write(log, { epoch: a.epoch, count: -1, check }, 'Bad.')).toEqual({
+			status: 'stale'
+		});
+		expect(await write(log, { epoch: a.epoch, count: 99, check }, 'Ahead.')).toEqual({
+			status: 'stale'
+		});
 		await a.leave();
 		await log.end(a.epoch);
 		expect(await write(log, read.revision, 'Late.')).toEqual({ status: 'stale' });
+	});
+
+	it('refuses a revision whose count is not the one read', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		const log = logOf(origin);
+		type(a, 'one ');
+		await settle();
+		const read = await readLog({ log, quill: quill() });
+		read.doc.free();
+		type(a, 'Typed. ');
+		await settle();
+		const claimed = { ...read.revision, count: read.revision.count + 1 };
+		expect(await write(log, claimed, 'Rewritten.')).toEqual({ status: 'stale' });
+		expect(text(a).startsWith('Typed. ')).toBe(true);
+	});
+
+	it('reads a session nobody is in whose entries are saved as the save, and ends it to write', async () => {
+		const origin = new Origin();
+		const a = await open(origin, { lease: 0 }).join();
+		type(a, 'Saved. ');
+		await settle();
+		await a.leave();
+		await wait(2);
+		const log = logOf(origin);
+		const read = await readLog({ log, quill: quill(), lease: 0 });
+		read.doc.free();
+		expect(read.revision).toEqual({ epoch: '', count: 0, check: '' });
+		const written = await writeLog({
+			log,
+			quill: quill(),
+			lease: 0,
+			base: read.revision,
+			writer: 'ai:1',
+			edit: (doc) => rewrite(doc, 'Rewritten.')
+		});
+		expect(written).toMatchObject({ status: 'written', revision: { count: 1 } });
+		expect((await log.current())?.epoch).not.toBe(a.epoch);
+		const b = await open(origin).join();
+		expect(text(b).startsWith('Saved. ')).toBe(true);
+		expect(abstract(b)).toBe('Rewritten.');
+	});
+
+	it('opens no session for a write from the save that writes nothing', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		await a.leave();
+		const log = logOf(origin);
+		await log.end(a.epoch);
+		await expect(
+			writeLog({
+				log,
+				quill: quill(),
+				base: { epoch: '', count: 0, check: '' },
+				writer: 'ai:1',
+				edit: (doc) => void quill().writer(doc).addCard('note', { label: 'Lost' }, '', 0)
+			})
+		).rejects.toThrow();
+		expect(await log.current()).toBeUndefined();
 	});
 
 	it('refuses a revision compaction has merged past', async () => {
@@ -446,8 +547,10 @@ describe('writes from a revision', () => {
 		await settle();
 		const read = await readLog({ log, quill: quill() });
 		read.doc.free();
-		for (let i = 0; i < 5; i++) type(a, `${i} `);
-		await settle();
+		for (let i = 0; i < 5; i++) {
+			type(a, `${i} `);
+			await settle();
+		}
 		expect(await write(log, read.revision, 'Late.')).toEqual({ status: 'stale' });
 	});
 });

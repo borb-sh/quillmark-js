@@ -1,31 +1,40 @@
 // A writer with no editor open, such as a server answering a model's tool call: it reads a room's
 // document at a revision, and later writes an edit from that revision, straight through the log.
 //
-// A revision is `{ epoch, count }`: the session, and how many of its log entries the state holds.
-// It is short enough to hand a model, and the state it names is rebuilt from the log. With no
-// session open, the revision is `{ epoch: '', count: 0 }`, the saved Document itself.
+// A revision is `{ epoch, count, check }`: the session, how many of its log entries the state
+// holds, and a digest of that state. It is short enough to hand a model, the state it names is
+// rebuilt from the log, and a count the reader did not read fails its check. With no session
+// open, or one nobody is in whose every entry is saved, the revision is `{ epoch: '', count: 0,
+// check: '' }`, the saved Document itself.
 //
-// A read changes nothing. A write opens a session when none is open, rebuilds the log's history,
-// makes the edit from its revision (`writeFrom`), and appends it only if the log still holds the
-// entries the conflict check saw, trying again when it moved. It then saves the Document the log
-// projects to, so the save follows the write with no client open.
+// A read changes nothing. A write from the save ends a session nobody is in, rebuilds the log's
+// history, makes the edit from its revision (`writeFrom`), opens a session from the save only once
+// it has an edit to append, and appends it only if the log still holds the entries the conflict
+// check saw, trying again when it moved. It then saves the Document the log projects to, so the
+// save follows the write with no client open.
 import * as Y from 'yjs';
 import { init, type Document, type Quill } from '@quillmark/wasm';
 import { seedDocument, type CardOp } from './document.js';
 import { changesSince, projectDocument, writeFrom, type Change } from './fork.js';
-import { QuillMismatch, type Opened, type Saved, type SessionLog } from './session.js';
+import { QuillMismatch, settled, type Opened, type Saved, type SessionLog } from './session.js';
 
-/** A point in a room's session: its epoch, and how many log entries the state there holds. */
+/** A point in a room's session: its epoch, how many log entries the state there holds, and a
+ *  digest of that state. A writer hands back the revision it read, as it read it. */
 export interface Revision {
 	epoch: string;
 	count: number;
+	check: string;
 }
 
 export interface ReadLogOpts {
 	log: SessionLog;
 	/** The quill the room's Document is under. */
 	quill: Quill;
+	/** How long a session stays open with nobody appending or present, in ms: `joinSession`'s. */
+	lease?: number;
 }
+
+const SAVE: Revision = { epoch: '', count: 0, check: '' };
 
 export interface LogRead {
 	revision: Revision;
@@ -42,20 +51,25 @@ export async function readLog(opts: ReadLogOpts & { since?: Revision }): Promise
 	const room = await open(opts);
 	try {
 		const opened = await log.current();
-		if (!opened) {
+		if (!opened || (await settled(log, opened, room.saved, opts.lease))) {
 			const doc = room.template.clone();
 			const changes = since && validRevision(since) && since.epoch === '' ? [] : undefined;
-			return { revision: { epoch: '', count: 0 }, doc, ...(changes ? { changes } : {}) };
+			return { revision: SAVE, doc, ...(changes ? { changes } : {}) };
 		}
 		const read = await history(log, opened);
 		if (!read) return readLog(opts);
 		try {
 			const doc = projectDocument(read.ydoc, quill, room.template);
-			const revision = { epoch: opened.epoch, count: read.count };
+			const revision = {
+				epoch: opened.epoch,
+				count: read.count,
+				check: checkOf(Y.encodeSnapshot(Y.snapshot(read.ydoc)))
+			};
 			let changes: Change[] | undefined;
 			if (since && validRevision(since) && since.epoch === opened.epoch) {
 				const base = await snapshotAt(log, opened, since.count, read.count);
-				if (base) changes = changesSince({ history: read.ydoc, base, quill, doc: room.template });
+				if (base && checkOf(base) === since.check)
+					changes = changesSince({ history: read.ydoc, base, quill, doc: room.template });
 			}
 			return { revision, doc, ...(changes ? { changes } : {}) };
 		} finally {
@@ -73,8 +87,8 @@ export interface WriteLogOpts extends ReadLogOpts {
 	writer: string;
 	/** Write the edit once under this key, for a writer that may retry, such as a tool call id. */
 	key?: string;
-	/** Make the edit on the Document as it stood at `base`; return its card operation, if any. */
-	edit(doc: Document): CardOp | void;
+	/** Make the edit on the Document as it stood at `base`; return its card operations, if any. */
+	edit(doc: Document): CardOp | CardOp[] | void;
 }
 
 export type LogWrite =
@@ -99,16 +113,21 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 		const seed = seedDocument(room.template, quill);
 		let opened = await log.current();
 		if (base.epoch === '') {
-			opened ??= await log.open(seed);
+			if (opened && (await settled(log, opened, room.saved, opts.lease))) {
+				await log.end(opened.epoch);
+				opened = await log.current();
+			}
 			// A session opened from the save the writer read starts from the same seed (I5).
-			if (!sameBytes(opened.seed, seed)) return { status: 'stale' };
+			if (opened && !sameBytes(opened.seed, seed)) return { status: 'stale' };
 		} else if (opened?.epoch !== base.epoch) return { status: 'stale' };
 		for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-			const read = await history(log, opened);
+			const read = opened ? await history(log, opened) : fromSeed(seed);
 			if (!read || base.count > read.count) return { status: 'stale' };
 			try {
-				const at = await snapshotAt(log, opened, base.count, read.count);
-				if (!at) return { status: 'stale' };
+				const at = opened
+					? await snapshotAt(log, opened, base.count, read.count)
+					: Y.encodeSnapshot(Y.snapshot(read.ydoc));
+				if (!at || (base.epoch !== '' && checkOf(at) !== base.check)) return { status: 'stale' };
 				const written = writeFrom({
 					history: read.ydoc,
 					base: at,
@@ -117,6 +136,10 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 					edit: opts.edit
 				});
 				if (written.conflicts.length) return { status: 'conflict', conflicts: written.conflicts };
+				if (!opened) {
+					opened = await log.open(seed);
+					if (!sameBytes(opened.seed, seed)) return { status: 'stale' };
+				}
 				const appended = await log.append(opened.epoch, written.update, {
 					writer: opts.writer,
 					after: read.count,
@@ -129,7 +152,11 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 				await save(log, opened.epoch, read.ydoc, quill, room.template);
 				return {
 					status: 'written',
-					revision: { epoch: opened.epoch, count: read.count + 1 },
+					revision: {
+						epoch: opened.epoch,
+						count: read.count + 1,
+						check: checkOf(Y.encodeSnapshot(Y.snapshot(read.ydoc)))
+					},
 					changes: written.changes
 				};
 			} finally {
@@ -168,6 +195,13 @@ async function history(
 	return { ydoc, count: read.count };
 }
 
+/** A session's state at its seed alone, before any entry. */
+function fromSeed(seed: Uint8Array): { ydoc: Y.Doc; count: number } {
+	const ydoc = new Y.Doc({ gc: false });
+	Y.applyUpdate(ydoc, seed);
+	return { ydoc, count: 0 };
+}
+
 /** `Y.encodeSnapshot` of the state after `count` entries, or `undefined` where the log cannot
  *  rebuild it. */
 async function snapshotAt(
@@ -195,6 +229,7 @@ async function save(
 	quill: Quill,
 	template: Document
 ): Promise<void> {
+	if (!log.save) return;
 	try {
 		const doc = projectDocument(ydoc, quill, template);
 		try {
@@ -216,8 +251,31 @@ function validRevision(r: Revision): boolean {
 		typeof r?.epoch === 'string' &&
 		Number.isSafeInteger(r.count) &&
 		r.count >= 0 &&
-		(r.epoch !== '' || r.count === 0)
+		typeof r.check === 'string' &&
+		(r.epoch !== '' || (r.count === 0 && r.check === ''))
 	);
+}
+
+/** A digest of the state `snapshot` names: its state vector and delete set, in a fixed order, as
+ *  eleven base-36 digits. */
+export function checkOf(snapshot: Uint8Array): string {
+	const { sv, ds } = Y.decodeSnapshot(snapshot);
+	const parts: number[] = [];
+	for (const client of [...sv.keys()].sort((x, y) => x - y)) parts.push(client, sv.get(client)!);
+	parts.push(-1);
+	for (const client of [...ds.clients.keys()].sort((x, y) => x - y))
+		for (const { clock, len } of ds.clients.get(client)!) parts.push(client, clock, len);
+	let h1 = 0xdeadbeef;
+	let h2 = 0x41c6ce57;
+	for (const n of parts)
+		for (const unit of String(n)) {
+			const c = unit.charCodeAt(0);
+			h1 = Math.imul(h1 ^ c, 2654435761);
+			h2 = Math.imul(h2 ^ c, 1597334677);
+		}
+	h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+	h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+	return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36).padStart(11, '0');
 }
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {

@@ -41,7 +41,7 @@ const type = (t: Tab, at: number, words: string) => {
 	t.doc.applyChange({}, { delta: { ops: [...(at ? [{ retain: at }] : []), { insert: words }] } });
 	t.binding.push();
 };
-const write = (t: Tab, base: Uint8Array, edit: (doc: Document) => CardOp | void) =>
+const write = (t: Tab, base: Uint8Array, edit: (doc: Document) => CardOp | CardOp[] | void) =>
 	writeFrom({ history: t.ydoc, base, quill: q, doc: t.doc, edit });
 
 describe('writeFrom', () => {
@@ -77,13 +77,61 @@ describe('writeFrom', () => {
 		const written = write(a, base, (doc) => {
 			q.writer(doc).reviseBody(old.replace('The body is a full block leaf', 'The body is new'));
 		});
-		expect(written.conflicts).toEqual([expect.objectContaining({ type: 'field', from: 'main' })]);
-		expect(written.conflicts[0]).not.toHaveProperty('field');
+		expect(written.conflicts).toEqual([]);
 		Y.applyUpdate(a.ydoc, written.update, 'ai');
 		const body = authoring(a).body!;
 		expect(body).toMatch(/^The body is new:/);
 		expect(body).toMatch(/segments rather than one run\. Edited\.$/);
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
+	it('keeps a line typed into between two lines a rewrite changed where it was typed', () => {
+		const [a, b] = session();
+		const lines = ['Alpha one.', 'Bravo two.', 'Charlie three.', 'Delta four.', 'Echo five.'];
+		q.writer(a.doc).reviseBody(lines.join('\n\n'));
+		a.binding.push();
+		const base = revision(a);
+		const at = Array.from(b.doc.main.body.text).join('').indexOf('three.');
+		type(b, at, 'typed ');
+		const written = write(a, base, (doc) => {
+			const next = [...lines];
+			next[1] += ' One.';
+			next[3] += ' Two.';
+			q.writer(doc).reviseBody(next.join('\n\n'));
+		});
+		expect(written.conflicts).toEqual([]);
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		expect(authoring(a).body!.split('\n\n')).toEqual([
+			'Alpha one.',
+			'Bravo two. One.',
+			'Charlie typed three.',
+			'Delta four. Two.',
+			'Echo five.'
+		]);
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
+	it('reports a line both sides rewrote, and lines next to each other as apart', () => {
+		const [a] = session();
+		const lines = ['Alpha one.', 'Bravo two.', 'Charlie three.'];
+		q.writer(a.doc).reviseBody(lines.join('\n\n'));
+		a.binding.push();
+		const base = revision(a);
+		type(a, Array.from(a.doc.main.body.text).join('').indexOf('two.'), 'typed ');
+		const same = write(a, base, (doc) => {
+			q.writer(doc).reviseBody(['Alpha one.', 'Bravo 2.', 'Charlie three.'].join('\n\n'));
+		});
+		expect(same.conflicts).toEqual([
+			expect.objectContaining({
+				type: 'field',
+				from: 'main',
+				hunks: [{ line: 2, before: 'Bravo two.', after: 'Bravo typed two.' }]
+			})
+		]);
+		const next = write(a, base, (doc) => {
+			q.writer(doc).reviseBody(['Alpha 1.', 'Bravo two.', 'Charlie 3.'].join('\n\n'));
+		});
+		expect(next.conflicts).toEqual([]);
 	});
 
 	it('lands a card inserted from an old revision beside the card it followed there', () => {
@@ -106,6 +154,27 @@ describe('writeFrom', () => {
 			'credits'
 		]);
 		expect(authoring(a).cards?.[2].fields).toEqual({ label: 'Added' });
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
+	it('writes several card operations from one edit', () => {
+		const [a, b] = session();
+		const base = revision(a);
+		const written = write(a, base, (doc) => {
+			const w = q.writer(doc);
+			w.addCard('note', { label: 'First' }, '', 0);
+			w.addCard('note', { label: 'Second' }, '', 2);
+			doc.moveCard(doc.cardCount - 1, 1);
+			return [
+				{ op: 'insert', at: 0 },
+				{ op: 'insert', at: 2 },
+				{ op: 'move', from: doc.cardCount - 1, to: 1 }
+			];
+		});
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		expect(authoring(a).cards?.[0].fields?.label).toBe('First');
+		expect(authoring(a).cards?.[3].fields?.label).toBe('Second');
+		expect(a.doc.cardCount).toBe(7);
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 
@@ -173,7 +242,7 @@ describe('changesSince', () => {
 				field: 'heading',
 				before: 'Findings',
 				after: 'Results',
-				hunk: { line: 0, before: 'Findings', after: 'Results' }
+				hunks: [{ line: 0, before: 'Findings', after: 'Results' }]
 			}
 		]);
 	});
