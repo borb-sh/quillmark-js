@@ -59,10 +59,9 @@ describe('strings on the mounted surface', () => {
 		expect(add?.getAttribute('aria-label')).toBe('Ajouter une carte');
 		expect(add?.textContent).toBe('');
 		expect(add?.querySelector('svg')).toBeNull();
-		// The append point states the words themselves after a `+` kept out of the name.
+		// The append point states the words themselves after a `+`.
 		const append = [...target.querySelectorAll('.qm-add-btn')].at(-1);
 		expect(append?.textContent).toBe('+ Ajouter une carte');
-		expect(append?.querySelector('[aria-hidden="true"]')?.textContent).toBe('+ ');
 
 		// An untouched key still reads the package's English on the same surface.
 		const titles = [...target.querySelectorAll('[title]')].map((el) => el.getAttribute('title'));

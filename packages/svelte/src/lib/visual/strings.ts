@@ -43,7 +43,7 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	cardTitle: string;
 
 	// ── The add affordance ────────────────────────────────────────────────────
-	/** The trailing strip's visible words, drawn after a `+` it adds itself, and every
+	/** The trailing strip's visible words, drawn after a `+`, and every
 	 * strip's accessible name. One string over
 	 * one kind and many: the trigger seeds a card, and which kind is the menu's word
 	 * to say or the schema's to have already settled. */
