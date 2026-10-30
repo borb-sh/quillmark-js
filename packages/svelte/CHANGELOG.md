@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`VisualEditor` exposes `washField(field)`.** It plays the arrival wash over a mounted field and moves nothing: no focus, no reveal, no scroll. A field in a closed group washes nothing, and a nested address washes its field's box. A host marks a change it wrote into the document with it, leaving the user's caret where it was.
+
 ## v0.29.1 - 2026-10-30
 
 **A card's column is mirrored.** A field's well ends where the body's lines and the delete glyph end, the same distance inside the card's inline inset as it starts; wells ran 5.5px further toward the end edge than anything else in the card.

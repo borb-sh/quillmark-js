@@ -238,6 +238,7 @@ The instance surface, reached by that `bind:this`:
 ```ts
 setCaret(at: Landing): Promise<void>;          // preview → editor; a caret where the pick has one
 focusField(field: DocPath): Promise<void>;     // any mounted field: reveal + focus, no caret
+washField(field: DocPath): void;               // the arrival wash alone: no focus, reveal or scroll
 insertCard(kind: string, at?: number): CardId | undefined;  // the new card's key
 removeCard(cardId: CardId): void;
 moveCard(cardId: CardId, dir: -1 | 1): void;   // one slot; a no-op at either edge
@@ -260,6 +261,8 @@ The second rung is the editor's because the editor holds `quill.schema`: a step 
 **The walk carries a place, not a focus**, and what a place means at its end is the leaf's — the same reason a control owns its focus. A prose leaf, a row or a cell, takes the offset (`ProseValue.setCaret`, `createField`'s body over the view it owns); a collapsed `object` row opens and hands the rest of the walk to the subform it opened, one flush later, since that subform does not exist until the row has rendered — opening is part of the landing rather than something the user does first, a collapsed row holding no control for a caret to sit in; a scalar cell takes the bare focus, an offset being a position in rendered content and a control having no coordinate to spend one in. An absent `pos` is the placement rung on this lane exactly as on `Landing`, which is where a `'segment'` hit lands, so one rule covers both lanes. The landing is therefore the one thing on the surface that answers after a flush, and `setCaret` was already async for the reveal.
 
 **The wash marks what the address named** (`core/bloom.ts`). A landing at depth blooms the innermost row it opened and not the repeater around it: the arrival answers "here" for a click made in the other pane, and a box wider than the one the click resolved says the field where the pick said the row. So the walk hands its row back with the landing, and the registry's own box — the whole list, a field-level subform — is what a landing on the field, or on a property no row holds, falls to, along with a row the document has since dropped. Every other control is one box, which is the one the registry holds.
+
+**A wash without a landing marks a change, and moves nothing** (`washField`). A host that wrote a field — an assistant's edit, say — shows where without taking the caret the user holds, so the verb plays the wash and does nothing else: no focus, no reveal, no scroll. A field in a closed group washes nothing, its box clipped to zero height, and opening the group would be the reveal the verb refuses. A nested address washes its field's box, since the row it names exists only once a landing opens it.
 
 ## Not owned
 

@@ -30,6 +30,7 @@ export function stubLayout(): void {
 /** The instance surface a host binds to. */
 export interface EditorRef {
 	focusField(field: string): Promise<void>;
+	washField(field: string): void;
 	setCaret(at: { field: string; pos?: number; granularity?: string }): Promise<void>;
 	insertCard(kind: string, at?: number): CardId | undefined;
 	removeCard(cardId: CardId): void;
