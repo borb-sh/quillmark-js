@@ -89,7 +89,7 @@ The verb is the whole encapsulation, which is why there is no workflow beside it
 
 **What the layout cannot assert is the host's, and it is four rules**: `assets/*` immutable, no edge cache on `quiver/quiver.json`, a missing path answered as a 404, and https. The first is the client's own content-hashed bundle; the second is the edge alone, the browser layer being closed by the fetch mode the loader picks for each name (QUIVER §"The index"). The last two are what a static host's defaults get wrong, and both surface as something other than themselves: a file refused as not the one it was named, and bytes nothing checked. `preview` serves a build under the first three, every path outside `assets/` sent `no-cache`, so a deploy is looked at locally under the rules it will meet.
 
-**The gate is the recipe's, not this verb's.** The packer stats each `Quill.yaml` as a sentinel and parses none, and the app target loads the quills it pins but renders none, so a quill whose plate does not compile builds cleanly; the verb that renders is `check`, and every documented recipe runs it first.
+**The gate is the recipe's, not this verb's.** The packer reads each `Quill.yaml` for the name and version it declares and compiles nothing, and the app target loads the quills it pins but renders none, so a quill whose plate does not compile builds cleanly; the verb that renders is `check`, and every documented recipe runs it first.
 
 **It clears what it writes**, so an `--out` holding the quiver or the working directory is refused. An `--out` nested inside the quiver is the ordinary layout, `dist/`, and nothing of the source is read after the clear.
 

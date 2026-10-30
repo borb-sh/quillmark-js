@@ -6,7 +6,7 @@
 // `--_qm-accent-wash`, so the scale stays in CSS where `color-mix` resolves. The wash is the host's
 // `::after` (`.qm-wash`, controls.css); this module plays it and adds nothing to the tree.
 
-import { rungStyle } from './rungs.js';
+import { rungMs, rungStyle } from './rungs.js';
 
 const WASH = '::after';
 /** The dwell used when the derivation is out of reach (an unstyled root, or jsdom). */
@@ -37,8 +37,6 @@ export function bloom(host: HTMLElement): void {
 	}
 	const reduced =
 		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-	const raw = rungStyle(host).getPropertyValue('--_qm-bloom-dwell').trim();
-	const n = Number.parseFloat(raw);
-	const duration = !Number.isFinite(n) ? FALLBACK_MS : raw.endsWith('ms') ? n : n * 1000;
+	const duration = rungMs(rungStyle(host), '--_qm-bloom-dwell') ?? FALLBACK_MS;
 	host.animate(reduced ? FRAMES_REDUCED : FRAMES, { duration, pseudoElement: WASH });
 }

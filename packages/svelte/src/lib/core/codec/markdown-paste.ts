@@ -54,7 +54,7 @@ type Level = { kind: string; indent: number; width: number };
  * is indented past the markers of the levels above it. A letter's ordinal is its place in
  * the alphabet. Lines in a fence and lines opening no item stand as they are.
  */
-export function plainTextList(text: string): string {
+function plainTextList(text: string): string {
 	if (!LOOSE_ITEM.test(text)) return text;
 	const levels: Level[] = [];
 	let fence = false;

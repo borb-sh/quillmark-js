@@ -36,7 +36,7 @@ npm run check:fonts        # the font suite's files against its manifest
 npm run check:bundle       # the same scales, in a built consumer
 ```
 
-Everything runs against the one reference quill, [`fixtures/quills/showcase/1.0.0`](fixtures/quills/showcase), a dev fixture at the workspace root, never published: it declares a field for every control the tier draws and three card kinds, so a surface is exercised against a schema rather than against a mock.
+Everything runs against the reference quill, [`fixtures/quills/showcase/1.0.0`](fixtures/quills/showcase), a dev fixture at the workspace root, never published (beside it sits `usaf_memo`, a held copy of a shipped quill; see [`fixtures/Quiver.yaml`](fixtures/Quiver.yaml)): it declares a field for every control the tier draws and three card kinds, so a surface is exercised against a schema rather than against a mock.
 
 ## Canon
 

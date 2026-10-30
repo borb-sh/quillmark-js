@@ -3,7 +3,7 @@
 
 /** `Mod-/`, read off `key` so a layout that shifts to reach `/` still matches; either
  *  modifier stands for `Mod`. */
-export function isGuidanceKey(e: KeyboardEvent): boolean {
+function isGuidanceKey(e: KeyboardEvent): boolean {
 	return e.key === '/' && (e.ctrlKey || e.metaKey) && !e.altKey && !e.isComposing;
 }
 
@@ -15,7 +15,7 @@ export function isGuidanceKey(e: KeyboardEvent): boolean {
  * a prose leaf's note) are skipped, and an undescribed property falls through to the
  * group around it.
  */
-export function guidanceTrigger(from: Element, root: Element): HTMLElement | undefined {
+function guidanceTrigger(from: Element, root: Element): HTMLElement | undefined {
 	for (let el = from.closest('[aria-describedby]'); el;) {
 		for (const id of el.getAttribute('aria-describedby')!.split(/\s+/)) {
 			const trigger = root.querySelector<HTMLElement>(`.qm-field-hint[aria-describedby="${id}"]`);

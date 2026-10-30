@@ -41,7 +41,7 @@
 		controlKind,
 		declaredContent,
 		fieldModels,
-		humanize,
+		fieldTitle,
 		isContainer,
 		literalText,
 		mountKey,
@@ -150,7 +150,6 @@
 	const routed = $derived(splitDeep(diagnostics));
 	const foot = $derived(unrouted(routed, (step) => typeof step === 'string' && has(step)));
 
-	const title = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
 	/** What an unset optional cell ghosts, which is what it prints: `none`. An answered
 	 *  cell ghosts nothing, an empty answer printing empty. */
 	const noneOf = (key: string, sub: QuillFieldSchema): string | undefined =>
@@ -163,7 +162,7 @@
 	/** The `aria-label` fallback, for a subform mounted without a field's id space:
 	 *  the field's name and the property's, since nothing else names the control. */
 	const fallbackName = (key: string, sub: QuillFieldSchema): string =>
-		`${label != null ? `${label} ` : ''}${title(key, sub)}`;
+		`${label != null ? `${label} ` : ''}${fieldTitle(key, sub)}`;
 
 	/** The handles of the cells the DOM cannot answer for, keyed by property name —
 	 *  which is stable, a subform drawing its properties by declaration and never by
@@ -313,7 +312,7 @@
 			>
 				{#if ids && kind !== 'array' && kind !== 'matrix'}
 					<FieldLabel
-						label={title(key, sub)}
+						label={fieldTitle(key, sub)}
 						controlId={labelable ? ids.control : undefined}
 						id={ids.label}
 						descriptionId={describes}
@@ -410,7 +409,7 @@
 						items={sub.items}
 						layout={arrayLayout(sub)}
 						max={sub.max}
-						label={title(key, sub)}
+						label={fieldTitle(key, sub)}
 						description={sub.description}
 						labelId={ids?.label}
 						descriptionId={describes}
@@ -438,7 +437,7 @@
 						bind:this={nestedEls[key]}
 						value={obj[key] as Record<string, unknown> | undefined}
 						schema={sub}
-						label={title(key, sub)}
+						label={fieldTitle(key, sub)}
 						description={sub.description}
 						labelId={ids?.label}
 						descriptionId={describes}
@@ -453,7 +452,7 @@
 						value={obj[key] as Record<string, unknown> | undefined}
 						schema={sub}
 						ghostMember={sub.default as string | undefined}
-						label={title(key, sub)}
+						label={fieldTitle(key, sub)}
 						id={ids?.control}
 						labelledBy={ids?.label}
 						describedBy={describes}

@@ -70,7 +70,7 @@
 		baseType,
 		controlKind,
 		declaredContent,
-		humanize,
+		fieldTitle,
 		literalText,
 		rowSummary,
 		schemaAt,
@@ -266,7 +266,6 @@
 	// one, else this instance's own.
 	const uid = $props.id();
 	const countId = $derived(`${idBase ?? `qm-${uid}`}-count`);
-	const columnTitle = (key: string, sub: QuillFieldSchema): string => sub.title ?? humanize(key);
 
 	// The awaited flush below is the only work that outlives a gesture here, so the
 	// span carries the reorder's frame and nothing else: it is the liveness
@@ -731,7 +730,7 @@
 							]}
 						>
 							<FieldLabel
-								label={columnTitle(key, sub)}
+								label={fieldTitle(key, sub)}
 								descriptionId={idBase != null ? propertyDomIds(idBase, key).description : undefined}
 								description={sub.description}
 							/>

@@ -103,7 +103,7 @@ function blockRule(regexp: RegExp, command: (match: RegExpMatchArray) => Command
 }
 
 /** The full markdown-shorthand rule set for a block schema. */
-export function markdownInputRules(schema: Schema): InputRule[] {
+function markdownInputRules(schema: Schema): InputRule[] {
 	const rules: InputRule[] = [];
 	const m = schema.marks;
 

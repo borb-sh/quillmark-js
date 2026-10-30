@@ -11,7 +11,7 @@ const isList = (node: PMNode): boolean =>
 
 /** The items the selection stands in, in the innermost list holding all of them, moved
  *  one place up (`-1`) or down (`1`). */
-export function moveItems(dir: -1 | 1): Command {
+function moveItems(dir: -1 | 1): Command {
 	return (state, dispatch) => {
 		const { $from, $to } = state.selection;
 		const range = $from.blockRange($to, isList);

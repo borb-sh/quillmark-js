@@ -20,6 +20,7 @@ Each subpath is its own module root; a bundler pulls only what the entry you imp
 | `@quillmark/svelte/preview` | The live preview: `createPreview` + `<Preview>`. Reaches nothing editor-side.                                          |
 | `@quillmark/svelte/visual`  | The federated WYSIWYG: `<VisualEditor>`, the codec's `createField` prose leaf.                                         |
 | `@quillmark/svelte`         | Re-exports `/core`.                                                                                                    |
+| `@quillmark/svelte/preset`  | The opt-in stylesheet for the page around a surface ([THEMING.md](THEMING.md)).                                        |
 
 ## Open a session
 

@@ -145,21 +145,21 @@ It carries a `--qmh-*` scale for the page, derived from the same nine dials and 
 
 An app that mounts an editor beside a preview over one session needs a screen to put them in, and the shape of that screen is the same every time. Five more classes are that shape, so what you write is the wiring rather than the grid:
 
-```html
+```svelte
 <div class="qm-workspace">
 	<header class="qm-bar site-head">
 		<span class="site-mark">acme<span class="site-slash">/</span>studio</span>
 	</header>
 	<div class="site-body">
 		<div class="qm-switch" role="group" aria-label="Visible pane">
-			<button class="qm-control" aria-pressed="{shown" ="" ="" ="1}" onclick="{()" ="">
-				(shown = 1)}>Editor
+			<button class="qm-control" aria-pressed={shown === 1} onclick={() => (shown = 1)}>
+				Editor
 			</button>
-			<button class="qm-control" aria-pressed="{shown" ="" ="" ="2}" onclick="{()" ="">
-				(shown = 2)}>Preview
+			<button class="qm-control" aria-pressed={shown === 2} onclick={() => (shown = 2)}>
+				Preview
 			</button>
 		</div>
-		<div class="qm-split" data-qm-show="{shown}">
+		<div class="qm-split" data-qm-show={shown}>
 			<section class="qm-frame"><!-- <VisualEditor class="qm-pane" /> --></section>
 			<section class="qm-frame"><!-- <Preview /> --></section>
 		</div>

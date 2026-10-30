@@ -12,7 +12,7 @@ export const MAX_NESTING_DEPTH = 12;
 /** The most containers any block in `doc` stands inside, counted as the store counts
  *  them: a `list_item` or a `blockquote` is one, the list around an item none, and no
  *  node holds an element (`decode.ts`). */
-export function nestingDepth(doc: PMNode): number {
+function nestingDepth(doc: PMNode): number {
 	const walk = (node: PMNode, depth: number): number => {
 		let deepest = depth;
 		node.forEach((child) => {

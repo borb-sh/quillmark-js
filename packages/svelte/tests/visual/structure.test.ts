@@ -28,6 +28,7 @@ import {
 	arrayLayout,
 	schemaAt,
 	matrixMembers,
+	matrixPrinted,
 	matrixHeld,
 	matrixColumns,
 	memberValue,
@@ -871,6 +872,14 @@ describe('schemaAt', () => {
 });
 
 describe('the matrix helpers', () => {
+	it('prints the stored map, else a mapping default', () => {
+		const withDefault = f({ type: 'matrix', members: { a: 'A' }, default: { a: true } });
+		expect(matrixPrinted(undefined, withDefault)).toEqual({ a: true });
+		expect(matrixPrinted({}, withDefault)).toEqual({});
+		expect(matrixPrinted(undefined, f({ type: 'matrix', members: { a: 'A' } }))).toBeUndefined();
+		expect(matrixPrinted(['a'], withDefault)).toBeUndefined();
+	});
+
 	it('reads the roster by own keys, in declaration order', () => {
 		expect(matrixMembers({ b: 'B', a: 'A' })).toEqual([
 			{ id: 'b', title: 'B' },

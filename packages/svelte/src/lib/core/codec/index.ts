@@ -63,13 +63,10 @@ export { rendersHref, storableUrl } from './urls.js';
 // imports is surface that still has to stay honest.
 export { decode, fitsInline, fitsLeaf, fitsPlain, renderContent, usvLength } from './decode.js';
 export { pmToContent, contentEdit, lower } from './encode.js';
-export type { ContentEdit } from './encode.js';
 export { usvToPM, pmToUsv, buildLineIndex } from './positions.js';
-export type { LineIndex } from './positions.js';
 
 // Reconciliation gate.
 export { createReconciler, contentEqual, valueEqual } from './reconcile.js';
-export type { Reconciler } from './reconcile.js';
 
 // Input rules (`createField` mounts them unless `noInputRules`, or over a mark-free schema).
 export { inputRulesPlugin } from './inputrules.js';

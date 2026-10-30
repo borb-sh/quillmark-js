@@ -6,9 +6,9 @@
    Studio has one screen, no reading column and no display type, and that screen is drawn
    as the preset's `.qm-workspace`, so what it adds to the endorsed look is one width.
 
-   Literals live here and nowhere else under `src`: `check:style` runs its axes over this
+   Literals live here and nowhere else under `client/`: `check:style` runs its axes over this
    scope too, with this file exempt as the place these defaults are minted. A rung here
-   restating one the preset carries is review's — the app is meant to look like the
+   restating one the preset carries is review's — studio is meant to look like the
    endorsed answer, and a local copy is where that stops. */
 
 :root {

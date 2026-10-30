@@ -218,7 +218,7 @@ function respan(rows: TableCell[][], r: number, c: number, span: Span): TableCel
  * row alike. `header` is a separate field because a table always has one; {@link fromRows} splits
  * it back.
  */
-export function allRows(props: TableProps): TableCell[][] {
+function allRows(props: TableProps): TableCell[][] {
 	return [props.header, ...props.rows];
 }
 
