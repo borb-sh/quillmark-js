@@ -1137,14 +1137,14 @@
 
 	   A pane is where the host has already framed the surface, so the ground needs less
 	   of itself to read as ground: the frame is what the stack would otherwise meet. So
-	   the gutter steps in to the seam the add strip holds between cards, the ground
-	   being one width all round the stack, and the width it gives back goes to what is
-	   written. */
+	   the ground steps in to `--_qm-gutter`, the seam the add strip holds between cards
+	   and the inset a card holds inside its own edge, so the ground is one width all
+	   round the stack and the width it gives back goes to what is written. */
 	:global(:where(.qm-editor.qm-pane)) {
 		height: 100%;
 		overflow: auto;
 		overscroll-behavior: contain;
-		padding: var(--_qm-space-4);
+		padding: var(--_qm-gutter);
 		padding-block-end: var(--_qm-tail);
 	}
 	/* The stack's one gapless seam, which `TipsCard` draws and this holds the two
@@ -1208,7 +1208,7 @@
 		align-items: center;
 		justify-content: center;
 		width: 100%;
-		height: var(--_qm-space-4);
+		height: var(--_qm-gutter);
 		color: var(--_qm-ink-label);
 		opacity: 0;
 		transition:

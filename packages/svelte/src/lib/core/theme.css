@@ -352,6 +352,12 @@
 	   `check:style`'s rhythm axis sees each of them read a rung, never that they read
 	   the same one — the case `--_qm-inset-control` above is cut for. */
 	--_qm-nest: var(--_qm-space-3);
+	/* The gutter: the ground round a pane's stack, the seam between two cards, and a
+	   card's inline inset from its edge to the line its section strokes stand on. One
+	   width for all three, so a band of ground and a band of card read as the same
+	   margin and a mark centred in either sits alike. A rung because the pane and the
+	   card are two components holding it. */
+	--_qm-gutter: var(--_qm-space-4);
 	/* The numerals a list marker is given room for: two digits, so a tenth item's number
 	   stands inside the leaf as the first's does. In `ch`, so it tracks the face the
 	   numbers are set in. */
