@@ -23,7 +23,7 @@ export interface LocalLogOpts {
 	compactAt?: number;
 }
 
-export function localLog(opts: LocalLogOpts): SessionLog {
+export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 	const storage = opts.storage ?? globalThis.localStorage;
 	const events = opts.events ?? globalThis;
 	const prefix = `qm-collab:${encodeURIComponent(opts.room)}:`;
@@ -50,8 +50,8 @@ export function localLog(opts: LocalLogOpts): SessionLog {
 	const current = (): Opened | undefined => {
 		const raw = storage.getItem(key.open);
 		if (!raw) return undefined;
-		const { epoch, seed } = JSON.parse(raw) as Record<string, string>;
-		return { epoch, seed: fromBase64(seed) };
+		const { epoch, seed, quill } = JSON.parse(raw) as Record<string, string>;
+		return { epoch, seed: fromBase64(seed), ...(quill === undefined ? {} : { quill }) };
 	};
 	const isOpen = (epoch: string) => current()?.epoch === epoch;
 	const load = (): Saved | undefined => {
@@ -87,10 +87,10 @@ export function localLog(opts: LocalLogOpts): SessionLog {
 
 	return {
 		current: async () => current(),
-		async open(seed) {
+		async open(seed, quill) {
 			const held = current();
 			if (held) return held;
-			storage.setItem(key.open, JSON.stringify({ epoch: randomId(), seed: toBase64(seed) }));
+			storage.setItem(key.open, JSON.stringify({ epoch: randomId(), seed: toBase64(seed), quill }));
 			touch();
 			return current()!;
 		},
