@@ -85,7 +85,6 @@
 	import { raiseGuidance } from './guidance.js';
 	import { familiesOf, registerFaces } from './fonts.js';
 	import Card from './Card.svelte';
-	import Icon from './icons/Icon.svelte';
 	import TipsCard from './TipsCard.svelte';
 	import FormatPopover from './FormatPopover.svelte';
 	// The add trigger and the kind menu draw shared recipes; a component carrying a
@@ -1025,21 +1024,20 @@
 	{#if kinds.length}
 		<!-- The strip past the last card is the append point, the one a reader looks for
 		 rather than finds by position, so it alone states itself in words at rest. A gap
-		 between cards carries a plus where the words would be: the strip is the gap, the
-		 pill it fills on hover is the space the new card takes, and the plus says what a
-		 press there does. -->
+		 between cards draws nothing inside it: the strip is the gap, and the pill it fills
+		 on hover is the space the new card takes. -->
 		{@const marked = atIndex === model.cards.length}
 		<div class={['qm-add-card', { 'qm-add-card-marked': marked }]}>
 			<!-- Marked, the words are the accessible name and no `aria-label` doubles
 			 them; bare, the same words land as the label, the strip having no
-			 geometry to carry them. -->
+			 content to carry them. -->
 			{#if kinds.length === 1}
 				<button
 					type="button"
 					class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
 					aria-label={marked ? undefined : merged.addCard}
 					onclick={() => addCard(atIndex, kinds[0], true)}
-					>{#if marked}{merged.addCard}{:else}<Icon name="plus" class="qm-add-glyph" />{/if}</button
+					>{#if marked}{`+ ${merged.addCard}`}{/if}</button
 				>
 			{:else}
 				<!-- Multi-kind add: pick the kind, then seed + insert. A menu rather than a
@@ -1051,10 +1049,7 @@
 					<DropdownMenu.Trigger
 						class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
 						aria-label={marked ? undefined : merged.addCard}
-						>{#if marked}{merged.addCard}{:else}<Icon
-								name="plus"
-								class="qm-add-glyph"
-							/>{/if}</DropdownMenu.Trigger
+						>{#if marked}{`+ ${merged.addCard}`}{/if}</DropdownMenu.Trigger
 					>
 					<DropdownMenu.Portal to={rootEl}>
 						<DropdownMenu.Content
@@ -1191,8 +1186,8 @@
 	/* Unboxed, like every button, and not dashed: a dashed edge is the placeholder idiom
 	 ("nothing is here yet"), which on a button reads as disabled or as a drop target. It
 	 stays honest in one place, the un-schemable card (`Card.svelte`), which is a state
-	 rather than a control. A gap's trigger rests invisible, so the fill and the plus are
-	 the whole of what it shows: the pill fills the strip because the strip is what was
+	 rather than a control. A gap's trigger rests invisible, so the fill is the whole of
+	 what it shows: the pill fills the strip because the strip is what was
 	 pressed, and the strip is the gap, so the fill is the card-to-be drawn where it will
 	 land.
 
@@ -1219,13 +1214,6 @@
 		transition:
 			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
-	}
-	/* The pill's own height, so a turned-down `--qm-space` shrinks the glyph with the
-	   strip rather than spilling it past the pill. */
-	.qm-add-card :global(.qm-add-glyph) {
-		height: 100%;
-		width: auto;
-		aspect-ratio: 1;
 	}
 	/* The strip that holds words at rest takes the height that centres them, and rests dim
 	   rather than absent, having something to be seen. */
