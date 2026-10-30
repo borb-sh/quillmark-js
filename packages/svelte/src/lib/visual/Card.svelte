@@ -437,12 +437,13 @@
 	 than the nesting rung the verticals inside keep: this edge closes the block rather
 	 than nesting one, and the rules it holds run that much further for it.
 
-	 Inside that inset is the card's one text column (`--_qm-column`): the title, a
-	 top-level field, the body's lines, the recovery note and the delete glyph's far edge
-	 all stand on it, so the card reads as one measure at both ends. */
+	 Inside that inset is the card's one text column (`--_qm-column`), at both ends: the
+	 title, a field, a heading, the body's lines and the recovery note start on it, and a
+	 field's well, a line of the body and the delete glyph end on it, so the card reads
+	 as one measure centred in its own edge. A section's nesting indents the start alone. */
 	.qm-card {
 		border-radius: var(--_qm-radius);
-		padding: var(--_qm-space-3) var(--_qm-space-2);
+		padding: var(--_qm-space-3) var(--_qm-card-inset);
 		background: var(--_qm-surface);
 		display: flex;
 		flex-direction: column;
@@ -454,13 +455,13 @@
 	 opens on its body keeps the full inset — prose is neither a heading nor a
 	 field row. */
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child) {
-		padding-top: var(--_qm-space);
+		padding-top: calc(var(--_qm-card-inset) - var(--_qm-space));
 	}
 	/* A section heading leading it: the vertical starts at the content's
 	 top-left, so the top inset is the inline one and the tip is a square
 	 corner of the card. */
 	.qm-card.qm-main:has(> .qm-card-body > .qm-card-meta:first-child > .qm-groups:first-child) {
-		padding-top: var(--_qm-space-2);
+		padding-top: var(--_qm-card-inset);
 	}
 	.qm-card-header {
 		display: flex;
@@ -587,11 +588,12 @@
 	 accordion spends the same rung from its header and its panel, where it also caps the
 	 vertical those two edges hold.
 
-	 No stroke: a vertical would mark a section a reader has no name for. The start
-	 inset is the column, so a top-level field and a section heading share it. */
+	 No stroke: a vertical would mark a section a reader has no name for. The inset is
+	 the column at both ends, so a top-level field and a section heading share its start
+	 and every well in the card shares its end. */
 	.qm-section {
 		padding-block: var(--_qm-space);
-		padding-inline-start: var(--_qm-column);
+		padding-inline: var(--_qm-column);
 	}
 	/* Where it faces a rule, the rung a heading already stands off one. The fields
 	 sit on the heading column, not the card's edge. */
@@ -616,8 +618,9 @@
 		--row-gap: var(--_qm-space-3);
 		row-gap: var(--row-gap);
 	}
-	/* The nesting vertical, one `--_qm-nest` in from the card's edge with the panel's
-	 fields the same rung off it (ARCHITECTURE §"A plane is a tone"). `--_qm-border` and
+	/* The nesting vertical, on the card's inset with the panel's fields one `--_qm-nest`
+	 off it (ARCHITECTURE §"A plane is a tone"). The end inset is the column's, so the
+	 panel's wells end where a top-level field's do. `--_qm-border` and
 	 not `--_qm-accent`: the verticals and the rules beside them are one stroke at every
 	 depth, and a tone that changed as it went in would read as unrelated lines rather
 	 than one figure. A named section is what earns it, which is why the ungrouped block
@@ -637,6 +640,7 @@
 		display: flex;
 		flex-direction: column;
 		border-left: var(--_qm-vertical-width) solid transparent;
+		padding-inline-end: var(--_qm-column);
 		padding-bottom: var(--_qm-space);
 		margin-bottom: calc(-1 * var(--_qm-space));
 		transition:

@@ -117,7 +117,7 @@
 		margin-top: calc(var(--_qm-radius) * -1);
 		border-radius: 0 0 var(--_qm-radius) var(--_qm-radius);
 		padding: calc(var(--_qm-space-3) + var(--_qm-radius))
-			calc(var(--_qm-space-2) + var(--_qm-column)) var(--_qm-space-3);
+			calc(var(--_qm-card-inset) + var(--_qm-column)) var(--_qm-space-3);
 		background: var(--_qm-tips-surface);
 		display: flex;
 		flex-direction: column;
