@@ -1,4 +1,4 @@
-export { bindDocument, seedDocument, Diverged } from './document.js';
+export { bindDocument, cardOps, seedDocument, Diverged } from './document.js';
 export type {
 	BindDocumentOpts,
 	CardOp,

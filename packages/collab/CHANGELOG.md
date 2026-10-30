@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Card operations from a whole-document revise.** `cardOps(from, count)` derives the card operations a `writeFrom` or `writeLog` edit returns from a `reviseDocument` receipt's `from`: the removals, then a move for each card outside the longest run both orders share, picked as `changesSince` picks it, and the inserts. A reorder, removal or insertion then keeps each card's identity, so what was typed into a moved card since stays in it, and the update moves exactly the cards the conflict check reads as moved. An alignment that names a card twice or past the list throws `RangeError`.
+
 ## v0.1.0 - 2026-10-30
 
 **Live editing of one document by several clients.** `bindDocument` keeps a WASM `Document` equal to a shared Yjs state in both directions: every body and `richtext` field as text with its lines, containers, marks and islands, every `text` field as plain text, every other field as a value, and the card list, kinds and titles. `push(op)` writes a local commit; `onRemote` says what a remote one moved, with the text delta a host maps its caret through. `seedDocument` writes the update a session starts from, the same bytes on every client. `joinSession` runs a session over a `SessionLog`: the session opens with its seed and quill version in one write, every local update is appended, batched while an append is out and retried when one fails, every other client's is applied, each save carries the Y snapshot it reflects so a stale save is refused and a deletion is saved, a client holding a value its Document refused does not save, and a session nobody is in ends once saved so the next join starts afresh from the save. `localLog` is a `SessionLog` in `localStorage`, for every tab of one origin.

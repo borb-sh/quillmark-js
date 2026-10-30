@@ -40,13 +40,46 @@ import {
 import { project } from './project.js';
 import { writeContent, type Mint } from './write.js';
 import { usvDelta } from './delta.js';
-import { changedRuns } from './lines.js';
+import { changedRuns, commonRun } from './lines.js';
 
 /** A change to the composable card list, by index, as the Document takes it. */
 export type CardOp =
 	| { op: 'insert'; at: number }
 	| { op: 'remove'; at: number }
 	| { op: 'move'; from: number; to: number };
+
+/**
+ * The card operations that take a list of `count` cards to the one `from` describes: for each
+ * card of the new list, the index of the old card it is, or `null` for an inserted one, as
+ * `writer.reviseDocument`'s receipt reports. Removals come first, highest index first. The kept
+ * cards that stay put are the longest run the old and new orders share, picked as `changesSince`
+ * and `writeFrom`'s conflict check pick it, so the update moves exactly the cards they read as
+ * moved. Every other kept card is moved once and every inserted card inserted, each placed after
+ * the card before it in the new list. Throws `RangeError` when `from` names a card twice or one
+ * past `count`.
+ */
+export function cardOps(from: readonly (number | null)[], count: number): CardOp[] {
+	const kept = from.filter((i): i is number => i !== null);
+	const named = new Set(kept);
+	if (named.size < kept.length || kept.some((i) => !Number.isInteger(i) || i < 0 || i >= count))
+		throw new RangeError(`cardOps: from names a card twice or one past ${count} cards`);
+	const ops: CardOp[] = [];
+	for (let i = count - 1; i >= 0; i--) if (!named.has(i)) ops.push({ op: 'remove', at: i });
+
+	const list = [...kept].sort((x, y) => x - y);
+	const stays = new Set(commonRun(list.map(String), kept.map(String)).map(([i]) => list[i]));
+	const key = (j: number) => from[j] ?? -1 - j;
+	from.forEach((i, j) => {
+		if (i !== null && stays.has(i)) return;
+		const at = i === null ? -1 : list.indexOf(i);
+		if (at >= 0) list.splice(at, 1);
+		const to = j === 0 ? 0 : list.indexOf(key(j - 1)) + 1;
+		list.splice(to, 0, key(j));
+		if (i === null) ops.push({ op: 'insert', at: to });
+		else ops.push({ op: 'move', from: at, to });
+	});
+	return ops;
+}
 
 /** A card by its place in the Document: the main card, or a composable card's index. */
 export type CardRef = 'main' | number;
