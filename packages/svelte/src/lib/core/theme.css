@@ -357,7 +357,7 @@
 	   width for all three, so a band of ground and a band of card read as the same
 	   margin and a mark centred in either sits alike. A rung because the pane and the
 	   card are two components holding it. */
-	--_qm-gutter: var(--_qm-space-4);
+	--_qm-gutter: var(--_qm-space-2);
 	/* The numerals a list marker is given room for: two digits, so a tenth item's number
 	   stands inside the leaf as the first's does. In `ch`, so it tracks the face the
 	   numbers are set in. */

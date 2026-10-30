@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A card's inline inset is the gutter, and its column is mirrored.** The card pads 16px inline at the default `--qm-space`, the width of the pane's ground and the seam between cards, where it padded 8px; a section's stroke stands that far inside the card's edge. A field's well ends where the body's lines and the delete glyph end, the same distance inside that inset as it starts; wells ran 5.5px further toward the end edge than anything else in the card.
+**One gutter, and a mirrored column.** In `.qm-pane`, the ground round the stack and the seam between two cards are 8px at the default `--qm-space`, the card's own inline inset, where they were 16px. A field's well ends where the body's lines and the delete glyph end, the same distance inside the card's inset as it starts; wells ran 5.5px further toward the end edge than anything else in the card.
 
 **The add strip between two cards draws no plus.** It rests invisible and fills its pill on hover or focus, its accessible name still `strings.addCard`. The strip past the last card reads `+ Add Card`, the strip drawing the `+` before `strings.addCard`, which defaults to `Add Card`.
 
