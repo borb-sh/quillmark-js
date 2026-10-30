@@ -88,6 +88,35 @@ describe('the preview zoom', () => {
 		expect(widths()[1]).toBeGreaterThan(fit[1]);
 	});
 
+	it('pans a diagonal wheel over pages overflowing both ways itself, and leaves the rest', () => {
+		const at = { left: 0, top: 0 };
+		for (const [axis, extent] of [
+			['Left', 'Width'],
+			['Top', 'Height']
+		] as const) {
+			const key = axis === 'Left' ? 'left' : 'top';
+			Object.defineProperty(container, `scroll${extent}`, { value: 2000, configurable: true });
+			Object.defineProperty(container, `scroll${axis}`, {
+				get: () => at[key],
+				set: (v: number) => (at[key] = Math.max(0, v)),
+				configurable: true
+			});
+		}
+		const wheel = (deltaX: number, deltaY: number): WheelEvent => {
+			const e = new WheelEvent('wheel', { deltaX, deltaY, cancelable: true });
+			container.dispatchEvent(e);
+			return e;
+		};
+
+		expect(wheel(30, 10).defaultPrevented).toBe(true);
+		expect(at).toEqual({ left: 30, top: 10 });
+
+		expect(wheel(0, 40).defaultPrevented).toBe(false);
+		expect(wheel(-50, -20).defaultPrevented).toBe(true);
+		expect(at).toEqual({ left: 0, top: 0 });
+		expect(wheel(-5, -5).defaultPrevented).toBe(false);
+	});
+
 	it('is the default again once a step lands back on the fit', () => {
 		const fit = widths();
 		container.focus();

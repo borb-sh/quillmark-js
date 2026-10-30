@@ -202,11 +202,28 @@ export function createViewport(
 	// Ctrl-wheel is a mouse's zoom, and the trackpad pinch Chromium and Firefox send as
 	// `deltaY = -100 ln(scale)`, in deltas smaller than a notch's: those track the fingers.
 	function onWheel(e: WheelEvent): void {
-		if (!(e.ctrlKey || e.metaKey)) return;
+		if (!(e.ctrlKey || e.metaKey)) return pan(e);
 		e.preventDefault();
 		const pinched = e.deltaMode === 0 && Math.abs(e.deltaY) < PINCH_DELTA;
 		const factor = Math.exp(-e.deltaY * (pinched ? PINCH_RATE : WHEEL_RATE[e.deltaMode]));
 		glideTo((g) => g.raw * factor, e.clientX, e.clientY);
+	}
+
+	// A trackpad pan over pages that overflow both ways, scrolled here: on macOS the
+	// browser rails a scroll not near enough a diagonal to the axis it leans on, which
+	// over a zoomed page is the wrong axis as often as not. A delta on one axis is left
+	// to the browser, so a mouse wheel keeps its smooth notch, and one at an edge
+	// chains on.
+	function pan(e: WheelEvent): void {
+		if (e.deltaMode !== 0 || !e.deltaX || !e.deltaY) return;
+		const { scrollWidth, scrollHeight, clientWidth, clientHeight } = container;
+		if (scrollWidth <= clientWidth || scrollHeight <= clientHeight) return;
+		const { scrollLeft, scrollTop } = container;
+		container.scrollLeft += e.deltaX;
+		container.scrollTop += e.deltaY;
+		if (container.scrollLeft !== scrollLeft || container.scrollTop !== scrollTop) {
+			e.preventDefault();
+		}
 	}
 
 	// The keys are the focused pane's alone: elsewhere they are the browser's own zoom,
