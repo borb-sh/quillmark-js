@@ -10,6 +10,8 @@ export interface ParsedQuillRef {
 }
 
 const NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
+/** The rule a quill name is held to, as it reads in an error. */
+export const QUILL_NAME_RULE = '[a-z][a-z0-9_]*, at most 64 characters';
 const SELECTOR_RE = /^\d+\.\d+(\.\d+)?$/;
 
 /**
@@ -56,7 +58,7 @@ export function parseQuillRef(ref: string): ParsedQuillRef {
 		if (!NAME_RE.test(segment)) {
 			throw new QuiverError(
 				'invalid_ref',
-				`Invalid ref: name "${fullName}" is not [collection.]name, each [a-z][a-z0-9_]* and at most 64 characters`,
+				`Invalid ref: name "${fullName}" is not [collection.]name, each ${QUILL_NAME_RULE}`,
 				{ ref }
 			);
 		}

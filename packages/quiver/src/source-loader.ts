@@ -9,7 +9,7 @@ import { join, relative, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { QuiverError } from './errors.js';
 import { parseQuiverYaml } from './quiver-yaml.js';
-import { isQuillName } from './ref.js';
+import { QUILL_NAME_RULE, isQuillName } from './ref.js';
 import { isCanonicalSemver, compareSemver } from './semver.js';
 import type { QuiverMeta } from './quiver-yaml.js';
 import type { QuiverLoader } from './quiver.js';
@@ -38,7 +38,7 @@ function refuseUnnamedQuill(quillName: string, quiverName: string): void {
 	if (!isQuillName(quillName)) {
 		throw new QuiverError(
 			'quiver_invalid',
-			`Quill directory "${quillName}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`,
+			`Quill directory "${quillName}" is not a quill name — a name is ${QUILL_NAME_RULE}`,
 			{ quiverName }
 		);
 	}
