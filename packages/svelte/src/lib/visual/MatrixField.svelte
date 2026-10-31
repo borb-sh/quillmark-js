@@ -45,7 +45,7 @@
 		matrixHeld,
 		matrixMembers,
 		matrixPrinted,
-		memberValue,
+		own,
 		memberWrite,
 		onRoster,
 		schemaAt
@@ -106,7 +106,7 @@
 	const map = $derived(matrixPrinted(value, schema));
 	const defaulted = $derived(value == null && map != null && Object.keys(map).length > 0);
 	const added = $derived(addedItems(schema, map));
-	const held = (id: string): boolean => matrixHeld(memberValue(map, id));
+	const held = (id: string): boolean => matrixHeld(own(map, id));
 	const heldCount = $derived(members.filter((m) => held(m.id)).length + added.length);
 	/** Whether `id` is an item this control draws: a roster member or a held added item. */
 	const drawn = (id: string): boolean =>
@@ -145,10 +145,6 @@
 	const colEls: Record<string, Subform | undefined> = $state({});
 	let rosterEl = $state<HTMLElement | undefined>();
 	let addEl = $state<{ focus: () => void } | undefined>();
-	/** A ref by member id, own keys only: an id can be spelled `constructor`. */
-	const ref = <T,>(refs: Record<string, T | undefined>, id: string): T | undefined =>
-		Object.hasOwn(refs, id) ? refs[id] : undefined;
-
 	/** The rows' content read: the boundary's, or, while the set is the default, the
 	 *  literal's own leaf at the codec its declared type names. */
 	function readAt(path: PathStep[]): Content | undefined {
@@ -167,7 +163,7 @@
 	}
 	/** The map with `id` unticked, its columns stashed for a retick. */
 	function unticked(id: string): Record<string, unknown> | undefined {
-		const columns = matrixColumns(memberValue(map, id));
+		const columns = matrixColumns(own(map, id));
 		if (Object.keys(columns).length) stash.set(id, columns);
 		else stash.delete(id);
 		return commitMember(map, id, undefined);
@@ -188,11 +184,11 @@
 		commit(commitMember(map, id, memberWrite(columns, title)));
 	}
 	function itemTitle(id: string): string {
-		const stored = memberValue(map, id) as Record<string, unknown> | undefined;
+		const stored = own(map, id) as Record<string, unknown> | undefined;
 		return String(stored?.[MATRIX_TITLE] ?? '');
 	}
 	function retitle(id: string, title: string): void {
-		commit(commitMember(map, id, memberWrite(matrixColumns(memberValue(map, id)), title)));
+		commit(commitMember(map, id, memberWrite(matrixColumns(own(map, id)), title)));
 	}
 	async function removeItem(id: string): Promise<void> {
 		const at = added.findIndex((item) => item.id === id);
@@ -200,7 +196,7 @@
 		await flush();
 		// The caret goes where the row was: the next added item, else the add box.
 		const next = added[at] ?? added[at - 1];
-		if (next) ref(titleEls, next.id)?.focus();
+		if (next) own(titleEls, next.id)?.focus();
 		else addEl?.focus();
 	}
 
@@ -210,20 +206,20 @@
 		const id = addedId(title, taken);
 		commit(commitMember(map, id, memberWrite({}, title)));
 		await flush();
-		const box = ref(memberEls, id);
+		const box = own(memberEls, id);
 		// The item's columns are what the author came to fill; a checklist has none, and
 		// the box stays where the next item is typed.
 		const first = Object.keys(schema.properties ?? {})[0];
-		if (first !== undefined) ref(colEls, id)?.focusPath([first]);
+		if (first !== undefined) own(colEls, id)?.focusPath([first]);
 		if (box) bloom(box);
 	}
 
 	/** Take the caret: the first item's control, else the add box. */
 	export function focus(): void {
 		const first = members[0];
-		if (first) return ref(tickEls, first.id)?.focus();
+		if (first) return own(tickEls, first.id)?.focus();
 		const item = added[0];
-		if (item) return ref(titleEls, item.id)?.focus();
+		if (item) return own(titleEls, item.id)?.focus();
 		addEl?.focus();
 	}
 	/** The box an arrival wash blooms in: the roster, not the label row above it, this
@@ -248,13 +244,13 @@
 			return undefined;
 		}
 		const column = rest[0];
-		const cells = ref(colEls, id);
-		const member = ref(memberEls, id);
+		const cells = own(colEls, id);
+		const member = own(memberEls, id);
 		if (column !== undefined && column !== MATRIX_TITLE && cells) {
 			const inner = cells.focusPath(rest, pos);
 			return inner instanceof Promise ? inner.then((box) => box ?? member) : (inner ?? member);
 		}
-		(ref(tickEls, id) ?? ref(titleEls, id))?.focus();
+		(own(tickEls, id) ?? own(titleEls, id))?.focus();
 		return member;
 	}
 </script>
@@ -363,7 +359,7 @@
 	{#if on && hasColumns}
 		<ObjectField
 			bind:this={colEls[id]}
-			value={matrixColumns(memberValue(map, id))}
+			value={matrixColumns(own(map, id))}
 			properties={schema.properties}
 			label={`${label ?? ''} ${title}`.trim()}
 			idBase={memberBase(id)}
