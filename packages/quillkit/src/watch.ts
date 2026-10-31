@@ -8,7 +8,7 @@ import { relative, resolve, sep } from 'node:path';
 import { within } from './paths.js';
 
 /** One repack per settled burst: an editor's save arrives as several watcher events. */
-const SETTLE_MS = 80;
+export const SETTLE_MS = 80;
 
 /** Call `fn` once a burst of calls stops arriving. `cancel` drops a call still waiting,
  *  which would otherwise run after teardown and hold the event loop open. */

@@ -4,6 +4,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type Plugin } from 'vite';
 import { carried } from '../../scripts/carried.mjs';
 import { CSS_TARGET } from '../../scripts/css-target.mjs';
+import { SETTLE_MS, serialize, settle } from './src/watch.js';
 
 // The client half of this package, built. `client/` is the browser's tree and `src/` is
 // the bin's; the two share a manifest and a `dist`, and meet nowhere else: the tool
@@ -29,8 +30,6 @@ const SOURCE = fileURLToPath(new URL('../../fixtures', import.meta.url));
  *  carries no quiver, and `quillkit build studio` lays one beside it. Generated, and
  *  gitignored. */
 const OUT = fileURLToPath(new URL('client/public/quiver', import.meta.url));
-/** One repack per settled burst: an editor's save arrives as several watcher events. */
-const SETTLE_MS = 80;
 /** The dev-only signal that a repack landed. The client answers it by minting a
  *  fresh `Quiver`; nothing on this side knows what a quill is. */
 const REPACKED = 'studio:quiver-repacked';
@@ -39,23 +38,8 @@ const REPACKED = 'studio:quiver-repacked';
  *  bundle takes rather than off declared ranges (`scripts/carried.mjs`). */
 const CARRIED = carried();
 
-/** Call `fn` once a burst of calls stops arriving. */
-function settle(ms: number, fn: () => void): () => void {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	return () => {
-		clearTimeout(timer);
-		timer = setTimeout(fn, ms);
-	};
-}
-
 function quiverSource(): Plugin {
-	// Serialized rather than concurrent: `build` owns its output directory, so two
-	// overlapping packs would race over one tree. Both arms chain, so a pack queues onto
-	// a settled promise whichever way the last one went; a rejected link would answer
-	// every later pack with the first failure instead of running it.
-	const run = (): Promise<void> => build(SOURCE, OUT);
-	let queue: Promise<void> = Promise.resolve();
-	const pack = (): Promise<void> => (queue = queue.then(run, run));
+	const pack = serialize(() => build(SOURCE, OUT));
 
 	return {
 		name: 'studio:quiver-source',
