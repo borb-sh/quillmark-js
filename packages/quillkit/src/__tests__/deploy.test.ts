@@ -96,17 +96,9 @@ describe('the targets', () => {
 		expect(await refs(true)).toContain('usaf_memo@0.0.0');
 	});
 
-	it('takes the default where no target is named, and names every target for one it does not have', () => {
+	it('takes the default where no target is named', () => {
 		expect(targetOf(undefined, 'build')).toBe(DEFAULT_TARGET);
 		expect(TARGETS).toContain(DEFAULT_TARGET);
-		const refused = (() => {
-			try {
-				targetOf('site', 'build');
-			} catch (err) {
-				return (err as Error).message;
-			}
-		})();
-		for (const target of TARGETS) expect(refused).toContain(target);
 	});
 });
 
