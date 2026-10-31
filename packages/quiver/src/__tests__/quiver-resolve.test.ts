@@ -55,7 +55,7 @@ describe('Quiver.resolve', () => {
 	it('"memo@^1" → invalid_ref (from parseQuillRef)', async () => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
 		expect(() => quiver.resolve('memo@^1')).toThrow(
-			expect.objectContaining({ code: 'invalid_ref' })
+			expect.objectContaining({ code: 'invalid_ref', ref: 'memo@^1' })
 		);
 	});
 

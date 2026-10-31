@@ -13,14 +13,16 @@ export default defineConfig({
 	plugins: [svelte({ compilerOptions: { hmr: false } })],
 	// `browser` picks svelte's client build, without which `mount()` resolves to the server
 	// entry and throws. `@quillmark/wasm` declares no `browser` condition, so it is unaffected.
+	// Tests live under `tests/` so `src/lib` stays pure package source for `svelte-package`.
 	resolve: { alias: { $lib: lib }, conditions: ['browser'] },
 	test: {
 		environment: 'node',
 		include: ['tests/**/*.{test,spec}.ts'],
 		setupFiles: ['./tests/setup.ts'],
-		// Files share a worker's module graph, so the Typst backend compiles once per worker.
+		// Files share a worker's module graph, so the Typst backend compiles once per worker;
+		// a file leaves no global state behind.
 		isolate: false,
-		// The Typst backend compiles lazily on the first `Engine.open`.
+		// The 26 MB Typst backend compiles lazily on the first `Engine.open`, so the budget is generous.
 		testTimeout: 30000,
 		hookTimeout: 30000
 	}

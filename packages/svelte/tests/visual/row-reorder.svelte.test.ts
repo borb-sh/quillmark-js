@@ -293,6 +293,7 @@ describe('reorder on an object row', () => {
 		// The open appendix's own list, a rung in: its rows are its own, not this field's.
 		const inner = outer.querySelector<HTMLElement>('.qm-element.open .qm-array')!;
 		const [first, second] = summaryTexts(inner);
+		expect(first).not.toBe(second);
 		const appendices = summaryTexts(outer);
 		const n = mounted.changes.length;
 

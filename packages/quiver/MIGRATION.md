@@ -24,7 +24,7 @@ A host rule naming `fonts/*` or `*.zip` under a built quiver names `*.quill` now
 
 A built quiver is `quiver.json` beside one bundle per quill and a `fonts/` directory. The hashed manifest and `store/` are gone, and `latest.json` carries only `format`, now 2. An old artifact under 0.30 is a `transport_error` on `quiver.json`; a 0.30 artifact under an older reader is refused with the upgrade named. Re-run `build`; nothing in the source layout changes.
 
-`quillkit`'s client carries its own copy of this package's reader and packs through the collection's, so a collection upgrades `@quillmark/quiver` in the same change as `quillkit`. `quillkit build` and `quillkit serve` refuse a pack with no `quiver.json`, naming the upgrade.
+`quillkit`'s client carries its own copy of this package's reader and packs through the collection's, so a collection upgrades `@quillmark/quiver` in the same change as `quillkit`. `quillkit` refuses a pack with no `quiver.json`, naming the upgrade.
 
 A host rule naming `quiver/latest.json` now names `quiver/quiver.json`.
 
