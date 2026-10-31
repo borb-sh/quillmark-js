@@ -26,7 +26,7 @@ npm run site               # the fixture quiver's studio as a deploy serves it, 
 npm test                   # every package's suite
 npm run check              # types, per package
 npm run lint               # prettier, over the repo
-npm run gate:fast          # every check below, in order, without a build
+npm run gate:fast          # lint, types and the checks through check:fonts, without a build
 npm run gate               # gate:fast, then build, bundle and the suite
 npm run check:docs         # every cross-doc section reference, and the stated wasm pin
 npm run check:style        # the closed `--_qm-*` / `--pg-*` / `--st-*` scales
@@ -34,6 +34,8 @@ npm run check:deps         # the dependency law
 npm run check:svelte       # the Svelte 5 forms, over every package that depends on svelte
 npm run check:fonts        # the font suite's files against its manifest
 npm run check:bundle       # the same scales, in a built consumer
+npm run check:pack         # each package's publish layout, linted by publint
+npm run check:registry     # each package's version against the registry's copy
 ```
 
 Everything runs against the reference quill, [`fixtures/quills/showcase/1.0.0`](fixtures/quills/showcase), a dev fixture at the workspace root, never published (beside it sits `usaf_memo`, a held copy of a shipped quill; see [`fixtures/Quiver.yaml`](fixtures/Quiver.yaml)): it declares a field for every control the tier draws and three card kinds, so a surface is exercised against a schema rather than against a mock.

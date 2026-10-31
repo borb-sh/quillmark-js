@@ -5,12 +5,14 @@
 // diagnostic anchored at a nested leaf draws at the nearest cell the tree holds.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
+import type { Document, Quill } from '@quillmark/wasm';
+import { fieldTitle, groupLabel } from '$lib/visual/structure';
 import { quill, example } from '../helpers/fixtures.js';
 import {
 	caret,
 	field,
 	mountEditor,
-	openGroup,
+	openField,
 	pick,
 	repeater,
 	settle,
@@ -21,12 +23,16 @@ import {
 
 afterEach(unmountAll);
 
+type Appendix = { title: string; entries: Array<{ label: string }> };
+const appendixTree = (q: Quill, doc: Document) => q.reader(doc).get('appendices') as Appendix[];
+
 describe('a landing at depth', () => {
 	it('opens each row on the way and places the caret in the leaf the address names', async () => {
 		const q = quill();
-		const mounted = mountEditor(q, example());
-		openGroup(mounted.target, 'Content');
-		const outer = field(mounted.target, 'Appendices');
+		const doc = example();
+		const tree = appendixTree(q, doc);
+		const mounted = mountEditor(q, doc);
+		const outer = openField(mounted.target, q.schema.main, 'appendices');
 		expect(outer.querySelector('.qm-element.open')).toBeNull();
 
 		await mounted.editor.setCaret({
@@ -37,14 +43,15 @@ describe('a landing at depth', () => {
 		await settle();
 
 		// Appendix 0 opened, entry 1 under it opened, and the caret sits in the entry's
-		// label leaf at the offset the compile resolved: `Sec|ondary`.
+		// label leaf at the offset the compile resolved.
+		const label = tree[0].entries[1].label;
 		const appendix = outer.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(appendix.querySelector('.qm-element-title')?.textContent).toBe('Sources');
+		expect(appendix.querySelector('.qm-element-title')?.textContent).toBe(tree[0].title);
 		const inner = repeater(appendix.querySelector('.qm-object')!);
 		const entry = inner.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(entry.querySelector('.qm-element-title')?.textContent).toBe('Secondary');
+		expect(entry.querySelector('.qm-element-title')?.textContent).toBe(label);
 		expect(entry.contains(document.activeElement)).toBe(true);
-		expect(caret()).toEqual({ text: 'Secondary', offset: 3 });
+		expect(caret()).toEqual({ text: label, offset: 3 });
 		// The wash marks the innermost row the address named, not the appendix around it.
 		expect(washHost(mounted.target)).toBe(entry);
 		expect(mounted.errors).toHaveLength(0);
@@ -53,8 +60,7 @@ describe('a landing at depth', () => {
 	it('opens the row it lands in and leaves the open row it left', async () => {
 		const q = quill();
 		const mounted = mountEditor(q, example());
-		openGroup(mounted.target, 'Content');
-		const outer = field(mounted.target, 'Appendices');
+		const outer = openField(mounted.target, q.schema.main, 'appendices');
 
 		await mounted.editor.setCaret({ field: 'main.appendices[0].title', pos: 0 });
 		await settle();
@@ -68,18 +74,23 @@ describe('a landing at depth', () => {
 
 	it('lands on a row it has to open, revealing the group first', async () => {
 		const q = quill();
-		const mounted = mountEditor(q, example());
+		const doc = example();
+		const mounted = mountEditor(q, doc);
+		const schema = q.schema.main.fields.appendices;
+		const group = groupLabel(q.schema.main, schema.ui!.group!);
 		const header = [...mounted.target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>
-			h.textContent?.includes('Content')
+			h.textContent?.includes(group)
 		)!;
 		expect(header.getAttribute('aria-expanded')).toBe('false');
 
 		await mounted.editor.focusField('main.appendices[1]');
 		await settle();
 		expect(header.getAttribute('aria-expanded')).toBe('true');
-		const outer = field(mounted.target, 'Appendices');
+		const outer = field(mounted.target, fieldTitle('appendices', schema));
 		const open = outer.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(open.querySelector('.qm-element-title')?.textContent).toBe('Glossary');
+		expect(open.querySelector('.qm-element-title')?.textContent).toBe(
+			appendixTree(q, doc)[1].title
+		);
 		expect(open.contains(document.activeElement)).toBe(true);
 		expect(washHost(mounted.target)).toBe(open);
 	});
@@ -102,8 +113,7 @@ describe('a landing at depth', () => {
 		const q = quill();
 		const doc = example();
 		const mounted = mountEditor(q, doc);
-		openGroup(mounted.target, 'Metadata');
-		const dist = field(mounted.target, 'Distribution');
+		const dist = openField(mounted.target, q.schema.main, 'distribution');
 		pick(dist, 'public');
 
 		await mounted.editor.focusField('main.distribution.license');
@@ -142,8 +152,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 	it('draws under the nearest cell the tree holds, following the rows as they open', () => {
 		const q = quill();
 		const mounted = mountEditor(q, example(), { diagnostics });
-		openGroup(mounted.target, 'Content');
-		const outer = field(mounted.target, 'Appendices');
+		const outer = openField(mounted.target, q.schema.main, 'appendices');
 
 		// Collapsed all the way down: the appendix row's head carries it, where the user
 		// can see a row, and the field's foot holds nothing.
@@ -187,8 +196,7 @@ describe('a diagnostic anchored at a nested leaf', () => {
 				{ severity: 'error' as const, message: 'bad date', path: 'main.distribution.lift_on' }
 			]
 		});
-		openGroup(mounted.target, 'Metadata');
-		const dist = field(mounted.target, 'Distribution');
+		const dist = openField(mounted.target, q.schema.main, 'distribution');
 		pick(dist, 'embargoed');
 
 		// The live cell's draws under that cell.

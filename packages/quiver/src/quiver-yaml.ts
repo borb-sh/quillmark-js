@@ -6,7 +6,7 @@
 
 import { parse as parseYaml } from 'yaml';
 import { QuiverError } from './errors.js';
-import { isQuillName } from './ref.js';
+import { QUILL_NAME_RULE, isQuillName } from './ref.js';
 
 export interface QuiverMeta {
 	name: string;
@@ -73,7 +73,7 @@ export function parseQuiverYaml(raw: string | Uint8Array): QuiverMeta {
 	if (!isQuillName(name)) {
 		throw new QuiverError(
 			'quiver_invalid',
-			`Quiver.yaml: "name" value "${name}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`
+			`Quiver.yaml: "name" value "${name}" is not a quill name — a name is ${QUILL_NAME_RULE}`
 		);
 	}
 

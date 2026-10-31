@@ -31,7 +31,7 @@ import {
 	matrixPrinted,
 	matrixHeld,
 	matrixColumns,
-	memberValue,
+	own,
 	memberWrite,
 	commitMember,
 	optionalCell,
@@ -900,10 +900,10 @@ describe('the matrix helpers', () => {
 	});
 
 	it('reads a member off the map by own key', () => {
-		expect(memberValue({ a: true }, 'a')).toBe(true);
-		expect(memberValue({ a: true }, 'b')).toBeUndefined();
-		expect(memberValue({}, 'constructor')).toBeUndefined();
-		expect(memberValue(undefined, 'a')).toBeUndefined();
+		expect(own({ a: true }, 'a')).toBe(true);
+		expect(own({ a: true }, 'b')).toBeUndefined();
+		expect(own({}, 'constructor')).toBeUndefined();
+		expect(own(undefined, 'a')).toBeUndefined();
 	});
 
 	it('takes the columns off a member, an added title aside', () => {

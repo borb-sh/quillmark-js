@@ -1,16 +1,17 @@
 /**
- * Build logic — internal, Node-only.
- *
- * All Node.js built-in imports are done dynamically inside `buildQuiver`, so
- * a module reaching this one for types alone does not pull `node:fs` or
- * `node:crypto` into a browser bundle.
+ * Build logic — internal, Node-only: reached from the Node entry alone.
  */
 
+import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, isAbsolute, resolve } from 'node:path';
 import { QuiverError } from './errors.js';
 import { BUNDLE_EXTENSION, packFiles } from './bundle.js';
 import { FORMAT, INDEX, LEGACY_POINTER } from './format.js';
 import { isFont } from './signature.js';
 import { isDraft } from './semver.js';
+import { scanSourceQuiver, readQuillTree } from './source-loader.js';
 
 /** Options for {@link buildQuiver}. */
 export interface BuildOptions {
@@ -49,19 +50,15 @@ const stagesOf = (out: string): { stage: string; prev: string } => ({
  *
  * Throws `transport_error`.
  */
-function assertSafeOutDir(
-	path: typeof import('node:path'),
-	sourceDir: string,
-	outDir: string
-): void {
-	const out = path.resolve(outDir);
+function assertSafeOutDir(sourceDir: string, outDir: string): void {
+	const out = resolve(outDir);
 	const { stage, prev } = stagesOf(out);
 
 	/** True when one of the owned trees is `target` or an ancestor of it. */
 	const owns = (target: string): boolean =>
 		[out, stage, prev].some((dir) => {
-			const rel = path.relative(dir, path.resolve(target));
-			return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+			const rel = relative(dir, resolve(target));
+			return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 		});
 
 	const what = owns(sourceDir)
@@ -106,16 +103,7 @@ export async function buildQuiver(
 	outDir: string,
 	options: BuildOptions = {}
 ): Promise<void> {
-	// Dynamic imports keep this module safe to type-import from browser contexts.
-	const nodePath = await import('node:path');
-	const { dirname, join, resolve } = nodePath;
-	const { mkdir, rename, rm, writeFile } = await import('node:fs/promises');
-	const { existsSync } = await import('node:fs');
-	const { createHash } = await import('node:crypto');
-
-	const { scanSourceQuiver, readQuillTree } = await import('./source-loader.js');
-
-	assertSafeOutDir(nodePath, sourceDir, outDir);
+	assertSafeOutDir(sourceDir, outDir);
 	const out = resolve(outDir);
 	const { stage, prev } = stagesOf(out);
 

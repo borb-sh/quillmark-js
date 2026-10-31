@@ -10,9 +10,8 @@ import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
 import { quill, example } from '../helpers/fixtures.js';
 import {
-	field,
 	mountEditor,
-	openGroup,
+	openField,
 	press,
 	settle,
 	summaries,
@@ -34,10 +33,7 @@ function threeRows(): Document {
 const order = (q: Quill, doc: Document) =>
 	(q.reader(doc).get('revisions') as Array<{ note: string }>).map((r) => r.note);
 
-function revisions(target: HTMLElement): HTMLElement {
-	openGroup(target, 'Metadata');
-	return field(target, 'Revisions');
-}
+const revisions = (target: HTMLElement) => openField(target, quill().schema.main, 'revisions');
 const rows = (arr: HTMLElement) => [...arr.querySelectorAll<HTMLElement>('.qm-element')];
 const handle = (arr: HTMLElement, k: number) =>
 	rows(arr)[k].querySelector<HTMLElement>('.qm-row-handle')!;
@@ -291,19 +287,20 @@ describe('reorder on an object row', () => {
 		const q = quill();
 		const doc = example();
 		const mounted = mountEditor(q, doc);
-		openGroup(mounted.target, 'Content');
-		const outer = field(mounted.target, 'Appendices');
+		const outer = openField(mounted.target, q.schema.main, 'appendices');
 		summaries(outer)[0].click();
 		flushSync();
 		// The open appendix's own list, a rung in: its rows are its own, not this field's.
 		const inner = outer.querySelector<HTMLElement>('.qm-element.open .qm-array')!;
-		expect(summaryTexts(inner)).toEqual(['Primary', 'Secondary']);
+		const [first, second] = summaryTexts(inner);
+		expect(first).not.toBe(second);
+		const appendices = summaryTexts(outer);
 		const n = mounted.changes.length;
 
 		press(summaries(inner)[0], 'ArrowDown', { altKey: true });
 		flushSync();
-		expect(summaryTexts(inner)).toEqual(['Secondary', 'Primary']);
-		expect(summaryTexts(outer)).toEqual(['Sources', 'Glossary']);
+		expect(summaryTexts(inner)).toEqual([second, first]);
+		expect(summaryTexts(outer)).toEqual(appendices);
 		// One move, one commit: the key reached the appendix row and was not its to answer.
 		expect(mounted.changes.length).toBe(n + 1);
 	});
@@ -312,9 +309,8 @@ describe('reorder on an object row', () => {
 		const q = quill();
 		const mounted = mountEditor(q, example());
 		// `authors` is `text[]` and `keywords` `richtext[]`: edit-in-place rows.
-		for (const name of ['Authors', 'Keywords']) {
-			openGroup(mounted.target, name === 'Authors' ? 'Who and what' : 'Content');
-			const f = field(mounted.target, name);
+		for (const name of ['authors', 'keywords']) {
+			const f = openField(mounted.target, q.schema.main, name);
 			expect(f.querySelectorAll('.qm-row-handle')).toHaveLength(0);
 			expect(f.querySelectorAll('.qm-row-btn.qm-remove').length).toBeGreaterThan(0);
 		}

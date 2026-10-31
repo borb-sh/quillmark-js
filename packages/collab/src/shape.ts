@@ -24,9 +24,9 @@ export const SLOT = '￼';
 
 /** The attribute keys a line's opening `\n` carries. Each is its own key, so a concurrent kind
  *  change and container change both land. */
-export const LINE_KIND = 'qm:kind';
-export const LINE_CONTAINERS = 'qm:containers';
-export const LINE_CONTINUES = 'qm:continues';
+const LINE_KIND = 'qm:kind';
+const LINE_CONTAINERS = 'qm:containers';
+const LINE_CONTINUES = 'qm:continues';
 export const LINE_KEYS = [LINE_KIND, LINE_CONTAINERS, LINE_CONTINUES] as const;
 
 /** The formatting marks a character attribute carries. An anchor is identity, not formatting,
@@ -82,7 +82,7 @@ export function contentTypes(ydoc: Y.Doc, name: string): ContentTypes {
 	return { text: ydoc.getText(name), meta: ydoc.getMap(`${name}#line0`) };
 }
 
-export const PARA = JSON.stringify({ kind: 'para' });
+const PARA = JSON.stringify({ kind: 'para' });
 
 export function readField({ text, meta }: ContentTypes): YField {
 	const chars: string[] = [];

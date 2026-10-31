@@ -8,12 +8,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
+import { fieldTitle } from '$lib/visual/structure';
 import { quill, example } from '../helpers/fixtures.js';
 import {
-	field,
 	leaf,
 	mountEditor,
-	openGroup,
+	openField,
 	pick,
 	repeater,
 	summaries,
@@ -27,11 +27,9 @@ afterEach(unmountAll);
 
 const read = (q: Quill, doc: Document, name: string) => q.reader(doc).get(name);
 
-/** The `appendices` field, its group opened. */
-function appendices(target: HTMLElement): HTMLElement {
-	openGroup(target, 'Content');
-	return field(target, 'Appendices');
-}
+type Appendix = { title: string; entries: Array<{ label: string; page: number }> };
+const appendixTree = (q: Quill, doc: Document) => read(q, doc, 'appendices') as Appendix[];
+const appendices = (target: HTMLElement) => openField(target, quill().schema.main, 'appendices');
 
 describe('a nested array property', () => {
 	it('draws as a record list inside the open row', () => {
@@ -39,9 +37,10 @@ describe('a nested array property', () => {
 		const doc = example();
 		const mounted = mountEditor(q, doc);
 		const outer = appendices(mounted.target);
+		const tree = appendixTree(q, doc);
 
 		// The outer rows, summarized by their `title` cell.
-		expect(summaryTexts(outer)).toEqual(['Sources', 'Glossary']);
+		expect(summaryTexts(outer)).toEqual(tree.map((a) => a.title));
 
 		summaries(outer)[0].click();
 		flushSync();
@@ -50,10 +49,12 @@ describe('a nested array property', () => {
 		const row = outer.querySelector<HTMLElement>('.qm-element.open')!;
 		expect(row.querySelector('[data-qm-prop="title"] .ProseMirror')).not.toBeNull();
 		const inner = repeater(row.querySelector('.qm-object')!);
-		expect(inner.querySelector('.qm-field-label span')?.textContent).toBe('Entries');
+		expect(inner.querySelector('.qm-field-label span')?.textContent).toBe(
+			fieldTitle('entries', q.schema.main.fields.appendices.items!.properties!.entries)
+		);
 		// Its rows are collapsed rows again, summarized by the `label` cell, the row's
 		// first short text.
-		expect(summaryTexts(inner)).toEqual(['Primary', 'Secondary']);
+		expect(summaryTexts(inner)).toEqual(tree[0].entries.map((e) => e.label));
 	});
 
 	it('opens one entry at a time, two rungs in, and commits the whole tree by value', () => {
@@ -72,15 +73,15 @@ describe('a nested array property', () => {
 		// the page an input. Depth is what is open, not the schema: two rungs of subform.
 		expect(entry.querySelectorAll('.ProseMirror')).toHaveLength(2);
 		const page = entry.querySelector<HTMLInputElement>('input[inputmode="numeric"]')!;
-		expect(page.value).toBe('14');
+		const tree = appendixTree(q, doc);
+		const was = tree[0].entries[1].page;
+		expect(page.value).toBe(String(was));
 
-		type(page, '15');
+		type(page, String(was + 1));
 		// The commit is the whole field: the nested row re-encodes up through the open
 		// appendix, and `reader.get` reads the committed tree back.
-		const tree = read(q, doc, 'appendices') as Array<{ entries: Array<{ page: number }> }>;
-		expect(tree[0].entries[1].page).toBe(15);
-		expect(tree[0].entries[0].page).toBe(12);
-		expect(tree[1].entries[0].page).toBe(20);
+		tree[0].entries[1].page = was + 1;
+		expect(appendixTree(q, doc)).toEqual(tree);
 		expect(mounted.changes.at(-1)?.path).toBe('main.appendices');
 	});
 
@@ -162,12 +163,13 @@ describe('a container inside a variant cell', () => {
 		const q = quill();
 		const doc = example();
 		const mounted = mountEditor(q, doc);
-		openGroup(mounted.target, 'Metadata');
-		const dist = field(mounted.target, 'Distribution');
+		const dist = openField(mounted.target, q.schema.main, 'distribution');
 
 		pick(dist, 'embargoed');
 		const notices = repeater(dist);
-		expect(notices.querySelector('.qm-field-label span')?.textContent).toBe('Notices');
+		expect(notices.querySelector('.qm-field-label span')?.textContent).toBe(
+			fieldTitle('notices', q.schema.main.fields.distribution.variants!.embargoed.notices)
+		);
 		expect(summaryTexts(notices)).toEqual([]);
 
 		notices.querySelector<HTMLButtonElement>('.qm-add-el')!.click();

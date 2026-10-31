@@ -11,9 +11,7 @@
 // out of, and paragraphs pasted into a numbered line are numbered lines.
 import { Fragment, Slice, type Node as PMNode } from 'prosemirror-model';
 import { Plugin, Selection } from 'prosemirror-state';
-
-const isList = (node: PMNode | null | undefined): node is PMNode =>
-	!!node && (node.type.name === 'ordered_list' || node.type.name === 'bullet_list');
+import { isList } from './list-node.js';
 
 /** The one list a slice is, if it is one: whole, or open where a run of its items was
  *  copied. */

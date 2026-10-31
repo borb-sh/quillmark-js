@@ -46,6 +46,7 @@
 		literalText,
 		mountKey,
 		optionalCell,
+		own,
 		placeFields,
 		printedText,
 		renderedBoolean,
@@ -185,9 +186,6 @@
 		| undefined
 	> = $state({});
 	let rootEl = $state<HTMLElement | undefined>();
-	/** A handle by property name, own keys only: a property can be named `constructor`. */
-	const ref = <T,>(map: Record<string, T | undefined>, key: string): T | undefined =>
-		Object.hasOwn(map, key) ? map[key] : undefined;
 	const FOCUSABLE = 'input, select, button, [tabindex]:not([tabindex="-1"])';
 	/** Take the caret: the first property that has somewhere to put it, in document
 	 * order — a subform has no single control of its own to land on. An empty subform
@@ -209,9 +207,9 @@
 			focus();
 			return undefined;
 		}
-		const nested = ref(nestedEls, key);
+		const nested = own(nestedEls, key);
 		if (nested) return nested.focusPath(rest, pos);
-		const prose = ref(proseEls, key);
+		const prose = own(proseEls, key);
 		if (prose) {
 			if (pos != null) prose.setCaret(pos);
 			else prose.focus();
@@ -238,7 +236,7 @@
 	/** Land in one property's cell, answering whether it took the caret. */
 	function landOn(cell: HTMLElement): boolean {
 		const key = cell.dataset.qmProp ?? '';
-		const owned = ref(nestedEls, key) ?? ref(proseEls, key);
+		const owned = own(nestedEls, key) ?? own(proseEls, key);
 		if (owned) {
 			owned.focus();
 			return true;

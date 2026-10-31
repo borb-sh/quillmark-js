@@ -14,7 +14,7 @@ import type {
 } from '@quillmark/wasm';
 import { MARK_KEYS, type Attrs, type YContainer, type YField, type YLine } from './shape.js';
 
-export interface Projection {
+interface Projection {
 	content: Content;
 	/** Island maps whose id another slot in the field already holds, with the id each takes.
 	 *  Every client derives the same ids, so writing them back to Y agrees. */

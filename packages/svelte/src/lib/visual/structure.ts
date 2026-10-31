@@ -333,10 +333,9 @@ export function matrixMembers(roster: Record<string, string> | undefined): Matri
 	return roster ? Object.keys(roster).map((id) => ({ id, title: roster[id] })) : [];
 }
 
-/** A member's stored payload, off the sparse map by own key: a document key can be
- *  spelled `constructor`. */
-export function memberValue(map: Record<string, unknown> | undefined, id: string): unknown {
-	return map && Object.hasOwn(map, id) ? map[id] : undefined;
+/** A value by own key: a document key or a declared id can be spelled `constructor`. */
+export function own<T>(map: Record<string, T> | undefined, key: string): T | undefined {
+	return map && Object.hasOwn(map, key) ? map[key] : undefined;
 }
 
 /** The value a matrix prints: the stored map, else a mapping `default:`. */
@@ -569,7 +568,7 @@ function firstShortText(
 		return kind === 'text' || (kind === 'prose' && shortCell(sub));
 	});
 	if (!named) return undefined;
-	return titleText(ownValue(values, named[0])).trim() || undefined;
+	return titleText(own(values, named[0])).trim() || undefined;
 }
 
 /** A collapsed row's own words ({@link firstShortText}). */
@@ -833,11 +832,6 @@ export function fieldValues(items: readonly PayloadItem[]): Record<string, unkno
 	const values: Record<string, unknown> = {};
 	for (const p of items) if (p.type === 'field') values[p.key] = p.value;
 	return values;
-}
-
-/** A value by own key: a declaration can name `constructor`. */
-function ownValue(values: Record<string, unknown>, name: string): unknown {
-	return Object.hasOwn(values, name) ? values[name] : undefined;
 }
 
 /** A field value as title text. A parsed field rests as the authored string and a

@@ -7,5 +7,4 @@ export interface Viewport {
 	height: number;
 }
 
-export function chrome(): string;
 export function load<T>(url: string, expression: string, viewport: Viewport): Promise<T>;

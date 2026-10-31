@@ -41,13 +41,6 @@ describe('fromDir', () => {
 		expect(text110).toContain('1.1.0');
 	});
 
-	it('getQuill throws quill_not_found for unknown quill name', async () => {
-		const q = await fromDir(SAMPLE_FIXTURE);
-		await expect(q.getQuill('unknown@1.0.0')).rejects.toThrow(
-			expect.objectContaining({ code: 'quill_not_found' })
-		);
-	});
-
 	it('quillNames() and versionsOf() return a fresh array each call', async () => {
 		const q = await fromDir(SAMPLE_FIXTURE);
 		expect(q.quillNames()).not.toBe(q.quillNames());

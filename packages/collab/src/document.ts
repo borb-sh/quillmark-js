@@ -123,7 +123,7 @@ export interface DocumentBinding {
 }
 
 /** Which form a field takes in Y: a content root, a plain-text root, or a card-map value. */
-export type Form = 'content' | 'plain' | 'value';
+type Form = 'content' | 'plain' | 'value';
 
 export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	const { doc, quill, ydoc } = opts;

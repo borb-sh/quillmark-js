@@ -2,12 +2,13 @@
 // Each file declares `@vitest-environment jsdom` and registers `afterEach(unmountAll)` itself: a
 // hook registered here would bind to the first importer.
 import { mount, unmount, flushSync, tick, type Component } from 'svelte';
-import type { Delta, Document, Quill } from '@quillmark/wasm';
+import type { Delta, Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
 import type { EditorError } from '$lib/core';
 import type { ActiveLeaf, CardId, CardOp, EditorChange } from '$lib/visual';
 import type { ActiveProse } from '$lib/visual/leaves';
 import type { VisualEditorProps } from '$lib/visual/props';
+import { fieldTitle, groupLabel } from '$lib/visual/structure';
 import VisualEditor from '$lib/visual/VisualEditor.svelte';
 import VisualEditorInner from '$lib/visual/VisualEditorInner.svelte';
 
@@ -139,6 +140,14 @@ export function openGroup(target: HTMLElement, label: string): void {
 	if (!header) throw new Error(`no group header ${label}`);
 	if (header.getAttribute('aria-expanded') !== 'true') header.click();
 	flushSync();
+}
+
+/** The field `name` of `card`, by the label its schema gives it, its group section
+ *  opened first. */
+export function openField(target: HTMLElement, card: QuillCardSchema, name: string): HTMLElement {
+	const schema = card.fields[name];
+	if (schema.ui?.group) openGroup(target, groupLabel(card, schema.ui.group));
+	return field(target, fieldTitle(name, schema));
 }
 
 /** Type into a text control: the input event a text commit rides and the change a

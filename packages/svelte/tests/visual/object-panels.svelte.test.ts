@@ -4,7 +4,7 @@
 // headed by the object, and everything else stands unframed above them.
 import { describe, it, expect, afterEach } from 'vitest';
 import { quill } from '../helpers/fixtures.js';
-import { field, mountEditor, openGroup, settle, unmountAll } from '../helpers/surface.svelte.js';
+import { field, mountEditor, openField, settle, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -84,11 +84,10 @@ describe('a card grouped by top-level objects', () => {
 	it('keeps a legacy `ui.groups` card’s objects as subforms inside its groups', () => {
 		const q = quill();
 		const { target } = mountEditor(q, q.seedDocument());
-		openGroup(target, 'Who and what');
-		const contact = field(target, 'Point of contact');
+		const contact = openField(target, q.schema.main, 'contact');
 		expect(contact.closest('.qm-group')).not.toBeNull();
 		expect(
 			headers(target.querySelector('.qm-card')!).map((h) => h.textContent?.trim())
-		).not.toContain('Point of contact');
+		).not.toContain(q.schema.main.fields.contact.title);
 	});
 });

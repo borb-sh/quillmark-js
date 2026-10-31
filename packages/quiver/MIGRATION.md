@@ -24,7 +24,7 @@ A host rule naming `fonts/*` or `*.zip` under a built quiver names `*.quill` now
 
 A built quiver is `quiver.json` beside one bundle per quill and a `fonts/` directory. The hashed manifest and `store/` are gone, and `latest.json` carries only `format`, now 2. An old artifact under 0.30 is a `transport_error` on `quiver.json`; a 0.30 artifact under an older reader is refused with the upgrade named. Re-run `build`; nothing in the source layout changes.
 
-`quillkit`'s client carries its own copy of this package's reader and packs through the collection's, so a collection upgrades `@quillmark/quiver` in the same change as `quillkit`. `quillkit site` and `quillkit studio` refuse a pack with no `quiver.json`, naming the upgrade.
+`quillkit`'s client carries its own copy of this package's reader and packs through the collection's, so a collection upgrades `@quillmark/quiver` in the same change as `quillkit`. `quillkit` refuses a pack with no `quiver.json`, naming the upgrade.
 
 A host rule naming `quiver/latest.json` now names `quiver/quiver.json`.
 
@@ -101,10 +101,10 @@ Build output moved from MD5 to SHA-256, and the loader verifies fetched bytes ag
 | `Quiver.fromDir`, `Quiver.fromBuiltDir`, `Quiver.build` (statics) | free functions from `@quillmark/quiver/node`   |
 | `Quiver._fromLoader`                                              | removed; construction is sealed                |
 | `BuildOptions`                                                    | removed; `build(src, out)` takes two arguments |
-| `@quillmark/quiver/preview`, `renderQuiverSamples`                | removed; `quillkit studio` answers live        |
-| `@quillmark/quiver/testing`, `runQuiverTests`                     | removed; `quillkit test` is the gate           |
+| `@quillmark/quiver/preview`, `renderQuiverSamples`                | removed; `quillkit serve` answers live         |
+| `@quillmark/quiver/testing`, `runQuiverTests`                     | removed; `quillkit check` is the gate          |
 | `quiver` / `quillmark-quiver` bin                                 | removed; the verbs are `quillkit`'s            |
-| `quiver.config.js`                                                | `quillkit.config.js`                           |
+| `quiver.config.js`                                                | removed; `quillkit` reads no config file       |
 
 The `@quillmark/wasm` peer floor is `>=0.101.0-0`. That range carries its own boundary changes, several of which a type checker also misses; the ledger is [`DOCUMENT_MODEL.md`](../svelte/prose/canon/DOCUMENT_MODEL.md) in `@quillmark/svelte`.
 
@@ -118,6 +118,6 @@ npm install --save-dev @quillmark/quiver @quillmark/wasm quillkit
 
 ```jsonc
 {
-	"scripts": { "test": "quillkit test", "build": "quillkit build" }
+	"scripts": { "test": "quillkit check", "build": "quillkit build" }
 }
 ```

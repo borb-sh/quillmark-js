@@ -5,9 +5,7 @@
 // key declines: an item leaving its list is a different edit.
 import type { Node as PMNode, Schema } from 'prosemirror-model';
 import type { Command } from 'prosemirror-state';
-
-const isList = (node: PMNode): boolean =>
-	node.type.name === 'ordered_list' || node.type.name === 'bullet_list';
+import { isList } from './list-node.js';
 
 /** The items the selection stands in, in the innermost list holding all of them, moved
  *  one place up (`-1`) or down (`1`). */

@@ -81,6 +81,7 @@
 	import { propertyDomIds } from './domid.js';
 	import type { LandingBox } from './leaves.js';
 	import { reorder, reorderArm } from './motion.js';
+	import { rowDrag } from './rowdrag.svelte.js';
 	import Icon from './icons/Icon.svelte';
 	import TextField from './TextField.svelte';
 	import ObjectField from './ObjectField.svelte';
@@ -535,7 +536,7 @@
 	 *  moves nothing, and never the record around it. A held drag owns the row until its
 	 *  release. */
 	function onRowKey(e: KeyboardEvent, k: number): void {
-		if (!e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || e.isComposing || drag) return;
+		if (!e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || e.isComposing || drag.held()) return;
 		// A cell that took the key — a select opening, a date segment stepping, a prose
 		// leaf joining — owns it.
 		if (e.defaultPrevented) return;
@@ -548,109 +549,12 @@
 		move(k, k + dir);
 	}
 
-	// ── The drag handle ──────────────────────────────────────────────────────────
-	// Press-and-drag the handle moves its row; a press that does not travel past the dead
-	// zone does nothing. The drop is the row under the pointer, read off the rows where
-	// they stand, so a scroll by any hand re-picks it. Held in an edge band of its
-	// scrollport, the drag scrolls it toward the rows out of view, once the pointer has
-	// been outside the band: a press on a row already in the band does not scroll. Nothing
-	// reflows until the release (the lift is a tone and the drop rule is out of flow), and
-	// the release is the one splice `move` makes. A handle that loses the pointer, or
-	// leaves the DOM, ends the drag with no move.
-	const DEAD_ZONE = 3;
-	/** The band at a scrollport's top and bottom edges that scrolls it under a held drag,
-	 *  and the most one frame scrolls, reached at the edge itself. */
-	const EDGE = 48;
-	const STEP = 16;
-	type RowDrag = { k: number; origin: number; y: number; engaged: boolean; drop: number };
-	let drag = $state<RowDrag | undefined>();
-	let follow: { grip: Element; port: Element; armed: boolean; frame: number } | undefined;
-	function onHandleDown(e: PointerEvent, k: number): void {
-		if (e.button !== 0) return;
-		e.preventDefault();
-		release();
-		const grip = e.currentTarget as HTMLElement;
-		grip.setPointerCapture?.(e.pointerId);
-		drag = { k, origin: e.clientY, y: e.clientY, engaged: false, drop: k };
-		follow = { grip, port: scrollport(grip), armed: false, frame: 0 };
-	}
-	function onHandleMove(e: PointerEvent): void {
-		if (!drag) return;
-		drag.y = e.clientY;
-		if (!drag.engaged) {
-			if (Math.abs(e.clientY - drag.origin) < DEAD_ZONE) return;
-			drag.engaged = true;
-			addEventListener('scroll', repick, { capture: true, passive: true });
-			if (follow) follow.frame = requestAnimationFrame(edgeScroll);
-		}
-		repick();
-	}
-	function repick(): void {
-		if (drag?.engaged) drag.drop = dropIndex(drag.k, drag.y);
-	}
-	const rowBox = (i: number): DOMRect | undefined => rowEls[ids[i]]?.getBoundingClientRect();
-	/** The row the pointer is over, or the nearest one past either end. */
-	function dropIndex(k: number, y: number): number {
-		let best = k;
-		let nearest = Infinity;
-		ids.forEach((_, i) => {
-			const box = rowBox(i);
-			if (!box) return;
-			const gap = y < box.top ? box.top - y : y > box.bottom ? y - box.bottom : 0;
-			if (gap < nearest) {
-				nearest = gap;
-				best = i;
-			}
-		});
-		return best;
-	}
-	const page = (): Element => document.scrollingElement ?? document.documentElement;
-	/** The nearest ancestor that scrolls vertically, else the page. */
-	function scrollport(from: Element): Element {
-		for (let el = from.parentElement; el; el = el.parentElement) {
-			const { overflowY } = getComputedStyle(el);
-			if (/auto|scroll/.test(overflowY) && el.scrollHeight > el.clientHeight) return el;
-		}
-		return page();
-	}
-	function edgeScroll(): void {
-		if (!follow || !drag?.engaged) return;
-		if (!follow.grip.isConnected) {
-			drag = undefined;
-			release();
-			return;
-		}
-		const { port } = follow;
-		const box = port === page() ? undefined : port.getBoundingClientRect();
-		const top = Math.max(box?.top ?? 0, 0);
-		const bottom = Math.min(box?.bottom ?? innerHeight, innerHeight);
-		const into = Math.min(drag.y - top - EDGE, 0) + Math.max(drag.y - bottom + EDGE, 0);
-		if (!into) follow.armed = true;
-		// Only toward rows still out of view: past the list's end there is nothing to reach.
-		const beyond =
-			into < 0 ? (rowBox(0)?.top ?? top) < top : (rowBox(ids.length - 1)?.bottom ?? 0) > bottom;
-		if (into && follow.armed && beyond)
-			port.scrollBy({ top: STEP * Math.max(-1, Math.min(1, into / EDGE)), behavior: 'instant' });
-		follow.frame = requestAnimationFrame(edgeScroll);
-	}
-	function release(): void {
-		if (follow) cancelAnimationFrame(follow.frame);
-		follow = undefined;
-		removeEventListener('scroll', repick, { capture: true });
-	}
-	onDestroy(release);
-	function onHandleUp(e: PointerEvent): void {
-		const done = drag;
-		drag = undefined;
-		release();
-		if (!done?.engaged || e.type !== 'pointerup') return;
-		move(done.k, done.drop);
-	}
-	/** Where the drop rule draws on row `k`, while a drag would land the row there. */
-	function dropSide(k: number): 'before' | 'after' | undefined {
-		if (!drag?.engaged || drag.drop !== k || drag.drop === drag.k) return undefined;
-		return drag.drop > drag.k ? 'after' : 'before';
-	}
+	const drag = rowDrag({
+		count: () => ids.length,
+		box: (i) => rowEls[ids[i]]?.getBoundingClientRect(),
+		move
+	});
+	onDestroy(drag.release);
 
 	/** Whether cells stand past the table scroller's end edge, under the pinned remove,
 	 *  which is what the fade before the remove draws on. */
@@ -774,9 +678,9 @@
 				<div
 					class={[
 						'qm-array-row qm-element qm-wash',
-						{ open: open.has(id), lifted: drag?.engaged && drag.k === k }
+						{ open: open.has(id), lifted: drag.lifted(k) }
 					]}
-					data-drop={dropSide(k)}
+					data-drop={drag.dropSide(k)}
 					data-qm-index={k}
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
@@ -892,11 +796,11 @@
 		class="qm-row-handle"
 		aria-hidden="true"
 		title={t.strings.arrayDrag}
-		onpointerdown={(e) => onHandleDown(e, k)}
-		onpointermove={onHandleMove}
-		onpointerup={onHandleUp}
-		onpointercancel={onHandleUp}
-		onlostpointercapture={onHandleUp}
+		onpointerdown={(e) => drag.down(e, k)}
+		onpointermove={drag.move}
+		onpointerup={drag.up}
+		onpointercancel={drag.up}
+		onlostpointercapture={drag.up}
 		><span class="qm-row-handle-bar"><Icon name="grip-vertical" /></span></span
 	>
 {/snippet}

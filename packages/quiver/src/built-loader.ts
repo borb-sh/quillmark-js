@@ -6,7 +6,7 @@
  */
 
 import { QuiverError } from './errors.js';
-import { isQuillName } from './ref.js';
+import { QUILL_NAME_RULE, isQuillName } from './ref.js';
 import { isCanonicalSemver, compareSemver } from './semver.js';
 import { FORMAT, INDEX } from './format.js';
 import { isZip } from './signature.js';
@@ -214,7 +214,7 @@ function parseIndex(raw: string): BuiltIndex {
 	if (!isQuillName(name)) {
 		throw new QuiverError(
 			'quiver_invalid',
-			`${INDEX} name "${name}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`
+			`${INDEX} name "${name}" is not a quill name — a name is ${QUILL_NAME_RULE}`
 		);
 	}
 
@@ -251,7 +251,7 @@ function parseIndex(raw: string): BuiltIndex {
 		if (!isQuillName(quillName)) {
 			throw new QuiverError(
 				'quiver_invalid',
-				`${at}.name "${quillName}" is not a quill name — a name is [a-z][a-z0-9_]*, at most 64 characters`
+				`${at}.name "${quillName}" is not a quill name — a name is ${QUILL_NAME_RULE}`
 			);
 		}
 

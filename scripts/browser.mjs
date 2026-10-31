@@ -45,7 +45,7 @@ function candidates() {
 }
 
 /** The first candidate that is a binary, or a refusal naming the way out. */
-export function chrome() {
+function chrome() {
 	const tried = candidates();
 	const at = tried.find((path) => existsSync(path) && statSync(path).isFile());
 	if (at === undefined)
