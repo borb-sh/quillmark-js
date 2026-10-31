@@ -34,7 +34,7 @@ Runes mode makes `export let`, `$:` and `$$props` compile errors. The rest still
 
 ## Packaging
 
-**One package, `@quillmark/svelte`, with subpath exports**: `/core`, `/preview`, `/visual` ship; `/form` is reserved for the metadata surface.
+**One package, `@quillmark/svelte`, with subpath exports**: `/core`, `/preview`, `/visual` ship, with `/preset` the opt-in stylesheet; `/form` is reserved for the metadata surface.
 
 **A subpath is a promise, so it carries a surface a consumer builds with.** Reading a document's canonical markdown is `doc.toMarkdown()` on the public `Document` handle, so a debug view over it is a recipe rather than an entry, and the README carries it whole in three lines. An entry adds an `exports` slot `publint` gates, a module root, a remount contract, and a compatibility promise, and it earns none of them by wrapping one public call.
 
@@ -46,7 +46,7 @@ Subpaths, not separate packages, because the thing a split would buy (a preview-
 
 The container's name is what makes that hold for the one surface with a distinct audience. Preview's audience (read-only viewer, share page, CI screenshot) is not editing, and a neutral container is a dependency it can take. So `/preview` keeps no editor-side import, and the reason is **bundle weight**: it is what makes the subpath claim true rather than merely stated. `check:deps` holds the subpath's edge, one relative hop past `core/` being what reaches the codec.
 
-Each subpath export declares `types` + `svelte` + `default`, all pointing at the `dist/<subpath>/index.js` module root; `publint` gates the map.
+Each surface subpath export declares `types` + `svelte` + `default`, all pointing at the `dist/<subpath>/index.js` module root; `/preset` declares `types` and a `default` that is its stylesheet. `publint` gates the map.
 
 ## Playground
 

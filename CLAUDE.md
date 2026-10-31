@@ -1,6 +1,6 @@
 # quillmark-js
 
-The JS tier downstream of the `@quillmark/wasm` artifact: `packages/svelte`, `packages/quiver`, `packages/quillkit`, and the private `packages/playground`. One npm workspace, one install, one gate.
+The JS tier downstream of the `@quillmark/wasm` artifact: `packages/svelte`, `packages/quiver`, `packages/fonts`, `packages/collab`, `packages/quillkit`, and the private `packages/playground`. One npm workspace, one install, one gate.
 
 Each package's `prose/canon/INDEX.md` is where its design lives; the design is still evolving, and unsettled work lives in GitHub issues.
 

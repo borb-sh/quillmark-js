@@ -1,7 +1,6 @@
 // The playground's quills come from a built quiver served under `/quiver/`, packed by
 // `packages/playground/scripts/build-quiver.mjs` (PLAYGROUND §"Quiver, not bundler"). One `Quiver`
-// serves the
-// page, so routes share its quill cache across client-side navigation.
+// serves the page, so routes share its quill cache across client-side navigation.
 import { Quiver } from '@quillmark/quiver';
 import { resolve } from '$app/paths';
 

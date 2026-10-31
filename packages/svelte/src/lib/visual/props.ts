@@ -116,7 +116,7 @@ export interface VisualEditorProps {
 	/** Appended to the root's own class: the surface is a mounted element the
 	 * consumer positions, so it needs a handle for layout it owns. */
 	class?: string;
-	/** Merged onto the root. Free because the derivation moved off this attribute
-	 *  and onto `data-qm-root` (core/theme.css). */
+	/** Merged onto the root. The theme derivation hangs off `data-qm-root`
+	 *  (core/theme.css), not this attribute. */
 	style?: string;
 }

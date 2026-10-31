@@ -202,7 +202,7 @@ export function tablePropsOfNode(node: PMNode): TableProps | undefined {
  * Reads the PM doc rather than stored content because that is what the caller holds and the commit
  * will project; a stale content could collide with an id the same transaction places.
  */
-export function islandMinter(doc: PMNode): () => string {
+function islandMinter(doc: PMNode): () => string {
 	return islandState(doc).mint;
 }
 

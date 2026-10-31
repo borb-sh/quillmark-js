@@ -1,5 +1,5 @@
 // Two lists of one kind that an edit leaves touching are one list. Each command that
-// opens such a seam joins it in its own transaction (`lists.ts` §cleanup), so the items
+// opens such a seam joins it in its own transaction (the commands in `lists.ts`), so the items
 // below count on from the items above. A seam no edit opened, two lists that arrived
 // touching, is the boundary `Content` marks, and stays.
 import type { Node as PMNode } from 'prosemirror-model';
@@ -24,14 +24,6 @@ export function joinLists(tr: Transaction, pos: number): boolean {
 	if (!touching(tr.doc, pos) || !canJoin(tr.doc, pos)) return false;
 	tr.join(pos);
 	return true;
-}
-
-/** Join the list at `pos` to a list of its kind touching it on either side. */
-export function joinAround(tr: Transaction, pos: number): void {
-	const node = tr.doc.nodeAt(pos);
-	if (!node) return;
-	joinLists(tr, pos + node.nodeSize);
-	joinLists(tr, pos);
 }
 
 /** Join at every seam of `seams` that two lists of one kind meet at, the last first so

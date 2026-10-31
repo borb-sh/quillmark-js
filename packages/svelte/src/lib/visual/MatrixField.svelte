@@ -44,12 +44,12 @@
 		matrixEmpty,
 		matrixHeld,
 		matrixMembers,
+		matrixPrinted,
 		memberValue,
 		memberWrite,
 		onRoster,
 		schemaAt
 	} from './structure.js';
-	import { matrixPrinted } from './checklists.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import type { LandingBox } from './leaves.js';
 	import { propertyDomIds } from './domid.js';

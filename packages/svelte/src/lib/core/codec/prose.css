@@ -68,7 +68,7 @@ li.ProseMirror-selectednode::after {
    blank line that doubles the leading and makes a short document read as a list of
    fragments. */
 .ProseMirror > * + *,
-.ProseMirror :is(blockquote, [data-qm-unknown-container]) > * + * {
+.ProseMirror blockquote > * + * {
 	margin-top: var(--_qm-space-3);
 }
 

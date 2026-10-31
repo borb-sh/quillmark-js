@@ -52,7 +52,7 @@ export function parseQuiverYaml(raw: string | Uint8Array): QuiverMeta {
 		if (!KNOWN_FIELDS.has(key)) {
 			throw new QuiverError(
 				'quiver_invalid',
-				`Quiver.yaml: unknown field "${key}" — only "name" and "description" are valid in V1`
+				`Quiver.yaml: unknown field "${key}" — only "name" and "description" are valid`
 			);
 		}
 	}

@@ -339,6 +339,18 @@ export function memberValue(map: Record<string, unknown> | undefined, id: string
 	return map && Object.hasOwn(map, id) ? map[id] : undefined;
 }
 
+/** The value a matrix prints: the stored map, else a mapping `default:`. */
+export function matrixPrinted(
+	value: unknown,
+	schema: QuillFieldSchema
+): Record<string, unknown> | undefined {
+	const map = (v: unknown) =>
+		typeof v === 'object' && v !== null && !Array.isArray(v)
+			? (v as Record<string, unknown>)
+			: undefined;
+	return value == null ? map(schema.default) : map(value);
+}
+
 /**
  * Whether a stored member is held: by being present. A mapping is held whatever it
  * carries, `{}` included, and a bare scalar is the tick itself, read as Quillmark's
@@ -407,7 +419,7 @@ export function memberWrite(columns: Record<string, unknown>, title?: string): u
 
 /** Whether `id` is spelled as a matrix id: snake_case, the rule the roster's ids and
  *  an added item's key share. */
-export function matrixId(id: string): boolean {
+function matrixId(id: string): boolean {
 	return /^[a-z][a-z0-9_]*$/.test(id);
 }
 
@@ -629,6 +641,11 @@ export function humanize(name: string): string {
 	return spaced ? spaced[0].toUpperCase() + spaced.slice(1) : spaced;
 }
 
+/** What a field or property is called: its `title:`, else its key humanized. */
+export function fieldTitle(key: string, schema: QuillFieldSchema): string {
+	return schema.title ?? humanize(key);
+}
+
 /**
  * Whether a field asks to share a row when its `ui.compact` is undeclared: a control
  * whose type bounds its width. Text never does, its type saying nothing of whether a
@@ -649,7 +666,7 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 			control,
 			group: schema.ui?.group,
 			compact: schema.ui?.compact ?? packsByDefault(control),
-			label: schema.title ?? humanize(name),
+			label: fieldTitle(name, schema),
 			description: schema.description,
 			inline: oneLine(schema),
 			plaintext: literalText(schema)
