@@ -5,10 +5,7 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import type { Transaction } from 'prosemirror-state';
 import { canJoin } from 'prosemirror-transform';
-
-function isList(node: PMNode): boolean {
-	return node.firstChild?.type === node.type.schema.nodes.list_item;
-}
+import { isList } from './list-node.js';
 
 /** Whether two lists of one kind meet at `pos`. */
 export function touching(doc: PMNode, pos: number): boolean {
