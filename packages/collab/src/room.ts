@@ -258,7 +258,7 @@ function validRevision(r: Revision): boolean {
 
 /** A digest of the state `snapshot` names: its state vector and delete set, in a fixed order, as
  *  eleven base-36 digits. */
-export function checkOf(snapshot: Uint8Array): string {
+function checkOf(snapshot: Uint8Array): string {
 	const { sv, ds } = Y.decodeSnapshot(snapshot);
 	const parts: number[] = [];
 	for (const client of [...sv.keys()].sort((x, y) => x - y)) parts.push(client, sv.get(client)!);
