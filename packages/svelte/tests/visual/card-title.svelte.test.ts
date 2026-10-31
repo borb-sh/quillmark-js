@@ -13,7 +13,7 @@ import {
 	field,
 	mountEditor,
 	mountInner,
-	openGroup,
+	openField,
 	press,
 	typeLeaf,
 	unmountAll
@@ -134,8 +134,9 @@ describe('a card rename', () => {
 
 		rename(title, 'Draft');
 		// A form control's commit is the lane that re-derives: the `numbered` switch.
-		openGroup(section, 'Set in');
-		field(section, 'Numbered').querySelector<HTMLElement>('[role="switch"]')!.click();
+		openField(section, q.schema.card_kinds!.section, 'numbered')
+			.querySelector<HTMLElement>('[role="switch"]')!
+			.click();
 		flushSync();
 		expect(changes.map((c) => c.source)).toEqual(['field']);
 		expect(title.value).toBe('Draft');

@@ -10,7 +10,7 @@ import {
 	field,
 	leaf,
 	mountEditor,
-	openGroup,
+	openField,
 	press,
 	unmountAll
 } from '../helpers/surface.svelte.js';
@@ -35,8 +35,9 @@ const describedText = (control: Element): string[] =>
 		.split(/\s+/)
 		.map((id) => document.getElementById(id)?.textContent ?? '');
 
+/** The `contact` subform's `name` cell, its group opened. */
 function contactName(target: HTMLElement): { input: HTMLElement; hint: HTMLElement } {
-	const contact = field(target, 'Point of contact');
+	const contact = openField(target, quill().schema.main, 'contact');
 	const label = [...contact.querySelectorAll<HTMLLabelElement>('.qm-object .qm-field-label')].find(
 		(l) => l.querySelector('span')?.textContent === 'Name'
 	)!;
@@ -56,7 +57,6 @@ describe('the guidance key', () => {
 
 	it('raises the focused control’s own description, and lowers it again', () => {
 		const { target } = mountEditor(quill(), example());
-		openGroup(target, 'Who and what');
 		const { input, hint } = contactName(target);
 		input.focus();
 
@@ -69,7 +69,6 @@ describe('the guidance key', () => {
 
 	it('lowers on Escape in the control and on focus leaving it', () => {
 		const { target } = mountEditor(quill(), example());
-		openGroup(target, 'Who and what');
 		const { input } = contactName(target);
 		input.focus();
 
