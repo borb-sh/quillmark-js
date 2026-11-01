@@ -15,7 +15,7 @@ function padding(value: string, extent: number): number {
 	return value.endsWith('%') ? (n / 100) * extent : n;
 }
 
-export function scrollInset(dom: Element): Inset {
+function scrollInset(dom: Element): Inset {
 	const inset = { top: 0, bottom: 0 };
 	const view = dom.ownerDocument.defaultView;
 	if (!view) return inset;
