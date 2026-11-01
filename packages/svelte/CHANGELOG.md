@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`VisualEditor` takes `notes`.** Each one is a `DocPath` and a snippet, which draws under the field the path names, below its diagnostics. A nested path draws under the field it hangs off, the body's under the body, and a path naming no field draws nothing. A host shows what it changed in a field with it, for example the words an edit replaced.
+
 **A trackpad pans a zoomed preview diagonally.** Over pages that overflow both ways, a scroll carrying both axes moves the pane along both; macOS railed any scroll that leaned more than two to one on an axis to that axis alone.
 
 ## v0.29.2 - 2026-10-30

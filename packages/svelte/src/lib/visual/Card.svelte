@@ -5,6 +5,7 @@
  reorder re-targets its commits without a remount.
 -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { wording } from './strings.js';
 
 	// Ambient from the editor root, with the package's English off-tree, so this
@@ -36,6 +37,8 @@
 		retype: (kind: string) => void;
 		rename: (title: string) => void;
 		diagFor: (field?: string) => Diagnostic[] | undefined;
+		/** The host's note under a field (VISUAL_EDITOR §"Field notes"). */
+		noteFor: (field?: string) => Snippet | undefined;
 		/** Consumer enum-option policy for a field; true when no hook set. */
 		enumAllowed: (field: string, value: string) => boolean;
 	}
@@ -346,6 +349,7 @@
 						{leaves}
 					/>
 					<DiagnosticList diagnostics={ops.diagFor(undefined)} />
+					{@render ops.noteFor(undefined)?.()}
 				</div>
 			{/if}
 		</div>
@@ -374,6 +378,7 @@
 				{onError}
 				{leaves}
 				diagnostics={ops.diagFor(f.name)}
+				note={ops.noteFor(f.name)}
 				headed={f === head}
 			/>
 		{/each}

@@ -17,6 +17,7 @@
  (`ProseField`).
 -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type {
 		Document,
 		Quill,
@@ -92,6 +93,8 @@
 		 *  landing handle here, a prose leaf its controller from inside `ProseField`. */
 		leaves?: LeafRegistry;
 		diagnostics?: Diagnostic[];
+		/** The host's note, drawn under the control and its diagnostics. */
+		note?: Snippet;
 		/** The section's header names this field and parks its description, under this
 		 * field's own label and description ids ({@link GroupSection.head}). */
 		headed?: boolean;
@@ -115,6 +118,7 @@
 		onError,
 		leaves,
 		diagnostics,
+		note,
 		headed = false
 	}: Props = $props();
 
@@ -445,6 +449,7 @@
 		{#if !isContainer(field.control)}
 			<DiagnosticList {diagnostics} />
 		{/if}
+		{@render note?.()}
 	</div>
 </div>
 

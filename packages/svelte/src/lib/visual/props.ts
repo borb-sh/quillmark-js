@@ -3,7 +3,9 @@
 // `VisualEditorInner` (the editor, which mounts once per key). A component cannot
 // export a type without a module script, and a type imported across the two would
 // make the pair circular, so the shape lives beside them instead.
+import type { Snippet } from 'svelte';
 import type { Document, Quill, Addr, Diagnostic, FontFace } from '@quillmark/wasm';
+import type { DocPath } from '../core/address.js';
 import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
@@ -71,6 +73,11 @@ export interface VisualEditorProps {
 	 */
 	diagnostics?: Diagnostic[];
 	/**
+	 * Host content drawn under a field, routed by `path` as a diagnostic is: a nested
+	 * path draws under the field it hangs off (VISUAL_EDITOR §"Field notes").
+	 */
+	notes?: FieldNote[];
+	/**
 	 * Consumer policy hook: given a field `addr` and an enum option,
 	 * return `false` to mark that option unavailable; `enumDisallowed` decides how
 	 * the control then draws it. The stored payload is untouched either way: the
@@ -119,4 +126,10 @@ export interface VisualEditorProps {
 	/** Merged onto the root. The theme derivation hangs off `data-qm-root`
 	 *  (core/theme.css), not this attribute. */
 	style?: string;
+}
+
+/** What a host draws under the field at `path`, below its diagnostics. */
+export interface FieldNote {
+	path: DocPath;
+	note: Snippet;
 }

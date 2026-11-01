@@ -18,13 +18,14 @@
  once per derive.
 -->
 <script lang="ts">
-	import { onDestroy, tick } from 'svelte';
+	import { onDestroy, tick, type Snippet } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { DropdownMenu } from 'bits-ui';
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
 	import {
 		addrForFieldPath,
 		cardPath,
+		nearestAddrForFieldPath,
 		nestedAddrForFieldPath,
 		fieldPathForAddr,
 		type DocPath,
@@ -99,6 +100,7 @@
 		onChange,
 		onError,
 		diagnostics,
+		notes,
 		enumOptionAllowed,
 		enumDisallowed = 'disable',
 		fonts,
@@ -613,6 +615,15 @@
 		const fromExternal = routeAndResolve(diagnostics, cardIds);
 		return mergeDiagnostics(fromValidate, fromExternal, [...commitErrors.values()]);
 	});
+	const noteByKey = $derived.by(() => {
+		const byKey = new Map<string, Snippet>();
+		for (const { path, note } of notes ?? []) {
+			const key = nearestAddrForFieldPath(path);
+			const resolved = key && resolveCardKey(key, cardIds);
+			if (resolved) byKey.set(fieldKeyToString(resolved), note);
+		}
+		return byKey;
+	});
 	function opsFor(id: string, isMain: boolean) {
 		// One identity per field: the leaf registry, the DOM's three names, and the
 		// diagnostics map all key off this string, so a leaf, its label and its
@@ -629,6 +640,7 @@
 			retype: (kind: string) => retypeCardById(id, kind),
 			rename: (title: string) => renameCardById(id, title),
 			diagFor: (field?: string) => diagByKey.get(leafKey(field)),
+			noteFor: (field?: string) => noteByKey.get(leafKey(field)),
 			enumAllowed: (field: string, value: string) =>
 				enumOptionAllowed?.(makeAddr(id, isMain, field), value) ?? true
 		};

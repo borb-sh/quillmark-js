@@ -16,7 +16,7 @@
 import '../core/theme.css';
 
 export { default as VisualEditor } from './VisualEditor.svelte';
-export type { VisualEditorProps } from './props.js';
+export type { FieldNote, VisualEditorProps } from './props.js';
 
 // The prose leaf: the vanilla mount API a non-Svelte consumer (or a custom
 // surface) builds on.
