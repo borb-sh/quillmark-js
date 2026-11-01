@@ -27,10 +27,11 @@ const FRAMES_REDUCED: Keyframe[] = [{ opacity: 1 }, { opacity: 1 }];
  * Run one wash over `host`, a `.qm-wash` box, resolving the dwell off its root so the number is
  * single-sourced in CSS (`core/rungs.ts`). `--_qm-bloom-dwell` already shortens under
  * `prefers-reduced-motion`, so `matchMedia` here only picks the frame list. A run in flight on the
- * same host is cancelled first, so two quick landings do not stack alphas.
+ * same host is cancelled first, so two quick landings do not stack alphas. Answers the run, or
+ * `undefined` where there is no animation to play it.
  */
-export function bloom(host: HTMLElement): void {
-	if (typeof host.animate !== 'function') return;
+export function bloom(host: HTMLElement): Animation | undefined {
+	if (typeof host.animate !== 'function') return undefined;
 	for (const a of host.getAnimations({ subtree: true })) {
 		const effect = a.effect as KeyframeEffect | null;
 		if (effect?.target === host && effect.pseudoElement === WASH) a.cancel();
@@ -38,5 +39,5 @@ export function bloom(host: HTMLElement): void {
 	const reduced =
 		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const duration = rungMs(rungStyle(host), '--_qm-bloom-dwell') ?? FALLBACK_MS;
-	host.animate(reduced ? FRAMES_REDUCED : FRAMES, { duration, pseudoElement: WASH });
+	return host.animate(reduced ? FRAMES_REDUCED : FRAMES, { duration, pseudoElement: WASH });
 }

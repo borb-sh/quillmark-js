@@ -6,6 +6,7 @@ import { reportError, errorMessage, type EditorErrorHandler } from '../core/erro
 import { createPaintLoop, type PaintLoop } from './paint.js';
 import { createBridge, type BridgeController, type HeldTrip } from './bridge.js';
 import { createViewport } from './viewport.js';
+import { cutWashes, washField } from './wash.js';
 import { mergePreviewStrings, type PreviewStringsInput } from './strings.js';
 
 export interface PreviewOptions {
@@ -43,6 +44,11 @@ export interface PreviewController {
 	 * Takes the editor's `onCaretMove` payload, so `onCaretMove={preview.focusPosition}` wires it.
 	 */
 	focusPosition(at: Place): void;
+	/**
+	 * Play the arrival wash over every box this compile places at `field`, and move nothing: no
+	 * scroll, and the follow stands. `false` when this compile places nothing at that address.
+	 */
+	washField(field: DocPath): boolean;
 	/**
 	 * End the follow: the pane stays where the user left it until the next `focusPosition`. Wire
 	 * `onActiveLeafChange={preview.endFollow}`; a form control reports no caret, so unwired the
@@ -140,6 +146,8 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 
 	return {
 		refresh(change) {
+			// A plane is laid at the layout it washed; a recompile may have moved the ink under it.
+			cutWashes(paintLoop.slots);
 			render(change.pageCount, change.dirtyPages);
 			viewport.update();
 			if (followed) bridge?.focusPosition(followed.field, followed.pos);
@@ -154,6 +162,9 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		focusPosition(at) {
 			followed = at;
 			bridge?.focusPosition(at.field, at.pos);
+		},
+		washField(field) {
+			return washField(session, paintLoop.slots, field);
 		},
 		endFollow() {
 			followed = undefined;

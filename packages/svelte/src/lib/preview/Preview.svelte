@@ -3,7 +3,7 @@
   container div on mount and tears it down on unmount. No logic beyond wiring;
   paint.ts/bridge.ts/controller.ts own the behavior. Exposes the
   `PreviewController` verbs as instance methods (`bind:this`) for a consumer
-  that drives `refresh`/`scrollToField`/`focusPosition`/`endFollow`/`setZoom`
+  that drives `refresh`/`scrollToField`/`focusPosition`/`washField`/`endFollow`/`setZoom`
   imperatively (e.g. after `session.apply` elsewhere).
 -->
 <script lang="ts">
@@ -73,6 +73,10 @@
 	export function focusPosition(at: Place): void {
 		controller?.focusPosition(at);
 	}
+	/** `false` when this compile places nothing at `field` ({@link PreviewController}). */
+	export function washField(field: DocPath): boolean {
+		return controller?.washField(field) ?? false;
+	}
 	/** The follow ends on a focus change ({@link PreviewController}), and the editor's
 	 *  own signal is one: `onActiveLeafChange={preview.endFollow}`. */
 	export function endFollow(): void {
@@ -124,6 +128,21 @@
 		touch-action: pan-x pan-y;
 		padding: var(--_qm-space-4);
 		background: var(--_qm-surface-sunken);
+	}
+
+	/* The arrival wash on the page (`wash.ts`): a plane at a field's box, its tone the editor's,
+	   reaching a hair past the ink's tight box and rounded, as a control's wash is a box's own. Over
+	   the canvas by tree order, the canvas being a slot's first child. */
+	:global(:where(.qm-preview-wash)) {
+		pointer-events: none;
+	}
+	:global(:where(.qm-preview-wash))::after {
+		content: '';
+		position: absolute;
+		inset: calc(-1 * var(--_qm-space-half));
+		border-radius: var(--_qm-radius-inner);
+		background: var(--_qm-accent-wash);
+		opacity: 0;
 	}
 
 	/* Sticky to the pane's bottom edge and stretched across it, so the pill's corner is

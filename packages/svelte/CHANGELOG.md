@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`Preview` exposes `washField(field)`.** It plays the editor's arrival wash over every box the compile places at the address and moves nothing: no scroll, and the follow stands. It answers `false` where the compile places nothing. A host marks a change it wrote into the document in both panes, calling it after the `refresh` that carries the edit.
+
 **A rich-text caret stays clear of a pane's `scroll-padding`.** A prose leaf's reveal keeps the caret its line of clearance past the block-axis `scroll-padding` its scrollports declare, so a host that covers the bottom of a `.qm-pane` with an overlay sets `scroll-padding-block-end` on it and typing stays above the overlay. The reveal ignored scroll padding, letting the caret slip under the overlay.
 
 **A trackpad pans a zoomed preview diagonally.** Over pages that overflow both ways, a scroll carrying both axes moves the pane along both; macOS railed any scroll that leaned more than two to one on an axis to that axis alone.

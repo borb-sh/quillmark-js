@@ -33,7 +33,7 @@ One session, many edit sources, preview stays a view. `refresh(changeSet)` is th
 
 **A counted page is the whole of the paint gate.** `paint` and `pageSize` refuse only a page the count excludes. A compile with zero pages is the one state the surface stands a message in, recoverable by the next `refresh` that brings pages. A paint that throws on a counted page is caught per slot and surfaced as the render-failed message rather than aborting the sweep, so no page count leaves the pane blank and silent.
 
-**The preview draws nothing of its own on the page.** It is the surface a user proofs against, so any ink it leaves is ink the reader has to discount. The zoom pill is the one thing it floats over the desk, at the pane's corner rather than on a page, and only while the zoom is not the default (§Zoom). Nothing advertises that the text is clickable either: the click target is the text itself, which is what a reader tries first. Nothing marks the field the editor's caret is in, and **correlating the two panes on the page is unbuilt**: the surface holds no shape for a design to inherit.
+**The preview leaves no ink of its own on the page.** It is the surface a user proofs against, so any ink that stays is ink the reader has to discount. The zoom pill is the one thing it floats over the desk, at the pane's corner rather than on a page, and only while the zoom is not the default (§Zoom). The one thing it draws on a page is the arrival wash a host asks for, which decays to nothing (§Wash). Nothing advertises that the text is clickable either: the click target is the text itself, which is what a reader tries first. Nothing marks the field the editor's caret is in, and **a resting correlation of the two panes on the page is unbuilt**: the surface holds no shape for a design to inherit.
 
 A **field box** is the rectangle on the rendered page where a schema field's content lands: the field's canonical `DocPath` address (`main.subject`, `cards.<kind>[2].name`, cards by absolute document index) mapped to on-page geometry. `fieldBoxes(field)` unions a field's segment rects into one (striped) box per page. `field` is not unique — a field split across pages or shown in header + footer surfaces several boxes — and the scroll takes the first.
 
@@ -106,9 +106,19 @@ The rule is this pane's, and it is about the keystroke rather than about the cal
 
 **A focus change ends the follow** (`endFollow`), as does the discrete hop above; nothing else does. The place is re-asserted on every recompile, so a leaf that reports no caret (every form control) would leave the pane being pulled back to the leaf the focus left; the rule is the arrival's, and the editor's `onActiveLeafChange` carries it ([VISUAL_EDITOR.md](VISUAL_EDITOR.md) §"Focus and the preview bridge"). A prose leaf restarts the follow with its own next caret.
 
+## Wash
+
+`washField(field)` plays the editor's arrival wash over the page (`wash.ts`), so a host marks a change it wrote into the document in both panes: the editor through its own `washField` ([VISUAL_EDITOR.md](VISUAL_EDITOR.md) §"Focus and the preview bridge"), the preview through this one.
+
+**Every box the address has, not the first.** The scroll needs one place to go; a wash marks where the change is, and a field split across pages changed on each. The boxes are `boxesForField`'s: a content field's segments in the placement the compile enumerates, one union per page, and a scalar the plate places untracked or an array at every placement `regions()` lists for it.
+
+**The editor's wash, on a plane that leaves.** A plane per box goes into its `.qm-page-slot` at the `%` rect, over the canvas, and `core/bloom.ts` plays its `::after` with the editor's tone (`--_qm-accent-wash`) and dwell (`--_qm-bloom-dwell`); it is removed when its run ends, so the page is left as the compile drew it. A second wash on the same address cuts the first, as a second landing does in the editor, and a `refresh` cuts every plane still playing: the plane is laid at the layout it washed, and the recompile may have moved the ink from under it.
+
+**It moves nothing.** No scroll, and the follow stands: the wash marks the change for a reader already looking there, and a pane that jumped to it would take them off what they were reading. Like the scroll, it answers whether this compile placed anything at the address. The boxes are the compile's, so a host washes after the `refresh` that carries the edit.
+
 ## Minimal surface
 
-`createPreview(session, opts)` hands back a `PreviewController` (`preview/controller.ts`) with `refresh`, `scrollToField`, `focusPosition`, `endFollow` and `setZoom`. Every option is once-bound, so a swap is the consumer's `{#key session}` ([VISUAL_EDITOR.md](VISUAL_EDITOR.md) §"The document swap").
+`createPreview(session, opts)` hands back a `PreviewController` (`preview/controller.ts`) with `refresh`, `scrollToField`, `focusPosition`, `washField`, `endFollow` and `setZoom`. Every option is once-bound, so a swap is the consumer's `{#key session}` ([VISUAL_EDITOR.md](VISUAL_EDITOR.md) §"The document swap").
 
 ## Not owned
 
