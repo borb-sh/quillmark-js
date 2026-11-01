@@ -22,6 +22,7 @@ import {
 	type Command
 } from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
+import { revealProps } from './reveal.js';
 import type {
 	Document,
 	DocumentReader,
@@ -379,10 +380,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		state,
 		editable: () => !held,
 		attributes: () => (held ? heldNamed : defaulted ? defaultNamed : named),
-		// Both terms, one line each: when a flagged dispatch moves the scrollport
-		// (`scrollThreshold`) and what it leaves at the edge (`scrollMargin`).
-		scrollThreshold: clearance,
-		scrollMargin: clearance,
+		...revealProps(clearance),
 		// Islands are block-schema only, so any other leaf mounts no node view at all.
 		nodeViews: block
 			? {

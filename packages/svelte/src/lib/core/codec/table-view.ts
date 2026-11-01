@@ -29,6 +29,7 @@ import { tablePropsOfNode } from './islands.js';
 import { tableElement, tableText } from './table-copy.js';
 import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
+import { revealProps } from './reveal.js';
 import {
 	ALIGNS,
 	canMerge,
@@ -1578,9 +1579,8 @@ class TableIslandView implements NodeView {
 			}),
 			attributes: { 'aria-label': name, class: 'qm-table-cell-editor' },
 			// A cell is one of the leaf's lines, so a reveal keeps the leaf's clearance, not PM's
-			// 5px default (`field.ts`).
-			scrollThreshold: this.deps.clearance,
-			scrollMargin: this.deps.clearance,
+			// 5px default, and the same scroll padding (`reveal.ts`).
+			...revealProps(this.deps.clearance),
 			dispatchTransaction: (tr) => {
 				const from = { r, c, head: view.state.selection.head };
 				const next = view.state.apply(tr);
