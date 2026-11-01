@@ -22,6 +22,8 @@ Nothing to import and nothing to set. The package pulls its own stylesheet, and 
 
 `.qm-pane` is opt-in on the editor rather than the default because the editor is what its own popovers portal into, and a scroll container clips them. In a pane you would have had that clipping from your own scrolling frame anyway; in a page you should not have it at all.
 
+**Something drawn over the bottom of the pane**: set `scroll-padding-block-end` on the `.qm-pane` element to the height it covers. A caret revealed in a rich-text field, by typing or by a landing, keeps its line of clearance above that inset, as the browser's own focus scroll does for a form control. `scroll-padding-block-start` does the same at the top.
+
 **Placing and sizing**: each surface carries a stable root class (`.qm-editor`, `.qm-preview`), so you can place it from your own stylesheet without a wrapper. Each also takes a `class` prop that merges onto the same element, which is the better handle when you have one to give.
 
 A surface's width is the one you give it. Each contains its own inline size, so what a document holds — a table is as wide as its columns — scrolls inside the mount rather than widening the column the mount stands in.

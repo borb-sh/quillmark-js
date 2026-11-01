@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A rich-text caret stays clear of a pane's `scroll-padding`.** A prose leaf's reveal keeps the caret its line of clearance past the block-axis `scroll-padding` its scrollports declare, so a host that covers the bottom of a `.qm-pane` with an overlay sets `scroll-padding-block-end` on it and typing stays above the overlay. The reveal ignored scroll padding, letting the caret slip under the overlay.
+
 **A trackpad pans a zoomed preview diagonally.** Over pages that overflow both ways, a scroll carrying both axes moves the pane along both; macOS railed any scroll that leaned more than two to one on an axis to that axis alone.
 
 ## v0.29.2 - 2026-10-30
