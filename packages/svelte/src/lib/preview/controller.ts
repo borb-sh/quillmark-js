@@ -6,7 +6,7 @@ import { reportError, errorMessage, type EditorErrorHandler } from '../core/erro
 import { createPaintLoop, type PaintLoop } from './paint.js';
 import { createBridge, type BridgeController, type HeldTrip } from './bridge.js';
 import { createViewport } from './viewport.js';
-import { washField } from './wash.js';
+import { cutWashes, washField } from './wash.js';
 import { mergePreviewStrings, type PreviewStringsInput } from './strings.js';
 
 export interface PreviewOptions {
@@ -146,6 +146,8 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 
 	return {
 		refresh(change) {
+			// A plane is laid at the layout it washed; a recompile may have moved the ink under it.
+			cutWashes(paintLoop.slots);
 			render(change.pageCount, change.dirtyPages);
 			viewport.update();
 			if (followed) bridge?.focusPosition(followed.field, followed.pos);

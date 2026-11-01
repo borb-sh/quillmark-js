@@ -2,7 +2,7 @@
 // The page wash against a stubbed session: which boxes take a plane, and that the plane goes once
 // its run ends. jsdom plays no animation, so `animate` is stubbed with a run the test ends.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { washField } from '$lib/preview/wash';
+import { cutWashes, washField } from '$lib/preview/wash';
 import type { LiveSession } from '@quillmark/wasm';
 import type { PageSlot } from '$lib/preview/paint';
 
@@ -90,6 +90,20 @@ describe('the page wash', () => {
 		expect(planes(slots[0])).toHaveLength(1);
 
 		runs.at(-1)!.onfinish!({} as AnimationPlaybackEvent);
+		expect(planes(slots[0])).toHaveLength(0);
+	});
+
+	it('cuts every plane on a page when no field is named', () => {
+		const session = {
+			fieldBoxes: (field: string) => [{ field, page: 0, rect: [0, 0, 10, 10] }],
+			regions: () => []
+		} as unknown as LiveSession;
+		const slots = mockSlots(1);
+		washField(session, slots, 'main.subject');
+		washField(session, slots, 'main.body');
+
+		cutWashes(slots);
+
 		expect(planes(slots[0])).toHaveLength(0);
 	});
 });

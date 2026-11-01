@@ -7,6 +7,15 @@ import type { PageSlot } from './paint.js';
 
 const WASH_CLASS = 'qm-preview-wash';
 
+/** Cut every plane still playing on `field`, or on any field when `field` is unset. */
+export function cutWashes(slots: readonly PageSlot[], field?: string): void {
+	for (const { el } of slots) {
+		for (const plane of el.querySelectorAll<HTMLElement>(`.${WASH_CLASS}`)) {
+			if (field === undefined || plane.dataset.field === field) plane.remove();
+		}
+	}
+}
+
 /**
  * Wash every box this compile places at `field`; `false` when it places none. A wash still playing
  * on the same address is cut first, so two quick washes do not stack alphas.
@@ -17,11 +26,7 @@ export function washField(
 	field: string
 ): boolean {
 	const boxes = boxesForField(field, session.fieldBoxes(field), () => session.regions());
-	for (const { el } of slots) {
-		for (const plane of el.querySelectorAll<HTMLElement>(`.${WASH_CLASS}`)) {
-			if (plane.dataset.field === field) plane.remove();
-		}
-	}
+	cutWashes(slots, field);
 	let placed = false;
 	for (const box of boxes) {
 		const slot = slots[box.page];

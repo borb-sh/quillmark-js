@@ -132,9 +132,8 @@
 
 	/* The arrival wash on the page (`wash.ts`): a plane at a field's box, its tone the editor's,
 	   reaching a hair past the ink's tight box and rounded, as a control's wash is a box's own. Over
-	   the canvas, which mounts after it as the band scrolls. */
+	   the canvas by tree order, the canvas being a slot's first child. */
 	:global(:where(.qm-preview-wash)) {
-		z-index: 1;
 		pointer-events: none;
 	}
 	:global(:where(.qm-preview-wash))::after {
