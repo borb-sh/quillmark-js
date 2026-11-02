@@ -249,7 +249,7 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 				const card = q.seedCard(kind, doc.seedOverlay(kind));
 				if (!card) return false;
 				const at = r.int(doc.cardCount + 1);
-				doc.insertCard(card, at);
+				doc.unchecked.insertCard(card, at, { actor: p.binding.actor });
 				op = { op: 'insert', at };
 				break;
 			}
@@ -275,9 +275,9 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 				const was = doc.card(at);
 				doc.removeCard(at);
 				try {
-					doc.insertCard({ ...was, kind: r.pick(kinds) }, at);
+					doc.unchecked.insertCard({ ...was, kind: r.pick(kinds) }, at);
 				} catch (e) {
-					doc.insertCard(was, at);
+					doc.unchecked.insertCard(was, at);
 					throw e;
 				}
 				break;
@@ -303,9 +303,10 @@ function staleEdit(r: Rng, q: Quill, p: Peer, base: Uint8Array): boolean {
 		base,
 		quill: q,
 		doc: p.doc,
-		edit(doc) {
+		edit(doc, actor) {
 			let op: CardOp | undefined;
-			const scratch = { doc, binding: { push: (o?: CardOp) => void (op = o) } } as unknown as Peer;
+			const binding = { actor, push: (o?: CardOp) => void (op = o) };
+			const scratch = { doc, binding } as unknown as Peer;
 			landed = edit(r, q, scratch);
 			return op;
 		}

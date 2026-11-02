@@ -20,6 +20,12 @@ export interface VisualEditorProps {
 	 */
 	quill: Quill;
 	/**
+	 * The card actor a card the editor adds is placed under, so its `$id` is one no
+	 * other writer mints: a live session's `binding.actor`. Absent, the id mints
+	 * positionally.
+	 */
+	actor?: string;
+	/**
 	 * The active leaf: its canonical `DocPath` and the session key of the card holding
 	 * it, which is what a host tracking the active card keeps across a reorder
 	 * (`CardId`).

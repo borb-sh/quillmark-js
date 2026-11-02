@@ -94,6 +94,7 @@
 	let {
 		doc,
 		quill,
+		actor,
 		onActiveLeafChange,
 		onCaretMove,
 		onChange,
@@ -420,7 +421,7 @@
 			const card = quill.seedCard(kind, overlay);
 			if (!card) return undefined;
 			const from = document.activeElement;
-			doc.insertCard(card, atIndex);
+			doc.unchecked.insertCard(card, atIndex, { actor });
 			const id = seq.next();
 			arm.arm();
 			cardIds = [...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)];
@@ -538,9 +539,9 @@
 			const card = doc.card(i);
 			doc.removeCard(i);
 			try {
-				doc.insertCard({ ...card, kind }, i);
+				doc.unchecked.insertCard({ ...card, kind }, i);
 			} catch (e) {
-				doc.insertCard(card, i);
+				doc.unchecked.insertCard(card, i);
 				throw e;
 			}
 			bump('structure', id, i);

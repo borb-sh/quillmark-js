@@ -140,7 +140,7 @@ describe('a multiline text cell on a record row', () => {
 	it('holds one over lines upstream does not call plain, and commits nothing', () => {
 		const q = probe();
 		const doc = load();
-		doc.storeField('jobs', [
+		doc.unchecked.storeField('jobs', [
 			{ title: 'Archives', address: core.importMarkdown('- one\n- two').content }
 		]);
 		const before = JSON.stringify(doc.getStored('jobs'));

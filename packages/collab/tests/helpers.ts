@@ -96,9 +96,10 @@ export function settle(all: Peer[]): void {
 		for (const p of all) deliver(p);
 }
 
-/** The Document as a comparable value: its cards in order, each card's fields by name. */
+/** The Document as a comparable value: its cards in order, each card's id and fields by name. */
 export function snapshot(doc: Document): string {
 	const card = (c: ReturnType<Document['card']>) => ({
+		id: c.id,
 		kind: c.kind,
 		title: (c.ext?.editor as { title?: string } | undefined)?.title,
 		fields: Object.fromEntries(

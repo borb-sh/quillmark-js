@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.135.0.**
+
 ## v0.22.0 - 2026-11-02
 
 **The carried `@quillmark/wasm` is 0.134.1.** Every body and `richtext` value is the content model, blocks, containers, anchors and table cells each carrying an id, and every composable card carries a `$id` (Quillmark's 0.133 → 0.134 migration).

@@ -171,7 +171,7 @@ describe('an array of objects', () => {
 	 *  array a hand fills from empty, so they clear it and drive the adds themselves. */
 	function emptied(q: Quill): Document {
 		const doc = q.seedDocument();
-		doc.storeField('revisions', []);
+		doc.unchecked.storeField('revisions', []);
 		return doc;
 	}
 

@@ -29,6 +29,7 @@ import type {
 import {
 	CARDS,
 	COMPANIONS,
+	ID,
 	KIND,
 	MAIN,
 	SESSION,
@@ -120,6 +121,9 @@ export interface DocumentBinding {
 	push(op?: CardOp | readonly CardOp[]): Addr[];
 	/** The Y id of each composable card, in Document order. */
 	readonly ids: readonly string[];
+	/** This client's card actor, `String(ydoc.clientID)`: a card the host inserts is placed with
+	 *  `doc.unchecked.insertCard(card, at, { actor })`, so its `$id` is one no other client mints. */
+	readonly actor: string;
 	/** Whether a remote value the Document refused is held: the Document is then not the Y
 	 *  state's projection, and a save of it would leave that value out. */
 	readonly holding: boolean;
@@ -323,6 +327,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const card = cardOf(c);
 		const map = ydoc.getMap<unknown>(name);
 		if (c !== MAIN && map.get(KIND) !== card.kind) map.set(KIND, card.kind);
+		if (c !== MAIN && card.id !== undefined && !map.has(ID)) map.set(ID, card.id);
 		const title = titleOf(card.ext);
 		if ((map.get(TITLE) ?? null) !== (title ?? null)) {
 			if (title === undefined) map.delete(TITLE);
@@ -457,7 +462,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 					ids.splice(i, 0, target[i]);
 					change.cards.push({ op: 'move', from: j, to: i });
 				} else {
-					doc.insertCard(cardFromY(target[i]), i);
+					doc.unchecked.insertCard(cardFromY(target[i]), i);
 					ids.splice(i, 0, target[i]);
 					inserted.add(target[i]);
 					change.cards.push({ op: 'insert', at: i });
@@ -489,7 +494,15 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		return [...out];
 	}
 
-	/** A composable card built from its Y state, for a card another client inserted. */
+	/** The `$id` Y holds for card `name`, where no other card of the Document holds it. */
+	function yId(name: string, c?: number): string | undefined {
+		const id = ydoc.getMap<unknown>(name).get(ID);
+		if (typeof id !== 'string') return undefined;
+		return doc.cards.some((card, i) => i !== c && card.id === id) ? undefined : id;
+	}
+
+	/** A composable card built from its Y state, for a card another client inserted. It spells
+	 *  the `$id` Y holds, so every client places it under one id. */
 	function cardFromY(id: string): CardInput {
 		const map = ydoc.getMap<unknown>(id);
 		const kind = map.get(KIND) as string;
@@ -502,8 +515,10 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			...held.filter((k) => !order.includes(k)).sort()
 		];
 		const title = map.get(TITLE);
+		const cardId = yId(id);
 		return {
 			kind,
+			...(cardId === undefined ? {} : { id: cardId }),
 			payloadItems: keys.map((key) => ({ type: 'field', key, value: yValue(id, key) })),
 			body: projectRoot(contentRoot(id)),
 			...(typeof title === 'string' ? { ext: { editor: { title } } } : {})
@@ -529,14 +544,19 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const map = ydoc.getMap<unknown>(name);
 		let moved = false;
 		const kind = map.get(KIND);
-		if (c !== MAIN && typeof kind === 'string' && kind !== doc.card(c).kind) {
+		const id = c === MAIN ? undefined : yId(name, c);
+		if (
+			c !== MAIN &&
+			typeof kind === 'string' &&
+			(kind !== doc.card(c).kind || (id !== undefined && id !== doc.card(c).id))
+		) {
 			const was = doc.card(c);
 			try {
 				doc.removeCard(c);
 				try {
-					doc.insertCard({ ...was, kind }, c);
+					doc.unchecked.insertCard({ ...was, kind, id: id ?? was.id }, c);
 				} catch (e) {
-					doc.insertCard(was, c);
+					doc.unchecked.insertCard(was, c);
 					throw e;
 				}
 				watchCard(name, schemaOf(c, kind));
@@ -572,7 +592,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				} else {
 					const value = yValue(name, key);
 					if (canonical(doc.getStored(addr)) === canonical(value)) continue;
-					doc.storeField(addr, value);
+					doc.unchecked.storeField(addr, value);
 					if (form === 'plain') synced.set(contentRoot(name, key), JSON.stringify(value));
 				}
 				held.delete(root);
@@ -602,7 +622,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				return reviseFrom(root, addr, change);
 			const value = yValue(name, field);
 			if (value === undefined || canonical(doc.getStored(addr)) === canonical(value)) return;
-			doc.storeField(addr, value);
+			doc.unchecked.storeField(addr, value);
 			held.delete(root);
 			synced.set(root, form === 'plain' ? JSON.stringify(value) : canonical(value));
 			if (declared(schema, field) === 'value') {
@@ -669,16 +689,22 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	};
 
 	if (ydoc.getMap(SESSION).has('quill') || order.length > 0 || ydoc.getMap(MAIN).size > 0) {
-		// Adopt the Y ids by position where the kinds line up, so the cards keep what has no Y
-		// form (comments, other `$ext` namespaces, anchors), and project the rest in.
-		// Cards that do not line up are the Document's own and leave, so the list is Y's alone.
-		const target = order.toArray();
-		const adopted =
-			target.length === doc.cardCount &&
-			target.every((id, i) => ydoc.getMap(id).get(KIND) === doc.card(i).kind);
-		ids = adopted ? [...target] : Array.from({ length: doc.cardCount }, (_, i) => `\0${i}`);
+		// Adopt each Y card whose `$id` a card of the Document holds, so the cards keep what has
+		// no Y form (comments, other `$ext` namespaces, anchors), and project the rest in.
+		// Cards Y holds no `$id` of are the Document's own and leave, so the list is Y's alone.
+		const byId = new Map<string, string>();
+		for (const name of order.toArray()) {
+			const id = ydoc.getMap(name).get(ID);
+			if (typeof id === 'string' && !byId.has(id)) byId.set(id, name);
+		}
+		ids = doc.cards.map(({ id }, i) => {
+			const name = id === undefined ? undefined : byId.get(id);
+			if (name === undefined) return `\0${i}`;
+			byId.delete(id!);
+			watchCard(name, schemaOf(i));
+			return name;
+		});
 		watchCard(MAIN, schemaOf(MAIN));
-		if (adopted) for (let i = 0; i < ids.length; i++) watchCard(ids[i], schemaOf(i));
 		pull('all');
 	} else {
 		ydoc.transact(() => {
@@ -695,6 +721,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		get ids() {
 			return ids;
 		},
+		actor: String(ydoc.clientID),
 		get holding() {
 			return held.size > 0;
 		},

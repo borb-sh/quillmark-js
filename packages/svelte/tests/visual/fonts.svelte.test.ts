@@ -42,7 +42,7 @@ const LIBRARY = [face('Tinos'), face('Tinos', 700), face('Carlito')];
 function load(intro: string) {
 	const q = quillFromYaml(YAML);
 	const doc = core.Document.fromMarkdown(['~~~', '$quill: font_probe@1.0.0', '~~~', ''].join('\n'));
-	doc.storeField('intro', intro);
+	doc.unchecked.storeField('intro', intro);
 	return { q, doc, intro: () => q.reader(doc).getContentAt({ field: 'intro' }, []) };
 }
 

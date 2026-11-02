@@ -112,7 +112,7 @@ const load = (notes: string[] = ['First note', 'Second note']): Document => {
 			''
 		].join('\n')
 	);
-	doc.storeField('notes', notes);
+	doc.unchecked.storeField('notes', notes);
 	return doc;
 };
 const LIST = '- one\n- two';

@@ -53,7 +53,7 @@ const load = (details: string): Document => {
 	const doc = core.Document.fromMarkdown(
 		['~~~', '$quill: island_cell@1.0.0', '~~~', ''].join('\n')
 	);
-	doc.storeField('jobs', [{ title: 'Archives', details }]);
+	doc.unchecked.storeField('jobs', [{ title: 'Archives', details }]);
 	return doc;
 };
 

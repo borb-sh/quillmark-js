@@ -139,7 +139,7 @@ describe('a top-level one-line richtext field over stored block content', () => 
 			refused = isQuillmarkError(e) ? e.diagnostics[0]?.code : undefined;
 		}
 		expect(refused).toBe('edit::field_not_single_line');
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		revalidate(mounted);
 
 		const leaf = leafOf(mounted.target, 'Title');
@@ -152,7 +152,7 @@ describe('a top-level one-line richtext field over stored block content', () => 
 		const doc = load('plain');
 		const { target, props } = mountEditor(q, doc, { diagnostics: [] });
 
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		// A host's own feed changing, with no revision to re-validate the document: the
 		// set routed to the title names nothing about its shape.
 		props.diagnostics = [{ severity: 'error', message: 'Checked elsewhere.', path: 'main.title' }];

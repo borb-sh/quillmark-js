@@ -197,7 +197,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('releases when the value an external write leaves is inline, and then commits', () => {
 		const doc = example();
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'title', holds);
 		const view = viewOf(field);
@@ -223,7 +223,7 @@ describe('the hold on a narrowed field', () => {
 		const view = viewOf(field);
 		expect(view.editable).toBe(true);
 
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		field.applyExternal();
 		expect(holds).toEqual([true]);
 		expect(view.editable).toBe(false);
@@ -255,7 +255,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('does not hold for the trailing newline a YAML block scalar keeps', () => {
 		const doc = example();
-		doc.storeField('subtitle', 'one line\n');
+		doc.unchecked.storeField('subtitle', 'one line\n');
 		expect(
 			quill()
 				.validate(doc)
@@ -543,7 +543,7 @@ describe('the empty-leaf ghost', () => {
 		const q = quill();
 		const doc = example();
 		const card = q.seedCard('note', doc.seedOverlay('note'));
-		doc.insertCard(card!, doc.cardCount);
+		doc.unchecked.insertCard(card!, doc.cardCount);
 		return doc;
 	}
 	/** The card just added: the last one, whatever the document held ahead of it. */

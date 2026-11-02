@@ -52,8 +52,8 @@ export interface ForkOpts {
 export interface WriteFromOpts extends ForkOpts {
 	/** Make the edit on the Document as it stood at `base`. An edit that inserts, removes or
 	 *  moves cards returns those operations, in the order it made them, and makes no other
-	 *  card-list change. */
-	edit(doc: Document): CardOp | CardOp[] | void;
+	 *  card-list change; it places a card under `actor`, the update's card actor. */
+	edit(doc: Document, actor: string): CardOp | CardOp[] | void;
 }
 
 export interface Written {
@@ -86,7 +86,7 @@ export function writeFrom(opts: WriteFromOpts): Written {
 		base = bind(scratch, quill, opts.doc);
 		const before = state(base, quill);
 		const count = base.doc.cardCount;
-		const made = opts.edit(base.doc) ?? [];
+		const made = opts.edit(base.doc, base.binding.actor) ?? [];
 		const ops = Array.isArray(made) ? made : [made];
 		const step = base.doc.cardCount - count;
 		const named = ops.reduce((n, o) => n + (o.op === 'insert' ? 1 : o.op === 'remove' ? -1 : 0), 0);

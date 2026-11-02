@@ -108,7 +108,7 @@ describe('patchEditorExt', () => {
 		const kind = Object.keys(quill.schema.card_kinds ?? {})[0];
 		const card = quill.seedCard(kind, doc.seedOverlay(kind));
 		if (!card) throw new Error(`the reference quill seeded no \`${kind}\` card`);
-		doc.insertCard(card);
+		doc.unchecked.insertCard(card);
 
 		for (const addr of [MAIN_CARD_ADDR, { card: 0 }]) {
 			patchEditorExt(doc, addr, { title: 'Renamed', tips: ['a', 'b'] });

@@ -75,7 +75,7 @@ describe('a document loaded from markdown', () => {
 		const kind = Object.keys(q.schema.card_kinds ?? {})[0];
 		const card = q.seedCard(kind, seeded.seedOverlay(kind));
 		expect(card).toBeTruthy();
-		seeded.insertCard(card!, 0);
+		seeded.unchecked.insertCard(card!, 0);
 		const withCard = core.Document.fromMarkdown(seeded.toMarkdown());
 		expect(withCard.cardCount).toBeGreaterThan(0);
 
