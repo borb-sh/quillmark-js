@@ -10,6 +10,7 @@ import { createField, blockSchema, buildLineIndex, offsetToPM, pmToContent } fro
 import type { FieldController } from '$lib/core/codec';
 import type { AnchorContext, Content, Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
+import { MemoryCommentStore, createComments } from '$lib/core';
 import { mount, quill, example, normalize, contentEqual, md, viewOf, press } from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
@@ -520,6 +521,40 @@ describe('onAnchorsDropped', () => {
 		expect(dropped.flat().map((c) => c.id)).toEqual(['a1']);
 		await Promise.resolve();
 		expect(field.anchorsInRange(start, start + 7)).toEqual(['a1']);
+		field.destroy();
+	});
+});
+
+describe('a comment over a leaf, wired as the editor wires it', () => {
+	it('is deleted with its text, and an undo brings both back', async () => {
+		const doc = example();
+		const store = new MemoryCommentStore();
+		const comments = createComments({ store, author: { id: 'u1', name: 'Ada' } });
+		await comments.ready;
+		let field!: FieldController;
+		field = createField({
+			doc,
+			quill: quill(),
+			addr: {},
+			container: mount(),
+			onAnchorsDropped: (dropped) => void comments.reconcile(doc, dropped),
+			onChange: () => {
+				if (comments.restore(doc).length) queueMicrotask(() => field.applyExternal());
+			}
+		});
+		const start = doc.main.body.text.indexOf('sibling');
+		field.insertAnchor('c-1', start, start + 7);
+		await comments.create(doc.anchorContext('c-1')!, 'Why nest?');
+		const view = viewOf(field);
+		const at = (offset: number) => offsetToPM(buildLineIndex(view.state.doc), offset);
+		view.dispatch(view.state.tr.delete(at(start), at(start + 7)));
+		await Promise.resolve();
+		expect(store.export().threads).toEqual([]);
+		undo(view.state, view.dispatch);
+		await Promise.resolve();
+		expect(comments.thread('c-1')?.anchored).toBe(true);
+		expect(field.anchorsInRange(start, start + 7)).toEqual(['c-1']);
+		expect(store.export().threads.map((t) => t.id)).toEqual(['c-1']);
 		field.destroy();
 	});
 });

@@ -82,6 +82,13 @@ export interface Comments {
 		markdown: string,
 		opts?: BaseOptions
 	): Promise<DocumentRevised & Reconciled>;
+	/**
+	 * Bring back each thread `reconcile` deleted this session whose text the document holds again
+	 * (an undo, the same words retyped in place): `doc.reattach` over their last selectors, under
+	 * the same exact-match rule. Answers the anchors it placed, the document written before it
+	 * returns; the store writes follow. Cheap while nothing is held.
+	 */
+	restore(doc: Document): AnchorContext[];
 	/** Store the live selector of every anchored thread whose context changed, for a save. */
 	refresh(doc: Document): Promise<void>;
 	/** For a host that opened from markdown: `doc.reattach` over every stored selector. A thread
@@ -116,6 +123,8 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 	/** `anchored` as last derived, overlaid on every re-list. */
 	const anchored = new Map<string, boolean>();
 	const drift = new Set<string>();
+	/** The threads `reconcile` deleted this session, as they stood: what `restore` brings back. */
+	const deletedHere = new Map<string, CommentThread>();
 	/** The anchors of the document last synced, which a re-list derives against. */
 	let live: readonly AnchorContext[] | undefined;
 	const listeners = new Set<(threads: readonly CommentThread[]) => void>();
@@ -304,6 +313,8 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 				if (write) writes.push(write);
 			}
 			for (const id of deleted) {
+				const gone = index[at(id)];
+				if (gone) deletedHere.set(id, gone);
 				index = index.filter((t) => t.id !== id);
 				anchored.delete(id);
 				drift.delete(id);
@@ -318,6 +329,24 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 			const revised = writer.reviseDocument(markdown, baseOpts);
 			const out = await comments.reconcile(doc, droppedSelectors(revised.droppedAnchors, before));
 			return { ...revised, ...out };
+		},
+		restore(doc) {
+			if (!deletedHere.size) return [];
+			const held = [...deletedHere.values()].filter((t) => at(t.id) < 0);
+			const live = new Set(doc.anchorContexts().map((c) => c.id));
+			const selectors = held
+				.filter((t) => !live.has(t.id))
+				.map((t) => ({ ...t.selector, id: t.id }));
+			if (!selectors.length) return [];
+			const { reattached } = doc.reattach(selectors);
+			for (const c of reattached) {
+				const thread = { ...deletedHere.get(c.id)!, selector: selectorOf(c) };
+				deletedHere.delete(c.id);
+				index = [...index, thread];
+				store.create(thread).catch(report);
+			}
+			if (reattached.length) derive(doc.anchorContexts());
+			return reattached;
 		},
 		async refresh(doc) {
 			const contexts = doc.anchorContexts();

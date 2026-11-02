@@ -145,7 +145,11 @@
 				},
 				onFocus,
 				onCaretMove,
-				onChange,
+				onChange: (changed) => {
+					const restored = currentComments()?.restore(doc) ?? [];
+					if (restored.length) queueMicrotask(() => controller?.applyExternal());
+					onChange?.(changed);
+				},
 				onError,
 				onAnchorsDropped: (dropped) => {
 					const comments = currentComments();
