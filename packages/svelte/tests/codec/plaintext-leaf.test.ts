@@ -14,7 +14,7 @@ import type { Content, Document } from '@quillmark/wasm';
 import { createField, hasMarks } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import { TextSelection } from 'prosemirror-state';
-import { core, mount, probeQuill, viewOf } from './_util.js';
+import { core, mount, probeQuill, viewOf, literal, plain } from './_util.js';
 
 const QUILL_YAML = `
 quill:
@@ -78,7 +78,7 @@ describe('a `text` leaf over an authored string', () => {
 		// The commit half. `applyChange` reads an authored string as markdown whatever the
 		// declared type, so a delta over the literal content would meet a shorter
 		// pre-image and be refused. The leaf takes no op path at all: it hands its text to
-		// the typed writer, which rests the field as the literal string.
+		// the typed writer, which rests the field as plain content of the literal text.
 		const doc = authored();
 		const errors: string[] = [];
 		const field = createField({
@@ -95,13 +95,13 @@ describe('a `text` leaf over an authored string', () => {
 		expect(errors).toEqual([]);
 		expect(field.getContent().text).toBe(`!${AUTHORED}`);
 		expect(q.reader(doc).getContent('note')!.text).toBe(`!${AUTHORED}`);
-		// The literal string, asterisks unescaped: the rest form `toMarkdown` round-trips.
-		expect(doc.getStored('note')).toBe(`!${AUTHORED}`);
+		// The literal text, asterisks unescaped: the rest form `toMarkdown` round-trips.
+		expect(literal(doc.getStored('note'))).toEqual(plain(`!${AUTHORED}`));
 
 		// And the next edit over that rest form is still literal.
 		view.dispatch(view.state.tr.insertText('?', 2));
 		expect(errors).toEqual([]);
-		expect(doc.getStored('note')).toBe(`!?${AUTHORED}`);
+		expect(literal(doc.getStored('note'))).toEqual(plain(`!?${AUTHORED}`));
 
 		field.destroy();
 		doc.free();
@@ -162,7 +162,7 @@ describe('a `text` leaf carries no marks', () => {
 	it('opens a value that already carries one, and drops it on the next commit', () => {
 		// The state an older build left behind: a strong mark on a `text` field, which
 		// renders as a coercion error. Decode strips it, so the leaf shows the text, and
-		// the first keystroke commits the text back as the literal string.
+		// the first keystroke commits the text back as plain content.
 		const doc = authored();
 		const marked: Content = {
 			text: AUTHORED,
@@ -180,7 +180,7 @@ describe('a `text` leaf carries no marks', () => {
 
 		view.dispatch(view.state.tr.insertText('!', 1));
 		expect(codes).toEqual([]);
-		expect(doc.getStored('note')).toBe(`!${AUTHORED}`);
+		expect(literal(doc.getStored('note'))).toEqual(plain(`!${AUTHORED}`));
 		expect(field.getContent().marks ?? []).toHaveLength(0);
 
 		field.destroy();

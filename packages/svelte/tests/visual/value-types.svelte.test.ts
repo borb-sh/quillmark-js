@@ -10,7 +10,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { DocumentReader, type Content, type Quill, type Document } from '@quillmark/wasm';
-import { core, quill } from '../helpers/fixtures.js';
+import { core, literal, plain, quill } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -156,11 +156,11 @@ describe('an object field', () => {
 			props[4].querySelector('.qm-field-label')?.id
 		);
 
-		// The property rests as its literal string, the scalar `text` field's rest form
-		// one key in, and the cell beside it rides the commit as ever.
-		expect(doc.getStored('contact')).toEqual({
-			name: 'Ada Lovelace',
-			note: 'ask for *Ada*, not Augusta'
+		// The property rests as plain content, the scalar `text` field's rest form one key
+		// in, and the cell beside it rides the commit as ever.
+		expect(literal(doc.getStored('contact'))).toEqual({
+			name: plain('Ada Lovelace'),
+			note: plain('ask for *Ada*, not Augusta')
 		});
 	});
 });
@@ -288,7 +288,7 @@ describe('an array holding a bare value', () => {
 			(rendered(q, doc, 'authors') as Content[]).map((c) => c.text)
 		);
 		typeLeaf(leaves()[0], 'Grace Hopper');
-		expect(doc.getStored('authors')).toEqual(['Grace Hopper']);
+		expect(literal(doc.getStored('authors'))).toEqual([plain('Grace Hopper')]);
 	});
 
 	it('draws a bare string as one prose row at its codec, and an add writes the list', () => {
@@ -305,7 +305,10 @@ describe('an array holding a bare value', () => {
 
 		field(target, 'Errata').querySelector<HTMLButtonElement>('.qm-add-el')!.click();
 		flushSync();
-		expect(doc.getStored('errata')).toEqual(['Page 9 omits the *colophon*.', '']);
+		expect(literal(doc.getStored('errata'))).toEqual([
+			plain('Page 9 omits the *colophon*.'),
+			plain('')
+		]);
 		expect(rows('Errata')).toEqual(['Page 9 omits the *colophon*.', '']);
 	});
 });

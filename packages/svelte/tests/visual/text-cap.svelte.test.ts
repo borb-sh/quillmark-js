@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
-import { core, quillFromYaml } from '../helpers/fixtures.js';
+import { core, literal, plain, quillFromYaml } from '../helpers/fixtures.js';
 import { field, leaf, mountEditor, paste, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -51,11 +51,11 @@ describe('a field declaring max:', () => {
 		expect(count(code)).toBe('0 / 5');
 
 		paste(leaf(code), 'abcdefgh');
-		expect(doc.getStored('code')).toBe('abcde');
+		expect(literal(doc.getStored('code'))).toEqual(plain('abcde'));
 		expect(count(code)).toBe('5 / 5');
 
 		paste(leaf(code), 'x');
-		expect(doc.getStored('code')).toBe('abcde');
+		expect(literal(doc.getStored('code'))).toEqual(plain('abcde'));
 
 		const described = leaf(code).getAttribute('aria-describedby') ?? '';
 		expect(described.split(' ').map((id) => document.getElementById(id)?.textContent)).toContain(
@@ -76,7 +76,7 @@ describe('a field declaring max:', () => {
 		)!;
 		paste(leaf(zip), '1234567');
 		flushSync();
-		expect((doc.getStored('contact') as { zip: string }).zip).toBe('12345');
+		expect((literal(doc.getStored('contact')) as { zip: unknown }).zip).toEqual(plain('12345'));
 		expect(count(zip)).toBe('5 / 5');
 	});
 

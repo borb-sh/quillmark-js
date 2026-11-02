@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Content, Document } from '@quillmark/wasm';
-import { core, quillFromYaml } from '../helpers/fixtures.js';
+import { core, literal, plain, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	field,
 	heldNote,
@@ -133,8 +133,8 @@ describe('a multiline text cell on a record row', () => {
 
 		paste(leaf, 'Apt 4, ');
 		expect(mounted.changes.at(-1)?.path).toBe('main.jobs');
-		const address = (doc.getStored('jobs') as Array<{ address: string }>)[0].address;
-		expect(address).toBe('Apt 4, 12 Main St\nSpringfield\n');
+		const [job] = literal(doc.getStored('jobs')) as Array<{ address: unknown }>;
+		expect(job.address).toEqual(plain('Apt 4, 12 Main St\nSpringfield\n'));
 	});
 
 	it('holds one over lines upstream does not call plain, and commits nothing', () => {
@@ -202,6 +202,7 @@ describe('a narrowed leaf over structure it cannot hold', () => {
 		expect(leaf.querySelectorAll('p')).toHaveLength(1);
 		paste(leaf, 'new ');
 		expect(mounted.changes.at(-1)?.path).toBe('main.tags');
-		expect(String((doc.getStored('tags') as unknown[])[0])).toContain('new plain block scalar');
+		const [tag] = literal(doc.getStored('tags')) as Array<{ plain: string }>;
+		expect(tag.plain).toContain('new plain block scalar');
 	});
 });

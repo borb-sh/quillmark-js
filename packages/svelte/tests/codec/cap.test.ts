@@ -8,7 +8,7 @@ import type { Document } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
 import { TextSelection } from 'prosemirror-state';
 import { capCount, createField, type FieldController } from '$lib/core/codec';
-import { core, mount, probeQuill, viewOf } from './_util.js';
+import { core, mount, probeQuill, viewOf, literal, plain } from './_util.js';
 
 /** A plain-text paste event jsdom can carry: it implements no `ClipboardEvent`. */
 function pasteEvent(): ClipboardEvent {
@@ -94,7 +94,7 @@ describe('typing', () => {
 		const field = leaf(doc, 'code');
 		const view = viewOf(field);
 		for (const ch of 'abcdefg') view.dispatch(view.state.tr.insertText(ch));
-		expect(doc.getStored('code')).toBe('abcde');
+		expect(literal(doc.getStored('code'))).toEqual(plain('abcde'));
 		expect(overLength(doc, 'code')).toBeUndefined();
 		field.destroy();
 	});
@@ -106,7 +106,7 @@ describe('typing', () => {
 		view.dispatch(view.state.tr.insertText('😀😀😀😀'));
 		view.dispatch(view.state.tr.insertText('😀'));
 		view.dispatch(view.state.tr.insertText('x'));
-		expect(doc.getStored('code')).toBe('😀😀😀😀😀');
+		expect(literal(doc.getStored('code'))).toEqual(plain('😀😀😀😀😀'));
 		field.destroy();
 	});
 
@@ -151,7 +151,7 @@ describe('paste', () => {
 		const view = viewOf(field);
 		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 2, 5)));
 		view.pasteText('XYZW', pasteEvent());
-		expect(doc.getStored('code')).toBe('aXYZe');
+		expect(literal(doc.getStored('code'))).toEqual(plain('aXYZe'));
 		field.destroy();
 	});
 
@@ -160,7 +160,7 @@ describe('paste', () => {
 		const field = leaf(doc, 'note');
 		const view = viewOf(field);
 		view.pasteText('more', pasteEvent());
-		expect(doc.getStored('note')).toBe('abcdefgh');
+		expect(literal(doc.getStored('note'))).toEqual(plain('abcdefgh'));
 		field.destroy();
 	});
 
@@ -169,7 +169,7 @@ describe('paste', () => {
 		const field = leaf(doc, 'note');
 		const view = viewOf(field);
 		view.pasteText('one\ntwo\nthree', pasteEvent());
-		expect(doc.getStored('note')).toBe('one\ntwo\n');
+		expect(literal(doc.getStored('note'))).toEqual(plain('one\ntwo\n'));
 		expect(overLength(doc, 'note')).toBeUndefined();
 		field.destroy();
 	});
@@ -183,9 +183,9 @@ describe('a value stored past the cap', () => {
 		view.dispatch(view.state.tr.insertText('x', 1));
 		expect(doc.getStored('code')).toBe('abcdefgh');
 		view.dispatch(view.state.tr.delete(1, 2));
-		expect(doc.getStored('code')).toBe('bcdefgh');
+		expect(literal(doc.getStored('code'))).toEqual(plain('bcdefgh'));
 		view.dispatch(view.state.tr.insertText('X', 1, 2));
-		expect(doc.getStored('code')).toBe('Xcdefgh');
+		expect(literal(doc.getStored('code'))).toEqual(plain('Xcdefgh'));
 		field.destroy();
 	});
 });

@@ -124,7 +124,7 @@ describe('resolve over the real showcase schema', () => {
 		// The example's answer is authored, not the default beneath it.
 		const authored = resolved(doc).authors;
 		expect(authored.source).toBe('authored');
-		expect(texts(authored.value)).toEqual(doc.getStored('authors'));
+		expect(texts(authored.value)).toEqual(texts(doc.getStored('authors')));
 		doc.removeField('authors');
 		const cleared = resolved(doc);
 		expect(cleared.authors.source).toBe('default');

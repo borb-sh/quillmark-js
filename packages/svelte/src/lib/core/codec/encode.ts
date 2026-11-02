@@ -19,6 +19,7 @@ import type {
 import { core } from '../lifecycle.js';
 import { HARD_BREAK, ISLAND_SLOT, islandEntryFromNode, type IslandNodeAttrs } from './islands.js';
 import { contentDescriptorFromPM, markKey } from './marks.js';
+import { plainSchema } from './schema.js';
 
 // ── Position-map runs (consumed by positions.ts) ────────────────────────────
 // A run is one segment of exact PM↔content correspondence, in document order. Offsets are UTF-16
@@ -35,6 +36,9 @@ export interface Scan {
 	marks: ContentMark[];
 	islands: ContentIsland[];
 	runs: PosRun[];
+	/** Whether the document is the plain schema's, a `text` leaf's, whose value spells
+	 *  `codec: "plain"`. */
+	plain: boolean;
 }
 
 /** A working accumulator threaded through the walk. */
@@ -97,6 +101,7 @@ export function scanDoc(doc: PMNode): Scan {
 		marks: [],
 		islands: [],
 		runs: [],
+		plain: doc.type.schema === plainSchema,
 		rawMarks: [],
 		lastContentEndPm: 0,
 		ids: idsOf(doc)
@@ -121,6 +126,7 @@ export function scanContent(s: Scan, anchors: ContentAnchor[] = []): Content {
 			(a, b) => a.start - b.start || a.end - b.end || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 		);
 	if (s.islands.length) out.islands = s.islands;
+	if (s.plain) out.codec = 'plain';
 	return out;
 }
 

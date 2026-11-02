@@ -8,7 +8,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { fieldTitle } from '$lib/visual/structure';
-import { quill, quillFromYaml } from '../helpers/fixtures.js';
+import { literal, plain, quill, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -23,7 +23,7 @@ import {
 
 afterEach(unmountAll);
 
-const stored = (doc: Document) => doc.getStored('checks');
+const stored = (doc: Document) => literal(doc.getStored('checks'));
 const checks = quill().schema.main.fields.checks;
 const titles = checks.members!;
 const roster = Object.values(titles);
@@ -156,7 +156,7 @@ describe('a matrix field', () => {
 
 		// The member's next edit writes it back without it.
 		pick(member(m, titles.margins), 'major');
-		expect(stored(doc)).toEqual({ fonts: true, margins: { note: 'x', severity: 'major' } });
+		expect(stored(doc)).toEqual({ fonts: true, margins: { note: plain('x'), severity: 'major' } });
 	});
 
 	it('keys as a checkbox group: every tick a tab stop, and no arrow walk', () => {
@@ -237,7 +237,7 @@ describe('an open matrix', () => {
 		press(addBox(m), 'Enter', { cancelable: true });
 		await settle();
 
-		expect(stored(doc)).toEqual({ kerning_pairs: { title: 'Kerning pairs' } });
+		expect(stored(doc)).toEqual({ kerning_pairs: { title: plain('Kerning pairs') } });
 		expect(count(m)).toBe(held(1, 1));
 		const item = m.querySelector<HTMLElement>('.qm-member.added')!;
 		expect(item.querySelector<HTMLInputElement>('.qm-member-title-input')?.value).toBe(
@@ -265,7 +265,7 @@ describe('an open matrix', () => {
 		// The id is the wire's, and a retitle leaves it where it is.
 		expect(stored(doc)).toEqual({
 			spelling: true,
-			kerning: { title: 'Kerning pairs', severity: 'major' }
+			kerning: { title: plain('Kerning pairs'), severity: 'major' }
 		});
 
 		item()!.querySelector<HTMLButtonElement>('.qm-member-remove')!.click();
@@ -341,9 +341,9 @@ describe('an open matrix', () => {
 			await settle();
 		}
 		expect(stored(doc)).toEqual({
-			kerning_pairs: { title: 'Kerning pairs' },
-			kerning_pairs_2: { title: 'Kerning pairs' },
-			kerning_pairs_3: { title: 'KERNING PAIRS' }
+			kerning_pairs: { title: plain('Kerning pairs') },
+			kerning_pairs_2: { title: plain('Kerning pairs') },
+			kerning_pairs_3: { title: plain('KERNING PAIRS') }
 		});
 		expect(addedTitles(m)).toEqual(['Kerning pairs', 'Kerning pairs', 'KERNING PAIRS']);
 		expect(count(m)).toBe(held(3, 3));
@@ -410,7 +410,7 @@ describe('an open matrix', () => {
 		const m = matrix(mounted.target);
 		press(typeAdd(m, 'Fonts!'), 'Enter', { cancelable: true });
 		await settle();
-		expect(stored(doc)).toEqual({ fonts_2: { title: 'Fonts!' } });
+		expect(stored(doc)).toEqual({ fonts_2: { title: plain('Fonts!') } });
 	});
 
 	it('hands the caret to the next added item when one is removed', async () => {
@@ -431,7 +431,7 @@ describe('an open matrix', () => {
 		]);
 		removes[1].click();
 		await settle();
-		expect(stored(doc)).toEqual({ a_one: { title: 'A' }, c_three: { title: 'C' } });
+		expect(stored(doc)).toEqual({ a_one: { title: plain('A') }, c_three: { title: plain('C') } });
 		expect((document.activeElement as HTMLInputElement).value).toBe('C');
 	});
 });
@@ -470,7 +470,7 @@ describe('an open checklist', () => {
 
 		press(typeAdd(tags, 'Reviewed'), 'Enter', { cancelable: true });
 		await settle();
-		expect(doc.getStored('tags')).toEqual({ reviewed: { title: 'Reviewed' } });
+		expect(literal(doc.getStored('tags'))).toEqual({ reviewed: { title: plain('Reviewed') } });
 		expect(document.activeElement).toBe(addBox(tags));
 		expect(addBox(tags).value).toBe('');
 

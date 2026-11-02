@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
-import { fieldValues, humanize } from '$lib/visual/structure';
+import { humanize } from '$lib/visual/structure';
 import {
 	activeView,
 	field,
@@ -40,7 +40,7 @@ describe('the card header', () => {
 		const { target } = mounted;
 
 		expect(q.schema.card_kinds!.section.title).toBeUndefined();
-		const heading = fieldValues(doc.cards[kinds.indexOf('section')].payloadItems).heading;
+		const heading = q.reader(doc).get({ card: kinds.indexOf('section'), field: 'heading' });
 		expect(heading).toBeTruthy();
 		expect(header(cardOf(target, kinds, 'section')).placeholder).toBe(heading);
 

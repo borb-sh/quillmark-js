@@ -10,7 +10,7 @@
 // content cell (`handling`'s two) is a leaf at the depth it sits.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
-import { core, quill, quillFromYaml } from '../helpers/fixtures.js';
+import { core, literal, plain, quill, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	field,
 	leaf,
@@ -45,7 +45,7 @@ function cellLeaf(target: HTMLElement, label: string): HTMLElement {
 	return leaf(prop);
 }
 
-const stored = (doc: Document) => doc.getStored('distribution');
+const stored = (doc: Document) => literal(doc.getStored('distribution'));
 
 describe('a variant enum field', () => {
 	it('draws the cells of the world the document renders as, and retires them on a flip', () => {
@@ -98,14 +98,14 @@ describe('a variant enum field', () => {
 		expect(stored(doc)).toEqual({ value: 'embargoed' });
 
 		typeLeaf(cellLeaf(target, 'Lift on'), '2027-01-01');
-		expect(stored(doc)).toEqual({ value: 'embargoed', lift_on: '2027-01-01' });
+		expect(stored(doc)).toEqual({ value: 'embargoed', lift_on: plain('2027-01-01') });
 
 		// The container commits by value, so the cell beside it has to ride along.
 		typeLeaf(cellLeaf(target, 'Held by'), 'Legal');
 		expect(stored(doc)).toEqual({
 			value: 'embargoed',
-			lift_on: '2027-01-01',
-			held_by: 'Legal'
+			lift_on: plain('2027-01-01'),
+			held_by: plain('Legal')
 		});
 	});
 
@@ -122,12 +122,12 @@ describe('a variant enum field', () => {
 		// answer on the ordinary gesture.
 		pickWorld(target, 'internal');
 		expect(cellLabels(target)).toEqual([]);
-		expect(stored(doc)).toEqual({ value: 'internal', lift_on: '2027-01-01' });
+		expect(stored(doc)).toEqual({ value: 'internal', lift_on: plain('2027-01-01') });
 
 		// And back: the answer is still the document's, so the cell re-draws filled.
 		pickWorld(target, 'embargoed');
 		expect(cellLeaf(target, 'Lift on').textContent).toBe('2027-01-01');
-		expect(stored(doc)).toEqual({ value: 'embargoed', lift_on: '2027-01-01' });
+		expect(stored(doc)).toEqual({ value: 'embargoed', lift_on: plain('2027-01-01') });
 	});
 
 	it('clears the discriminant alone, and the whole field when it held nothing else', () => {
@@ -148,7 +148,7 @@ describe('a variant enum field', () => {
 		pickWorld(target, 'embargoed');
 		typeLeaf(cellLeaf(target, 'Lift on'), '2027-01-01');
 		pickWorld(target, null);
-		expect(stored(doc)).toEqual({ lift_on: '2027-01-01' });
+		expect(stored(doc)).toEqual({ lift_on: plain('2027-01-01') });
 	});
 });
 
@@ -157,7 +157,7 @@ describe('a variant enum field', () => {
 // prose. Driven off `handling` on disk exactly as the block above is driven off
 // `distribution`.
 describe('a variant whose default is the blank', () => {
-	const held = (doc: Document) => doc.getStored('handling');
+	const held = (doc: Document) => literal(doc.getStored('handling'));
 	const handling = (target: HTMLElement) => trigger(field(target, 'Handling'));
 
 	it('draws the discriminant alone, ghosting the em dash the blank has no glyph for', () => {
@@ -233,7 +233,7 @@ describe('a variant whose default is the blank', () => {
 		expect(leaves[1].querySelector('em, strong')).toBeNull();
 
 		// The write is the other lane: the container commits whole, and the typed writer
-		// rests a cell's `Content` back as the literal string the codec names. (jsdom
+		// rests a cell's `Content` back as plain content, the codec its type names. (jsdom
 		// implements no contenteditable, so the keystroke that produces one is out of
 		// reach here, as it is for an array's prose row.)
 		q.writer(doc).set('handling', {
@@ -241,7 +241,11 @@ describe('a variant whose default is the blank', () => {
 			controlled_by: core.importMarkdown('SPEC/BB').content,
 			caveat: ''
 		});
-		expect(held(doc)).toEqual({ value: 'CONTROLLED', controlled_by: 'SPEC/BB', caveat: '' });
+		expect(held(doc)).toEqual({
+			value: 'CONTROLLED',
+			controlled_by: plain('SPEC/BB'),
+			caveat: plain('')
+		});
 	});
 });
 
@@ -272,7 +276,7 @@ main:
                 default: ""
 `;
 	const nested = () => quillFromYaml(NESTED);
-	const header = (doc: Document) => doc.getStored('header');
+	const header = (doc: Document) => literal(doc.getStored('header'));
 	const cell = (target: HTMLElement): HTMLElement | null =>
 		field(target, 'Header').querySelector<HTMLElement>(
 			'[data-qm-prop="controlled_by"] .ProseMirror'
@@ -299,7 +303,9 @@ main:
 		expect(cell(target)?.textContent).toBe('SPEC');
 
 		typeLeaf(cell(target)!, 'LEGAL');
-		expect(header(doc)).toEqual({ classification: { value: 'CUI', controlled_by: 'LEGAL' } });
+		expect(header(doc)).toEqual({
+			classification: { value: 'CUI', controlled_by: plain('LEGAL') }
+		});
 	});
 
 	it('draws the ghosted world while unset, and keeps a stranded answer through a flip', () => {
@@ -313,11 +319,11 @@ main:
 
 		pickWorld(target, 'CUI', 'Header');
 		typeLeaf(cell(target)!, 'SPEC');
-		expect(header(doc)).toEqual({ classification: { value: 'CUI', controlled_by: 'SPEC' } });
+		expect(header(doc)).toEqual({ classification: { value: 'CUI', controlled_by: plain('SPEC') } });
 
 		pickWorld(target, 'U', 'Header');
 		expect(cell(target)).toBeNull();
-		expect(header(doc)).toEqual({ classification: { value: 'U', controlled_by: 'SPEC' } });
+		expect(header(doc)).toEqual({ classification: { value: 'U', controlled_by: plain('SPEC') } });
 	});
 
 	it('lands a cell address on the live cell, and a dormant one on the discriminant', async () => {

@@ -442,7 +442,7 @@ export function addedItems(
 		if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) continue;
 		const title = (stored as Record<string, unknown>)[MATRIX_TITLE];
 		if (title == null) continue;
-		out.push({ id, title: String(title) });
+		out.push({ id, title: titleText(title) });
 	}
 	return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
@@ -824,7 +824,7 @@ export function fieldValues(items: readonly PayloadItem[]): Record<string, unkno
 }
 
 /** A field value as title text. A parsed field rests as the authored string and a
- *  committed one as `Content`, whose `text` is the same words; a scalar reads as
+ *  committed one as `Content`, plain for a `text` field, whose `text` is the same words; a scalar reads as
  *  itself; a variant container reads as its discriminant member, the one cell of it
  *  that names the world; any other container as nothing. */
 export function titleText(v: unknown): string {

@@ -23,11 +23,11 @@ import {
 	pmToOffset,
 	offsetToPM
 } from '$lib/core/codec';
-import { quill, example } from '../helpers/fixtures.js';
+import { quill, example, literal, plain } from '../helpers/fixtures.js';
 
 export const core = await init();
 
-export { quill, example };
+export { quill, example, literal, plain };
 export function freshDoc(): Document {
 	return example();
 }
