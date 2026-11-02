@@ -9,7 +9,8 @@
 // hold it re-evaluates flips.
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
-import { history, redo, undo } from 'prosemirror-history';
+import { history, isHistoryTransaction, redo, undo } from 'prosemirror-history';
+import type { StepMap } from 'prosemirror-transform';
 import { keymap } from 'prosemirror-keymap';
 import { Fragment, Slice, type Node as PMNode, type Schema } from 'prosemirror-model';
 import {
@@ -224,7 +225,7 @@ export interface LeafViews {
 	nestedViews(): EditorView[];
 }
 
-const anchorKey = new PluginKey<AnchorPos[]>('quill-anchors');
+const anchorKey = new PluginKey<AnchorState>('quill-anchors');
 
 /**
  * An anchor mutation carried on a transaction's `anchorKey` meta, folded into the plugin's set so
@@ -236,36 +237,134 @@ type AnchorEdit =
 	| { op: 'reset'; anchors: AnchorPos[] };
 
 /**
+ * An anchor a deletion swallowed, held until the undo that puts its text back: where the deletion
+ * landed, how much of the deleted slice stood before and after the anchor, and the anchor's own
+ * length, so only a history step that re-inserts that slice whole restores it. A ghost a later
+ * deletion swallows is wrapped the same way (`inner`), and the undo of that deletion unwraps it.
+ */
+interface Ghost {
+	id: string;
+	at: number;
+	lead: number;
+	len: number;
+	trail: number;
+	inner?: Ghost;
+}
+
+/** The plugin's state: the anchors the leaf holds, and the ghosts of ranges deletions swallowed.
+ *  History keeps 100 events, so ghosts past that many are the oldest and go. */
+interface AnchorState {
+	anchors: AnchorPos[];
+	ghosts: Ghost[];
+}
+const GHOSTS = 100;
+
+/**
  * Plugin-held anchors (PM coords), mapped through every edit's `StepMap` and mutated by an {@link
  * AnchorEdit} meta. The store's rule, so the commit has nothing to reconcile: a range keeps its
  * edges, text typed at either landing outside it, and a point stays left of text typed at it. A
- * range whose text is wholly deleted goes; a point never does.
+ * range whose text is wholly deleted goes, and comes back with its text when history puts the
+ * deleted slice back ({@link Ghost}); a point never goes.
  */
-function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorPos[]> {
-	return new Plugin<AnchorPos[]>({
+function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorState> {
+	return new Plugin<AnchorState>({
 		key: anchorKey,
 		state: {
-			init: () => seed,
-			apply: (tr, anchors) => {
-				let next = tr.docChanged
-					? anchors.flatMap((a) => {
-							if (a.start === a.end) {
-								const at = tr.mapping.map(a.start, -1);
-								return [{ id: a.id, start: at, end: at }];
-							}
-							const start = tr.mapping.map(a.start, 1);
-							const end = tr.mapping.map(a.end, -1);
-							return start < end ? [{ id: a.id, start, end }] : [];
-						})
-					: anchors;
+			init: () => ({ anchors: seed, ghosts: [] }),
+			apply: (tr, held) => {
+				let { anchors, ghosts } = held;
+				if (tr.docChanged) {
+					const undoing = isHistoryTransaction(tr);
+					for (const map of tr.mapping.maps)
+						({ anchors, ghosts } = mapAnchors(map, anchors, ghosts, undoing));
+				}
 				const edit = tr.getMeta(anchorKey) as AnchorEdit | undefined;
-				if (edit?.op === 'add') next = [...next, { id: edit.id, start: edit.start, end: edit.end }];
-				else if (edit?.op === 'remove') next = next.filter((a) => a.id !== edit.id);
-				else if (edit?.op === 'reset') next = edit.anchors;
-				return next;
+				if (edit?.op === 'add')
+					anchors = [...anchors, { id: edit.id, start: edit.start, end: edit.end }];
+				else if (edit?.op === 'remove') {
+					anchors = anchors.filter((a) => a.id !== edit.id);
+					ghosts = ghosts.filter((g) => g.id !== edit.id);
+				} else if (edit?.op === 'reset') anchors = edit.anchors;
+				return { anchors, ghosts: ghosts.slice(-GHOSTS) };
 			}
 		}
 	});
+}
+
+/** The replaced range of `map` holding `[from, to]`, where one does. */
+function rangeOf(
+	map: StepMap,
+	from: number,
+	to: number
+): { oldStart: number; oldEnd: number; newStart: number; newEnd: number } | undefined {
+	let hit: { oldStart: number; oldEnd: number; newStart: number; newEnd: number } | undefined;
+	map.forEach((oldStart, oldEnd, newStart, newEnd) => {
+		if (!hit && oldStart <= from && to <= oldEnd) hit = { oldStart, oldEnd, newStart, newEnd };
+	});
+	return hit;
+}
+
+/** One step's map over the anchors and ghosts: a range the step deletes whole becomes a ghost,
+ *  and under a history step a ghost whose slice comes back whole becomes its anchor again. */
+function mapAnchors(
+	map: StepMap,
+	anchors: AnchorPos[],
+	ghosts: Ghost[],
+	undoing: boolean
+): AnchorState {
+	const nextAnchors: AnchorPos[] = [];
+	const nextGhosts: Ghost[] = [];
+	for (const g of ghosts) {
+		const range = rangeOf(map, g.at, g.at);
+		if (!range) {
+			nextGhosts.push({ ...g, at: map.map(g.at, -1) });
+			continue;
+		}
+		const { oldStart, oldEnd, newStart, newEnd } = range;
+		if (undoing && newEnd - newStart === g.lead + g.len + g.trail) {
+			if (g.inner) nextGhosts.push({ ...g.inner, at: newStart + g.lead });
+			else nextAnchors.push({ id: g.id, start: newStart + g.lead, end: newStart + g.lead + g.len });
+			continue;
+		}
+		if (oldEnd === oldStart) {
+			nextGhosts.push({ ...g, at: map.map(g.at, -1) });
+			continue;
+		}
+		nextGhosts.push({
+			id: g.id,
+			at: newStart,
+			lead: g.at - oldStart,
+			len: 0,
+			trail: oldEnd - g.at,
+			inner: g
+		});
+	}
+	for (const a of anchors) {
+		if (a.start === a.end) {
+			const at = map.map(a.start, -1);
+			nextAnchors.push({ id: a.id, start: at, end: at });
+			continue;
+		}
+		const start = map.map(a.start, 1);
+		const end = map.map(a.end, -1);
+		if (start < end) {
+			nextAnchors.push({ id: a.id, start, end });
+			continue;
+		}
+		const range = rangeOf(map, a.start, a.end);
+		nextGhosts.push(
+			range
+				? {
+						id: a.id,
+						at: range.newStart,
+						lead: a.start - range.oldStart,
+						len: a.end - a.start,
+						trail: range.oldEnd - a.end
+					}
+				: { id: a.id, at: start, lead: 0, len: a.end - a.start, trail: 0 }
+		);
+	}
+	return { anchors: nextAnchors, ghosts: nextGhosts };
 }
 
 /** An anchor in content offsets at its PM positions over `index`. */
@@ -622,7 +721,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	}
 
 	/** The anchors the plugin currently holds (PM coords); `[]` before the first apply. */
-	const heldAnchors = (): AnchorPos[] => anchorKey.getState(view.state) ?? [];
+	const heldAnchors = (): AnchorPos[] => anchorKey.getState(view.state)?.anchors ?? [];
 
 	/** The plugin's anchors as content offsets, against `index` — which `dispatchTransaction`
 	 *  rebuilt over the new document before the commit this reads for. */

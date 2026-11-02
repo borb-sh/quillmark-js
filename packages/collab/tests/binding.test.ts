@@ -9,6 +9,14 @@ import { core, deliver, edit, peers, quill, settle, snapshot, type Peer } from '
 const example = () => quill().exampleDocument()!;
 const body = (p: Peer, card?: number): Content =>
 	p.doc.getStored(card === undefined ? {} : { card }) as Content;
+const withBody = (text: string) => (): Document => {
+	const doc = example();
+	doc.replace(
+		{},
+		{ text, blocks: text.split('\n').map((_, i) => ({ id: `b${i}`, kind: 'para' as const })) }
+	);
+	return doc;
+};
 const LIST: ContentContainer = { id: 'l', kind: 'list', attrs: { ordered: true, start: 1 } };
 const listDoc = (): Document => {
 	const doc = example();
@@ -100,6 +108,72 @@ describe('content', () => {
 		expect(body(a).text).toBe(body(b).text);
 	});
 
+	it('a repair that inserts is read by every client and written back by none', () => {
+		const [a, b] = peers(2, withBody('Title words\nbody'));
+		a.doc.apply({}, { steps: [{ setBlock: { id: 'b0', kind: 'heading', attrs: { level: 1 } } }] });
+		a.binding.push();
+		b.doc.apply({}, { steps: [{ splice: { at: 5, delete: ' ', insert: ' ' } }] });
+		b.binding.push();
+		settle([a, b]);
+		const merged = body(a).text;
+		edit(a.doc, {}, [{ retain: merged.length }, { insert: ' A' }]);
+		a.binding.push();
+		edit(b.doc, {}, [{ retain: merged.length }, { insert: ' B' }]);
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect([`${merged} A B`, `${merged} B A`]).toContain(body(a).text);
+	});
+
+	it('text split off a table by repair is not split twice by two clients typing', () => {
+		const [a, b] = peers(2, () => {
+			const doc = example();
+			doc.replace({}, core.importMarkdown('lead\n\n| h |\n| - |\n\ntail').content);
+			return doc;
+		});
+		const slot = Array.from(body(a).text).indexOf('￼');
+		edit(a.doc, {}, [{ retain: slot + 1 }, { delete: '\ntail'.length }]);
+		a.binding.push();
+		edit(b.doc, {}, [{ retain: slot + 2 }, { insert: 'typed ' }]);
+		b.binding.push();
+		settle([a, b]);
+		const blocks = body(a).blocks.length;
+		edit(a.doc, {}, [{ insert: 'A ' }]);
+		a.binding.push();
+		edit(b.doc, {}, [{ insert: 'B ' }]);
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(body(a).blocks).toHaveLength(blocks);
+	});
+
+	it('Enter at the start of a block another client re-kinds keeps that kind on the text', () => {
+		const [a, b] = peers(2, withBody('one\ntwo'));
+		a.doc.apply({}, { steps: [{ setBlock: { id: 'b1', kind: 'heading', attrs: { level: 2 } } }] });
+		a.binding.push();
+		b.doc.apply({}, core.splitBlock(body(b), 4, 'bn'));
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(body(a).text).toBe('one\n\ntwo');
+		expect(body(a).blocks.map((x) => [x.id, x.kind])).toEqual([
+			['b0', 'para'],
+			['bn', 'para'],
+			['b1', 'heading']
+		]);
+	});
+
+	it('text typed before a repeat of itself is written where it was typed', () => {
+		const [a, b] = peers(2, withBody('see the cat'));
+		a.doc.apply({}, { steps: [{ splice: { at: 4, delete: 'the cat', insert: '' } }] });
+		a.binding.push();
+		b.doc.apply({}, { steps: [{ splice: { at: 4, insert: 'the big ' } }] });
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(body(a).text).toBe('see the big ');
+	});
+
 	it('hands the host the delta a remote edit made', () => {
 		const [a, b] = peers(2, listDoc);
 		edit(b.doc, {}, [{ retain: 2 }, { insert: 'xy' }]);
@@ -156,6 +230,31 @@ describe('cards', () => {
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
 		expect(a.doc.card(at).kind).toBe('section');
+		expect(a.errors).toEqual([]);
+		expect(b.errors).toEqual([]);
+	});
+
+	it('an edit racing a retype to a kind without the field lands, and the field keeps its root', () => {
+		const [a, b] = peers(2, example);
+		const at = a.doc.cards.findIndex((c) => c.kind === 'section');
+		const lead = { card: at, field: 'lead' };
+		edit(a.doc, lead, [{ insert: 'a ' }]);
+		a.binding.push();
+		const was = b.doc.card(at);
+		b.doc.removeCard(at);
+		b.doc.insertCard({ ...was, kind: 'signoff' }, at);
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(b.doc.card(at).kind).toBe('signoff');
+		expect((a.doc.getStored(lead) as Content).text.startsWith('a ')).toBe(true);
+		const now = a.doc.card(at);
+		a.doc.removeCard(at);
+		a.doc.insertCard({ ...now, kind: 'section' }, at);
+		a.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(b.doc.read(lead).text.startsWith('a ')).toBe(true);
 		expect(a.errors).toEqual([]);
 		expect(b.errors).toEqual([]);
 	});

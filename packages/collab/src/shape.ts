@@ -25,7 +25,7 @@ export const SLOT = '￼';
 /** The attribute keys the `\n` opening a block carries: its id, its kind with its attributes as
  *  a JSON string, and its container path as a JSON array. Each is its own key, so a concurrent
  *  kind change and path change both land. */
-const BLOCK_ID = 'qm:id';
+export const BLOCK_ID = 'qm:id';
 const BLOCK_KIND = 'qm:kind';
 const BLOCK_PATH = 'qm:path';
 export const LINE_KEYS = [BLOCK_ID, BLOCK_KIND, BLOCK_PATH] as const;

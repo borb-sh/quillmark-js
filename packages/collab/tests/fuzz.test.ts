@@ -10,6 +10,7 @@ import { writeFrom, type CardOp } from '../src/index.js';
 import * as Y from 'yjs';
 import { project } from '../src/project.js';
 import { contentRoot, contentTypes, readField } from '../src/shape.js';
+import { withoutAnchors } from '../src/write.js';
 import { core, deliver, peers, quill, settle, snapshot, canonical, type Peer } from './helpers.js';
 
 const SEEDS = 120;
@@ -162,6 +163,7 @@ function contentEdit(r: Rng, rt: Content): Change | undefined {
 }
 
 /** Every content field a peer's Document holds: bodies, and the declared `richtext` fields. */
+/** The content fields `p`'s cards declare, where a random edit lands. */
 function contentAddrs(q: Quill, p: Peer): Addr[] {
 	const out: Addr[] = [{}];
 	for (const [name, f] of Object.entries(q.schema.main.fields))
@@ -172,6 +174,24 @@ function contentAddrs(q: Quill, p: Peer): Addr[] {
 			if (f.type === 'richtext') out.push({ card: i, field: name });
 	});
 	return out;
+}
+
+/** Every content root Y holds for `p`: each card's body, and each field its map marks `@f`
+ *  as content, whatever the card's kind declares. */
+function contentRoots(p: Peer): { addr: Addr; card: string; root: string }[] {
+	const names = ['main', ...p.binding.ids];
+	return names.flatMap((card, k) => {
+		const at: Addr = k ? { card: k - 1 } : {};
+		const out = [{ addr: at, card, root: contentRoot(card) }];
+		for (const [key, form] of p.ydoc.getMap<unknown>(card).entries())
+			if (key.startsWith('@') && form === 'content')
+				out.push({
+					addr: { ...at, field: key.slice(1) },
+					card,
+					root: contentRoot(card, key.slice(1))
+				});
+		return out;
+	});
 }
 
 /** One random local edit on `p`, pushed; whether anything landed. */
@@ -332,20 +352,16 @@ describe('three peers, random concurrent edits', () => {
 				if (snapshot(p.doc) !== want) failures.push(`seed ${seed}: documents differ`);
 			for (const p of out.all) {
 				if (p.errors.length) failures.push(`seed ${seed}: ${String(p.errors[0])}`);
-				const names = ['main', ...p.binding.ids];
-				contentAddrs(q, p).forEach((addr) => {
-					const card = addr.card === undefined ? 'main' : names[(addr.card as number) + 1];
-					const stored = p.doc.getStored(addr) as Content | undefined;
-					if (!stored) return;
-					const projected = project(
-						readField(contentTypes(p.ydoc, contentRoot(card, addr.field)))
-					).content;
-					if (projected.text !== stored.text)
-						failures.push(`seed ${seed}: ${card}/${addr.field ?? '$body'} Y text differs`);
+				contentRoots(p).forEach(({ addr, card, root }) => {
+					const stored = p.doc.getStored(addr);
+					const field = addr.field ?? '$body';
+					if (typeof stored !== 'object' || stored === null)
+						return failures.push(`seed ${seed}: ${card}/${field} holds no content`);
+					const projected = project(readField(contentTypes(p.ydoc, root))).content;
+					if (canonical(withoutAnchors(stored as Content)) !== canonical(projected))
+						failures.push(`seed ${seed}: ${card}/${field} differs from its root`);
 					if (canonical(core.normalize(projected)) !== canonical(projected))
-						failures.push(
-							`seed ${seed}: ${card}/${addr.field ?? '$body'} projection is not canonical`
-						);
+						failures.push(`seed ${seed}: ${card}/${field} projection is not canonical`);
 				});
 			}
 		}

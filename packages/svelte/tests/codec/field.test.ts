@@ -461,6 +461,35 @@ describe('anchor insertion', () => {
 		field.destroy();
 	});
 
+	it('an anchor deleted with its text comes back with the text on undo', () => {
+		const doc = example();
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const view = viewOf(field);
+		field.insertAnchor('a1', 1, 4);
+		view.dispatch(view.state.tr.delete(1, 5));
+		expect(bodyAnchors(doc)).toEqual([]);
+		undo(view.state, view.dispatch);
+		expect(bodyAnchors(doc)).toEqual([{ id: 'a1', start: 1, end: 4 }]);
+		field.destroy();
+	});
+
+	it('an anchor inside a wider deletion comes back at its own range, through two undos', () => {
+		const doc = example();
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const view = viewOf(field);
+		const text = doc.main.body.text;
+		field.insertAnchor('a1', 2, 5);
+		view.dispatch(view.state.tr.delete(2, 8));
+		view.dispatch(view.state.tr.insertText('X', 1));
+		expect(bodyAnchors(doc)).toEqual([]);
+		undo(view.state, view.dispatch);
+		expect(bodyAnchors(doc)).toEqual([]);
+		undo(view.state, view.dispatch);
+		expect(doc.main.body.text).toBe(text);
+		expect(bodyAnchors(doc)).toEqual([{ id: 'a1', start: 2, end: 5 }]);
+		field.destroy();
+	});
+
 	it('anchorsInRange reports coverage for the popover active state', () => {
 		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });

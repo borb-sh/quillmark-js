@@ -11,6 +11,7 @@
 import * as Y from 'yjs';
 import type { Content, ContentIsland } from '@quillmark/wasm';
 import {
+	BLOCK_ID,
 	LINE_KEYS,
 	MARK_KEYS,
 	SLOT,
@@ -52,24 +53,44 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 		islands.map((i) => i.id)
 	);
 
+	const ylines = next.blocks.map(yBlock);
+	const marks = markAttrs(next.marks ?? [], b);
+	const opens: Attrs[] = [];
+	let line = 0;
+	b.forEach((ch, i) => {
+		if (ch === '\n') opens[i] = lineAttrs(ylines[++line]);
+	});
+	const desired = (i: number): Attrs => (b[i] === '\n' ? opens[i] : marks[i]);
+	// A `\n` is the same character only where it opens the same block, so a new block's `\n` is
+	// never written onto the one another client is editing.
+	const same = (i: number, j: number): boolean =>
+		a[i] === b[j] &&
+		a[i] !== SLOT &&
+		(a[i] !== '\n' || cur.attrs[i][BLOCK_ID] === opens[j][BLOCK_ID]);
+	const sameB = (i: number, j: number): boolean =>
+		b[i] === b[j] && b[i] !== SLOT && (b[i] !== '\n' || opens[i][BLOCK_ID] === opens[j][BLOCK_ID]);
+
 	// Each stretch between kept slots, and where its splices fall.
 	const splices: { at: number; end: number; from: number; to: number }[] = [];
 	const splice = (a0: number, a1: number, b0: number, b1: number) => {
 		let p = 0;
-		while (a0 + p < a1 && b0 + p < b1 && a[a0 + p] === b[b0 + p] && a[a0 + p] !== SLOT) p++;
+		while (a0 + p < a1 && b0 + p < b1 && same(a0 + p, b0 + p)) p++;
 		let s = 0;
-		while (
-			s < a1 - a0 - p &&
-			s < b1 - b0 - p &&
-			a[a1 - 1 - s] === b[b1 - 1 - s] &&
-			a[a1 - 1 - s] !== SLOT
-		)
-			s++;
+		while (s < a1 - a0 - p && s < b1 - b0 - p && same(a1 - 1 - s, b1 - 1 - s)) s++;
+		// An insertion alone sits as far left as the text allows: a word typed before a repeat of
+		// itself is written before the repeat, where it was typed, and not after it.
+		if (a1 - s === a0 + p) {
+			const len = b1 - s - (b0 + p);
+			while (p > 0 && sameB(b0 + p - 1, b0 + p - 1 + len)) p--;
+			s = a1 - a0 - p;
+		}
 		if (a1 - s > a0 + p || b1 - s > b0 + p)
 			splices.push({ at: a0 + p, end: a1 - s, from: b0 + p, to: b1 - s });
 	};
+	const idA = (i: number): string => String(cur.attrs[i][BLOCK_ID] ?? '');
+	const idB = (i: number): string => String(opens[i][BLOCK_ID] ?? '');
 	const stretch = (a0: number, a1: number, b0: number, b1: number) => {
-		for (const [[x0, x1], [y0, y1]] of sameLines(a, a0, a1, b, b0, b1)) {
+		for (const [[x0, x1], [y0, y1]] of sameLines(a, a0, a1, idA, b, b0, b1, idB)) {
 			splice(a0, x0, b0, y0);
 			[a0, b0] = [x1, y1];
 		}
@@ -83,15 +104,6 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 		b0 = bSlots[kb] + 1;
 	}
 	stretch(a0, a.length, b0, b.length);
-
-	const ylines = next.blocks.map(yBlock);
-	const marks = markAttrs(next.marks ?? [], b);
-	const opens: Attrs[] = [];
-	let line = 0;
-	b.forEach((ch, i) => {
-		if (ch === '\n') opens[i] = lineAttrs(ylines[++line]);
-	});
-	const desired = (i: number): Attrs => (b[i] === '\n' ? opens[i] : marks[i]);
 
 	// The island behind each new slot: a kept one keeps its map.
 	const used = new Set(cur.islands.map((m) => m.get('id') as string));
@@ -194,30 +206,44 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 /**
  * The lines of `a[a0, a1)` and `b[b0, b1)` that both keep whole, as `[[from, to], [from, to]]`
  * ranges in order: the longest common run of lines, a line holding a slot never counting as
- * kept. A line is its characters up to and including its `\n`.
+ * kept. A line is its characters up to and including its `\n`, and the id of the block that
+ * `\n` opens (`idOf`), so a line is kept only where its block is.
  */
 function sameLines(
 	a: string[],
 	a0: number,
 	a1: number,
+	idA: (i: number) => string,
 	b: string[],
 	b0: number,
-	b1: number
+	b1: number,
+	idB: (i: number) => string
 ): [[number, number], [number, number]][] {
-	const split = (chars: string[], from: number, to: number, side: string) => {
+	const split = (
+		chars: string[],
+		from: number,
+		to: number,
+		side: string,
+		idOf: (i: number) => string
+	) => {
 		const out: { key: string; from: number; to: number }[] = [];
 		for (let i = from; i < to;) {
 			let j = i;
 			while (j < to && chars[j] !== '\n') j++;
+			const id = j < to ? `${SLOT}${idOf(j)}` : '';
 			if (j < to) j++;
 			const line = chars.slice(i, j);
-			out.push({ key: line.includes(SLOT) ? `${side}${SLOT}${i}` : line.join(''), from: i, to: j });
+			out.push({
+				key: line.includes(SLOT) ? `${side}${SLOT}${i}` : `${line.join('')}${id}`,
+				from: i,
+				to: j
+			});
 			i = j;
 		}
 		return out;
 	};
-	const x = split(a, a0, a1, 'a');
-	const y = split(b, b0, b1, 'b');
+	const x = split(a, a0, a1, 'a', idA);
+	const y = split(b, b0, b1, 'b', idB);
 	const pairs = commonRun(
 		x.map((l) => l.key),
 		y.map((l) => l.key)
