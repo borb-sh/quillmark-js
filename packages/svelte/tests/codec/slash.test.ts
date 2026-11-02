@@ -307,10 +307,7 @@ describe('a list pick runs at any caret in the block', () => {
 		typeAt(field, view, 5, ' /list');
 		press(view, 'Enter');
 		const stored = field.getContent();
-		expect(levelsOf(stored)).toEqual([
-			[item(false)],
-			[item(false), item(false)]
-		]);
+		expect(levelsOf(stored)).toEqual([[item(false)], [item(false), item(false)]]);
 		field.destroy();
 	});
 });

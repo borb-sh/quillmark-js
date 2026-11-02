@@ -57,8 +57,9 @@ describe('changes the host made', () => {
 		const doc = example();
 		const { target, editor } = mountEditor(q, doc);
 		const at = doc.cards.findIndex((c) => c.kind === 'section');
-		doc.insertCard({ ...doc.card(at), kind: 'note' }, at);
-		doc.removeCard(at + 1);
+		const card = doc.card(at);
+		doc.removeCard(at);
+		doc.insertCard({ ...card, kind: 'note' }, at);
 		editor.refresh();
 		flushSync();
 		expect(leafKeys(slots(target)[at])).toContain(`c${at}:label`);

@@ -202,7 +202,9 @@ describe('a paste into a deep body', () => {
 		const after = field.getContent();
 		expect(changes.count).toBe(lands ? 1 : 0);
 		if (lands) {
-			expect(Math.max(...pathsOf(after).map((path) => path.filter((c) => c.kind !== 'list').length))).toBe(10 + levels);
+			expect(
+				Math.max(...pathsOf(after).map((path) => path.filter((c) => c.kind !== 'list').length))
+			).toBe(10 + levels);
 			expect(view.state.doc.textContent).toContain(`i${levels}`);
 		} else {
 			expect(after).toEqual(before);

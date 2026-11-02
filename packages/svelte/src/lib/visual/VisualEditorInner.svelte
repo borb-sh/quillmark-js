@@ -532,12 +532,17 @@
 		const i = cardIndexOf(id);
 		if (i < 0) return;
 		try {
-			// Insert the retyped card ahead of the original and drop the original after.
-			// `insertCard` validates the whole card before it mutates and `removeCard`
-			// cannot throw, so a refusal leaves the document as it was; the reverse order
-			// would leave it a card short.
-			doc.insertCard({ ...doc.card(i), kind }, i);
-			doc.removeCard(i + 1);
+			// The retyped card keeps the original's `$id`, which two cards cannot hold at
+			// once, so the original goes first and comes back where `insertCard` refuses:
+			// it validates the whole card before it mutates, so the document is as it was.
+			const card = doc.card(i);
+			doc.removeCard(i);
+			try {
+				doc.insertCard({ ...card, kind }, i);
+			} catch (e) {
+				doc.insertCard(card, i);
+				throw e;
+			}
 			bump('structure', id, i);
 		} catch (e) {
 			reportError(onError, {
@@ -789,7 +794,7 @@
 	}
 
 	/**
-	 * Put the caret in a revealed target, at the finest grain it can take: a USV offset
+	 * Put the caret in a revealed target, at the finest grain it can take: a UTF-16 offset
 	 * in a prose leaf or a nested content cell, a bare focus everywhere else. A form
 	 * control has no coordinate to spend an offset in (an `<input type="number">`
 	 * refuses a selection outright), which is also the whole of what a click on

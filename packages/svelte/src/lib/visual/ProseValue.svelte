@@ -151,7 +151,7 @@
 		view.focus();
 		view.dom.scrollIntoView({ block: 'nearest' });
 	}
-	/** Take the caret to USV `pos` in this leaf's own content: what a landing on an
+	/** Take the caret to UTF-16 offset `pos` in this leaf's own content: what a landing on an
 	 * element address resolves to when the compile answered a cluster-exact offset
 	 * (`leaves.ts`). `createField`'s body over the view this component owns.
 	 *

@@ -285,6 +285,12 @@ function readLeaf(reader: DocumentReader, addr: Addr): Content {
 	return reader.getContent(addr) ?? emptyContent();
 }
 
+/** `addr` as a content write takes it: a card named by its `$id`, which a write requires. */
+function writeAddr(doc: Document, addr: Addr): Addr {
+	if (typeof addr.card !== 'number') return addr;
+	return { ...addr, card: doc.card(addr.card).id ?? addr.card };
+}
+
 /** The canonical empty `Content`: one empty `para` block. */
 export function emptyContent(): Content {
 	return { text: '', blocks: [{ id: 'b0', kind: 'para' }] };
@@ -488,16 +494,17 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// Keeps the optimistic PM on throw. Returns whether anything landed, independent of which
 	// branch ran.
 	function commitEdit(oldRt: Content, newRt: Content): boolean {
+		const at = writeAddr(doc, addr);
 		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
 			return commitUnset();
 		if (plaintext) return commitPlain(newRt.text.replaceAll(HARD_BREAK, '\n'));
 		try {
 			// Only a field not yet at content rest replaces by choice: neither an absent declared
 			// field nor an authored string has anchors to lose (`changeCommittable`).
-			if (!changeCommittable(doc, addr)) doc.replace(addr, newRt);
+			if (!changeCommittable(doc, addr)) doc.replace(at, newRt);
 			else {
 				const change = lower(oldRt, newRt);
-				if (change) doc.apply(addr, change);
+				if (change) doc.apply(at, change);
 			}
 			reconciler.commit(readLeaf(reader, addr));
 			return true;
@@ -512,7 +519,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				cause: e
 			});
 			try {
-				doc.replace(addr, newRt);
+				doc.replace(at, newRt);
 				reconciler.commit(readLeaf(reader, addr));
 				return true;
 			} catch (e2) {

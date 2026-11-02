@@ -22,11 +22,13 @@ const cellParser = new DOMParser(
 	schemaRules.filter((rule) => !('node' in rule && rule.node?.startsWith('island_')))
 );
 
-/** A `<td>` or `<th>` as a cell: its blocks are lines and a `<br>` a break, each one `U+2028`
+/** A `<td>` or `<th>` as a cell: its blocks and each `<br>` are a break, one `U+2028`
  *  in the text (`cellContent`), and its marks the ones the schema's rules read. Whitespace
  *  at the cell's edges is dropped, which is where a source's empty paragraph lands. */
 function cellFromDOM(el: HTMLElement): GridCell {
-	const { text, marks = [] } = pmToContent(cellParser.parse(el));
+	const parsed = pmToContent(cellParser.parse(el));
+	const text = parsed.text.replaceAll('\n', HARD_BREAK);
+	const marks = parsed.marks ?? [];
 	const lead = text.length - text.trimStart().length;
 	const kept = text.trim();
 	const end = kept.length;
@@ -129,7 +131,10 @@ export function tablePastePlugin(): Plugin {
 			clipboardTextParser: ((text, _context, plain) => {
 				const props = plain ? null : tableFromText(text);
 				if (!props) return null;
-				const island = blockSchema.nodes.island_block.create({ islandType: 'table', ...islandOf(props) });
+				const island = blockSchema.nodes.island_block.create({
+					islandType: 'table',
+					...islandOf(props)
+				});
 				return new Slice(Fragment.from(island), 0, 0);
 			}) as EditorProps['clipboardTextParser']
 		}

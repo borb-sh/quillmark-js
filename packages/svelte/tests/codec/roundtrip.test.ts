@@ -217,7 +217,7 @@ function gesture(r: () => number, state: EditorState): EditorState {
 
 describe('generative keymap → lower → apply', () => {
 	it('every document the keymaps reach projects, stores and maps', () => {
-				for (let seed = 1; seed <= 100; seed++) {
+		for (let seed = 1; seed <= 100; seed++) {
 			const r = rng(seed);
 			const source = genMarkdown(r);
 			const doc = freshDoc();

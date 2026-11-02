@@ -186,7 +186,8 @@ export function islandEntryFromNode(attrs: IslandNodeAttrs): ContentIsland {
 export function isTableProps(props: unknown): props is TableProps {
 	if (typeof props !== 'object' || props === null) return false;
 	const { columns, rows } = props as Record<string, unknown>;
-	const ids = (v: unknown): v is string[] => Array.isArray(v) && v.every((c) => typeof c === 'string');
+	const ids = (v: unknown): v is string[] =>
+		Array.isArray(v) && v.every((c) => typeof c === 'string');
 	return (
 		ids(columns) &&
 		Array.isArray(rows) &&

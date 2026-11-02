@@ -226,7 +226,12 @@ function groupItems(
  * A single leaf block node from its record, exhaustive over the closed block vocabulary so a kind
  * added upstream is a compile error. A kind spelled `x-` reads as a paragraph that holds its kind.
  */
-function makeLeaf(schema: Schema, seg: Segment, marks: ContentMark[], cursor: IslandCursor): PMNode {
+function makeLeaf(
+	schema: Schema,
+	seg: Segment,
+	marks: ContentMark[],
+	cursor: IslandCursor
+): PMNode {
 	const block = seg.block;
 	const id = block.id || null;
 	switch (block.kind) {
@@ -300,7 +305,8 @@ function buildInline(
 ): PMNode[] {
 	const out: PMNode[] = [];
 	const breaks =
-		host !== 'inline' && takesLineBreak(host === 'heading' ? schema.nodes.heading : schema.nodes.paragraph);
+		host !== 'inline' &&
+		takesLineBreak(host === 'heading' ? schema.nodes.heading : schema.nodes.paragraph);
 	let runText = '';
 	let runKey = '';
 	let runMarks: readonly Mark[] = [];

@@ -118,8 +118,7 @@ function propsOf(rt: Content): TableGrid {
 function withTable(grid: TableGrid): Content {
 	const rt = md(TABLE_MD);
 	rt.islands![0] = { ...rt.islands![0], ...islandOf(grid) } as Content['islands'] extends
-		| (infer I)[]
-		| undefined
+		(infer I)[] | undefined
 		? I
 		: never;
 	return rt;
@@ -2151,7 +2150,7 @@ describe('a table on the clipboard lands as a table island', () => {
 
 	it('the island arrives with no id, and the paste pass mints the next', () => {
 		const rt = pasted(GOOGLE_SHEETS, TABLE_MD);
-		expect(rt.islands.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
+		expect(rt.islands!.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
 	});
 });
 
@@ -2168,7 +2167,7 @@ describe('a table leaves by the clipboard and does not come back by it', () => {
 	});
 
 	it('a held column from the header row writes the header as one', () => {
-		const props = withCell(LETTERED, 2, 1, { text: 'say "hi"\nthere', marks: [strong(0, 3)] });
+		const props = withCell(LETTERED, 2, 1, { text: 'say "hi"\u2028there', marks: [strong(0, 3)] });
 		const { field } = tableLeaf(props);
 		grips(field, 'column')[1].click();
 		const { event, held } = clipboard('copy');
@@ -2208,7 +2207,7 @@ describe('a table leaves by the clipboard and does not come back by it', () => {
 		view.dom.dispatchEvent(clipboard('paste', EXCEL).event);
 		expect(shapeEqual(leafProps(field), LETTERED)).toBe(true);
 		expect(doc.main.body.islands).toHaveLength(1);
-		expect(leafProps(field).rows[0][1].text).toBe('Grade Count O-3 12 Line one\nLine two 7a2');
+		expect(leafProps(field).rows[0][1].text).toBe('Grade Count O-3 12 Line one\u2028Line two 7a2');
 		field.destroy();
 	});
 });

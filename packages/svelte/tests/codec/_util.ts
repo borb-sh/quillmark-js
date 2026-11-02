@@ -89,7 +89,8 @@ export function depthsOf(rt: Content): number[] {
  *  reader sees, which two spellings of one edit agree on where their ids differ. */
 export function unnamed(rt: Content): Content {
 	const names = new Map<string, string>();
-	const name = (id: string) => names.get(id) ?? (names.set(id, `c${names.size}`), `c${names.size - 1}`);
+	const name = (id: string) =>
+		names.get(id) ?? (names.set(id, `c${names.size}`), `c${names.size - 1}`);
 	const blocks = rt.blocks.map((b, i) => ({
 		...b,
 		id: `b${i}`,

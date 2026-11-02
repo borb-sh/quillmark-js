@@ -17,12 +17,7 @@
 // A cell is its own content unit: `marks` and `anchors` are UTF-16 offsets into that cell's
 // `text`, a `U+2028` in it a hard break, so it decodes and projects through the machinery a field
 // does (`cellSchema`).
-import type {
-	Content,
-	ContentAnchor,
-	ContentMark,
-	TableProps
-} from '@quillmark/wasm';
+import type { Content, ContentAnchor, ContentMark, TableProps } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { pmToContent } from './encode.js';
 import { HARD_BREAK, isTableProps, type IslandNodeAttrs } from './islands.js';
@@ -90,7 +85,9 @@ export function gridOf(props: TableProps, slots: Record<string, Content> | null)
 		header,
 		rows,
 		aligns: props.columns.map((c) => props.aligns?.[c] ?? 'none'),
-		...(props.widths && { widths: props.widths && props.columns.map((c) => props.widths?.[c] ?? null) }),
+		...(props.widths && {
+			widths: props.widths && props.columns.map((c) => props.widths?.[c] ?? null)
+		}),
 		...(props.align && { align: props.align }),
 		...(props.head !== undefined && { head: props.head }),
 		...(Object.keys(extra).length && { extra })
@@ -130,9 +127,18 @@ export function islandOf(grid: TableGrid): { props: TableProps; slots: Record<st
 	const g = normalizeTable(grid);
 	const rows = allRows(g);
 	const every = rows.flat().flatMap((cell) => (cell.ids ? [cell.ids] : []));
-	const rowId = minter(every.map((i) => i.row), 'r');
-	const columnId = minter(every.map((i) => i.column), 'k');
-	const slotId = minter(every.map((i) => i.slot), 's');
+	const rowId = minter(
+		every.map((i) => i.row),
+		'r'
+	);
+	const columnId = minter(
+		every.map((i) => i.column),
+		'k'
+	);
+	const slotId = minter(
+		every.map((i) => i.slot),
+		's'
+	);
 	const columns = g.aligns.map((_, c) =>
 		columnId(rows.map((row) => row[c]?.ids?.column).find((id) => id !== undefined))
 	);
@@ -150,7 +156,10 @@ export function islandOf(grid: TableGrid): { props: TableProps; slots: Record<st
 			})
 		)
 	}));
-	const keyed = <T>(xs: readonly T[] | undefined, skip: (x: T) => boolean): Record<string, T> | undefined => {
+	const keyed = <T>(
+		xs: readonly T[] | undefined,
+		skip: (x: T) => boolean
+	): Record<string, T> | undefined => {
 		const entries = (xs ?? []).flatMap((x, c) => (skip(x) ? [] : [[columns[c]!, x] as const]));
 		return entries.length ? Object.fromEntries(entries) : undefined;
 	};
@@ -776,7 +785,8 @@ export function cellFromDoc(doc: PMNode, prior: GridCell): GridCell {
 	const { anchors: held, ...rest } = prior;
 	const next: GridCell = { ...rest, text: projected.text, marks: projected.marks ?? [] };
 	if (!held?.length) return next;
-	const at = (pos: number, assoc: 'before' | 'after') => mapThrough(prior.text, next.text, pos, assoc);
+	const at = (pos: number, assoc: 'before' | 'after') =>
+		mapThrough(prior.text, next.text, pos, assoc);
 	const anchors = held.flatMap((a) => {
 		if (a.start === a.end) {
 			const p = at(a.start, 'before');

@@ -240,7 +240,7 @@ describe('what the parse rules refuse', () => {
 	it('an href carrying a line ending arrives percent-encoded, and stores', () => {
 		const back = parse('<p><a href="http://a&#10;b/c">x</a></p>');
 		const projected = pmToContent(back);
-		expect(projected.marks[0]).toMatchObject({ type: 'link', attrs: { url: 'http://a%0Ab/c' } });
+		expect(projected.marks![0]).toMatchObject({ type: 'link', attrs: { url: 'http://a%0Ab/c' } });
 		const doc = freshDoc();
 		expect(() => doc.replace({}, projected)).not.toThrow();
 	});

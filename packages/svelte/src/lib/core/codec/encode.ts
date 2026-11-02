@@ -13,7 +13,8 @@ import type {
 	ContentContainer,
 	ContentIsland,
 	ContentMark,
-	ContentMarkKind
+	ContentMarkKind,
+	Step
 } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
 import { HARD_BREAK, ISLAND_SLOT, islandEntryFromNode, type IslandNodeAttrs } from './islands.js';
@@ -101,7 +102,8 @@ export function scanDoc(doc: PMNode): Scan {
 		ids: idsOf(doc)
 	};
 	scanBlocks(acc, doc, 0, []);
-	if (!acc.blocks.length) acc.blocks.push({ id: claim(acc.ids, acc.ids.blocks, null, 'b'), kind: 'para' });
+	if (!acc.blocks.length)
+		acc.blocks.push({ id: claim(acc.ids, acc.ids.blocks, null, 'b'), kind: 'para' });
 	acc.marks = mergeMarks(acc.rawMarks);
 	return acc;
 }
@@ -137,10 +139,20 @@ function scanBlocks(acc: Acc, parent: PMNode, contentStart: number, path: string
 }
 
 /** A container's record less its id. */
-type ContainerKind = ContentContainer extends infer C ? (C extends unknown ? Omit<C, 'id'> : never) : never;
+type ContainerKind = ContentContainer extends infer C
+	? C extends unknown
+		? Omit<C, 'id'>
+		: never
+	: never;
 
 /** A container the walk opens: its record, named once, and the path under it. */
-function open(acc: Acc, node: PMNode, path: string[], record: ContainerKind, prefix: string): string[] {
+function open(
+	acc: Acc,
+	node: PMNode,
+	path: string[],
+	record: ContainerKind,
+	prefix: string
+): string[] {
 	const id = claim(acc.ids, acc.ids.containers, node.attrs.id, prefix);
 	acc.containers.push({ id, ...record } as ContentContainer);
 	return [...path, id];
@@ -158,7 +170,13 @@ function scanBlock(acc: Acc, node: PMNode, nodePos: number, path: string[]): voi
 			break;
 		case 'code_block': {
 			const lang = node.attrs.lang as string | null;
-			beginBlock(acc, node, contentStart, path, lang ? { kind: 'code', attrs: { lang } } : { kind: 'code' });
+			beginBlock(
+				acc,
+				node,
+				contentStart,
+				path,
+				lang ? { kind: 'code', attrs: { lang } } : { kind: 'code' }
+			);
 			const codeText = node.textContent.replaceAll('\n', HARD_BREAK);
 			if (codeText.length) emitText(acc, codeText, contentStart, []);
 			acc.lastContentEndPm = contentStart + node.content.size;
@@ -202,9 +220,13 @@ function scanBlock(acc: Acc, node: PMNode, nodePos: number, path: string[]): voi
 
 /** A textblock's kind: a heading's `level`, a paragraph's `x-` kind where it holds one, or `para`. */
 function textblockKind(node: PMNode): ContentBlockKind {
-	if (node.type.name === 'heading') return { kind: 'heading', attrs: { level: node.attrs.level as number } };
+	if (node.type.name === 'heading')
+		return { kind: 'heading', attrs: { level: node.attrs.level as number } };
 	const ext = node.attrs.ext as { kind: `x-${string}`; attrs: Record<string, unknown> } | null;
-	if (ext) return Object.keys(ext.attrs).length ? { kind: ext.kind, attrs: ext.attrs } : { kind: ext.kind };
+	if (ext)
+		return Object.keys(ext.attrs).length
+			? { kind: ext.kind, attrs: ext.attrs }
+			: { kind: ext.kind };
 	return { kind: 'para' };
 }
 
@@ -218,7 +240,12 @@ function beginBlock(
 	want: unknown = node.attrs.id
 ): void {
 	if (acc.blocks.length > 0) {
-		acc.runs.push({ kind: 'nl', pmStart: acc.lastContentEndPm, pmEnd: thisContentStart, at: acc.text.length });
+		acc.runs.push({
+			kind: 'nl',
+			pmStart: acc.lastContentEndPm,
+			pmEnd: thisContentStart,
+			at: acc.text.length
+		});
 		appendText(acc, '\n');
 	}
 	const id = claim(acc.ids, acc.ids.blocks, want, 'b');
@@ -251,12 +278,16 @@ function emitText(acc: Acc, s: string, pmStart: number, marks: readonly Mark[]):
 	const at = acc.text.length;
 	acc.runs.push({ kind: 'text', pmStart, at, s });
 	appendText(acc, s);
-	for (const mark of marks) acc.rawMarks.push({ start: at, end: acc.text.length, ...contentDescriptorFromPM(mark) });
+	for (const mark of marks)
+		acc.rawMarks.push({ start: at, end: acc.text.length, ...contentDescriptorFromPM(mark) });
 }
 
 /** Merge adjacent/overlapping same-descriptor marks into maximal ranges. */
 function mergeMarks(raw: ContentMark[]): ContentMark[] {
-	const groups = new Map<string, { descriptor: ContentMarkKind; intervals: { start: number; end: number }[] }>();
+	const groups = new Map<
+		string,
+		{ descriptor: ContentMarkKind; intervals: { start: number; end: number }[] }
+	>();
 	for (const m of raw) {
 		const { start, end, ...descriptor } = m;
 		const key = markKey(descriptor as ContentMarkKind);
@@ -288,5 +319,26 @@ function mergeMarks(raw: ContentMark[]): ContentMark[] {
  */
 export function lower(oldRt: Content, newRt: Content): Change | null {
 	const change = core().diff(oldRt, newRt);
-	return change.steps.length ? change : null;
+	return change.steps.length ? { steps: layoutLast(change.steps) } : null;
+}
+
+/**
+ * `steps` with each island props step that brings no slots after the slot edits of its island:
+ * `apply` settles a table's spans as the props step lands, so a merge whose covered cells still
+ * hold their text loses its span unless the text goes first. A step bringing no slots names only
+ * slots the island holds already, so the slot edits land the same either side of it.
+ */
+function layoutLast(steps: Step[]): Step[] {
+	const held = new Map<string, Step>();
+	const out: Step[] = [];
+	for (const step of steps) {
+		if ('island' in step && 'id' in step.island && !step.island.slots)
+			held.set(step.island.id, step);
+		else out.push(step);
+	}
+	for (const [id, step] of held) {
+		const last = out.findLastIndex((s) => 'nested' in s && s.nested.island === id);
+		out.splice(last + 1, 0, step);
+	}
+	return out;
 }

@@ -83,7 +83,7 @@ describe('a block leaf reads markdown text', () => {
 		].join('\n');
 		const rt = pasted(text(answer), '');
 		expect(core.exportMarkdown(rt)).toBe(core.exportMarkdown(md(answer)));
-		expect(rt.islands.map((island) => island.type)).toEqual(['table']);
+		expect(rt.islands!.map((island) => island.type)).toEqual(['table']);
 	});
 
 	it.each([
@@ -126,7 +126,7 @@ describe('a block leaf reads markdown text', () => {
 			text('| a | b |\n|---|---|\n| 1 | 2 |'),
 			'| x | y |\n|---|---|\n| 3 | 4 |\n\npara'
 		);
-		expect(rt.islands.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
+		expect(rt.islands!.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
 	});
 
 	it('text with no block at a line head stays literal', () => {

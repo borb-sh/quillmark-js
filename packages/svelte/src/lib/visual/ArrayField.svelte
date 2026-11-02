@@ -393,7 +393,7 @@
 	}
 	/**
 	 * Land at `steps`: element `steps[0]`, and the rest of the walk inside its subform,
-	 * at USV `pos` where the leaf the walk ends in can take one ({@link
+	 * at UTF-16 offset `pos` where the leaf the walk ends in can take one ({@link
 	 * FieldControl.focusPath}). The index resolves to the element's session id here, at
 	 * the call, never carried as one — an index is stale the moment anything above it
 	 * splices. Past the live list it falls back to {@link focus}: the field is right and
