@@ -6,6 +6,10 @@
 
 **On the content model of `@quillmark/wasm` 0.134.1.** The peer range is `>=0.134.1-0 <0.135.0-0`. A prose leaf lowers each edit to a `Change` through the store's `diff` and commits it with `apply`, naming its card by `$id`; a field not yet at content rest, or an `apply` that throws, takes `replace`. Content offsets are UTF-16 code units, so `Place.pos`, `onCaretMove` and the `Delta` `applyExternal` takes count UTF-16 where they counted scalar values. A table's cells are its island's slots, and a merge keeps its span. A retype removes the card, then inserts it, since card ids are unique.
 
+## v0.29.3 - 2026-11-02
+
+**The `@quillmark/wasm` peer range stops below 0.134.0.** 0.134 removes `applyChange`, `overwrite` and `mapPos`, which the prose codec calls, so a range admitting it installed a wasm the editor throws on at its first edit.
+
 **`Preview` exposes `washField(field)`.** It plays the editor's arrival wash over every box the compile places at the address and moves nothing: no scroll, and the follow stands. It answers `false` where the compile places nothing. A host marks a change it wrote into the document in both panes, calling it after the `refresh` that carries the edit.
 
 **A rich-text caret stays clear of a pane's `scroll-padding`.** A prose leaf's reveal keeps the caret its line of clearance past the block-axis `scroll-padding` its scrollports declare, so a host that covers the bottom of a `.qm-pane` with an overlay sets `scroll-padding-block-end` on it and typing stays above the overlay. The reveal ignored scroll padding, letting the caret slip under the overlay.
