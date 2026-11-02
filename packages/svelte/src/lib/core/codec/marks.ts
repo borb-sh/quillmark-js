@@ -1,21 +1,17 @@
-// Mark algebra: two content classes to two PM mechanisms.
-//   formatting (strong/emph/underline/strike/code/font_family/link)  ↔ PM marks
-//   identity   (anchor{id}, zero-width)                  ↔ decorations (see field.ts)
-// This module owns the type-name translation and the descriptor keying the mark
-// diff groups by; the anchor↔decoration bridge is field.ts, the mark ops are
-// encode.ts. `emph` is the content name; `em` the PM name: the one asymmetry.
+// Mark algebra: formatting and identity to two PM mechanisms.
+//   formatting (strong/emph/underline/strike/code/font_family/link, and an `x-` mark) ↔ PM marks
+//   identity   (a content anchor, a range or a point)                       ↔ plugin-held positions (field.ts)
+// This module owns the type-name translation and the descriptor keying the projection merges by.
+// `emph` is the content name; `em` the PM name: the one asymmetry. An `x-` mark rides the `ext`
+// mark, holding its name and attributes as written.
 import type { Mark, Schema } from 'prosemirror-model';
 import type { ContentMark, ContentMarkKind } from '@quillmark/wasm';
 import { canonicalJson } from './reconcile.js';
 
-/** A PM mark from a content formatting mark, or `null` for an anchor, which no PM mark
- *  draws (`field.ts` holds it as a decoration). Exhaustive over
- *  the closed mark vocabulary, so a member added upstream is a compile error here rather
- *  than an index into a PM mark this schema does not declare. */
+/** A PM mark from a content formatting mark, or `null` where the schema declares none for it. An
+ *  `x-` type rides `ext`. */
 export function pmMarkFromContent(schema: Schema, m: ContentMark): Mark | null {
 	switch (m.type) {
-		case 'anchor':
-			return null;
 		case 'font_family':
 			return schema.marks.font_family.create({ name: m.attrs.name });
 		case 'emph':
@@ -27,10 +23,8 @@ export function pmMarkFromContent(schema: Schema, m: ContentMark): Mark | null {
 		case 'strike':
 		case 'code':
 			return schema.marks[m.type].create();
-		default: {
-			const unreached: never = m;
-			return unreached;
-		}
+		default:
+			return schema.marks.ext?.create({ type: m.type, attrs: m.attrs ?? null }) ?? null;
 	}
 }
 
@@ -46,12 +40,17 @@ export function contentDescriptorFromPM(mark: Mark): ContentMarkKind {
 	if (name === 'link') return { type: 'link', attrs: { url: mark.attrs.href as string } };
 	if (name === 'font_family')
 		return { type: 'font_family', attrs: { name: mark.attrs.name as string } };
+	if (name === 'ext') {
+		const type = mark.attrs.type as `x-${string}`;
+		const attrs = mark.attrs.attrs as Record<string, unknown> | null;
+		return attrs && Object.keys(attrs).length ? { type, attrs } : { type };
+	}
 	return { type: name as 'strong' | 'underline' | 'strike' | 'code' };
 }
 
 /**
  * The range-free `{ type, … }` half of a content mark: `contentDescriptorFromPM`'s
- * content-side twin, and what a `MarkOp` carries beside its range. Lifted off the
+ * content-side twin, and what a splice's mark carries beside its range. Lifted off the
  * range envelope rather than rebuilt arm by arm, so a payload crosses whole and an
  * arm added upstream reaches this by construction.
  */
@@ -61,30 +60,24 @@ export function descriptorOf(m: ContentMark): ContentMarkKind {
 }
 
 /**
- * A stable grouping key for the mark diff: marks sharing a key union into one
- * coverage set. Payload-free formatting keys on its type, everything else on
- * type+attrs, because `applyChange`'s `remove` matches type and attrs (verified),
- * so two links differing in url are independent mark families. This is the seam's
- * own `(type, attrs)` tie-break, which is why no arm needs a case of its own.
+ * A stable grouping key for marks: marks sharing a key union into one coverage set.
+ * Payload-free formatting keys on its type, everything else on type+attrs, so two
+ * links differing in url are independent mark families: the store's own `(type,
+ * attrs)` union rule, which is why no arm needs a case of its own.
  */
 export function markKey(descriptor: ContentMarkKind): string {
 	if ('attrs' in descriptor) return `${descriptor.type}\u0000${canonicalJson(descriptor.attrs)}`;
 	return descriptor.type;
 }
 
-/** A held anchor position: an identity id at a USV content offset (zero-width). */
+/** A held anchor: an identity id over `[start, end)` content offsets, a point where they meet. */
 export interface AnchorPos {
 	id: string;
-	pos: number;
+	start: number;
+	end: number;
 }
 
-/**
- * The identity anchors of a `Content` as `{ id, pos }` in USV: the seed for the
- * field's anchor-position plugin and the `oldAnchors` the mark diff rebases.
- * Anchors are zero-width, so `start` is the position.
- */
-export function anchorsFromContent(rt: { marks: ContentMark[] }): AnchorPos[] {
-	const out: AnchorPos[] = [];
-	for (const m of rt.marks) if (m.type === 'anchor') out.push({ id: m.attrs.id, pos: m.start });
-	return out;
+/** The identity anchors of a `Content`: the seed for the field's anchor plugin. */
+export function anchorsFromContent(rt: { anchors?: AnchorPos[] }): AnchorPos[] {
+	return (rt.anchors ?? []).map(({ id, start, end }) => ({ id, start, end }));
 }

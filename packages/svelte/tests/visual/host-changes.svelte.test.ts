@@ -45,7 +45,7 @@ describe('changes the host made', () => {
 		const doc = example();
 		const { target, editor, changes } = mountEditor(q, doc);
 		const delta = { ops: [{ insert: 'Remote ' }] };
-		doc.applyChange({}, { delta });
+		doc.apply({}, { steps: [{ splice: { at: 0, insert: 'Remote ' } }] });
 		editor.applyExternal(doc.pathFor({}), delta);
 		flushSync();
 		expect(leaf(target, 'main:$body').textContent?.startsWith('Remote ')).toBe(true);

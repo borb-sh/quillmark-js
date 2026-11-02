@@ -173,8 +173,8 @@ function addrForSegs(segs: DocPathSeg[]): Addr | undefined {
  * The head segment a card index resolves to, or `undefined` when out of the live array. A falsy
  * kind is the unknown-kind form `cards[i]`.
  */
-function cardHead(index: number | undefined, kinds: readonly string[]): DocPathSeg | undefined {
+function cardHead(index: Addr['card'], kinds: readonly string[]): DocPathSeg | undefined {
 	if (index == null) return { seg: 'main' };
-	if (!Number.isInteger(index) || index < 0 || index >= kinds.length) return undefined;
+	if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= kinds.length) return undefined;
 	return { seg: 'card', kind: kinds[index] || null, index };
 }

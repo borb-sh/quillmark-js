@@ -1,9 +1,9 @@
 // Two structural properties the fixed-example suites miss:
-//   (1) decode → lower round-trip under a seeded generator over random line
-//       kinds / containers / continues / marks:
+//   (1) decode → lower round-trip under a seeded generator over random block
+//       kinds / containers / breaks / marks:
 //       `normalize(pmToContent(decode(rt))) == normalize(rt)`;
 //   (2) the chain the leaf actually runs, under the same generator:
-//       `decode → press → pmToContent → lower → applyChange`, asserting the
+//       `decode → press → pmToContent → lower → apply`, asserting the
 //       projection validates, the store equals the optimistic PM, the position map
 //       still inverts after the structural edit, and the store decodes back to the leaf.
 //
@@ -18,19 +18,18 @@ import {
 	blockSchema,
 	bodyKeymap,
 	buildLineIndex,
-	contentEdit,
 	decode,
 	inputRulesPlugin,
 	lower,
 	pmToContent,
-	usvLength,
-	usvToPM
+	offsetToPM
 } from '$lib/core/codec';
 import { linebreakPlugin } from '$lib/core/codec/breaks.js';
 import {
 	assertPositionInverse,
 	contentEqual,
 	freshDoc,
+	unnamed,
 	keyDriver,
 	md,
 	normalize
@@ -52,7 +51,7 @@ function rng(seed: number): () => number {
 // ── A small markdown content generator ───────────────────────────────────────
 // Markdown (not raw `Content`) is the source so every sample is a guaranteed-
 // valid content via `importMarkdown`: the generator explores line kinds, list/
-// quote containers, the hard-break `continues` flag, inline marks, code fences and
+// quote containers, the hard break, inline marks, code fences and
 // nesting to three levels, while staying clear of islands (own round-trip concerns)
 // and mark-on-code overlap, a range no projection carries (CODEC §Marks).
 // At most one mark per word, so no overlap that would blur the property under test.
@@ -127,7 +126,7 @@ function genBlock(r: () => number, depth: number): string {
 	if (kind < 0.26) return genInline(r); // paragraph
 	if (kind < 0.38) return `# ${genInline(r)}`; // heading
 	if (kind < 0.54) return genFence(r);
-	if (kind < 0.62) return `${genInline(r)}\\\n${genInline(r)}`; // hard break → `continues`
+	if (kind < 0.62) return `${genInline(r)}\\\n${genInline(r)}`; // a hard break
 	if (depth === 0) return genInline(r);
 	if (kind < 0.78) return genList(r, depth - 1, false);
 	if (kind < 0.9) return genList(r, depth - 1, true);
@@ -154,15 +153,13 @@ describe('generative decode → lower round-trip', () => {
 });
 
 // ── The chain the leaf runs, under the same generator ────────────────────────
-// `decode → press → pmToContent → lower → applyChange`, against a real `Document`,
+// `decode → press → pmToContent → lower → apply`, against a real `Document`,
 // with the gestures drawn from the keys `bodyKeymap` binds falling through to
 // `baseKeymap`, over the normalizer the leaf mounts beneath them — the composition
 // `proseLeafPlugins` assembles, so precedence is under test alongside the codec. Four
 // assertions per step, and the first is the one the pure round-trip cannot make:
-// **every document the keymaps can reach projects to a valid `Content`**. A projection
-// that carries more segments than lines does not throw on the way out; it
-// under-specifies the bundle, `applyChange` accepts it, and the field diverges from
-// the leaf for the rest of the session.
+// **every document the keymaps can reach projects to a valid `Content`**, and the
+// change `diff` lowers it to lands exactly that value.
 //
 // The fourth closes the loop the other way: the store decodes back to the document the
 // writer is looking at. A leaf holding a second spelling of a shape stores and previews
@@ -196,14 +193,17 @@ function type(state: EditorState, text: string): EditorState {
 	return cur;
 }
 
-/** A random selection: a caret at a USV offset (so never inside a surrogate pair),
- *  widened to a range often enough that the range branches are reached. */
+/** A random selection: a caret at a content offset stepped off any surrogate pair's
+ *  middle, widened to a range often enough that the range branches are reached. */
 function place(r: () => number, state: EditorState): EditorState {
 	const index = buildLineIndex(state.doc);
-	const total = usvLength(pmToContent(state.doc).text);
-	const usv = (n: number) => usvToPM(index, Math.min(n, total));
-	const head = usv(Math.floor(r() * (total + 1)));
-	const anchor = r() < 0.2 ? usv(Math.floor(r() * (total + 1))) : head;
+	const { text } = pmToContent(state.doc);
+	const at = (n: number) => {
+		const low = text.charCodeAt(n);
+		return offsetToPM(index, low >= 0xdc00 && low <= 0xdfff ? n - 1 : n);
+	};
+	const head = at(Math.floor(r() * (text.length + 1)));
+	const anchor = r() < 0.2 ? at(Math.floor(r() * (text.length + 1))) : head;
 	const sel = TextSelection.between(state.doc.resolve(anchor), state.doc.resolve(head));
 	return state.apply(state.tr.setSelection(sel));
 }
@@ -215,20 +215,13 @@ function gesture(r: () => number, state: EditorState): EditorState {
 	return press(state, pick(r, KEYS));
 }
 
-describe('generative keymap → lower → applyChange', () => {
+describe('generative keymap → lower → apply', () => {
 	it('every document the keymaps reach projects, stores and maps', () => {
-		// One scratch `Document` for the normalizer, reused across every step:
-		// `overwrite` replaces the content, and seeding a document is what a step costs.
-		const scratch = freshDoc();
-		const canonical = (rt: Content): Content => {
-			scratch.overwrite({}, rt);
-			return scratch.main.body;
-		};
-		for (let seed = 1; seed <= 100; seed++) {
+				for (let seed = 1; seed <= 100; seed++) {
 			const r = rng(seed);
 			const source = genMarkdown(r);
 			const doc = freshDoc();
-			doc.overwrite({}, md(source));
+			doc.replace({}, md(source));
 			let stored = doc.main.body;
 			let state = EditorState.create({
 				doc: decode(stored, blockSchema),
@@ -238,12 +231,14 @@ describe('generative keymap → lower → applyChange', () => {
 				const where = `seed ${seed} step ${step}\n${source}`;
 				state = gesture(r, place(r, state));
 				const projected = pmToContent(state.doc);
-				// (1) valid: `overwrite` is where the content invariants are checked.
-				const optimistic = canonical(projected);
-				doc.applyChange({}, lower(contentEdit(stored, projected)));
+				// (1) valid: `normalize` checks the content invariants.
+				const optimistic = normalize(projected);
+				const change = lower(stored, projected);
+				if (change) doc.apply({}, change);
 				stored = doc.main.body;
-				// (2) the store is what the writer is looking at.
-				expect(contentEqual(stored, optimistic), where).toBe(true);
+				// (2) the store is what the writer is looking at, up to the ids `diff`
+				// gives what it opens.
+				expect(contentEqual(unnamed(stored), unnamed(optimistic)), where).toBe(true);
 				// (3) the caret still crosses the boundary in both directions.
 				assertPositionInverse(state.doc, where);
 				// (4) and a re-hydrate draws the leaf back, unchanged.

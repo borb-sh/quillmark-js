@@ -1,32 +1,184 @@
-// The table island's model: the cell codec (a `TableCell` ↔ one inline-schema PM doc) and the
-// rectangularizing constructors every row and column op goes through (CODEC §Islands, §"The table
-// island").
+// The table island's model: the grid every row and column op works (`TableGrid`, a header row and
+// body rows of cells), its two crossings to the island the store holds (`gridOf`, `islandOf`), the
+// cell codec (a `GridCell` ↔ one inline-schema PM doc), and the rectangularizing constructors
+// (CODEC §Islands, §"The table island").
 //
-// `TableProps` normalizes to one column count shared by `header`, every row, `aligns` and `widths`.
-// The editor keeps its optimistic PM and re-hydrates only on an external change (CODEC
+// The store's table is `columns` and `rows` of ids, each cell naming the slot holding its content,
+// and layout keyed by column and slot id. The grid holds it by place: each cell carries the row,
+// column and slot ids it arrived under, so a move carries them with the cells, and `islandOf` reads
+// each rank's id off the first cell holding an unclaimed one, minting past the table's highest.
+//
+// The grid normalizes to one column count shared by `header`, every row, `aligns` and `widths`. The
+// editor keeps its optimistic PM and re-hydrates only on an external change (CODEC
 // §Reconciliation), so an op that emitted a ragged table would leave the store rectangularized and
 // PM ragged with no repair. Every constructor therefore ends in {@link normalizeTable}, and a
 // caller reaches the shape only through them.
 //
-// A cell is its own content unit: `marks` are USV offsets into that cell's `text`, not
-// `Content.text`. A cell is one paragraph with no containers and no islands, a `\n` in its text
-// being a hard break, so it decodes and projects through the machinery a field does (`cellSchema`).
-import type { Content, TableCell, TableProps } from '@quillmark/wasm';
+// A cell is its own content unit: `marks` and `anchors` are UTF-16 offsets into that cell's
+// `text`, a `U+2028` in it a hard break, so it decodes and projects through the machinery a field
+// does (`cellSchema`).
+import type {
+	Content,
+	ContentAnchor,
+	ContentMark,
+	TableProps
+} from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
-import { core } from '../lifecycle.js';
-import { usvLength } from './decode.js';
-import { contentEdit, pmToContent } from './encode.js';
+import { pmToContent } from './encode.js';
+import { HARD_BREAK, isTableProps, type IslandNodeAttrs } from './islands.js';
 import { valueEqual } from './reconcile.js';
 
-/** One column's alignment, read off the boundary rather than restated. */
-export type TableAlign = TableProps['aligns'][number];
+/** One column's alignment, `none` where the store keys none. */
+export type TableAlign = 'none' | NonNullable<TableProps['align']>;
 
 /** The alignments a column can take: the four the content declares, `none` first
  *  because it is what a column arrives at and what a set is cleared back to. */
 export const ALIGNS: readonly TableAlign[] = ['none', 'left', 'center', 'right'];
 
+/** A cell's own layout, as the store keys it by slot. */
+type CellAttrs = NonNullable<TableProps['cell_attrs']>[string];
+
+/** The ids a cell arrived under. */
+export interface CellIds {
+	row: string;
+	column: string;
+	slot: string;
+	block: string;
+}
+
+/** One cell of the grid: its slot's text, marks and anchors, its own layout, its ids. */
+export interface GridCell extends CellAttrs {
+	text: string;
+	marks: ContentMark[];
+	anchors?: ContentAnchor[];
+	ids?: CellIds;
+}
+
+/** A table by place: row 0 the header, `aligns` and `widths` one per column. */
+export interface TableGrid {
+	header: GridCell[];
+	rows: GridCell[][];
+	aligns: TableAlign[];
+	widths?: (number | null)[];
+	align?: TableProps['align'];
+	head?: number;
+	/** The props keys the table names none of, riding through. */
+	extra?: Record<string, unknown>;
+}
+
+const TABLE_KEYS = new Set(['columns', 'rows', 'head', 'aligns', 'widths', 'align', 'cell_attrs']);
+
+/** The grid a table island spells, each cell its slot's content and its ids. */
+export function gridOf(props: TableProps, slots: Record<string, Content> | null): TableGrid {
+	const attrs = props.cell_attrs ?? {};
+	const cells = props.rows.map((row) =>
+		props.columns.map((column): GridCell => {
+			const slot = row.cells[column] ?? '';
+			const content = slots?.[slot];
+			return {
+				...attrs[slot],
+				text: content?.text ?? '',
+				marks: content?.marks ?? [],
+				...(content?.anchors?.length && { anchors: content.anchors }),
+				ids: { row: row.id, column, slot, block: content?.blocks[0]?.id ?? 'b0' }
+			};
+		})
+	);
+	const extra = Object.fromEntries(Object.entries(props).filter(([k]) => !TABLE_KEYS.has(k)));
+	const [header = [], ...rows] = cells;
+	return normalizeTable({
+		header,
+		rows,
+		aligns: props.columns.map((c) => props.aligns?.[c] ?? 'none'),
+		...(props.widths && { widths: props.widths && props.columns.map((c) => props.widths?.[c] ?? null) }),
+		...(props.align && { align: props.align }),
+		...(props.head !== undefined && { head: props.head }),
+		...(Object.keys(extra).length && { extra })
+	});
+}
+
+/** A node's grid, or `undefined` for any other island and for a payload of the wrong shape. */
+export function tableOfNode(node: PMNode): TableGrid | undefined {
+	const attrs = node.attrs as IslandNodeAttrs;
+	return attrs.islandType === 'table' && isTableProps(attrs.props)
+		? gridOf(attrs.props, attrs.slots)
+		: undefined;
+}
+
+/** A minter for one id space: `{prefix}{n}` past the highest `held` names under `prefix`. */
+function minter(held: Iterable<string>, prefix: string): (want?: string) => string {
+	const taken = new Set<string>();
+	let next = 0;
+	for (const id of held) {
+		const m = new RegExp(`^${prefix}(\\d+)$`).exec(id);
+		if (m) next = Math.max(next, Number(m[1]) + 1);
+	}
+	return (want) => {
+		if (want && !taken.has(want)) {
+			taken.add(want);
+			return want;
+		}
+		let id = `${prefix}${next++}`;
+		while (taken.has(id)) id = `${prefix}${next++}`;
+		taken.add(id);
+		return id;
+	};
+}
+
+/** The island a grid spells: its props and slots, each rank's id the first its cells carry. */
+export function islandOf(grid: TableGrid): { props: TableProps; slots: Record<string, Content> } {
+	const g = normalizeTable(grid);
+	const rows = allRows(g);
+	const every = rows.flat().flatMap((cell) => (cell.ids ? [cell.ids] : []));
+	const rowId = minter(every.map((i) => i.row), 'r');
+	const columnId = minter(every.map((i) => i.column), 'k');
+	const slotId = minter(every.map((i) => i.slot), 's');
+	const columns = g.aligns.map((_, c) =>
+		columnId(rows.map((row) => row[c]?.ids?.column).find((id) => id !== undefined))
+	);
+	const slots: Record<string, Content> = {};
+	const cellAttrs: Record<string, CellAttrs> = {};
+	const out = rows.map((row) => ({
+		id: rowId(row.map((cell) => cell.ids?.row).find((id) => id !== undefined)),
+		cells: Object.fromEntries(
+			row.map((cell, c) => {
+				const slot = slotId(cell.ids?.slot);
+				slots[slot] = cellContent(cell);
+				const own = cellAttrsOf(cell);
+				if (Object.keys(own).length) cellAttrs[slot] = own;
+				return [columns[c]!, slot];
+			})
+		)
+	}));
+	const keyed = <T>(xs: readonly T[] | undefined, skip: (x: T) => boolean): Record<string, T> | undefined => {
+		const entries = (xs ?? []).flatMap((x, c) => (skip(x) ? [] : [[columns[c]!, x] as const]));
+		return entries.length ? Object.fromEntries(entries) : undefined;
+	};
+	const aligns = keyed(g.aligns, (a) => a === 'none') as TableProps['aligns'];
+	const widths = keyed(g.widths, (w) => w === null) as TableProps['widths'];
+	return {
+		props: {
+			...g.extra,
+			columns,
+			rows: out,
+			...(g.head !== undefined && g.head !== 1 && { head: g.head }),
+			...(aligns && { aligns }),
+			...(widths && { widths }),
+			...(g.align && { align: g.align }),
+			...(Object.keys(cellAttrs).length && { cell_attrs: cellAttrs })
+		},
+		slots
+	};
+}
+
+/** A cell's own layout: every key beside its text, marks, anchors and ids. */
+function cellAttrsOf(cell: GridCell): CellAttrs {
+	const { text: _t, marks: _m, anchors: _a, ids: _i, ...layout } = cell;
+	return layout;
+}
+
 /** The zero cell: empty text, no marks. */
-export function emptyCell(): TableCell {
+export function emptyCell(): GridCell {
 	return { text: '', marks: [] };
 }
 
@@ -35,12 +187,12 @@ export function emptyCell(): TableCell {
  * op works {@link allRows}, and whichever row lands at index 0 is the header afterwards. The one
  * row the model refuses is the last, there being no table under it.
  */
-export function rowCount(props: TableProps): number {
+export function rowCount(props: TableGrid): number {
 	return props.rows.length + 1;
 }
 
 /** The cells of row `r` in that space. */
-export function rowCells(props: TableProps, r: number): TableCell[] {
+export function rowCells(props: TableGrid, r: number): GridCell[] {
 	return r === 0 ? props.header : (props.rows[r - 1] ?? []);
 }
 
@@ -48,17 +200,17 @@ export function rowCells(props: TableProps, r: number): TableCell[] {
  * Whether a row holds no text, telling a row on offer from one taken up (`table-view.ts` §`step`).
  * Text alone: a mark over none is invisible.
  */
-export function rowEmpty(props: TableProps, r: number): boolean {
+export function rowEmpty(props: TableGrid, r: number): boolean {
 	return rowCells(props, r).every((cell) => cell.text === '');
 }
 
 /** The cell at `(row, column)`, or the zero cell where the rectangle does not reach. */
-export function cellAt(props: TableProps, r: number, c: number): TableCell {
+export function cellAt(props: TableGrid, r: number, c: number): GridCell {
 	return rowCells(props, r)[c] ?? emptyCell();
 }
 
 /** The table's column count: the one number `header`, every row and `aligns` share. */
-export function columnCount(props: TableProps): number {
+export function columnCount(props: TableGrid): number {
 	return props.aligns.length;
 }
 
@@ -67,14 +219,14 @@ export function columnCount(props: TableProps): number {
  * across `header`, every row, `aligns` and `widths`, padding with empty cells, `none` and auto-fit.
  * The layout keys ride through, each absent at its default as the store writes it.
  */
-export function normalizeTable(props: TableProps): TableProps {
+export function normalizeTable(props: TableGrid): TableGrid {
 	const cols = Math.max(
 		1,
 		props.header.length,
 		props.aligns.length,
 		...props.rows.map((row) => row.length)
 	);
-	const fit = (cells: TableCell[]): TableCell[] =>
+	const fit = (cells: GridCell[]): GridCell[] =>
 		Array.from({ length: cols }, (_, c) => cells[c] ?? emptyCell());
 	const widths = Array.from({ length: cols }, (_, c) => props.widths?.[c] ?? null);
 	const [header = [], ...rows] = settleSpans(
@@ -87,12 +239,13 @@ export function normalizeTable(props: TableProps): TableProps {
 		aligns: Array.from({ length: cols }, (_, c) => props.aligns[c] ?? 'none'),
 		...(widths.some((w) => w !== null) && { widths }),
 		...(props.align && { align: props.align }),
-		...(props.head !== undefined && props.head !== 1 && { head: props.head })
+		...(props.head !== undefined && props.head !== 1 && { head: props.head }),
+		...(props.extra && { extra: props.extra })
 	};
 }
 
 /** How many rows from the top draw as header rows, absent being one. */
-export function headRows(props: TableProps): number {
+export function headRows(props: TableGrid): number {
 	return props.head ?? 1;
 }
 
@@ -105,7 +258,7 @@ export interface Span {
 const SPAN_KEYS = ['colspan', 'rowspan'] as const;
 
 /** A span key as the cell holds it: a whole number from 1, else 1. */
-function spanKey(cell: TableCell, key: (typeof SPAN_KEYS)[number]): number {
+function spanKey(cell: GridCell, key: (typeof SPAN_KEYS)[number]): number {
 	const n = cell[key];
 	return typeof n === 'number' && Number.isInteger(n) && n >= 1 ? n : 1;
 }
@@ -117,7 +270,7 @@ function spanKey(cell: TableCell, key: (typeof SPAN_KEYS)[number]): number {
  * slot it would cover holds a cell with no text and no mark that no other span covers, stopping at
  * the grid's edge and at the end of its own section (header rows or body).
  */
-function spansOf(rows: TableCell[][], head: number): (Span | null)[][] {
+function spansOf(rows: GridCell[][], head: number): (Span | null)[][] {
 	const top = Math.min(head, rows.length);
 	const covered = rows.map((row) => row.map(() => false));
 	const spans: (Span | null)[][] = rows.map((row) => row.map(() => null));
@@ -144,7 +297,7 @@ function spansOf(rows: TableCell[][], head: number): (Span | null)[][] {
 }
 
 /** {@link spansOf} over a table's rows, header first. */
-export function spanGrid(props: TableProps): (Span | null)[][] {
+export function spanGrid(props: TableGrid): (Span | null)[][] {
 	return spansOf(allRows(props), headRows(props));
 }
 
@@ -166,7 +319,7 @@ export function anchorAt(
 }
 
 /** `cell` holding `span`, each key absent at 1. */
-function withSpan(cell: TableCell, span: Span): TableCell {
+function withSpan(cell: GridCell, span: Span): GridCell {
 	const { colspan: _colspan, rowspan: _rowspan, ...rest } = cell;
 	return {
 		...rest,
@@ -180,7 +333,7 @@ function withSpan(cell: TableCell, span: Span): TableCell {
  * its alignment kept: what the store settles a table to. A key holding no whole number from 1 stays
  * as written and reads as 1.
  */
-function settleSpans(rows: TableCell[][], head = 1): TableCell[][] {
+function settleSpans(rows: GridCell[][], head = 1): GridCell[][] {
 	const spans = spansOf(rows, head);
 	return rows.map((row, r) =>
 		row.map((cell, c) => {
@@ -198,7 +351,7 @@ function settleSpans(rows: TableCell[][], head = 1): TableCell[][] {
 }
 
 /** Every span in the grid, by its drawn cell. */
-function spanList(props: TableProps): { r: number; c: number; span: Span }[] {
+function spanList(props: TableGrid): { r: number; c: number; span: Span }[] {
 	return spanGrid(props).flatMap((row, r) =>
 		row.flatMap((span, c) =>
 			span && (span.colspan > 1 || span.rowspan > 1) ? [{ r, c, span }] : []
@@ -207,7 +360,7 @@ function spanList(props: TableProps): { r: number; c: number; span: Span }[] {
 }
 
 /** `rows` with the span of the cell at `(r, c)` set to `span`. */
-function respan(rows: TableCell[][], r: number, c: number, span: Span): TableCell[][] {
+function respan(rows: GridCell[][], r: number, c: number, span: Span): GridCell[][] {
 	return rows.map((row, y) =>
 		y === r ? row.map((cell, x) => (x === c ? withSpan(cell, span) : cell)) : row
 	);
@@ -218,7 +371,7 @@ function respan(rows: TableCell[][], r: number, c: number, span: Span): TableCel
  * row alike. `header` is a separate field because a table always has one; {@link fromRows} splits
  * it back.
  */
-function allRows(props: TableProps): TableCell[][] {
+function allRows(props: TableGrid): GridCell[][] {
 	return [props.header, ...props.rows];
 }
 
@@ -226,13 +379,13 @@ function allRows(props: TableProps): TableCell[][] {
  * A flat list back into the stored shape: whatever sits at index 0 is the header. No caller passes
  * an empty list; every op that could reach one refuses the last row first.
  */
-function fromRows(props: TableProps, rows: TableCell[][]): TableProps {
+function fromRows(props: TableGrid, rows: GridCell[][]): TableGrid {
 	const [header = [], ...rest] = rows;
 	return normalizeTable({ ...props, header, rows: rest });
 }
 
 /** A fresh table: a header plus `bodyRows` empty rows, every column unaligned. */
-export function newTable(cols = 3, bodyRows = 2): TableProps {
+export function newTable(cols = 3, bodyRows = 2): TableGrid {
 	return normalizeTable({
 		header: Array.from({ length: cols }, emptyCell),
 		rows: Array.from({ length: bodyRows }, () => Array.from({ length: cols }, emptyCell)),
@@ -241,8 +394,8 @@ export function newTable(cols = 3, bodyRows = 2): TableProps {
 }
 
 /** `props` with the cell at `(r, c)` replaced. */
-export function withCell(props: TableProps, r: number, c: number, cell: TableCell): TableProps {
-	const replace = (cells: TableCell[]) => cells.map((old, i) => (i === c ? cell : old));
+export function withCell(props: TableGrid, r: number, c: number, cell: GridCell): TableGrid {
+	const replace = (cells: GridCell[]) => cells.map((old, i) => (i === c ? cell : old));
 	return normalizeTable({
 		...props,
 		header: r === 0 ? replace(props.header) : props.header,
@@ -251,7 +404,7 @@ export function withCell(props: TableProps, r: number, c: number, cell: TableCel
 }
 
 /** A new empty body row below row `r` (row 0, the header, opens the first body row). */
-export function insertRow(props: TableProps, r: number): TableProps {
+export function insertRow(props: TableGrid, r: number): TableGrid {
 	const at = Math.max(0, Math.min(r, props.rows.length));
 	const fresh = Array.from({ length: columnCount(props) }, emptyCell);
 	let rows = allRows(props);
@@ -265,7 +418,7 @@ export function insertRow(props: TableProps, r: number): TableProps {
  * Drop row `r`, the header included: the row left at index 0 becomes the header. A no-op at the
  * last row, which is the removal of the table and the island's to answer.
  */
-export function deleteRow(props: TableProps, r: number): TableProps {
+export function deleteRow(props: TableGrid, r: number): TableGrid {
 	let rows = allRows(props);
 	if (rows.length <= 1 || r < 0 || r >= rows.length) return normalizeTable(props);
 	for (const { r: y, c, span } of spanList(props)) {
@@ -288,7 +441,7 @@ export function deleteRow(props: TableProps, r: number): TableProps {
 }
 
 /** A new empty column after column `c`. */
-export function insertColumn(props: TableProps, c: number): TableProps {
+export function insertColumn(props: TableGrid, c: number): TableGrid {
 	const at = Math.max(0, Math.min(c + 1, columnCount(props)));
 	const splice = <T>(xs: T[], fresh: T): T[] => [...xs.slice(0, at), fresh, ...xs.slice(at)];
 	let rows = allRows(props);
@@ -306,7 +459,7 @@ export function insertColumn(props: TableProps, c: number): TableProps {
 }
 
 /** Drop column `c`; a no-op at one column (a table has at least one). */
-export function deleteColumn(props: TableProps, c: number): TableProps {
+export function deleteColumn(props: TableGrid, c: number): TableGrid {
 	if (columnCount(props) <= 1) return normalizeTable(props);
 	const drop = <T>(xs: T[]) => xs.filter((_, i) => i !== c);
 	let rows = allRows(props);
@@ -343,12 +496,12 @@ function transpose<T>(xs: T[][]): T[][] {
  * together keeps it.
  */
 function unspan(
-	lines: TableCell[][],
+	lines: GridCell[][],
 	spans: { line: number; at: number; length: number }[],
 	key: (typeof SPAN_KEYS)[number],
 	from: number,
 	to: number
-): TableCell[][] {
+): GridCell[][] {
 	const order = move(
 		lines.map((_, i) => i),
 		from,
@@ -389,7 +542,7 @@ function move<T>(xs: T[], from: number, to: number): T[] {
  * Row `r` moved by `by` places, clamped: a drag past the rectangle is a no-op, not an error. The
  * header travels like any other row; being the header is holding index 0.
  */
-export function moveRow(props: TableProps, r: number, by: number): TableProps {
+export function moveRow(props: TableGrid, r: number, by: number): TableGrid {
 	const rows = allRows(props);
 	const to = Math.max(0, Math.min(r + by, rows.length - 1));
 	if (r === to || r < 0 || r >= rows.length) return normalizeTable(props);
@@ -405,7 +558,7 @@ export function moveRow(props: TableProps, r: number, by: number): TableProps {
  * Column `c` moved by `by` places, clamped. `aligns` and `widths` travel with the column, being its
  * properties.
  */
-export function moveColumn(props: TableProps, c: number, by: number): TableProps {
+export function moveColumn(props: TableGrid, c: number, by: number): TableGrid {
 	const to = Math.max(0, Math.min(c + by, columnCount(props) - 1));
 	if (c === to || c < 0 || c >= columnCount(props)) return normalizeTable(props);
 	const shift = <T>(xs: T[]): T[] => move(xs, c, to);
@@ -432,13 +585,13 @@ export function moveColumn(props: TableProps, c: number, by: number): TableProps
  * deletes ranks and one spanning both is the table, so what reaches here is a proper sub-rectangle.
  */
 export function clearCells(
-	props: TableProps,
+	props: TableGrid,
 	r0: number,
 	c0: number,
 	r1: number,
 	c1: number
-): TableProps {
-	const blank = (cells: TableCell[], r: number): TableCell[] =>
+): TableGrid {
+	const blank = (cells: GridCell[], r: number): GridCell[] =>
 		cells.map((cell, c) =>
 			r >= r0 && r <= r1 && c >= c0 && c <= c1 ? { ...cell, text: '', marks: [] } : cell
 		);
@@ -453,8 +606,8 @@ export function clearCells(
  * Set column `c`'s alignment and clear its cells' own `align`, which would outrank it
  * (`table-view.ts`).
  */
-export function setAlign(props: TableProps, c: number, align: TableAlign): TableProps {
-	const release = (cells: TableCell[]): TableCell[] =>
+export function setAlign(props: TableGrid, c: number, align: TableAlign): TableGrid {
+	const release = (cells: GridCell[]): GridCell[] =>
 		cells.map((cell, i) => {
 			if (i !== c || cell.align === undefined) return cell;
 			const { align: _align, ...rest } = cell;
@@ -469,7 +622,7 @@ export function setAlign(props: TableProps, c: number, align: TableAlign): Table
 }
 
 /** Draw the top `head` rows as header rows (`table-view.ts`). */
-export function setHead(props: TableProps, head: number): TableProps {
+export function setHead(props: TableGrid, head: number): TableGrid {
 	return normalizeTable({ ...props, head });
 }
 
@@ -482,7 +635,7 @@ export interface CellBlock {
 }
 
 /** `block` grown until every drawn cell it touches lies wholly inside it. */
-export function closeBlock(props: TableProps, block: CellBlock): CellBlock {
+export function closeBlock(props: TableGrid, block: CellBlock): CellBlock {
 	const grid = spanGrid(props);
 	let { r0, c0, r1, c1 } = block;
 	for (let grown = true; grown;) {
@@ -508,7 +661,7 @@ export function closeBlock(props: TableProps, block: CellBlock): CellBlock {
 /**
  * Whether `block` can be one cell: more than one drawn cell, inside the header rows or the body.
  */
-export function canMerge(props: TableProps, block: CellBlock): boolean {
+export function canMerge(props: TableGrid, block: CellBlock): boolean {
 	const { r0, c0, r1, c1 } = closeBlock(props, block);
 	const head = headRows(props);
 	const across = r0 < head && r1 >= head;
@@ -521,19 +674,19 @@ export function canMerge(props: TableProps, block: CellBlock): boolean {
  * order, a line apiece, every other slot an empty one the span covers, alignment kept. The top-left
  * cell's alignment is the merged cell's. A block {@link canMerge} refuses comes back as it was.
  */
-export function mergeCells(props: TableProps, block: CellBlock): TableProps {
+export function mergeCells(props: TableGrid, block: CellBlock): TableGrid {
 	if (!canMerge(props, block)) return normalizeTable(props);
 	const { r0, c0, r1, c1 } = closeBlock(props, block);
 	const grid = spanGrid(props);
 	const rows = allRows(props);
 	let text = '';
-	const marks: TableCell['marks'] = [];
+	const marks: GridCell['marks'] = [];
 	for (let r = r0; r <= r1; r++)
 		for (let c = c0; c <= c1; c++) {
 			const cell = rows[r]![c]!;
 			if (!grid[r]![c] || cell.text === '') continue;
-			if (text) text += '\n';
-			const at = usvLength(text);
+			if (text) text += HARD_BREAK;
+			const at = text.length;
 			text += cell.text;
 			for (const m of cell.marks) marks.push({ ...m, start: m.start + at, end: m.end + at });
 		}
@@ -552,7 +705,7 @@ export function mergeCells(props: TableProps, block: CellBlock): TableProps {
  * The merged cell covering `(r, c)` back to the cells under it: its text stays top-left, the rest
  * are the empty cells it covered.
  */
-export function splitCell(props: TableProps, r: number, c: number): TableProps {
+export function splitCell(props: TableGrid, r: number, c: number): TableGrid {
 	const a = anchorAt(spanGrid(props), r, c);
 	return fromRows(props, respan(allRows(props), a.r, a.c, { colspan: 1, rowspan: 1 }));
 }
@@ -560,7 +713,7 @@ export function splitCell(props: TableProps, r: number, c: number): TableProps {
 /**
  * Set or clear the column weights (`table-view.ts`); `undefined` returns every column to auto-fit.
  */
-export function setWidths(props: TableProps, widths: (number | null)[] | undefined): TableProps {
+export function setWidths(props: TableGrid, widths: (number | null)[] | undefined): TableGrid {
 	return normalizeTable({ ...props, widths });
 }
 
@@ -569,7 +722,7 @@ export function setWidths(props: TableProps, widths: (number | null)[] | undefin
  * throughout. An auto-fit column beside weighted ones takes the mean weight, since the editor's
  * fixed-layout grid cannot size it to content as the page does.
  */
-export function columnShares(props: TableProps): number[] | undefined {
+export function columnShares(props: TableGrid): number[] | undefined {
 	const set = props.widths?.filter((w): w is number => w !== null);
 	if (!props.widths || !set?.length) return undefined;
 	const mean = set.reduce((a, b) => a + b, 0) / set.length;
@@ -580,71 +733,73 @@ export function columnShares(props: TableProps): number[] | undefined {
 
 // ── The cell codec ──────────────────────────────────────────────────────────
 
-/**
- * A cell as a one-paragraph `Content` for `decode` under `cellSchema`: each `\n` opens a
- * `continues` line, the hard break it decodes to. The cell's marks are that content's marks.
- */
-export function cellContent(cell: TableCell): Content {
-	const breaks = cell.text.split('\n').length - 1;
+/** A cell as its slot: one paragraph, for `decode` under `cellSchema`. */
+export function cellContent(cell: GridCell): Content {
 	return {
 		text: cell.text,
-		lines: [
-			{ containers: [], kind: 'para' },
-			...Array.from({ length: breaks }, () => ({
-				containers: [],
-				kind: 'para' as const,
-				continues: true
-			}))
-		],
-		marks: cell.marks,
-		islands: []
+		blocks: [{ id: cell.ids?.block ?? 'b0', kind: 'para' }],
+		...(cell.marks.length && { marks: cell.marks }),
+		...(cell.anchors?.length && { anchors: cell.anchors })
 	};
 }
 
 /**
- * The cell a nested PM doc projects, carrying `prior`'s identity anchors through.
- *
- * Anchors inside a cell are preserved verbatim, never minted: they are not in the field plugin's
- * coordinate space (its position map holds one `atom` run for the whole table), so the popover
- * withholds its `anchor` button in a cell. Preserving still means rebasing: `mapMarks` carries each
- * held anchor through the cell's delta by the store's rule, and a mark the splice deleted through
- * lands where the splice left it.
+ * Where `pos` in `before` lands in `after`, reading the edit between them as the one replaced run
+ * their common prefix and suffix leave: what a keystroke in a cell is. `assoc` says which side of
+ * the replaced run a position at its edge or inside it takes.
  */
-export function cellFromDoc(doc: PMNode, prior: TableCell): TableCell {
-	const projected = pmToContent(doc);
-	const text = projected.text;
-	const layout = cellLayout(prior);
-	const anchors = prior.marks.filter((m) => m.type === 'anchor');
-	if (!anchors.length) return { ...layout, text, marks: projected.marks };
-	const before = cellContent(prior);
-	const delta = contentEdit(before, cellContent({ text, marks: [] })).delta;
-	const rebased = core()
-		.mapMarks(before, delta ? { delta } : {})
-		.filter((m) => m.type === 'anchor');
-	return {
-		...layout,
-		text,
-		marks: [...projected.marks, ...rebased].sort((a, b) => a.start - b.start || a.end - b.end)
-	};
+function mapThrough(before: string, after: string, pos: number, assoc: 'before' | 'after'): number {
+	const most = Math.min(before.length, after.length);
+	let head = 0;
+	while (head < most && before[head] === after[head]) head++;
+	let tail = 0;
+	while (tail < most - head && before[before.length - 1 - tail] === after[after.length - 1 - tail])
+		tail++;
+	const oldEnd = before.length - tail;
+	const newEnd = after.length - tail;
+	if (pos < head || (pos === head && assoc === 'before')) return pos;
+	if (pos > oldEnd || (pos === oldEnd && assoc === 'after')) return pos + newEnd - oldEnd;
+	return assoc === 'before' ? head : newEnd;
 }
 
-/** A cell's keys beside its text and marks: what no edit of the text touches. */
-function cellLayout(cell: TableCell): Omit<TableCell, 'text' | 'marks'> {
-	const { text: _text, marks: _marks, ...layout } = cell;
-	return layout;
+/**
+ * The cell a nested PM doc projects, carrying `prior`'s layout, ids and anchors through.
+ *
+ * Anchors inside a cell are preserved, never minted: they are not in the field plugin's coordinate
+ * space (its position map holds one `atom` run for the whole table), so the popover withholds its
+ * `anchor` button in a cell. Preserving still means rebasing: each held anchor maps through the
+ * edit by the store's rule, a range's start after it and its end before, a point before, and a
+ * range the edit closes is dropped.
+ */
+export function cellFromDoc(doc: PMNode, prior: GridCell): GridCell {
+	const projected = pmToContent(doc);
+	const { anchors: held, ...rest } = prior;
+	const next: GridCell = { ...rest, text: projected.text, marks: projected.marks ?? [] };
+	if (!held?.length) return next;
+	const at = (pos: number, assoc: 'before' | 'after') => mapThrough(prior.text, next.text, pos, assoc);
+	const anchors = held.flatMap((a) => {
+		if (a.start === a.end) {
+			const p = at(a.start, 'before');
+			return [{ ...a, start: p, end: p }];
+		}
+		const start = at(a.start, 'after');
+		const end = at(a.end, 'before');
+		return start < end ? [{ ...a, start, end }] : [];
+	});
+	return anchors.length ? { ...next, anchors } : next;
 }
 
 /**
  * Whether two cells are the same value, telling an own edit from an external one (an undo, a
  * re-hydrate) without a flag. Marks compare structurally, as `reconcile.ts` states.
  */
-export function cellEqual(a: TableCell, b: TableCell): boolean {
-	return a.text === b.text && valueEqual(a.marks, b.marks);
+export function cellEqual(a: GridCell, b: GridCell): boolean {
+	return a.text === b.text && valueEqual(a.marks, b.marks) && valueEqual(a.anchors, b.anchors);
 }
 
 /** Whether two tables have the same rectangle, alignment, header and widths: the
  *  change that forces a rebuild rather than a per-cell reseed. */
-export function shapeEqual(a: TableProps, b: TableProps): boolean {
+export function shapeEqual(a: TableGrid, b: TableGrid): boolean {
 	return (
 		a.rows.length === b.rows.length &&
 		a.aligns.length === b.aligns.length &&

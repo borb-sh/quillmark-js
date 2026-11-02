@@ -232,7 +232,7 @@ describe('a one-line text field', () => {
 describe('a multiline text field over content `isPlain` refuses', () => {
 	it('holds, committing nothing, and releases on the re-hydrate that leaves it plain', () => {
 		const doc = load();
-		doc.overwrite({ field: 'address' }, md('- one\n- two'));
+		doc.replace({ field: 'address' }, md('- one\n- two'));
 		const before = JSON.stringify(doc.getStored('address'));
 		const holds: boolean[] = [];
 		const f = createField({
@@ -266,7 +266,7 @@ describe('a multiline text field over content `isPlain` refuses', () => {
 
 	it('does not hold for a mark alone, which the decode drops', () => {
 		const doc = load();
-		doc.overwrite({ field: 'address' }, md('**12** Main St'));
+		doc.replace({ field: 'address' }, md('**12** Main St'));
 		const { f, view } = leaf(doc, 'address');
 		expect(view.editable).toBe(true);
 		expect(view.state.doc.toString()).toBe('doc(paragraph("12 Main St"))');

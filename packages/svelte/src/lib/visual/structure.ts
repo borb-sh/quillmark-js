@@ -244,18 +244,7 @@ export function declaredContent(v: unknown, markdown: boolean): Content | undefi
 	const text = printedText(v);
 	if (text === undefined) return undefined;
 	if (markdown) return core().importMarkdown(text).content;
-	return {
-		text,
-		lines: text
-			.split('\n')
-			.map((_, i) =>
-				i === 0
-					? { containers: [], kind: 'para' as const }
-					: { containers: [], kind: 'para' as const, continues: true }
-			),
-		marks: [],
-		islands: []
-	};
+	return { text: text.replaceAll('\n', '\u2028'), blocks: [{ id: 'b0', kind: 'para' }] };
 }
 
 /** A field's `{#each}` key: its name and what a mounted leaf reads once, its type,

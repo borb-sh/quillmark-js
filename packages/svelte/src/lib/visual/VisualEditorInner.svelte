@@ -178,7 +178,8 @@
 	 * key is a host's only handle on a card, so a stale one is dropped rather than
 	 * reported. */
 	function cardIdOf(addr: Addr): CardId | undefined {
-		return addr.card == null ? 'main' : cardIds[addr.card];
+		if (addr.card == null) return 'main';
+		return typeof addr.card === 'number' ? cardIds[addr.card] : undefined;
 	}
 
 	// ── Teardown (core/teardown.ts: unregister, cancel, then free) ──────────────
@@ -299,7 +300,7 @@
 	let liveTitles = $state<Record<CardId, string>>({});
 	function refreshTitle(addr: Addr, cardId: CardId): void {
 		const { card: at, field } = addr;
-		if (at == null || field == null) return;
+		if (typeof at !== 'number' || field == null) return;
 		const shown = model.cards[at];
 		const cardSchema = shown && quill.schema.card_kinds?.[shown.kind];
 		if (!cardSchema || cardSchema.title?.trim()) return;
@@ -318,7 +319,7 @@
 	// ── Commit routing ──────────────────────────────────────────────────────────
 	// Scalars / arrays / objects → the typed writer (schema-checked); a cleared entry
 	// arrives as `undefined` and takes the unset lane instead. Prose leaves commit
-	// themselves via the codec (applyChange) and do not pass through here.
+	// themselves via the codec (`apply`) and do not pass through here.
 	//
 	// A bad value makes `writer.set` throw a `QuillmarkError` whose `diagnostics[0]`
 	// carries a `code` and a canonical `path` (`edit::field_coercion_failed` at
@@ -951,7 +952,7 @@
 	 *  second reading of the schema beside it. */
 	function declaredField(addr: Addr): QuillFieldSchema | undefined {
 		if (addr.field == null) return undefined;
-		const kind = addr.card == null ? undefined : model.cards[addr.card]?.kind;
+		const kind = typeof addr.card === 'number' ? model.cards[addr.card]?.kind : undefined;
 		const schema = quill.schema;
 		const card = addr.card == null ? schema.main : kind ? schema.card_kinds?.[kind] : undefined;
 		return card?.fields?.[addr.field];

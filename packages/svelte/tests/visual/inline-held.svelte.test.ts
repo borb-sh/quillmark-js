@@ -175,7 +175,7 @@ describe('a top-level one-line richtext field over stored block content', () => 
 describe('a top-level text field over content upstream does not call plain', () => {
 	it('holds a one-line one, whose refusal upstream names not_plain', () => {
 		const doc = load('plain');
-		doc.overwrite({ field: 'line' }, core.importMarkdown(STRUCTURED).content);
+		doc.replace({ field: 'line' }, core.importMarkdown(STRUCTURED).content);
 		const mounted = mountEditor(probe(), doc);
 		const leaf = leafOf(mounted.target, 'Line');
 		expectHeld(leaf);
@@ -185,7 +185,7 @@ describe('a top-level text field over content upstream does not call plain', () 
 	it('releases a multiline one once a re-validation follows an external write', () => {
 		const q = probe();
 		const doc = load('plain');
-		doc.overwrite({ field: 'address' }, core.importMarkdown(STRUCTURED).content);
+		doc.replace({ field: 'address' }, core.importMarkdown(STRUCTURED).content);
 		const mounted = mountEditor(q, doc);
 		expectHeld(leafOf(mounted.target, 'Address'));
 

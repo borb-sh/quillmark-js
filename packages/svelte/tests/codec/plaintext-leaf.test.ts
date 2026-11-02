@@ -65,7 +65,7 @@ describe('a `text` leaf over an authored string', () => {
 		const rich = reader.getContent('tag')!;
 
 		expect(plain.text).toBe(AUTHORED);
-		expect(plain.marks).toHaveLength(0);
+		expect(plain.marks ?? []).toHaveLength(0);
 		// The same string, decoded by the other declared type: delimiters consumed,
 		// emphasis carried as a mark.
 		expect(rich.text).toBe('Wing Motto Here');
@@ -152,7 +152,7 @@ describe('a `text` leaf carries no marks', () => {
 			new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent
 		);
 
-		expect(field.getContent().marks).toHaveLength(0);
+		expect(field.getContent().marks ?? []).toHaveLength(0);
 		expect(field.getContent().text).toBe(`bold plain${AUTHORED}`);
 
 		field.destroy();
@@ -166,11 +166,11 @@ describe('a `text` leaf carries no marks', () => {
 		const doc = authored();
 		const marked: Content = {
 			text: AUTHORED,
-			lines: [{ containers: [], kind: 'para' }],
+			blocks: [{ id: 'b0', kind: 'para' }],
 			marks: [{ type: 'strong', start: 0, end: 4 }],
 			islands: []
 		};
-		doc.overwrite('note', marked);
+		doc.replace('note', marked);
 		expect((doc.getStored('note') as Content).marks).toHaveLength(1);
 
 		const codes: string[] = [];
@@ -181,7 +181,7 @@ describe('a `text` leaf carries no marks', () => {
 		view.dispatch(view.state.tr.insertText('!', 1));
 		expect(codes).toEqual([]);
 		expect(doc.getStored('note')).toBe(`!${AUTHORED}`);
-		expect(field.getContent().marks).toHaveLength(0);
+		expect(field.getContent().marks ?? []).toHaveLength(0);
 
 		field.destroy();
 		doc.free();

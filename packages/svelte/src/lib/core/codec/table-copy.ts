@@ -5,9 +5,10 @@
 // so a paste inside the editor reads the island back whole.
 import { DOMSerializer, type Node as PMNode, type Slice } from 'prosemirror-model';
 import { Plugin } from 'prosemirror-state';
-import type { TableCell, TableProps } from '@quillmark/wasm';
+import type { GridCell, TableGrid } from './table.js';
 import { decode } from './decode.js';
-import { tablePropsOfNode } from './islands.js';
+import { HARD_BREAK } from './islands.js';
+import { tableOfNode } from './table.js';
 import { blockSchema, cellSchema } from './schema.js';
 import {
 	anchorAt,
@@ -27,7 +28,7 @@ export interface CellRange {
 	c1: number;
 }
 
-const whole = (props: TableProps): CellRange => ({
+const whole = (props: TableGrid): CellRange => ({
 	r0: 0,
 	c0: 0,
 	r1: rowCount(props) - 1,
@@ -36,7 +37,7 @@ const whole = (props: TableProps): CellRange => ({
 
 const cellSerializer = DOMSerializer.fromSchema(cellSchema);
 
-function cellDOM(tag: 'th' | 'td', cell: TableCell): HTMLElement {
+function cellDOM(tag: 'th' | 'td', cell: GridCell): HTMLElement {
 	const dom = document.createElement(tag);
 	const paragraph = decode(cellContent(cell), cellSchema).firstChild;
 	if (paragraph) dom.append(cellSerializer.serializeFragment(paragraph.content));
@@ -47,7 +48,7 @@ function cellDOM(tag: 'th' | 'td', cell: TableCell): HTMLElement {
  *  holds them. The cells carry their marks, breaks and spans, a span cut to the range,
  *  and nothing else of the table's layout. A slot a merged cell in the range covers
  *  draws nothing; one whose cell starts outside the range draws empty. */
-export function tableElement(props: TableProps, range = whole(props)): HTMLTableElement {
+export function tableElement(props: TableGrid, range = whole(props)): HTMLTableElement {
 	const table = document.createElement('table');
 	const grid = spanGrid(props);
 	let body: HTMLTableSectionElement | undefined;
@@ -76,12 +77,13 @@ export function tableElement(props: TableProps, range = whole(props)): HTMLTable
 
 /** A cell holding a tab, a line end or a quote goes in quotes with its quotes doubled,
  *  as Excel and Sheets write one. */
-function tsvCell(text: string): string {
+function tsvCell(cell: string): string {
+	const text = cell.replaceAll(HARD_BREAK, '\n');
 	return /[\t\n"]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 /** The cells of `range` as tab-separated text, a line a row. */
-export function tableText(props: TableProps, range = whole(props)): string {
+export function tableText(props: TableGrid, range = whole(props)): string {
 	const lines: string[] = [];
 	for (let r = range.r0; r <= range.r1; r++) {
 		const cells: string[] = [];
@@ -99,7 +101,7 @@ const islandSerializer = new DOMSerializer(
 	{
 		...base.nodes,
 		island_block: (node) => {
-			const props = tablePropsOfNode(node);
+			const props = tableOfNode(node);
 			const dom = DOMSerializer.renderSpec(
 				document,
 				blockSchema.nodes.island_block.spec.toDOM!(node)
@@ -112,7 +114,7 @@ const islandSerializer = new DOMSerializer(
 );
 
 function leafText(node: PMNode): string {
-	const props = node.type === blockSchema.nodes.island_block ? tablePropsOfNode(node) : undefined;
+	const props = node.type === blockSchema.nodes.island_block ? tableOfNode(node) : undefined;
 	if (props) return tableText(props);
 	return node.type.spec.leafText?.(node) ?? '';
 }

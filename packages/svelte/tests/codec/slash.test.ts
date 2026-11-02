@@ -9,6 +9,7 @@ import type { FieldController, LeafViews, SlashState } from '$lib/core/codec';
 import { filterItems } from '$lib/core/codec/slash.js';
 import type { Document, TableProps } from '@quillmark/wasm';
 import { mount, press, quill, md } from './_util.js';
+import { levelsOf } from './_util.js';
 
 // jsdom has no layout, and ProseMirror measures: the caret it scrolls into view
 // after a structural key, and the trigger the menu anchors on. One stub for both,
@@ -24,7 +25,7 @@ beforeAll(() => {
 /** A body leaf over `markdown`, with the menu's reports captured. */
 function leaf(markdown = 'para') {
 	const doc: Document = quill().seedDocument();
-	doc.overwrite({}, md(markdown));
+	doc.replace({}, md(markdown));
 	const reports: (SlashState | undefined)[] = [];
 	// One count per committed edit (`field.ts` §`dispatchTransaction`), which is what a
 	// host recompiles on: the currency a pick is measured in.
@@ -124,7 +125,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		pick(field, view, 0, name);
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha');
-		expect(stored.lines[0].containers).toEqual(containers);
+		expect(levelsOf(stored)[0]).toEqual(containers);
 		field.destroy();
 	});
 
@@ -133,7 +134,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		pick(field, view, 6, 'list');
 		const stored = field.getContent();
 		// One list of two items, so the second item is ordinal 1 of the first's list.
-		expect(stored.lines.map((l) => l.containers)).toEqual([
+		expect(levelsOf(stored)).toEqual([
 			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }],
 			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 1 } }]
 		]);
@@ -143,14 +144,14 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 	it('`/heading` is level 1, the level `# ` counts to', () => {
 		const { field, view } = leaf('alpha');
 		pick(field, view, 0, 'heading');
-		expect(field.getContent().lines[0]).toMatchObject({ kind: 'heading', attrs: { level: 1 } });
+		expect(field.getContent().blocks[0]).toMatchObject({ kind: 'heading', attrs: { level: 1 } });
 		field.destroy();
 	});
 
 	it('`/code` opens the fence and the paragraph after it, and keeps the caret inside', () => {
 		const { field, view } = leaf('');
 		pick(field, view, 0, 'code');
-		expect(field.getContent().lines.map((l) => l.kind)).toEqual(['code', 'para']);
+		expect(field.getContent().blocks.map((l) => l.kind)).toEqual(['code', 'para']);
 		// A code block is the one block no gap cursor sits beside, so the exit is minted;
 		// the caret stays in the fence.
 		expect(view.state.selection.$head.parent.type.name).toBe('code_block');
@@ -257,7 +258,7 @@ describe('a list pick runs at any caret in the block', () => {
 			press(view, 'Enter');
 			const stored = field.getContent();
 			expect(stored.text).toBe('alpha beta');
-			expect(stored.lines.map((l) => l.containers)).toEqual([[item(ordered)]]);
+			expect(levelsOf(stored)).toEqual([[item(ordered)]]);
 			field.destroy();
 		});
 
@@ -268,7 +269,7 @@ describe('a list pick runs at any caret in the block', () => {
 			press(view, 'Enter');
 			const stored = field.getContent();
 			expect(stored.text).toBe('alpha beta');
-			expect(stored.lines.map((l) => l.containers)).toEqual([[item(ordered)]]);
+			expect(levelsOf(stored)).toEqual([[item(ordered)]]);
 			// The caret stays where the run was.
 			const { $head } = view.state.selection;
 			expect($head.parent.textContent.slice($head.parentOffset)).toBe('beta');
@@ -282,7 +283,7 @@ describe('a list pick runs at any caret in the block', () => {
 			press(view, 'Enter');
 			const stored = field.getContent();
 			expect(stored.text).toBe('alpha \n');
-			expect(stored.lines.map((l) => l.containers)).toEqual([[], [item(ordered)]]);
+			expect(levelsOf(stored)).toEqual([[], [item(ordered)]]);
 			// The caret is in the fresh item, where its text goes.
 			const { $head } = view.state.selection;
 			expect($head.parent.content.size).toBe(0);
@@ -297,7 +298,7 @@ describe('a list pick runs at any caret in the block', () => {
 		press(view, 'Enter');
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha\nbeta gamma');
-		expect(stored.lines.map((l) => l.containers)).toEqual([[item(false)], [item(false, 1)]]);
+		expect(levelsOf(stored)).toEqual([[item(false)], [item(false, 1)]]);
 		field.destroy();
 	});
 
@@ -306,7 +307,7 @@ describe('a list pick runs at any caret in the block', () => {
 		typeAt(field, view, 5, ' /list');
 		press(view, 'Enter');
 		const stored = field.getContent();
-		expect(stored.lines.map((l) => l.containers)).toEqual([
+		expect(levelsOf(stored)).toEqual([
 			[item(false)],
 			[item(false), item(false)]
 		]);
@@ -387,7 +388,7 @@ describe('the query filters, and a miss draws nothing', () => {
 		view.focus();
 		press(view, 'Enter');
 		// Enter split the paragraph rather than inserting: no offer, no pick.
-		expect(field.getContent().islands).toHaveLength(0);
+		expect(field.getContent().islands ?? []).toHaveLength(0);
 		expect(field.getContent().text).toBe('/zzz\n');
 		field.destroy();
 	});
@@ -464,7 +465,7 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		// And Enter is the body's again: it splits the block, where a live run would have
 		// consumed the text and inserted a table.
 		press(view, 'Enter');
-		expect(field.getContent().islands).toHaveLength(0);
+		expect(field.getContent().islands ?? []).toHaveLength(0);
 		expect(field.getContent().text).toBe('/ta\n');
 		field.destroy();
 	});
@@ -505,7 +506,7 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		expect(commits()).toBe(before + 1);
 		// The empty block the run was typed in is replaced, and a paragraph after the
 		// island is the exit.
-		expect(field.getContent().lines.map((l) => l.kind)).toEqual(['para', 'para']);
+		expect(field.getContent().blocks.map((l) => l.kind)).toEqual(['para', 'para']);
 		field.destroy();
 	});
 
@@ -517,7 +518,7 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		// The paragraph keeps every character but the run, and the island opens after it
 		// rather than splitting it.
 		expect(stored.text).toBe('para \n￼\n');
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
+		expect(stored.blocks.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
 		field.destroy();
 	});
 
@@ -528,15 +529,15 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		type(view, '/table');
 		press(view, 'Enter');
 		const body = doc.main.body;
-		expect(body.islands.map((i) => i.id)).toEqual(['isl-0']);
-		expect(body.islands[0].type).toBe('table');
-		const props = body.islands[0].props as TableProps;
-		expect(props.header).toHaveLength(3);
-		expect(props.rows).toHaveLength(2);
+		expect(body.islands?.map((i) => i.id)).toEqual(['isl-0']);
+		expect(body.islands![0].type).toBe('table');
+		const props = body.islands![0].props as TableProps;
+		expect(props.columns).toHaveLength(3);
+		expect(props.rows).toHaveLength(3);
 		// The island opened a line of its own, and a paragraph after it: a block island
 		// at the end of a body would otherwise leave nowhere to type.
 		expect(body.text).toBe('para\n￼\n');
-		expect(body.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
+		expect(body.blocks.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
 		// And the caret is in the fresh table rather than on it.
 		const focused = (field as FieldController & LeafViews).focusedView();
 		expect((field as FieldController & LeafViews).nestedViews()).toContain(focused);
@@ -547,7 +548,7 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		const { field, view } = leaf('');
 		typeAt(field, view, 0, '/tab');
 		field.slashPick('table');
-		expect(field.getContent().lines.map((l) => l.kind)).toEqual(['para', 'para']);
+		expect(field.getContent().blocks.map((l) => l.kind)).toEqual(['para', 'para']);
 		field.destroy();
 	});
 
@@ -588,8 +589,8 @@ describe('a pick lands in the container the caret was writing in', () => {
 		// Three lines, no exit paragraph: a fourth would be an empty continuation of item 0,
 		// which the reference quill typesets as an unnumbered paragraph.
 		expect(stored.text).toBe('alpha\n￼\nbeta');
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
-		expect(stored.lines[1].containers).toEqual([item(0)]);
+		expect(stored.blocks.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
+		expect(levelsOf(stored)[1]).toEqual([item(0)]);
 		// The caret lands in the fresh cell all the same.
 		const focused = (field as FieldController & LeafViews).focusedView();
 		expect((field as FieldController & LeafViews).nestedViews()).toContain(focused);
@@ -600,8 +601,8 @@ describe('a pick lands in the container the caret was writing in', () => {
 		const { field, view } = leaf('1. alpha\n2. beta');
 		pick(field, view, 6);
 		const stored = field.getContent();
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para', 'para']);
-		expect(stored.lines[2].containers).toEqual([item(1, true)]);
+		expect(stored.blocks.map((l) => l.kind)).toEqual(['para', 'para', 'para', 'para']);
+		expect(levelsOf(stored)[2]).toEqual([item(1, true)]);
 		field.destroy();
 	});
 
@@ -609,7 +610,7 @@ describe('a pick lands in the container the caret was writing in', () => {
 		const { field, view } = leaf('- alpha\n    - beta');
 		pick(field, view, 6);
 		const stored = field.getContent();
-		expect(stored.lines[2].containers).toEqual([item(0), item(0)]);
+		expect(levelsOf(stored)[2]).toEqual([item(0), item(0)]);
 		field.destroy();
 	});
 
@@ -617,7 +618,7 @@ describe('a pick lands in the container the caret was writing in', () => {
 		const { field, view } = leaf('> alpha');
 		pick(field, view, 0);
 		const stored = field.getContent();
-		expect(stored.lines[1].containers).toEqual([{ container: 'quote' }]);
+		expect(levelsOf(stored)[1]).toEqual([{ container: 'quote' }]);
 		field.destroy();
 	});
 
@@ -626,9 +627,9 @@ describe('a pick lands in the container the caret was writing in', () => {
 		pick(field, view, 6);
 		const stored = field.getContent();
 		expect(stored.text).toBe('alpha\nbeta\n￼\n');
-		expect(stored.lines.map((l) => l.kind)).toEqual(['para', 'para', 'para', 'para']);
+		expect(stored.blocks.map((l) => l.kind)).toEqual(['para', 'para', 'para', 'para']);
 		// The exit is the item's: the island opened inside it, so the way out is there too.
-		expect(stored.lines[3].containers).toEqual([item(1)]);
+		expect(levelsOf(stored)[3]).toEqual([item(1)]);
 		field.destroy();
 	});
 });
@@ -638,7 +639,7 @@ describe('the menu does not disturb the body it sits in', () => {
 		const { field, view } = leaf('para');
 		field.setCaret(2);
 		press(view, 'Enter');
-		expect(field.getContent().lines).toHaveLength(2);
+		expect(field.getContent().blocks).toHaveLength(2);
 		field.destroy();
 	});
 
@@ -647,13 +648,13 @@ describe('the menu does not disturb the body it sits in', () => {
 		view.focus();
 		press(view, 'Escape');
 		expect(view.hasFocus()).toBe(false);
-		expect(field.getContent().lines).toHaveLength(1);
+		expect(field.getContent().blocks).toHaveLength(1);
 		field.destroy();
 	});
 
 	it("a leaf given no `onSlash` mounts no trigger, so the keys stay the body's", () => {
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md(''));
+		doc.replace({}, md(''));
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const view = (field as FieldController & LeafViews).view;
 		field.setCaret(0);
@@ -661,7 +662,7 @@ describe('the menu does not disturb the body it sits in', () => {
 		// The `/` is prose, and nothing claimed Enter.
 		expect(field.getContent().text).toBe('/');
 		press(view, 'Enter');
-		expect(field.getContent().lines).toHaveLength(2);
+		expect(field.getContent().blocks).toHaveLength(2);
 		field.destroy();
 	});
 });

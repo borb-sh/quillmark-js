@@ -15,7 +15,7 @@ import {
 import { pickList, wrapInList, wrapInQuote } from '$lib/core/codec/blocks.js';
 import { MAX_NESTING_DEPTH, nestingPlugin } from '$lib/core/codec/nesting.js';
 import { slashItems } from '$lib/core/codec/slash.js';
-import { md, mount, quill, representable, textblocks, viewOf } from './_util.js';
+import { md, mount, pathsOf, quill, representable, textblocks, viewOf } from './_util.js';
 
 const n = blockSchema.nodes;
 const p = (text: string) => n.paragraph.create(null, blockSchema.text(text));
@@ -47,9 +47,12 @@ function apply(state: EditorState, cmd: Command): { handled: boolean; next: Edit
 	return { handled, next };
 }
 
-/** The deepest container count over any line, as the store reads it. */
+/** The deepest nesting over any block, as the store counts it: a list's item or a
+ *  quote is a level, the list around an item none. */
 function deepest(state: EditorState): number {
-	return Math.max(...pmToContent(state.doc).lines.map((line) => line.containers.length));
+	return Math.max(
+		...pathsOf(pmToContent(state.doc)).map((path) => path.filter((c) => c.kind !== 'list').length)
+	);
 }
 
 describe('Tab', () => {
@@ -152,7 +155,7 @@ describe('a paste into a deep body', () => {
 	/** A body `levels` quotes deep, the caret on a fresh line under its one line. */
 	function deepBody(levels: number) {
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md(`${'> '.repeat(levels)}a`));
+		doc.replace({}, md(`${'> '.repeat(levels)}a`));
 		const changes = { count: 0 };
 		const field = createField({
 			doc,
@@ -199,7 +202,7 @@ describe('a paste into a deep body', () => {
 		const after = field.getContent();
 		expect(changes.count).toBe(lands ? 1 : 0);
 		if (lands) {
-			expect(Math.max(...after.lines.map((l) => l.containers.length))).toBe(10 + levels);
+			expect(Math.max(...pathsOf(after).map((path) => path.filter((c) => c.kind !== 'list').length))).toBe(10 + levels);
 			expect(view.state.doc.textContent).toContain(`i${levels}`);
 		} else {
 			expect(after).toEqual(before);

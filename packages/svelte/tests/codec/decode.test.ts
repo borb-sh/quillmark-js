@@ -18,7 +18,7 @@ import type { Content } from '@quillmark/wasm';
 import type { Node as PMNode } from 'prosemirror-model';
 import { pmMarkFromContent } from '$lib/core/codec/marks.js';
 import { cellSchema } from '$lib/core/codec/schema.js';
-import { cellContent, cellFromDoc } from '$lib/core/codec/table.js';
+import { cellContent, cellFromDoc, gridOf } from '$lib/core/codec/table.js';
 import { md, normalize, contentEqual, titleContent, bodyContent, quill } from './_util.js';
 
 /** decode → pmToContent, both sides normalized through the real content. */
@@ -46,7 +46,7 @@ describe('overlapping formatting → correct inline node splits', () => {
 	it('strong[0,4)+emph[2,6) yields {strong},{strong,emph},{emph}', () => {
 		const rt: Content = {
 			text: 'abcdef',
-			lines: [{ containers: [], kind: 'para' }],
+			blocks: [{ id: 'b0', kind: 'para' }],
 			marks: [
 				{ start: 0, end: 4, type: 'strong' },
 				{ start: 2, end: 6, type: 'emph' }
@@ -69,28 +69,28 @@ describe('overlapping formatting → correct inline node splits', () => {
 describe('island round-trip (id preserved)', () => {
 	it('image (inline island) survives decode → pmToContent → normalize', () => {
 		const rt = md('![alt text](img.png)');
-		expect(rt.islands[0].type).toBe('image');
+		expect(rt.islands![0].type).toBe('image');
 		// Alone on its line and still inline: the island's type, not the line, says block.
 		const decoded = decode(rt, blockSchema);
 		expect(decoded.child(0).type.name).toBe('paragraph');
 		expect(decoded.child(0).child(0).type.name).toBe('island_inline');
 		const back = pmToContent(decoded);
 		expect(back.islands).toHaveLength(1);
-		expect(back.islands[0].type).toBe('image');
-		expect(back.islands[0].id).toBe(rt.islands[0].id);
+		expect(back.islands![0].type).toBe('image');
+		expect(back.islands![0].id).toBe(rt.islands![0].id);
 		expect(back.text).toContain('￼');
 		expect(contentEqual(normalize(back), normalize(rt))).toBe(true);
 	});
 
 	it('table (block island) survives with id preserved', () => {
 		const rt = md('| a | b |\n|---|---|\n| 1 | 2 |');
-		expect(rt.islands[0].type).toBe('table');
+		expect(rt.islands![0].type).toBe('table');
 		const decoded = decode(rt, blockSchema);
-		expect(rt.lines[0].kind).toBe('para');
+		expect(rt.blocks[0].kind).toBe('para');
 		expect(decoded.child(0).type.name).toBe('island_block');
 		const back = pmToContent(decoded);
-		expect(back.islands[0].type).toBe('table');
-		expect(back.islands[0].id).toBe(rt.islands[0].id);
+		expect(back.islands![0].type).toBe('table');
+		expect(back.islands![0].id).toBe(rt.islands![0].id);
 		expect(contentEqual(normalize(back), normalize(rt))).toBe(true);
 	});
 });
@@ -104,7 +104,7 @@ describe('constructs read, not edited', () => {
 		['footnote', md('Noted[^1] here.\n\n[^1]: The **note**.')],
 		['math', md('Inline $x^2$ and $$\\frac{a}{b}$$ here.')]
 	])('a %s island decodes inline and survives decode → pmToContent whole', (type, rt) => {
-		expect(rt.islands.map((island) => island.type)).toEqual(
+		expect(rt.islands!.map((island) => island.type)).toEqual(
 			type === 'math' ? ['math', 'math'] : ['footnote']
 		);
 		const decoded = decode(rt, blockSchema);
@@ -123,7 +123,7 @@ describe('a font family', () => {
 
 	it('edits in a block and an inline leaf, and drops from a plain one', () => {
 		const rt = md('a <qm-span family="Carlito">set</qm-span> run');
-		expect(rt.marks.map((m) => m.type)).toEqual(['font_family']);
+		expect(rt.marks!.map((m) => m.type)).toEqual(['font_family']);
 		expect(fitsLeaf(rt, block)).toBe(true);
 		expect(fitsLeaf(rt, { ...block, inline: true })).toBe(true);
 		expect(fitsLeaf(rt, { ...block, plaintext: true })).toBe(true);
@@ -141,9 +141,9 @@ describe('a font family', () => {
 	it('survives a table cell', () => {
 		const rt = md('| <qm-span family="Carlito">head</qm-span> |\n| --- |\n| cell |');
 		expect(fitsLeaf(rt, block)).toBe(true);
-		const island = rt.islands[0];
+		const island = rt.islands![0];
 		if (island.type !== 'table') throw new Error('expected a table');
-		const cell = island.props.header[0];
+		const cell = gridOf(island.props, island.slots ?? null).header[0];
 		expect(cellFromDoc(decode(cellContent(cell), cellSchema), cell)).toEqual(cell);
 	});
 });
@@ -158,17 +158,14 @@ describe('one-line / plain constraints', () => {
 	});
 
 	it('fitsInline admits the trailing newline a YAML block scalar keeps, and nothing past it', () => {
-		const para: Content['lines'][number] = { containers: [], kind: 'para' };
-		const plain = (text: string, lines: Content['lines']): Content => ({
+		const plain = (text: string): Content => ({
 			text,
-			lines,
-			marks: [],
-			islands: []
+			blocks: text.split('\n').map((_, i) => ({ id: `b${i}`, kind: 'para' }))
 		});
-		expect(fitsInline(plain('one line\n', [para, para]))).toBe(true);
-		expect(fitsInline(plain('one\ntwo', [para, para]))).toBe(false);
-		expect(fitsInline(plain('one\ntwo\n', [para, para, para]))).toBe(false);
-		expect(fitsInline(plain('one\n', [para, { ...para, continues: true }]))).toBe(false);
+		expect(fitsInline(plain('one line\n'))).toBe(true);
+		expect(fitsInline(plain('one\ntwo'))).toBe(false);
+		expect(fitsInline(plain('one\ntwo\n'))).toBe(false);
+		expect(fitsInline(plain('one\u2028'))).toBe(false);
 	});
 
 	it('inline schema decodes to exactly one paragraph', () => {
@@ -195,7 +192,7 @@ describe('one-line / plain constraints', () => {
 	});
 
 	// What upstream's literal codec reads out of a string: a lone `\n` between two
-	// written lines continues the paragraph, and every other `\n` opens one.
+	// written lines is a hard break, and every other `\n` opens a paragraph.
 	it.each([
 		['a lone newline', 'a\nb', 'doc(paragraph("a", hard_break, "b"))'],
 		['a blank line', 'a\n\nb', 'doc(paragraph("a"), paragraph, paragraph("b"))'],
@@ -210,7 +207,7 @@ describe('one-line / plain constraints', () => {
 
 		const pm = decode(rt, plainSchema);
 		expect(pm.toString()).toBe(shape);
-		expect(pmToContent(pm).text).toBe(value);
+		expect(pmToContent(pm).text).toBe(rt.text);
 		expect(contentEqual(normalize(pmToContent(pm)), normalize(rt))).toBe(true);
 	});
 
@@ -232,36 +229,38 @@ describe('one-line / plain constraints', () => {
 	});
 });
 
-// Contiguity plus an equal container path reads as one container, so a second
-// adjacent run of one shape carries `instance`. It is the only thing that tells the
-// two apart: the normalizer numbers a run's `ordinal`s gaplessly from 0, so a reset
-// carries no boundary of its own.
-describe('adjacent sibling containers (the `instance` boundary)', () => {
-	const item = (ordinal: number, instance = 0) =>
-		({ container: 'list_item', attrs: { ordered: false, start: 1, ordinal }, instance }) as never;
+// Two adjacent containers of one shape are two containers: their ids tell them apart,
+// so a decode that merged them would re-encode one.
+describe('adjacent sibling containers', () => {
+	const list = { kind: 'list', attrs: { ordered: false, start: 1 } } as const;
 	const twoLists: Content = {
 		text: 'a\nb\nc',
-		lines: [
-			{ containers: [item(0)], kind: 'para' },
-			{ containers: [item(1)], kind: 'para' },
-			{ containers: [item(0, 1)], kind: 'para' }
+		blocks: [
+			{ id: 'b0', kind: 'para', path: ['l0', 'i0'] },
+			{ id: 'b1', kind: 'para', path: ['l0', 'i1'] },
+			{ id: 'b2', kind: 'para', path: ['l1', 'i2'] }
 		],
-		marks: [],
-		islands: []
+		containers: [
+			{ id: 'l0', ...list },
+			{ id: 'i0', kind: 'item' },
+			{ id: 'i1', kind: 'item' },
+			{ id: 'l1', ...list },
+			{ id: 'i2', kind: 'item' }
+		]
 	};
 	const twoQuotes: Content = {
 		text: 'a\nb',
-		lines: [
-			{ containers: [{ container: 'quote', instance: 0 }], kind: 'para' },
-			{ containers: [{ container: 'quote', instance: 1 }], kind: 'para' }
+		blocks: [
+			{ id: 'b0', kind: 'para', path: ['q0'] },
+			{ id: 'b1', kind: 'para', path: ['q1'] }
 		],
-		marks: [],
-		islands: []
+		containers: [
+			{ id: 'q0', kind: 'quote' },
+			{ id: 'q1', kind: 'quote' }
+		]
 	};
 
-	it('round-trips through the content (the exit-criterion shape)', () => {
-		// The normalizer keeps the discriminator, so a merged decode would re-encode
-		// one run — ordinals [0,1,2], or one two-paragraph quote — and fail this equality.
+	it('round-trips through the content', () => {
 		for (const rt of [twoLists, twoQuotes]) {
 			const canon = normalize(rt);
 			expect(contentEqual(normalize(pmToContent(decode(canon, blockSchema))), canon)).toBe(true);
@@ -275,7 +274,7 @@ describe('mark-set run keying', () => {
 		// sets must key differently, or the runs merge and the second set is dropped.
 		const rt: Content = {
 			text: 'ab',
-			lines: [{ containers: [], kind: 'para' }],
+			blocks: [{ id: 'b0', kind: 'para' }],
 			marks: [
 				{ start: 0, end: 1, type: 'link', attrs: { url: 'a|strong' } } as never,
 				{ start: 1, end: 2, type: 'link', attrs: { url: 'a' } } as never,
@@ -302,7 +301,7 @@ describe('the href gate', () => {
 	function linked(href: string): Content {
 		return {
 			text: 'here',
-			lines: [{ containers: [], kind: 'para' }],
+			blocks: [{ id: 'b0', kind: 'para' }],
 			marks: [{ start: 0, end: 4, type: 'link', attrs: { url: href } } as never],
 			islands: []
 		};
@@ -342,13 +341,16 @@ describe('inline runs against the per-code-point definition', () => {
 	 *  through the shared converter, so the assertion is which code points carry which set
 	 *  rather than how a mark spells itself in either vocabulary. */
 	function scanned(rt: Content): string[][] {
-		return [...rt.text].map((_, i) =>
-			rt.marks
+		let at = 0;
+		return [...rt.text].map((ch) => {
+			const i = at;
+			at += ch.length;
+			return (rt.marks ?? [])
 				.filter((m) => m.start <= i && i < m.end)
 				.map((m) => pmMarkFromContent(blockSchema, m)?.type.name)
 				.filter((name): name is string => !!name)
-				.sort()
-		);
+				.sort();
+		});
 	}
 
 	/** The same, read off the decoded paragraph's inline runs. */
@@ -393,9 +395,9 @@ describe('inline runs against the per-code-point definition', () => {
 		// re-resolve the slot forces.
 		const rt: Content = {
 			text: 'ab￼cd',
-			lines: [{ containers: [], kind: 'para' }],
-			marks: [{ start: 2, end: 5, type: 'strong' } as never],
-			islands: [{ id: 'i1', type: 'table', props: null } as never]
+			blocks: [{ id: 'b0', kind: 'para' }],
+			marks: [{ start: 2, end: 5, type: 'strong' }],
+			islands: [{ id: 'i1', type: 'image', props: { url: 'u', alt: '' } }]
 		};
 		const para = decode(rt, blockSchema).child(0);
 		const tail = para.child(para.childCount - 1);

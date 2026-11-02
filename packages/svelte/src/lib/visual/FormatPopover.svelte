@@ -8,7 +8,7 @@
  raises it over that leaf's selection rect; each button dispatches a PM `toggleMark`
  command straight at the leaf's `EditorView`, whose own `dispatchTransaction` commits
  the result as it commits a keystroke: a field's lowers it to `markOps` through
- `applyChange` (field.ts), a by-value leaf's hands the re-encoded value to its parent
+ `apply` (field.ts), a by-value leaf's hands the re-encoded value to its parent
  (`ProseValue`). This component never touches the content. The keymap mirror
  (Mod-b/i/u, Mod-Shift-x, Mod-e) lives in the codec's keymap (field.ts); this is
  the pointer affordance for all six marks. Mod-K is this surface's own key, the

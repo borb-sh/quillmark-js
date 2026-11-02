@@ -10,7 +10,7 @@ import { md, mount, quill, representable, viewOf } from './_util.js';
 
 function leaf(markdown: string): { field: FieldController; view: EditorView } {
 	const doc = quill().seedDocument();
-	doc.overwrite({}, md(markdown));
+	doc.replace({}, md(markdown));
 	const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 	return { field, view: viewOf(field) };
 }

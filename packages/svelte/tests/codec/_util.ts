@@ -1,13 +1,18 @@
-// Shared codec test helpers. A real Document is the normalizer: the content
-// normalizes on write, so round-trips are idempotent only up to normalization:
-// `normalize` installs a Content and reads it back through the WASM content so
-// tests assert post-normalize equality.
+// Shared codec test helpers. The store normalizes on write, so round-trips are
+// idempotent only up to normalization: `normalize` is the canonical form `replace`
+// stores, so tests assert post-normalize equality.
 import { expect } from 'vitest';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { baseKeymap } from 'prosemirror-commands';
-import { init, type Content, type Document, type Quill } from '@quillmark/wasm';
+import {
+	init,
+	type Content,
+	type ContentContainer,
+	type Document,
+	type Quill
+} from '@quillmark/wasm';
 import { contentEqual } from '$lib/core/codec/reconcile.js';
 import {
 	blockSchema,
@@ -15,9 +20,8 @@ import {
 	decode,
 	type FieldController,
 	pmToContent,
-	pmToUsv,
-	usvLength,
-	usvToPM
+	pmToOffset,
+	offsetToPM
 } from '$lib/core/codec';
 import { quill, example } from '../helpers/fixtures.js';
 
@@ -28,11 +32,71 @@ export function freshDoc(): Document {
 	return example();
 }
 
-/** Install `rt` into a fresh main body and read it back; the canonical (normalized) form. */
+/** The canonical (normalized) form of `rt`: what `replace` stores from it. */
 export function normalize(rt: Content): Content {
-	const doc = freshDoc();
-	doc.overwrite({}, rt);
-	return doc.main.body;
+	return core.normalize(rt);
+}
+
+/** Each block's containers, outermost first: the records its `path` names. */
+export function pathsOf(rt: Content): ContentContainer[][] {
+	const byId = new Map((rt.containers ?? []).map((c) => [c.id, c]));
+	return rt.blocks.map((b) => (b.path ?? []).map((id) => byId.get(id)!));
+}
+
+/** One nesting level of a block: an item as its list's attrs, its place among the list's
+ *  items and its own `checked`, or a quote. */
+export type Level =
+	| {
+			container: 'list_item';
+			attrs: { ordered: boolean; start: number; ordinal: number; checked?: boolean };
+	  }
+	| { container: 'quote' };
+
+/** Each block's levels, outermost first: its path read as the nesting a reader sees. */
+export function levelsOf(rt: Content): Level[][] {
+	const items = new Map<string, string[]>();
+	return pathsOf(rt).map((path) => {
+		const out: Level[] = [];
+		path.forEach((c, i) => {
+			if (c.kind === 'quote') out.push({ container: 'quote' });
+			if (c.kind !== 'item') return;
+			const list = path[i - 1]!;
+			if (list.kind !== 'list') return;
+			const seen = items.get(list.id) ?? [];
+			if (!seen.includes(c.id)) seen.push(c.id);
+			items.set(list.id, seen);
+			out.push({
+				container: 'list_item',
+				attrs: {
+					ordered: list.attrs.ordered,
+					start: list.attrs.start,
+					ordinal: seen.indexOf(c.id),
+					...(c.attrs?.checked !== undefined && { checked: c.attrs.checked })
+				}
+			});
+		});
+		return out;
+	});
+}
+
+/** Each block's nesting depth, as the store counts it: a list's item or a quote is a
+ *  level, the list around an item none. */
+export function depthsOf(rt: Content): number[] {
+	return pathsOf(rt).map((path) => path.filter((c) => c.kind !== 'list').length);
+}
+
+/** `rt` with its block and container ids renamed by order of appearance: the value a
+ *  reader sees, which two spellings of one edit agree on where their ids differ. */
+export function unnamed(rt: Content): Content {
+	const names = new Map<string, string>();
+	const name = (id: string) => names.get(id) ?? (names.set(id, `c${names.size}`), `c${names.size - 1}`);
+	const blocks = rt.blocks.map((b, i) => ({
+		...b,
+		id: `b${i}`,
+		...(b.path && { path: b.path.map(name) })
+	}));
+	const containers = rt.containers?.map((c) => ({ ...c, id: name(c.id) }));
+	return { ...rt, blocks, ...(containers && { containers }) };
 }
 
 /** Content value-equality (key-order-insensitive), re-exported for assertions. */
@@ -179,8 +243,8 @@ export function keyDriver(keys: Record<string, Command>) {
 }
 
 /**
- * The position map's defining property, asserted over every USV offset of `doc`:
- * `pmToUsv ∘ usvToPM` is the identity, and every PM position it produces is in range.
+ * The position map's defining property, asserted over every offset of `doc` off a surrogate pair's middle:
+ * `pmToOffset ∘ offsetToPM` is the identity, and every PM position it produces is in range.
  * The index is built fresh here, so a caller that mutated the doc asserts against the
  * rebuilt map rather than a stale one.
  *
@@ -190,12 +254,14 @@ export function keyDriver(keys: Record<string, Command>) {
  */
 export function assertPositionInverse(doc: PMNode, label = 'position map'): void {
 	const index = buildLineIndex(doc);
-	const total = usvLength(pmToContent(doc).text);
+	const { text } = pmToContent(doc);
 	const broken: string[] = [];
-	for (let p = 0; p <= total; p++) {
-		const pm = usvToPM(index, p);
-		const back = pm >= 0 && pm <= doc.content.size ? pmToUsv(index, pm) : NaN;
-		if (back !== p) broken.push(`USV ${p} → PM ${pm} → USV ${back}`);
+	for (let p = 0; p <= text.length; p++) {
+		const low = text.charCodeAt(p);
+		if (low >= 0xdc00 && low <= 0xdfff) continue;
+		const pm = offsetToPM(index, p);
+		const back = pm >= 0 && pm <= doc.content.size ? pmToOffset(index, pm) : NaN;
+		if (back !== p) broken.push(`${p} → PM ${pm} → ${back}`);
 	}
 	expect(broken, label).toEqual([]);
 }

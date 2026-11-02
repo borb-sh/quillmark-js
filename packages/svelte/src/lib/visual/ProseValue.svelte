@@ -2,7 +2,7 @@
  A prose leaf the parent commits by value: an element of a `richtext` (fixture
  `keywords`) or `text` (`authors`, `errata`) array, and a content cell of a subform — an
  `object`'s property, a variant's cell ({@link ObjectField}). None of them is
- `applyChange`-addressable: `Addr.field` is a flat name, so `keywords[0]` and
+ `apply`-addressable: `Addr.field` is a flat name, so `keywords[0]` and
  `contact.note` have no op address. So this is not a `createField` leaf: it mounts a
  minimal PM view over the codec's decode/encode and a leaf schema, and on every edit
  hands the re-encoded `Content` up to the parent — {@link ArrayField}, which commits
@@ -62,8 +62,8 @@
 		proseAttributes,
 		proseLeafPlugins,
 		buildLineIndex,
-		pmToUsv,
-		usvToPM,
+		pmToOffset,
+		offsetToPM,
 		valueEqual,
 		type LeafViews,
 		type TextCap
@@ -156,7 +156,7 @@
 	 * (`leaves.ts`). `createField`'s body over the view this component owns.
 	 *
 	 * The index is built here rather than held: a landing is a discrete act, and one
-	 * doc walk per click is cheaper than a cache to invalidate per keystroke. `usvToPM`
+	 * doc walk per click is cheaper than a cache to invalidate per keystroke. `offsetToPM`
 	 * clamps, so an offset past a value the compile has moved on from lands the end.
 	 *
 	 * `Selection.near`, not `TextSelection.create`: the mapped position can be
@@ -164,7 +164,7 @@
 	 * reasons are `FieldController.setCaret`'s (`codec/field.ts`). */
 	export function setCaret(pos: number): void {
 		if (!view) return;
-		const pm = usvToPM(buildLineIndex(view.state.doc), pos);
+		const pm = offsetToPM(buildLineIndex(view.state.doc), pos);
 		const sel = Selection.near(view.state.doc.resolve(pm));
 		view.focus();
 		view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
@@ -292,9 +292,9 @@
 				if (held) seat?.release(views);
 				else if (mounted.hasFocus()) seat?.focus(views);
 				// The caret keeps its offset, clamped, as a field's re-hydrate keeps it.
-				const caret = pmToUsv(buildLineIndex(mounted.state.doc), mounted.state.selection.head);
+				const caret = pmToOffset(buildLineIndex(mounted.state.doc), mounted.state.selection.head);
 				const fresh = build(current);
-				const sel = Selection.near(fresh.doc.resolve(usvToPM(buildLineIndex(fresh.doc), caret)));
+				const sel = Selection.near(fresh.doc.resolve(offsetToPM(buildLineIndex(fresh.doc), caret)));
 				mounted.updateState(fresh.apply(fresh.tr.setSelection(sel)));
 				reconciler.commit(current);
 			};

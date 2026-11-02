@@ -73,7 +73,7 @@ describe('a retype that changes the codec under a field name', () => {
 		expect(errors).toEqual([]);
 		const stored = doc.getStored({ card: 0, field: 'note' }) as Content;
 		expect(stored.text).toBe('a *b* c');
-		expect(stored.marks).toEqual([]);
+		expect(stored.marks ?? []).toEqual([]);
 		expect(savedText(q, doc)).toBe('a *b* c');
 	});
 

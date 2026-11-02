@@ -1,6 +1,6 @@
 // The codec barrel: the bidirectional bridge between one content field (`Content`)
-// and one ProseMirror document (CODEC.md). Decode (content → PM), lower (PM tr → a
-// `ChangeBundle` for `applyChange`), the USV↔PM position map, and the `createField`
+// and one ProseMirror document (CODEC.md). Decode (content → PM), lower (PM doc → a
+// `Change` for `apply`), the UTF-16↔PM position map, and the `createField`
 // prose leaf. Consumed by the VisualEditor and the codec test suite.
 
 // ProseMirror's structural base styles and the gap cursor's, then the retint of the
@@ -62,8 +62,8 @@ export { rendersHref, storableUrl } from './urls.js';
 // reached only by relative import within `codec/` stays off it: an export nothing
 // imports is surface that still has to stay honest.
 export { decode, fitsInline, fitsLeaf, fitsPlain, renderContent, usvLength } from './decode.js';
-export { pmToContent, contentEdit, lower } from './encode.js';
-export { usvToPM, pmToUsv, buildLineIndex } from './positions.js';
+export { pmToContent, lower } from './encode.js';
+export { offsetToPM, pmToOffset, buildLineIndex } from './positions.js';
 
 // Reconciliation gate.
 export { createReconciler, contentEqual, valueEqual } from './reconcile.js';

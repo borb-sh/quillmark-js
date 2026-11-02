@@ -26,7 +26,7 @@ const page = (body: string) =>
 
 function pasted(html: string) {
 	const doc = quill().seedDocument();
-	doc.overwrite({}, md(''));
+	doc.replace({}, md(''));
 	const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 	const view = viewOf(field);
 	view.dispatch(view.state.tr.setSelection(TextSelection.atStart(view.state.doc)));

@@ -1,22 +1,22 @@
-// Positions: the USV ↔ PM map that carries the caret (CODEC §Positions). A content
-// offset is a USV code-point index into the flat `text`; a PM position counts node
-// tokens. The map is a list of runs (built by the shared `scanDoc` walk, so it can
-// never disagree with the content projection) that tile the text: a `text` run
-// where PM and USV advance together (converting UTF-16↔USV per code point; the
-// hazard: an astral char is two UTF-16 units but one USV), an `nl` run for a
-// content `\n` spanning a PM block boundary or hard break, and an `atom` run for a
-// `U+FFFC` island slot. `ContentHit.pos` / `FieldRegion.span` reach a PM caret
-// through `usvToPM`; a caret signal to the preview runs `pmToUsv` in reverse.
+// Positions: the content ↔ PM map that carries the caret (CODEC §Positions). A content offset is a
+// UTF-16 index into the flat `text`; a PM position counts node tokens. The map is a list of runs
+// (built by the shared `scanDoc` walk, so it can never disagree with the content projection) that
+// tile the text: a `text` run where PM and the content advance together, an `nl` run for a `\n`
+// spanning a PM block boundary or a `U+2028` standing for a hard break, and an `atom` run for a
+// `U+FFFC` island slot. `ContentHit.pos` / `FieldRegion.span` reach a PM caret through
+// `offsetToPM`; a caret signal to the preview runs `pmToOffset` in reverse.
 import type { Node as PMNode } from 'prosemirror-model';
+import type { Delta } from '@quillmark/wasm';
 import { scanDoc, type PosRun, type Scan } from './encode.js';
 
-/** A prebuilt line→position index for a PM doc, rebuilt on structural change. */
+/** A prebuilt position index for a PM doc, rebuilt on structural change. */
 export interface LineIndex {
 	runs: PosRun[];
-	usvEnd: number;
+	/** Length of the content text. */
+	end: number;
 	/** PM position at the end of the last content run (the caret-max). */
 	pmEndContent: number;
-	/** PM content position of the first line (the caret for an empty doc). */
+	/** PM content position of the first block (the caret for an empty doc). */
 	firstContentStart: number;
 }
 
@@ -37,7 +37,7 @@ export function lineIndexOf(s: Scan): LineIndex {
 		const last = runs[runs.length - 1];
 		pmEndContent = runEndPm(last);
 	}
-	return { runs, usvEnd: s.usvEnd, pmEndContent, firstContentStart };
+	return { runs, end: s.text.length, pmEndContent, firstContentStart };
 }
 
 /** PM position just past a run (its exclusive end). */
@@ -47,14 +47,14 @@ function runEndPm(run: PosRun): number {
 	return run.pmStart + 1;
 }
 
-const usvStartOf = (run: PosRun) => run.usvStart;
+const atOf = (run: PosRun) => run.at;
 const pmStartOf = (run: PosRun) => run.pmStart;
 
 /**
  * Index of the last run whose `coord` is ≤ `pos`, or `-1` when `pos` precedes the
  * first run. The walk emits runs in document order and every run owns at least one
  * position in each space, so both coordinates increase strictly across the list and
- * the lookup bisects. Bulk conversion is what wants it: `readAnchorsUsv` converts
+ * the lookup bisects. Bulk conversion is what wants it: `readAnchors` converts
  * once per anchor on every commit, and a scan would make that O(anchors × runs).
  */
 function lastRunAtOrBefore(runs: PosRun[], pos: number, coord: (run: PosRun) => number): number {
@@ -73,63 +73,50 @@ function lastRunAtOrBefore(runs: PosRun[], pos: number, coord: (run: PosRun) => 
 	return found;
 }
 
-/** USV content offset → PM position. */
-export function usvToPM(index: LineIndex, usvPos: number): number {
-	const usv = clamp(usvPos, 0, index.usvEnd);
-	if (usv >= index.usvEnd) return index.usvEnd === 0 ? index.firstContentStart : index.pmEndContent;
-	// The runs tile the USV space from 0 (every text the walk appends pushes its run
-	// first), so below `usvEnd` the run at or before `usv` is the run that owns it.
-	const run = index.runs[lastRunAtOrBefore(index.runs, usv, usvStartOf)];
-	if (run.kind === 'text') return run.pmStart + utf16OfCodePoints(run.s, usv - run.usvStart);
+/** Content offset → PM position. */
+export function offsetToPM(index: LineIndex, offset: number): number {
+	const at = clamp(offset, 0, index.end);
+	if (at >= index.end) return index.end === 0 ? index.firstContentStart : index.pmEndContent;
+	// The runs tile the content from 0 (every text the walk appends pushes its run first), so
+	// below `end` the run at or before `at` is the run that owns it.
+	const run = index.runs[lastRunAtOrBefore(index.runs, at, atOf)];
+	if (run.kind === 'text') return run.pmStart + (at - run.at);
 	return run.pmStart; // nl / atom: the run's single owned position
 }
 
-/** PM position → USV content offset. */
-export function pmToUsv(index: LineIndex, pmPos: number): number {
+/** PM position → content offset. */
+export function pmToOffset(index: LineIndex, pmPos: number): number {
 	const i = lastRunAtOrBefore(index.runs, pmPos, pmStartOf);
 	if (i < 0) return 0; // before the first run's PM position (or no runs at all)
 	const run = index.runs[i];
-	// PM coverage, unlike USV, has gaps no run owns (a rule's own token). A position
-	// in one is past every run that could answer it → the end of the content text.
-	if (pmPos >= runEndPm(run)) return index.usvEnd;
-	if (run.kind === 'text') return run.usvStart + codePointsOfUtf16(run.s, pmPos - run.pmStart);
-	return run.usvStart;
-}
-
-// ── UTF-16 ↔ USV conversions within one text run ────────────────────────────
-
-/** UTF-16 length of the first `n` code points of `s`. */
-function utf16OfCodePoints(s: string, n: number): number {
-	let cp = 0;
-	let i = 0;
-	while (cp < n && i < s.length) {
-		i += charUnitLen(s, i);
-		cp++;
-	}
-	return i;
-}
-
-/** Number of whole code points within the first `k` UTF-16 units of `s`. */
-function codePointsOfUtf16(s: string, k: number): number {
-	let cp = 0;
-	let i = 0;
-	while (i < k && i < s.length) {
-		i += charUnitLen(s, i);
-		cp++;
-	}
-	return cp;
-}
-
-/** UTF-16 unit length (1 or 2) of the code point starting at `i`. */
-function charUnitLen(s: string, i: number): number {
-	const code = s.charCodeAt(i);
-	if (code >= 0xd800 && code <= 0xdbff && i + 1 < s.length) {
-		const next = s.charCodeAt(i + 1);
-		if (next >= 0xdc00 && next <= 0xdfff) return 2;
-	}
-	return 1;
+	// PM coverage has gaps no run owns (a rule's own token). A position in one is past every run
+	// that could answer it → the end of the content text.
+	if (pmPos >= runEndPm(run)) return index.end;
+	if (run.kind === 'text') return run.at + (pmPos - run.pmStart);
+	return run.at;
 }
 
 function clamp(n: number, lo: number, hi: number): number {
 	return n < lo ? lo : n > hi ? hi : n;
+}
+
+/**
+ * Where content offset `pos` lands after `delta`, its ops counting UTF-16 code units: text
+ * inserted at `pos` lands before it, so a caret at an edit's edge follows the text typed there.
+ */
+export function mapThroughDelta(delta: Delta, pos: number): number {
+	let at = 0;
+	let out = pos;
+	for (const op of delta.ops) {
+		if (at > pos) break;
+		if ('retain' in op) at += op.retain;
+		else if ('insert' in op) out += op.insert.length;
+		else {
+			const gone = Math.min(op.delete, Math.max(0, pos - at));
+			out -= gone;
+			if (pos < at + op.delete) break;
+			at += op.delete;
+		}
+	}
+	return out;
 }

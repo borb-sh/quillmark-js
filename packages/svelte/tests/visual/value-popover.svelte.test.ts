@@ -359,7 +359,7 @@ describe('the formatting popover over a field’s own leaf', () => {
 			.click();
 		flushSync();
 		expect(intro.querySelector('ol > li')?.textContent).toBe('Intro words');
-		expect(q.reader(doc).getContentAt({ field: 'intro' }, [])?.lines[0].containers).toHaveLength(1);
+		expect(q.reader(doc).getContentAt({ field: 'intro' }, [])?.blocks[0].path).toHaveLength(2);
 		expect(document.activeElement).toBe(intro);
 	});
 
@@ -544,7 +544,7 @@ describe('Mod-K raises the link prompt', () => {
 		expect(modK(cell).defaultPrevented).toBe(true);
 		expect(document.activeElement).toBe(prompt());
 		submit('example.com');
-		const table = doc.main.body.islands[0].props as {
+		const table = doc.main.body.islands![0].props as {
 			header: { text: string; marks: { type: string; start: number; end: number }[] }[];
 		};
 		expect(table.header[0].marks.map((m) => [m.type, m.start, m.end])).toEqual([['link', 0, 2]]);
