@@ -86,7 +86,7 @@ describe('Engine.render against a quiver quill', () => {
 		// Loading side: the stored bytes are the only input. The document names its
 		// quill, the quiver answers it — the consumer dispatches to no loader of its
 		// own.
-		const doc = core.Document.fromMarkdown(stored);
+		const doc = core.Document.parse(stored);
 		try {
 			// A created document pins the series, `name@MAJOR.MINOR`, which resolves as a selector.
 			const [major, minor] = authored.metadata.version.split('.');

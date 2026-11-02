@@ -15,7 +15,7 @@
 // writer, as an array's prose row asserts them (`text-array`).
 import { describe, it, expect, afterEach } from 'vitest';
 import { fieldModels, groupLabel, groupOrder } from '$lib/visual/structure';
-import { quill } from '../helpers/fixtures.js';
+import { literal, plain, quill } from '../helpers/fixtures.js';
 import { field, mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -99,7 +99,7 @@ describe('the shipped quill on the surface', () => {
 
 	// What the cells rest as, both ways. The read is the one a variant's key answers
 	// only at the boundary that walks it; the write is the container's own, whole.
-	it('draws the CUI world as prose cells, read at their codec and rested as strings', () => {
+	it('draws the CUI world as prose cells, read at their codec and rested as plain content', () => {
 		const q = memo();
 		const doc = q.seedDocument();
 		q.writer(doc).set('classification', {
@@ -126,14 +126,14 @@ describe('the shipped quill on the surface', () => {
 			'PRVCY',
 			'FEDONLY'
 		]);
-		// Every cell rests as its literal string, which is what a `text` cell's
-		// codec commits: the banner reads them as text and the storage says so.
-		expect(doc.getStored('classification')).toEqual({
+		// Every cell rests as plain content of its literal text, which is what a `text`
+		// cell's codec commits: the banner reads them as text and the storage says so.
+		expect(literal(doc.getStored('classification'))).toEqual({
 			value: 'CUI',
-			controlled_by: 'SAF/AA',
-			poc: 'Capt J. Smith, DSN 555-1234',
-			category: 'PRVCY',
-			limited_dissemination: 'FEDONLY'
+			controlled_by: plain('SAF/AA'),
+			poc: plain('Capt J. Smith, DSN 555-1234'),
+			category: plain('PRVCY'),
+			limited_dissemination: plain('FEDONLY')
 		});
 	});
 });

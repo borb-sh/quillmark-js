@@ -10,7 +10,18 @@ import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Content, Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
-import { mount, quill, example, normalize, contentEqual, md, viewOf, press } from './_util.js';
+import {
+	mount,
+	quill,
+	example,
+	normalize,
+	contentEqual,
+	md,
+	viewOf,
+	press,
+	literal,
+	plain
+} from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
 // rect to reveal it. Stubbed rather than guarded in the source: a landing is right to
@@ -197,7 +208,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('releases when the value an external write leaves is inline, and then commits', () => {
 		const doc = example();
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'title', holds);
 		const view = viewOf(field);
@@ -223,7 +234,7 @@ describe('the hold on a narrowed field', () => {
 		const view = viewOf(field);
 		expect(view.editable).toBe(true);
 
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		field.applyExternal();
 		expect(holds).toEqual([true]);
 		expect(view.editable).toBe(false);
@@ -235,7 +246,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('holds a one-line text field, whose refusal upstream names not_plain', () => {
 		const doc = example();
-		doc.replace({ field: 'subtitle' }, md(STRUCTURED));
+		doc.unchecked.storeField('subtitle', md(STRUCTURED));
 		expect(
 			quill()
 				.validate(doc)
@@ -255,7 +266,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('does not hold for the trailing newline a YAML block scalar keeps', () => {
 		const doc = example();
-		doc.storeField('subtitle', 'one line\n');
+		doc.unchecked.storeField('subtitle', 'one line\n');
 		expect(
 			quill()
 				.validate(doc)
@@ -284,7 +295,7 @@ describe('text fields fire no markdown input rules', () => {
 
 	it('a text field does NOT fire the strong rule — delimiters and no-marks survive', () => {
 		const doc = example();
-		const before = doc.getStored('subtitle') as string;
+		const before = quill().reader(doc).get('subtitle') as string;
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -297,8 +308,8 @@ describe('text fields fire no markdown input rules', () => {
 		view.dispatch(view.state.tr.insertText('**x*', 1)); // literal; the closing `*` fires the rule
 		expect(fireClosingStar(view)).toBeFalsy(); // no rule to match → not intercepted
 		view.dispatch(view.state.tr.insertText('*', view.state.selection.head));
-		// The literal string, the field's rest form: no mark had anywhere to land.
-		expect(doc.getStored('subtitle')).toBe(`**x**${before}`);
+		// The literal text, in the field's plain rest form: no mark had anywhere to land.
+		expect(literal(doc.getStored('subtitle'))).toEqual(plain(`**x**${before}`));
 		field.destroy();
 	});
 
@@ -543,7 +554,7 @@ describe('the empty-leaf ghost', () => {
 		const q = quill();
 		const doc = example();
 		const card = q.seedCard('note', doc.seedOverlay('note'));
-		doc.insertCard(card!, doc.cardCount);
+		doc.unchecked.insertCard(card!, doc.cardCount);
 		return doc;
 	}
 	/** The card just added: the last one, whatever the document held ahead of it. */

@@ -23,7 +23,7 @@ afterEach(unmountAll);
 
 function threeRows(): Document {
 	const doc = example();
-	doc.storeField('revisions', [
+	doc.unchecked.storeField('revisions', [
 		{ note: 'A', pages: 1 },
 		{ note: 'B', pages: 2 },
 		{ note: 'C', pages: 3 }

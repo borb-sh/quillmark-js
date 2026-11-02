@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. A card the editor adds is placed through `doc.unchecked.insertCard`, under the required `actor` prop, a live session's `binding.actor` or `null` where no session binds the document, so two clients adding cards at once never mint one `$id`; a retype places the card through it too. The docs name `Document.parse` as the markdown import.
+
+**A `text` field rests as plain content.** On 0.135 a `text` field, element or cell is stored as `Content` spelling `codec: "plain"`, which the typed writer the leaf commits through writes. A plain leaf's projection spells the codec, so it compares equal to the read it mounted from, and an open matrix reads an added item's title through it.
+
 **A comment anchor survives delete and undo.** An anchor whose text a deletion swallowed came back without its anchor on undo, since anchors live beside ProseMirror's history rather than in it. The leaf now holds the anchor as a ghost of the deletion and puts it back at its range when an undo restores the deleted slice whole.
 
 ## v0.30.0 - 2026-11-02

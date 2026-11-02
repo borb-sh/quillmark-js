@@ -121,6 +121,7 @@
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
+	let actor = $state<string | null>(null);
 	let room = $state('none');
 	let previewRef: ReturnType<typeof Preview> | undefined = $state();
 
@@ -382,6 +383,7 @@
 		docHandle = undefined;
 		engineHandle = undefined;
 		live = undefined;
+		actor = null;
 		room = 'none';
 		fonts = [];
 		refused = undefined;
@@ -422,14 +424,14 @@
 			const doc = example ?? quill.seedDocument();
 			created.unshift(doc);
 			// The seed variants. `?foreign` holds a card whose kind the schema cannot
-			// project: `Document.insertCard` is schema-agnostic where the Quill-bound
+			// project: `doc.unchecked.insertCard` is schema-agnostic where the Quill-bound
 			// writer would reject it, and the engine renders past it with a warning, so the
 			// seed reaches the recovery shell over a preview that leaves the card out.
 			// `?tips` seeds the guidance channel a quill or consumer supplies
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
 			// does not replace the map.
 			if (params.has('foreign')) {
-				doc.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
+				doc.unchecked.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
 			}
 			if (params.has('tips')) {
 				visual.patchEditorExt(doc, MAIN_CARD_ADDR, {
@@ -478,6 +480,7 @@
 			}
 			if (joined) {
 				live = joined;
+				actor = joined.binding.actor;
 				room = `${roomName} · ${joined.epoch}`;
 			}
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
@@ -716,6 +719,7 @@
 						bind:this={editorRef}
 						doc={docHandle}
 						quill={quillHandle}
+						{actor}
 						onActiveLeafChange={handleActiveLeaf}
 						onCaretMove={handleCaretMove}
 						onChange={handleChange}

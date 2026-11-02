@@ -8,7 +8,7 @@ What an app is left holding once it mounts `<VisualEditor>` and `<Preview>`: the
 
 ## The text edge
 
-**A host that stores markdown owns the round trip.** `Document.fromMarkdown(md)` in, `doc.toMarkdown()` out, and the surfaces in between never see either: `<VisualEditor>` takes a `Document` and edits it, so text is a thing the host converts at both ends. The verbs are pinned in [DOCUMENT_MODEL.md](DOCUMENT_MODEL.md) §"The host's text edge".
+**A host that stores markdown owns the round trip.** `Document.parse(md)` in, `doc.toMarkdown()` out, and the surfaces in between never see either: `<VisualEditor>` takes a `Document` and edits it, so text is a thing the host converts at both ends. The verbs are pinned in [DOCUMENT_MODEL.md](DOCUMENT_MODEL.md) §"The host's text edge".
 
 **The markdown may be a document its reader did not write**, so the round trip is also the seam an untrusted one enters by. What the surfaces hold over one whatever it carries, and what that leaves the host, is stated for the consumer in the [README](../../README.md#what-a-document-is-trusted-to-be).
 

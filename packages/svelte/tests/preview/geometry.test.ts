@@ -276,7 +276,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		// The cells of a world nobody picked print nothing, so the address exists only
 		// once the document is in that world with the cell written.
 		const session = await open((doc) =>
-			doc.storeField('handling', {
+			doc.unchecked.storeField('handling', {
 				value: 'CONTROLLED',
 				controlled_by: 'SPEC/AA',
 				caveat: 'no copies'
@@ -305,7 +305,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		// The plate loops, so `note` and `pages` reach the preview through the array and
 		// `detail` reaches it as its own row; `pages` is the row's one scalar.
 		const session = await open((doc) =>
-			doc.storeField('revisions', [
+			doc.unchecked.storeField('revisions', [
 				{ note: 'Fig. 2 relabelled', pages: 1, detail: 'The caption named the wrong figure.' },
 				{ note: 'Year corrected', pages: 2, detail: 'Page 4 gave 2025.' }
 			])

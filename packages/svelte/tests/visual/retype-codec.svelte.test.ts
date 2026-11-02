@@ -4,13 +4,13 @@
 // from the declared type once, at mount. A field whose codec the retype changes
 // remounts on the new kind's type, so an edit after it stores what that type stores:
 // a `richtext` leaf a content object whose text keeps the delimiters typed, a
-// `text` one the literal string a saved document reads back unchanged. The probe
+// `text` one plain content of the literal text, which a saved document reads back unchanged. The probe
 // is its own quill: two kinds holding one `note` field each, one codec apiece.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Content, Document, Quill } from '@quillmark/wasm';
 import { hasMarks } from '$lib/core/codec';
-import { quillFromYaml } from '../helpers/fixtures.js';
+import { literal, plain, quillFromYaml } from '../helpers/fixtures.js';
 import { activeView, mountInner, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -77,14 +77,14 @@ describe('a retype that changes the codec under a field name', () => {
 		expect(savedText(q, doc)).toBe('a *b* c');
 	});
 
-	it('remounts a richtext leaf as plaintext, which stores its literal string', async () => {
+	it('remounts a richtext leaf as plaintext, which stores plain content of its literal text', async () => {
 		const q = probe();
 		const doc = q.emptyDocument();
 		const { view, errors } = await retypeAndType(q, doc, 'richnote', 'plainnote', 'x  y *z*');
 
 		expect(hasMarks(view.state.schema)).toBe(false);
 		expect(errors).toEqual([]);
-		expect(doc.getStored({ card: 0, field: 'note' })).toBe('x  y *z*');
+		expect(literal(doc.getStored({ card: 0, field: 'note' }))).toEqual(plain('x  y *z*'));
 		expect(savedText(q, doc)).toBe('x  y *z*');
 	});
 });

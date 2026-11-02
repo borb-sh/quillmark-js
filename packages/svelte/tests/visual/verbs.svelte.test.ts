@@ -112,7 +112,7 @@ function twoSections(q: Quill): Document {
 	}
 	const card = q.seedCard('section', doc.seedOverlay('section'));
 	if (!card) throw new Error('fixture drift: the quill seeds no section card');
-	doc.insertCard(card, 1);
+	doc.unchecked.insertCard(card, 1);
 	return doc;
 }
 

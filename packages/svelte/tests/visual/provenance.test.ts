@@ -89,7 +89,7 @@ describe('resolve over the real showcase schema', () => {
 
 	it('flips a field to `authored` (no ghost) once a value is stored, back on clear', () => {
 		const doc = quill().seedDocument();
-		doc.storeField('tracking_id', 'ACME-9');
+		doc.unchecked.storeField('tracking_id', 'ACME-9');
 		const authored = resolved(doc);
 		expect(authored.tracking_id).toMatchObject({ source: 'authored', value: { text: 'ACME-9' } });
 		// An authored field ghosts nothing; the control shows its own value.
@@ -124,7 +124,7 @@ describe('resolve over the real showcase schema', () => {
 		// The example's answer is authored, not the default beneath it.
 		const authored = resolved(doc).authors;
 		expect(authored.source).toBe('authored');
-		expect(texts(authored.value)).toEqual(doc.getStored('authors'));
+		expect(texts(authored.value)).toEqual(texts(doc.getStored('authors')));
 		doc.removeField('authors');
 		const cleared = resolved(doc);
 		expect(cleared.authors.source).toBe('default');
@@ -148,7 +148,7 @@ describe('resolve over the real showcase schema', () => {
 		// An object-shaped rung ghosts nothing however it resolves; only text does.
 		expect(stringifyGhost(ghostDefault(unset.contact))).toBeUndefined();
 
-		doc.storeField('contact', { email: 'ada@example.org' });
+		doc.unchecked.storeField('contact', { email: 'ada@example.org' });
 		const authored = resolved(doc);
 		expect(authored.contact).toMatchObject({
 			source: 'authored',

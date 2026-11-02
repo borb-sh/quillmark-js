@@ -635,10 +635,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	}
 
 	/**
-	 * A `text` leaf's commit: its whole text through the typed writer, resting the field as that
-	 * literal string (CODEC §Inline mode). The content-object rest form would emit markdown
-	 * (escaped `*`, backslash breaks) and read back changed. A refusal lands nothing and has no
-	 * fallback; the next edit writes the whole text again.
+	 * A `text` leaf's commit: its whole text through the typed writer, which rests it as plain
+	 * content (CODEC §Inline mode). A refusal lands nothing and has no fallback; the next edit
+	 * writes the whole text again.
 	 */
 	function commitPlain(text: string): boolean {
 		try {

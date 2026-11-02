@@ -151,7 +151,7 @@ describe('content', () => {
 		const [a, b] = peers(2, withBody('one\ntwo'));
 		a.doc.apply({}, { steps: [{ setBlock: { id: 'b1', kind: 'heading', attrs: { level: 2 } } }] });
 		a.binding.push();
-		b.doc.apply({}, core.splitBlock(body(b), 4, 'bn'));
+		b.doc.splitBlock({}, 4, { id: 'bn' });
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
@@ -201,12 +201,71 @@ describe('cards', () => {
 	it('a remote insert arrives as a card op with the card whole', () => {
 		const [a, b] = peers(2, example);
 		const card = quill().seedCard('note', b.doc.seedOverlay('note'))!;
-		b.doc.insertCard(card, 1);
+		b.doc.unchecked.insertCard(card, 1);
 		b.binding.push({ op: 'insert', at: 1 });
 		deliver(a);
 		expect(a.changes.at(-1)!.cards).toEqual([{ op: 'insert', at: 1 }]);
 		expect(a.doc.card(1).kind).toBe('note');
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+	});
+
+	it('two cards inserted at once keep the ids their actors minted on every client', () => {
+		const [a, b] = peers(2, example);
+		const placed = [a, b].map((p) => {
+			const card = quill().seedCard('note', p.doc.seedOverlay('note'))!;
+			const id = p.doc.unchecked.insertCard(card, 1, { actor: p.binding.actor });
+			p.binding.push({ op: 'insert', at: 1 });
+			return id;
+		});
+		settle([a, b]);
+		expect(a.doc.cards.map((c) => c.id)).toEqual(b.doc.cards.map((c) => c.id));
+		for (const id of placed) expect(a.doc.cards.filter((c) => c.id === id)).toHaveLength(1);
+		expect(a.doc.toStored()).toBe(b.doc.toStored());
+	});
+
+	const ids = (p: Peer) => p.doc.cards.map((c) => c.id);
+	const converged = (all: Peer[]) => {
+		const [a, ...rest] = all;
+		for (const p of rest) expect(snapshot(p.doc)).toBe(snapshot(a.doc));
+		expect(new Set(ids(a)).size).toBe(a.doc.cardCount);
+		for (const p of all) expect(p.errors).toEqual([]);
+	};
+
+	it('a freed id placed again while another client moves its old card names one card everywhere', () => {
+		const [a, b] = peers(2, example);
+		const was = a.doc.card(1);
+		a.doc.removeCard(1);
+		a.binding.push({ op: 'remove', at: 1 });
+		const card = quill().seedCard('note', a.doc.seedOverlay('note'))!;
+		a.doc.unchecked.insertCard({ ...card, id: was.id }, 0);
+		a.binding.push({ op: 'insert', at: 0 });
+		b.doc.moveCard(1, 0);
+		b.binding.push({ op: 'move', from: 1, to: 0 });
+		settle([a, b]);
+		converged([a, b]);
+		expect(a.doc.cardCount).toBe(b.doc.cardCount);
+		expect(ids(a)).toContain(was.id);
+	});
+
+	it('an undone removal racing a card placed under the freed id names one card everywhere', () => {
+		const [a, b] = peers(2, example);
+		const origins = new Set<unknown>();
+		a.ydoc.on('beforeTransaction', (tr: Y.Transaction) => {
+			if (typeof tr.origin === 'symbol') origins.add(tr.origin);
+		});
+		const undo = new Y.UndoManager(a.ydoc.getArray('$cards'), { trackedOrigins: origins });
+		const was = a.doc.card(1);
+		a.doc.removeCard(1);
+		a.binding.push({ op: 'remove', at: 1 });
+		deliver(b);
+		const card = quill().seedCard('note', b.doc.seedOverlay('note'))!;
+		b.doc.unchecked.insertCard({ ...card, id: was.id }, 0);
+		b.binding.push({ op: 'insert', at: 0 });
+		undo.undo();
+		expect(ids(a)).toContain(was.id);
+		settle([a, b]);
+		converged([a, b]);
+		expect(ids(a).filter((id) => id === was.id)).toHaveLength(1);
 	});
 
 	it('syncs a card title and keeps the rest of $ext local', () => {
@@ -223,7 +282,7 @@ describe('cards', () => {
 		const at = a.doc.cards.findIndex((c) => c.kind === 'figure');
 		const was = a.doc.card(at);
 		a.doc.removeCard(at);
-		a.doc.insertCard({ ...was, kind: 'section' }, at);
+		a.doc.unchecked.insertCard({ ...was, kind: 'section' }, at);
 		a.binding.push();
 		edit(b.doc, { card: at, field: 'caption' }, [{ insert: 'b ' }]);
 		b.binding.push();
@@ -242,7 +301,7 @@ describe('cards', () => {
 		a.binding.push();
 		const was = b.doc.card(at);
 		b.doc.removeCard(at);
-		b.doc.insertCard({ ...was, kind: 'signoff' }, at);
+		b.doc.unchecked.insertCard({ ...was, kind: 'signoff' }, at);
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
@@ -250,7 +309,7 @@ describe('cards', () => {
 		expect((a.doc.getStored(lead) as Content).text.startsWith('a ')).toBe(true);
 		const now = a.doc.card(at);
 		a.doc.removeCard(at);
-		a.doc.insertCard({ ...now, kind: 'section' }, at);
+		a.doc.unchecked.insertCard({ ...now, kind: 'section' }, at);
 		a.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));

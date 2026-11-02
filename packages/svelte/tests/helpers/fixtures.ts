@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, sep } from 'node:path';
 import { init, type Document, type Quill } from '@quillmark/wasm';
+import { HARD_BREAK } from '$lib/core/codec/islands.js';
 
 /** The core surface, for the classes and free functions `init` is the only door to. */
 export const core = await init();
@@ -75,4 +76,19 @@ export function quillFromYaml(yaml: string): Quill {
 			['plate.typ', bytes('#set page(width: 200pt)\n')]
 		])
 	);
+}
+
+/** A plain content object as {@link literal} spells it: its codec and its literal text. */
+export const plain = (text: string): { plain: string } => ({ plain: text });
+
+/** `value` with each content object spelling `codec: "plain"` in it, at any depth, as
+ *  {@link plain}: a stored `text` leaf compared by its codec and its literal text, a hard break
+ *  read as the `\n` it is, ids aside. */
+export function literal(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(literal);
+	if (value === null || typeof value !== 'object') return value;
+	const v = value as Record<string, unknown>;
+	if (v.codec === 'plain' && typeof v.text === 'string')
+		return plain(v.text.replaceAll(HARD_BREAK, '\n'));
+	return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, literal(x)]));
 }

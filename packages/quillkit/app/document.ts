@@ -9,7 +9,7 @@ export function land(
 	ref: string,
 	markdown: string
 ): { doc: Document; stranded: Diagnostic[] } {
-	const doc = core.Document.fromMarkdown(markdown);
+	const doc = core.Document.parse(markdown);
 	try {
 		if (doc.quillRef !== ref) doc.setQuillRef(ref);
 		return { doc, stranded: quill.conform(doc) };

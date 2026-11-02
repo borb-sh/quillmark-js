@@ -25,5 +25,5 @@
 </script>
 
 {#if doc && quill}
-	<VisualEditor doc={doc!} quill={quill!} />
+	<VisualEditor doc={doc!} quill={quill!} actor={null} />
 {/if}

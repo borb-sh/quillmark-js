@@ -216,7 +216,7 @@
 		let probe: Document | undefined;
 		try {
 			// Quill-free, so the ref is read before anything is opened against it.
-			probe = core!.Document.fromMarkdown(text);
+			probe = core!.Document.parse(text);
 			asked = probe.quillRef;
 		} catch (err) {
 			return messageOf(err);
@@ -569,6 +569,7 @@
 						bind:this={editorRef}
 						doc={open.doc}
 						quill={open.quill}
+						actor={null}
 						diagnostics={notes}
 						onActiveLeafChange={handleActiveLeaf}
 						onCaretMove={handleCaretMove}

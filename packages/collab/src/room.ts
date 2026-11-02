@@ -88,8 +88,9 @@ export interface WriteLogOpts extends ReadLogOpts {
 	writer: string;
 	/** Write the edit once under this key, for a writer that may retry, such as a tool call id. */
 	key?: string;
-	/** Make the edit on the Document as it stood at `base`; return its card operations, if any. */
-	edit(doc: Document): CardOp | CardOp[] | void;
+	/** Make the edit on the Document as it stood at `base`, placing a card under `actor`; return
+	 *  its card operations, if any. */
+	edit(doc: Document, actor: string): CardOp | CardOp[] | void;
 }
 
 export type LogWrite =

@@ -1,7 +1,7 @@
 // The Y shape of a document: which root holds what, and the read that flattens a content field.
 //
-// A card is `main` or its id. Its fields that are neither `richtext` nor `text` are keys of the
-// card's own `Y.Map`, beside `$kind` and `$title`; each content field is a root of its own,
+// A card is `main` or its Y id. Its fields that are neither `richtext` nor `text` are keys of the
+// card's own `Y.Map`, beside `$id`, `$kind` and `$title`; each content field is a root of its own,
 // `<card>/<field>`, and the body is `<card>/$body`. A field name is `[A-Za-z_][A-Za-z0-9_]*`, so
 // none of `/`, `$`, `@` or `#` can collide with one. `$cards` orders the composable cards.
 import * as Y from 'yjs';
@@ -10,6 +10,7 @@ import type { ContentBlock, ContentMark } from '@quillmark/wasm';
 export const MAIN = 'main';
 export const CARDS = '$cards';
 export const SESSION = '$session';
+export const ID = '$id';
 export const KIND = '$kind';
 export const TITLE = '$title';
 export const BODY = '$body';

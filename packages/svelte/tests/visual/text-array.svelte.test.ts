@@ -6,12 +6,12 @@
 // reads through `reader.getContentAt`, which decodes an element at the codec its
 // `items` type names, so a literal string opens as content carrying its own
 // asterisks and no mark. It writes back the `Content` every prose leaf hands up,
-// which the typed writer rests as the literal string again — the claim that lets a
+// which the typed writer rests as plain content of the literal text — the claim that lets a
 // `text` element mount the same prose leaf its field does.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
-import { core, quill, example } from '../helpers/fixtures.js';
+import { core, quill, example, literal, plain } from '../helpers/fixtures.js';
 import { field, mountEditor, press, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -36,10 +36,10 @@ describe('an array of `text`', () => {
 		try {
 			const q = quill();
 			const doc = example();
-			// The element rests as its literal string; the row reads it through the codec
-			// the declared type names rather than off the stored value.
-			const seeded = doc.getStored('errata') as string[];
-			expect(seeded.every((e) => typeof e === 'string')).toBe(true);
+			// The element rests as plain content; the row reads it through the codec the
+			// declared type names rather than off the stored value.
+			const seeded = read(q, doc, 'errata') as string[];
+			expect(literal(doc.getStored('errata'))).toEqual(seeded.map(plain));
 			expect(seeded.length).toBeGreaterThan(1);
 
 			const { target, errors } = mountEditor(q, doc);
@@ -58,21 +58,21 @@ describe('an array of `text`', () => {
 		}
 	});
 
-	it('adds an element and rests it as a string', () => {
+	it('adds an element and rests it as plain content', () => {
 		const q = quill();
 		const doc = example();
 		const { target } = mountEditor(q, doc);
 
-		const seeded = doc.getStored('errata') as string[];
+		const seeded = read(q, doc, 'errata') as string[];
 		add(target);
 		expect(rows(target)).toHaveLength(seeded.length + 1);
 		expect(rows(target).at(-1)!.textContent).toBe('');
 
-		// A prose row commits `Content`, and the slot it lands in is a `text`
-		// one: what rests is the string, so the array stays a string array.
+		// A prose row commits `Content`, and the slot it lands in is a `text` one: what
+		// rests is plain content, as every element of the array does.
 		const grown = [...seeded, ''];
 		expect(read(q, doc, 'errata')).toEqual(grown);
-		expect(doc.getStored('errata')).toEqual(grown);
+		expect(literal(doc.getStored('errata'))).toEqual(grown.map(plain));
 	});
 
 	// The other half of that write, without the row: what a prose leaf hands up for
@@ -80,11 +80,11 @@ describe('an array of `text`', () => {
 	// into the element's rest form. jsdom implements no contenteditable, so the
 	// keystroke that produces one cannot be driven here; the writer's half is where the
 	// claim lives anyway.
-	it('rests an edited element as its literal string', () => {
+	it('rests an edited element as plain content of its literal text', () => {
 		const q = quill();
 		const doc = example();
 		q.writer(doc).set('errata', [core.importMarkdown('Page 9 omits the colophon.').content]);
-		expect(doc.getStored('errata')).toEqual(['Page 9 omits the colophon.']);
+		expect(literal(doc.getStored('errata'))).toEqual([plain('Page 9 omits the colophon.')]);
 	});
 
 	it('removes an element on Backspace only once it reads empty', () => {
@@ -92,7 +92,7 @@ describe('an array of `text`', () => {
 		const doc = example();
 		const { target } = mountEditor(q, doc);
 
-		const seeded = doc.getStored('errata') as string[];
+		const seeded = read(q, doc, 'errata') as string[];
 		// A populated element keeps its row: the emptiness test reads the element's
 		// committed value, which a seeded row has.
 		press(rows(target)[0], 'Backspace');
@@ -110,12 +110,14 @@ describe('an array of `text`', () => {
 		const doc = example();
 		const { target } = mountEditor(q, doc);
 
-		const seeded = doc.getStored('errata') as string[];
+		const seeded = read(q, doc, 'errata') as string[];
 		press(rows(target)[0], 'Enter');
 		expect(rows(target)).toHaveLength(seeded.length + 1);
 		// The new row is the first one's sibling, not the list's tail.
 		expect(rows(target)[1].textContent).toBe('');
-		expect(doc.getStored('errata')).toEqual([seeded[0], '', ...seeded.slice(1)]);
+		expect(literal(doc.getStored('errata'))).toEqual(
+			[seeded[0], '', ...seeded.slice(1)].map(plain)
+		);
 	});
 
 	it('takes a paste of several lines as a row per line', () => {
@@ -133,7 +135,7 @@ describe('an array of `text`', () => {
 		});
 		rows(target)[0].dispatchEvent(event);
 		flushSync();
-		expect(doc.getStored('errata')).toEqual(['one', 'two', 'three']);
+		expect(literal(doc.getStored('errata'))).toEqual(['one', 'two', 'three'].map(plain));
 		expect(rows(target).map((r) => r.textContent)).toEqual(['one', 'two', 'three']);
 	});
 
@@ -159,13 +161,13 @@ describe('an array of `text`', () => {
 	});
 });
 
-// The `richtext` twin, on a document through the transport door (`Document.fromMarkdown`):
+// The `richtext` twin, on a document through the transport door (`Document.parse`):
 // its elements rest as authored strings, the scalar field's rest form, and the row reads
 // one at the codec the declared type names, so the emphasis is lowered by the boundary
 // rather than by the row.
 describe('an array of richtext loaded from markdown', () => {
 	it('mounts authored-string elements as prose rows, with emphasis lowered', () => {
-		const doc = core.Document.fromMarkdown(`~~~
+		const doc = core.Document.parse(`~~~
 $quill: showcase@1.0.0
 $kind: main
 title: Probe

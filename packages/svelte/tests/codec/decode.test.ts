@@ -201,7 +201,7 @@ describe('one-line / plain constraints', () => {
 		['trailing spaces', 'a  \nb  ', 'doc(paragraph("a  ", hard_break, "b  "))']
 	])('the plain schema holds %s, and projects back to the same lines', (_, value, shape) => {
 		const doc = quill().seedDocument();
-		doc.storeField('errata', [value]);
+		doc.unchecked.storeField('errata', [value]);
 		const rt = quill().reader(doc).getContentAt('errata', [0])!;
 		doc.free();
 
