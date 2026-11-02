@@ -21,11 +21,12 @@ import {
 	type Command
 } from 'prosemirror-state';
 import { EditorView, type NodeView, type NodeViewConstructor } from 'prosemirror-view';
-import type { TableCell, TableProps } from '@quillmark/wasm';
+import type { GridCell, TableGrid } from './table.js';
 import { decode } from './decode.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
-import { tablePropsOfNode } from './islands.js';
+import { tableOfNode } from './table.js';
+import type { IslandNodeAttrs } from './islands.js';
 import { tableElement, tableText } from './table-copy.js';
 import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
@@ -61,7 +62,8 @@ import {
 	splitCell,
 	withCell,
 	type Span,
-	type TableAlign
+	type TableAlign,
+	islandOf
 } from './table.js';
 
 /** Everything the island's chrome says. Accessible names, not decoration: every
@@ -167,7 +169,7 @@ const HEADER_GLYPH = [
 
 /** Draw a cell's alignment on its box: its own where it holds one, its column's
  *  otherwise, and the vertical one where it holds one. */
-function layCell(box: HTMLElement, props: TableProps, r: number, c: number): void {
+function layCell(box: HTMLElement, props: TableGrid, r: number, c: number): void {
 	const cell = cellAt(props, r, c);
 	const column = props.aligns[c] ?? 'none';
 	box.style.textAlign = cell.align ?? (column === 'none' ? '' : column);
@@ -175,8 +177,8 @@ function layCell(box: HTMLElement, props: TableProps, r: number, c: number): voi
 }
 
 /** The cells of an inclusive rectangle, in reading order. */
-function allCells(props: TableProps, held: Cells): TableCell[] {
-	const out: TableCell[] = [];
+function allCells(props: TableGrid, held: Cells): GridCell[] {
+	const out: GridCell[] = [];
 	for (let r = held.r0; r <= held.r1; r++)
 		for (let c = held.c0; c <= held.c1; c++) out.push(cellAt(props, r, c));
 	return out;
@@ -287,7 +289,7 @@ interface MountedCell {
 	 * TableIslandView.update}; held because `cellFromDoc` crosses the WASM boundary once per
 	 * anchored cell.
 	 */
-	shown: TableCell;
+	shown: GridCell;
 	unregister: () => void;
 	r: number;
 	c: number;
@@ -402,18 +404,24 @@ interface Seat {
 }
 
 /**
- * Where the caret stood as each table value was written over, keyed by that value: an undo hands
- * back the `props` object the edit replaced, so the seat held against it is where the edit was made
- * from.
+ * Where the caret stood as each table value was written over, keyed by that value's `slots`, which
+ * every write replaces: an undo hands back the object the edit replaced, so the seat held against
+ * it is where the edit was made from.
  */
-const departures = new WeakMap<TableProps, Seat>();
+const departures = new WeakMap<object, Seat>();
+
+/** The key {@link departures} holds a node's value under. */
+const valueKey = (node: PMNode): object | undefined => {
+	const slots = (node.attrs as IslandNodeAttrs).slots;
+	return slots ?? undefined;
+};
 
 class TableIslandView implements NodeView {
 	readonly dom: HTMLElement;
 	private cells: MountedCell[] = [];
 	/** The props the current DOM was built from: what an `update` compares against to
 	 *  tell a reseed from a rebuild. */
-	private rendered: TableProps | undefined;
+	private rendered: TableGrid | undefined;
 	private selected: Cells | undefined;
 	private drag: Drag | undefined;
 	private sweep: Sweep | undefined;
@@ -467,7 +475,7 @@ class TableIslandView implements NodeView {
 		if (node.type !== this.node.type) return false;
 		const before = this.rendered;
 		this.node = node;
-		const props = tablePropsOfNode(node);
+		const props = tableOfNode(node);
 		if (!props || !before || !shapeEqual(before, props)) {
 			this.render();
 			return true;
@@ -477,7 +485,8 @@ class TableIslandView implements NodeView {
 		// re-hydrate takes fresh state. Compared against `shown`, not a doc projection: this runs
 		// every keystroke and projecting costs a `mapMarks` across WASM per anchored cell.
 		this.rendered = props;
-		const departure = departures.get(props);
+		const key = valueKey(node);
+		const departure = key && departures.get(key);
 		for (const mounted of this.cells) {
 			const stored = cellAt(props, mounted.r, mounted.c);
 			if (cellEqual(stored, mounted.shown)) continue;
@@ -760,7 +769,7 @@ class TableIslandView implements NodeView {
 	 * The rectangle a line covers, which is what selecting one means. `props` is the caller's where
 	 * it reads a line per grip, since each `props()` revalidates the whole table.
 	 */
-	private lineCells(line: Line, props: TableProps = this.props()): Cells {
+	private lineCells(line: Line, props: TableGrid = this.props()): Cells {
 		return line.axis === 'row'
 			? { r0: line.index, c0: 0, r1: line.index, c1: columnCount(props) - 1, swept: false }
 			: { r0: 0, c0: line.index, r1: rowCount(props) - 1, c1: line.index, swept: false };
@@ -769,7 +778,7 @@ class TableIslandView implements NodeView {
 	/** The index space an axis allows, which is the whole of it on both. The header is
 	 *  row 0 rather than a line above the floor: a walk reaches it, a drag lands on it,
 	 *  and the row that lands there is the header (`table.ts` §{@link moveRow}). */
-	private bounds(axis: Axis, props: TableProps): { floor: number; limit: number } {
+	private bounds(axis: Axis, props: TableGrid): { floor: number; limit: number } {
 		return axis === 'row'
 			? { floor: 0, limit: rowCount(props) - 1 }
 			: { floor: 0, limit: columnCount(props) - 1 };
@@ -1294,8 +1303,9 @@ class TableIslandView implements NodeView {
 		this.cellCluster = undefined;
 		this.rails = [];
 		this.dom.textContent = '';
-		const props = tablePropsOfNode(this.node);
-		const departure = props && departures.get(props);
+		const props = tableOfNode(this.node);
+		const key = valueKey(this.node);
+		const departure = props && key && departures.get(key);
 		this.rendered = props;
 		if (props) mounted.set(this.dom, this);
 		else mounted.delete(this.dom);
@@ -1364,7 +1374,7 @@ class TableIslandView implements NodeView {
 	 * and the border handle after it. The column chrome hangs here because a merged cell in the
 	 * first row stands over several columns.
 	 */
-	private rail(props: TableProps, s: TableChromeStrings): HTMLElement {
+	private rail(props: TableGrid, s: TableChromeStrings): HTMLElement {
 		const tr = el('tr', 'qm-table-rail');
 		tr.setAttribute('aria-hidden', 'true');
 		tr.appendChild(el('td', 'qm-table-rail-cell'));
@@ -1383,7 +1393,7 @@ class TableIslandView implements NodeView {
 	 * holding the row's grip. A slot a merged cell covers draws nothing.
 	 */
 	private row(
-		props: TableProps,
+		props: TableGrid,
 		grid: (Span | null)[][],
 		r: number,
 		s: TableChromeStrings
@@ -1627,8 +1637,8 @@ class TableIslandView implements NodeView {
 	// ── Ops ───────────────────────────────────────────────────────────────────
 
 	/** The table this view is currently showing; the zero table if the node stopped being one. */
-	private props(): TableProps {
-		return tablePropsOfNode(this.node) ?? normalizeTable({ header: [], rows: [], aligns: [] });
+	private props(): TableGrid {
+		return tableOfNode(this.node) ?? normalizeTable({ header: [], rows: [], aligns: [] });
 	}
 
 	/**
@@ -1637,7 +1647,7 @@ class TableIslandView implements NodeView {
 	 * writes a whole table.
 	 */
 	private write(
-		next: TableProps,
+		next: TableGrid,
 		focus?: { r: number; c: number },
 		from = this.focusedSeat()
 	): void {
@@ -1645,12 +1655,12 @@ class TableIslandView implements NodeView {
 		if (pos == null) return;
 		const node = this.outer.state.doc.nodeAt(pos);
 		if (!node || node.type !== this.node.type) return;
-		const left = tablePropsOfNode(node);
+		const left = valueKey(node);
 		if (left && from) departures.set(left, from);
 		this.outer.dispatch(
 			this.outer.state.tr.setNodeMarkup(pos, undefined, {
 				...node.attrs,
-				props: normalizeTable(next)
+				...islandOf(next)
 			})
 		);
 		if (focus) this.focusCell(focus.r, focus.c);

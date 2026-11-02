@@ -12,16 +12,10 @@
 // rebuilt from one that kept the content deleted since.
 import * as Y from 'yjs';
 import type { Addr, AuthoringCard, Content, Document, Quill } from '@quillmark/wasm';
-import {
-	bindDocument,
-	canonical,
-	Diverged,
-	formOf,
-	type CardOp,
-	type CardRef
-} from './document.js';
+import { bindDocument, Diverged, formOf, type CardOp, type CardRef } from './document.js';
 import { changedRuns, commonRun, meet, type Run } from './lines.js';
-import { MAIN, SLOT } from './shape.js';
+import { MAIN, SLOT, canonical } from './shape.js';
+import { islandWithoutAnchors } from './write.js';
 
 /** What differs between two states of one session, by the cards' place in each. A card moved
  *  is named by `from`, its index in the older state, and `at`, its index in the newer one. */
@@ -224,35 +218,39 @@ function textLines(text: string): string[] {
 	return text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
 }
 
-/** Each line of `content` as one comparable value: its characters, an island slot as the island,
- *  its kind and containers without the numbers derived from position, and its marks from its
- *  start. Two lines with one value are one line to Y. */
+/** Each block of `content` as one comparable value: its characters, an island slot as the
+ *  island, its record with its containers' records in place of their ids, and its marks from its
+ *  start. Two blocks with one value are one line to Y. */
 function contentLines(content: Content): string[] {
 	const chars = Array.from(content.text);
+	const containers = new Map((content.containers ?? []).map(({ id, ...rest }) => [id, rest]));
+	const islands = content.islands ?? [];
 	const out: string[] = [];
 	let start = 0;
+	let unit = 0;
 	let island = 0;
-	content.lines.forEach((line, k) => {
+	content.blocks.forEach(({ id: _, path, ...record }, k) => {
 		let end = start;
-		while (end < chars.length && chars[end] !== '\n') end++;
+		let unitEnd = unit;
+		while (end < chars.length && chars[end] !== '\n') unitEnd += chars[end++].length;
 		const text = chars
 			.slice(start, end)
-			.map((ch) => (ch === SLOT ? canonical(content.islands[island++] ?? null) : ch));
-		const containers = line.containers.map((c) =>
-			c.container === 'list_item'
-				? { c: c.container, ordered: c.attrs.ordered, checked: c.attrs.checked }
-				: { c: c.container }
-		);
-		const marks = content.marks
-			.filter((m) => m.type !== 'anchor' && m.start < end && m.end > start)
+			.map((ch) =>
+				ch === SLOT
+					? canonical(islands[island] ? islandWithoutAnchors(islands[island++]) : null)
+					: ch
+			);
+		const marks = (content.marks ?? [])
+			.filter((m) => m.start < unitEnd && m.end > unit)
 			.map((m) => ({
 				...m,
-				start: Math.max(m.start, start) - start,
-				end: Math.min(m.end, end) - start
+				start: Math.max(m.start, unit) - unit,
+				end: Math.min(m.end, unitEnd) - unit
 			}));
-		const { containers: _, ...rest } = line;
-		out.push(canonical({ text, rest, containers, marks, last: k === content.lines.length - 1 }));
+		const within = (path ?? []).map((c) => containers.get(c) ?? null);
+		out.push(canonical({ text, record, within, marks, last: k === content.blocks.length - 1 }));
 		start = end + 1;
+		unit = unitEnd + 1;
 	});
 	return out;
 }

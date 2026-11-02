@@ -129,7 +129,7 @@ describe('the font picker', () => {
 		expect(box.value).toBe('Tinos');
 
 		pick(box, '');
-		expect(intro()?.marks).toEqual([]);
+		expect(intro()?.marks ?? []).toEqual([]);
 	});
 
 	it('reads no family over a selection setting two', async () => {
@@ -156,7 +156,7 @@ describe('the font picker', () => {
 		const box = (await picker())!;
 		expect(options(box)).toEqual([DEFAULT_VISUAL_STRINGS.fontDefault, 'Figtree']);
 		pick(box, '');
-		expect(intro()?.marks).toEqual([]);
+		expect(intro()?.marks ?? []).toEqual([]);
 	});
 });
 

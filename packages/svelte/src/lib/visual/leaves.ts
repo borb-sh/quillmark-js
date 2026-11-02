@@ -4,7 +4,7 @@
 // Two lanes behind one lookup. Every mounted field registers a {@link FieldControl} —
 // take the caret, and a box to bloom — which is the whole of what a reveal and a
 // focus need, and the whole of what a form control has. A prose leaf registers its
-// `FieldController` instead: a superset, carrying the codec seam (a caret at a USV
+// `FieldController` instead: a superset, carrying the codec seam (a caret at a UTF-16
 // offset, the formatting popover's observation) that no `<input>` answers. So
 // `control` covers every field and `prose` covers the leaves that have one, and the
 // verbs ask for the half they use: `focusField` never needs the codec, and
@@ -47,7 +47,7 @@ export interface FieldControl {
 	/**
 	 * Land at `steps` inside a control that has an inside — an array's element, an
 	 * object's property, a variant's cell, a matrix's member, and any of them under any
-	 * other — at USV `pos` where the leaf the walk ends in can take one. Each rung
+	 * other — at UTF-16 offset `pos` where the leaf the walk ends in can take one. Each rung
 	 * resolves its own step at the call (an index to a session id, a key to a mounted
 	 * cell) and hands the rest to the control it opened, so nothing positional is
 	 * carried. A step the tree does not hold falls back to that rung's own

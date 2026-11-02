@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The standalone prose leaf: a `createField` over a real `showcase` `title` (one line)
-// and body edits via applyChange; the caret survives own-edits through the PM StepMap;
+// and body edits via apply; the caret survives own-edits through the PM StepMap;
 // an external content change re-hydrates and the leaf's own edit does not; a narrowed
 // field holds over a value upstream's one-line rule refuses, and releases once it fits.
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -8,7 +8,7 @@ import { EditorView } from 'prosemirror-view';
 import { Selection, TextSelection } from 'prosemirror-state';
 import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
-import type { Document, TableProps } from '@quillmark/wasm';
+import type { Content, Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
 import { mount, quill, example, normalize, contentEqual, md, viewOf, press } from './_util.js';
 
@@ -24,7 +24,7 @@ describe('createField over a real showcase leaf', () => {
 		doc = example();
 	});
 
-	it('edits the inline `title` field via applyChange', () => {
+	it('edits the inline `title` field via apply', () => {
 		const caret: number[] = [];
 		const field = createField({
 			doc,
@@ -90,17 +90,7 @@ describe('field-level reconciliation', () => {
 		expect(view.state.doc).toBe(afterOwn); // same state object → no re-hydrate
 
 		// A foreign edit straight to the content (another source), then applyExternal.
-		doc.applyChange(
-			{ field: 'title' },
-			{
-				delta: {
-					ops: [
-						{ insert: 'EXT ' },
-						{ retain: (doc.getStored('title') as { text: string }).text.length }
-					]
-				}
-			}
-		);
+		doc.apply({ field: 'title' }, { steps: [{ splice: { at: 0, insert: 'EXT ' } }] });
 		field.applyExternal();
 		expect(view.state.doc.textContent.startsWith('EXT ')).toBe(true);
 		expect((field.getContent() as { text: string }).text.startsWith('EXT ')).toBe(true);
@@ -113,7 +103,7 @@ describe('field-level reconciliation', () => {
 		field.setCaret(4);
 		view.dispatch(view.state.tr.insertText('mine', view.state.selection.head));
 		const delta = { ops: [{ insert: 'theirs ' }] };
-		doc.applyChange({}, { delta });
+		doc.apply({}, { steps: [{ splice: { at: 0, insert: 'theirs ' } }] });
 		const mounted = view.state;
 		field.applyExternal(delta);
 		expect(view.state).not.toBe(mounted);
@@ -140,7 +130,7 @@ describe('the hold on a body over what no node holds', () => {
 	 *  dispatched on it leaves the stored body as it was. */
 	const held = (markdown: string, drawn: (view: EditorView) => void): void => {
 		const doc = example();
-		doc.overwrite({}, md(markdown));
+		doc.replace({}, md(markdown));
 		const before = JSON.stringify(doc.main.body);
 		const holds: boolean[] = [];
 		const field = body(doc, holds);
@@ -159,7 +149,7 @@ describe('the hold on a body over what no node holds', () => {
 			'lead\n\n| <qm-span family="Carlito">a</qm-span> |\n|---|\n| b |'
 		]) {
 			const doc = example();
-			doc.overwrite({}, md(markdown));
+			doc.replace({}, md(markdown));
 			const families = JSON.stringify(doc.main.body.islands);
 			const holds: boolean[] = [];
 			const field = body(doc, holds);
@@ -245,7 +235,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('holds a one-line text field, whose refusal upstream names not_plain', () => {
 		const doc = example();
-		doc.overwrite({ field: 'subtitle' }, md(STRUCTURED));
+		doc.replace({ field: 'subtitle' }, md(STRUCTURED));
 		expect(
 			quill()
 				.validate(doc)
@@ -326,7 +316,7 @@ describe('text fields fire no markdown input rules', () => {
 		expect(fireClosingStar(view)).toBe(true); // the rule intercepts and transforms
 		const rt = doc.getStored('colophon') as { text: string; marks: { type: string }[] };
 		expect(rt.text).toBe('x');
-		expect(rt.marks.some((m) => m.type === 'strong')).toBe(true);
+		expect(rt.marks?.some((m) => m.type === 'strong')).toBe(true);
 		field.destroy();
 	});
 });
@@ -335,7 +325,7 @@ describe('the mark chords', () => {
 	// The keymap's toggles over a selection, pressed as the keyboard does; jsdom names no
 	// platform, so `Mod` is Ctrl.
 	const marksOf = (doc: Document): string[] =>
-		(doc.getStored('colophon') as { marks: { type: string }[] }).marks.map((m) => m.type);
+		((doc.getStored('colophon') as { marks?: { type: string }[] }).marks ?? []).map((m) => m.type);
 
 	it('toggles strike on Mod-Shift-x and code on Mod-e', () => {
 		const doc = example();
@@ -360,7 +350,7 @@ describe('the mark chords', () => {
 });
 
 describe('createField over an ABSENT declared richtext field', () => {
-	it('installs on the first edit (applyChange throws on absent), then applyChanges', () => {
+	it('installs on the first edit (apply throws on absent), then applies', () => {
 		const doc = example();
 		// `colophon` is `default:`-only, so it is absent from the seed.
 		expect(doc.getStored('colophon')).toBeUndefined();
@@ -375,7 +365,7 @@ describe('createField over an ABSENT declared richtext field', () => {
 		// First edit → the codec installs the field (creating it).
 		view.dispatch(view.state.tr.insertText('Motto', 1));
 		expect((doc.getStored('colophon') as { text: string } | undefined)?.text).toBe('Motto');
-		// Second edit → the field is now present, so it lowers to applyChange and lands.
+		// Second edit → the field is now present, so it lowers to apply and lands.
 		field.setCaret(5);
 		view.dispatch(view.state.tr.insertText('!', view.state.selection.head));
 		expect((doc.getStored('colophon') as { text: string }).text).toBe('Motto!');
@@ -386,9 +376,7 @@ describe('createField over an ABSENT declared richtext field', () => {
 describe('a default the leaf holds', () => {
 	const said = (text: string) => ({
 		text,
-		lines: [{ containers: [], kind: 'para' as const }],
-		marks: [],
-		islands: []
+		blocks: [{ id: 'b0', kind: 'para' as const }]
 	});
 
 	it('is held unwritten, re-seated by a new one, and taken whole by the first edit', () => {
@@ -422,18 +410,14 @@ describe('a default the leaf holds', () => {
 });
 
 describe('a within-block hard break', () => {
-	it('lands in the store as a `continues` line, matching the optimistic PM', () => {
+	it('lands in the store as a U+2028 in its block, matching the optimistic PM', () => {
 		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const view = viewOf(field);
-		// Insert a hard_break into the first paragraph: the `continues` line that
-		// `setContinues` reaches, so it commits through `applyChange`.
 		field.setCaret(3);
 		view.dispatch(view.state.tr.replaceSelectionWith(blockSchema.nodes.hard_break.create(), false));
-		// The store now carries a within-block hard break (continues:true), and it
-		// matches the optimistic PM up to normalization.
 		const body = doc.main.body;
-		expect(body.lines.some((l) => l.continues)).toBe(true);
+		expect(body.text).toContain('\u2028');
 		expect(contentEqual(body, normalize(pmToContent(view.state.doc)))).toBe(true);
 		field.destroy();
 	});
@@ -442,9 +426,7 @@ describe('a within-block hard break', () => {
 describe('anchor insertion', () => {
 	/** The `anchor` identity marks of the stored body content, `id` lifted out of `attrs`. */
 	function bodyAnchors(doc: Document): { id: string; start: number; end: number }[] {
-		return doc.main.body.marks
-			.filter((m) => m.type === 'anchor')
-			.map((m) => ({ id: m.attrs.id, start: m.start, end: m.end }));
+		return doc.main.body.anchors ?? [];
 	}
 
 	it('inserts a caller-supplied identity anchor that persists in the content', () => {
@@ -656,7 +638,7 @@ describe('an island edit on the op path', () => {
 
 	/** A body holding a block island between two paragraphs, mounted as a leaf. */
 	function tableBody(doc: Document): FieldController {
-		doc.overwrite({}, md(TABLE_MD));
+		doc.replace({}, md(TABLE_MD));
 		return createField({ doc, quill: quill(), addr: {}, container: mount() });
 	}
 
@@ -677,10 +659,12 @@ describe('an island edit on the op path', () => {
 		const view = viewOf(field);
 		const pos = islandPos(view);
 		const node = view.state.doc.nodeAt(pos)!;
-		const props = JSON.parse(JSON.stringify(node.attrs.props)) as TableProps;
-		props.rows[0][0].text = 'EDITED';
-		view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, props }));
-		expect((doc.main.body.islands[0].props as TableProps).rows[0][0].text).toBe('EDITED');
+		const props = node.attrs.props as TableProps;
+		const slot = props.rows[1].cells[props.columns[0]];
+		const slots = structuredClone(node.attrs.slots) as Record<string, Content>;
+		slots[slot].text = 'EDITED';
+		view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, slots }));
+		expect(doc.main.body.islands![0].slots![slot].text).toBe('EDITED');
 		// The reconciler advanced with it, so the next keystroke still diffs from
 		// what the store holds rather than from a pre-edit content.
 		field.setCaret(1);
@@ -695,13 +679,12 @@ describe('an island edit on the op path', () => {
 		const view = viewOf(field);
 		field.insertAnchor('a1', 2);
 		view.dispatch(view.state.tr.delete(islandPos(view), islandPos(view) + 1));
-		expect(doc.main.body.islands).toHaveLength(0);
+		expect(doc.main.body.islands ?? []).toHaveLength(0);
 		undo(view.state, view.dispatch);
-		// The undo lowers to `{ op: 'insert' }` rather than an install, so the
-		// island comes back with its id and the field's anchor is still there.
+		// The island comes back with its id, and the field's anchor is still there.
 		expect(doc.main.body.text).toBe(md(TABLE_MD).text);
-		expect(doc.main.body.islands.map((i) => i.id)).toEqual(['isl-0']);
-		expect(doc.main.body.marks.some((m) => m.type === 'anchor')).toBe(true);
+		expect(doc.main.body.islands?.map((i) => i.id)).toEqual(['isl-0']);
+		expect(doc.main.body.anchors?.map((a) => a.id)).toEqual(['a1']);
 		field.destroy();
 	});
 });

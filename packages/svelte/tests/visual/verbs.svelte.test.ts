@@ -155,7 +155,7 @@ describe('a reorder through the card control', () => {
 		});
 
 		const after = slots(target);
-		const staleIndex = addrForFieldPath(captured.field)!.card!;
+		const staleIndex = addrForFieldPath(captured.field)!.card as number;
 		expect(leafKeys(after[staleIndex])).toContain('c1:$body');
 		expect(leafKeys(after[1])).toContain(`${captured.cardId}:$body`);
 	});

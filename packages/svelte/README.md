@@ -112,7 +112,7 @@ In Svelte, `<Preview {session} onPick={…} />` exposes the same verbs (`refresh
 		/* the active leaf: `active.field` (a DocPath), and `active.cardId` for its card */
 	}}
 	onCaretMove={(at) => {
-		/* the caret moved to `at.field` (a DocPath) at `at.pos` (USV) */
+		/* the caret moved to `at.field` (a DocPath) at `at.pos` (UTF-16) */
 	}}
 	onError={(err) => {
 		/* a failure the editor recovered from; editing continues */

@@ -7,11 +7,11 @@
 import { DOMParser, Fragment, Slice } from 'prosemirror-model';
 import { Plugin } from 'prosemirror-state';
 import type { EditorProps } from 'prosemirror-view';
-import type { TableCell, TableProps } from '@quillmark/wasm';
-import { usvLength } from './decode.js';
+import type { GridCell, TableGrid } from './table.js';
 import { pmToContent } from './encode.js';
 import { blockSchema } from './schema.js';
-import { emptyCell, normalizeTable } from './table.js';
+import { HARD_BREAK } from './islands.js';
+import { emptyCell, islandOf, normalizeTable } from './table.js';
 
 const schemaRules = DOMParser.fromSchema(blockSchema).rules;
 
@@ -22,15 +22,16 @@ const cellParser = new DOMParser(
 	schemaRules.filter((rule) => !('node' in rule && rule.node?.startsWith('island_')))
 );
 
-/** A `<td>` or `<th>` as a cell: its blocks are lines and a `<br>` a break, each one `\n`
+/** A `<td>` or `<th>` as a cell: its blocks and each `<br>` are a break, one `U+2028`
  *  in the text (`cellContent`), and its marks the ones the schema's rules read. Whitespace
  *  at the cell's edges is dropped, which is where a source's empty paragraph lands. */
-function cellFromDOM(el: HTMLElement): TableCell {
-	const { text, marks } = pmToContent(cellParser.parse(el));
-	// Every whitespace character is in the BMP, so `lead` counts USVs as well.
+function cellFromDOM(el: HTMLElement): GridCell {
+	const parsed = pmToContent(cellParser.parse(el));
+	const text = parsed.text.replaceAll('\n', HARD_BREAK);
+	const marks = parsed.marks ?? [];
 	const lead = text.length - text.trimStart().length;
 	const kept = text.trim();
-	const end = usvLength(kept);
+	const end = kept.length;
 	return {
 		text: kept,
 		marks: marks.flatMap((m) => {
@@ -47,9 +48,9 @@ function cellFromDOM(el: HTMLElement): TableCell {
  * cell splits: its content in the first slot it covers and an empty cell in each other,
  * so the cells beside and under it keep their columns.
  */
-function tableFromDOM(table: HTMLTableElement): TableProps | null {
+function tableFromDOM(table: HTMLTableElement): TableGrid | null {
 	const rows = Array.from(table.rows);
-	const grid: TableCell[][] = rows.map(() => []);
+	const grid: GridCell[][] = rows.map(() => []);
 	rows.forEach((tr, r) => {
 		let c = 0;
 		for (const td of Array.from(tr.cells)) {
@@ -78,7 +79,7 @@ const BARE = /[^\t\r\n]*/y;
  * Sheets write a cell holding any of the three; a quote not closed that way is literal.
  * The line ends closing the text are the spreadsheet's terminator, not an empty row.
  */
-function tableFromText(text: string): TableProps | null {
+function tableFromText(text: string): TableGrid | null {
 	const body = text.replace(/[\r\n]+$/, '');
 	const lines: string[][] = [[]];
 	let at = 0;
@@ -86,7 +87,7 @@ function tableFromText(text: string): TableProps | null {
 		QUOTED.lastIndex = BARE.lastIndex = at;
 		const quoted = QUOTED.exec(body);
 		const cell = quoted
-			? quoted[1].replace(/""/g, '"').replace(/\r\n?/g, '\n')
+			? quoted[1].replace(/""/g, '"').replace(/\r\n?|\n/g, HARD_BREAK)
 			: BARE.exec(body)![0];
 		lines.at(-1)!.push(cell);
 		at = quoted ? QUOTED.lastIndex : BARE.lastIndex;
@@ -110,7 +111,7 @@ const clipboardParser = new DOMParser(blockSchema, [
 		node: 'island_block',
 		getAttrs: (el) => {
 			const props = tableFromDOM(el as HTMLTableElement);
-			return props ? { islandType: 'table', props } : false;
+			return props ? { islandType: 'table', ...islandOf(props) } : false;
 		}
 	},
 	...schemaRules
@@ -130,7 +131,10 @@ export function tablePastePlugin(): Plugin {
 			clipboardTextParser: ((text, _context, plain) => {
 				const props = plain ? null : tableFromText(text);
 				if (!props) return null;
-				const island = blockSchema.nodes.island_block.create({ islandType: 'table', props });
+				const island = blockSchema.nodes.island_block.create({
+					islandType: 'table',
+					...islandOf(props)
+				});
 				return new Slice(Fragment.from(island), 0, 0);
 			}) as EditorProps['clipboardTextParser']
 		}

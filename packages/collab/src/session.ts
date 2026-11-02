@@ -9,7 +9,8 @@
 // A session ends at a join that finds nobody has appended or been present within the lease and
 // the save reflecting every entry: the next session opens from the save.
 import * as Y from 'yjs';
-import { init, type Addr, type Document, type Quill } from '@quillmark/wasm';
+import type { Addr, Document, Quill } from '@quillmark/wasm';
+import { init } from './core.js';
 import {
 	bindDocument,
 	seedDocument,

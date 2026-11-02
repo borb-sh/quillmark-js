@@ -144,11 +144,11 @@ describe('an array of `text`', () => {
 		const q = quill();
 		const doc = example();
 		// An astral character before the offset is the hazard: 𝔘 is one code point and
-		// two UTF-16 units, so USV 9 is UTF-16 10 and a naive offset lands short of it.
+		// two UTF-16 units, so the offset after it counts both.
 		q.writer(doc).set('errata', [core.importMarkdown('astral \u{1D518} tail here').content]);
 		const { target, editor } = mountEditor(q, doc);
 
-		await editor.setCaret({ field: 'main.errata[0]', pos: 9, granularity: 'cluster' });
+		await editor.setCaret({ field: 'main.errata[0]', pos: 10, granularity: 'cluster' });
 		await tick();
 
 		expect(document.activeElement?.getAttribute('aria-label')).toBe('Errata 1');

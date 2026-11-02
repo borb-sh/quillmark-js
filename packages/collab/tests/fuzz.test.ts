@@ -1,11 +1,11 @@
 // Convergence under random concurrent edits. Three peers edit one Document the way the editor
-// commits (`applyChange` on content, the typed writer on fields, the card verbs on the list), push
+// commits (`apply` on content, the typed writer on fields, the card verbs on the list), push
 // after each, exchange Y updates at random times and in random order, and must end holding one
 // Document. The mix leans on where the content model fights a CRDT: items inserted into one list
-// (positional ordinals), tables edited and typed around (slots), and cards moved and edited at once.
+// (container runs), tables edited and typed around (slots), and cards moved and edited at once.
 // Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are.
 import { describe, expect, it } from 'vitest';
-import type { Addr, ChangeBundle, Content, ContentContainer, Quill } from '@quillmark/wasm';
+import type { Addr, Change, Content, Quill } from '@quillmark/wasm';
 import { writeFrom, type CardOp } from '../src/index.js';
 import * as Y from 'yjs';
 import { project } from '../src/project.js';
@@ -32,25 +32,30 @@ type Rng = ReturnType<typeof rng>;
 const WORDS = ['a', 'bc', 'def', ' ', 'xy z', '🎉', 'é'];
 const SLOT = '￼';
 
-const lineStarts = (rt: Content): number[] => {
-	const starts = [0];
-	Array.from(rt.text).forEach((c, i) => c === '\n' && starts.push(i + 1));
-	return starts;
+/** The UTF-16 offset of USV position `k` of `text`. */
+const unit = (text: string, k: number): number => Array.from(text).slice(0, k).join('').length;
+/** Each block's id with its USV range, `\n` excluded. */
+const blockRanges = (rt: Content) => {
+	const chars = Array.from(rt.text);
+	let start = 0;
+	return rt.blocks.map((b) => {
+		let end = start;
+		while (end < chars.length && chars[end] !== '\n') end++;
+		const range = { block: b, start, end };
+		start = end + 1;
+		return range;
+	});
 };
-const lineEnd = (rt: Content, line: number): number => {
-	const starts = lineStarts(rt);
-	return line + 1 < starts.length ? starts[line + 1] - 1 : Array.from(rt.text).length;
-};
-const table = (text: string) => ({
-	header: [{ text, marks: [] }],
-	rows: [],
-	aligns: ['none' as const]
-});
+const fresh = (r: Rng) => `f${r.int(2 ** 30).toString(36)}`;
 
 /** One random content edit over `rt`; `undefined` where the pick does not apply. */
-function contentEdit(r: Rng, rt: Content): ChangeBundle | undefined {
+function contentEdit(r: Rng, rt: Content): Change | undefined {
+	const { splitBlock, deleteRange, indent, outdent, wrap, importMarkdown } = core;
 	const len = Array.from(rt.text).length;
-	const line = r.int(rt.lines.length);
+	const u = (k: number) => unit(rt.text, k);
+	const ranges = blockRanges(rt);
+	const { block, start, end } = r.pick(ranges);
+	const slots = Array.from(rt.text).flatMap((c, i) => (c === SLOT ? [i] : []));
 	switch (
 		r.pick([
 			'type',
@@ -74,123 +79,84 @@ function contentEdit(r: Rng, rt: Content): ChangeBundle | undefined {
 		] as const)
 	) {
 		case 'type':
-			return { delta: { ops: [{ retain: r.int(len + 1) }, { insert: r.pick(WORDS) }] } };
+			return { steps: [{ splice: { at: u(r.int(len + 1)), insert: r.pick(WORDS) } }] };
 		case 'delete': {
 			if (!len) return undefined;
 			const at = r.int(len);
-			return { delta: { ops: [{ retain: at }, { delete: 1 + r.int(Math.min(4, len - at)) }] } };
+			return deleteRange(rt, u(at), u(at + 1 + r.int(Math.min(4, len - at))));
 		}
 		case 'enter':
-			return { delta: { ops: [{ retain: r.int(len + 1) }, { insert: '\n' }] } };
+			return splitBlock(rt, u(r.int(len + 1)), fresh(r));
 		case 'item': {
-			// Enter at the end of a list line, with every later item restated renumbered, as the
-			// codec writes it.
-			const listLines = rt.lines.flatMap((l, i) =>
-				l.containers[0]?.container === 'list_item' ? [i] : []
-			);
-			if (!listLines.length) return undefined;
-			const at = r.pick(listLines);
-			const restated = [...rt.lines];
-			restated.splice(at + 1, 0, rt.lines[at]);
-			const containers = restated.map((l, i): ContentContainer[] => {
-				const c = l.containers[0];
-				if (i <= at || c?.container !== 'list_item') return l.containers;
-				return [
-					{ ...c, attrs: { ...c.attrs, ordinal: c.attrs.ordinal + 1 } },
-					...l.containers.slice(1)
-				];
-			});
-			return {
-				delta: { ops: [{ retain: lineEnd(rt, at) }, { insert: `\n${r.pick(WORDS)}` }] },
-				lineOps: containers.map((c, i) => ({ op: 'setContainers', line: i, containers: c }))
-			};
+			// Enter at the end of a block inside a list.
+			const listed = ranges.filter((x) => x.block.path?.length);
+			if (!listed.length) return undefined;
+			return splitBlock(rt, u(r.pick(listed).end), fresh(r));
 		}
 		case 'list':
-			return {
-				lineOps: [
-					{
-						op: 'setContainers',
-						line,
-						containers: [
-							{ container: 'list_item', attrs: { ordered: r.next() < 0.5, start: 1, ordinal: 0 } }
-						]
-					}
-				]
-			};
+			return wrap(rt, block.id, block.id, { kind: 'list', ordered: r.next() < 0.5 });
 		case 'quote':
-			return {
-				lineOps: [
-					{
-						op: 'setContainers',
-						line,
-						containers: rt.lines[line].containers.length ? [] : [{ container: 'quote' }]
-					}
-				]
-			};
-		case 'nest': {
-			// A line one level into the container its line above holds, the deepest a `Tab` reaches.
-			if (line === 0) return undefined;
-			const above = rt.lines[line - 1].containers;
-			const inner: ContentContainer =
-				r.next() < 0.7
-					? { container: 'list_item', attrs: { ordered: r.next() < 0.5, start: 1, ordinal: 0 } }
-					: { container: 'quote' };
-			return {
-				lineOps: [{ op: 'setContainers', line, containers: [...above.slice(0, 2), inner] }]
-			};
-		}
+			return block.path?.length
+				? outdent(rt, block.id)
+				: wrap(rt, block.id, block.id, { kind: 'quote' });
+		case 'nest':
+			return indent(rt, block.id);
 		case 'heading':
 			return {
-				lineOps: [{ op: 'setKind', line, kind: 'heading', attrs: { level: 1 + r.int(3) } }]
+				steps: [{ setBlock: { id: block.id, kind: 'heading', attrs: { level: 1 + r.int(3) } } }]
 			};
 		case 'bold': {
-			const start = lineStarts(rt)[line];
-			const end = lineEnd(rt, line);
 			if (end <= start) return undefined;
 			const a = start + r.int(end - start);
-			return {
-				markOps: [
-					{
-						op: r.next() < 0.7 ? 'add' : 'remove',
-						type: 'strong',
-						start: a,
-						end: a + 1 + r.int(end - a)
-					}
-				]
-			};
+			const b = a + 1 + r.int(end - a);
+			return { steps: [{ mark: { start: u(a), end: u(b), add: r.next() < 0.7, type: 'strong' } }] };
 		}
 		case 'table': {
-			const at = lineEnd(rt, line);
+			const island = {
+				...importMarkdown('| t |\n| - |').content.islands![0],
+				id: `isl-${r.int(3)}`
+			};
 			return {
-				delta: { ops: [{ retain: at }, { insert: '\n' }] },
-				islandOps: [
-					{ op: 'insert', at: at + 1, id: `isl-${r.int(3)}`, type: 'table', props: table('t') }
+				steps: [
+					{
+						splice: {
+							at: u(end),
+							insert: `\n${SLOT}`,
+							blocks: [{ id: fresh(r), kind: 'para' }],
+							islands: [island]
+						}
+					}
 				]
 			};
 		}
 		case 'cell': {
-			const island = rt.islands.length ? r.pick(rt.islands) : undefined;
-			if (island?.type !== 'table') return undefined;
+			const island = rt.islands?.length ? r.pick(rt.islands) : undefined;
+			if (island?.type !== 'table' || !island.slots) return undefined;
+			const slot = r.pick(Object.keys(island.slots));
 			return {
-				islandOps: [{ op: 'set', id: island.id, type: 'table', props: table(r.pick(WORDS)) }]
+				steps: [
+					{
+						nested: {
+							island: island.id,
+							slot,
+							change: { steps: [{ splice: { at: 0, insert: r.pick(WORDS) } }] }
+						}
+					}
+				]
 			};
 		}
 		case 'nearTable': {
-			const slots = Array.from(rt.text).flatMap((c, i) => (c === SLOT ? [i] : []));
 			if (!slots.length) return undefined;
 			const s = r.pick(slots);
 			const at = r.next() < 0.5 ? Math.max(0, s - 1) : Math.min(len, s + 2);
-			return { delta: { ops: [{ retain: at }, { insert: r.pick(WORDS) }] } };
+			return { steps: [{ splice: { at: u(at), insert: r.pick(WORDS) } }] };
 		}
 		case 'cut': {
 			// A deletion that spans a table's slot, the edit that deletes an island.
-			const slots = Array.from(rt.text).flatMap((c, i) => (c === SLOT ? [i] : []));
 			if (!slots.length) return undefined;
 			const s = r.pick(slots);
 			const at = Math.max(0, s - r.int(3));
-			return {
-				delta: { ops: [{ retain: at }, { delete: Math.min(len - at, s - at + 1 + r.int(2)) }] }
-			};
+			return deleteRange(rt, u(at), u(Math.min(len, s + 1 + r.int(2))));
 		}
 	}
 }
@@ -235,16 +201,11 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 		) {
 			case 'content': {
 				const addr = r.pick(contentAddrs(q, p));
-				const rt = (doc.getStored(addr) as Content | undefined) ?? {
-					text: '',
-					lines: [{ kind: 'para', containers: [] }],
-					marks: [],
-					islands: []
-				};
-				const bundle = contentEdit(r, rt);
-				if (!bundle) return false;
 				if (doc.getStored(addr) == null) return false;
-				doc.applyChange(addr, bundle);
+				const at = typeof addr.card === 'number' ? { ...addr, card: doc.card(addr.card).id } : addr;
+				const change = contentEdit(r, doc.read(at));
+				if (!change) return false;
+				doc.apply(at, change);
 				break;
 			}
 			case 'text':
@@ -291,8 +252,14 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 			case 'retype': {
 				if (!doc.cardCount) return false;
 				const at = r.int(doc.cardCount);
-				doc.insertCard({ ...doc.card(at), kind: r.pick(kinds) }, at);
-				doc.removeCard(at + 1);
+				const was = doc.card(at);
+				doc.removeCard(at);
+				try {
+					doc.insertCard({ ...was, kind: r.pick(kinds) }, at);
+				} catch (e) {
+					doc.insertCard(was, at);
+					throw e;
+				}
 				break;
 			}
 			case 'rename': {
@@ -367,7 +334,7 @@ describe('three peers, random concurrent edits', () => {
 				if (p.errors.length) failures.push(`seed ${seed}: ${String(p.errors[0])}`);
 				const names = ['main', ...p.binding.ids];
 				contentAddrs(q, p).forEach((addr) => {
-					const card = addr.card === undefined ? 'main' : names[addr.card + 1];
+					const card = addr.card === undefined ? 'main' : names[(addr.card as number) + 1];
 					const stored = p.doc.getStored(addr) as Content | undefined;
 					if (!stored) return;
 					const projected = project(

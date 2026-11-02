@@ -13,6 +13,7 @@ import type { Content, Document, TableProps } from '@quillmark/wasm';
 import { createField, plaintextSchema, proseLeafPlugins } from '$lib/core/codec';
 import type { FieldController, LeafViews } from '$lib/core/codec';
 import { core, md, mount, probeQuill, quill, viewOf } from './_util.js';
+import { depthsOf } from './_util.js';
 
 type Clipboard = Record<string, string>;
 
@@ -30,7 +31,7 @@ function pasteEvent(data: Clipboard = {}): ClipboardEvent {
  *  draft. An empty `markdown` is an empty body. */
 function body(markdown = 'para') {
 	const doc = quill().seedDocument();
-	doc.overwrite({}, md(markdown));
+	doc.replace({}, md(markdown));
 	const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 	const view = viewOf(field);
 	view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)));
@@ -57,7 +58,7 @@ describe('a block leaf reads markdown text', () => {
 		expect(core.exportMarkdown(rt)).toBe(
 			core.exportMarkdown(md('para\n\n- Purpose\n- Background\n  - first\n  - second\n- Action'))
 		);
-		expect(rt.lines.at(-2)?.containers).toHaveLength(2);
+		expect(depthsOf(rt).at(-2)).toBe(2);
 	});
 
 	// What an LLM chat's copy button writes: markdown and no HTML.
@@ -82,7 +83,7 @@ describe('a block leaf reads markdown text', () => {
 		].join('\n');
 		const rt = pasted(text(answer), '');
 		expect(core.exportMarkdown(rt)).toBe(core.exportMarkdown(md(answer)));
-		expect(rt.islands.map((island) => island.type)).toEqual(['table']);
+		expect(rt.islands!.map((island) => island.type)).toEqual(['table']);
 	});
 
 	it.each([
@@ -106,7 +107,7 @@ describe('a block leaf reads markdown text', () => {
 	it('a memo’s unindented outline nests by its markers: `1.`, `a.`, `(1)`, `(a)`', () => {
 		const rt = pasted(text('1. A\na. sub\n(1) deep\n(a) deeper\nb. sub2\n2. B'), '');
 		expect(rt.text).toBe('A\nsub\ndeep\ndeeper\nsub2\nB');
-		expect(rt.lines.map((line) => line.containers.length)).toEqual([1, 2, 3, 4, 2, 1]);
+		expect(depthsOf(rt)).toEqual([1, 2, 3, 4, 2, 1]);
 	});
 
 	it('bullet characters are bullets', () => {
@@ -117,7 +118,7 @@ describe('a block leaf reads markdown text', () => {
 	it('a list counting from past its first marker keeps its count', () => {
 		const rt = pasted(text('Intro\n(3) three\n(4) four'), '');
 		expect(rt.text).toBe('Intro\nthree\nfour');
-		expect(rt.lines.map((line) => line.containers.length)).toEqual([0, 1, 1]);
+		expect(depthsOf(rt)).toEqual([0, 1, 1]);
 	});
 
 	it('a pipe table lands as an island, under an id the paste pass mints past the field’s', () => {
@@ -125,14 +126,14 @@ describe('a block leaf reads markdown text', () => {
 			text('| a | b |\n|---|---|\n| 1 | 2 |'),
 			'| x | y |\n|---|---|\n| 3 | 4 |\n\npara'
 		);
-		expect(rt.islands.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
+		expect(rt.islands!.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
 	});
 
 	it('text with no block at a line head stays literal', () => {
 		const rt = pasted(text('A dash - mid-sentence\nand **bold** with no block'));
 		expect(rt.text).toBe('para\nA dash - mid-sentence\nand **bold** with no block');
-		expect(rt.marks).toEqual([]);
-		expect(rt.lines.every((line) => line.containers.length === 0)).toBe(true);
+		expect(rt.marks ?? []).toEqual([]);
+		expect(depthsOf(rt).every((d) => d === 0)).toBe(true);
 	});
 
 	it.each([
@@ -152,8 +153,8 @@ describe('a block leaf reads markdown text', () => {
 		['a footnote', '- noted[^1]\n\n[^1]: The note.']
 	])('a draft holding %s stays literal', (_, markdown) => {
 		const rt = pasted(text(markdown));
-		expect(rt.islands).toEqual([]);
-		expect(rt.lines.every((line) => line.kind === 'para' && !line.containers.length)).toBe(true);
+		expect(rt.islands).toBeUndefined();
+		expect(rt.blocks.every((b) => b.kind === 'para' && !b.path)).toBe(true);
 	});
 
 	it('nesting past the store’s depth stays literal', () => {
@@ -164,7 +165,7 @@ describe('a block leaf reads markdown text', () => {
 	// The DOM parse reads the source's own structure, so the text beside it is not read.
 	it('HTML on the clipboard is the paste, and the text beside it is not read', () => {
 		const rt = pasted({ 'text/html': '<h2>Purpose</h2>', 'text/plain': '# Purpose' });
-		expect(rt.lines.at(-1)).toMatchObject({ kind: 'heading', attrs: { level: 2 } });
+		expect(rt.blocks.at(-1)).toMatchObject({ kind: 'heading', attrs: { level: 2 } });
 	});
 
 	// `pasteText` is ProseMirror's paste as plain text, the one a Shift-held paste takes.
@@ -172,7 +173,7 @@ describe('a block leaf reads markdown text', () => {
 		const { doc, field, view } = body();
 		view.pasteText('- Purpose\n- Action', pasteEvent());
 		expect(doc.main.body.text).toBe('para\n- Purpose\n- Action');
-		expect(doc.main.body.lines.every((line) => line.containers.length === 0)).toBe(true);
+		expect(depthsOf(doc.main.body).every((d) => d === 0)).toBe(true);
 		field.destroy();
 	});
 });
@@ -218,12 +219,12 @@ main:
 		f.destroy();
 		return q.reader(doc).getContent(field)!;
 	}
-	const listed = (rt: Content): boolean => rt.lines.some((line) => line.containers.length);
+	const listed = (rt: Content): boolean => depthsOf(rt).some((d) => d > 0);
 
 	it('a block richtext field', () => {
 		const rt = pasteInto('notes', {});
 		expect(rt.text).toBe('Purpose\nAction');
-		expect(rt.lines.every((line) => line.containers.length === 1)).toBe(true);
+		expect(depthsOf(rt).every((d) => d === 1)).toBe(true);
 	});
 
 	it('an inline richtext field keeps the text, its lines joined', () => {
@@ -234,7 +235,7 @@ main:
 
 	it('a multiline text field keeps the text, line for line', () => {
 		const rt = pasteInto('address', { plaintext: true });
-		expect(rt.text).toBe(LIST);
+		expect(rt.text).toBe(LIST.replaceAll('\n', '\u2028'));
 		expect(listed(rt)).toBe(false);
 	});
 
@@ -266,7 +267,7 @@ describe('a URL pasted over a selection links it', () => {
 	 *  (each later block one position further on per boundary it crosses). */
 	function selected(markdown: string, from: number, to: number) {
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md(markdown));
+		doc.replace({}, md(markdown));
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const view = viewOf(field);
 		view.dispatch(
@@ -303,18 +304,18 @@ describe('a URL pasted over a selection links it', () => {
 	])('%s replaces the selection, as any text does', (_, clip) => {
 		const rt = pastedOver('see the roster', 4, 14, text(clip));
 		expect(rt.text).toBe(`see ${clip}`);
-		expect(rt.marks).toEqual([]);
+		expect(rt.marks ?? []).toEqual([]);
 	});
 
 	it('a selection crossing blocks takes the default paste', () => {
 		const rt = pastedOver('see the\n\nroster', 4, 11, text(URL));
-		expect(rt.marks).toEqual([]);
+		expect(rt.marks ?? []).toEqual([]);
 		expect(rt.text).toBe(`see ${URL}ster`);
 	});
 
 	it('a selection inside a fence takes the default paste', () => {
 		const rt = pastedOver('```\nconst a = 1;\n```', 6, 7, text(URL));
-		expect(rt.marks).toEqual([]);
+		expect(rt.marks ?? []).toEqual([]);
 		expect(rt.text).toBe(`const ${URL} = 1;`);
 	});
 
@@ -340,13 +341,14 @@ describe('a URL pasted over a selection links it', () => {
 
 	it("a table cell's own paste links its words too", () => {
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md('| a | b |\n|---|---|\n| the roster | 2 |'));
+		doc.replace({}, md('| a | b |\n|---|---|\n| the roster | 2 |'));
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const cell = (field as FieldController & LeafViews).nestedViews()[2]!;
 		cell.dispatch(cell.state.tr.setSelection(TextSelection.create(cell.state.doc, 5, 11)));
 		cell.dom.dispatchEvent(pasteEvent(text(URL)));
-		const props = field.getContent().islands[0]!.props as TableProps;
-		expect(props.rows[0]![0]).toEqual({
+		const island = field.getContent().islands![0]!;
+		const props = island.props as TableProps;
+		expect(island.slots![props.rows[1]!.cells[props.columns[0]!]!]).toMatchObject({
 			text: 'the roster',
 			marks: [{ start: 4, end: 10, type: 'link', attrs: { url: URL } }]
 		});

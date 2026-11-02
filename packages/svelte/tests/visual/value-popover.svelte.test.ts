@@ -14,7 +14,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { toggleMark } from 'prosemirror-commands';
 import { AllSelection, TextSelection } from 'prosemirror-state';
-import type { Content, Document, PathStep } from '@quillmark/wasm';
+import type { Content, Document, PathStep, TableProps } from '@quillmark/wasm';
 import { hasMarks } from '$lib/core/codec';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
@@ -359,7 +359,7 @@ describe('the formatting popover over a field’s own leaf', () => {
 			.click();
 		flushSync();
 		expect(intro.querySelector('ol > li')?.textContent).toBe('Intro words');
-		expect(q.reader(doc).getContentAt({ field: 'intro' }, [])?.lines[0].containers).toHaveLength(1);
+		expect(q.reader(doc).getContentAt({ field: 'intro' }, [])?.blocks[0].path).toHaveLength(2);
 		expect(document.activeElement).toBe(intro);
 	});
 
@@ -544,9 +544,9 @@ describe('Mod-K raises the link prompt', () => {
 		expect(modK(cell).defaultPrevented).toBe(true);
 		expect(document.activeElement).toBe(prompt());
 		submit('example.com');
-		const table = doc.main.body.islands[0].props as {
-			header: { text: string; marks: { type: string; start: number; end: number }[] }[];
-		};
-		expect(table.header[0].marks.map((m) => [m.type, m.start, m.end])).toEqual([['link', 0, 2]]);
+		const island = doc.main.body.islands![0];
+		const props = island.props as TableProps;
+		const head = island.slots![props.rows[0]!.cells[props.columns[0]!]!]!;
+		expect(head.marks?.map((m) => [m.type, m.start, m.end])).toEqual([['link', 0, 2]]);
 	});
 });

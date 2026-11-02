@@ -103,6 +103,13 @@ const marks: Record<string, MarkSpec> = {
 			];
 		}
 	},
+	// A content mark this build names no PM mark for, by its `x-` type and attributes as written. It
+	// formats nothing, and several stack on one character.
+	ext: {
+		attrs: { type: {}, attrs: { default: null } },
+		excludes: '',
+		toDOM: () => ['span', 0]
+	},
 	link: {
 		attrs: { href: { default: '' } },
 		inclusive: false,
@@ -144,22 +151,27 @@ function fenceLang(pre: HTMLElement): string | null {
 }
 
 // ── Block nodes ─────────────────────────────────────────────────────────────
+// Every block and container carries the id of the content part it decodes from, `null` on one a
+// command or a paste made. No `toDOM` writes it, so a copy carries none, and the projection keeps the
+// first holder of an id a split copied (`encode.ts`).
+const ID = { default: null };
+
 const blockNodes: Record<string, NodeSpec> = {
 	doc: { content: 'block+' },
 	paragraph: {
 		content: 'inline*',
 		group: 'block',
+		attrs: { id: ID, ext: { default: null } },
 		parseDOM: [{ tag: 'p' }],
 		toDOM: () => ['p', 0]
 	},
-	// A heading holds no `hard_break`: the store clears a `continues` after one and markdown has no
-	// syntax for a break inside it. Declaring it out makes that structural rather than a rule each
-	// door holds.
+	// A heading holds no `hard_break`: the store refuses a break in one and markdown has no syntax
+	// for it. Declaring it out makes that structural rather than a rule each door holds.
 	heading: {
 		content: '(text | island_inline)*',
 		group: 'block',
 		defining: true,
-		attrs: { level: { default: 1 } },
+		attrs: { id: ID, level: { default: 1 } },
 		parseDOM: [1, 2, 3, 4, 5, 6].map((level) => ({ tag: `h${level}`, attrs: { level } })),
 		toDOM: (node) => [`h${node.attrs.level as number}`, 0]
 	},
@@ -170,7 +182,7 @@ const blockNodes: Record<string, NodeSpec> = {
 		defining: true,
 		marks: '',
 		whitespace: 'pre',
-		attrs: { lang: { default: null } },
+		attrs: { id: ID, lang: { default: null } },
 		parseDOM: [
 			{
 				tag: 'pre',
@@ -188,14 +200,20 @@ const blockNodes: Record<string, NodeSpec> = {
 		content: 'block+',
 		group: 'block',
 		defining: true,
+		attrs: { id: ID },
 		parseDOM: [{ tag: 'blockquote' }],
 		toDOM: () => ['blockquote', 0]
 	},
-	horizontal_rule: { group: 'block', parseDOM: [{ tag: 'hr' }], toDOM: () => ['hr'] },
+	horizontal_rule: {
+		group: 'block',
+		attrs: { id: ID },
+		parseDOM: [{ tag: 'hr' }],
+		toDOM: () => ['hr']
+	},
 	ordered_list: {
 		content: 'list_item+',
 		group: 'block',
-		attrs: { start: { default: 1 } },
+		attrs: { id: ID, start: { default: 1 } },
 		parseDOM: [
 			{
 				tag: 'ol',
@@ -217,6 +235,7 @@ const blockNodes: Record<string, NodeSpec> = {
 	bullet_list: {
 		content: 'list_item+',
 		group: 'block',
+		attrs: { id: ID },
 		parseDOM: [{ tag: 'ul' }],
 		toDOM: () => ['ul', 0]
 	},
@@ -224,7 +243,7 @@ const blockNodes: Record<string, NodeSpec> = {
 	list_item: {
 		content: 'block+',
 		defining: true,
-		attrs: { checked: { default: null } },
+		attrs: { id: ID, checked: { default: null } },
 		parseDOM: [
 			{
 				tag: 'li',

@@ -11,9 +11,16 @@
 import { describe, it, expect } from 'vitest';
 import { GapCursor } from 'prosemirror-gapcursor';
 import { undo, undoDepth } from 'prosemirror-history';
-import { AllSelection, NodeSelection, Selection, TextSelection } from 'prosemirror-state';
+import {
+	AllSelection,
+	EditorState,
+	NodeSelection,
+	Selection,
+	TextSelection
+} from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { createField, decode, blockSchema, pmToContent } from '$lib/core/codec';
+import { createField, decode, blockSchema, pmToContent, proseLeafPlugins } from '$lib/core/codec';
+import { DEFAULT_TABLE_STRINGS, tableNodeView } from '$lib/core/codec/table-view.js';
 import { cellSchema } from '$lib/core/codec/schema.js';
 import type { FieldController, LeafViews } from '$lib/core/codec';
 import {
@@ -42,11 +49,16 @@ import {
 	mergeCells,
 	spanGrid,
 	splitCell,
-	withCell
+	withCell,
+	gridOf,
+	islandOf,
+	tableOfNode,
+	type GridCell,
+	type TableGrid
 } from '$lib/core/codec/table.js';
 import { mintIslandId } from '$lib/core/codec/islands.js';
 import { tableElement } from '$lib/core/codec/table-copy.js';
-import type { Content, TableCell, TableProps } from '@quillmark/wasm';
+import type { Content, TableProps } from '@quillmark/wasm';
 import { core, mount, press, quill, md } from './_util.js';
 import {
 	CHROME,
@@ -60,24 +72,55 @@ import {
 
 const TABLE_MD = 'para\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ntail';
 
-/** A table payload no reader can index. The store's table decode fills what it can and
- *  keeps the rest, so this is a stored state and not only a pasted one; the cast is the
- *  authored shape, which the type is right to refuse. */
+/** A table payload no reader can index: what a paste of a foreign island element can
+ *  carry, which the store refuses and the leaf still draws. */
 const BAD_PROPS = { any: 1 } as unknown as TableProps;
 
-function cell(text: string): TableCell {
+/** A body's leaf plugins and table view over {@link TABLE_MD} with {@link BAD_PROPS} in
+ *  the island: a view the store never held, so mounted without a field. */
+function placeholderView(): EditorView {
+	const rt = md(TABLE_MD);
+	rt.islands![0] = { id: 'isl-0', type: 'table', props: BAD_PROPS };
+	const state = EditorState.create({
+		doc: decode(rt, blockSchema),
+		plugins: proseLeafPlugins(blockSchema, { inline: false })
+	});
+	return new EditorView(mount(), {
+		state,
+		nodeViews: {
+			island_block: tableNodeView({
+				strings: () => DEFAULT_TABLE_STRINGS,
+				register: () => () => {},
+				onCellFocus: () => {},
+				clearance: undefined
+			})
+		}
+	});
+}
+
+function cell(text: string): GridCell {
 	return { text, marks: [] };
 }
 
-/** The table island's props in a content. */
-function propsOf(rt: Content): TableProps {
-	return rt.islands[0].props as TableProps;
+/** `grid` without the ids its cells arrived under: the table a reader sees. */
+function bare(grid: TableGrid): TableGrid {
+	const strip = (cells: GridCell[]) => cells.map(({ ids: _ids, ...cell }) => cell);
+	return { ...grid, header: strip(grid.header), rows: grid.rows.map(strip) };
 }
 
-/** A content holding one table island, with `props` in place of the imported ones. */
-function withTable(props: TableProps): Content {
+/** The table island's grid in a content, without its ids. */
+function propsOf(rt: Content): TableGrid {
+	const island = rt.islands![0];
+	return bare(gridOf(island.props as TableProps, island.slots ?? null));
+}
+
+/** A content holding one table island, spelling `grid` in place of the imported one. */
+function withTable(grid: TableGrid): Content {
 	const rt = md(TABLE_MD);
-	rt.islands[0].props = props;
+	rt.islands![0] = { ...rt.islands![0], ...islandOf(grid) } as Content['islands'] extends
+		(infer I)[] | undefined
+		? I
+		: never;
 	return rt;
 }
 
@@ -85,12 +128,12 @@ function withTable(props: TableProps): Content {
  *  a ragged op would be caught by. */
 function stored(rt: Content): Content {
 	const doc = quill().seedDocument();
-	doc.overwrite({}, rt);
+	doc.replace({}, rt);
 	return doc.main.body;
 }
 
 /** The table `text` grid, the shape assertions read against. */
-function grid(props: TableProps): string[][] {
+function grid(props: TableGrid): string[][] {
 	return Array.from({ length: rowCount(props) }, (_, r) => rowCells(props, r).map((c) => c.text));
 }
 
@@ -106,7 +149,7 @@ const LETTERED = normalizeTable({
 describe('the rectangle survives every op', () => {
 	// One case per op, each asserted the same way: what the store holds after an
 	// install is exactly the projection the editor is showing.
-	const OPS: { name: string; run: (p: TableProps) => TableProps }[] = [
+	const OPS: { name: string; run: (p: TableGrid) => TableGrid }[] = [
 		{ name: 'insert a row below the header', run: (p) => insertRow(p, 0) },
 		{ name: 'insert a row below the last', run: (p) => insertRow(p, rowCount(p) - 1) },
 		{ name: 'delete a body row', run: (p) => deleteRow(p, 1) },
@@ -194,7 +237,7 @@ describe('the layout keys ride every op', () => {
 
 describe('merged cells', () => {
 	/** Each drawn cell's span as `colspan x rowspan`, and `-` for a covered slot. */
-	const spans = (props: TableProps) =>
+	const spans = (props: TableGrid) =>
 		spanGrid(props).map((row) =>
 			row.map((span) => (span ? `${span.colspan}x${span.rowspan}` : '-'))
 		);
@@ -207,7 +250,7 @@ describe('merged cells', () => {
 			['2x2', '-'],
 			['-', '-']
 		]);
-		expect(cellAt(MERGED, 1, 0).text).toBe('a1\na2\nb1\nb2');
+		expect(cellAt(MERGED, 1, 0).text).toBe('a1\u2028a2\u2028b1\u2028b2');
 		expect(propsOf(stored(withTable(MERGED)))).toEqual(MERGED);
 		expect(shapeEqual(MERGED, LETTERED)).toBe(false);
 	});
@@ -230,7 +273,7 @@ describe('merged cells', () => {
 		expect(spans(split)).toEqual(spans(LETTERED));
 		expect(grid(split)).toEqual([
 			['h1', 'h2'],
-			['a1\na2\nb1\nb2', ''],
+			['a1\u2028a2\u2028b1\u2028b2', ''],
 			['', '']
 		]);
 	});
@@ -251,7 +294,7 @@ describe('merged cells', () => {
 			['1x1', '1x1'],
 			['2x1', '-']
 		]);
-		expect(cellAt(own, 1, 0).text).toBe('a1\na2\nb1\nb2');
+		expect(cellAt(own, 1, 0).text).toBe('a1\u2028a2\u2028b1\u2028b2');
 		expect(spans(deleteColumn(MERGED, 0))[1]).toEqual(['1x2']);
 		for (const next of [row, column, below, own])
 			expect(propsOf(stored(withTable(next)))).toEqual(next);
@@ -306,42 +349,33 @@ describe('what the model already answers', () => {
 
 describe('the cell codec: a cell is its own content unit', () => {
 	/** A cell through decode and back: the round-trip a keystroke rides. */
-	function roundTrip(c: TableCell): TableCell {
+	function roundTrip(c: GridCell): GridCell {
 		return cellFromDoc(decode(cellContent(c), cellSchema), c);
 	}
 
 	it("a cell's marks are cell-local and survive the trip", () => {
-		const c: TableCell = { text: 'bold text', marks: [{ start: 0, end: 4, type: 'strong' }] };
+		const c: GridCell = { text: 'bold text', marks: [{ start: 0, end: 4, type: 'strong' }] };
 		expect(roundTrip(c)).toEqual(c);
 	});
 
 	it('an anchor in a cell is preserved verbatim across an edit', () => {
-		const c: TableCell = {
-			text: 'abcd',
-			marks: [{ start: 3, end: 3, type: 'anchor', attrs: { id: 'a1' } }] as TableCell['marks']
-		};
+		const c: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'a1', start: 3, end: 3 }] };
 		// Retype the cell to something longer, inserted before the anchor.
 		const edited = decode(cellContent({ text: 'XXabcd', marks: [] }), cellSchema);
-		const next = cellFromDoc(edited, c);
-		const anchor = next.marks.find((m) => m.type === 'anchor') as {
-			start: number;
-			attrs: { id: string };
-		};
-		expect(anchor.attrs.id).toBe('a1');
-		expect(anchor.start).toBe(5); // rebased through the two inserted chars
+		expect(cellFromDoc(edited, c).anchors).toEqual([{ id: 'a1', start: 5, end: 5 }]);
 	});
 
 	it('a cell anchor holds its position against an insertion at it, as a field’s does', () => {
-		const c: TableCell = {
-			text: 'abcd',
-			marks: [{ start: 2, end: 2, type: 'anchor', attrs: { id: 'a1' } }] as TableCell['marks']
-		};
+		const c: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'a1', start: 2, end: 2 }] };
 		// Typed at the anchor's own position: the one offset where the two assocs differ.
 		const edited = decode(cellContent({ text: 'abXcd', marks: [] }), cellSchema);
-		const anchor = cellFromDoc(edited, c).marks.find((m) => m.type === 'anchor') as {
-			start: number;
-		};
-		expect(anchor.start).toBe(2);
+		expect(cellFromDoc(edited, c).anchors?.[0]?.start).toBe(2);
+	});
+
+	it('a range anchor in a cell keeps its extent through an edit inside it', () => {
+		const c: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'r1', start: 1, end: 3 }] };
+		const edited = decode(cellContent({ text: 'abXcd', marks: [] }), cellSchema);
+		expect(cellFromDoc(edited, c).anchors).toEqual([{ id: 'r1', start: 1, end: 4 }]);
 	});
 
 	it('two spellings of one mark are one cell, whatever order the keys arrive in', () => {
@@ -349,17 +383,17 @@ describe('the cell codec: a cell is its own content unit', () => {
 		// the other's key order: compared as text, an own edit reads as an external one
 		// and `TableIslandView.update` reseeds the cell being typed in on every
 		// keystroke, caret and all.
-		const stored: TableCell = {
+		const stored: GridCell = {
 			text: 'linked',
 			marks: [
 				{ start: 0, end: 6, type: 'link', attrs: { url: 'https://x.com' } }
-			] as TableCell['marks']
+			] as GridCell['marks']
 		};
-		const projected: TableCell = {
+		const projected: GridCell = {
 			text: 'linked',
 			marks: [
 				{ attrs: { url: 'https://x.com' }, type: 'link', end: 6, start: 0 }
-			] as TableCell['marks']
+			] as GridCell['marks']
 		};
 
 		expect(cellEqual(stored, projected)).toBe(true);
@@ -367,7 +401,7 @@ describe('the cell codec: a cell is its own content unit', () => {
 		expect(cellEqual(stored, { ...stored, marks: [] })).toBe(false);
 	});
 
-	it('a hard break is one `\\n`, and a mark either side of it keeps its offsets', () => {
+	it('a hard break is one U+2028, and a mark either side of it keeps its offsets', () => {
 		const strong = cellSchema.marks.strong.create();
 		const doc = cellSchema.node('doc', null, [
 			cellSchema.node('paragraph', null, [
@@ -379,7 +413,7 @@ describe('the cell codec: a cell is its own content unit', () => {
 		]);
 		const cell = cellFromDoc(doc, emptyCell());
 		expect(cell).toEqual({
-			text: 'a\nbc',
+			text: 'a\u2028bc',
 			marks: [
 				{ start: 0, end: 1, type: 'strong' },
 				{ start: 2, end: 3, type: 'strong' }
@@ -388,8 +422,8 @@ describe('the cell codec: a cell is its own content unit', () => {
 		expect(decode(cellContent(cell), cellSchema).eq(doc)).toBe(true);
 	});
 
-	it('a mark spanning a stored `\\n` leaves the break unmarked, as decode does in prose', () => {
-		const spanning: TableCell = { text: 'a\nbc', marks: [{ start: 0, end: 3, type: 'strong' }] };
+	it('a mark spanning a stored break leaves the break unmarked, as decode does in prose', () => {
+		const spanning: GridCell = { text: 'a\u2028bc', marks: [{ start: 0, end: 3, type: 'strong' }] };
 		expect(decode(cellContent(spanning), cellSchema).toString()).toBe(
 			'doc(paragraph(strong("a"), hard_break, strong("b"), "c"))'
 		);
@@ -399,9 +433,9 @@ describe('the cell codec: a cell is its own content unit', () => {
 // ── The NodeView ────────────────────────────────────────────────────────────
 
 /** A body holding one table island, mounted as a leaf. */
-function tableLeaf(props?: TableProps) {
+function tableLeaf(props?: TableGrid) {
 	const doc = quill().seedDocument();
-	doc.overwrite({}, props ? withTable(props) : md(TABLE_MD));
+	doc.replace({}, props ? withTable(props) : md(TABLE_MD));
 	const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 	return { doc, field };
 }
@@ -478,7 +512,7 @@ function cellViews(field: FieldController): EditorView[] {
 }
 
 /** The stored table props for a mounted leaf. */
-function leafProps(field: FieldController): TableProps {
+function leafProps(field: FieldController): TableGrid {
 	return propsOf(field.getContent());
 }
 
@@ -648,7 +682,7 @@ describe('the table NodeView', () => {
 		// That rectangle spans both axes — the column is every column and it runs every
 		// row — so it is the table, and the table is what goes.
 		press(caret(field), 'Backspace');
-		expect(doc.main.body.islands).toHaveLength(0);
+		expect(doc.main.body.islands ?? []).toHaveLength(0);
 		field.destroy();
 	});
 
@@ -923,13 +957,13 @@ describe('the table NodeView', () => {
 		}
 	});
 
-	it('Shift-Enter in a cell is a line break: one `\\n` in its text, and no row', () => {
+	it('Shift-Enter in a cell is a line break: one U+2028 in its text, and no row', () => {
 		const { field } = tableLeaf(LETTERED);
 		const view = cellViews(field)[0];
 		view.focus();
 		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 2)));
 		press(view, 'Enter', { shiftKey: true });
-		expect(leafProps(field).header[0].text).toBe('h\n1');
+		expect(leafProps(field).header[0].text).toBe('h\u20281');
 		expect(leafProps(field).rows).toHaveLength(2);
 		expect(view.state.doc.toString()).toBe('doc(paragraph("h", hard_break, "1"))');
 		expect((field as FieldController & LeafViews).focusedView()).toBe(view);
@@ -1004,26 +1038,22 @@ describe('the table NodeView', () => {
 
 	it('a reseed leaves the record current, so a second external change reseeds again', () => {
 		const { doc, field } = tableLeaf(LETTERED);
-		doc.overwrite({}, withTable(withCell(LETTERED, 0, 0, cell('ONE'))));
+		doc.replace({}, withTable(withCell(LETTERED, 0, 0, cell('ONE'))));
 		field.applyExternal();
 		expect(cellViews(field)[0].state.doc.textContent).toBe('ONE');
 		// Back to the value the cell mounted with, which is what a record left at the
 		// mount seed still holds: it would compare equal and the reseed be skipped.
-		doc.overwrite({}, withTable(LETTERED));
+		doc.replace({}, withTable(LETTERED));
 		field.applyExternal();
 		expect(cellViews(field)[0].state.doc.textContent).toBe('h1');
 		field.destroy();
 	});
 
 	it('an island whose props no reader can index keeps the literal placeholder', () => {
-		const doc = quill().seedDocument();
-		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS };
-		doc.overwrite({}, rt);
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
-		expect(field.el.querySelector('table')).toBeNull();
-		expect(field.el.textContent).toContain('[table]');
-		field.destroy();
+		const view = placeholderView();
+		expect(view.dom.querySelector('table')).toBeNull();
+		expect(view.dom.textContent).toContain('[table]');
+		view.destroy();
 	});
 });
 
@@ -1079,15 +1109,13 @@ describe('a delete against a table steps into it', () => {
 		expect(caret(field)).toBe(cellViews(field).at(-1));
 	});
 	it('a placeholder island answers as an atom: Backspace below it selects it', () => {
-		const doc = quill().seedDocument();
-		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS };
-		doc.overwrite({}, rt);
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
-		press(caretIn(field, 'tail', 0), 'Backspace');
-		const { selection } = outerView(field).state;
+		const view = placeholderView();
+		const tail = view.state.doc.content.size - 'tail'.length - 1;
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, tail)));
+		press(view, 'Backspace');
+		const { selection } = view.state;
 		expect(selection instanceof NodeSelection && selection.node.type.name).toBe('island_block');
-		field.destroy();
+		view.destroy();
 	});
 });
 
@@ -1160,7 +1188,7 @@ describe('a cell’s own alignment is carried, never authored', () => {
 			[cell('b1'), { ...cell('b2'), align: 'left', valign: 'middle' }]
 		]
 	});
-	const own = (props: TableProps, text: string) => {
+	const own = (props: TableGrid, text: string) => {
 		const found = Array.from({ length: rowCount(props) }, (_, r) => rowCells(props, r))
 			.flat()
 			.find((c) => c.text === text)!;
@@ -1267,7 +1295,7 @@ describe('alignment is set on the held column', () => {
 	// A cell's own alignment outranks its column's, so a press that left it would draw no
 	// change over a column whose cells arrive aligned.
 	it('a press clears its cells’ own alignment in the same step, even at the column’s', () => {
-		const centered = (c: TableCell): TableCell => ({ ...c, align: 'center' });
+		const centered = (c: GridCell): GridCell => ({ ...c, align: 'center' });
 		const { field } = tableLeaf(
 			normalizeTable({
 				...LETTERED,
@@ -1449,7 +1477,7 @@ describe('a grip holds a line and a sweep holds cells', () => {
 		press(caret(field), 'Backspace');
 		// Every rank going at once leaves no table for a rank deletion to have produced,
 		// so what the selection names is the table.
-		expect(doc.main.body.islands).toHaveLength(0);
+		expect(doc.main.body.islands ?? []).toHaveLength(0);
 		expect(doc.main.body.text).toBe('para\ntail');
 		// An ordinary transaction on the leaf's own view, so one undo brings it back whole.
 		press(outerView(field), 'z', { ctrlKey: true });
@@ -1801,7 +1829,7 @@ describe('a pointer press on the island resolves to a caret', () => {
 	it('a gap cursor is the caret where the document holds no text position', () => {
 		// The island is the whole document, so there is no block beside it to write in.
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md('| a | b |\n|---|---|\n| 1 | 2 |'));
+		doc.replace({}, md('| a | b |\n|---|---|\n| 1 | 2 |'));
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		layout(field, HOSTS.slice(0, 4));
 		pressAt(field.el.querySelector('.qm-table-island')!, 195, 110);
@@ -1810,18 +1838,14 @@ describe('a pointer press on the island resolves to a caret', () => {
 	});
 
 	it('an island drawing no interior keeps the click: the rule, not an exception', () => {
-		const doc = quill().seedDocument();
-		const rt = md(TABLE_MD);
-		rt.islands[0] = { id: 'isl-0', type: 'table', props: BAD_PROPS };
-		doc.overwrite({}, rt);
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const view = placeholderView();
 		// Dispatched at the island rather than through it: PM's own mousedown wants a
 		// `elementFromPoint` jsdom does not have, and what is asserted is that the
 		// guard declined to stand in front of it.
 		const event = new MouseEvent('mousedown', { cancelable: true, clientX: 5, clientY: 5 });
-		field.el.querySelector('.qm-table-island')!.dispatchEvent(event);
+		view.dom.querySelector('.qm-table-island')!.dispatchEvent(event);
 		expect(event.defaultPrevented).toBe(false);
-		field.destroy();
+		view.destroy();
 	});
 });
 
@@ -1877,7 +1901,7 @@ describe('a selection is the subject of the next command', () => {
 
 	it('a printable key over an INLINE island lands after the image, in its line', () => {
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md('a ![alt](url) b'));
+		doc.replace({}, md('a ![alt](url) b'));
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const outer = outerView(field);
 		let at = -1;
@@ -1925,7 +1949,7 @@ function clipboard(kind: 'copy' | 'cut' | 'paste', seed: Clipboard = {}) {
  *  event on the leaf, read by the handler ProseMirror registers for one. */
 function pasted(data: Clipboard, markdown = 'para'): Content {
 	const doc = quill().seedDocument();
-	doc.overwrite({}, md(markdown));
+	doc.replace({}, md(markdown));
 	const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 	const outer = outerView(field);
 	outer.dispatch(outer.state.tr.setSelection(Selection.atEnd(outer.state.doc)));
@@ -1974,13 +1998,13 @@ describe('a table on the clipboard lands as a table island', () => {
 		);
 	});
 
-	it('Excel: its markup and its text alone read as one table, a break a `\\n`', () => {
+	it('Excel: its markup and its text alone read as one table, a break a U+2028', () => {
 		const both = pasted(EXCEL);
 		expect(propsOf(both)).toEqual({
 			header: [cell('Grade'), cell('Count')],
 			rows: [
 				[cell('O-3'), cell('12')],
-				[cell('Line one\nLine two'), cell('7')]
+				[cell('Line one\u2028Line two'), cell('7')]
 			],
 			aligns: ['none', 'none']
 		});
@@ -2000,7 +2024,7 @@ describe('a table on the clipboard lands as a table island', () => {
 			],
 			rows: [
 				[
-					cell('Submit roster\nby Friday'),
+					cell('Submit roster\u2028by Friday'),
 					{
 						text: 'AFI 33-360',
 						marks: [
@@ -2029,7 +2053,7 @@ describe('a table on the clipboard lands as a table island', () => {
 		const both = pasted(GOOGLE_SHEETS);
 		expect(grid(propsOf(both))).toEqual([
 			['Unit', 'Strength', 'Note'],
-			['1st Wing', '42', 'Line one\nLine two']
+			['1st Wing', '42', 'Line one\u2028Line two']
 		]);
 		expect(propsOf(pasted({ 'text/plain': GOOGLE_SHEETS['text/plain'] }))).toEqual(propsOf(both));
 		expect(core.exportMarkdown(both)).toBe(
@@ -2107,26 +2131,26 @@ describe('a table on the clipboard lands as a table island', () => {
 
 	it('text with a tab on some lines and not all stays text', () => {
 		const rt = pasted({ 'text/plain': 'a\tb\nc\nd\te' });
-		expect(rt.islands).toEqual([]);
+		expect(rt.islands ?? []).toEqual([]);
 		expect(rt.text).toBe('paraa\tb\nc\nd\te');
 	});
 
 	// `pasteText` is ProseMirror's paste as plain text, the one a Shift-held paste takes.
 	it('a paste as plain text keeps the tabs as text', () => {
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md('para'));
+		doc.replace({}, md('para'));
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const outer = outerView(field);
 		outer.dispatch(outer.state.tr.setSelection(Selection.atEnd(outer.state.doc)));
 		outer.pasteText(EXCEL['text/plain'], clipboard('paste').event);
-		expect(doc.main.body.islands).toEqual([]);
+		expect(doc.main.body.islands ?? []).toEqual([]);
 		expect(doc.main.body.text).toContain('O-3\t12');
 		field.destroy();
 	});
 
 	it('the island arrives with no id, and the paste pass mints the next', () => {
 		const rt = pasted(GOOGLE_SHEETS, TABLE_MD);
-		expect(rt.islands.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
+		expect(rt.islands!.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
 	});
 });
 
@@ -2143,7 +2167,7 @@ describe('a table leaves by the clipboard and does not come back by it', () => {
 	});
 
 	it('a held column from the header row writes the header as one', () => {
-		const props = withCell(LETTERED, 2, 1, { text: 'say "hi"\nthere', marks: [strong(0, 3)] });
+		const props = withCell(LETTERED, 2, 1, { text: 'say "hi"\u2028there', marks: [strong(0, 3)] });
 		const { field } = tableLeaf(props);
 		grips(field, 'column')[1].click();
 		const { event, held } = clipboard('copy');
@@ -2183,7 +2207,7 @@ describe('a table leaves by the clipboard and does not come back by it', () => {
 		view.dom.dispatchEvent(clipboard('paste', EXCEL).event);
 		expect(shapeEqual(leafProps(field), LETTERED)).toBe(true);
 		expect(doc.main.body.islands).toHaveLength(1);
-		expect(leafProps(field).rows[0][1].text).toBe('Grade Count O-3 12 Line one\nLine two 7a2');
+		expect(leafProps(field).rows[0][1].text).toBe('Grade Count O-3 12 Line one\u2028Line two 7a2');
 		field.destroy();
 	});
 });

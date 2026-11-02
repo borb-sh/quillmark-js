@@ -74,7 +74,7 @@ const islandTypes = (q: ReturnType<typeof probe>, doc: Document): string[] | und
 	q
 		.reader(doc)
 		.getContentAt({ field: 'jobs' }, [0, 'details'])
-		?.islands.map((i) => i.type);
+		?.islands?.map((i) => i.type);
 
 function expectHeld(leaf: HTMLElement): void {
 	expect(leaf.getAttribute('contenteditable')).toBe('false');

@@ -86,11 +86,10 @@ const load = (): Document =>
 		].join('\n')
 	);
 
-const listItems = (rt: Content): string[] =>
-	rt.lines
-		.map((line, i) => ({ line, text: rt.text.split('\n')[i] }))
-		.filter(({ line }) => line.containers.some((c) => c.container === 'list_item'))
-		.map(({ text }) => text);
+const listItems = (rt: Content): string[] => {
+	const texts = rt.text.split('\n');
+	return rt.blocks.flatMap((block, i) => (block.path?.length ? [texts[i]!] : []));
+};
 
 describe('a block richtext cell on a record row', () => {
 	it('draws the list it holds across the row, and keeps it through an edit', () => {

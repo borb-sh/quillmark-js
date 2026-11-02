@@ -4,14 +4,14 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as Y from 'yjs';
-import { init, type Document, type Quill } from '@quillmark/wasm';
+import { init, type Addr, type Delta, type Document, type Quill, type Step } from '@quillmark/wasm';
 import {
 	bindDocument,
 	seedDocument,
 	type DocumentBinding,
 	type RemoteChange
 } from '../src/index.js';
-import { canonical } from '../src/document.js';
+import { canonical } from '../src/shape.js';
 
 export const core = await init();
 
@@ -110,3 +110,25 @@ export function snapshot(doc: Document): string {
 }
 
 export { canonical };
+
+/** Apply `ops` to the text at `addr` as a typist would, one splice each, its card named by `$id`
+ *  as a content write takes it. */
+export function edit(doc: Document, addr: Addr, ops: Delta['ops']): void {
+	const card = typeof addr.card === 'number' ? doc.card(addr.card).id : addr.card;
+	const at = { ...addr, ...(card === undefined ? {} : { card }) };
+	let text = doc.read(at).text;
+	let pos = 0;
+	const steps: Step[] = [];
+	for (const op of ops) {
+		if ('retain' in op) pos += op.retain;
+		else if ('delete' in op) {
+			steps.push({ splice: { at: pos, delete: text.slice(pos, pos + op.delete), insert: '' } });
+			text = text.slice(0, pos) + text.slice(pos + op.delete);
+		} else {
+			steps.push({ splice: { at: pos, insert: op.insert } });
+			text = text.slice(0, pos) + op.insert + text.slice(pos);
+			pos += op.insert.length;
+		}
+	}
+	doc.apply(at, { steps });
+}

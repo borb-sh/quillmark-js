@@ -5,9 +5,8 @@ import { normalize } from './_util.js';
 
 // Two adjacent lists of the same type; the shape the cleanup invariant must not
 // fuse (`lists.ts` §cleanup). `md('- a\n\n<!-- -->\n\n- b')` is CommonMark's spelling
-// for it. `instance` is the boundary: the projection mints one for a second sibling of
-// the same run shape, `decode` breaks its run on it, and the normalizer keeps it — which
-// is what restarts the second run's `ordinal`s, gapless from 0 within a run.
+// for it. The list's id is the boundary: the projection names each list node its own
+// container, `decode` groups by it, and the normalizer keeps it.
 describe('adjacent same-type lists keep their boundary', () => {
 	const item = (t: string) =>
 		blockSchema.nodes.list_item.create(
@@ -24,11 +23,11 @@ describe('adjacent same-type lists keep their boundary', () => {
 		bullet: pair('bullet_list', null),
 		ordered: pair('ordered_list', { start: 1 })
 	})) {
-		it(`${name}: the ordinal reset survives the normalizer and re-decodes to two`, () => {
+		it(`${name}: the two lists survive the normalizer and re-decode to two`, () => {
 			const stored = normalize(pmToContent(doc));
-			expect(
-				stored.lines.map((l) => (l.containers[0] as { attrs: { ordinal: number } }).attrs.ordinal)
-			).toEqual([0, 1, 0]);
+			const lists = stored.blocks.map((b) => b.path?.[0]);
+			expect(lists[0]).toBe(lists[1]);
+			expect(lists[2]).not.toBe(lists[0]);
 			expect(decode(stored, blockSchema).childCount).toBe(2);
 		});
 	}

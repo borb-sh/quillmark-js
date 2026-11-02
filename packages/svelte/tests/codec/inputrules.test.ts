@@ -558,7 +558,7 @@ describe('Backspace right after a shorthand takes it back', () => {
 
 	it("a table cell's mark rule", () => {
 		const doc = quill().seedDocument();
-		doc.overwrite({}, md('| a | b |\n|---|---|\n| 1 | 2 |'));
+		doc.replace({}, md('| a | b |\n|---|---|\n| 1 | 2 |'));
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 		const cell = (field as FieldController & LeafViews).nestedViews()[2]!;
 		cell.dispatch(cell.state.tr.setSelection(TextSelection.atEnd(cell.state.doc)));

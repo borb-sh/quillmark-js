@@ -21,7 +21,7 @@ beforeAll(() => {
 /** A focused body leaf over `markdown`, with a menu mounted unless `opts` says otherwise. */
 function leaf(markdown: string, opts: Partial<CreateFieldOpts> = {}) {
 	const doc: Document = quill().seedDocument();
-	doc.overwrite({}, md(markdown));
+	doc.replace({}, md(markdown));
 	const field = createField({
 		doc,
 		quill: quill(),

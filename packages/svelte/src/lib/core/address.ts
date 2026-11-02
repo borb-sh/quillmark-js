@@ -20,12 +20,12 @@ export type DocPath = string;
 /**
  * A place in the document: a field and a caret within it. What the editor reports when its caret
  * moves and what the preview scrolls to, so `onCaretMove={preview.focusPosition}` translates
- * nothing. `pos` is USV, the coordinate shared on both sides of the boundary; a `ContentHit` is a
+ * nothing. `pos` is a UTF-16 offset, the coordinate shared on both sides of the boundary; a `ContentHit` is a
  * `Place` with extras.
  */
 export interface Place {
 	field: DocPath;
-	/** The caret in USV. */
+	/** The caret, a UTF-16 offset. */
 	pos: number;
 }
 
@@ -37,7 +37,7 @@ export interface Place {
  */
 export interface Landing {
 	field: DocPath;
-	/** The caret in USV, absent on the placement rung. */
+	/** The caret, a UTF-16 offset, absent on the placement rung. */
 	pos?: number;
 	/** Whether `pos` is cluster-exact or floored to a segment start; the boundary's
 	 *  own marker, carried through untouched. */
@@ -173,8 +173,9 @@ function addrForSegs(segs: DocPathSeg[]): Addr | undefined {
  * The head segment a card index resolves to, or `undefined` when out of the live array. A falsy
  * kind is the unknown-kind form `cards[i]`.
  */
-function cardHead(index: number | undefined, kinds: readonly string[]): DocPathSeg | undefined {
+function cardHead(index: Addr['card'], kinds: readonly string[]): DocPathSeg | undefined {
 	if (index == null) return { seg: 'main' };
-	if (!Number.isInteger(index) || index < 0 || index >= kinds.length) return undefined;
+	if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= kinds.length)
+		return undefined;
 	return { seg: 'card', kind: kinds[index] || null, index };
 }

@@ -19,7 +19,7 @@ import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { rangeAnchor, type RangeAnchor } from './anchor.js';
 import { consuming, pickList, pickSubList, toCodeBlock, toHeading, wrapInQuote } from './blocks.js';
 import { mintIslandId } from './islands.js';
-import { newTable } from './table.js';
+import { islandOf, newTable } from './table.js';
 
 /**
  * The menu as the chrome sees it: the command names the query matched, the keyboard's cursor, and
@@ -365,7 +365,7 @@ const SLASH_COMMANDS: Record<string, Command> = {
 		state.schema.nodes.island_block.create({
 			id: mintIslandId(state.doc),
 			islandType: 'table',
-			props: newTable()
+			...islandOf(newTable())
 		})
 	)
 };

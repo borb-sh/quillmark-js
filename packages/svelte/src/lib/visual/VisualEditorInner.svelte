@@ -178,7 +178,8 @@
 	 * key is a host's only handle on a card, so a stale one is dropped rather than
 	 * reported. */
 	function cardIdOf(addr: Addr): CardId | undefined {
-		return addr.card == null ? 'main' : cardIds[addr.card];
+		if (addr.card == null) return 'main';
+		return typeof addr.card === 'number' ? cardIds[addr.card] : undefined;
 	}
 
 	// ── Teardown (core/teardown.ts: unregister, cancel, then free) ──────────────
@@ -299,7 +300,7 @@
 	let liveTitles = $state<Record<CardId, string>>({});
 	function refreshTitle(addr: Addr, cardId: CardId): void {
 		const { card: at, field } = addr;
-		if (at == null || field == null) return;
+		if (typeof at !== 'number' || field == null) return;
 		const shown = model.cards[at];
 		const cardSchema = shown && quill.schema.card_kinds?.[shown.kind];
 		if (!cardSchema || cardSchema.title?.trim()) return;
@@ -318,7 +319,7 @@
 	// ── Commit routing ──────────────────────────────────────────────────────────
 	// Scalars / arrays / objects → the typed writer (schema-checked); a cleared entry
 	// arrives as `undefined` and takes the unset lane instead. Prose leaves commit
-	// themselves via the codec (applyChange) and do not pass through here.
+	// themselves via the codec (`apply`) and do not pass through here.
 	//
 	// A bad value makes `writer.set` throw a `QuillmarkError` whose `diagnostics[0]`
 	// carries a `code` and a canonical `path` (`edit::field_coercion_failed` at
@@ -531,12 +532,17 @@
 		const i = cardIndexOf(id);
 		if (i < 0) return;
 		try {
-			// Insert the retyped card ahead of the original and drop the original after.
-			// `insertCard` validates the whole card before it mutates and `removeCard`
-			// cannot throw, so a refusal leaves the document as it was; the reverse order
-			// would leave it a card short.
-			doc.insertCard({ ...doc.card(i), kind }, i);
-			doc.removeCard(i + 1);
+			// The retyped card keeps the original's `$id`, which two cards cannot hold at
+			// once, so the original goes first and comes back where `insertCard` refuses:
+			// it validates the whole card before it mutates, so the document is as it was.
+			const card = doc.card(i);
+			doc.removeCard(i);
+			try {
+				doc.insertCard({ ...card, kind }, i);
+			} catch (e) {
+				doc.insertCard(card, i);
+				throw e;
+			}
 			bump('structure', id, i);
 		} catch (e) {
 			reportError(onError, {
@@ -788,7 +794,7 @@
 	}
 
 	/**
-	 * Put the caret in a revealed target, at the finest grain it can take: a USV offset
+	 * Put the caret in a revealed target, at the finest grain it can take: a UTF-16 offset
 	 * in a prose leaf or a nested content cell, a bare focus everywhere else. A form
 	 * control has no coordinate to spend an offset in (an `<input type="number">`
 	 * refuses a selection outright), which is also the whole of what a click on
@@ -951,7 +957,7 @@
 	 *  second reading of the schema beside it. */
 	function declaredField(addr: Addr): QuillFieldSchema | undefined {
 		if (addr.field == null) return undefined;
-		const kind = addr.card == null ? undefined : model.cards[addr.card]?.kind;
+		const kind = typeof addr.card === 'number' ? model.cards[addr.card]?.kind : undefined;
 		const schema = quill.schema;
 		const card = addr.card == null ? schema.main : kind ? schema.card_kinds?.[kind] : undefined;
 		return card?.fields?.[addr.field];

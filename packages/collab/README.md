@@ -63,6 +63,6 @@ if (!conflicts.length) session.apply(update, 'ai:run-1');
 
 ## Without a session
 
-`bindDocument({ doc, quill, ydoc, onRemote })` binds a Document to any `Y.Doc` and leaves the transport to the host. `seedDocument(doc, quill)` is the update a Y state starts from, the same bytes on every client that seeds the same Document.
+`bindDocument({ doc, quill, ydoc, onRemote })` binds a Document to any `Y.Doc` and leaves the transport to the host, once `await init()` from this package has instantiated the core it reads. `seedDocument(doc, quill)` is the update a Y state starts from, the same bytes on every client that seeds the same Document.
 
 The design, its invariants and its pitfalls: [`prose/canon/COLLAB.md`](prose/canon/COLLAB.md).

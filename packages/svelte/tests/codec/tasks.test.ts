@@ -24,6 +24,7 @@ import {
 	md,
 	mount,
 	normalize,
+	pathsOf,
 	quill,
 	startOf,
 	viewOf
@@ -31,18 +32,15 @@ import {
 
 const TASKS = '- [x] done\n- [ ] open\n- plain';
 
-/** Each line's own `list_item` attrs, outermost first. */
+/** Each block's own item attrs, outermost first. */
 const items = (rt: Content) =>
-	rt.lines.map((l) =>
-		l.containers
-			.filter(
-				(c): c is Extract<ContentContainer, { container: 'list_item' }> =>
-					c.container === 'list_item'
-			)
-			.map((c) => c.attrs)
+	pathsOf(rt).map((path) =>
+		path
+			.filter((c): c is Extract<ContentContainer, { kind: 'item' }> => c.kind === 'item')
+			.map((c) => c.attrs ?? {})
 	);
 
-/** Each line's `checked`, `'none'` where its innermost item carries no key. */
+/** Each block's `checked`, `'none'` where its innermost item carries no key. */
 const checks = (rt: Content) =>
 	items(rt).map((path) => {
 		const at = path.at(-1);
@@ -51,7 +49,7 @@ const checks = (rt: Content) =>
 
 function body(markdown: string, holds: boolean[] = []) {
 	const doc = quill().seedDocument();
-	doc.overwrite({}, md(markdown));
+	doc.replace({}, md(markdown));
 	const field = createField({
 		doc,
 		quill: quill(),

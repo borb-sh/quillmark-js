@@ -1,12 +1,12 @@
 // The prose leaf: `createField` (VISUAL_EDITOR §Surface). One content field, one PM view wired to
 // the WASM edit surface.
 //
-// `dispatchTransaction` applies the transaction optimistically, lowers it to a `ChangeBundle` (or
-// `overwrite` for a field not yet at content rest, which has nothing to splice), commits via
-// `doc.applyChange` (a `text` leaf's whole text through the typed writer), then fires `onChange` if
-// it committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through
-// `onError`. An external change re-hydrates through `applyExternal`, gated by `reconcile` except
-// where the hold it re-evaluates flips.
+// `dispatchTransaction` applies the transaction optimistically, lowers it to a `Change` (or
+// `replace` for a field not yet at content rest, which has nothing to change), commits via
+// `doc.apply` (a `text` leaf's whole text through the typed writer), then fires `onChange` if it
+// committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through `onError`.
+// An external change re-hydrates through `applyExternal`, gated by `reconcile` except where the
+// hold it re-evaluates flips.
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
@@ -36,10 +36,17 @@ import { core } from '../lifecycle.js';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
 import { decode, fitsLeaf } from './decode.js';
-import { usvToPM, pmToUsv, buildLineIndex, lineIndexOf, type LineIndex } from './positions.js';
-import { lower, pmToContent, scanContent, scanDoc, contentEdit } from './encode.js';
+import {
+	offsetToPM,
+	pmToOffset,
+	buildLineIndex,
+	lineIndexOf,
+	mapThroughDelta,
+	type LineIndex
+} from './positions.js';
+import { lower, pmToContent, scanContent, scanDoc } from './encode.js';
 import { capPlugin, type TextCap } from './cap.js';
-import { islandPastePlugin } from './islands.js';
+import { HARD_BREAK, islandPastePlugin } from './islands.js';
 import { anchorsFromContent, type AnchorPos } from './marks.js';
 import { contentEqual, createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
@@ -141,7 +148,7 @@ export interface CreateFieldOpts {
 	 * unanswered `none` is what the empty leaf draws and an empty answer would hide. */
 	emptyUnsets?: boolean;
 	onFocus?(addr: Addr): void;
-	/** Fired with the new USV caret after an edit or a selection move. */
+	/** Fired with the new caret offset after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
 	/**
 	 * Fired after an edit committed to the document: the leaf's change signal. Unlike `onCaretMove`
@@ -159,7 +166,7 @@ export interface FieldController {
 	/** The mounted `container`: the leaf's element, for a caller that has to reach the
 	 *  DOM the view sits in (the arrival wash, `core/bloom.ts`) rather than re-find it. */
 	readonly el: HTMLElement;
-	/** Place the caret at USV `pos` (preview onPick → usvToPM → here). */
+	/** Place the caret at content offset `pos` (preview onPick → offsetToPM → here). */
 	setCaret(pos: number): void;
 	/**
 	 * External content change → re-hydrate this leaf (gated by reconcile), and re-evaluate its
@@ -181,14 +188,14 @@ export interface FieldController {
 	/** The current stored content for this addr (for tests / reconcile). */
 	getContent(): Content;
 	/**
-	 * Insert an identity anchor `id` at USV `pos`. Zero-width; it folds into the plugin's position
-	 * set and commits through the mark-diff `anchor` op. The id is caller-supplied and must be
-	 * unique and invariant; a duplicate id is a no-op.
+	 * Insert an identity anchor `id` over content offsets `[pos, end)`, a point where `end` is
+	 * absent. It folds into the plugin's set and commits with the next change. The id is
+	 * caller-supplied and must be unique and invariant; a duplicate id is a no-op.
 	 */
-	insertAnchor(id: string, pos: number): void;
+	insertAnchor(id: string, pos: number, end?: number): void;
 	/** Remove the identity anchor `id` (the inverse of {@link insertAnchor}); a no-op if absent. */
 	removeAnchor(id: string): void;
-	/** Ids of the anchors within USV range `[from, to]`: a selection's anchor state. */
+	/** Ids of the anchors touching content range `[from, to]`: a selection's anchor state. */
 	anchorsInRange(from: number, to: number): string[];
 	/**
 	 * Move the slash menu's cursor onto the command `name` (a pointer entering an item): the
@@ -198,7 +205,7 @@ export interface FieldController {
 	/** Run the command `name` (a click on its item): the same path Enter takes. A no-op
 	 *  with no menu open, which is the state a stale click lands in. */
 	slashPick(name: string): void;
-	/** The current PM selection as a USV `{ from, to }` range (the boundary currency). */
+	/** The current PM selection as a content `{ from, to }` range (the boundary currency). */
 	selectionRange(): { from: number; to: number };
 	destroy(): void;
 }
@@ -220,21 +227,20 @@ export interface LeafViews {
 const anchorKey = new PluginKey<AnchorPos[]>('quill-anchors');
 
 /**
- * An anchor mutation carried on a transaction's `anchorKey` meta, folded into the plugin's position
- * set so the next commit lowers it through the mark diff like a toggled mark. `pos` is a PM
- * position.
+ * An anchor mutation carried on a transaction's `anchorKey` meta, folded into the plugin's set so
+ * the next commit lands it with the change. Positions are PM positions.
  */
 type AnchorEdit =
-	| { op: 'add'; id: string; pos: number }
+	| { op: 'add'; id: string; start: number; end: number }
 	| { op: 'remove'; id: string }
 	| { op: 'reset'; anchors: AnchorPos[] };
 
-/** Plugin-held anchor positions (PM coords), mapped through every edit's `StepMap`
- * and mutated by an {@link AnchorEdit} meta (an insert/remove at a selection).
- *
- * The `-1` is the store's rule for a point, not PM's default: `applyChange` rebases a
- * zero-width mark `before`, so text typed at an anchor's own position lands after it
- * and the mark diff has no op to spend reconciling this set with the store. */
+/**
+ * Plugin-held anchors (PM coords), mapped through every edit's `StepMap` and mutated by an {@link
+ * AnchorEdit} meta. The store's rule, so the commit has nothing to reconcile: a range keeps its
+ * edges, text typed at either landing outside it, and a point stays left of text typed at it. A
+ * range whose text is wholly deleted goes; a point never does.
+ */
 function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorPos[]> {
 	return new Plugin<AnchorPos[]>({
 		key: anchorKey,
@@ -242,16 +248,29 @@ function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorPos[]> {
 			init: () => seed,
 			apply: (tr, anchors) => {
 				let next = tr.docChanged
-					? anchors.map((a) => ({ id: a.id, pos: tr.mapping.map(a.pos, -1) }))
+					? anchors.flatMap((a) => {
+							if (a.start === a.end) {
+								const at = tr.mapping.map(a.start, -1);
+								return [{ id: a.id, start: at, end: at }];
+							}
+							const start = tr.mapping.map(a.start, 1);
+							const end = tr.mapping.map(a.end, -1);
+							return start < end ? [{ id: a.id, start, end }] : [];
+						})
 					: anchors;
 				const edit = tr.getMeta(anchorKey) as AnchorEdit | undefined;
-				if (edit?.op === 'add') next = [...next, { id: edit.id, pos: edit.pos }];
+				if (edit?.op === 'add') next = [...next, { id: edit.id, start: edit.start, end: edit.end }];
 				else if (edit?.op === 'remove') next = next.filter((a) => a.id !== edit.id);
 				else if (edit?.op === 'reset') next = edit.anchors;
 				return next;
 			}
 		}
 	});
+}
+
+/** An anchor in content offsets at its PM positions over `index`. */
+function toPM(index: LineIndex, a: AnchorPos): AnchorPos {
+	return { id: a.id, start: offsetToPM(index, a.start), end: offsetToPM(index, a.end) };
 }
 
 /**
@@ -266,9 +285,15 @@ function readLeaf(reader: DocumentReader, addr: Addr): Content {
 	return reader.getContent(addr) ?? emptyContent();
 }
 
-/** The canonical empty `Content`: one empty `para` line. */
+/** `addr` as a content write takes it: a card named by its `$id`, which a write requires. */
+function writeAddr(doc: Document, addr: Addr): Addr {
+	if (typeof addr.card !== 'number') return addr;
+	return { ...addr, card: doc.card(addr.card).id ?? addr.card };
+}
+
+/** The canonical empty `Content`: one empty `para` block. */
 export function emptyContent(): Content {
-	return { text: '', lines: [{ containers: [], kind: 'para' }], marks: [], islands: [] };
+	return { text: '', blocks: [{ id: 'b0', kind: 'para' }] };
 }
 
 /** Whether `rt` is the empty leaf: {@link emptyContent}, nothing typed and no shape left. */
@@ -277,12 +302,12 @@ export function isEmptyContent(rt: Content): boolean {
 }
 
 /**
- * Whether ops may commit here: the stored value is a `Content` object, so `applyChange` splices
- * exactly what PM shows. The other rest forms take `overwrite`: an unset field has nothing to
- * splice, and an authored string carries no anchors to pay. A body always rests as `Content`; a
- * `text` leaf commits through the writer ({@link createField}).
+ * Whether a change may commit here: the stored value is a `Content` object, so `apply` changes
+ * exactly what PM shows. The other rest forms take `replace`: an unset field has nothing to change,
+ * and an authored string carries no anchors to pay. A body always rests as `Content`; a `text` leaf
+ * commits through the writer ({@link createField}).
  */
-function opsCommittable(doc: Document, addr: Addr): boolean {
+function changeCommittable(doc: Document, addr: Addr): boolean {
 	const stored = doc.getStored(addr);
 	return stored !== null && typeof stored === 'object';
 }
@@ -415,11 +440,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			// (`docChanged` false), so the `anchorKey` meta routes it.
 			if (!held && (tr.docChanged || tr.getMeta(anchorKey))) {
 				// (d) the change signal, only for what actually landed.
-				const newRt = scan ? scanContent(scan) : pmToContent(next.doc);
+				const anchors = plaintext ? [] : readAnchors();
+				const newRt = scan ? scanContent(scan, anchors) : pmToContent(next.doc, anchors);
 				if (commitEdit(oldRt, newRt)) opts.onChange?.(addr);
 			}
 			// The caret, for structural and selection-only changes, reported after the commit.
-			opts.onCaretMove?.(addr, pmToUsv(index, next.selection.head));
+			opts.onCaretMove?.(addr, pmToOffset(index, next.selection.head));
 		},
 		handleDOMEvents: {
 			focus: () => {
@@ -445,10 +471,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		const anchors = plaintext ? [] : anchorsFromContent(rt);
 		// Seed anchor plugin positions in PM coords via a fresh index over pmDoc.
 		const seedIndex = buildLineIndex(pmDoc);
-		const seededAnchors = anchors.map((a) => ({
-			id: a.id,
-			pos: usvToPM(seedIndex, a.pos)
-		}));
+		const seededAnchors = anchors.map((a) => toPM(seedIndex, a));
 		const built = EditorState.create({
 			doc: pmDoc,
 			plugins: proseLeafPlugins(schema, {
@@ -467,42 +490,36 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		return { state: built, index: seedIndex };
 	}
 
-	// (b)+(c): lower the edit to ops and commit, or `overwrite` a field not yet at content rest.
+	// (b)+(c): lower the edit to a change and commit, or `replace` a field not yet at content rest.
 	// Keeps the optimistic PM on throw. Returns whether anything landed, independent of which
 	// branch ran.
 	function commitEdit(oldRt: Content, newRt: Content): boolean {
+		const at = writeAddr(doc, addr);
 		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
 			return commitUnset();
-		if (plaintext) return commitPlain(newRt.text);
-		// The text splice, computed once per keystroke and shared by the gate, both overwrite
-		// fallbacks and `lower`.
-		const edit = contentEdit(oldRt, newRt);
+		if (plaintext) return commitPlain(newRt.text.replaceAll(HARD_BREAK, '\n'));
 		try {
-			// Only a field not yet at content rest overwrites by choice: `applyChange` throws on an
-			// absent declared field, and neither it nor an authored string has anchors to lose
-			// (`opsCommittable`). Every structural edit lowers; the island channel places a slot
-			// the `delta` may not carry.
-			if (!opsCommittable(doc, addr)) {
-				doc.overwrite(addr, edit.newRt); // brings the field to content rest
-			} else {
-				// Post-edit anchors are the plugin's positions (mapped through the tr) as
-				// USV; the pre-edit set is `oldRt`'s own, which `lower` reads for itself.
-				doc.applyChange(addr, lower(edit, { newAnchors: readAnchorsUsv() }));
+			// Only a field not yet at content rest replaces by choice: neither an absent declared
+			// field nor an authored string has anchors to lose (`changeCommittable`).
+			if (!changeCommittable(doc, addr)) doc.replace(at, newRt);
+			else {
+				const change = lower(oldRt, newRt);
+				if (change) doc.apply(at, change);
 			}
 			reconciler.commit(readLeaf(reader, addr));
 			return true;
 		} catch (e) {
-			// Bound the damage: after an op path the gates missed, the reconciler re-diffs from
-			// stale content and every later edit would re-throw. Install the full projection
-			// (correct store, pays this field's anchors).
+			// Bound the damage: after a change the store refused, the reconciler re-diffs from stale
+			// content and every later edit would re-throw. Replace with the full projection, which
+			// carries each anchor where its text survives.
 			reportError(opts.onError, {
 				code: 'commit-fallback',
 				severity: 'error',
-				message: `applyChange refused; overwrote the whole field: ${errorMessage(e)}`,
+				message: `apply refused; replaced the whole field: ${errorMessage(e)}`,
 				cause: e
 			});
 			try {
-				doc.overwrite(addr, edit.newRt);
+				doc.replace(at, newRt);
 				reconciler.commit(readLeaf(reader, addr));
 				return true;
 			} catch (e2) {
@@ -510,7 +527,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				reportError(opts.onError, {
 					code: 'commit-lost',
 					severity: 'error',
-					message: `overwrite fallback failed; the stored value is stale while the editor keeps the edit: ${errorMessage(e2)}`,
+					message: `replace fallback failed; the stored value is stale while the editor keeps the edit: ${errorMessage(e2)}`,
 					cause: e2
 				});
 				return false;
@@ -528,6 +545,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		try {
 			const name = addr.field;
 			if (name === undefined) throw new Error('a text leaf names a field');
+			if (typeof addr.card === 'string') throw new Error('a text leaf names its card by index');
 			(addr.card === undefined ? writer : writer.card(addr.card)).set(name, text);
 			reconciler.commit(readLeaf(reader, addr));
 			return true;
@@ -582,8 +600,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			if (!tr.doc.eq(next)) return false;
 			const after = buildLineIndex(tr.doc);
 			if (delta && before.selection instanceof TextSelection) {
-				const { mapPos } = core();
-				const at = (pm: number) => usvToPM(after, mapPos(delta, pmToUsv(index, pm), 'after'));
+				const at = (pm: number) => offsetToPM(after, mapThroughDelta(delta, pmToOffset(index, pm)));
 				tr.setSelection(
 					TextSelection.between(
 						tr.doc.resolve(at(before.selection.anchor)),
@@ -594,7 +611,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			if (!plaintext)
 				tr.setMeta(anchorKey, {
 					op: 'reset',
-					anchors: anchorsFromContent(rt).map((a) => ({ id: a.id, pos: usvToPM(after, a.pos) }))
+					anchors: anchorsFromContent(rt).map((a) => toPM(after, a))
 				} as AnchorEdit);
 			view.updateState(before.apply(tr));
 			index = view.state.doc.eq(tr.doc) ? after : buildLineIndex(view.state.doc);
@@ -607,16 +624,20 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	/** The anchors the plugin currently holds (PM coords); `[]` before the first apply. */
 	const heldAnchors = (): AnchorPos[] => anchorKey.getState(view.state) ?? [];
 
-	/** The plugin's anchor positions as USV, against `index` — which `dispatchTransaction`
+	/** The plugin's anchors as content offsets, against `index` — which `dispatchTransaction`
 	 *  rebuilt over the new document before the commit this reads for. */
-	function readAnchorsUsv(): AnchorPos[] {
-		return heldAnchors().map((a) => ({ id: a.id, pos: pmToUsv(index, a.pos) }));
+	function readAnchors(): AnchorPos[] {
+		return heldAnchors().map((a) => ({
+			id: a.id,
+			start: pmToOffset(index, a.start),
+			end: pmToOffset(index, a.end)
+		}));
 	}
 
 	const controller: FieldController = {
 		el: container,
 		setCaret(pos: number): void {
-			const pm = usvToPM(index, pos);
+			const pm = offsetToPM(index, pos);
 			// `Selection.near`: the mapped position can be non-inline, where a raw TextSelection is
 			// invalid.
 			const sel = Selection.near(view.state.doc.resolve(pm));
@@ -642,12 +663,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				return;
 			}
 			if (flipped) held = !held;
-			const caretUsv = pmToUsv(index, view.state.selection.head);
+			const caret = pmToOffset(index, view.state.selection.head);
 			const fresh = buildState(current);
 			index = fresh.index;
-			// Best-effort caret continuity across an external change: keep the USV. Set
+			// Best-effort caret continuity across an external change: keep the offset. Set
 			// rather than dispatched, so a leaf the caret is not in reports no caret move.
-			const sel = Selection.near(fresh.state.doc.resolve(usvToPM(index, caretUsv)));
+			const sel = Selection.near(fresh.state.doc.resolve(offsetToPM(index, caret)));
 			view.updateState(fresh.state.apply(fresh.state.tr.setSelection(sel)));
 			reconciler.commit(current);
 			if (flipped) opts.onHold?.(held);
@@ -673,15 +694,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		getContent(): Content {
 			return readLeaf(reader, addr);
 		},
-		insertAnchor(id: string, pos: number): void {
-			// A text field carries no marks (§Inline mode), and a held one commits nothing.
+		insertAnchor(id: string, pos: number, end: number = pos): void {
+			// A text field carries no anchors (§Inline mode), and a held one commits nothing.
 			if (plaintext || held) return;
-			if (heldAnchors().some((a) => a.id === id)) return; // ids are unique + invariant (0.97 policy)
-			// An anchor commits through `applyChange`, so the field is brought to content rest
-			// first or the overwrite branch would drop it.
-			if (!opsCommittable(doc, addr)) doc.overwrite(addr, reconciler.last);
-			const pm = usvToPM(index, pos);
-			view.dispatch(view.state.tr.setMeta(anchorKey, { op: 'add', id, pos: pm } as AnchorEdit));
+			if (heldAnchors().some((a) => a.id === id)) return; // ids are unique and invariant
+			const at = toPM(index, { id, start: Math.min(pos, end), end: Math.max(pos, end) });
+			view.dispatch(view.state.tr.setMeta(anchorKey, { op: 'add', ...at } as AnchorEdit));
 		},
 		removeAnchor(id: string): void {
 			if (plaintext) return;
@@ -690,10 +708,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		},
 		anchorsInRange(from: number, to: number): string[] {
 			return heldAnchors()
-				.filter((a) => {
-					const u = pmToUsv(index, a.pos);
-					return u >= from && u <= to;
-				})
+				.filter((a) => pmToOffset(index, a.end) >= from && pmToOffset(index, a.start) <= to)
 				.map((a) => a.id);
 		},
 		slashFocus(name: string): void {
@@ -705,8 +720,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		selectionRange(): { from: number; to: number } {
 			const { from, to } = view.state.selection;
 			return {
-				from: pmToUsv(index, from),
-				to: pmToUsv(index, to)
+				from: pmToOffset(index, from),
+				to: pmToOffset(index, to)
 			};
 		},
 		destroy(): void {

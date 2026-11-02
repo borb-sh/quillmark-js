@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { EditorState, NodeSelection, TextSelection } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
 import { blockSchema, bodyKeymap, decode } from '$lib/core/codec';
+import { islandOf, newTable } from '$lib/core/codec/table.js';
 import { md, atBlock, startOf, keyDriver, shape, textblocks } from './_util.js';
 
 const { expectPress, press } = keyDriver(bodyKeymap(blockSchema));
@@ -214,7 +215,7 @@ describe('Delete on an empty line takes the line', () => {
 					n.island_block.create({
 						id: 'isl-0',
 						islandType: 'table',
-						props: { header: [], rows: [], aligns: [] }
+						...islandOf(newTable(1, 0))
 					})
 				),
 				0

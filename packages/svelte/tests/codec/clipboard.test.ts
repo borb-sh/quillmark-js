@@ -15,7 +15,7 @@ import {
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { blockSchema as S, pmToContent, proseLeafPlugins } from '$lib/core/codec';
-import { tablePropsOfNode } from '$lib/core/codec/islands.js';
+import { tableOfNode } from '$lib/core/codec/table.js';
 import { freshDoc, mount } from './_util.js';
 import { GOOGLE_DOCS_PROSE } from './_clipboard.js';
 
@@ -34,10 +34,18 @@ function parse(html: string): PMNode {
 const doc = (...blocks: PMNode[]): PMNode => S.nodes.doc.create(null, blocks);
 const para = (...inline: PMNode[]): PMNode => S.nodes.paragraph.create(null, inline);
 const table = (attrs: Attrs): PMNode => S.nodes.island_block.create(attrs);
+const slot = (text: string) => ({ text, blocks: [{ id: 'b0', kind: 'para' }] });
 const TABLE: Attrs = {
 	id: 'isl-0',
 	islandType: 'table',
-	props: { header: ['h'], rows: [['a']] }
+	props: {
+		columns: ['k0'],
+		rows: [
+			{ id: 'r0', cells: { k0: 's0' } },
+			{ id: 'r1', cells: { k0: 's1' } }
+		]
+	},
+	slots: { s0: slot('h'), s1: slot('a') }
 };
 
 /** A block leaf's plugin stack over `over`, mounted: where a paste lands. */
@@ -117,7 +125,7 @@ describe('a copy and a paste carry the whole node', () => {
 	// The rung the round-trip is for: what the leaf would store after the paste.
 	it('and the fence still spells its language in the content', () => {
 		const back = parse(serialize(doc(S.nodes.code_block.create({ lang: 'py' }, S.text('x')))));
-		expect(pmToContent(back).lines[0]).toMatchObject({ kind: 'code', attrs: { lang: 'py' } });
+		expect(pmToContent(back).blocks[0]).toMatchObject({ kind: 'code', attrs: { lang: 'py' } });
 	});
 
 	// Through PM's own copy path rather than the serializer alone: the props a table
@@ -126,7 +134,9 @@ describe('a copy and a paste carry the whole node', () => {
 		const view = leaf(doc(table(TABLE), para()));
 		const copied = view.state.doc.slice(0, view.state.doc.child(0).nodeSize);
 		const { dom } = view.serializeForClipboard(copied);
-		expect(parse((dom as HTMLElement).innerHTML).child(0).attrs.props).toEqual(TABLE.props);
+		const back = parse((dom as HTMLElement).innerHTML).child(0);
+		expect(back.attrs.props).toEqual(TABLE.props);
+		expect(back.attrs.slots).toEqual(TABLE.slots);
 		view.destroy();
 	});
 });
@@ -136,7 +146,7 @@ describe('a copy and a paste carry the whole node', () => {
 describe('what a paste from outside the editor states', () => {
 	it('a span styling a face is the source face, never a font family', () => {
 		const pasted = parse('<p><span style="font-family: Tinos">a</span></p>');
-		expect(pmToContent(pasted).marks).toEqual([]);
+		expect(pmToContent(pasted).marks).toBeUndefined();
 	});
 
 	it.each([
@@ -230,9 +240,9 @@ describe('what the parse rules refuse', () => {
 	it('an href carrying a line ending arrives percent-encoded, and stores', () => {
 		const back = parse('<p><a href="http://a&#10;b/c">x</a></p>');
 		const projected = pmToContent(back);
-		expect(projected.marks[0]).toMatchObject({ type: 'link', attrs: { url: 'http://a%0Ab/c' } });
+		expect(projected.marks![0]).toMatchObject({ type: 'link', attrs: { url: 'http://a%0Ab/c' } });
 		const doc = freshDoc();
-		expect(() => doc.overwrite({}, projected)).not.toThrow();
+		expect(() => doc.replace({}, projected)).not.toThrow();
 	});
 
 	it("an image island's url carrying one arrives the same way", () => {
@@ -265,23 +275,19 @@ describe('an island payload of the wrong shape reaches no reader', () => {
 		);
 
 	it.each([
-		['rows that are not rows', '{"header":[],"rows":"nope","aligns":[]}'],
-		['cells that are not cells', '{"header":[7],"rows":[],"aligns":[]}'],
+		['rows that are not rows', '{"columns":[],"rows":"nope"}'],
+		['columns that are not ids', '{"columns":[7],"rows":[]}'],
 		['nothing at all', 'null']
 	])('%s draws the placeholder instead', (_name, props) => {
-		expect(tablePropsOfNode(island(props).child(0))).toBeUndefined();
+		expect(tableOfNode(island(props).child(0))).toBeUndefined();
 	});
 
 	// The fixture above carries opaque JSON, which is all the round-trip is about; a
 	// reader wants the rectangle, so this states one.
 	it('and a table the reader can index still reads', () => {
-		const props = {
-			header: [{ text: 'h', marks: [] }],
-			rows: [[{ text: 'a', marks: [] }]],
-			aligns: ['none']
-		};
-		const before = doc(table({ ...TABLE, props }));
-		expect(tablePropsOfNode(parse(serialize(before)).child(0))).toEqual(props);
+		const grid = tableOfNode(parse(serialize(doc(table(TABLE)))).child(0));
+		expect(grid?.header.map((c) => c.text)).toEqual(['h']);
+		expect(grid?.rows.map((row) => row.map((c) => c.text))).toEqual([['a']]);
 	});
 });
 
@@ -293,6 +299,7 @@ describe('the paste pass re-mints a colliding island id', () => {
 		const landed = pasted(view, serialize(doc(table(TABLE)))).child(0);
 		expect(landed.attrs.id).not.toBe(TABLE.id);
 		expect(landed.attrs.props).toEqual(TABLE.props);
+		expect(landed.attrs.slots).toEqual(TABLE.slots);
 		view.destroy();
 	});
 

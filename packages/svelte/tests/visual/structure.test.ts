@@ -721,10 +721,10 @@ describe('declaredContent', () => {
 		expect(md?.text).toBe('One two');
 		expect(md?.marks).toHaveLength(1);
 		const plain = declaredContent('*a*\nb', false);
-		expect(plain?.text).toBe('*a*\nb');
-		// One paragraph whose second line continues it, as the literal codec reads one.
-		expect(plain?.lines.map((l) => !!l.continues)).toEqual([false, true]);
-		expect(plain?.marks).toEqual([]);
+		// One paragraph holding a hard break, as the literal codec reads one.
+		expect(plain?.text).toBe('*a*\u2028b');
+		expect(plain?.blocks).toHaveLength(1);
+		expect(plain?.marks).toBeUndefined();
 		expect(declaredContent('', false)).toBeUndefined();
 		expect(declaredContent('  ', true)).toBeUndefined();
 		expect(declaredContent({ a: 1 }, false)).toBeUndefined();
