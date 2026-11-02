@@ -24,13 +24,15 @@ import {
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { revealProps } from './reveal.js';
 import type {
+	AnchorContext,
 	Document,
 	DocumentReader,
 	DocumentWriter,
 	Content,
 	Addr,
 	Delta,
-	Quill
+	Quill,
+	Receipt
 } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
 import type { EditorErrorHandler } from '../errors.js';
@@ -159,6 +161,14 @@ export interface CreateFieldOpts {
 	onChange?(addr: Addr): void;
 	/** Recovered failures on the commit path ({@link EditorErrorHandler}). */
 	onError?: EditorErrorHandler;
+	/**
+	 * Fired after a commit that took anchors out of the field other than through {@link
+	 * FieldController.removeAnchor}: a range whose text the edit deleted, and each one the write's
+	 * receipt names as dropped. Each selector is read before the write, the form `doc.reattach`
+	 * takes. The leaf re-reads the field after the hook returns, so an anchor the hook places
+	 * again draws. A table cell's anchors are carried by the cell's own edit and not reported here.
+	 */
+	onAnchorsDropped?(dropped: AnchorContext[]): void;
 }
 
 /** The prose-leaf handle (VISUAL_EDITOR §Surface). */
@@ -369,6 +379,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 
 	let index: LineIndex; // rebuilt on every structural change
 	let view: EditorView;
+	let destroyed = false;
 	// The ghost's live cell: the ghost plugin reads it per pass, so moving it is an
 	// assignment plus a re-render rather than a rebuilt plugin stack.
 	let placeholderText = opts.placeholder;
@@ -376,6 +387,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// The views nested inside this leaf, one per table cell (`table-view.ts`): chrome asks the leaf
 	// which view holds the caret.
 	const nested = new Set<EditorView>();
+
+	// Ids `removeAnchor` took out since the last commit: removed on purpose, so not dropped.
+	const removed = new Set<string>();
 
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
@@ -495,18 +509,24 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// branch ran.
 	function commitEdit(oldRt: Content, newRt: Content): boolean {
 		const at = writeAddr(doc, addr);
-		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
-			return commitUnset();
+		const lost = lostAnchors(oldRt, newRt);
+		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt)) {
+			const done = commitUnset();
+			if (done) reportDropped(lost);
+			return done;
+		}
 		if (plaintext) return commitPlain(newRt.text.replaceAll(HARD_BREAK, '\n'));
 		try {
 			// Only a field not yet at content rest replaces by choice: neither an absent declared
 			// field nor an authored string has anchors to lose (`changeCommittable`).
-			if (!changeCommittable(doc, addr)) doc.replace(at, newRt);
+			let receipt: Receipt | undefined;
+			if (!changeCommittable(doc, addr)) receipt = doc.replace(at, newRt);
 			else {
 				const change = lower(oldRt, newRt);
-				if (change) doc.apply(at, change);
+				if (change) receipt = doc.apply(at, change);
 			}
 			reconciler.commit(readLeaf(reader, addr));
+			reportDropped(lost, receipt);
 			return true;
 		} catch (e) {
 			// Bound the damage: after a change the store refused, the reconciler re-diffs from stale
@@ -519,8 +539,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				cause: e
 			});
 			try {
-				doc.replace(at, newRt);
+				const receipt = doc.replace(at, newRt);
 				reconciler.commit(readLeaf(reader, addr));
+				reportDropped(lost, receipt);
 				return true;
 			} catch (e2) {
 				// Optimistic PM stays; the store is stale for this field from here.
@@ -533,6 +554,35 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				return false;
 			}
 		}
+	}
+
+	/**
+	 * The selectors of the anchors `oldRt` holds and `newRt` does not, other than those
+	 * `removeAnchor` took out, read off the document before the write lands. Empty with no hook.
+	 */
+	function lostAnchors(oldRt: Content, newRt: Content): AnchorContext[] {
+		const purposeful = [...removed];
+		removed.clear();
+		if (!opts.onAnchorsDropped || !oldRt.anchors?.length) return [];
+		const kept = new Set([...(newRt.anchors ?? []).map((a) => a.id), ...purposeful]);
+		return oldRt.anchors.flatMap((a) => {
+			if (kept.has(a.id)) return [];
+			const context = doc.anchorContext(a.id);
+			return context ? [context] : [];
+		});
+	}
+
+	/** Hand `lost` and the receipt's drops to `onAnchorsDropped`, then re-read the field, which
+	 *  draws whatever the hook placed again. */
+	function reportDropped(lost: AnchorContext[], receipt?: Receipt): void {
+		if (!opts.onAnchorsDropped) return;
+		const seen = new Set(lost.map((c) => c.id));
+		const dropped = [...lost, ...(receipt?.droppedAnchors ?? []).filter((c) => !seen.has(c.id))];
+		if (!dropped.length) return;
+		opts.onAnchorsDropped(dropped);
+		queueMicrotask(() => {
+			if (!destroyed) controller.applyExternal();
+		});
 	}
 
 	/**
@@ -704,6 +754,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		removeAnchor(id: string): void {
 			if (plaintext) return;
 			if (!heldAnchors().some((a) => a.id === id)) return; // absent: nothing to commit
+			removed.add(id);
 			view.dispatch(view.state.tr.setMeta(anchorKey, { op: 'remove', id } as AnchorEdit));
 		},
 		anchorsInRange(from: number, to: number): string[] {
@@ -725,6 +776,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			};
 		},
 		destroy(): void {
+			destroyed = true;
 			view.destroy();
 		}
 	};

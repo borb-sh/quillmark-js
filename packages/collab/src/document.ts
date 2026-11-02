@@ -21,6 +21,7 @@ import type {
 	Content,
 	Delta,
 	Document,
+	DroppedAnchor,
 	PayloadItem,
 	Quill,
 	QuillCardSchema
@@ -95,8 +96,9 @@ export interface RemoteChange {
 	/** Text and content fields that changed. A content field revised in place carries the delta
 	 *  from its previous text, which a host maps its selection through; one that landed whole,
 	 *  and a `text` field, carry none. A card `cards` inserted is new as a whole and is not
-	 *  listed. */
-	content: { addr: Addr; delta?: Delta }[];
+	 *  listed. `droppedAnchors` names each anchor this client's Document held on text the change
+	 *  deleted, its selector as read before the pull: what a comment reconcile takes. */
+	content: { addr: Addr; delta?: Delta; droppedAnchors?: DroppedAnchor[] }[];
 }
 
 export interface BindDocumentOpts {
@@ -224,20 +226,22 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 
 	/**
-	 * Write `content`, the projection of `root`, over the field at `addr`. `replace` re-mints an id
-	 * it introduces that the Document's own log holds, so the value it lands can differ from the
-	 * projection by ids; such a field is named in `reminted`, to be written back to Y.
+	 * Write `content`, the projection of `root`, over the field at `addr`, answering the anchors
+	 * the write dropped. `replace` re-mints an id it introduces that the Document's own log holds,
+	 * so the value it lands can differ from the projection by ids; such a field is named in
+	 * `reminted`, to be written back to Y.
 	 */
 	function land(
 		root: string,
 		addr: Addr,
 		content: Content,
 		reminted: { root: string; addr: Addr }[]
-	): void {
-		doc.replace(writeAddr(addr), content);
+	): DroppedAnchor[] {
+		const { droppedAnchors } = doc.replace(writeAddr(addr), content);
 		const landed = contentKey(storedContent(addr));
 		synced.set(root, landed);
 		if (landed !== contentKey(content)) reminted.push({ root, addr });
+		return droppedAnchors;
 	}
 
 	/** Write each field's Document value to Y, where it landed under ids Y does not hold. */
@@ -595,10 +599,13 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				return;
 			}
 			const event = events.get(root);
-			land(root, addr, projection.content, reminted);
+			const dropped = land(root, addr, projection.content, reminted);
 			held.delete(root);
-			if (!before || !event) change.content.push({ addr });
-			else change.content.push({ addr, delta: deltaOf(event) });
+			change.content.push({
+				addr,
+				...(before && event ? { delta: deltaOf(event) } : {}),
+				...(dropped.length ? { droppedAnchors: dropped } : {})
+			});
 		} catch (e) {
 			held.add(root);
 			report(e);

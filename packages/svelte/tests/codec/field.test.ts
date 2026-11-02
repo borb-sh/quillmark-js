@@ -6,10 +6,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorView } from 'prosemirror-view';
 import { Selection, TextSelection } from 'prosemirror-state';
-import { createField, blockSchema, pmToContent } from '$lib/core/codec';
+import { createField, blockSchema, buildLineIndex, offsetToPM, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
-import type { Content, Document, TableProps } from '@quillmark/wasm';
+import type { AnchorContext, Content, Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
+import { MemoryCommentStore, createComments } from '$lib/core';
 import { mount, quill, example, normalize, contentEqual, md, viewOf, press } from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
@@ -467,6 +468,93 @@ describe('anchor insertion', () => {
 		field.insertAnchor('a1', 4);
 		expect(field.anchorsInRange(0, 10)).toEqual(['a1']);
 		expect(field.anchorsInRange(0, 3)).toEqual([]);
+		field.destroy();
+	});
+});
+
+describe('onAnchorsDropped', () => {
+	const pmAt = (view: EditorView, offset: number) =>
+		offsetToPM(buildLineIndex(view.state.doc), offset);
+
+	/** A body leaf with an anchor over the first `quote`, and the drops it reports. */
+	function commented(quote: string, onAnchorsDropped?: (d: AnchorContext[]) => void) {
+		const doc = example();
+		const dropped: AnchorContext[][] = [];
+		const field = createField({
+			doc,
+			quill: quill(),
+			addr: {},
+			container: mount(),
+			onAnchorsDropped: (d) => {
+				dropped.push(d);
+				onAnchorsDropped?.(d);
+			}
+		});
+		const start = doc.main.body.text.indexOf(quote);
+		field.insertAnchor('a1', start, start + quote.length);
+		return { doc, field, view: viewOf(field), dropped, start, before: doc.anchorContext('a1')! };
+	}
+
+	it('reports a range whose text an edit deleted, as read before the edit', () => {
+		const { doc, field, view, dropped, start, before } = commented('sibling');
+		view.dispatch(view.state.tr.delete(pmAt(view, start), pmAt(view, start + 7)));
+		expect(doc.anchorContext('a1')).toBeUndefined();
+		expect(dropped).toEqual([[before]]);
+		field.destroy();
+	});
+
+	it('reports nothing for removeAnchor or an edit that keeps the range', () => {
+		const { field, view, dropped } = commented('sibling');
+		view.dispatch(view.state.tr.insertText('XY', 1));
+		const inside = pmAt(view, field.getContent().anchors![0].start + 2);
+		view.dispatch(view.state.tr.delete(inside, inside + 2));
+		field.removeAnchor('a1');
+		expect(dropped).toEqual([]);
+		field.destroy();
+	});
+
+	it('draws an anchor the hook placed again over retyped text', async () => {
+		const { doc, field, view, dropped, start } = commented('sibling', (d) => doc.reattach(d));
+		const [from, to] = [pmAt(view, start), pmAt(view, start + 7)];
+		const text = view.state.doc.textBetween(from, to);
+		view.dispatch(view.state.tr.delete(from, to).insertText(text, from));
+		expect(dropped.flat().map((c) => c.id)).toEqual(['a1']);
+		await Promise.resolve();
+		expect(field.anchorsInRange(start, start + 7)).toEqual(['a1']);
+		field.destroy();
+	});
+});
+
+describe('a comment over a leaf, wired as the editor wires it', () => {
+	it('is deleted with its text, and an undo brings both back', async () => {
+		const doc = example();
+		const store = new MemoryCommentStore();
+		const comments = createComments({ store, author: { id: 'u1', name: 'Ada' } });
+		await comments.ready;
+		let field!: FieldController;
+		field = createField({
+			doc,
+			quill: quill(),
+			addr: {},
+			container: mount(),
+			onAnchorsDropped: (dropped) => void comments.reconcile(doc, dropped),
+			onChange: () => {
+				if (comments.restore(doc).length) queueMicrotask(() => field.applyExternal());
+			}
+		});
+		const start = doc.main.body.text.indexOf('sibling');
+		field.insertAnchor('c-1', start, start + 7);
+		await comments.create(doc.anchorContext('c-1')!, 'Why nest?');
+		const view = viewOf(field);
+		const at = (offset: number) => offsetToPM(buildLineIndex(view.state.doc), offset);
+		view.dispatch(view.state.tr.delete(at(start), at(start + 7)));
+		await Promise.resolve();
+		expect(store.export().threads).toEqual([]);
+		undo(view.state, view.dispatch);
+		await Promise.resolve();
+		expect(comments.thread('c-1')?.anchored).toBe(true);
+		expect(field.anchorsInRange(start, start + 7)).toEqual(['c-1']);
+		expect(store.export().threads.map((t) => t.id)).toEqual(['c-1']);
 		field.destroy();
 	});
 });

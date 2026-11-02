@@ -48,6 +48,12 @@ The bridge between the panes runs on addresses, and a field only has one where t
 
 **So a front-matter field a user types into is content and gets the caret for free**, `text` as much as `richtext`. The reference memo's `subject`, `memo_for` and `signature_block` are all caret-addressable, the array elements each at their own address (`main.memo_for[0]`), and `signature_block` reaches the field rung besides because the plate places a `signature-field` widget bound to it. A scalar a plate prints itself surfaces nothing: a preview click there does not land, and `scrollToField` returns `false`, until the plate prints it through `qm.ink` or claims it with `qm.region`. Which rung a field lands in is the quill's to decide, so a bridge that reaches too little is answered in the collection.
 
+## Comments
+
+**A host with comments builds the controller and hands it to the editor.** `createComments({store, author})` from `/core` over the host's `CommentStore`, passed as `<VisualEditor comments>`. The editor reconciles its own leaves' drops and re-syncs after a structure edit; every other writer the host runs reconciles its own: `comments.reviseDocument` for a whole-document markdown write, `comments.reconcile` with a `Receipt`'s `droppedAnchors` for a field write, and with `RemoteChange.content[i].droppedAnchors` under collab, the change's `delta` keyed by the dropped selectors' own `path`, so a placement must overlap text the change inserted ([COMMENTS.md](COMMENTS.md) §Reconcile).
+
+**A host holding threads never reopens from markdown.** `toMarkdown` drops every anchor and `equals` counts them, so the guarded reopen above never matches once a document holds one: it remounts on every echo and every thread loses its anchor. Such a host persists the `StoredDocument`, or keeps the live document and revises it with `comments.reviseDocument` when text arrives from outside. A host that stored markdown before comments existed calls `comments.recover(doc)` once after `fromMarkdown`.
+
 ## Not owned here
 
 - The surfaces' own contracts, and which prop is once-bound: [VISUAL_EDITOR.md](VISUAL_EDITOR.md), [PREVIEW.md](PREVIEW.md).

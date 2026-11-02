@@ -109,6 +109,22 @@ describe('content', () => {
 		const { delta } = change.content.find((c) => c.addr.card === undefined && !c.addr.field)!;
 		expect(delta).toEqual({ ops: [{ retain: 2 }, { insert: 'xy' }] });
 	});
+
+	it('names the anchors a remote edit deleted the text of, as read before the pull', () => {
+		const [a, b] = peers(2, listDoc);
+		a.doc.apply({}, { steps: [{ anchor: { id: 'c1', start: 4, end: 7 } }] });
+		a.binding.push();
+		const before = a.doc.anchorContext('c1');
+		edit(b.doc, {}, [{ retain: 3 }, { delete: 4 }]);
+		b.binding.push();
+		deliver(a);
+		const [change] = a.changes;
+		const { droppedAnchors } = change.content.find(
+			(c) => c.addr.card === undefined && !c.addr.field
+		)!;
+		expect(droppedAnchors).toEqual([before]);
+		expect(a.doc.anchorContext('c1')).toBeUndefined();
+	});
 });
 
 describe('cards', () => {
