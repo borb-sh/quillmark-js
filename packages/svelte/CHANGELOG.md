@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`VisualEditor` exposes `revealField(field)`.** It opens the group holding a mounted field, scrolls it to the nearest edge of the fold and plays the arrival wash, without focusing it. A host lands on a field this way on a touch screen, where `focusField` raises the on-screen keyboard.
+
 **A comment anchor survives delete and undo.** An anchor whose text a deletion swallowed came back without its anchor on undo, since anchors live beside ProseMirror's history rather than in it. The leaf now holds the anchor as a ghost of the deletion and puts it back at its range when an undo restores the deleted slice whole.
 
 ## v0.30.0 - 2026-11-02

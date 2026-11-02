@@ -75,6 +75,10 @@
 	export async function focusField(field: DocPath): Promise<void> {
 		await inner?.focusField(field);
 	}
+	/** Reveal, scroll to and wash the field at `field` without focusing it. */
+	export async function revealField(field: DocPath): Promise<void> {
+		await inner?.revealField(field);
+	}
 	/** Wash the field at `field` where it is on show, without focusing or revealing it. */
 	export function washField(field: DocPath): void {
 		inner?.washField(field);

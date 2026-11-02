@@ -236,6 +236,29 @@ describe('the landing verbs over a form control', () => {
 	// fold. Layout is a thing jsdom does not have, so the seam is the flag rather than the
 	// rect: the reveal moves the accordion instantly, and the header gesture the motion is
 	// there for is what restores it.
+	it('reveals, scrolls to and washes a field without focusing it', async () => {
+		const q = quill();
+		const { target, editor, errors } = mountEditor(q, example());
+		const header = [...target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>
+			h.textContent?.includes('Metadata')
+		);
+		const trips: (ScrollIntoViewOptions | undefined)[] = [];
+		const scroll = Element.prototype.scrollIntoView;
+		Element.prototype.scrollIntoView = function (arg?: boolean | ScrollIntoViewOptions) {
+			trips.push(arg as ScrollIntoViewOptions);
+		};
+		const before = document.activeElement;
+
+		await editor.revealField('main.tracking_id');
+		await tick();
+		Element.prototype.scrollIntoView = scroll;
+
+		expect(header?.getAttribute('aria-expanded')).toBe('true');
+		expect(document.activeElement).toBe(before);
+		expect(trips.map((t) => t?.block)).toContain('nearest');
+		expect(errors).toHaveLength(0);
+	});
+
 	it('reveals a group instantly, and animates again for a header click', async () => {
 		const q = quill();
 		const { target, editor } = mountEditor(q, example());
