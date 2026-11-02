@@ -269,7 +269,7 @@ describe('an array of objects', () => {
 // so the rows are the render's reading and a gesture writes that list whole.
 describe('an array holding a bare value', () => {
 	const loaded = (...fields: string[]): Document =>
-		core.Document.fromMarkdown(['~~~', '$quill: showcase@1.0.0', ...fields, '~~~', ''].join('\n'));
+		core.Document.parse(['~~~', '$quill: showcase@1.0.0', ...fields, '~~~', ''].join('\n'));
 	const rendered = (q: Quill, doc: Document, name: string) =>
 		new DocumentReader(q, doc).resolve().main.fields.find((r) => r.name === name)?.value;
 

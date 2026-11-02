@@ -59,7 +59,7 @@ main:
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: block_cell@1.0.0',

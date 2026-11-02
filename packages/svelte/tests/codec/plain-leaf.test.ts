@@ -35,7 +35,7 @@ main:
 
 const q = probeQuill(QUILL_YAML);
 const load = (): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: plain_probe@0.1.0',
@@ -67,7 +67,7 @@ const caretAtEnd = (view: EditorView): void =>
 /** The field as a saved document reads it back: `toMarkdown`, a fresh parse, and the
  *  schema-bound read. */
 function saved(doc: Document, field: string): unknown {
-	const back = core.Document.fromMarkdown(doc.toMarkdown());
+	const back = core.Document.parse(doc.toMarkdown());
 	const value = q.reader(back).get(field);
 	back.free();
 	return value;
@@ -192,7 +192,7 @@ describe('a one-line text field', () => {
 	// The newline a YAML `|` scalar keeps opens an empty second line, which the leaf
 	// drops rather than joins: a space there is one a click at the end types after.
 	it('holds a `|` scalar’s trailing newline as nothing, and an edit stores no space', () => {
-		const doc = core.Document.fromMarkdown(
+		const doc = core.Document.parse(
 			['~~~', '$quill: plain_probe@0.1.0', 'line: |', '  solo', '~~~', ''].join('\n')
 		);
 		expect(doc.getStored('line')).toBe('solo\n');

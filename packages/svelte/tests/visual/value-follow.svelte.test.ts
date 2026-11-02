@@ -54,7 +54,7 @@ main:
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: value_follow@1.0.0',

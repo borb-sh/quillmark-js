@@ -146,6 +146,6 @@ describe('patchEditorExt', () => {
 		const doc = quill.seedDocument();
 		patchEditorExt(doc, MAIN_CARD_ADDR, { tips: ['a tip'] });
 		patchEditorExt(doc, MAIN_CARD_ADDR, { tips: undefined });
-		expect(() => core.Document.fromMarkdown(doc.toMarkdown())).not.toThrow();
+		expect(() => core.Document.parse(doc.toMarkdown())).not.toThrow();
 	});
 });

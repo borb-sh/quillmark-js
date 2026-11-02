@@ -38,7 +38,7 @@ const quiver = await fromDir(root);
 const engine = new Engine();
 
 const { Document } = await init(); // Document is exported only through init()
-const doc = Document.fromMarkdown(markdownString);
+const doc = Document.parse(markdownString);
 const quill = await quiver.getQuill(doc.quillRef);
 const result = await engine.render(quill, doc, { format: 'pdf' });
 ```
@@ -83,7 +83,7 @@ const quiver = await Quiver.fromBuiltUrl('/quivers/my-quiver/');
 const engine = new Engine();
 
 const { Document } = await init(); // Document is exported only through init()
-const doc = Document.fromMarkdown(markdownString);
+const doc = Document.parse(markdownString);
 const quill = await quiver.getQuill(doc.quillRef);
 const result = await engine.render(quill, doc, { format: 'pdf' });
 ```

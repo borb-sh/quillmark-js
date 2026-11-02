@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. A card the editor adds is placed through `doc.unchecked.insertCard`, under the `actor` prop where the host passes one, a live session's `binding.actor`, so two clients adding cards at once never mint one `$id`; a retype places the card through it too.
+**On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. A card the editor adds is placed through `doc.unchecked.insertCard`, under the `actor` prop where the host passes one, a live session's `binding.actor`, so two clients adding cards at once never mint one `$id`; a retype places the card through it too. The docs name `Document.parse` as the markdown import.
 
 **A comment anchor survives delete and undo.** An anchor whose text a deletion swallowed came back without its anchor on undo, since anchors live beside ProseMirror's history rather than in it. The leaf now holds the anchor as a ghost of the deletion and puts it back at its range when an undo restores the deleted slice whole.
 

@@ -50,9 +50,7 @@ main:
 const probe = () => quillFromYaml(YAML);
 const ISLANDS = '| a | b |\n|---|---|\n| 1 | 2 |\n\nSee ![chart](chart.png) here.';
 const load = (details: string): Document => {
-	const doc = core.Document.fromMarkdown(
-		['~~~', '$quill: island_cell@1.0.0', '~~~', ''].join('\n')
-	);
+	const doc = core.Document.parse(['~~~', '$quill: island_cell@1.0.0', '~~~', ''].join('\n'));
 	doc.unchecked.storeField('jobs', [{ title: 'Archives', details }]);
 	return doc;
 };

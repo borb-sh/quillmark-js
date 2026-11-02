@@ -159,13 +159,13 @@ describe('an array of `text`', () => {
 	});
 });
 
-// The `richtext` twin, on a document through the transport door (`Document.fromMarkdown`):
+// The `richtext` twin, on a document through the transport door (`Document.parse`):
 // its elements rest as authored strings, the scalar field's rest form, and the row reads
 // one at the codec the declared type names, so the emphasis is lowered by the boundary
 // rather than by the row.
 describe('an array of richtext loaded from markdown', () => {
 	it('mounts authored-string elements as prose rows, with emphasis lowered', () => {
-		const doc = core.Document.fromMarkdown(`~~~
+		const doc = core.Document.parse(`~~~
 $quill: showcase@1.0.0
 $kind: main
 title: Probe

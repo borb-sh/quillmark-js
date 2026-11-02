@@ -39,9 +39,7 @@ main:
         max: 3
 `);
 const load = (): Document =>
-	core.Document.fromMarkdown(
-		['~~~', '$quill: text_cap@1.0.0', 'tags:', '  - ab', '~~~', ''].join('\n')
-	);
+	core.Document.parse(['~~~', '$quill: text_cap@1.0.0', 'tags:', '  - ab', '~~~', ''].join('\n'));
 
 const count = (scope: HTMLElement) => scope.querySelector('.qm-field-count')?.textContent;
 

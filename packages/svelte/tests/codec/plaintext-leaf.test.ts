@@ -41,7 +41,7 @@ const AUTHORED = 'Wing *Motto* Here';
  *  neither is conformed. Hand-written rather than round-tripped, because a serialize
  *  would escape the asterisks and the contrast is what escaping erases. */
 const authored = (): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: codec_probe@0.1.0',

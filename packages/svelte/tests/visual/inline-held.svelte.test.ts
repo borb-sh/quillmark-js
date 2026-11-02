@@ -53,7 +53,7 @@ card_kinds:
 const probe = () => quillFromYaml(YAML);
 const STRUCTURED = '- one\n- two\n\npara ![i](a.png)';
 const load = (title: string, ...cards: string[]): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: inline_held@1.0.0',

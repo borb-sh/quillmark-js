@@ -47,7 +47,7 @@ main:
 `);
 
 const docWith = (fields: Record<string, string> = {}): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: cap_probe@0.1.0',

@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The carried `@quillmark/wasm` is 0.135.0.**
+**The carried `@quillmark/wasm` is 0.135.0.** Studio opens a markdown file through `Document.parse`, the one markdown import.
 
 ## v0.22.0 - 2026-11-02
 

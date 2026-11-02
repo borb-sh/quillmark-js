@@ -280,7 +280,7 @@ main:
 
 	it('draws the discriminant and the live cells, and commits the container whole', () => {
 		const q = nested();
-		const doc = core.Document.fromMarkdown(
+		const doc = core.Document.parse(
 			[
 				'~~~',
 				'$quill: nested_variant@1.0.0',
