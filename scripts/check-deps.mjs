@@ -16,8 +16,9 @@
 //   2. One wasm per process. A handle minted by one copy of the linear memory and handed
 //      to another is foreign, so what matters is how many copies meet inside one process. A
 //      package a consumer can import puts its copy in the importer's process, so it peers
-//      the artifact and never depends on it, at a single `>=` comparator (loose, until 1.0
-//      makes a narrow one honest); root `overrides` pins the developed-against version to
+//      the artifact and never depends on it, at a `>=` floor (loose, until 1.0 makes a
+//      narrow one honest), capped by a `<` ceiling only at a release that breaks it, which
+//      the root pin sits under; root `overrides` pins the developed-against version to
 //      exactly one, loose ranges permitting two installs rather than preventing them. A
 //      package with no importable entry is a bundled terminal: nothing imports it, so the
 //      copy it bundles meets no other.
@@ -127,9 +128,14 @@ else if (!/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(pin))
 	fail(`package.json: \`overrides.${WASM}\` is \`${pin}\` — pin exactly one version, not a range`);
 
 /** `>=1.2.3-0` → `[1, 2, 3]`, or null if the range is not a single `>=` comparator. */
-const floorOf = (range) => {
-	const m = /^>=\s*(\d+)\.(\d+)\.(\d+)(-[\w.]+)?$/.exec(range.trim());
-	return m ? [+m[1], +m[2], +m[3]] : null;
+const VERSION = /(\d+)\.(\d+)\.(\d+)(?:-[\w.]+)?/.source;
+/** The floor and the optional ceiling of a `>=X [<Y]` range, or null for any other shape. */
+const boundsOf = (range) => {
+	const m = new RegExp(`^>=\\s*${VERSION}(?:\\s+<\\s*${VERSION})?$`).exec(range.trim());
+	if (!m) return null;
+	const floor = [+m[1], +m[2], +m[3]];
+	const ceiling = m[4] === undefined ? null : [+m[4], +m[5], +m[6]];
+	return ceiling && !below(floor, ceiling) ? null : { floor, ceiling };
 };
 /** Lexicographic, not per-position: `0.99.0` is above the floor `0.98.5`. */
 const below = (a, b) => {
@@ -159,14 +165,19 @@ for (const { dir, json } of PACKAGES) {
 		);
 		continue;
 	}
-	const floor = floorOf(range);
-	if (!floor)
+	const bounds = boundsOf(range);
+	const pinned = pin?.split('-')[0].split('.').map(Number);
+	if (!bounds)
 		fail(
-			`packages/${dir}/package.json: \`peerDependencies.${WASM}\` is \`${range}\` — the range is loose until wasm 1.0, one \`>=\` comparator`
+			`packages/${dir}/package.json: \`peerDependencies.${WASM}\` is \`${range}\` — the range is loose until wasm 1.0, a \`>=\` floor and at most a \`<\` ceiling above it`
 		);
-	else if (pin && below(pin.split('-')[0].split('.').map(Number), floor))
+	else if (pinned && below(pinned, bounds.floor))
 		fail(
 			`packages/${dir}/package.json: the root pin \`${pin}\` is below this package's floor \`${range}\``
+		);
+	else if (pinned && bounds.ceiling && !below(pinned, bounds.ceiling))
+		fail(
+			`packages/${dir}/package.json: the root pin \`${pin}\` is not below this package's ceiling \`${range}\``
 		);
 }
 
