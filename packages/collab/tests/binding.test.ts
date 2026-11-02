@@ -147,6 +147,33 @@ describe('content', () => {
 		expect(body(a).blocks).toHaveLength(blocks);
 	});
 
+	it('Enter at the start of a block another client re-kinds keeps that kind on the text', () => {
+		const [a, b] = peers(2, withBody('one\ntwo'));
+		a.doc.apply({}, { steps: [{ setBlock: { id: 'b1', kind: 'heading', attrs: { level: 2 } } }] });
+		a.binding.push();
+		b.doc.apply({}, core.splitBlock(body(b), 4, 'bn'));
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(body(a).text).toBe('one\n\ntwo');
+		expect(body(a).blocks.map((x) => [x.id, x.kind])).toEqual([
+			['b0', 'para'],
+			['bn', 'para'],
+			['b1', 'heading']
+		]);
+	});
+
+	it('text typed before a repeat of itself is written where it was typed', () => {
+		const [a, b] = peers(2, withBody('see the cat'));
+		a.doc.apply({}, { steps: [{ splice: { at: 4, delete: 'the cat', insert: '' } }] });
+		a.binding.push();
+		b.doc.apply({}, { steps: [{ splice: { at: 4, insert: 'the big ' } }] });
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(body(a).text).toBe('see the big ');
+	});
+
 	it('hands the host the delta a remote edit made', () => {
 		const [a, b] = peers(2, listDoc);
 		edit(b.doc, {}, [{ retain: 2 }, { insert: 'xy' }]);

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The writer keeps a block's `\n` with its block, and places a lone insertion where it was typed.** A line is kept only where its text and the id of the block its `\n` opens both match, and a `\n` matches only the `\n` of the same block, so Enter at the start of a block another client re-kinds leaves that kind on the text rather than on the new empty block. An insertion with no deletion is written as far left as the text allows, so "the big " typed before "the cat" while another client deletes "the cat" converges to `"see the big "` and not `"see big the "`.
+
 **A field's Y form follows its value, not the card's kind.** A content value stays in its root under `@f` through a retype to a kind that does not declare `f`, so an edit to that root racing the retype lands on every client instead of being dropped with the root (fuzz seed 249). The fuzz now asserts that every content root Y holds equals the Document's value for it.
 
 **No client writes back a repair that inserts.** A mend `repair` makes by inserting (a split block's `\n` and record, the space a heading's hard break becomes, a missing cell's empty slot) is read through `repair` on every client and written back by none, as a session has no single writer: a client's next edit to that field writes its own change, and each block the repair mended that the edit left alone stays as Y holds it. Two clients editing after such a merge no longer write the repair twice, which duplicated text (`"Title words\nbody A words\nbody B"`).
