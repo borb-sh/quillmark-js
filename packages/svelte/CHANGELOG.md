@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.30.0 - 2026-11-02
+
 **On the content model of `@quillmark/wasm` 0.134.1.** The peer range is `>=0.134.1-0 <0.135.0-0`. A prose leaf lowers each edit to a `Change` through the store's `diff` and commits it with `apply`, naming its card by `$id`; a field not yet at content rest, or an `apply` that throws, takes `replace`. Content offsets are UTF-16 code units, so `Place.pos`, `onCaretMove` and the `Delta` `applyExternal` takes count UTF-16 where they counted scalar values. A table's cells are its island's slots, and a merge keeps its span. A retype removes the card, then inserts it, since card ids are unique.
 
 ## v0.29.3 - 2026-11-02
