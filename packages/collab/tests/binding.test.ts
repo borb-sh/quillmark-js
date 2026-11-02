@@ -206,6 +206,31 @@ describe('cards', () => {
 		expect(a.errors).toEqual([]);
 		expect(b.errors).toEqual([]);
 	});
+
+	it('an edit racing a retype to a kind without the field lands, and the field keeps its root', () => {
+		const [a, b] = peers(2, example);
+		const at = a.doc.cards.findIndex((c) => c.kind === 'section');
+		const lead = { card: at, field: 'lead' };
+		edit(a.doc, lead, [{ insert: 'a ' }]);
+		a.binding.push();
+		const was = b.doc.card(at);
+		b.doc.removeCard(at);
+		b.doc.insertCard({ ...was, kind: 'signoff' }, at);
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(b.doc.card(at).kind).toBe('signoff');
+		expect((a.doc.getStored(lead) as Content).text.startsWith('a ')).toBe(true);
+		const now = a.doc.card(at);
+		a.doc.removeCard(at);
+		a.doc.insertCard({ ...now, kind: 'section' }, at);
+		a.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(b.doc.read(lead).text.startsWith('a ')).toBe(true);
+		expect(a.errors).toEqual([]);
+		expect(b.errors).toEqual([]);
+	});
 });
 
 describe('a remote value the Document refuses', () => {

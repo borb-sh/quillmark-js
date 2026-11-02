@@ -8,10 +8,11 @@
 // field through `replace`, which keeps the Document's own anchors. Nothing here knows the
 // editor; the host hears what moved through `onRemote`.
 //
-// A field's Y form follows its declared type on the card's current kind: a `richtext` field is a
-// content root, a `text` field a plain one, anything else a value in the card map. A retype can
-// change which, so the writer always writes the form the kind declares and the reader takes
-// whichever form a field arrives in: `@<field>` in the card map says which root holds it.
+// A field's Y form follows its value: a content value is a content root, a string a plain root
+// where the kind declares `text` or Y already holds it plain, anything else a value in the card
+// map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
+// to the root racing the retype lands; the reader takes whichever form a field arrives in:
+// `@<field>` in the card map says which root holds it.
 import * as Y from 'yjs';
 import type {
 	Addr,
@@ -171,6 +172,13 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** The form `schema` declares for field `name`; an undeclared field is a value. */
 	const declared = (schema: QuillCardSchema | undefined, name: string): Form =>
 		schema && Object.hasOwn(schema.fields, name) ? formOf(schema.fields[name].type) : 'value';
+	/** The form `value` is written in: the one `declared` names where the value fits it, else the
+	 *  one its shape names, a string staying plain where Y already holds it so (`held`). */
+	const formFor = (declared: Form, value: unknown, held: Form | undefined): Form => {
+		if (declared === 'content' || isContent(value)) return 'content';
+		if (typeof value !== 'string') return 'value';
+		return declared === 'plain' || held === 'plain' ? 'plain' : 'value';
+	};
 	/** The form a field arrives in from Y; `undefined` where Y holds none. */
 	const arrived = (map: Y.Map<unknown>, key: string): Form | undefined => {
 		const at = map.get(present(key));
@@ -327,8 +335,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const seen = new Set<string>();
 		for (const item of fieldItems(card.payloadItems)) {
 			const addr = addrOf(c, item.key);
-			let form = declared(schema, item.key);
-			if (form === 'plain' && typeof item.value !== 'string') form = 'value';
+			const form = formFor(declared(schema, item.key), item.value, arrived(map, item.key));
 			const root = contentRoot(name, item.key);
 			if (held.has(root)) {
 				seen.add(item.key).add(present(item.key));
@@ -726,6 +733,12 @@ export class Diverged extends Error {
 }
 
 export { canonical };
+
+const isContent = (v: unknown): v is Content =>
+	typeof v === 'object' &&
+	v !== null &&
+	typeof (v as Content).text === 'string' &&
+	Array.isArray((v as Content).blocks);
 
 export function formOf(type: string): Form {
 	const base = type.endsWith('?') ? type.slice(0, -1) : type;

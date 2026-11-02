@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A field's Y form follows its value, not the card's kind.** A content value stays in its root under `@f` through a retype to a kind that does not declare `f`, so an edit to that root racing the retype lands on every client instead of being dropped with the root (fuzz seed 249). The fuzz now asserts that every content root Y holds equals the Document's value for it.
+
 **No client writes back a repair that inserts.** A mend `repair` makes by inserting (a split block's `\n` and record, the space a heading's hard break becomes, a missing cell's empty slot) is read through `repair` on every client and written back by none, as a session has no single writer: a client's next edit to that field writes its own change, and each block the repair mended that the edit left alone stays as Y holds it. Two clients editing after such a merge no longer write the repair twice, which duplicated text (`"Title words\nbody A words\nbody B"`).
 
 ## v0.2.0 - 2026-11-02
