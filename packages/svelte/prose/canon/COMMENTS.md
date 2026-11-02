@@ -16,19 +16,19 @@ A comment is a thread the host stores, joined to the document by one anchor over
 
 ## Reconcile
 
-**A drop is answered once: placed again, or the thread is deleted with its text.** `reconcile(doc, dropped, deltas?)` takes the selectors a write dropped, passes the ones a thread holds to `doc.reattach`, stores each placed thread's new selector, and deletes each thread `reattach` could not place. The document is written before the first await, so a caller that re-reads after the call sees the placed anchors.
+**A drop is answered once: placed again, or the thread is deleted with its text.** `reconcile(doc, dropped, deltas?)` takes the selectors a write dropped, passes the ones a thread holds to `doc.reattach` (every one, before the store's first list lands, since none can yet be told a stray), stores each placed thread's new selector, and deletes each thread `reattach` could not place. The document is written before the first await, so a caller that re-reads after the call sees the placed anchors.
 
 **Only a drop deletes; an absence never does.** A thread whose anchor is missing without a write having dropped it (another collab client's thread, a document reopened from markdown, a card removed) stays, unanchored, and `recover` runs `reattach` over every stored selector for a host that opened from markdown. Deleting there would let opening a document erase other people's threads.
 
 **Every writer reaches the flow with what it already holds.** A `Receipt` (`apply`, `replace`, `revise`) carries full selectors in `droppedAnchors`. A writer's `Revised` and `DocumentRevised` name drops by id alone, so the caller reads `doc.anchorContexts()` before the write and `droppedSelectors` joins the two; `reviseDocument` does that around `writer.reviseDocument`. A prose leaf reports through `onAnchorsDropped`, and a collab pull through `RemoteChange.content[i].droppedAnchors`.
 
-**A leaf's drop is a range whose text an edit deleted.** The leaf lowers its edit by diff, and an anchor the diff removes is a step, not a drop, so `onAnchorsDropped` names the anchors the commit's old content held and its new one does not, other than those `removeAnchor` took out, read before the write, joined with the receipt's own drops. After the hook the leaf re-reads the field, so an anchor the flow placed again draws. A table cell's anchors are carried by the cell's own edit and reported by no leaf.
+**A leaf's drop is a range whose text an edit deleted.** The leaf lowers its edit by diff, and an anchor the diff removes is a step, not a drop, so `onAnchorsDropped` names the anchors the commit's old content held and its new one does not, other than those `removeAnchor` took out, read before the write, joined with the receipt's own drops. After the hook the leaf re-reads the field, so an anchor the flow placed again draws. A table cell's anchors are carried by the cell's own edit and reported by no leaf. `DocumentRevised` names no cell anchor either, so a cell's thread a whole-document revise drops is left unanchored rather than deleted.
 
 **Drift is shown, not fixed.** A surviving anchor whose quote differs from the stored one is in `drifted` until the next `refresh`, which stores the live selector of every anchored thread for a save. A point never overwrites a stored quote.
 
 ## In the editor
 
-`<VisualEditor comments={…}>` publishes the controller to the mounted tree. A prose leaf hands its drops to `comments.reconcile`, a structure edit and a mount call `comments.sync`, and the editor draws nothing for a thread yet.
+`<VisualEditor comments={…}>` publishes the controller to the mounted tree. A prose leaf hands its drops to `comments.reconcile`, and a mount and every edit call `comments.sync`, so `anchored` and `drifted` follow each keystroke, and the editor draws nothing for a thread yet.
 
 ## Not owned here
 

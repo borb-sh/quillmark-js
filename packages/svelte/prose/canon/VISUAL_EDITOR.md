@@ -267,7 +267,7 @@ The second rung is the editor's because the editor holds `quill.schema`: a step 
 
 **A wash without a landing marks a change, and moves nothing** (`washField`). A host that wrote a field — an assistant's edit, say — shows where without taking the caret the user holds, so the verb plays the wash and does nothing else: no focus, no reveal, no scroll. A field in a closed group washes nothing, its box clipped to zero height, and opening the group would be the reveal the verb refuses. A nested address washes its field's box, since the row it names exists only once a landing opens it.
 
-**`comments` takes a comment controller and draws nothing yet.** A prose leaf hands the anchors its commits drop to `comments.reconcile`, and a mount and every structure edit call `comments.sync`, so `anchored` follows the document the editor holds ([COMMENTS.md](COMMENTS.md) §"In the editor").
+**`comments` takes a comment controller and draws nothing yet.** A prose leaf hands the anchors its commits drop to `comments.reconcile`, and a mount and every edit call `comments.sync`, so `anchored` follows the document the editor holds ([COMMENTS.md](COMMENTS.md) §"In the editor").
 
 ## Not owned
 

@@ -141,9 +141,15 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 		createdAt: now()
 	});
 
+	let listing = 0;
+	let loaded = false;
 	async function load(): Promise<void> {
+		const ticket = ++listing;
 		try {
-			index = await store.list();
+			const listed = await store.list();
+			if (ticket !== listing) return;
+			index = listed;
+			loaded = true;
 			for (const id of [...anchored.keys()]) if (at(id) < 0) anchored.delete(id);
 			for (const id of [...drift]) if (at(id) < 0) drift.delete(id);
 			const ids = new Set(live?.map((c) => c.id));
@@ -196,6 +202,7 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 		},
 
 		async create(context, body) {
+			if (at(context.id) >= 0) throw new Error(`comment thread ${context.id} already exists`);
 			const first = message(body);
 			const thread: CommentThread = {
 				id: context.id,
@@ -249,6 +256,8 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 			const i = at(id);
 			if (i < 0) return;
 			const prior = index[i];
+			const wasAnchored = anchored.get(id);
+			const wasDrifted = drift.has(id);
 			index = index.toSpliced(i, 1);
 			anchored.delete(id);
 			drift.delete(id);
@@ -256,7 +265,9 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 			try {
 				await store.remove(id);
 			} catch (e) {
-				index = index.toSpliced(i, 0, prior);
+				if (at(id) < 0) index = index.toSpliced(Math.min(i, index.length), 0, prior);
+				if (wasAnchored !== undefined) anchored.set(id, wasAnchored);
+				if (wasDrifted) drift.add(id);
 				publish();
 				throw e;
 			}
@@ -280,11 +291,13 @@ export function createComments(opts: CreateCommentsOpts): Comments {
 			derive(doc.anchorContexts());
 		},
 		async reconcile(doc, dropped, deltas) {
-			const ours = dropped.filter((c) => at(c.id) >= 0);
+			// Before the first list lands no drop can be told a stray, so every one is offered back.
+			const ours = loaded ? dropped.filter((c) => at(c.id) >= 0) : dropped;
 			const placed = ours.length
-				? doc.reattach(ours, deltas)
+				? doc.reattach([...ours], deltas)
 				: { reattached: [] as AnchorContext[], orphaned: [] as AnchorContext[] };
-			const deleted = placed.orphaned.map((c) => c.id);
+			if (!loaded) await ready;
+			const deleted = placed.orphaned.map((c) => c.id).filter((id) => at(id) >= 0);
 			const writes: Promise<void>[] = [];
 			for (const c of placed.reattached) {
 				const write = keep(c);

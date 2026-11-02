@@ -3,7 +3,13 @@
 // and an anchor that is merely absent leaves its thread in place, unanchored.
 import { describe, expect, it } from 'vitest';
 import type { AnchorContext, Document } from '@quillmark/wasm';
-import { MemoryCommentStore, createComments, newThreadId, type CommentStore } from '$lib/core';
+import {
+	MemoryCommentStore,
+	createComments,
+	newThreadId,
+	selectorOf,
+	type CommentStore
+} from '$lib/core';
 import { core, example, quill } from '../helpers/fixtures.js';
 
 const author = { id: 'u1', name: 'Ada' };
@@ -127,6 +133,60 @@ describe('createComments', () => {
 			'offline'
 		);
 		expect(comments.threads).toEqual([]);
+	});
+});
+
+describe('createComments, when the store misbehaves', () => {
+	it('refuses a second thread on an id it holds, and keeps the first', async () => {
+		const doc = example();
+		const { comments } = await opened(doc);
+		const context = anchorOver(doc, 'sibling');
+		await comments.create(context, 'Why nest?');
+		await expect(comments.create(context, 'Again')).rejects.toThrow();
+		expect(comments.threads.map((t) => t.id)).toEqual([context.id]);
+	});
+
+	it('restores a thread and its anchored state when the store refuses its removal', async () => {
+		class Refusing extends MemoryCommentStore {
+			override async remove(): Promise<void> {
+				throw new Error('offline');
+			}
+		}
+		const doc = example();
+		const { comments } = await opened(doc, new Refusing());
+		const context = anchorOver(doc, 'sibling');
+		await comments.create(context, 'Why nest?');
+		await expect(comments.remove(context.id)).rejects.toThrow('offline');
+		expect(comments.thread(context.id)?.anchored).toBe(true);
+	});
+
+	it('answers a drop that lands before the first list, once the list does', async () => {
+		const doc = example();
+		const context = anchorOver(doc, 'sibling');
+		let release!: () => void;
+		class Slow extends MemoryCommentStore {
+			override async list() {
+				await new Promise<void>((r) => (release = r));
+				return super.list();
+			}
+		}
+		const store = new Slow([
+			{
+				id: context.id,
+				status: 'open',
+				anchored: true,
+				selector: selectorOf(context),
+				messages: [],
+				createdAt: '',
+				updatedAt: ''
+			}
+		]);
+		const comments = createComments({ store, author });
+		const receipt = doc.revise({}, bodyWithout(doc, 'sibling'));
+		const pending = comments.reconcile(doc, receipt.droppedAnchors);
+		release();
+		expect((await pending).deleted).toEqual([context.id]);
+		expect(store.export().threads).toEqual([]);
 	});
 });
 

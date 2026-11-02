@@ -296,6 +296,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
+		comments?.sync(doc);
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
 

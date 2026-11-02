@@ -505,6 +505,8 @@ describe('onAnchorsDropped', () => {
 	it('reports nothing for removeAnchor or an edit that keeps the range', () => {
 		const { field, view, dropped } = commented('sibling');
 		view.dispatch(view.state.tr.insertText('XY', 1));
+		const inside = pmAt(view, field.getContent().anchors![0].start + 2);
+		view.dispatch(view.state.tr.delete(inside, inside + 2));
 		field.removeAnchor('a1');
 		expect(dropped).toEqual([]);
 		field.destroy();
