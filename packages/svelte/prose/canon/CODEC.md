@@ -47,7 +47,7 @@ An anchor does **not** become a PM mark: see §Marks.
 - **islands**: each island node's entry, its `props` and its `slots` (a table's cells, each a nested `Content`), under the id the node carries.
 - **blocks and containers**: each textblock's record under its node's id, its `path` the ids of the list, item and quote nodes around it, and a record for each of those containers. A node keeps its own id where no earlier node holds it, so the text a split leaves keeps its block's id, and a node with none, or a pasted copy, takes `{prefix}{n}` past the highest the document holds (`encode.ts`, `Ids`).
 - **formatting**: each PM mark's `[start, end)` coverage, unioned by the `(type, attrs)` pair the wire carries, so a link and an unknown `x-` key the same way and neither has a case of its own (`markKey`).
-- **anchors**: the anchor plugin's held positions, mapped through each transaction with the bias the store gives an anchor's edges, so the diff moves an anchor only where the edit moved its text.
+- **anchors**: the anchor plugin's held positions, mapped through each transaction with the bias the store gives an anchor's edges, so the diff moves an anchor only where the edit moved its text. A range a deletion swallows is held as a ghost of that deletion, and an undo that puts the deleted slice back whole puts the anchor back at its range, so the next commit's diff re-places it; a slice that comes back changed leaves the anchor dropped.
 
 Everything the change says, it says against the stored value, so a rebase in the store meets it as any other writer's.
 
