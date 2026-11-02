@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.2.0 - 2026-11-02
+
 **On the content model of `@quillmark/wasm` 0.134.1.** The peer range is `>=0.134.1-0 <0.135.0-0`. The Y shape follows the model: each `\n` carries its block's id, kind and container path, containers are records by id in `<root>#containers`, block 0's record sits in `<root>#block0`, and each island slot is its own key of the island's map. The projection reads a merged state through the store's `repair`, so two clients' concurrent edits that no single edit could make read as one valid value on every client. A remote value lands through `replace`, its card named by `$id`, and an id `replace` re-mints is written back to Y. `onRemote`'s delta counts UTF-16. A Y state an earlier version wrote carries no block ids or containers, so a host ends its open sessions before it upgrades, and the next one opens from the save.
 
 **`init()`.** The binding's sync verbs read the core's free functions, so a host awaits `init()` from `@quillmark/collab` before `bindDocument`, `seedDocument`, `writeFrom` or `changesSince`. `joinSession`, `readLog` and `writeLog` await it themselves.
