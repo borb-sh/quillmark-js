@@ -8,9 +8,9 @@
 // field through `replace`, which keeps the Document's own anchors. Nothing here knows the
 // editor; the host hears what moved through `onRemote`.
 //
-// A field's Y form follows its value: a content value is a content root, a string a plain root
-// where the kind declares `text` or Y already holds it plain, anything else a value in the card
-// map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
+// A field's Y form follows its value: a content value is a content root, marked `text` where it
+// spells `codec: "plain"`, a string a plain root where the kind declares `text` or Y already holds
+// it plain, anything else a value in the card map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
 // to the root racing the retype lands; the reader takes whichever form a field arrives in:
 // `@<field>` in the card map says which root holds it.
 import * as Y from 'yjs';
@@ -130,8 +130,9 @@ export interface DocumentBinding {
 	destroy(): void;
 }
 
-/** Which form a field takes in Y: a content root, a plain-text root, or a card-map value. */
-type Form = 'content' | 'plain' | 'value';
+/** Which form a field takes in Y: a content root, a content root whose value spells
+ *  `codec: "plain"`, a plain-text root holding a string, or a card-map value. */
+type Form = 'content' | 'text' | 'plain' | 'value';
 
 export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	const { doc, quill, ydoc } = opts;
@@ -179,14 +180,15 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** The form `value` is written in: the one `declared` names where the value fits it, else the
 	 *  one its shape names, a string staying plain where Y already holds it so (`held`). */
 	const formFor = (declared: Form, value: unknown, held: Form | undefined): Form => {
-		if (declared === 'content' || isContent(value)) return 'content';
+		if (isContent(value)) return value.codec === 'plain' ? 'text' : 'content';
+		if (declared === 'content') return 'content';
 		if (typeof value !== 'string') return 'value';
 		return declared === 'plain' || held === 'plain' ? 'plain' : 'value';
 	};
 	/** The form a field arrives in from Y; `undefined` where Y holds none. */
 	const arrived = (map: Y.Map<unknown>, key: string): Form | undefined => {
 		const at = map.get(present(key));
-		if (at === 'content' || at === 'plain') return at;
+		if (at === 'content' || at === 'text' || at === 'plain') return at;
 		return map.has(key) ? 'value' : undefined;
 	};
 
@@ -201,7 +203,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	function watchCard(name: string, schema: QuillCardSchema | undefined): void {
 		watch(contentRoot(name));
 		for (const [field, f] of Object.entries(schema?.fields ?? {}))
-			if (formOf(f.type) === 'content') watch(contentRoot(name, field));
+			if (formOf(f.type) !== 'value') watch(contentRoot(name, field));
 	}
 
 	/** A content field's value in the Document, as content; `undefined` where it is absent. */
@@ -211,11 +213,16 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (typeof v === 'object') return v as Content;
 		return reader.getContent(addr) ?? undefined;
 	}
+	/** The projection of `root`, spelling `codec: "plain"` where its card map marks it `text`. */
 	function projectField(root: string): Projection {
 		const projection = project(readField(contentTypes(ydoc, root)));
 		if (projection.repairs.some(inserts)) inserting.add(root);
 		else inserting.delete(root);
-		return projection;
+		const slash = root.indexOf('/');
+		const field = root.slice(slash + 1);
+		if (ydoc.getMap<unknown>(root.slice(0, slash)).get(present(field)) !== 'text')
+			return projection;
+		return { ...projection, content: { ...projection.content, codec: 'plain' } };
 	}
 	const projectRoot = (root: string): Content => projectField(root).content;
 
@@ -269,7 +276,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		content: Content,
 		reminted: { root: string; addr: Addr }[]
 	): void {
-		doc.replace(writeAddr(addr), content);
+		const was = doc.getStored(addr);
+		if (isContent(was) && was.codec === content.codec) doc.replace(writeAddr(addr), content);
+		else doc.unchecked.storeField(addr, content);
 		const landed = contentKey(storedContent(addr));
 		synced.set(root, landed);
 		if (landed !== contentKey(content)) reminted.push({ root, addr });
@@ -480,7 +489,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	function yValue(name: string, key: string): unknown {
 		const map = ydoc.getMap<unknown>(name);
 		const form = arrived(map, key);
-		if (form === 'content') return projectRoot(contentRoot(name, key));
+		if (form === 'content' || form === 'text') return projectRoot(contentRoot(name, key));
 		if (form === 'plain') return ydoc.getText(contentRoot(name, key)).toString();
 		return form === 'value' ? structuredClone(map.get(key)) : undefined;
 	}
@@ -535,7 +544,8 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			const root = contentRoot(name, key);
 			const v = doc.getStored(addrOf(c, key));
 			if (form === 'plain') synced.set(root, JSON.stringify(v));
-			else if (form === 'content') synced.set(root, contentKey(storedContent(addrOf(c, key))));
+			else if (form === 'content' || form === 'text')
+				synced.set(root, contentKey(storedContent(addrOf(c, key))));
 		}
 	}
 
@@ -585,7 +595,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 					if (doc.getStored(addr) == null) continue;
 					doc.removeField(addr);
 					synced.delete(contentRoot(name, key));
-				} else if (form === 'content' && isLeaf) {
+				} else if ((form === 'content' || form === 'text') && isLeaf) {
 					if (doc.getStored(addr) != null) continue;
 					pullField(c, key, change);
 					continue;
@@ -618,7 +628,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (change.content.some((x) => sameAddr(x.addr, addr))) return;
 		const schema = schemaOf(c);
 		try {
-			if (form === 'content' && declared(schema, field) === 'content')
+			if ((form === 'content' || form === 'text') && declared(schema, field) !== 'value')
 				return reviseFrom(root, addr, change);
 			const value = yValue(name, field);
 			if (value === undefined || canonical(doc.getStored(addr)) === canonical(value)) return;

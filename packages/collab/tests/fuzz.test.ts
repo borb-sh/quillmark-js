@@ -5,7 +5,7 @@
 // (container runs), tables edited and typed around (slots), and cards moved and edited at once.
 // Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are.
 import { describe, expect, it } from 'vitest';
-import type { Addr, Change, Content, Quill } from '@quillmark/wasm';
+import type { Addr, Change, Content, Document, Quill } from '@quillmark/wasm';
 import { writeFrom, type CardOp } from '../src/index.js';
 import * as Y from 'yjs';
 import { project } from '../src/project.js';
@@ -49,9 +49,16 @@ const blockRanges = (rt: Content) => {
 };
 const fresh = (r: Rng) => `f${r.int(2 ** 30).toString(36)}`;
 
+/** A content edit, made on a Document at an address. */
+type ContentEdit = (doc: Document, at: Addr) => unknown;
+const steps =
+	(change: Change): ContentEdit =>
+	(doc, at) =>
+		doc.apply(at, change);
+
 /** One random content edit over `rt`; `undefined` where the pick does not apply. */
-function contentEdit(r: Rng, rt: Content): Change | undefined {
-	const { splitBlock, deleteRange, indent, outdent, wrap, importMarkdown } = core;
+function contentEdit(r: Rng, rt: Content): ContentEdit | undefined {
+	const { importMarkdown } = core;
 	const len = Array.from(rt.text).length;
 	const u = (k: number) => unit(rt.text, k);
 	const ranges = blockRanges(rt);
@@ -80,44 +87,54 @@ function contentEdit(r: Rng, rt: Content): Change | undefined {
 		] as const)
 	) {
 		case 'type':
-			return { steps: [{ splice: { at: u(r.int(len + 1)), insert: r.pick(WORDS) } }] };
+			return steps({ steps: [{ splice: { at: u(r.int(len + 1)), insert: r.pick(WORDS) } }] });
 		case 'delete': {
 			if (!len) return undefined;
 			const at = r.int(len);
-			return deleteRange(rt, u(at), u(at + 1 + r.int(Math.min(4, len - at))));
+			const to = u(at + 1 + r.int(Math.min(4, len - at)));
+			return (doc, addr) => doc.deleteRange(addr, u(at), to);
 		}
-		case 'enter':
-			return splitBlock(rt, u(r.int(len + 1)), fresh(r));
+		case 'enter': {
+			const at = u(r.int(len + 1));
+			const id = fresh(r);
+			return (doc, addr) => doc.splitBlock(addr, at, { id });
+		}
 		case 'item': {
 			// Enter at the end of a block inside a list.
 			const listed = ranges.filter((x) => x.block.path?.length);
 			if (!listed.length) return undefined;
-			return splitBlock(rt, u(r.pick(listed).end), fresh(r));
+			const at = u(r.pick(listed).end);
+			const id = fresh(r);
+			return (doc, addr) => doc.splitBlock(addr, at, { id });
 		}
-		case 'list':
-			return wrap(rt, block.id, block.id, { kind: 'list', ordered: r.next() < 0.5 });
+		case 'list': {
+			const ordered = r.next() < 0.5;
+			return (doc, addr) => doc.wrap(addr, block.id, block.id, { kind: 'list', ordered });
+		}
 		case 'quote':
 			return block.path?.length
-				? outdent(rt, block.id)
-				: wrap(rt, block.id, block.id, { kind: 'quote' });
+				? (doc, addr) => doc.outdent(addr, block.id, undefined)
+				: (doc, addr) => doc.wrap(addr, block.id, block.id, { kind: 'quote' });
 		case 'nest':
-			return indent(rt, block.id);
+			return (doc, addr) => doc.indent(addr, block.id, undefined);
 		case 'heading':
-			return {
+			return steps({
 				steps: [{ setBlock: { id: block.id, kind: 'heading', attrs: { level: 1 + r.int(3) } } }]
-			};
+			});
 		case 'bold': {
 			if (end <= start) return undefined;
 			const a = start + r.int(end - start);
 			const b = a + 1 + r.int(end - a);
-			return { steps: [{ mark: { start: u(a), end: u(b), add: r.next() < 0.7, type: 'strong' } }] };
+			return steps({
+				steps: [{ mark: { start: u(a), end: u(b), add: r.next() < 0.7, type: 'strong' } }]
+			});
 		}
 		case 'table': {
 			const island = {
 				...importMarkdown('| t |\n| - |').content.islands![0],
 				id: `isl-${r.int(3)}`
 			};
-			return {
+			return steps({
 				steps: [
 					{
 						splice: {
@@ -128,13 +145,13 @@ function contentEdit(r: Rng, rt: Content): Change | undefined {
 						}
 					}
 				]
-			};
+			});
 		}
 		case 'cell': {
 			const island = rt.islands?.length ? r.pick(rt.islands) : undefined;
 			if (island?.type !== 'table' || !island.slots) return undefined;
 			const slot = r.pick(Object.keys(island.slots));
-			return {
+			return steps({
 				steps: [
 					{
 						nested: {
@@ -144,20 +161,21 @@ function contentEdit(r: Rng, rt: Content): Change | undefined {
 						}
 					}
 				]
-			};
+			});
 		}
 		case 'nearTable': {
 			if (!slots.length) return undefined;
 			const s = r.pick(slots);
 			const at = r.next() < 0.5 ? Math.max(0, s - 1) : Math.min(len, s + 2);
-			return { steps: [{ splice: { at: u(at), insert: r.pick(WORDS) } }] };
+			return steps({ steps: [{ splice: { at: u(at), insert: r.pick(WORDS) } }] });
 		}
 		case 'cut': {
 			// A deletion that spans a table's slot, the edit that deletes an island.
 			if (!slots.length) return undefined;
 			const s = r.pick(slots);
 			const at = Math.max(0, s - r.int(3));
-			return deleteRange(rt, u(at), u(Math.min(len, s + 1 + r.int(2))));
+			const to = u(Math.min(len, s + 1 + r.int(2)));
+			return (doc, addr) => doc.deleteRange(addr, u(at), to);
 		}
 	}
 }
@@ -177,18 +195,19 @@ function contentAddrs(q: Quill, p: Peer): Addr[] {
 }
 
 /** Every content root Y holds for `p`: each card's body, and each field its map marks `@f`
- *  as content, whatever the card's kind declares. */
-function contentRoots(p: Peer): { addr: Addr; card: string; root: string }[] {
+ *  as content or plain content, whatever the card's kind declares. */
+function contentRoots(p: Peer): { addr: Addr; card: string; root: string; plain: boolean }[] {
 	const names = ['main', ...p.binding.ids];
 	return names.flatMap((card, k) => {
 		const at: Addr = k ? { card: k - 1 } : {};
-		const out = [{ addr: at, card, root: contentRoot(card) }];
+		const out = [{ addr: at, card, root: contentRoot(card), plain: false }];
 		for (const [key, form] of p.ydoc.getMap<unknown>(card).entries())
-			if (key.startsWith('@') && form === 'content')
+			if (key.startsWith('@') && (form === 'content' || form === 'text'))
 				out.push({
 					addr: { ...at, field: key.slice(1) },
 					card,
-					root: contentRoot(card, key.slice(1))
+					root: contentRoot(card, key.slice(1)),
+					plain: form === 'text'
 				});
 		return out;
 	});
@@ -225,7 +244,7 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 				const at = typeof addr.card === 'number' ? { ...addr, card: doc.card(addr.card).id } : addr;
 				const change = contentEdit(r, doc.read(at));
 				if (!change) return false;
-				doc.apply(at, change);
+				change(doc, at);
 				break;
 			}
 			case 'text':
@@ -353,12 +372,13 @@ describe('three peers, random concurrent edits', () => {
 				if (snapshot(p.doc) !== want) failures.push(`seed ${seed}: documents differ`);
 			for (const p of out.all) {
 				if (p.errors.length) failures.push(`seed ${seed}: ${String(p.errors[0])}`);
-				contentRoots(p).forEach(({ addr, card, root }) => {
+				contentRoots(p).forEach(({ addr, card, root, plain }) => {
 					const stored = p.doc.getStored(addr);
 					const field = addr.field ?? '$body';
 					if (typeof stored !== 'object' || stored === null)
 						return failures.push(`seed ${seed}: ${card}/${field} holds no content`);
-					const projected = project(readField(contentTypes(p.ydoc, root))).content;
+					const read = project(readField(contentTypes(p.ydoc, root))).content;
+					const projected: Content = plain ? { ...read, codec: 'plain' } : read;
 					if (canonical(withoutAnchors(stored as Content)) !== canonical(projected))
 						failures.push(`seed ${seed}: ${card}/${field} differs from its root`);
 					if (canonical(core.normalize(projected)) !== canonical(projected))

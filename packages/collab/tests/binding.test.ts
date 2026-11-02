@@ -151,7 +151,7 @@ describe('content', () => {
 		const [a, b] = peers(2, withBody('one\ntwo'));
 		a.doc.apply({}, { steps: [{ setBlock: { id: 'b1', kind: 'heading', attrs: { level: 2 } } }] });
 		a.binding.push();
-		b.doc.apply({}, core.splitBlock(body(b), 4, 'bn'));
+		b.doc.splitBlock({}, 4, { id: 'bn' });
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));

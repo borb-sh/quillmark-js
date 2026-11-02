@@ -195,7 +195,7 @@ function state(bound: Bound, quill: Quill): State {
 			if (v == null) continue;
 			const form = formOf(f.type);
 			if (form === 'plain' && typeof v === 'string') lines.set(`${c}/${field}`, textLines(v));
-			else if (form === 'content') {
+			else if (form !== 'value') {
 				const content = typeof v === 'object' ? (v as Content) : reader.getContent(addr);
 				if (content) lines.set(`${c}/${field}`, contentLines(content));
 			}
