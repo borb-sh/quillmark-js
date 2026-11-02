@@ -21,3 +21,9 @@ export { fieldPathForAddr, addrForFieldPath } from './address.js';
 // ── The error channel ───────────────────────────────────────────────────────
 // What every surface reports a recovered failure through, via its `onError` prop.
 export type { EditorError, EditorErrorCode, EditorErrorHandler } from './errors.js';
+
+// ── Comments ────────────────────────────────────────────────────────────────
+// The thread model, the store seam and the reconcile flow (COMMENTS.md): framework-free, so a
+// host with no editor (a server, a collab client with its own UI) runs the same flow the editor's
+// comment surfaces do.
+export * from './comments/index.js';

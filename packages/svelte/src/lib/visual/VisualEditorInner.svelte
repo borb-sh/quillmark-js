@@ -78,6 +78,7 @@
 		type RoutedDiagnostic
 	} from './diagnostics.js';
 	import { fieldDomIds, groupPanelId } from './domid.js';
+	import { setComments } from './comments.js';
 	import { createLeafRegistry, type ActiveProse, type FieldControl } from './leaves.js';
 	import { reorder, reorderArm, reorderTrips, scrollSettled, slot } from './motion.js';
 	import { tipsChannel } from './tips.js';
@@ -98,6 +99,7 @@
 		onCaretMove,
 		onChange,
 		onError,
+		comments,
 		diagnostics,
 		enumOptionAllowed,
 		enumDisallowed = 'disable',
@@ -121,6 +123,9 @@
 			return formatDiagnostic;
 		}
 	});
+
+	setComments(() => comments);
+	$effect(() => comments?.sync(doc));
 
 	// The host's font library: registered with the page while mounted, so a run draws in
 	// the face the preview sets it in, and offered family by family to the popover.
@@ -159,6 +164,7 @@
 	 */
 	function bump(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		rederive();
+		comments?.sync(doc);
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });

@@ -13,6 +13,7 @@
 		type TextCap
 	} from '../core/codec/index.js';
 	import type { LeafRegistry } from './leaves.js';
+	import { commentsChannel } from './comments.js';
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
 	import './controls.css';
@@ -112,6 +113,7 @@
 	const block = $derived(!inline);
 
 	let controller: FieldController | undefined;
+	const currentComments = commentsChannel();
 
 	/** What the label's click calls. The controller's focus, not the container's, which
 	 * leaves the PM selection unplaced. */
@@ -145,6 +147,10 @@
 				onCaretMove,
 				onChange,
 				onError,
+				onAnchorsDropped: (dropped) => {
+					const comments = currentComments();
+					if (comments) void comments.reconcile(doc, dropped);
+				},
 				heldNoteId: heldId,
 				onHold: (next) => {
 					held = next;

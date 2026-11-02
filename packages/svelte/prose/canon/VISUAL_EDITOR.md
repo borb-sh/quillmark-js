@@ -231,6 +231,7 @@ Two layers, per [ARCHITECTURE.md](ARCHITECTURE.md): the prose leaf is the vanill
   onCaretMove={preview.focusPosition}
   onChange={(change) => change.source === 'structure' ? recompileNow() : schedule()}
   onError={(err) => …}
+  comments={comments}                        <!-- createComments(…), COMMENTS.md -->
 />
 <!-- bridge in: visualEditor.setCaret(at) from preview.onPick -->
 ```
@@ -265,6 +266,8 @@ The second rung is the editor's because the editor holds `quill.schema`: a step 
 **The wash marks what the address named** (`core/bloom.ts`). A landing at depth blooms the innermost row it opened and not the repeater around it: the arrival answers "here" for a click made in the other pane, and a box wider than the one the click resolved says the field where the pick said the row. So the walk hands its row back with the landing, and the registry's own box — the whole list, a field-level subform — is what a landing on the field, or on a property no row holds, falls to, along with a row the document has since dropped. Every other control is one box, which is the one the registry holds.
 
 **A wash without a landing marks a change, and moves nothing** (`washField`). A host that wrote a field — an assistant's edit, say — shows where without taking the caret the user holds, so the verb plays the wash and does nothing else: no focus, no reveal, no scroll. A field in a closed group washes nothing, its box clipped to zero height, and opening the group would be the reveal the verb refuses. A nested address washes its field's box, since the row it names exists only once a landing opens it.
+
+**`comments` takes a comment controller and draws nothing yet.** A prose leaf hands the anchors its commits drop to `comments.reconcile`, and a mount and every structure edit call `comments.sync`, so `anchored` follows the document the editor holds ([COMMENTS.md](COMMENTS.md) §"In the editor").
 
 ## Not owned
 

@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**Comment threads, without their UI.** `/core` exports the comment model: `createComments({store, author})`, the `CommentStore` a host implements with `MemoryCommentStore` beside it, and `newThreadId()`. `comments.reconcile(doc, dropped)` answers anchors a write dropped: `doc.reattach` places each one again where its text still stands, and a thread it cannot place is deleted with its text. A thread whose anchor is only absent stays, unanchored, and `comments.recover(doc)` re-places threads after an open from markdown. `comments.reviseDocument` wraps `writer.reviseDocument` in that flow.
+
+**`<VisualEditor comments>` and `onAnchorsDropped`.** A prose leaf reports the anchors a commit took out, a range whose text was deleted and any the store's receipt dropped, to the new `createField` option `onAnchorsDropped`, with each selector as read before the write, and re-reads the field after it. The editor routes them to `comments.reconcile` and calls `comments.sync` on mount and after each structure edit.
+
 ## v0.30.0 - 2026-11-02
 
 **On the content model of `@quillmark/wasm` 0.134.1.** The peer range is `>=0.134.1-0 <0.135.0-0`. A prose leaf lowers each edit to a `Change` through the store's `diff` and commits it with `apply`, naming its card by `$id`; a field not yet at content rest, or an `apply` that throws, takes `replace`. Content offsets are UTF-16 code units, so `Place.pos`, `onCaretMove` and the `Delta` `applyExternal` takes count UTF-16 where they counted scalar values. A table's cells are its island's slots, and a merge keeps its span. A retype removes the card, then inserts it, since card ids are unique.

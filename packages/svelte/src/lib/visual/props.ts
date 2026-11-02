@@ -6,6 +6,7 @@
 import type { Document, Quill, Addr, Diagnostic, FontFace } from '@quillmark/wasm';
 import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
+import type { Comments } from '../core/comments/index.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
 import type { FormatDiagnostic, VisualStringsInput } from './strings.js';
 
@@ -65,6 +66,12 @@ export interface VisualEditorProps {
 	 * route. Reaches the prose leaves too, so one handler covers the surface.
 	 */
 	onError?: EditorErrorHandler;
+	/**
+	 * The comment controller (`createComments`, `/core`). A prose commit that drops an anchor hands
+	 * it to `comments.reconcile`, which places it again or deletes its thread, and a structure edit
+	 * re-derives which threads this document still anchors.
+	 */
+	comments?: Comments;
 	/**
 	 * External diagnostics, routed by `.path` and merged with `quill.validate`
 	 * and local commit errors (VISUAL_EDITOR §Diagnostics). Warnings do not draw.
