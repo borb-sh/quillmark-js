@@ -200,7 +200,7 @@
 			<div class="art">
 				<div class="qm-frame demo-frame">
 					{#if VisualEditor && editDoc && quillHandle}
-						<VisualEditor class="qm-pane" doc={editDoc} quill={quillHandle} />
+						<VisualEditor class="qm-pane" doc={editDoc} quill={quillHandle} actor={null} />
 					{/if}
 				</div>
 			</div>

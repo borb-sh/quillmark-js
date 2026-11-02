@@ -251,6 +251,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			if (!ops.length && doc.cardCount !== ids.length) realign();
 			for (const c of refs()) pushCard(c, renames);
 		}, origin);
+		settleIds();
 		const rewritten: Addr[] = [];
 		const reminted: { root: string; addr: Addr }[] = [];
 		for (const { root, addr } of renames) {
@@ -426,6 +427,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			order.toArray().some((id) => !known.has(id) && touched.has(id));
 		if (listMoved) pullCards(change, inserted);
 		if (diverged) return change;
+		if (listMoved || ids.some(hit)) settleIds(change);
 		for (const c of refs()) {
 			const name = nameOf(c);
 			if (inserted.has(name)) continue;
@@ -449,12 +451,8 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 
 	function pullCards(change: RemoteChange, inserted: Set<string>): void {
-		const seen = new Set<string>();
-		const target = order.toArray().filter((id) => {
-			if (seen.has(id) || typeof ydoc.getMap(id).get(KIND) !== 'string') return false;
-			seen.add(id);
-			return true;
-		});
+		const target = liveOrder();
+		const seen = new Set(target);
 		for (let i = ids.length - 1; i >= 0; i--) {
 			if (seen.has(ids[i])) continue;
 			doc.removeCard(i);
@@ -503,15 +501,97 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		return [...out];
 	}
 
-	/** The `$id` Y holds for card `name`, where no other card of the Document holds it. */
-	function yId(name: string, c?: number): string | undefined {
-		const id = ydoc.getMap<unknown>(name).get(ID);
-		if (typeof id !== 'string') return undefined;
-		return doc.cards.some((card, i) => i !== c && card.id === id) ? undefined : id;
+	/**
+	 * The `$id` each live card holds, by Y name, as every client reads it from one Y state: the
+	 * `$id` its map holds, where it is a card id and no card before it in `$cards` holds it, else
+	 * one derived from its Y name, which is unique. So a `$id` Y holds twice, after a merge or
+	 * from a placement under no actor, names one card on every client.
+	 */
+	function resolveIds(): Map<string, string> {
+		const out = new Map<string, string>();
+		const claimed = new Set<string>();
+		const rest: string[] = [];
+		for (const name of liveOrder()) {
+			const id = ydoc.getMap<unknown>(name).get(ID);
+			if (typeof id === 'string' && CARD_ID.test(id) && !claimed.has(id)) {
+				out.set(name, id);
+				claimed.add(id);
+			} else rest.push(name);
+		}
+		for (const name of rest) {
+			let id = derivedId(name);
+			for (let k = 2; claimed.has(id); k++) id = `${derivedId(name)}_${k}`;
+			out.set(name, id);
+			claimed.add(id);
+		}
+		return out;
+	}
+
+	/** The live cards' Y names in `$cards` order, an id held twice counting once. */
+	function liveOrder(): string[] {
+		const seen = new Set<string>();
+		return order.toArray().filter((id) => {
+			if (seen.has(id) || typeof ydoc.getMap(id).get(KIND) !== 'string') return false;
+			seen.add(id);
+			return true;
+		});
+	}
+
+	/**
+	 * Give every card the `$id` {@link resolveIds} names, and write each one Y holds otherwise
+	 * back to its map. Every client writes the same value, so the writes converge. A card whose
+	 * id changes is placed again under it, through a free id first where its own is the one
+	 * another card is to take.
+	 */
+	function settleIds(change?: RemoteChange): void {
+		const resolved = resolveIds();
+		const want = ids.map((name) => resolved.get(name));
+		const changing = want.flatMap((id, i) =>
+			id !== undefined && doc.card(i).id !== id && !held.has(ids[i]) ? [i] : []
+		);
+		const taken = new Set(doc.cards.map((c) => c.id));
+		const free = (id: string): string => {
+			let k = 0;
+			while (taken.has(`${id}_t${k}`)) k++;
+			taken.add(`${id}_t${k}`);
+			return `${id}_t${k}`;
+		};
+		try {
+			for (const i of changing) {
+				const now = doc.card(i).id;
+				if (want.some((id, j) => j !== i && id === now)) placeAs(i, free(want[i]!));
+			}
+			for (const i of changing) {
+				placeAs(i, want[i]!);
+				if (change && !change.fields.includes(i)) change.fields.push(i);
+			}
+		} catch (e) {
+			diverged = true;
+			report(new Diverged(e));
+			return;
+		}
+		const stale = [...resolved].filter(([name, id]) => ydoc.getMap(name).get(ID) !== id);
+		if (stale.length)
+			ydoc.transact(() => {
+				for (const [name, id] of stale) ydoc.getMap(name).set(ID, id);
+			}, origin);
+	}
+
+	/** Place card `i` again under `id`, as it is otherwise. */
+	function placeAs(i: number, id: string): void {
+		const was = doc.card(i);
+		doc.removeCard(i);
+		try {
+			doc.unchecked.insertCard({ ...was, id }, i);
+		} catch (e) {
+			doc.unchecked.insertCard(was, i);
+			throw e;
+		}
 	}
 
 	/** A composable card built from its Y state, for a card another client inserted. It spells
-	 *  the `$id` Y holds, so every client places it under one id. */
+	 *  the `$id` Y holds where no card of the Document holds it yet, so every client places it
+	 *  under one id; {@link settleIds} gives it the rest. */
 	function cardFromY(id: string): CardInput {
 		const map = ydoc.getMap<unknown>(id);
 		const kind = map.get(KIND) as string;
@@ -524,7 +604,13 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			...held.filter((k) => !order.includes(k)).sort()
 		];
 		const title = map.get(TITLE);
-		const cardId = yId(id);
+		const spelled = ydoc.getMap<unknown>(id).get(ID);
+		const cardId =
+			typeof spelled === 'string' &&
+			CARD_ID.test(spelled) &&
+			!doc.cards.some((c) => c.id === spelled)
+				? spelled
+				: undefined;
 		return {
 			kind,
 			...(cardId === undefined ? {} : { id: cardId }),
@@ -554,17 +640,12 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const map = ydoc.getMap<unknown>(name);
 		let moved = false;
 		const kind = map.get(KIND);
-		const id = c === MAIN ? undefined : yId(name, c);
-		if (
-			c !== MAIN &&
-			typeof kind === 'string' &&
-			(kind !== doc.card(c).kind || (id !== undefined && id !== doc.card(c).id))
-		) {
+		if (c !== MAIN && typeof kind === 'string' && kind !== doc.card(c).kind) {
 			const was = doc.card(c);
 			try {
 				doc.removeCard(c);
 				try {
-					doc.unchecked.insertCard({ ...was, kind, id: id ?? was.id }, c);
+					doc.unchecked.insertCard({ ...was, kind }, c);
 				} catch (e) {
 					doc.unchecked.insertCard(was, c);
 					throw e;
@@ -776,6 +857,13 @@ const isContent = (v: unknown): v is Content =>
 	v !== null &&
 	typeof (v as Content).text === 'string' &&
 	Array.isArray((v as Content).blocks);
+
+/** A card id's grammar, as the store holds it. */
+const CARD_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/** The `$id` a card takes from its Y name where the one its map holds is another card's: a Y
+ *  name is unique, and {@link resolveIds} steps past one another card already holds. */
+const derivedId = (name: string): string => `y${name}`.slice(0, 64);
 
 export function formOf(type: string): Form {
 	const base = type.endsWith('?') ? type.slice(0, -1) : type;

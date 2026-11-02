@@ -223,6 +223,51 @@ describe('cards', () => {
 		expect(a.doc.toStored()).toBe(b.doc.toStored());
 	});
 
+	const ids = (p: Peer) => p.doc.cards.map((c) => c.id);
+	const converged = (all: Peer[]) => {
+		const [a, ...rest] = all;
+		for (const p of rest) expect(snapshot(p.doc)).toBe(snapshot(a.doc));
+		expect(new Set(ids(a)).size).toBe(a.doc.cardCount);
+		for (const p of all) expect(p.errors).toEqual([]);
+	};
+
+	it('a freed id placed again while another client moves its old card names one card everywhere', () => {
+		const [a, b] = peers(2, example);
+		const was = a.doc.card(1);
+		a.doc.removeCard(1);
+		a.binding.push({ op: 'remove', at: 1 });
+		const card = quill().seedCard('note', a.doc.seedOverlay('note'))!;
+		a.doc.unchecked.insertCard({ ...card, id: was.id }, 0);
+		a.binding.push({ op: 'insert', at: 0 });
+		b.doc.moveCard(1, 0);
+		b.binding.push({ op: 'move', from: 1, to: 0 });
+		settle([a, b]);
+		converged([a, b]);
+		expect(a.doc.cardCount).toBe(b.doc.cardCount);
+		expect(ids(a)).toContain(was.id);
+	});
+
+	it('an undone removal racing a card placed under the freed id names one card everywhere', () => {
+		const [a, b] = peers(2, example);
+		const origins = new Set<unknown>();
+		a.ydoc.on('beforeTransaction', (tr: Y.Transaction) => {
+			if (typeof tr.origin === 'symbol') origins.add(tr.origin);
+		});
+		const undo = new Y.UndoManager(a.ydoc.getArray('$cards'), { trackedOrigins: origins });
+		const was = a.doc.card(1);
+		a.doc.removeCard(1);
+		a.binding.push({ op: 'remove', at: 1 });
+		deliver(b);
+		const card = quill().seedCard('note', b.doc.seedOverlay('note'))!;
+		b.doc.unchecked.insertCard({ ...card, id: was.id }, 0);
+		b.binding.push({ op: 'insert', at: 0 });
+		undo.undo();
+		expect(ids(a)).toContain(was.id);
+		settle([a, b]);
+		converged([a, b]);
+		expect(ids(a).filter((id) => id === was.id)).toHaveLength(1);
+	});
+
 	it('syncs a card title and keeps the rest of $ext local', () => {
 		const [a, b] = peers(2, example);
 		a.doc.storeExt({ card: 1 }, { editor: { title: 'Aside', tips: false }, mine: 1 });

@@ -34,5 +34,6 @@ export const VISUAL = `<script lang="ts">
 <VisualEditor
   {doc}
   {quill}
+  actor={null}
   onChange={() => preview.refresh(session.update(doc))}
 />`;

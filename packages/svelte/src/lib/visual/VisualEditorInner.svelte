@@ -421,7 +421,7 @@
 			const card = quill.seedCard(kind, overlay);
 			if (!card) return undefined;
 			const from = document.activeElement;
-			doc.unchecked.insertCard(card, atIndex, { actor });
+			doc.unchecked.insertCard(card, atIndex, actor === null ? undefined : { actor });
 			const id = seq.next();
 			arm.arm();
 			cardIds = [...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)];

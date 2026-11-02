@@ -95,7 +95,7 @@ In Svelte, `<Preview {session} onPick={…} />` exposes the same verbs (`refresh
 
 ## Visual editor
 
-`<VisualEditor>` is a federated composition of many small editors over one document: each content leaf a ProseMirror prose surface, each scalar a form control, cards the editor's own. It commits directly to the `doc` handle.
+`<VisualEditor>` is a federated composition of many small editors over one document: each content leaf a ProseMirror prose surface, each scalar a form control, cards the editor's own. It commits directly to the `doc` handle. `actor` is required: a live session's `binding.actor`, under which each card the editor adds mints its `$id`, or `null` for a document no session binds.
 
 ```svelte
 <script lang="ts">
@@ -105,6 +105,7 @@ In Svelte, `<Preview {session} onPick={…} />` exposes the same verbs (`refresh
 <VisualEditor
 	{doc}
 	{quill}
+	actor={null}
 	onChange={(change) => {
 		/* an edit LANDED; `change.source` is 'prose' | 'field' | 'structure' */
 	}}
@@ -137,6 +138,7 @@ Hand it a different `doc` and the editor **re-keys itself**: every leaf remounts
 	bind:this={editor}
 	{doc}
 	{quill}
+	actor={null}
 	onActiveLeafChange={(a) => (activeCard = a.cardId)}
 />
 
@@ -155,6 +157,7 @@ The package ships English and a seam to replace it. `strings` is keyed and **par
 <VisualEditor
 	{doc}
 	{quill}
+	actor={null}
 	strings={{
 		cardDelete: 'Supprimer la carte',
 		addCard: '+ Ajouter une carte'
@@ -181,7 +184,7 @@ const engine = new Engine({ fonts: [carlito] });
 	engine.fontFaces(quill).then((faces) => (fonts = faces));
 </script>
 
-<VisualEditor {doc} {quill} {fonts} />
+<VisualEditor {doc} {quill} actor={null} {fonts} />
 ```
 
 [`@quillmark/fonts`](../fonts) is the library every Quillmark client builds its engine over, so a family a document names sets the same way in each; a host's own files go after it. `fontFaces` loads the render build, as `open` does, so mount the editor first and let the faces arrive behind it. A family the document already sets edits with no library at all, and the picker offers it so it can be cleared.

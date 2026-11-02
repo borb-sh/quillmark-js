@@ -61,7 +61,7 @@ A third-party client opening the same documents does not have those, and a run s
 	engine.fontFaces(quill).then((faces) => (fonts = faces));
 </script>
 
-<VisualEditor {doc} {quill} {fonts} fontLabels={LABELS} />
+<VisualEditor {doc} {quill} actor={null} {fonts} fontLabels={LABELS} />
 ```
 
 ## Rendering with the CLI

@@ -121,7 +121,7 @@
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
-	let actor = $state<string | undefined>();
+	let actor = $state<string | null>(null);
 	let room = $state('none');
 	let previewRef: ReturnType<typeof Preview> | undefined = $state();
 
@@ -383,7 +383,7 @@
 		docHandle = undefined;
 		engineHandle = undefined;
 		live = undefined;
-		actor = undefined;
+		actor = null;
 		room = 'none';
 		fonts = [];
 		refused = undefined;

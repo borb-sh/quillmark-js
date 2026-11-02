@@ -568,6 +568,7 @@
 						bind:this={editorRef}
 						doc={open.doc}
 						quill={open.quill}
+						actor={null}
 						diagnostics={notes}
 						onActiveLeafChange={handleActiveLeaf}
 						onCaretMove={handleCaretMove}

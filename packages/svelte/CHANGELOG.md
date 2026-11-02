@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. A card the editor adds is placed through `doc.unchecked.insertCard`, under the `actor` prop where the host passes one, a live session's `binding.actor`, so two clients adding cards at once never mint one `$id`; a retype places the card through it too. The docs name `Document.parse` as the markdown import.
+**On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. A card the editor adds is placed through `doc.unchecked.insertCard`, under the required `actor` prop, a live session's `binding.actor` or `null` where no session binds the document, so two clients adding cards at once never mint one `$id`; a retype places the card through it too. The docs name `Document.parse` as the markdown import.
 
 **A `text` field rests as plain content.** On 0.135 a `text` field, element or cell is stored as `Content` spelling `codec: "plain"`, which the typed writer the leaf commits through writes. A plain leaf's projection spells the codec, so it compares equal to the read it mounted from, and an open matrix reads an added item's title through it.
 

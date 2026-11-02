@@ -83,6 +83,7 @@ function mountWith<E>(
 	const props: VisualEditorProps = $state({
 		doc,
 		quill: q,
+		actor: null,
 		onChange: (c: EditorChange) => changes.push(c),
 		onError: (e: EditorError) => errors.push(e),
 		onActiveLeafChange: (a: ActiveLeaf) => active.push(a),
