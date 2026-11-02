@@ -5,7 +5,7 @@
 // each written whole. Card inserts, removes and moves are written as those operations, because a
 // diff of the card list cannot tell a move from two edits. Remote edits come in whole: a Y
 // transaction from any other origin projects each root it touched into the Document, a content
-// field through `reviseContent`, which keeps the Document's own anchors. Nothing here knows the
+// field through `replace`, which keeps the Document's own anchors. Nothing here knows the
 // editor; the host hears what moved through `onRemote`.
 //
 // A field's Y form follows its declared type on the card's current kind: a `richtext` field is a
@@ -27,10 +27,12 @@ import type {
 } from '@quillmark/wasm';
 import {
 	CARDS,
+	COMPANIONS,
 	KIND,
 	MAIN,
 	SESSION,
 	TITLE,
+	canonical,
 	contentRoot,
 	contentTypes,
 	present,
@@ -38,8 +40,8 @@ import {
 	utf16
 } from './shape.js';
 import { project } from './project.js';
-import { writeContent, type Mint } from './write.js';
-import { usvDelta } from './delta.js';
+import { withoutAnchors, writeContent, type Mint } from './write.js';
+import { deltaOf } from './delta.js';
 import { changedRuns, commonRun } from './lines.js';
 
 /** A change to the composable card list, by index, as the Document takes it. */
@@ -141,6 +143,8 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** Cards and fields, by Y name, whose last remote value the Document refused. A push leaves
 	 *  them as Y holds them: the Document's value is not one this client synced. */
 	const held = new Set<string>();
+	/** The fields a pull landed under ids Y does not hold, written back once it ends. */
+	let reminted: { root: string; addr: Addr }[] = [];
 	/** The card list a remote change could not be applied to: nothing more is pulled or pushed. */
 	let diverged = false;
 	let mismatchReported = false;
@@ -153,6 +157,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	});
 	const cardAddr = (c: CardRef): CardAddr => (c === MAIN ? {} : { card: c });
 	const cardOf = (c: CardRef): Card => (c === MAIN ? doc.main : doc.card(c));
+	/** `addr` naming its card by `$id`, as a content write takes it. */
+	const writeAddr = (addr: Addr): Addr =>
+		typeof addr.card === 'number' ? { ...addr, card: doc.card(addr.card).id } : addr;
 	const schemaOf = (c: CardRef, kind?: string): QuillCardSchema | undefined =>
 		c === MAIN ? quill.schema.main : quill.schema.card_kinds?.[kind ?? doc.card(c).kind];
 	const refs = (): CardRef[] => [MAIN, ...ids.map((_, i) => i)];
@@ -203,16 +210,45 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			for (const c of refs()) pushCard(c, renames);
 		}, origin);
 		const rewritten: Addr[] = [];
+		const reminted: { root: string; addr: Addr }[] = [];
 		for (const { root, addr } of renames) {
 			try {
-				doc.reviseContent(addr, projectRoot(root));
-				synced.set(root, contentKey(storedContent(addr)));
+				land(root, addr, projectRoot(root), reminted);
 				rewritten.push(addr);
 			} catch (e) {
 				report(e);
 			}
 		}
+		writeBack(reminted);
 		return rewritten;
+	}
+
+	/**
+	 * Write `content`, the projection of `root`, over the field at `addr`. `replace` re-mints an id
+	 * it introduces that the Document's own log holds, so the value it lands can differ from the
+	 * projection by ids; such a field is named in `reminted`, to be written back to Y.
+	 */
+	function land(
+		root: string,
+		addr: Addr,
+		content: Content,
+		reminted: { root: string; addr: Addr }[]
+	): void {
+		doc.replace(writeAddr(addr), content);
+		const landed = contentKey(storedContent(addr));
+		synced.set(root, landed);
+		if (landed !== contentKey(content)) reminted.push({ root, addr });
+	}
+
+	/** Write each field's Document value to Y, where it landed under ids Y does not hold. */
+	function writeBack(reminted: { root: string; addr: Addr }[]): void {
+		if (!reminted.length) return;
+		ydoc.transact(() => {
+			for (const { root, addr } of reminted) {
+				const content = storedContent(addr);
+				if (content) writeContent(contentTypes(ydoc, root), content, mint);
+			}
+		}, origin);
 	}
 
 	/** Where the `k`th card in Document order sits in `$cards`, which can hold an id twice
@@ -301,9 +337,10 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 
 	/** Empty a root whose form is changing, so the new form is written over nothing. */
 	function clearRoot(root: string): void {
-		const { text, meta } = contentTypes(ydoc, root);
+		const { text, meta, containers } = contentTypes(ydoc, root);
 		if (text.length) text.delete(0, text.length);
 		for (const key of [...meta.keys()]) meta.delete(key);
+		for (const key of [...containers.keys()]) containers.delete(key);
 		synced.delete(root);
 	}
 
@@ -334,7 +371,8 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const change: RemoteChange = { cards: [], fields: [], content: [] };
 		if (diverged) return change;
 		const hit = (name: string) => touched === 'all' || touched.has(name);
-		const hitRoot = (root: string) => hit(root) || hit(`${root}#line0`);
+		reminted = [];
+		const hitRoot = (root: string) => hit(root) || COMPANIONS.some((s) => hit(`${root}${s}`));
 		const inserted = new Set<string>();
 		const known = new Set(ids);
 		const listMoved =
@@ -343,24 +381,20 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			order.toArray().some((id) => !known.has(id) && touched.has(id));
 		if (listMoved) pullCards(change, inserted);
 		if (diverged) return change;
-		const reids: [Y.Map<unknown>, string][] = [];
 		for (const c of refs()) {
 			const name = nameOf(c);
 			if (inserted.has(name)) continue;
 			const map = ydoc.getMap<unknown>(name);
-			if (hit(name)) pullCard(c, change, reids);
-			if (hitRoot(contentRoot(name))) pullBody(c, change, reids);
+			if (hit(name)) pullCard(c, change);
+			if (hitRoot(contentRoot(name))) pullBody(c, change);
 			for (const key of [...map.keys()]) {
 				if (!key.startsWith('@')) continue;
 				const field = key.slice(1);
-				if (hitRoot(contentRoot(name, field))) pullField(c, field, change, reids);
+				if (hitRoot(contentRoot(name, field))) pullField(c, field, change);
 			}
 		}
 		events.clear();
-		if (reids.length)
-			ydoc.transact(() => {
-				for (const [map, id] of reids) map.set('id', id);
-			}, origin);
+		writeBack(reminted);
 		const session = ydoc.getMap<unknown>(SESSION).get('quill');
 		if (typeof session === 'string' && session !== doc.quillRef && !mismatchReported) {
 			mismatchReported = true;
@@ -459,15 +493,21 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		}
 	}
 
-	function pullCard(c: CardRef, change: RemoteChange, reids: [Y.Map<unknown>, string][]): void {
+	function pullCard(c: CardRef, change: RemoteChange): void {
 		const name = nameOf(c);
 		const map = ydoc.getMap<unknown>(name);
 		let moved = false;
 		const kind = map.get(KIND);
 		if (c !== MAIN && typeof kind === 'string' && kind !== doc.card(c).kind) {
+			const was = doc.card(c);
 			try {
-				doc.insertCard({ ...doc.card(c), kind }, c);
-				doc.removeCard(c + 1);
+				doc.removeCard(c);
+				try {
+					doc.insertCard({ ...was, kind }, c);
+				} catch (e) {
+					doc.insertCard(was, c);
+					throw e;
+				}
 				watchCard(name, schemaOf(c, kind));
 				moved = true;
 			} catch (e) {
@@ -496,7 +536,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 					synced.delete(contentRoot(name, key));
 				} else if (form === 'content' && isLeaf) {
 					if (doc.getStored(addr) != null) continue;
-					pullField(c, key, change, reids);
+					pullField(c, key, change);
 					continue;
 				} else {
 					const value = yValue(name, key);
@@ -515,16 +555,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (moved && !change.fields.includes(c)) change.fields.push(c);
 	}
 
-	function pullBody(c: CardRef, change: RemoteChange, reids: [Y.Map<unknown>, string][]): void {
-		reviseFrom(contentRoot(nameOf(c)), addrOf(c), change, reids);
+	function pullBody(c: CardRef, change: RemoteChange): void {
+		reviseFrom(contentRoot(nameOf(c)), addrOf(c), change);
 	}
 
-	function pullField(
-		c: CardRef,
-		field: string,
-		change: RemoteChange,
-		reids: [Y.Map<unknown>, string][]
-	): void {
+	function pullField(c: CardRef, field: string, change: RemoteChange): void {
 		const name = nameOf(c);
 		const addr = addrOf(c, field);
 		const form = arrived(ydoc.getMap<unknown>(name), field);
@@ -533,7 +568,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const schema = schemaOf(c);
 		try {
 			if (form === 'content' && declared(schema, field) === 'content')
-				return reviseFrom(root, addr, change, reids);
+				return reviseFrom(root, addr, change);
 			const value = yValue(name, field);
 			if (value === undefined || canonical(doc.getStored(addr)) === canonical(value)) return;
 			doc.storeField(addr, value);
@@ -548,17 +583,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		}
 	}
 
-	/** Revise the content field at `addr` to the projection of `root`. */
-	function reviseFrom(
-		root: string,
-		addr: Addr,
-		change: RemoteChange,
-		reids: [Y.Map<unknown>, string][]
-	): void {
+	/** Write the projection of `root` over the content field at `addr`. */
+	function reviseFrom(root: string, addr: Addr, change: RemoteChange): void {
 		if (change.content.some((x) => sameAddr(x.addr, addr))) return;
 		try {
 			const projection = project(readField(contentTypes(ydoc, root)));
-			reids.push(...projection.reids);
 			const before = storedContent(addr);
 			if (before && contentKey(before) === contentKey(projection.content)) {
 				held.delete(root);
@@ -566,18 +595,10 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				return;
 			}
 			const event = events.get(root);
-			if (!before) {
-				doc.overwrite(addr, projection.content);
-				held.delete(root);
-				synced.set(root, contentKey(storedContent(addr)));
-				change.content.push({ addr });
-				return;
-			}
-			const revised = doc.reviseContent(addr, projection.content);
+			land(root, addr, projection.content, reminted);
 			held.delete(root);
-			synced.set(root, contentKey(storedContent(addr)));
-			const delta = event ? usvDelta(event, Array.from(before.text)) : revised.delta;
-			change.content.push({ addr, delta });
+			if (!before || !event) change.content.push({ addr });
+			else change.content.push({ addr, delta: deltaOf(event) });
 		} catch (e) {
 			held.add(root);
 			report(e);
@@ -680,6 +701,8 @@ export class Diverged extends Error {
 	}
 }
 
+export { canonical };
+
 export function formOf(type: string): Form {
 	const base = type.endsWith('?') ? type.slice(0, -1) : type;
 	return base === 'richtext' ? 'content' : base === 'text' ? 'plain' : 'value';
@@ -698,21 +721,7 @@ const sameAddr = (a: Addr, b: Addr): boolean => a.card === b.card && a.field ===
 
 /** A content value's key for comparing what Y carries: its anchors are the Document's own. */
 function contentKey(content: Content | undefined): string {
-	if (!content) return canonical(null);
-	return canonical({ ...content, marks: content.marks.filter((m) => m.type !== 'anchor') });
-}
-
-/** JSON with keys sorted at every depth, so two values compare by content alone. */
-export function canonical(value: unknown): string {
-	return JSON.stringify(value ?? null, (_, v) =>
-		v && typeof v === 'object' && !Array.isArray(v)
-			? Object.fromEntries(
-					Object.keys(v)
-						.sort()
-						.map((k) => [k, v[k]])
-				)
-			: v
-	);
+	return canonical(content ? withoutAnchors(content) : null);
 }
 
 /** Replace `text`'s content with `next`: a splice over each run of lines that differs, over its

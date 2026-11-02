@@ -6,26 +6,26 @@
 // two splices, so an edit made meanwhile between them stays where it was typed; and a slot whose island
 // survived is never deleted and re-inserted. Re-inserting one would leave two slots holding its id
 // when two clients do it at once, and would drop a concurrent edit to its props. After the splices,
-// attributes are written only where Y differs: formatting runs, and line metadata on the lines whose
-// metadata changed. The codec restates every line's containers with renumbered ordinals on a
-// structural edit, so containers go through `assignIds` first, which gives a line the identities
-// its old line held wherever its run is the same run.
+// attributes are written only where Y differs: formatting runs, and the record of each block whose
+// record changed. Containers are records by id, each written where it differs.
 import * as Y from 'yjs';
-import type { Content, ContentContainer, ContentIsland } from '@quillmark/wasm';
+import type { Content, ContentIsland } from '@quillmark/wasm';
 import {
 	LINE_KEYS,
 	MARK_KEYS,
 	SLOT,
+	SLOT_PREFIX,
 	attrsEqual,
+	canonical,
 	lineAttrs,
 	markAttrs,
 	readField,
+	slotKey,
 	units,
 	utf16,
+	yBlock,
 	type Attrs,
-	type ContentTypes,
-	type YContainer,
-	type YLine
+	type ContentTypes
 } from './shape.js';
 import { commonRun } from './lines.js';
 
@@ -39,8 +39,9 @@ export type Mint = () => string;
  */
 export function writeContent(types: ContentTypes, next: Content, mint: Mint): Map<string, string> {
 	const renamed = new Map<string, string>();
-	const { text, meta } = types;
+	const { text, meta, containers } = types;
 	const cur = readField(types);
+	const islands = next.islands ?? [];
 	const a = cur.chars;
 	const b = Array.from(next.text);
 
@@ -48,11 +49,10 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 	const bSlots = slotsOf(b);
 	const pairs = commonRun(
 		cur.islands.map((m) => m.get('id') as string),
-		next.islands.map((i) => i.id)
+		islands.map((i) => i.id)
 	);
 
 	// Each stretch between kept slots, and where its splices fall.
-	const bToA: (number | undefined)[] = new Array(b.length);
 	const splices: { at: number; end: number; from: number; to: number }[] = [];
 	const splice = (a0: number, a1: number, b0: number, b1: number) => {
 		let p = 0;
@@ -65,15 +65,12 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 			a[a1 - 1 - s] !== SLOT
 		)
 			s++;
-		for (let i = 0; i < p; i++) bToA[b0 + i] = a0 + i;
-		for (let i = 0; i < s; i++) bToA[b1 - 1 - i] = a1 - 1 - i;
 		if (a1 - s > a0 + p || b1 - s > b0 + p)
 			splices.push({ at: a0 + p, end: a1 - s, from: b0 + p, to: b1 - s });
 	};
 	const stretch = (a0: number, a1: number, b0: number, b1: number) => {
 		for (const [[x0, x1], [y0, y1]] of sameLines(a, a0, a1, b, b0, b1)) {
 			splice(a0, x0, b0, y0);
-			for (let i = 0; i < x1 - x0; i++) bToA[y0 + i] = x0 + i;
 			[a0, b0] = [x1, y1];
 		}
 		splice(a0, a1, b0, b1);
@@ -82,14 +79,13 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 	let b0 = 0;
 	for (const [ka, kb] of pairs) {
 		stretch(a0, aSlots[ka], b0, bSlots[kb]);
-		bToA[bSlots[kb]] = aSlots[ka];
 		a0 = aSlots[ka] + 1;
 		b0 = bSlots[kb] + 1;
 	}
 	stretch(a0, a.length, b0, b.length);
 
-	const ylines = assignIds(next, cur.lines, oldLines(a, b, bToA), mint);
-	const marks = markAttrs(next.marks, b.length);
+	const ylines = next.blocks.map(yBlock);
+	const marks = markAttrs(next.marks ?? [], b);
 	const opens: Attrs[] = [];
 	let line = 0;
 	b.forEach((ch, i) => {
@@ -114,7 +110,7 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 		let i = from;
 		while (i < to) {
 			if (b[i] === SLOT) {
-				const island = next.islands[slotIndex.get(i)!];
+				const island = islands[slotIndex.get(i)!];
 				text.insertEmbed(pos, islandMap(island, used, mint, renamed), desired(i));
 				pos += 1;
 				i += 1;
@@ -142,10 +138,11 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 
 	// Kept islands whose payload changed.
 	for (const [kb, map] of keptMap) {
-		const island = next.islands[kb];
+		const island = islands[kb];
 		if (map.get('type') !== island.type) map.set('type', island.type);
-		if (JSON.stringify(map.get('props')) !== JSON.stringify(island.props))
+		if (canonical(map.get('props')) !== canonical(island.props))
 			map.set('props', structuredClone(island.props));
+		writeSlots(map, island);
 	}
 
 	// Attributes, where they differ.
@@ -175,7 +172,15 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 		k = j;
 	}
 
-	// Line 0 lives in the map.
+	// Containers, by id.
+	const named = new Set<string>();
+	for (const { id, ...record } of next.containers ?? []) {
+		named.add(id);
+		if (canonical(containers.get(id)) !== canonical(record)) containers.set(id, record);
+	}
+	for (const id of [...containers.keys()]) if (!named.has(id)) containers.delete(id);
+
+	// Block 0's record lives in the map.
 	const first = lineAttrs(ylines[0]);
 	for (const key of LINE_KEYS) {
 		const v = first[key] ?? null;
@@ -249,106 +254,37 @@ function islandMap(
 	map.set('id', id);
 	map.set('type', island.type);
 	map.set('props', structuredClone(island.props));
+	writeSlots(map, island);
 	return map;
 }
 
-/** For each line of the new text, the old line that opens with the same `\n` (line 0 with line
- *  0), or `undefined` for a line whose `\n` a splice inserted. */
-function oldLines(a: string[], b: string[], bToA: (number | undefined)[]): (number | undefined)[] {
-	const lineAt = new Map<number, number>();
-	let n = 0;
-	a.forEach((ch, i) => {
-		if (ch === '\n') lineAt.set(i, ++n);
-	});
-	const out: (number | undefined)[] = [0];
-	b.forEach((ch, i) => {
-		if (ch !== '\n') return;
-		const from = bToA[i];
-		out.push(from === undefined ? undefined : lineAt.get(from));
-	});
+/** The island's slots, each under its own key, written where it differs; anchors are the
+ *  Document's own and have no Y form. */
+function writeSlots(map: Y.Map<unknown>, island: ContentIsland): void {
+	const slots = island.slots ?? {};
+	for (const [id, content] of Object.entries(slots)) {
+		const value = withoutAnchors(content);
+		if (canonical(map.get(slotKey(id))) !== canonical(value)) map.set(slotKey(id), value);
+	}
+	for (const key of [...map.keys()])
+		if (key.startsWith(SLOT_PREFIX) && !Object.hasOwn(slots, key.slice(SLOT_PREFIX.length)))
+			map.delete(key);
+}
+
+/** `content` with its anchors and its slots' anchors dropped, as Y carries it. */
+export function withoutAnchors(content: Content): Content {
+	const { anchors: _, islands, ...rest } = content;
+	const out: Content = structuredClone(rest);
+	if (islands) out.islands = islands.map(islandWithoutAnchors);
 	return out;
 }
 
-type Run = { id?: string };
-
-/**
- * The Y form of every line's containers. A run of lines is one container: a list is lines whose
- * outer path matches and whose `list_item` at this depth has one shape and instance, an item is
- * the lines of one list sharing an ordinal, and any other container is lines whose container at
- * this depth is equal. Each run takes the first identity one of its lines held before the edit
- * that no earlier run has taken, and a run with none is minted one.
- */
-function assignIds(
-	next: Content,
-	old: YLine[],
-	oldOf: (number | undefined)[],
-	mint: Mint
-): YLine[] {
-	const claimed = new Set<string>();
-	const adopt = (run: Run, id: string) => {
-		if (run.id !== undefined || claimed.has(id)) return;
-		run.id = id;
-		claimed.add(id);
-	};
-	const runs: { outer: Run; item?: Run; node: ContentContainer }[][] = [];
-	next.lines.forEach((line, i) => {
-		const here: (typeof runs)[number] = [];
-		let samePrefix = i > 0;
-		line.containers.forEach((c, d) => {
-			const prev = samePrefix ? runs[i - 1][d] : undefined;
-			const was = oldOf[i] === undefined ? undefined : old[oldOf[i]!]?.containers[d];
-			let outer: Run;
-			let item: Run | undefined;
-			if (c.container === 'list_item') {
-				const pc = prev?.node;
-				const sameList =
-					pc?.container === 'list_item' &&
-					pc.attrs.ordered === c.attrs.ordered &&
-					(pc.instance ?? 0) === (c.instance ?? 0);
-				outer = sameList ? prev!.outer : {};
-				item = sameList && pc.attrs.ordinal === c.attrs.ordinal ? prev!.item! : {};
-				if (was?.c === 'list_item') {
-					adopt(outer, was.list);
-					adopt(item, was.item);
-				}
-			} else {
-				outer = prev && JSON.stringify(prev.node) === JSON.stringify(c) ? prev.outer : {};
-				if (was?.c === 'quote') adopt(outer, was.id);
-			}
-			here.push({ outer, item, node: c });
-			samePrefix = !!prev && prev.outer === outer && prev.item === item;
-		});
-		runs.push(here);
-	});
-
-	return next.lines.map((line, i) => ({
-		kind: JSON.stringify(
-			'attrs' in line && line.attrs !== undefined
-				? { kind: line.kind, attrs: line.attrs }
-				: { kind: line.kind }
-		),
-		containers: runs[i].map(({ outer, item, node }) => yContainer(node, outer, item, mint)),
-		continues: !!line.continues
-	}));
-}
-
-function yContainer(
-	c: ContentContainer,
-	outer: Run,
-	item: Run | undefined,
-	mint: Mint
-): YContainer {
-	outer.id ??= mint();
-	if (c.container !== 'list_item') return { c: 'quote', id: outer.id };
-	item!.id ??= mint();
-	return {
-		c: 'list_item',
-		list: outer.id,
-		item: item!.id,
-		ordered: c.attrs.ordered,
-		start: c.attrs.start,
-		...(c.attrs.checked === undefined ? {} : { checked: c.attrs.checked })
-	};
+export function islandWithoutAnchors(island: ContentIsland): ContentIsland {
+	if (!island.slots) return structuredClone(island);
+	const slots = Object.fromEntries(
+		Object.entries(island.slots).map(([k, v]) => [k, withoutAnchors(v)])
+	);
+	return { ...structuredClone(island), slots };
 }
 
 /** `attrs` with every key of `keys` it does not set written as `null`, and the other family

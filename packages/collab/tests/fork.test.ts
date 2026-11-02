@@ -12,7 +12,7 @@ import {
 	writeFrom
 } from '../src/index.js';
 import type { CardOp, DocumentBinding } from '../src/index.js';
-import { quill, snapshot } from './helpers.js';
+import { edit, quill, snapshot } from './helpers.js';
 
 const q = quill();
 
@@ -45,7 +45,7 @@ function session(): [Tab, Tab] {
 const revision = (t: Tab) => Y.encodeSnapshot(Y.snapshot(t.ydoc));
 const authoring = (t: Tab) => q.toAuthoring(t.doc);
 const type = (t: Tab, at: number, words: string) => {
-	t.doc.applyChange({}, { delta: { ops: [...(at ? [{ retain: at }] : []), { insert: words }] } });
+	edit(t.doc, {}, [...(at ? [{ retain: at }] : []), { insert: words }]);
 	t.binding.push();
 };
 const write = (t: Tab, base: Uint8Array, edit: (doc: Document) => CardOp | CardOp[] | void) =>
@@ -188,7 +188,7 @@ describe('writeFrom', () => {
 	it('keeps a card a whole-document edit reordered as the card typed into since', () => {
 		const [a, b] = session();
 		const base = revision(a);
-		b.doc.applyChange({ card: 3 }, { delta: { ops: [{ insert: 'Typed. ' }] } });
+		edit(b.doc, { card: 3 }, [{ insert: 'Typed. ' }]);
 		b.binding.push();
 		const written = write(a, base, (doc) => {
 			const count = doc.cardCount;

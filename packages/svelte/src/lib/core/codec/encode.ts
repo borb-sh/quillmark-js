@@ -319,26 +319,6 @@ function mergeMarks(raw: ContentMark[]): ContentMark[] {
  */
 export function lower(oldRt: Content, newRt: Content): Change | null {
 	const change = core().diff(oldRt, newRt);
-	return change.steps.length ? { steps: layoutLast(change.steps) } : null;
+	return change.steps.length ? change : null;
 }
 
-/**
- * `steps` with each island props step that brings no slots after the slot edits of its island:
- * `apply` settles a table's spans as the props step lands, so a merge whose covered cells still
- * hold their text loses its span unless the text goes first. A step bringing no slots names only
- * slots the island holds already, so the slot edits land the same either side of it.
- */
-function layoutLast(steps: Step[]): Step[] {
-	const held = new Map<string, Step>();
-	const out: Step[] = [];
-	for (const step of steps) {
-		if ('island' in step && 'id' in step.island && !step.island.slots)
-			held.set(step.island.id, step);
-		else out.push(step);
-	}
-	for (const [id, step] of held) {
-		const last = out.findLastIndex((s) => 'nested' in s && s.nested.island === id);
-		out.splice(last + 1, 0, step);
-	}
-	return out;
-}

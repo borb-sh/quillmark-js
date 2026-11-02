@@ -14,7 +14,7 @@ import {
 	type Session,
 	type SessionLog
 } from '../src/index.js';
-import { quill, snapshot, type FixtureName } from './helpers.js';
+import { edit, quill, snapshot, type FixtureName } from './helpers.js';
 
 class Origin {
 	readonly data = new Map<string, string>();
@@ -86,7 +86,7 @@ function open(
 }
 
 const type = (s: Session, word: string) => {
-	s.doc.applyChange({}, { delta: { ops: [{ insert: word }] } });
+	edit(s.doc, {}, [{ insert: word }]);
 	s.push();
 };
 const text = (s: Session) => (s.doc.getStored({}) as Content).text;
@@ -122,7 +122,7 @@ describe('sessions', () => {
 		await settle();
 		expect(await a.save()).toBe(true);
 		expect(await a.save()).toBe(false);
-		a.doc.applyChange({}, { delta: { ops: [{ delete: 4 }] } });
+		edit(a.doc, {}, [{ delete: 4 }]);
 		a.push();
 		await settle();
 		expect(await a.save()).toBe(true);
@@ -161,7 +161,7 @@ describe('sessions', () => {
 		type(a, 'abc ');
 		await settle();
 		await a.save();
-		a.doc.applyChange({}, { delta: { ops: [{ delete: 4 }] } });
+		edit(a.doc, {}, [{ delete: 4 }]);
 		a.doc.removeCard(0);
 		a.push({ op: 'remove', at: 0 });
 		const want = snapshot(a.doc);
@@ -237,8 +237,9 @@ describe('sessions', () => {
 		const card = quill().seedCard('note', a.doc.seedOverlay('note'))!;
 		a.doc.insertCard(card, 0);
 		a.push({ op: 'insert', at: 0 });
-		a.doc.insertCard({ ...a.doc.card(1), kind: 'note' }, 1);
-		a.doc.removeCard(2);
+		const was = a.doc.card(1);
+		a.doc.removeCard(1);
+		a.doc.insertCard({ ...was, kind: 'note' }, 1);
 		a.push();
 		await settle();
 		const b = await open(origin).join();

@@ -1,108 +1,60 @@
 // The projection: one content field's Y state → the `Content` every client derives from it.
 //
 // A pure function of the Y state, so two clients holding one state hand their Documents one
-// value. The positional numbers are derived here: a list item's `ordinal` counts item-id changes
-// within a run of one list id, and `instance` alternates where two adjacent runs at one depth
-// carry different ids of one shape (a quote, or a list of one `ordered`).
+// value. Two valid edits can merge into a state no single edit makes: an item added to a list
+// another client removed, two slots naming one island, text typed beside a table. The store's
+// `repair` reads such a state as the one valid value, deterministically, every id it mints derived
+// from the ids involved, so every client reads the same value and nothing is written back.
 import type * as Y from 'yjs';
-import type {
-	Content,
-	ContentContainer,
-	ContentIsland,
-	ContentLine,
-	ContentMark
-} from '@quillmark/wasm';
-import { MARK_KEYS, type Attrs, type YContainer, type YField, type YLine } from './shape.js';
+import type { Content, ContentContainer, ContentMark, RawContent, Repair } from '@quillmark/wasm';
+import { core } from './core.js';
+import { MARK_KEYS, SLOT_PREFIX, units, type Attrs, type YField } from './shape.js';
 
-interface Projection {
+export interface Projection {
 	content: Content;
-	/** Island maps whose id another slot in the field already holds, with the id each takes.
-	 *  Every client derives the same ids, so writing them back to Y agrees. */
-	reids: [Y.Map<unknown>, string][];
+	/** What `repair` mended to reach `content`, none for a state no merge broke. */
+	repairs: Repair[];
 }
 
 export function project(field: YField): Projection {
-	const reids: Projection['reids'] = [];
-	const seen = new Set<string>();
-	const islands = field.islands.map((map) => {
-		const island = islandOf(map);
-		if (seen.has(island.id)) {
-			let n = 1;
-			while (seen.has(`${island.id}~${n}`)) n++;
-			island.id = `${island.id}~${n}`;
-			reids.push([map, island.id]);
-		}
-		seen.add(island.id);
-		return island;
-	});
-	return {
-		content: {
-			text: field.chars.join(''),
-			lines: deriveLines(field.lines),
-			marks: deriveMarks(field.chars, field.attrs),
-			islands
-		},
-		reids
+	const raw: RawContent = {
+		text: field.chars.join(''),
+		blocks: field.blocks.map((b) => ({
+			...(JSON.parse(b.kind) as { kind: 'para' }),
+			id: b.id,
+			...(b.path.length ? { path: b.path } : {})
+		})),
+		containers: [...field.containers.entries()].map(
+			([id, record]) => ({ ...(record as object), id }) as ContentContainer
+		),
+		marks: deriveMarks(field.chars, field.attrs),
+		islands: field.islands.map(islandOf)
 	};
+	const { content, repairs } = core().repair(raw);
+	return { content, repairs };
 }
 
-function islandOf(map: Y.Map<unknown>): ContentIsland {
+function islandOf(map: Y.Map<unknown>) {
+	const slots: Record<string, Content> = {};
+	for (const [key, value] of map.entries())
+		if (key.startsWith(SLOT_PREFIX))
+			slots[key.slice(SLOT_PREFIX.length)] = structuredClone(value as Content);
 	return {
 		id: map.get('id') as string,
-		type: map.get('type'),
-		props: structuredClone(map.get('props'))
-	} as ContentIsland;
-}
-
-function deriveLines(ylines: YLine[]): ContentLine[] {
-	// Per depth, what the line before held there: its identity, and the numbers derived for it.
-	let prev: { key: string; run: string; shape: string; ordinal: number; instance: number }[] = [];
-	return ylines.map((yl) => {
-		const here: typeof prev = [];
-		let samePrefix = true;
-		const containers = yl.containers.map((yc, d) => {
-			const list = yc.c === 'list_item';
-			const run = list ? `${yc.list}:${yc.ordered}` : yc.id;
-			const key = list ? `${yc.list}/${yc.item}` : yc.id;
-			const shape = list ? `list:${yc.ordered}` : 'quote';
-			const p = samePrefix ? prev[d] : undefined;
-			let ordinal = 0;
-			let instance = 0;
-			if (p && p.run === run) {
-				instance = p.instance;
-				ordinal = p.key === key ? p.ordinal : p.ordinal + 1;
-			} else if (p && p.shape === shape) {
-				instance = 1 - p.instance;
-			}
-			here.push({ key, run, shape, ordinal, instance });
-			samePrefix = samePrefix && !!p && p.key === key;
-			return containerOf(yc, ordinal, instance);
-		});
-		prev = here;
-		return {
-			...(JSON.parse(yl.kind) as Pick<ContentLine, 'kind'>),
-			containers,
-			...(yl.continues ? { continues: true } : {})
-		} as ContentLine;
-	});
-}
-
-function containerOf(yc: YContainer, ordinal: number, instance: number): ContentContainer {
-	const inst = instance ? { instance } : {};
-	if (yc.c === 'quote') return { container: 'quote', ...inst };
-	return {
-		container: 'list_item',
-		attrs: {
-			ordered: yc.ordered,
-			start: yc.start,
-			ordinal,
-			...(yc.checked === undefined ? {} : { checked: yc.checked })
-		},
-		...inst
+		type: map.get('type') as 'table',
+		props: structuredClone(map.get('props')) as never,
+		...(Object.keys(slots).length ? { slots } : {})
 	};
 }
 
 function deriveMarks(chars: string[], attrs: Attrs[]): ContentMark[] {
+	const at: number[] = [];
+	let u = 0;
+	for (const ch of chars) {
+		at.push(u);
+		u += units(ch);
+	}
+	at.push(u);
 	const marks: ContentMark[] = [];
 	for (const key of MARK_KEYS) {
 		let start = -1;
@@ -110,7 +62,7 @@ function deriveMarks(chars: string[], attrs: Attrs[]): ContentMark[] {
 		for (let i = 0; i <= chars.length; i++) {
 			const v = i < chars.length && chars[i] !== '\n' ? (attrs[i][key] ?? null) : null;
 			if (v === value && start >= 0) continue;
-			if (start >= 0) marks.push(markOf(key, value, start, i));
+			if (start >= 0) marks.push(markOf(key, value, at[start], at[i]));
 			start = v === null ? -1 : i;
 			value = v;
 		}

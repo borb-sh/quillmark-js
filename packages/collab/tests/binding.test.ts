@@ -4,105 +4,110 @@ import { describe, expect, it } from 'vitest';
 import type { Content, ContentContainer, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
 import { bindDocument, Diverged, seedDocument } from '../src/index.js';
-import { core, deliver, peers, quill, settle, snapshot, type Peer } from './helpers.js';
+import { core, deliver, edit, peers, quill, settle, snapshot, type Peer } from './helpers.js';
 
 const example = () => quill().exampleDocument()!;
 const body = (p: Peer, card?: number): Content =>
 	p.doc.getStored(card === undefined ? {} : { card }) as Content;
-const item = (ordinal: number): ContentContainer[] => [
-	{ container: 'list_item', attrs: { ordered: true, start: 1, ordinal } }
-];
+const LIST: ContentContainer = { id: 'l', kind: 'list', attrs: { ordered: true, start: 1 } };
 const listDoc = (): Document => {
 	const doc = example();
-	doc.overwrite(
+	doc.replace(
 		{},
 		{
 			text: 'one\ntwo',
-			lines: [
-				{ kind: 'para', containers: item(0) },
-				{ kind: 'para', containers: item(1) }
+			blocks: [
+				{ id: 'b0', kind: 'para', path: ['l', 'i0'] },
+				{ id: 'b1', kind: 'para', path: ['l', 'i1'] }
 			],
-			marks: [],
-			islands: []
+			containers: [LIST, { id: 'i0', kind: 'item' }, { id: 'i1', kind: 'item' }]
 		}
 	);
 	return doc;
 };
 
 describe('content', () => {
-	it('two items added to one list at once number as one list', () => {
+	it('two items added to one list at once stay one list', () => {
 		const [a, b] = peers(2, listDoc);
 		const add = (p: Peer, at: number, word: string) => {
-			const lines = [...body(p).lines];
-			lines.splice(at + 1, 0, lines[at]);
-			p.doc.applyChange(
+			p.doc.apply(
 				{},
 				{
-					delta: {
-						ops: [{ retain: at === 0 ? 3 : 7 }, { insert: `\n${word}` }]
-					},
-					lineOps: lines.map((_, i) => ({ op: 'setContainers', line: i, containers: item(i) }))
+					steps: [
+						{ container: { id: `i-${word}`, kind: 'item' } },
+						{
+							splice: {
+								at,
+								insert: `\n${word}`,
+								blocks: [{ id: `b-${word}`, kind: 'para', path: ['l', `i-${word}`] }]
+							}
+						}
+					]
 				}
 			);
 			p.binding.push();
 		};
-		add(a, 0, 'alpha');
-		add(b, 1, 'beta');
+		add(a, 3, 'alpha');
+		add(b, 7, 'beta');
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
 		const got = body(a);
 		expect(got.text).toBe('one\nalpha\ntwo\nbeta');
-		expect(got.lines.map((l) => l.containers)).toEqual([0, 1, 2, 3].map(item));
+		expect(got.blocks.map((x) => x.path)).toEqual(
+			['i0', 'i-alpha', 'i1', 'i-beta'].map((i) => ['l', i])
+		);
 	});
 
 	it('a table inserted on a line another client types on keeps one slot and both edits', () => {
 		const [a, b] = peers(2, listDoc);
-		const props = { header: [{ text: 'h', marks: [] }], rows: [], aligns: ['none' as const] };
-		a.doc.applyChange(
+		const table = core.importMarkdown('| h |\n| - |').content.islands![0];
+		a.doc.apply(
 			{},
 			{
-				delta: { ops: [{ retain: 3 }, { insert: '\n' }] },
-				islandOps: [{ op: 'insert', at: 4, id: 'isl-0', type: 'table', props }]
+				steps: [
+					{
+						splice: {
+							at: 7,
+							insert: '\n\uFFFC',
+							blocks: [{ id: 'bt', kind: 'para' }],
+							islands: [table]
+						}
+					}
+				]
 			}
 		);
 		a.binding.push();
-		b.doc.applyChange({}, { delta: { ops: [{ retain: 3 }, { insert: '!' }] } });
+		edit(b.doc, {}, [{ retain: 3 }, { insert: '!' }]);
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
 		const got = body(a);
 		expect(got.islands).toHaveLength(1);
-		expect(got.islands[0].id).not.toBe('isl-0');
-		expect(Array.from(got.text).filter((c) => c === '￼')).toHaveLength(1);
-		expect(got.text).toContain('one!');
+		expect(got.islands![0].id).not.toBe(table.id);
+		expect(Array.from(got.text).filter((c) => c === '\uFFFC')).toHaveLength(1);
+		expect(got.text).toContain('!');
 	});
 
 	it("a client's anchor survives another client's edit and stays its own", () => {
 		const [a, b] = peers(2, listDoc);
-		a.doc.applyChange(
-			{},
-			{ markOps: [{ op: 'add', type: 'anchor', attrs: { id: 'c1' }, start: 4, end: 7 }] }
-		);
+		a.doc.apply({}, { steps: [{ anchor: { id: 'c1', start: 4, end: 7 } }] });
 		a.binding.push();
-		b.doc.applyChange({}, { delta: { ops: [{ insert: 'zero ' }] } });
+		edit(b.doc, {}, [{ insert: 'zero ' }]);
 		b.binding.push();
 		settle([a, b]);
-		const anchor = body(a).marks.find((m) => m.type === 'anchor');
-		expect(anchor).toMatchObject({ start: 9, end: 12 });
-		expect(body(b).marks.some((m) => m.type === 'anchor')).toBe(false);
+		expect(body(a).anchors).toEqual([{ id: 'c1', start: 9, end: 12 }]);
+		expect(body(b).anchors).toBeUndefined();
 		expect(body(a).text).toBe(body(b).text);
 	});
 
 	it('hands the host the delta a remote edit made', () => {
 		const [a, b] = peers(2, listDoc);
-		b.doc.applyChange({}, { delta: { ops: [{ retain: 2 }, { insert: 'xy' }] } });
+		edit(b.doc, {}, [{ retain: 2 }, { insert: 'xy' }]);
 		b.binding.push();
 		deliver(a);
 		const [change] = a.changes;
 		const { delta } = change.content.find((c) => c.addr.card === undefined && !c.addr.field)!;
-		expect(delta).toBeDefined();
-		expect(core.mapPos(delta!, 5, 'after')).toBe(7);
-		expect(core.mapPos(delta!, 1, 'after')).toBe(1);
+		expect(delta).toEqual({ ops: [{ retain: 2 }, { insert: 'xy' }] });
 	});
 });
 
@@ -111,7 +116,7 @@ describe('cards', () => {
 		const [a, b] = peers(2, example);
 		a.doc.moveCard(0, 2);
 		a.binding.push({ op: 'move', from: 0, to: 2 });
-		b.doc.applyChange({ card: 0 }, { delta: { ops: [{ insert: 'moved ' }] } });
+		edit(b.doc, { card: 0 }, [{ insert: 'moved ' }]);
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
@@ -142,10 +147,11 @@ describe('cards', () => {
 	it('a retype carries a field into the form the new kind declares', () => {
 		const [a, b] = peers(2, example);
 		const at = a.doc.cards.findIndex((c) => c.kind === 'figure');
-		a.doc.insertCard({ ...a.doc.card(at), kind: 'section' }, at);
-		a.doc.removeCard(at + 1);
+		const was = a.doc.card(at);
+		a.doc.removeCard(at);
+		a.doc.insertCard({ ...was, kind: 'section' }, at);
 		a.binding.push();
-		b.doc.applyChange({ card: at, field: 'caption' }, { delta: { ops: [{ insert: 'b ' }] } });
+		edit(b.doc, { card: at, field: 'caption' }, [{ insert: 'b ' }]);
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
@@ -161,7 +167,7 @@ describe('a remote value the Document refuses', () => {
 		b.ydoc.transact(() => b.ydoc.getMap('main').set('bad-name', 1));
 		settle([a, b]);
 		expect(a.errors).toHaveLength(1);
-		a.doc.applyChange({}, { delta: { ops: [{ insert: 'a ' }] } });
+		edit(a.doc, {}, [{ insert: 'a ' }]);
 		a.binding.push();
 		settle([a, b]);
 		expect(a.ydoc.getMap('main').get('bad-name')).toBe(1);
@@ -178,7 +184,7 @@ describe('a remote value the Document refuses', () => {
 		deliver(a);
 		expect(a.errors.at(-1)).toBeInstanceOf(Diverged);
 		const before = Y.encodeStateVector(a.ydoc);
-		a.doc.applyChange({}, { delta: { ops: [{ insert: 'a ' }] } });
+		edit(a.doc, {}, [{ insert: 'a ' }]);
 		expect(a.binding.push()).toEqual([]);
 		expect(Y.encodeStateVector(a.ydoc)).toEqual(before);
 	});
@@ -203,7 +209,7 @@ describe('a remote value the Document refuses', () => {
 		const other = example();
 		const binding = bindDocument({ doc: other, quill: q, ydoc: y });
 		for (const word of ['one ', 'two ']) {
-			other.applyChange({}, { delta: { ops: [{ insert: word }] } });
+			edit(other, {}, [{ insert: word }]);
 			binding.push();
 			Y.applyUpdate(x, Y.encodeStateAsUpdate(y, Y.encodeStateVector(x)));
 		}

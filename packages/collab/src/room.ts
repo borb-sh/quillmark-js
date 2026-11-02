@@ -13,7 +13,8 @@
 // check saw, trying again when it moved. It then saves the Document the log projects to, so the
 // save follows the write with no client open.
 import * as Y from 'yjs';
-import { init, type Document, type Quill } from '@quillmark/wasm';
+import type { Document, Quill } from '@quillmark/wasm';
+import { init } from './core.js';
 import { seedDocument, type CardOp } from './document.js';
 import { changesSince, projectDocument, writeFrom, type Change } from './fork.js';
 import { QuillMismatch, settled, type Opened, type Saved, type SessionLog } from './session.js';
