@@ -9,6 +9,14 @@ import { core, deliver, edit, peers, quill, settle, snapshot, type Peer } from '
 const example = () => quill().exampleDocument()!;
 const body = (p: Peer, card?: number): Content =>
 	p.doc.getStored(card === undefined ? {} : { card }) as Content;
+const withBody = (text: string) => (): Document => {
+	const doc = example();
+	doc.replace(
+		{},
+		{ text, blocks: text.split('\n').map((_, i) => ({ id: `b${i}`, kind: 'para' as const })) }
+	);
+	return doc;
+};
 const LIST: ContentContainer = { id: 'l', kind: 'list', attrs: { ordered: true, start: 1 } };
 const listDoc = (): Document => {
 	const doc = example();
@@ -98,6 +106,45 @@ describe('content', () => {
 		expect(body(a).anchors).toEqual([{ id: 'c1', start: 9, end: 12 }]);
 		expect(body(b).anchors).toBeUndefined();
 		expect(body(a).text).toBe(body(b).text);
+	});
+
+	it('a repair that inserts is read by every client and written back by none', () => {
+		const [a, b] = peers(2, withBody('Title words\nbody'));
+		a.doc.apply({}, { steps: [{ setBlock: { id: 'b0', kind: 'heading', attrs: { level: 1 } } }] });
+		a.binding.push();
+		b.doc.apply({}, { steps: [{ splice: { at: 5, delete: ' ', insert: ' ' } }] });
+		b.binding.push();
+		settle([a, b]);
+		const merged = body(a).text;
+		edit(a.doc, {}, [{ retain: merged.length }, { insert: ' A' }]);
+		a.binding.push();
+		edit(b.doc, {}, [{ retain: merged.length }, { insert: ' B' }]);
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect([`${merged} A B`, `${merged} B A`]).toContain(body(a).text);
+	});
+
+	it('text split off a table by repair is not split twice by two clients typing', () => {
+		const [a, b] = peers(2, () => {
+			const doc = example();
+			doc.replace({}, core.importMarkdown('lead\n\n| h |\n| - |\n\ntail').content);
+			return doc;
+		});
+		const slot = Array.from(body(a).text).indexOf('￼');
+		edit(a.doc, {}, [{ retain: slot + 1 }, { delete: '\ntail'.length }]);
+		a.binding.push();
+		edit(b.doc, {}, [{ retain: slot + 2 }, { insert: 'typed ' }]);
+		b.binding.push();
+		settle([a, b]);
+		const blocks = body(a).blocks.length;
+		edit(a.doc, {}, [{ insert: 'A ' }]);
+		a.binding.push();
+		edit(b.doc, {}, [{ insert: 'B ' }]);
+		b.binding.push();
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		expect(body(a).blocks).toHaveLength(blocks);
 	});
 
 	it('hands the host the delta a remote edit made', () => {

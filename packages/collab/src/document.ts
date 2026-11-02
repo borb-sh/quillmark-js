@@ -39,7 +39,8 @@ import {
 	readField,
 	utf16
 } from './shape.js';
-import { project } from './project.js';
+import { inserts, project, type Projection } from './project.js';
+import { unrepaired } from './repaired.js';
 import { withoutAnchors, writeContent, type Mint } from './write.js';
 import { deltaOf } from './delta.js';
 import { changedRuns, commonRun } from './lines.js';
@@ -143,6 +144,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** Cards and fields, by Y name, whose last remote value the Document refused. A push leaves
 	 *  them as Y holds them: the Document's value is not one this client synced. */
 	const held = new Set<string>();
+	/** The roots whose projection last read through a repair that inserts: a write there holds
+	 *  what the repair mended as Y holds it (`unrepaired`). */
+	const inserting = new Set<string>();
 	/** The fields a pull landed under ids Y does not hold, written back once it ends. */
 	let reminted: { root: string; addr: Addr }[] = [];
 	/** The card list a remote change could not be applied to: nothing more is pulled or pushed. */
@@ -195,8 +199,27 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (typeof v === 'object') return v as Content;
 		return reader.getContent(addr) ?? undefined;
 	}
-	const projectRoot = (root: string): Content =>
-		project(readField(contentTypes(ydoc, root))).content;
+	function projectField(root: string): Projection {
+		const projection = project(readField(contentTypes(ydoc, root)));
+		if (projection.repairs.some(inserts)) inserting.add(root);
+		else inserting.delete(root);
+		return projection;
+	}
+	const projectRoot = (root: string): Content => projectField(root).content;
+
+	/** Write `content` over the content root `root`. A peer writes back no repair that inserts:
+	 *  the session has no single writer to leave it to, so every peer reads it through `repair`. */
+	function writeField(root: string, content: Content): Map<string, string> {
+		const types = contentTypes(ydoc, root);
+		if (!inserting.has(root)) return writeContent(types, content, mint);
+		const raw = readField(types);
+		const projection = project(raw);
+		if (!projection.repairs.some(inserts)) {
+			inserting.delete(root);
+			return writeContent(types, content, mint);
+		}
+		return writeContent(types, unrepaired(raw, projection.content, content), mint);
+	}
 
 	// ── Document → Y ─────────────────────────────────────────────────────────
 
@@ -246,7 +269,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		ydoc.transact(() => {
 			for (const { root, addr } of reminted) {
 				const content = storedContent(addr);
-				if (content) writeContent(contentTypes(ydoc, root), content, mint);
+				if (content) writeField(root, content);
 			}
 		}, origin);
 	}
@@ -342,6 +365,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		for (const key of [...meta.keys()]) meta.delete(key);
 		for (const key of [...containers.keys()]) containers.delete(key);
 		synced.delete(root);
+		inserting.delete(root);
 	}
 
 	function pushContent(
@@ -353,7 +377,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const value = contentKey(content);
 		if (held.has(root) || synced.get(root) === value) return;
 		watch(root);
-		const renamed = writeContent(contentTypes(ydoc, root), content, mint);
+		const renamed = writeField(root, content);
 		synced.set(root, value);
 		if (renamed.size) renames.push({ root, addr });
 	}
@@ -587,7 +611,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	function reviseFrom(root: string, addr: Addr, change: RemoteChange): void {
 		if (change.content.some((x) => sameAddr(x.addr, addr))) return;
 		try {
-			const projection = project(readField(contentTypes(ydoc, root)));
+			const projection = projectField(root);
 			const before = storedContent(addr);
 			if (before && contentKey(before) === contentKey(projection.content)) {
 				held.delete(root);

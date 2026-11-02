@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**No client writes back a repair that inserts.** A mend `repair` makes by inserting (a split block's `\n` and record, the space a heading's hard break becomes, a missing cell's empty slot) is read through `repair` on every client and written back by none, as a session has no single writer: a client's next edit to that field writes its own change, and each block the repair mended that the edit left alone stays as Y holds it. Two clients editing after such a merge no longer write the repair twice, which duplicated text (`"Title words\nbody A words\nbody B"`).
+
 ## v0.2.0 - 2026-11-02
 
 **On the content model of `@quillmark/wasm` 0.134.1.** The peer range is `>=0.134.1-0 <0.135.0-0`. The Y shape follows the model: each `\n` carries its block's id, kind and container path, containers are records by id in `<root>#containers`, block 0's record sits in `<root>#block0`, and each island slot is its own key of the island's map. The projection reads a merged state through the store's `repair`, so two clients' concurrent edits that no single edit could make read as one valid value on every client. A remote value lands through `replace`, its card named by `$id`, and an id `replace` re-mints is written back to Y. `onRemote`'s delta counts UTF-16. A Y state an earlier version wrote carries no block ids or containers, so a host ends its open sessions before it upgrades, and the next one opens from the save.

@@ -4,11 +4,19 @@
 // value. Two valid edits can merge into a state no single edit makes: an item added to a list
 // another client removed, two slots naming one island, text typed beside a table. The store's
 // `repair` reads such a state as the one valid value, deterministically, every id it mints derived
-// from the ids involved, so every client reads the same value and nothing is written back.
+// from the ids involved, so every client reads the same value without writing it.
 import type * as Y from 'yjs';
-import type { Content, ContentContainer, ContentMark, RawContent, Repair } from '@quillmark/wasm';
+import type {
+	Content,
+	ContentBlock,
+	ContentContainer,
+	ContentIsland,
+	ContentMark,
+	RawContent,
+	Repair
+} from '@quillmark/wasm';
 import { core } from './core.js';
-import { MARK_KEYS, SLOT_PREFIX, units, type Attrs, type YField } from './shape.js';
+import { MARK_KEYS, SLOT_PREFIX, units, type Attrs, type YBlock, type YField } from './shape.js';
 
 export interface Projection {
 	content: Content;
@@ -19,11 +27,7 @@ export interface Projection {
 export function project(field: YField): Projection {
 	const raw: RawContent = {
 		text: field.chars.join(''),
-		blocks: field.blocks.map((b) => ({
-			...(JSON.parse(b.kind) as { kind: 'para' }),
-			id: b.id,
-			...(b.path.length ? { path: b.path } : {})
-		})),
+		blocks: field.blocks.map(contentBlock),
 		containers: [...field.containers.entries()].map(
 			([id, record]) => ({ ...(record as object), id }) as ContentContainer
 		),
@@ -34,7 +38,20 @@ export function project(field: YField): Projection {
 	return { content, repairs };
 }
 
-function islandOf(map: Y.Map<unknown>) {
+/** Whether a mend's write-back inserts text or a slot, which only a session's single writer
+ *  writes back. */
+export const inserts = (r: Repair): boolean =>
+	r.inserts === true || (r.repair === 'in_slot' && inserts(r.inner));
+
+export function contentBlock(b: YBlock): ContentBlock {
+	return {
+		...(JSON.parse(b.kind) as { kind: 'para' }),
+		id: b.id,
+		...(b.path.length ? { path: b.path } : {})
+	};
+}
+
+export function islandOf(map: Y.Map<unknown>): ContentIsland {
 	const slots: Record<string, Content> = {};
 	for (const [key, value] of map.entries())
 		if (key.startsWith(SLOT_PREFIX))
@@ -47,7 +64,7 @@ function islandOf(map: Y.Map<unknown>) {
 	};
 }
 
-function deriveMarks(chars: string[], attrs: Attrs[]): ContentMark[] {
+export function deriveMarks(chars: string[], attrs: Attrs[]): ContentMark[] {
 	const at: number[] = [];
 	let u = 0;
 	for (const ch of chars) {
