@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.29.3 - 2026-11-02
+
 **The `@quillmark/wasm` peer range stops below 0.134.0.** 0.134 removes `applyChange`, `overwrite` and `mapPos`, which the prose codec calls, so a range admitting it installed a wasm the editor throws on at its first edit.
 
 **`Preview` exposes `washField(field)`.** It plays the editor's arrival wash over every box the compile places at the address and moves nothing: no scroll, and the follow stands. It answers `false` where the compile places nothing. A host marks a change it wrote into the document in both panes, calling it after the `refresh` that carries the edit.
