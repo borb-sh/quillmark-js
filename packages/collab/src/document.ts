@@ -8,8 +8,9 @@
 // field through `replace`, which keeps the Document's own anchors. Nothing here knows the
 // editor; the host hears what moved through `onRemote`.
 //
-// A field's Y form follows its value: a content value is a content root, a string a plain root
-// where the kind declares `text` or Y already holds it plain, anything else a value in the card
+// A field's Y form follows its value: a `text` field's string or `codec: "plain"` content is a
+// plain root, any other content value a content root, a string a plain root where Y already
+// holds it plain, anything else a value in the card
 // map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
 // to the root racing the retype lands; the reader takes whichever form a field arrives in:
 // `@<field>` in the card map says which root holds it.
@@ -175,6 +176,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** The form `value` is written in: the one `declared` names where the value fits it, else the
 	 *  one its shape names, a string staying plain where Y already holds it so (`held`). */
 	const formFor = (declared: Form, value: unknown, held: Form | undefined): Form => {
+		if (declared === 'plain' && plainText(value) !== undefined) return 'plain';
 		if (declared === 'content' || isContent(value)) return 'content';
 		if (typeof value !== 'string') return 'value';
 		return declared === 'plain' || held === 'plain' ? 'plain' : 'value';
@@ -352,7 +354,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				clearRoot(root);
 				map.set(present(item.key), form);
 			}
-			if (form === 'plain') pushPlain(root, item.value as string);
+			if (form === 'plain') pushPlain(root, plainText(item.value) ?? '');
 			else {
 				const content = storedContent(addr);
 				if (content) pushContent(root, addr, content, renames);
@@ -519,7 +521,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			const form = arrived(map, key);
 			const root = contentRoot(name, key);
 			const v = doc.getStored(addrOf(c, key));
-			if (form === 'plain') synced.set(root, JSON.stringify(v));
+			if (form === 'plain') synced.set(root, JSON.stringify(plainText(v) ?? v));
 			else if (form === 'content') synced.set(root, contentKey(storedContent(addrOf(c, key))));
 		}
 	}
@@ -571,8 +573,13 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 					continue;
 				} else {
 					const value = yValue(name, key);
-					if (canonical(doc.getStored(addr)) === canonical(value)) continue;
-					doc.storeField(addr, value);
+					if (
+						form === 'plain'
+							? samePlain(addr, value)
+							: canonical(doc.getStored(addr)) === canonical(value)
+					)
+						continue;
+					storeYValue(addr, form, value);
 					if (form === 'plain') synced.set(contentRoot(name, key), JSON.stringify(value));
 				}
 				held.delete(root);
@@ -601,8 +608,14 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			if (form === 'content' && declared(schema, field) === 'content')
 				return reviseFrom(root, addr, change);
 			const value = yValue(name, field);
-			if (value === undefined || canonical(doc.getStored(addr)) === canonical(value)) return;
-			doc.storeField(addr, value);
+			if (value === undefined) return;
+			if (
+				form === 'plain'
+					? samePlain(addr, value)
+					: canonical(doc.getStored(addr)) === canonical(value)
+			)
+				return;
+			storeYValue(addr, form, value);
 			held.delete(root);
 			synced.set(root, form === 'plain' ? JSON.stringify(value) : canonical(value));
 			if (declared(schema, field) === 'value') {
@@ -612,6 +625,19 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			held.add(root);
 			report(e);
 		}
+	}
+
+	/** Whether the field at `addr` holds the plain text `value` Y holds. */
+	const samePlain = (addr: Addr, value: unknown): boolean =>
+		plainText(doc.getStored(addr)) === value;
+
+	/** Write a value Y holds over the field at `addr`: a plain text revises a field resting as a
+	 *  `codec: "plain"` content, which keeps its anchors, and every other value stores. */
+	function storeYValue(addr: Addr, form: Form | undefined, value: unknown): void {
+		const stored = doc.getStored(addr);
+		if (form === 'plain' && typeof value === 'string' && isPlainContent(stored))
+			doc.revise(writeAddr(addr), value);
+		else doc.storeField(addr, value);
 	}
 
 	/** Write the projection of `root` over the content field at `addr`. */
@@ -739,6 +765,16 @@ const isContent = (v: unknown): v is Content =>
 	v !== null &&
 	typeof (v as Content).text === 'string' &&
 	Array.isArray((v as Content).blocks);
+
+const isPlainContent = (v: unknown): v is Content =>
+	isContent(v) && (v as { codec?: unknown }).codec === 'plain';
+
+/** The literal text a `text` field holds: a string as written, or a `codec: "plain"` content's
+ *  text; `undefined` for any other value. */
+export function plainText(v: unknown): string | undefined {
+	if (typeof v === 'string') return v;
+	return isPlainContent(v) ? v.text : undefined;
+}
 
 export function formOf(type: string): Form {
 	const base = type.endsWith('?') ? type.slice(0, -1) : type;
