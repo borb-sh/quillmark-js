@@ -321,4 +321,3 @@ export function lower(oldRt: Content, newRt: Content): Change | null {
 	const change = core().diff(oldRt, newRt);
 	return change.steps.length ? change : null;
 }
-

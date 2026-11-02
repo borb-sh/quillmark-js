@@ -4,7 +4,9 @@
 
 ## Unreleased
 
-**The `@quillmark/wasm` peer range stops below 0.134.0.** 0.134 removes `overwrite` and `reviseContent`, which a bound document calls, so a range admitting it installed a wasm the binding throws on at its first remote edit.
+**On the content model of `@quillmark/wasm` 0.134.1.** The peer range is `>=0.134.1-0 <0.135.0-0`. The Y shape follows the model: each `\n` carries its block's id, kind and container path, containers are records by id in `<root>#containers`, block 0's record sits in `<root>#block0`, and each island slot is its own key of the island's map. The projection reads a merged state through the store's `repair`, so two clients' concurrent edits that no single edit could make read as one valid value on every client. A remote value lands through `replace`, its card named by `$id`, and an id `replace` re-mints is written back to Y. `onRemote`'s delta counts UTF-16. A Y state an earlier version wrote carries no block ids or containers, so a host ends its open sessions before it upgrades, and the next one opens from the save.
+
+**`init()`.** The binding's sync verbs read the core's free functions, so a host awaits `init()` from `@quillmark/collab` before `bindDocument`, `seedDocument`, `writeFrom` or `changesSince`. `joinSession`, `readLog` and `writeLog` await it themselves.
 
 **Card operations from a whole-document revise.** `cardOps(from, count)` derives the card operations a `writeFrom` or `writeLog` edit returns from a `reviseDocument` receipt's `from`: the removals, then a move for each card outside the longest run both orders share, picked as `changesSince` picks it, and the inserts. A reorder, removal or insertion then keeps each card's identity, so what was typed into a moved card since stays in it, and the update moves exactly the cards the conflict check reads as moved. An alignment that names a card twice or past the list throws `RangeError`.
 
