@@ -12,7 +12,14 @@
 // rebuilt from one that kept the content deleted since.
 import * as Y from 'yjs';
 import type { Addr, AuthoringCard, Content, Document, Quill } from '@quillmark/wasm';
-import { bindDocument, Diverged, formOf, type CardOp, type CardRef } from './document.js';
+import {
+	bindDocument,
+	Diverged,
+	formOf,
+	plainText,
+	type CardOp,
+	type CardRef
+} from './document.js';
 import { changedRuns, commonRun, meet, type Run } from './lines.js';
 import { MAIN, SLOT, canonical } from './shape.js';
 import { islandWithoutAnchors } from './write.js';
@@ -194,7 +201,8 @@ function state(bound: Bound, quill: Quill): State {
 			const v = doc.getStored(addr);
 			if (v == null) continue;
 			const form = formOf(f.type);
-			if (form === 'plain' && typeof v === 'string') lines.set(`${c}/${field}`, textLines(v));
+			const text = plainText(v);
+			if (form === 'plain' && text !== undefined) lines.set(`${c}/${field}`, textLines(text));
 			else if (form === 'content') {
 				const content = typeof v === 'object' ? (v as Content) : reader.getContent(addr);
 				if (content) lines.set(`${c}/${field}`, contentLines(content));
