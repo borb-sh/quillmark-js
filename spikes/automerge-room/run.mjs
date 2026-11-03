@@ -8,12 +8,15 @@ import { strict as assert } from 'node:assert';
 import { performance } from 'node:perf_hooks';
 import { Client, Store, sync } from './room.mjs';
 
-const pkg = process.env.QUILLMARK_WASM ?? new URL('../../../quillmark/pkg', import.meta.url).pathname;
+const pkg =
+	process.env.QUILLMARK_WASM ?? new URL('../../../quillmark/pkg', import.meta.url).pathname;
 const { init } = await import(`${pkg}/runtime/runtime.js`);
 const { Document, SyncState } = await init();
 
 const splice = (at, insert, del = '') => ({ steps: [{ splice: { at, delete: del, insert } }] });
-const seed = Document.parse('~~~\n$quill: memo@0.1.0\n~~~\n\nRevenue grew 12% this quarter.\n\nShip v2 in May.\n');
+const seed = Document.parse(
+	'~~~\n$quill: memo@0.1.0\n~~~\n\nRevenue grew 12% this quarter.\n\nShip v2 in May.\n'
+);
 const store = new Store(seed.save());
 
 const ann = new Client(Document, store, 'ann');
@@ -29,8 +32,14 @@ bo.pull();
 assert.equal(ann.doc.read({}).text, bo.doc.read({}).text);
 
 const elsewhere = new Client(Document, store, 'server');
-assert.throws(() => elsewhere.doc.revise({}, read.markdown.replace('12%', '15%'), { base: read.base }), /changed since/);
-const receipt = writer.doc.revise({}, read.markdown.replace('12%', '15%'), { base: read.base, actor: 'llm' });
+assert.throws(
+	() => elsewhere.doc.revise({}, read.markdown.replace('12%', '15%'), { base: read.base }),
+	/changed since/
+);
+const receipt = writer.doc.revise({}, read.markdown.replace('12%', '15%'), {
+	base: read.base,
+	actor: 'llm'
+});
 writer.push();
 ann.pull();
 bo.pull();
