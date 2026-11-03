@@ -1,0 +1,15 @@
+{
+	"name": "spike-automerge-collab",
+	"private": true,
+	"type": "module",
+	"description": "Integration spike: can @quillmark/collab be rebuilt on the Automerge live-document surface of @quillmark/wasm?",
+	"scripts": {
+		"link": "node link.mjs",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@quillmark/wasm-published": "npm:@quillmark/wasm@0.134.1",
+		"vitest": "5.0.3",
+		"vite": "8.3.4"
+	}
+}
