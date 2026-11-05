@@ -105,6 +105,9 @@ export interface BindDocumentOpts {
 	doc: Document;
 	quill: Quill;
 	ydoc: Y.Doc;
+	/** Whether this client is the session's single writer, which writes back a repair that
+	 *  inserts once it reads one, so the state no longer needs it. */
+	repairs?: boolean;
 	onRemote?(change: RemoteChange): void;
 	/** A remote value the Document refused. The field keeps its last value. */
 	onError?(error: unknown): void;
@@ -215,11 +218,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 	const projectRoot = (root: string): Content => projectField(root).content;
 
-	/** Write `content` over the content root `root`. A peer writes back no repair that inserts:
-	 *  the session has no single writer to leave it to, so every peer reads it through `repair`. */
+	/** Write `content` over the content root `root`. A peer other than the session's single
+	 *  writer writes back no repair that inserts: it reads it through `repair`. */
 	function writeField(root: string, content: Content): Map<string, string> {
 		const types = contentTypes(ydoc, root);
-		if (!inserting.has(root)) return writeContent(types, content, mint);
+		if (opts.repairs || !inserting.has(root)) return writeContent(types, content, mint);
 		const raw = readField(types);
 		const projection = project(raw);
 		if (!projection.repairs.some(inserts)) {
@@ -255,9 +258,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 
 	/**
-	 * Write `content`, the projection of `root`, over the field at `addr`. `replace` re-mints an id
-	 * it introduces that the Document's own log holds, so the value it lands can differ from the
-	 * projection by ids; such a field is named in `reminted`, to be written back to Y.
+	 * Write `content`, the projection of `root`, over the field at `addr`. The value `replace`
+	 * lands can differ from the projection by ids; such a field is named in `reminted`, to be
+	 * written back to Y.
 	 */
 	function land(
 		root: string,
@@ -271,7 +274,8 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (landed !== contentKey(content)) reminted.push({ root, addr });
 	}
 
-	/** Write each field's Document value to Y, where it landed under ids Y does not hold. */
+	/** Write each field's Document value to Y, where it landed under ids Y does not hold or,
+	 *  for the single writer, read through a repair that inserts. */
 	function writeBack(reminted: { root: string; addr: Addr }[]): void {
 		if (!reminted.length) return;
 		ydoc.transact(() => {
@@ -619,6 +623,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (change.content.some((x) => sameAddr(x.addr, addr))) return;
 		try {
 			const projection = projectField(root);
+			if (opts.repairs && projection.repairs.some(inserts)) reminted.push({ root, addr });
 			const before = storedContent(addr);
 			if (before && contentKey(before) === contentKey(projection.content)) {
 				held.delete(root);

@@ -29,12 +29,14 @@ export interface Saved {
 	version: Uint8Array;
 }
 
-/** An open session: its epoch, the update every client starts it from, and the quill
- *  (`name@version`) it was opened under, which every client joining it runs. */
+/** An open session: its epoch, the update every client starts it from, the quill
+ *  (`name@version`) it was opened under, which every client joining it runs, and its single
+ *  writer, the one client that writes back a repair that inserts. */
 export interface Opened {
 	epoch: string;
 	seed: Uint8Array;
 	quill?: string;
+	writer?: string;
 }
 
 /** How an append went: kept, refused because the epoch is no longer open, refused because the
@@ -50,13 +52,23 @@ export interface AppendOpts {
 	key?: string;
 }
 
+/** A state of an epoch the log keeps past compaction: how many entries it holds, its
+ *  `Y.encodeSnapshot`, and the name a version gives it. A session's history holds every state it
+ *  passed through (garbage collection off), so the snapshot alone rebuilds the state. */
+export interface Checkpoint {
+	count: number;
+	snapshot: Uint8Array;
+	label?: string;
+}
+
 /** Where a room keeps its saved Document and its session's log. */
 export interface SessionLog {
 	/** The open session; `undefined` when none is. */
 	current(): Promise<Opened | undefined>;
-	/** Open a session from `seed` under `quill` unless one is open already; the session open
-	 *  after. */
-	open(seed: Uint8Array, quill?: string): Promise<Opened>;
+	/** Open a session from `seed` under `quill`, `writer` its single writer, unless one is open
+	 *  already; the session open after. A server store names its own writer, whatever the
+	 *  caller passes. */
+	open(seed: Uint8Array, quill?: string, writer?: string): Promise<Opened>;
 	/** Close `epoch` and drop its entries, when it is still the open one. */
 	end(epoch: string): Promise<void>;
 	/** Add an entry to `epoch`'s log. Entries are numbered from 1 in the order they are kept,
@@ -80,6 +92,14 @@ export interface SessionLog {
 	 * longer open, or when compaction merged an entry past `count` with one before it.
 	 */
 	upTo(epoch: string, count: number): Promise<Uint8Array[] | undefined>;
+	/**
+	 * Keep `checkpoint` for `epoch` while it is open, and drop it when the epoch ends. A store
+	 * that keeps none leaves it out, and a revision is then rebuilt from `upTo` alone.
+	 */
+	checkpoint?(epoch: string, checkpoint: Checkpoint): Promise<void>;
+	/** The checkpoints kept for `epoch`, in the order kept; `undefined` when `epoch` is no longer
+	 *  open. */
+	checkpoints?(epoch: string): Promise<Checkpoint[] | undefined>;
 	/** Call `onChange` when the log may hold new entries. A hint: `since` is what reads them. */
 	subscribe(onChange: () => void): () => void;
 	load(): Promise<Saved | undefined>;
@@ -98,7 +118,9 @@ export interface JoinSessionOpts {
 	quill: Quill;
 	/** The Document a room starts from when it holds no saved one. Read once, and freed. */
 	initial(): Document;
-	/** Who this client's edits are by, passed to every `append` they make. */
+	/** Who this client's edits are by, passed to every `append` they make. A client that opens
+	 *  the session names it its single writer, and a client the open session names so writes
+	 *  back a repair that inserts. */
 	writer?: string;
 	/** How long a session stays open with nobody appending or present, in ms. */
 	lease?: number;
@@ -233,7 +255,7 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		probe.free();
 		throw new QuillMismatch(ref);
 	}
-	if (!opened) opened = await log.open(seedDocument(probe, quill), quillOf(quill));
+	if (!opened) opened = await log.open(seedDocument(probe, quill), quillOf(quill), opts.writer);
 	probe.free();
 	if (opened.quill !== undefined && opened.quill !== quillOf(quill))
 		throw new QuillMismatch(opened.quill);
@@ -324,6 +346,7 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		doc,
 		quill,
 		ydoc,
+		repairs: opts.writer !== undefined && opened.writer === opts.writer,
 		onRemote: (change) => {
 			if (ready) opts.onRemote?.(change);
 		},

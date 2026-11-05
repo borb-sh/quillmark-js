@@ -13,13 +13,21 @@ export { joinSession, QuillMismatch } from './session.js';
 export type {
 	Appended,
 	AppendOpts,
+	Checkpoint,
 	JoinSessionOpts,
 	Opened,
 	Saved,
 	Session,
 	SessionLog
 } from './session.js';
-export { readLog, writeLog } from './room.js';
-export type { LogRead, LogWrite, ReadLogOpts, Revision, WriteLogOpts } from './room.js';
+export { readLog, readVersion, saveVersion, writeLog } from './room.js';
+export type {
+	LogRead,
+	LogWrite,
+	ReadLogOpts,
+	ReadVersionOpts,
+	Revision,
+	WriteLogOpts
+} from './room.js';
 export { localLog } from './local.js';
 export type { LocalLogOpts } from './local.js';

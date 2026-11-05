@@ -8,6 +8,8 @@ import {
 	localLog,
 	QuillMismatch,
 	readLog,
+	readVersion,
+	saveVersion,
 	writeFrom,
 	writeLog,
 	type Revision,
@@ -343,13 +345,15 @@ describe('writes from a revision', () => {
 		expect(writers).toEqual(['ada', 'ai:1']);
 	});
 
-	it('reads a room without changing it, and writes through its log', async () => {
+	it('reads a room changing nothing but the checkpoint it keeps, and writes through its log', async () => {
 		const origin = new Origin();
 		const a = await open(origin).join();
 		const log = logOf(origin);
-		const before = JSON.stringify([...origin.data]);
+		const content = () =>
+			JSON.stringify([...origin.data].filter(([k]) => !k.includes(':checkpoints:')));
+		const before = content();
 		const read = await readLog({ log, quill: quill() });
-		expect(JSON.stringify([...origin.data])).toBe(before);
+		expect(content()).toBe(before);
 		expect(read.revision.epoch).toBe(a.epoch);
 		expect(snapshot(read.doc)).toBe(snapshot(a.doc));
 		read.doc.free();
@@ -540,10 +544,11 @@ describe('writes from a revision', () => {
 		expect(await log.current()).toBeUndefined();
 	});
 
-	it('refuses a revision compaction has merged past', async () => {
+	it('writes from a revision compaction has merged past through its checkpoint, and refuses it with none', async () => {
 		const origin = new Origin();
 		const a = await open(origin, { compactAt: 3 }).join();
 		const log = localLog({ room: 'r', ...origin.tab(), compactAt: 3 });
+		const { checkpoint: _, checkpoints: __, ...bare } = log;
 		type(a, 'one ');
 		await settle();
 		const read = await readLog({ log, quill: quill() });
@@ -552,6 +557,28 @@ describe('writes from a revision', () => {
 			type(a, `${i} `);
 			await settle();
 		}
-		expect(await write(log, read.revision, 'Late.')).toEqual({ status: 'stale' });
+		expect(await write(bare, read.revision, 'Late.')).toEqual({ status: 'stale' });
+		expect((await write(log, read.revision, 'Late.')).status).toBe('written');
+		await settle();
+		expect(abstract(a)).toBe('Late.');
+	});
+
+	it('reads a named version as it stood, and writes from it', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		const log = logOf(origin);
+		rewrite(a.doc, 'Draft one.');
+		a.push();
+		await settle();
+		const named = await saveVersion({ log, quill: quill(), label: 'v1' });
+		rewrite(a.doc, 'Draft two.');
+		a.push();
+		await settle();
+		const version = await readVersion({ log, quill: quill(), label: 'v1' });
+		expect(version?.revision).toEqual(named);
+		expect(quill().reader(version!.doc).get('abstract')).toBe('Draft one.');
+		version!.doc.free();
+		expect(await readVersion({ log, quill: quill(), label: 'v2' })).toBeUndefined();
+		expect(await write(log, named, 'Restored.')).toMatchObject({ status: 'conflict' });
 	});
 });

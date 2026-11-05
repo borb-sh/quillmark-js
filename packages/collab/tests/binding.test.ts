@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import type { Content, ContentContainer, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
 import { bindDocument, Diverged, seedDocument } from '../src/index.js';
+import { inserts, project } from '../src/project.js';
+import { contentRoot, contentTypes, readField } from '../src/shape.js';
 import { core, deliver, edit, peers, quill, settle, snapshot, type Peer } from './helpers.js';
 
 const example = () => quill().exampleDocument()!;
@@ -123,6 +125,29 @@ describe('content', () => {
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
 		expect([`${merged} A B`, `${merged} B A`]).toContain(body(a).text);
+	});
+
+	it("the session's single writer writes a repair that inserts back, and every client then reads none", () => {
+		const tabled = () => {
+			const doc = example();
+			doc.replace({}, core.importMarkdown('lead\n\n| h |\n| - |\n\ntail').content);
+			return doc;
+		};
+		const inserting = (p: Peer) =>
+			project(readField(contentTypes(p.ydoc, contentRoot('main')))).repairs.filter(inserts);
+		for (const writer of [undefined, 2]) {
+			const [a, b, c] = peers(3, tabled, quill(), writer);
+			const slot = Array.from(body(a).text).indexOf('￼');
+			edit(a.doc, {}, [{ retain: slot + 1 }, { delete: '\ntail'.length }]);
+			a.binding.push();
+			edit(b.doc, {}, [{ retain: slot + 2 }, { insert: 'typed ' }]);
+			b.binding.push();
+			settle([a, b, c]);
+			expect(inserting(a)).toHaveLength(writer === undefined ? 1 : 0);
+			expect(snapshot(a.doc)).toBe(snapshot(c.doc));
+			expect(snapshot(b.doc)).toBe(snapshot(c.doc));
+			expect([a, b, c].flatMap((p) => p.errors)).toEqual([]);
+		}
 	});
 
 	it('text split off a table by repair is not split twice by two clients typing', () => {

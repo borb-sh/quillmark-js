@@ -6,12 +6,13 @@
 // event, which fires in every other tab of the origin, is the wake-up. Once an epoch passes
 // `compactAt` entries, the appending tab merges them into one entry holding their whole range,
 // writing it before deleting the keys it merged, and a reader that finds a key it listed gone
-// lists again. Web Storage has no transactions: two tabs opening a session at once each write
+// lists again. The epoch's checkpoints are one key, a list, so a revision compaction merged
+// past is still rebuilt from its snapshot. Web Storage has no transactions: two tabs opening a session at once each write
 // one, the later write stands, and the other tab's session ends at its first append; two tabs
 // appending in the same instant can take one entry number, which a conditional append does not
 // catch. An entry's `writer` is not kept: every tab of an origin is one person.
 import * as Y from 'yjs';
-import { covers, type Opened, type Saved, type SessionLog } from './session.js';
+import { covers, type Checkpoint, type Opened, type Saved, type SessionLog } from './session.js';
 
 export interface LocalLogOpts {
 	room: string;
@@ -33,9 +34,10 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 		touched: `${prefix}touched`,
 		log: (epoch: string) => `${prefix}log:${epoch}:`,
 		count: (epoch: string) => `${prefix}count:${epoch}`,
-		once: (epoch: string, k: string) => `${prefix}key:${epoch}:${encodeURIComponent(k)}`
+		once: (epoch: string, k: string) => `${prefix}key:${epoch}:${encodeURIComponent(k)}`,
+		checkpoints: (epoch: string) => `${prefix}checkpoints:${epoch}`
 	};
-	const writer = randomId();
+	const tab = randomId();
 	let n = 0;
 	const keysUnder = (head: string): string[] => {
 		const out: string[] = [];
@@ -50,8 +52,13 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 	const current = (): Opened | undefined => {
 		const raw = storage.getItem(key.open);
 		if (!raw) return undefined;
-		const { epoch, seed, quill } = JSON.parse(raw) as Record<string, string>;
-		return { epoch, seed: fromBase64(seed), ...(quill === undefined ? {} : { quill }) };
+		const { epoch, seed, quill, writer } = JSON.parse(raw) as Record<string, string>;
+		return {
+			epoch,
+			seed: fromBase64(seed),
+			...(quill === undefined ? {} : { quill }),
+			...(writer === undefined ? {} : { writer })
+		};
 	};
 	const isOpen = (epoch: string) => current()?.epoch === epoch;
 	const load = (): Saved | undefined => {
@@ -61,7 +68,7 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 		return { epoch, stored, version: fromBase64(version) };
 	};
 	const write = (epoch: string, from: number, to: number, update: Uint8Array) =>
-		storage.setItem(`${key.log(epoch)}${writer}:${n++}`, `${from}-${to} ${toBase64(update)}`);
+		storage.setItem(`${key.log(epoch)}${tab}:${n++}`, `${from}-${to} ${toBase64(update)}`);
 	/** Every entry of `epoch` still stored: its range and update. A key listed and then gone,
 	 *  merged away by another tab, has the whole listing read again. */
 	const stored = (
@@ -84,13 +91,24 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 		}
 	};
 	const touch = () => storage.setItem(key.touched, String(Date.now()));
+	const checkpoints = (epoch: string): Checkpoint[] =>
+		(
+			JSON.parse(storage.getItem(key.checkpoints(epoch)) ?? '[]') as {
+				count: number;
+				snapshot: string;
+				label?: string;
+			}[]
+		).map((c) => ({ ...c, snapshot: fromBase64(c.snapshot) }));
 
 	return {
 		current: async () => current(),
-		async open(seed, quill) {
+		async open(seed, quill, writer) {
 			const held = current();
 			if (held) return held;
-			storage.setItem(key.open, JSON.stringify({ epoch: randomId(), seed: toBase64(seed), quill }));
+			storage.setItem(
+				key.open,
+				JSON.stringify({ epoch: randomId(), seed: toBase64(seed), quill, writer })
+			);
 			touch();
 			return current()!;
 		},
@@ -98,6 +116,7 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 			if (!isOpen(epoch)) return;
 			storage.removeItem(key.open);
 			storage.removeItem(key.count(epoch));
+			storage.removeItem(key.checkpoints(epoch));
 			for (const k of [...entries(epoch), ...keysUnder(key.once(epoch, ''))]) storage.removeItem(k);
 		},
 		async append(epoch, update, append = {}) {
@@ -138,6 +157,22 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 			const all = stored(epoch);
 			if (all.some((e) => e.from <= upTo && e.to > upTo)) return undefined;
 			return all.filter((e) => e.to <= upTo).map((e) => e.update);
+		},
+		async checkpoint(epoch, checkpoint) {
+			if (!isOpen(epoch)) return;
+			const held = checkpoints(epoch);
+			const same = (c: Checkpoint) =>
+				c.count === checkpoint.count &&
+				c.label === checkpoint.label &&
+				toBase64(c.snapshot) === toBase64(checkpoint.snapshot);
+			if (held.some(same)) return;
+			storage.setItem(
+				key.checkpoints(epoch),
+				JSON.stringify([...held, checkpoint].map((c) => ({ ...c, snapshot: toBase64(c.snapshot) })))
+			);
+		},
+		async checkpoints(epoch) {
+			return isOpen(epoch) ? checkpoints(epoch) : undefined;
 		},
 		subscribe(onChange) {
 			const fn = (e: Event) => {

@@ -7,7 +7,9 @@
 // open, or one nobody is in whose every entry is saved, the revision is `{ epoch: '', count: 0,
 // check: '' }`, the saved Document itself.
 //
-// A read changes nothing. A write from the save ends a session nobody is in, rebuilds the log's
+// A read changes no content: it keeps a checkpoint of the revision it hands out, where the log
+// keeps checkpoints, so compaction never makes it stale. A named version is a checkpoint with a
+// label, read back as a revision like any other. A write from the save ends a session nobody is in, rebuilds the log's
 // history, makes the edit from its revision (`writeFrom`), opens a session from the save only once
 // it has an edit to append, and appends it only if the log still holds the entries the conflict
 // check saw, trying again when it moved. It then saves the Document the log projects to, so the
@@ -33,6 +35,11 @@ export interface ReadLogOpts {
 	quill: Quill;
 	/** How long a session stays open with nobody appending or present, in ms: `joinSession`'s. */
 	lease?: number;
+}
+
+/** A read of the room at the version saved under `label`, rather than as it stands. */
+export interface ReadVersionOpts extends ReadLogOpts {
+	label: string;
 }
 
 const SAVE: Revision = { epoch: '', count: 0, check: '' };
@@ -61,16 +68,13 @@ export async function readLog(opts: ReadLogOpts & { since?: Revision }): Promise
 		if (!read) return readLog(opts);
 		try {
 			const doc = projectDocument(read.ydoc, quill, room.template);
-			const revision = {
-				epoch: opened.epoch,
-				count: read.count,
-				check: checkOf(Y.encodeSnapshot(Y.snapshot(read.ydoc)))
-			};
+			const snapshot = Y.encodeSnapshot(Y.snapshot(read.ydoc));
+			const revision = { epoch: opened.epoch, count: read.count, check: checkOf(snapshot) };
+			await log.checkpoint?.(opened.epoch, { count: read.count, snapshot });
 			let changes: Change[] | undefined;
 			if (since && validRevision(since) && since.epoch === opened.epoch) {
-				const base = await snapshotAt(log, opened, since.count, read.count);
-				if (base && checkOf(base) === since.check)
-					changes = changesSince({ history: read.ydoc, base, quill, doc: room.template });
+				const base = await snapshotAt(log, opened, since, read.count);
+				if (base) changes = changesSince({ history: read.ydoc, base, quill, doc: room.template });
 			}
 			return { revision, doc, ...(changes ? { changes } : {}) };
 		} finally {
@@ -126,9 +130,9 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 			if (!read || base.count > read.count) return { status: 'stale' };
 			try {
 				const at = opened
-					? await snapshotAt(log, opened, base.count, read.count)
+					? await snapshotAt(log, opened, base, read.count)
 					: Y.encodeSnapshot(Y.snapshot(read.ydoc));
-				if (!at || (base.epoch !== '' && checkOf(at) !== base.check)) return { status: 'stale' };
+				if (!at) return { status: 'stale' };
 				const written = writeFrom({
 					history: read.ydoc,
 					base: at,
@@ -151,13 +155,11 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 				if (appended === 'duplicate') return { status: 'duplicate' };
 				Y.applyUpdate(read.ydoc, written.update);
 				await save(log, opened.epoch, read.ydoc, quill, room.template);
+				const snapshot = Y.encodeSnapshot(Y.snapshot(read.ydoc));
+				await log.checkpoint?.(opened.epoch, { count: read.count + 1, snapshot });
 				return {
 					status: 'written',
-					revision: {
-						epoch: opened.epoch,
-						count: read.count + 1,
-						check: checkOf(Y.encodeSnapshot(Y.snapshot(read.ydoc)))
-					},
+					revision: { epoch: opened.epoch, count: read.count + 1, check: checkOf(snapshot) },
 					changes: written.changes
 				};
 			} finally {
@@ -169,6 +171,65 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 		room.template.free();
 	}
 }
+
+/**
+ * Name the state the room's session holds now `label`, opening a session from the save where
+ * none is open; the revision it names. A version lasts the session it was saved in.
+ */
+export async function saveVersion(opts: ReadVersionOpts): Promise<Revision> {
+	const { log, quill, label } = opts;
+	const room = await open(opts);
+	try {
+		let opened = await log.current();
+		if (opened && (await settled(log, opened, room.saved, opts.lease))) {
+			await log.end(opened.epoch);
+			opened = undefined;
+		}
+		opened ??= await log.open(seedDocument(room.template, quill), quillRef(quill));
+		const read = await history(log, opened);
+		if (!read) return saveVersion(opts);
+		try {
+			const snapshot = Y.encodeSnapshot(Y.snapshot(read.ydoc));
+			await log.checkpoint?.(opened.epoch, { count: read.count, snapshot, label });
+			return { epoch: opened.epoch, count: read.count, check: checkOf(snapshot) };
+		} finally {
+			read.ydoc.destroy();
+		}
+	} finally {
+		room.template.free();
+	}
+}
+
+/** The room's Document at the version last saved under `label` in the open session, and its
+ *  revision, from which `writeLog` writes; `undefined` where the session holds no such version. */
+export async function readVersion(opts: ReadVersionOpts): Promise<LogRead | undefined> {
+	const { log, quill, label } = opts;
+	const room = await open(opts);
+	try {
+		const opened = await log.current();
+		if (!opened) return undefined;
+		const version = (await log.checkpoints?.(opened.epoch))
+			?.filter((c) => c.label === label)
+			.at(-1);
+		if (!version) return undefined;
+		const read = await history(log, opened);
+		if (!read) return undefined;
+		const at = Y.createDocFromSnapshot(read.ydoc, Y.decodeSnapshot(version.snapshot));
+		try {
+			return {
+				revision: { epoch: opened.epoch, count: version.count, check: checkOf(version.snapshot) },
+				doc: projectDocument(at, quill, room.template)
+			};
+		} finally {
+			at.destroy();
+			read.ydoc.destroy();
+		}
+	} finally {
+		room.template.free();
+	}
+}
+
+const quillRef = (quill: Quill) => `${quill.metadata.name}@${quill.metadata.version}`;
 
 /** The room's saved Document, checked against `quill`. The caller frees `template`. */
 async function open(opts: ReadLogOpts): Promise<{ saved: Saved; template: Document }> {
@@ -203,22 +264,28 @@ function fromSeed(seed: Uint8Array): { ydoc: Y.Doc; count: number } {
 	return { ydoc, count: 0 };
 }
 
-/** `Y.encodeSnapshot` of the state after `count` entries, or `undefined` where the log cannot
- *  rebuild it. */
+/** `Y.encodeSnapshot` of the state `revision` names, from a checkpoint the log kept or else
+ *  its first entries; `undefined` where the log cannot rebuild it or its check fails. */
 async function snapshotAt(
 	log: SessionLog,
 	opened: Opened,
-	count: number,
+	revision: Revision,
 	head: number
 ): Promise<Uint8Array | undefined> {
-	if (count > head) return undefined;
-	const updates = count === 0 ? [] : await log.upTo(opened.epoch, count);
+	if (revision.count > head) return undefined;
+	const checked = (snapshot: Uint8Array) =>
+		revision.epoch === '' || checkOf(snapshot) === revision.check;
+	const kept = (await log.checkpoints?.(opened.epoch))?.find(
+		(c) => c.count === revision.count && checked(c.snapshot)
+	);
+	if (kept) return kept.snapshot;
+	const updates = revision.count === 0 ? [] : await log.upTo(opened.epoch, revision.count);
 	if (!updates) return undefined;
 	const ydoc = new Y.Doc({ gc: false });
 	Y.applyUpdate(ydoc, Y.mergeUpdates([opened.seed, ...updates]));
 	const snapshot = Y.encodeSnapshot(Y.snapshot(ydoc));
 	ydoc.destroy();
-	return snapshot;
+	return checked(snapshot) ? snapshot : undefined;
 }
 
 /** Save what `ydoc` projects to. The edit is in the log whether or not the save is kept, so a

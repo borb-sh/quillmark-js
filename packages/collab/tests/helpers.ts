@@ -55,7 +55,13 @@ export interface Peer {
 }
 
 /** `n` peers over one starting Document, each joining from the same seed, history kept. */
-export function peers(n: number, start: () => Document, q: Quill = quill()): Peer[] {
+/** `n` peers over one seed; the one at `writer`, if given, is the session's single writer. */
+export function peers(
+	n: number,
+	start: () => Document,
+	q: Quill = quill(),
+	writer?: number
+): Peer[] {
 	const first = start();
 	const seed = seedDocument(first, q);
 	first.free();
@@ -70,6 +76,7 @@ export function peers(n: number, start: () => Document, q: Quill = quill()): Pee
 			doc,
 			quill: q,
 			ydoc,
+			repairs: i === writer,
 			onRemote: (c) => peer.changes.push(c),
 			onError: (e) => peer.errors.push(e)
 		});
