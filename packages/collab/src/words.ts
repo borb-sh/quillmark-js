@@ -5,7 +5,7 @@
 // "two" into "three" deletes "two" and inserts "three", leaving no shared "t" for a concurrent
 // edit to land inside, and two words it changed far apart in one line are two splices, so what
 // was typed between them stays.
-import { changedRuns, type Run } from './lines.js';
+import { changedRuns, type Run, type Splice } from './lines.js';
 import { LINE_KEYS, MARK_KEYS, SLOT, canonical, type YField } from './shape.js';
 
 export type Grain = 'char' | 'word';
@@ -28,14 +28,6 @@ export function tokenSpans(chars: readonly string[], from: number, to: number): 
 		i = j;
 	}
 	return out;
-}
-
-export interface Splice {
-	/** `a[at, end)` is replaced by `b[from, to)`. */
-	at: number;
-	end: number;
-	from: number;
-	to: number;
 }
 
 /**

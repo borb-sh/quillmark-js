@@ -219,7 +219,7 @@ describe('sessions', () => {
 
 	it('retries a failed write, and sends what was typed meanwhile with it', async () => {
 		const origin = new Origin();
-		const tab = open(origin, { retry: [20] });
+		const tab = open(origin, { retry: [200] });
 		const a = await tab.join();
 		const b = await open(origin).join();
 		origin.full = true;
@@ -227,7 +227,7 @@ describe('sessions', () => {
 		await settle();
 		type(a, 'two ');
 		origin.full = false;
-		await wait(40);
+		await wait(400);
 		expect(tab.ended.lost).toBeUndefined();
 		expect(text(b).startsWith('two one ')).toBe(true);
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));

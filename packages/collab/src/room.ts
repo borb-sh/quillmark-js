@@ -20,6 +20,7 @@ import * as Y from 'yjs';
 import type { Document, Quill } from '@quillmark/wasm';
 import { init } from './core.js';
 import { cardOps, seedDocument, type CardOp } from './document.js';
+import { sameBytes } from './shape.js';
 import {
 	changesSince,
 	projectDocument,
@@ -148,7 +149,7 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 			if (opened && !sameBytes(opened.seed, seed)) return { status: 'stale' };
 		} else if (opened?.epoch !== base.epoch) return { status: 'stale' };
 		for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-			const read = opened ? await history(log, opened) : fromSeed(seed);
+			const read = opened ? await history(log, opened) : { ydoc: rebuilt([seed]), count: 0 };
 			if (!read || base.count > read.count) return { status: 'stale' };
 			try {
 				const at = opened
@@ -215,12 +216,7 @@ export async function readVersion(opts: VersionOpts): Promise<Document | undefin
 	const version = (await opts.log.versions()).filter((v) => v.label === opts.label).at(-1);
 	if (!version) return undefined;
 	const { Document } = await init();
-	const doc = Document.fromStored(version.stored);
-	if (doc.quillRef.split('@')[0] !== opts.quill.metadata.name) {
-		doc.free();
-		throw new QuillMismatch(doc.quillRef);
-	}
-	return doc;
+	return underQuill(Document.fromStored(version.stored), opts.quill);
 }
 
 export interface RestoreVersionOpts extends VersionOpts {
@@ -263,17 +259,19 @@ function checkQuill(opened: Opened, quill: Quill): void {
 	if (opened.quill !== quillRef(quill)) throw new QuillMismatch(opened.quill);
 }
 
+/** `doc`, refused and freed where it is under another quill than `quill`. */
+function underQuill(doc: Document, quill: Quill): Document {
+	if (doc.quillRef.split('@')[0] === quill.metadata.name) return doc;
+	doc.free();
+	throw new QuillMismatch(doc.quillRef);
+}
+
 /** The room's saved Document, checked against `quill`. The caller frees `template`. */
 async function open(opts: ReadLogOpts): Promise<{ saved: Saved; template: Document }> {
 	const { Document } = await init();
 	const saved = await opts.log.load();
 	if (!saved) throw new Error('the room holds no document');
-	const template = Document.fromStored(saved.stored);
-	if (template.quillRef.split('@')[0] !== opts.quill.metadata.name) {
-		template.free();
-		throw new QuillMismatch(template.quillRef);
-	}
-	return { saved, template };
+	return { saved, template: underQuill(Document.fromStored(saved.stored), opts.quill) };
 }
 
 /** The session's Y state with its history, and how many entries it holds; `undefined` when the
@@ -283,17 +281,14 @@ async function history(
 	opened: Opened
 ): Promise<{ ydoc: Y.Doc; count: number } | undefined> {
 	const read = await log.since(opened.epoch);
-	if (!read) return undefined;
-	const ydoc = new Y.Doc({ gc: false });
-	Y.applyUpdate(ydoc, Y.mergeUpdates([opened.seed, ...read.updates]));
-	return { ydoc, count: read.count };
+	return read && { ydoc: rebuilt([opened.seed, ...read.updates]), count: read.count };
 }
 
-/** A session's state at its seed alone, before any entry. */
-function fromSeed(seed: Uint8Array): { ydoc: Y.Doc; count: number } {
+/** The Y state `updates` make, with its history. */
+function rebuilt(updates: Uint8Array[]): Y.Doc {
 	const ydoc = new Y.Doc({ gc: false });
-	Y.applyUpdate(ydoc, seed);
-	return { ydoc, count: 0 };
+	Y.applyUpdate(ydoc, Y.mergeUpdates(updates));
+	return ydoc;
 }
 
 /** `Y.encodeSnapshot` of the state `revision` names: the seed for the save, or a checkpoint the
@@ -306,8 +301,7 @@ async function snapshotAt(
 ): Promise<Uint8Array | undefined> {
 	if (revision.count > head) return undefined;
 	if (revision.epoch === '') {
-		const ydoc = new Y.Doc({ gc: false });
-		Y.applyUpdate(ydoc, opened.seed);
+		const ydoc = rebuilt([opened.seed]);
 		const snapshot = Y.encodeSnapshot(Y.snapshot(ydoc));
 		ydoc.destroy();
 		return snapshot;
@@ -373,8 +367,4 @@ function checkOf(snapshot: Uint8Array): string {
 	h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
 	h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
 	return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36).padStart(11, '0');
-}
-
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
-	return a.length === b.length && a.every((x, i) => x === b[i]);
 }

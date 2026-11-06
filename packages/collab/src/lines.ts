@@ -33,6 +33,15 @@ export interface Run {
 	end: number;
 }
 
+/** A run to replace: `[at, end)` of a target takes `[from, to)` of a source. A `Run` from `a` to
+ *  `b` is the splice that takes `b` back to `a`. */
+export interface Splice {
+	at: number;
+	end: number;
+	from: number;
+	to: number;
+}
+
 /** The runs between the common ones: where `a` and `b` differ, in order. */
 export function changedRuns(a: readonly string[], b: readonly string[]): Run[] {
 	const out: Run[] = [];

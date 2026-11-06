@@ -8,6 +8,7 @@
 // callers it names, and answers what failed, empty when the store conforms. It takes no test
 // runner: a host asserts the answer is empty in its own.
 import * as Y from 'yjs';
+import { sameBytes } from './shape.js';
 import type { SessionLog } from './session.js';
 
 /** Who reaches the store: an id the store authenticated, and whether they may only read. */
@@ -143,10 +144,6 @@ export async function checkServerStore(opts: ServerStoreOpts): Promise<string[]>
 
 const QUILL = 'q@1.0.0';
 const SNAPSHOT = Y.encodeSnapshot(Y.emptySnapshot);
-
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
-	return a.length === b.length && a.every((x, i) => x === b[i]);
-}
 
 /** A session seed, written by client id 0 as `seedDocument` writes one. */
 function seedUpdate(text = 'seed'): Uint8Array {
