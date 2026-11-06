@@ -37,7 +37,7 @@ export interface StructuralUndo {
 	 *  asks for it back, and the control has nothing of its own to undo yet. */
 	hand(el: Element | null): void;
 	/** Whether ⌘Z pressed at `target` is the offer's: the page's body, where a removal under
-	 *  the pointer leaves the focus; the handed control; or a control under `root` that keeps
+	 *  the pointer leaves the focus, when this offer is the page's latest; the handed control; or a control under `root` that keeps
 	 *  no history of its own. A text control that is not the handed one keeps its key. */
 	accepts(target: EventTarget | null, root: Element | undefined): boolean;
 	/** Hold the lapse while the toast is under the pointer or the focus, and let it run again. */
@@ -50,6 +50,10 @@ export interface StructuralUndo {
 }
 
 const EDITABLE = 'input, textarea, select, [contenteditable="true"]';
+
+/** The editor whose offer is the page's latest: the body belongs to no surface, so of two
+ *  editors with an offer standing, the key at the body is the one that offered last's. */
+let latest: object | undefined;
 
 export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 	let current = $state<UndoOffer | undefined>();
@@ -66,13 +70,14 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		handed = undefined;
 		current = undefined;
 	};
-	return {
+	const self: StructuralUndo & { dispose(): void } = {
 		get current() {
 			return current;
 		},
 		offer(notice, restore) {
 			clear();
 			current = { notice, restore };
+			latest = self;
 			timer = setTimeout(clear, OFFER_MS);
 		},
 		hand(el) {
@@ -88,7 +93,8 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		},
 		accepts(target, root) {
 			if (!current || !(target instanceof Element)) return false;
-			if (target === document.body || target === handed) return true;
+			if (target === document.body) return latest === self;
+			if (target === handed) return true;
 			return !!root?.contains(target) && !target.closest(EDITABLE);
 		},
 		pause() {
@@ -111,6 +117,7 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		withdraw: clear,
 		dispose: clear
 	};
+	return self;
 }
 
 const KEY = Symbol('qm.undo');
