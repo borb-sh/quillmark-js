@@ -235,10 +235,11 @@ describe('writeFrom', () => {
 	it('reports a card removed since that the edit wrote', () => {
 		const [a] = session();
 		const base = revision(a);
+		const id = a.doc.card(0).id;
 		a.doc.removeCard(0);
 		a.binding.push({ op: 'remove', at: 0 });
 		const written = write(a, base, (doc) => void q.writer(doc).card(0).set('heading', 'New'));
-		expect(written.conflicts).toEqual([{ type: 'remove', from: 0 }]);
+		expect(written.conflicts).toEqual([{ type: 'remove', from: 0, id }]);
 	});
 
 	it('refuses a card-list change made without its operation, writing nothing', () => {
@@ -353,6 +354,7 @@ describe('changesSince', () => {
 	it('reads card moves, removals, inserts, retypes and fields between two states', () => {
 		const [a] = session();
 		const base = revision(a);
+		const ids = a.doc.cards.map((c) => c.id);
 		a.doc.moveCard(3, 0);
 		a.binding.push({ op: 'move', from: 3, to: 0 });
 		a.doc.removeCard(3);
@@ -363,13 +365,19 @@ describe('changesSince', () => {
 		a.binding.push();
 		const changes = changesSince({ history: a.ydoc, base, quill: q, doc: a.doc });
 		expect(changes).toEqual([
-			{ type: 'remove', from: 2 },
-			{ type: 'move', from: 3, at: 0 },
-			{ type: 'insert', at: 4, card: { kind: 'note', fields: { label: 'Last' }, body: '' } },
+			{ type: 'remove', from: 2, id: ids[2] },
+			{ type: 'move', from: 3, at: 0, id: ids[3] },
+			{
+				type: 'insert',
+				at: 4,
+				id: a.doc.card(4).id,
+				card: { kind: 'note', fields: { label: 'Last' }, body: '' }
+			},
 			{
 				type: 'field',
 				from: 0,
 				at: 1,
+				id: ids[0],
 				field: 'heading',
 				before: 'Findings',
 				after: 'Results',

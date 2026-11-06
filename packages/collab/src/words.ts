@@ -60,18 +60,29 @@ export function wordSplices(
 	const kb = tb.map(([s, e]) => keyB(s, e));
 	const startA = (k: number) => (k < ta.length ? ta[k][0] : a1);
 	const startB = (k: number) => (k < tb.length ? tb[k][0] : b1);
-	const out: Splice[] = [];
+	return leftmost(ka, kb).map(({ from, to, at, end }) => ({
+		at: startA(from),
+		end: startA(to),
+		from: startB(at),
+		to: startB(end)
+	}));
+}
+
+/** The runs `a` and `b` differ in, an insertion alone moved as far left as the text allows: one
+ *  change finds one place, however the longest common subsequence happened to align it. */
+function leftmost(a: readonly string[], b: readonly string[]): Run[] {
+	const out: Run[] = [];
 	let floor = 0;
-	for (const r of changedRuns(ka, kb)) {
+	for (const r of changedRuns(a, b)) {
 		let { from, to, at, end } = r;
 		if (from === to)
-			while (from > floor && at > 0 && ka[from - 1] === kb[end - 1]) {
+			while (from > floor && at > 0 && a[from - 1] === b[end - 1]) {
 				from--;
 				to--;
 				at--;
 				end--;
 			}
-		out.push({ at: startA(from), end: startA(to), from: startB(at), to: startB(end) });
+		out.push({ from, to, at, end });
 		floor = r.to;
 	}
 	return out;
@@ -121,17 +132,36 @@ function marksAt(field: YField, i: number): Record<string, unknown> {
 	return out;
 }
 
+/** A run of tokens two states of one root differ in. An insertion alone can sit at any gap
+ *  from `from` to `hi` where the tokens around it repeat, so its place is that whole range. */
+export interface TokenRun extends Run {
+	hi: number;
+}
+
 /** The runs of tokens two states of one root differ in, by the tokens of the first. */
-export function tokenRuns(before: Tokens, after: Tokens): Run[] {
-	return changedRuns(before.keys, after.keys);
+export function tokenRuns(before: Tokens, after: Tokens): TokenRun[] {
+	const [a, b] = [before.keys, after.keys];
+	const runs = leftmost(a, b);
+	return runs.map((r, k) => {
+		if (r.from !== r.to) return { ...r, hi: r.from };
+		const ceiling = k + 1 < runs.length ? runs[k + 1].from : a.length;
+		let { from: hi, at, end } = r;
+		while (hi < ceiling && end < b.length && b[at] === b[end]) {
+			hi++;
+			at++;
+			end++;
+		}
+		return { ...r, hi };
+	});
 }
 
 /** Whether two runs of one base's tokens meet: they share a token, or one inserts at a place the
  *  other touches, its edges included, since two inserts beside one deleted word interleave. */
-export function wordsMeet(x: Run, y: Run): boolean {
+export function wordsMeet(x: TokenRun, y: TokenRun): boolean {
 	if (Math.max(x.from, y.from) < Math.min(x.to, y.to)) return true;
-	if (x.from === x.to) return y.from <= x.from && x.from <= y.to;
-	if (y.from === y.to) return x.from <= y.from && y.from <= x.to;
+	if (x.from === x.to && y.from === y.to) return x.from <= y.hi && y.from <= x.hi;
+	if (x.from === x.to) return x.from <= y.to && y.from <= x.hi;
+	if (y.from === y.to) return y.from <= x.to && x.from <= y.hi;
 	return false;
 }
 
@@ -139,7 +169,7 @@ export function wordsMeet(x: Run, y: Run): boolean {
 export function blocksOf(run: Run, tokens: Tokens): [number, number] {
 	const last = tokens.block.length - 1;
 	if (run.from === run.to) {
-		const b = tokens.block[Math.min(run.from, last)];
+		const b = tokens.block[Math.min(Math.max(run.from - 1, 0), last)];
 		return [b, b];
 	}
 	return [tokens.block[run.from], tokens.block[run.to - 1]];

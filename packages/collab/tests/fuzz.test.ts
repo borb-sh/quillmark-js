@@ -329,7 +329,11 @@ function staleEdit(r: Rng, q: Quill, p: Peer, base: Uint8Array): boolean {
 	});
 	Y.applyUpdate(p.ydoc, update, 'writer');
 	for (const part of held) {
-		if (r.next() < 0.5 || heldState(part, p.ydoc).state === 'gone') continue;
+		if (
+			r.next() < 0.5 ||
+			heldState(part, { history: p.ydoc, quill: q, doc: p.doc }).state === 'gone'
+		)
+			continue;
 		const written = writeHeld(part, { history: p.ydoc, quill: q, doc: p.doc });
 		Y.applyUpdate(p.ydoc, written.update, 'writer');
 	}

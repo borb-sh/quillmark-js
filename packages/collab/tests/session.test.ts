@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Content, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
 import {
+	heldState,
 	joinSession,
 	localLog,
 	QuillMismatch,
@@ -12,7 +13,9 @@ import {
 	restoreVersion,
 	saveVersion,
 	writeFrom,
+	writeHeld,
 	writeLog,
+	type Held,
 	type Revision,
 	type Session,
 	type SessionLog
@@ -380,6 +383,39 @@ describe('writes from a revision', () => {
 		expect(abstract(a)).toBe('Rewritten.');
 		expect(text(a).startsWith('Typed. ')).toBe(true);
 		expect((await log.load())?.stored).toBe(a.doc.toStored());
+	});
+
+	it('holds through the log what meets a change, for a tab to write on request', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		const log = logOf(origin);
+		const q = quill();
+		const read = await readLog({ log, quill: q });
+		const body = q.toAuthoring(read.doc).body!;
+		read.doc.free();
+		type(a, 'Typed. ');
+		await settle();
+		const written = await writeLog({
+			log,
+			quill: q,
+			base: read.revision,
+			author: 'ai:1',
+			hold: 'hunk',
+			edit: (doc) => {
+				rewrite(doc, 'Rewritten.');
+				q.writer(doc).revise({}, `Drafted. ${body}`);
+			}
+		});
+		expect(written).toMatchObject({ status: 'written', held: [{ type: 'text', from: 'main' }] });
+		await settle();
+		expect(abstract(a)).toBe('Rewritten.');
+		expect(text(a).startsWith('Typed. ')).toBe(true);
+		const [part] = JSON.parse(JSON.stringify((written as { held: Held[] }).held)) as Held[];
+		const opts = { history: a.ydoc, quill: q, doc: a.doc };
+		expect(heldState(part, opts).state).toBe('open');
+		a.apply(writeHeld(part, opts).update, 'ai:1');
+		expect(text(a).startsWith('Drafted. ')).toBe(true);
+		expect(heldState(part, opts).state).toBe('matched');
 	});
 
 	it('reads what changed since a revision, as hunks', async () => {
