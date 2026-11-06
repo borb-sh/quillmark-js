@@ -49,8 +49,8 @@
 
  An empty list of lines (any element but an `object`) draws a standing row to type
  into, so a list's first line takes no press of the add chip first. The row is not an
- element and draws as one that is not there yet: a dashed edge round no fill, a ghost
- saying to type, no remove. Nothing commits until it holds something, so the field
+ element and draws as one that is not there yet: a row's own box, ghosted and empty,
+ with no remove. Nothing commits until it holds something, so the field
  stays where it was, absent or `[]`, and Enter and Backspace have nothing to act on.
  Its first non-empty edit or paste commits it as the list's first element, keeping its
  id, so the caret stays in the leaf it is typing into.
@@ -785,7 +785,6 @@
 							plaintext={items != null && literalText(items)}
 							cap={textCap(items)}
 							label={rowName(k)}
-							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onChange={(rt) => commitElement(k, rt)}
 							lines={{
 								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
@@ -798,7 +797,6 @@
 							bind:this={els[id]}
 							value={String(arr[k] ?? '')}
 							label={rowName(k)}
-							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onCommit={(v) => commitElement(k, v)}
 							onKey={(e) => onElementKey(e, k)}
 						/>
@@ -899,12 +897,14 @@
 	.qm-array-rows[data-default] .qm-element-title:not(.untitled) {
 		color: var(--_qm-ink-default);
 	}
-	/* A row that is not an element yet: the box's edge dashed round no fill, the
-	   placeholder idiom, until its first keystroke makes it one. */
+	/* A row that is not an element yet: the box a row draws, at the muted rung until it
+	   holds the caret, and its first keystroke makes it one. */
 	.qm-array-row.standing > :global(:is(.qm-input, .qm-control-box)) {
-		background: transparent;
-		outline: var(--_qm-border-width) dashed var(--_qm-border);
-		outline-offset: calc(-1 * var(--_qm-border-width));
+		opacity: var(--_qm-opacity-muted);
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-array-row.standing:focus-within > :global(:is(.qm-input, .qm-control-box)) {
+		opacity: 1;
 	}
 	.qm-array-rows[data-default] :global(.qm-toggle[data-state='checked']) {
 		background: var(--_qm-accent-default);

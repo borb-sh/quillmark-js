@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**An empty list of lines draws a row to type into.** An array whose elements are not `object`s, holding none, draws one standing row with a dashed edge, no fill and a `Type to add` ghost (`strings.arrayStanding`), so its first line takes no press of `+ Add`. The row is no element: Enter and Backspace in it do nothing and nothing is written until it holds something, so the field stays absent or `[]`. Its first edit commits it as the first element, and the caret stays where it is.
+**An empty list of lines draws a row to type into.** An array whose elements are not `object`s, holding none, draws one standing row, a row's own box ghosted at the muted rung and empty, so its first line takes no press of `+ Add`. The row is no element: Enter and Backspace in it do nothing and nothing is written until it holds something, so the field stays absent or `[]`. Its first edit commits it as the first element, and the caret stays where it is.
 
 **A comment anchor survives delete and undo.** An anchor whose text a deletion swallowed came back without its anchor on undo, since anchors live beside ProseMirror's history rather than in it. The leaf now holds the anchor as a ghost of the deletion and puts it back at its range when an undo restores the deleted slice whole.
 
