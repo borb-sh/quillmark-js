@@ -6,8 +6,14 @@
 // `U+FFFC` island slot. `ContentHit.pos` / `FieldRegion.span` reach a PM caret through
 // `offsetToPM`; a caret signal to the preview runs `pmToOffset` in reverse.
 import type { Node as PMNode } from 'prosemirror-model';
-import type { Delta } from '@quillmark/wasm';
 import { scanDoc, type PosRun, type Scan } from './encode.js';
+
+/** A text change as one pass over the text before, offsets in UTF-16 code units: what a host
+ *  hands `applyExternal` for a field another writer changed, such as `@quillmark/collab`'s
+ *  `RemoteChange` delta. */
+export interface Delta {
+	ops: ({ retain: number } | { insert: string } | { delete: number })[];
+}
 
 /** A prebuilt position index for a PM doc, rebuilt on structural change. */
 export interface LineIndex {

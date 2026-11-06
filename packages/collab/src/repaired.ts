@@ -68,7 +68,7 @@ export function unrepaired(raw: YField, repaired: Content, next: Content): Conte
 		named.add(id);
 		containers.push({ ...(record as object), id } as ContentContainer);
 	}
-	return contentOf(out, containers);
+	return { ...contentOf(out, containers), ...(next.codec ? { codec: next.codec } : {}) };
 }
 
 function linesOf(content: Content): Line[] {

@@ -30,7 +30,6 @@ import type {
 	DocumentWriter,
 	Content,
 	Addr,
-	Delta,
 	Quill
 } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
@@ -43,11 +42,12 @@ import {
 	buildLineIndex,
 	lineIndexOf,
 	mapThroughDelta,
+	type Delta,
 	type LineIndex
 } from './positions.js';
 import { lower, pmToContent, scanContent, scanDoc } from './encode.js';
 import { capPlugin, type TextCap } from './cap.js';
-import { HARD_BREAK, islandPastePlugin } from './islands.js';
+import { islandPastePlugin } from './islands.js';
 import { anchorsFromContent, type AnchorPos } from './marks.js';
 import { contentEqual, createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
@@ -444,6 +444,12 @@ export function heldAttributes(
 	};
 }
 
+/** A plain leaf's value as the literal text its `text` field takes: a paragraph break a blank
+ *  line and a hard break a lone `\n`, as the engine spells a `codec: "plain"` value. */
+function literalOf(rt: Content): string {
+	return core().exportMarkdown({ ...rt, codec: 'plain' }) as string;
+}
+
 export function createField(opts: CreateFieldOpts): FieldController {
 	const { doc, addr, container } = opts;
 	const inline = !!opts.inline;
@@ -596,7 +602,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		const at = writeAddr(doc, addr);
 		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
 			return commitUnset();
-		if (plaintext) return commitPlain(newRt.text.replaceAll(HARD_BREAK, '\n'));
+		if (plaintext) return commitPlain(literalOf(newRt));
 		try {
 			// Only a field not yet at content rest replaces by choice: neither an absent declared
 			// field nor an authored string has anchors to lose (`changeCommittable`).
@@ -904,25 +910,39 @@ export function proseLeafPlugins(
 }
 
 /**
- * A plain leaf's clipboard text is literal, one line per `\n` both ways; upstream's defaults split
- * pasted text on any run of newlines and write a copy's blocks joined by a blank line.
+ * A plain leaf's clipboard text is literal both ways, spelled as the engine spells a `text` value:
+ * a lone `\n` a hard break, a blank line a paragraph boundary, and a run of `\n` its pairs as
+ * paragraph boundaries, an odd one over a hard break before them. Upstream's defaults split pasted
+ * text on any run of newlines and write a copy's breaks as nothing.
  */
 function plainClipboardPlugin(): Plugin {
-	const { paragraph } = plainSchema.nodes;
+	const { paragraph, hard_break } = plainSchema.nodes;
+	const line = (text: string) =>
+		paragraph.create(
+			null,
+			text
+				.split('\n')
+				.flatMap((part, i) => [
+					...(i ? [hard_break.create()] : []),
+					...(part ? [plainSchema.text(part)] : [])
+				])
+		);
 	return new Plugin({
 		props: {
-			clipboardTextParser: (text) =>
-				new Slice(
-					Fragment.from(
-						text
-							.split(/\r\n?|\n/)
-							.map((line) => paragraph.create(null, line ? plainSchema.text(line) : null))
-					),
-					1,
-					1
-				),
+			clipboardTextParser: (text) => {
+				const paragraphs: string[] = [''];
+				for (const piece of text.replace(/\r\n?/g, '\n').split(/(\n+)/)) {
+					if (!piece.startsWith('\n')) {
+						paragraphs[paragraphs.length - 1] += piece;
+						continue;
+					}
+					if (piece.length % 2) paragraphs[paragraphs.length - 1] += '\n';
+					for (let k = 0; k < piece.length >> 1; k++) paragraphs.push('');
+				}
+				return new Slice(Fragment.from(paragraphs.map(line)), 1, 1);
+			},
 			clipboardTextSerializer: (slice) =>
-				slice.content.textBetween(0, slice.content.size, '\n', '\n')
+				slice.content.textBetween(0, slice.content.size, '\n\n', '\n')
 		}
 	});
 }

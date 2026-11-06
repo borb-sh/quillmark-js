@@ -12,6 +12,7 @@ import * as Y from 'yjs';
 import type { Content, ContentIsland } from '@quillmark/wasm';
 import {
 	BLOCK_ID,
+	CODEC,
 	LINE_KEYS,
 	MARK_KEYS,
 	SLOT,
@@ -199,6 +200,10 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 		if ((meta.get(key) ?? null) === v) continue;
 		if (v === null) meta.delete(key);
 		else meta.set(key, v);
+	}
+	if ((meta.get(CODEC) ?? null) !== (next.codec ?? null)) {
+		if (next.codec) meta.set(CODEC, next.codec);
+		else meta.delete(CODEC);
 	}
 	return renamed;
 }

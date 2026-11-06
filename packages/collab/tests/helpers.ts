@@ -4,10 +4,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as Y from 'yjs';
-import { init, type Addr, type Delta, type Document, type Quill, type Step } from '@quillmark/wasm';
+import { init, type Addr, type Document, type Quill, type Step } from '@quillmark/wasm';
 import {
 	bindDocument,
 	seedDocument,
+	type Delta,
 	type DocumentBinding,
 	type RemoteChange
 } from '../src/index.js';
@@ -103,9 +104,10 @@ export function settle(all: Peer[]): void {
 		for (const p of all) deliver(p);
 }
 
-/** The Document as a comparable value: its cards in order, each card's fields by name. */
+/** The Document as a comparable value: its cards in order, each card's `$id` and fields by name. */
 export function snapshot(doc: Document): string {
 	const card = (c: ReturnType<Document['card']>) => ({
+		id: c.id,
 		kind: c.kind,
 		title: (c.ext?.editor as { title?: string } | undefined)?.title,
 		fields: Object.fromEntries(

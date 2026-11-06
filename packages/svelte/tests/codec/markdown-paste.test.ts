@@ -203,7 +203,7 @@ main:
     line:
       type: text
 `);
-	const load = (): Document => core.Document.fromMarkdown('~~~\n$quill: paste_probe@0.1.0\n~~~\n');
+	const load = (): Document => core.Document.parse('~~~\n$quill: paste_probe@0.1.0\n~~~\n');
 	const LIST = '- Purpose\n- Action';
 
 	function pasteInto(

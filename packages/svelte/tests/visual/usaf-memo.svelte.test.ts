@@ -15,7 +15,7 @@
 // writer, as an array's prose row asserts them (`text-array`).
 import { describe, it, expect, afterEach } from 'vitest';
 import { fieldModels, groupLabel, groupOrder } from '$lib/visual/structure';
-import { quill } from '../helpers/fixtures.js';
+import { quill, literal } from '../helpers/fixtures.js';
 import { field, mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -128,7 +128,7 @@ describe('the shipped quill on the surface', () => {
 		]);
 		// Every cell rests as its literal string, which is what a `text` cell's
 		// codec commits: the banner reads them as text and the storage says so.
-		expect(doc.getStored('classification')).toEqual({
+		expect(literal(doc.getStored('classification'))).toEqual({
 			value: 'CUI',
 			controlled_by: 'SAF/AA',
 			poc: 'Capt J. Smith, DSN 555-1234',

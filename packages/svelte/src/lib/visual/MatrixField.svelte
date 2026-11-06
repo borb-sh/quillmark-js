@@ -36,6 +36,7 @@
 		MATRIX_TITLE,
 		addedId,
 		addedItems,
+		titleText,
 		baseType,
 		commitMember,
 		declaredContent,
@@ -185,7 +186,7 @@
 	}
 	function itemTitle(id: string): string {
 		const stored = own(map, id) as Record<string, unknown> | undefined;
-		return String(stored?.[MATRIX_TITLE] ?? '');
+		return titleText(stored?.[MATRIX_TITLE]);
 	}
 	function retitle(id: string, title: string): void {
 		commit(commitMember(map, id, memberWrite(matrixColumns(own(map, id)), title)));

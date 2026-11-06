@@ -162,10 +162,12 @@ describe('one-line / plain constraints', () => {
 			text,
 			blocks: text.split('\n').map((_, i) => ({ id: `b${i}`, kind: 'para' }))
 		});
+		expect(fitsInline(plain('one line\u2028'))).toBe(true);
 		expect(fitsInline(plain('one line\n'))).toBe(true);
+		expect(fitsInline(plain('one\u2028two'))).toBe(false);
+		expect(fitsInline(plain('one\u2028\u2028'))).toBe(false);
 		expect(fitsInline(plain('one\ntwo'))).toBe(false);
 		expect(fitsInline(plain('one\ntwo\n'))).toBe(false);
-		expect(fitsInline(plain('one\u2028'))).toBe(false);
 	});
 
 	it('inline schema decodes to exactly one paragraph', () => {
@@ -191,24 +193,26 @@ describe('one-line / plain constraints', () => {
 		expect(doc.child(0).textContent).toBe('plain bold em');
 	});
 
-	// What upstream's literal codec reads out of a string: a lone `\n` between two
-	// written lines is a hard break, and every other `\n` opens a paragraph.
+	// What upstream's plain codec reads out of a string: a lone `\n` is a hard break, and a
+	// blank line opens a paragraph.
 	it.each([
 		['a lone newline', 'a\nb', 'doc(paragraph("a", hard_break, "b"))'],
-		['a blank line', 'a\n\nb', 'doc(paragraph("a"), paragraph, paragraph("b"))'],
-		['a trailing newline', 'a\n', 'doc(paragraph("a"), paragraph)'],
-		['a leading newline', '\na', 'doc(paragraph, paragraph("a"))'],
+		['a blank line', 'a\n\nb', 'doc(paragraph("a"), paragraph("b"))'],
+		['a trailing newline', 'a\n', 'doc(paragraph("a", hard_break))'],
+		['a leading newline', '\na', 'doc(paragraph(hard_break, "a"))'],
 		['trailing spaces', 'a  \nb  ', 'doc(paragraph("a  ", hard_break, "b  "))']
 	])('the plain schema holds %s, and projects back to the same lines', (_, value, shape) => {
 		const doc = quill().seedDocument();
-		doc.storeField('errata', [value]);
+		doc.unchecked.storeField('errata', [value]);
 		const rt = quill().reader(doc).getContentAt('errata', [0])!;
 		doc.free();
 
 		const pm = decode(rt, plainSchema);
 		expect(pm.toString()).toBe(shape);
 		expect(pmToContent(pm).text).toBe(rt.text);
-		expect(contentEqual(normalize(pmToContent(pm)), normalize(rt))).toBe(true);
+		expect(contentEqual(normalize({ ...pmToContent(pm), codec: rt.codec }), normalize(rt))).toBe(
+			true
+		);
 	});
 
 	it('fitsPlain asks upstream whether the lines are plain, marks set aside', () => {

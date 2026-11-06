@@ -18,7 +18,7 @@ afterEach(unmountAll);
 /** A seeded document with one card the schema cannot project, last in the stack. */
 function withForeignCard(q: Quill): Document {
 	const doc = q.seedDocument();
-	doc.insertCard({
+	doc.unchecked.insertCard({
 		kind: 'legacy_kind',
 		payloadItems: [{ type: 'field', key: 'label', value: 'Held' }],
 		body: 'Trapped legacy body.'

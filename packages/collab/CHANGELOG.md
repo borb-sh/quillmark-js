@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. `Delta` is this package's own, exported beside `RemoteChange`, and `onRemote`'s delta for a revised field is the text change the Document's `replace` answers in its receipt, so a caret maps through exactly what the write did, a repair's insertion included. A `text` field's plain codec rides Y as `qm:codec` in its root's `#block0` record, so it lands on every client as plain content. A card's `$id` rides Y on its card map: the first valid claim in `$cards` order holds it, a card with none takes its Y name, and the resolved id is written back, so two cards placed at once take one id each, the same on every client. A Y state an earlier version wrote carries no `$id`, and its cards take their Y names.
+
 **The writer keeps a block's `\n` with its block, and places a lone insertion where it was typed.** A line is kept only where its text and the id of the block its `\n` opens both match, and a `\n` matches only the `\n` of the same block, so Enter at the start of a block another client re-kinds leaves that kind on the text rather than on the new empty block. An insertion with no deletion is written as far left as the text allows, so "the big " typed before "the cat" while another client deletes "the cat" converges to `"see the big "` and not `"see big the "`.
 
 **A field's Y form follows its value, not the card's kind.** A content value stays in its root under `@f` through a retype to a kind that does not declare `f`, so an edit to that root racing the retype lands on every client instead of being dropped with the root (fuzz seed 249). The fuzz now asserts that every content root Y holds equals the Document's value for it.

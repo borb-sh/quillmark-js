@@ -76,3 +76,15 @@ export function quillFromYaml(yaml: string): Quill {
 		])
 	);
 }
+
+/**
+ * A stored value with each `text` field's content, a `codec: "plain"` value at any depth, read as
+ * the literal text it spells: what a test asserts a plain field rests as.
+ */
+export function literal(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(literal);
+	if (!value || typeof value !== 'object') return value;
+	if ((value as { codec?: unknown }).codec === 'plain')
+		return core.exportMarkdown(value as Parameters<typeof core.exportMarkdown>[0]);
+	return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, literal(v)]));
+}

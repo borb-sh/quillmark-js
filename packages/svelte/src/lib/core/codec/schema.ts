@@ -313,13 +313,13 @@ export const cellSchema = new Schema({
 
 /**
  * A `text` field declaring `multiline: true`: paragraphs and hard breaks, no marks, islands or
- * containers, the shape `Content::is_plain` admits. A paragraph and a break both store one `\n`, so
- * a paragraph here is a line (`data-qm-line`): `prose.css` draws a run of them at the leading.
+ * containers, the shape `Content::is_plain` admits. Its literal text spells a break as a `\n` and a
+ * paragraph boundary as a blank line.
  */
 export const plainSchema = new Schema({
 	nodes: {
 		doc: { content: 'paragraph+' },
-		paragraph: { ...blockNodes.paragraph, toDOM: () => ['p', { 'data-qm-line': '' }, 0] },
+		paragraph: blockNodes.paragraph,
 		text: inlineLeafNodes.text,
 		hard_break: inlineLeafNodes.hard_break
 	},

@@ -14,7 +14,7 @@ import type { Content, Document } from '@quillmark/wasm';
 import { createField, hasMarks } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import { TextSelection } from 'prosemirror-state';
-import { core, mount, probeQuill, viewOf } from './_util.js';
+import { core, mount, probeQuill, viewOf, literal } from './_util.js';
 
 const QUILL_YAML = `
 quill:
@@ -41,7 +41,7 @@ const AUTHORED = 'Wing *Motto* Here';
  *  neither is conformed. Hand-written rather than round-tripped, because a serialize
  *  would escape the asterisks and the contrast is what escaping erases. */
 const authored = (): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: codec_probe@0.1.0',
@@ -96,12 +96,12 @@ describe('a `text` leaf over an authored string', () => {
 		expect(field.getContent().text).toBe(`!${AUTHORED}`);
 		expect(q.reader(doc).getContent('note')!.text).toBe(`!${AUTHORED}`);
 		// The literal string, asterisks unescaped: the rest form `toMarkdown` round-trips.
-		expect(doc.getStored('note')).toBe(`!${AUTHORED}`);
+		expect(literal(doc.getStored('note'))).toBe(`!${AUTHORED}`);
 
 		// And the next edit over that rest form is still literal.
 		view.dispatch(view.state.tr.insertText('?', 2));
 		expect(errors).toEqual([]);
-		expect(doc.getStored('note')).toBe(`!?${AUTHORED}`);
+		expect(literal(doc.getStored('note'))).toBe(`!?${AUTHORED}`);
 
 		field.destroy();
 		doc.free();
@@ -180,7 +180,7 @@ describe('a `text` leaf carries no marks', () => {
 
 		view.dispatch(view.state.tr.insertText('!', 1));
 		expect(codes).toEqual([]);
-		expect(doc.getStored('note')).toBe(`!${AUTHORED}`);
+		expect(literal(doc.getStored('note'))).toBe(`!${AUTHORED}`);
 		expect(field.getContent().marks ?? []).toHaveLength(0);
 
 		field.destroy();

@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Content, Document } from '@quillmark/wasm';
-import { core, quillFromYaml } from '../helpers/fixtures.js';
+import { core, quillFromYaml, literal } from '../helpers/fixtures.js';
 import {
 	field,
 	heldNote,
@@ -59,7 +59,7 @@ main:
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: block_cell@1.0.0',
@@ -129,18 +129,21 @@ describe('a multiline text cell on a record row', () => {
 		const leaf = cell.querySelector<HTMLElement>('.ProseMirror')!;
 		expect(leaf.getAttribute('contenteditable')).toBe('true');
 		expect(heldNote(leaf)).toBeNull();
-		expect(leaf.querySelector('p')?.innerHTML).toBe('12 Main St<br>Springfield');
+		// The `|` scalar's trailing newline is a hard break, drawn as the empty line it opens.
+		expect(leaf.querySelector('p')?.innerHTML).toBe(
+			'12 Main St<br>Springfield<br><br class="ProseMirror-trailingBreak">'
+		);
 
 		paste(leaf, 'Apt 4, ');
 		expect(mounted.changes.at(-1)?.path).toBe('main.jobs');
-		const address = (doc.getStored('jobs') as Array<{ address: string }>)[0].address;
+		const address = literal((doc.getStored('jobs') as Array<{ address: unknown }>)[0].address);
 		expect(address).toBe('Apt 4, 12 Main St\nSpringfield\n');
 	});
 
 	it('holds one over lines upstream does not call plain, and commits nothing', () => {
 		const q = probe();
 		const doc = load();
-		doc.storeField('jobs', [
+		doc.unchecked.storeField('jobs', [
 			{ title: 'Archives', address: core.importMarkdown('- one\n- two').content }
 		]);
 		const before = JSON.stringify(doc.getStored('jobs'));
@@ -202,6 +205,6 @@ describe('a narrowed leaf over structure it cannot hold', () => {
 		expect(leaf.querySelectorAll('p')).toHaveLength(1);
 		paste(leaf, 'new ');
 		expect(mounted.changes.at(-1)?.path).toBe('main.tags');
-		expect(String((doc.getStored('tags') as unknown[])[0])).toContain('new plain block scalar');
+		expect(literal((doc.getStored('tags') as unknown[])[0])).toContain('new plain block scalar');
 	});
 });

@@ -252,11 +252,11 @@ describe('sessions', () => {
 		const origin = new Origin();
 		const a = await open(origin).join();
 		const card = quill().seedCard('note', a.doc.seedOverlay('note'))!;
-		a.doc.insertCard(card, 0);
+		a.doc.unchecked.insertCard(card, 0);
 		a.push({ op: 'insert', at: 0 });
 		const was = a.doc.card(1);
 		a.doc.removeCard(1);
-		a.doc.insertCard({ ...was, kind: 'note' }, 1);
+		a.doc.unchecked.insertCard({ ...was, kind: 'note' }, 1);
 		a.push();
 		await settle();
 		const b = await open(origin).join();
@@ -310,7 +310,7 @@ describe('sessions', () => {
 describe('writes from a revision', () => {
 	const abstract = (s: Session) => quill().toAuthoring(s.doc).fields?.abstract;
 	const rewrite = (doc: Document, words: string) =>
-		void quill().writer(doc).reviseField('abstract', words);
+		void quill().writer(doc).revise('abstract', words);
 	const logOf = (origin: Origin) => localLog({ room: 'r', ...origin.tab() });
 	const write = (log: SessionLog, base: Revision, words: string, extra: { key?: string } = {}) =>
 		writeLog({

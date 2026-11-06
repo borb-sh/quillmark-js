@@ -1373,7 +1373,7 @@ describe('alignment is set on the held column', () => {
 		toggle(field, 0, 'center').click();
 		grips(field, 'column')[1].click();
 		press(caret(field), 'ArrowLeft', { shiftKey: true });
-		const out = core.exportMarkdown(field.getContent());
+		const out = core.exportMarkdown(field.getContent()) as string;
 		expect(out).toContain('| :---: | :--- |');
 		const back = md(out);
 		expect(propsOf(back).aligns).toEqual(['center', 'left']);

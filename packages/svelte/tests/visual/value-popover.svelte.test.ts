@@ -92,7 +92,7 @@ main:
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (notes: string[] = ['First note', 'Second note']): Document => {
-	const doc = core.Document.fromMarkdown(
+	const doc = core.Document.parse(
 		[
 			'~~~',
 			'$quill: value_popover@1.0.0',
@@ -112,7 +112,7 @@ const load = (notes: string[] = ['First note', 'Second note']): Document => {
 			''
 		].join('\n')
 	);
-	doc.storeField('notes', notes);
+	doc.unchecked.storeField('notes', notes);
 	return doc;
 };
 const LIST = '- one\n- two';
@@ -405,7 +405,7 @@ describe('the formatting popover over a field’s own leaf', () => {
 
 	it('rises over a select-all in a table cell', async () => {
 		const q = probe();
-		const doc = core.Document.fromMarkdown(
+		const doc = core.Document.parse(
 			[
 				'~~~',
 				'$quill: value_popover@1.0.0',
@@ -521,7 +521,7 @@ describe('Mod-K raises the link prompt', () => {
 
 	it('in a table cell, writing the link into the cell', async () => {
 		const q = probe();
-		const doc = core.Document.fromMarkdown(
+		const doc = core.Document.parse(
 			[
 				'~~~',
 				'$quill: value_popover@1.0.0',

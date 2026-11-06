@@ -73,19 +73,17 @@ export function decode(rt: Content, schema: Schema): PMNode {
 
 /**
  * Whether `rt` decodes under an inline schema with nothing but whitespace dropped: upstream's
- * one-line rule, or one plain line and the empty one a trailing `\n` opens (the one a YAML `|`
- * scalar keeps in a `text` value). Marks are the schema's business.
+ * one-line rule, or one plain line and the break a trailing `\n` spells (the one a YAML `|`
+ * scalar keeps in a `text` value), or the empty line a trailing blank line opens. Marks are the
+ * schema's business.
  */
 export function fitsInline(rt: Content): boolean {
 	if (core().isInline(rt)) return true;
 	const plain = (b: ContentBlock): boolean => b.kind === 'para' && !b.path?.length;
-	return (
-		!rt.islands?.length &&
-		rt.blocks.length === 2 &&
-		rt.blocks.every(plain) &&
-		rt.text.endsWith('\n') &&
-		!rt.text.includes(HARD_BREAK)
-	);
+	if (rt.islands?.length || !rt.blocks.every(plain)) return false;
+	const breaks = rt.text.split(HARD_BREAK).length - 1;
+	if (rt.blocks.length === 1) return breaks === 1 && rt.text.endsWith(HARD_BREAK);
+	return rt.blocks.length === 2 && rt.text.endsWith('\n') && breaks === 0;
 }
 
 /**
@@ -121,12 +119,15 @@ function decodeInline(
 	marks: ContentMark[],
 	cursor: IslandCursor
 ): PMNode {
-	// An inline field is single-line: stray blocks and breaks join with a space. The empty block a
-	// trailing `\n` opens is dropped, so a first edit stores no space nobody typed. Islands are not
-	// representable inline: the slot char is dropped and its entry skipped.
+	// An inline field is single-line: stray blocks and breaks join with a space. The break a
+	// trailing `\n` spells, and the empty block a trailing blank line opens, are dropped, so a first
+	// edit stores no space nobody typed. Islands are not representable inline: the slot char is
+	// dropped and its entry skipped.
 	const inline: PMNode[] = [];
 	const last = segments.length - 1;
-	segments.forEach((seg, i) => {
+	segments.forEach((at, i) => {
+		const seg =
+			i === last && at.text.endsWith(HARD_BREAK) ? { ...at, text: at.text.slice(0, -1) } : at;
 		if (i > 0 && i === last && seg.text === '') return;
 		if (i > 0) inline.push(schema.text(' '));
 		inline.push(...buildInline(schema, seg, marks, cursor, 'inline'));

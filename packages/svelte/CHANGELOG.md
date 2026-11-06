@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. `Delta`, the text change `applyExternal` and `onCaretMove` map through, is declared by `@quillmark/svelte/core`, since the core no longer exports one. A `text` leaf commits its field as the engine's plain codec spells it: Enter opens a paragraph, stored as a blank line, and Shift-Enter opens a line, stored as `\n`; its paragraphs draw at a richtext leaf's block rhythm, and a trailing newline draws as the empty line it opens. A copy out of it writes a paragraph break as a blank line, and a paste reads one back. A matrix's added item reads its `title` off the plain content it rests as. A card add or retype places the card through `doc.unchecked.insertCard`.
+
 **An empty list of lines draws a row to type into.** An array whose elements are not `object`s, holding none, draws one standing row, a row's own box ghosted at the muted rung and empty, so its first line takes no press of `+ Add`. The row is no element: Enter and Backspace in it do nothing and nothing is written until it holds something, so the field stays absent or `[]`. Its first edit commits it as the first element, and the caret stays where it is.
 
 **A comment anchor survives delete and undo.** An anchor whose text a deletion swallowed came back without its anchor on undo, since anchors live beside ProseMirror's history rather than in it. The leaf now holds the anchor as a ghost of the deletion and puts it back at its range when an undo restores the deleted slice whole.

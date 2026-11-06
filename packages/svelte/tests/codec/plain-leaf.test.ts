@@ -12,7 +12,7 @@ import { Slice } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import { Selection, TextSelection } from 'prosemirror-state';
 import { createField } from '$lib/core/codec';
-import { core, md, mount, press, probeQuill, viewOf } from './_util.js';
+import { core, md, mount, press, probeQuill, viewOf, literal } from './_util.js';
 
 const QUILL_YAML = `
 quill:
@@ -35,7 +35,7 @@ main:
 
 const q = probeQuill(QUILL_YAML);
 const load = (): Document =>
-	core.Document.fromMarkdown(
+	core.Document.parse(
 		[
 			'~~~',
 			'$quill: plain_probe@0.1.0',
@@ -67,7 +67,7 @@ const caretAtEnd = (view: EditorView): void =>
 /** The field as a saved document reads it back: `toMarkdown`, a fresh parse, and the
  *  schema-bound read. */
 function saved(doc: Document, field: string): unknown {
-	const back = core.Document.fromMarkdown(doc.toMarkdown());
+	const back = core.Document.parse(doc.toMarkdown());
 	const value = q.reader(back).get(field);
 	back.free();
 	return value;
@@ -95,7 +95,7 @@ describe('a text field declaring `multiline: true`', () => {
 		view.dispatch(view.state.tr.insertText('Apt 4, ', 1));
 
 		expect(errors).toEqual([]);
-		expect(doc.getStored('address')).toBe('Apt 4, 12 Main St\nSpringfield');
+		expect(literal(doc.getStored('address'))).toBe('Apt 4, 12 Main St\nSpringfield');
 		expect(saved(doc, 'address')).toBe('Apt 4, 12 Main St\nSpringfield');
 		f.destroy();
 		doc.free();
@@ -116,13 +116,13 @@ describe('a text field declaring `multiline: true`', () => {
 		const { f, view } = leaf(doc, 'address');
 		view.dispatch(view.state.tr.insertText('!', 1));
 
-		expect(doc.getStored('address')).toBe(`!${value}`);
+		expect(literal(doc.getStored('address'))).toBe(`!${value}`);
 		expect(saved(doc, 'address')).toBe(`!${value}`);
 		f.destroy();
 		doc.free();
 	});
 
-	it('opens a line on Enter and on Shift-Enter, each one stored `\\n`', () => {
+	it('opens a paragraph on Enter, stored as a blank line, and a line on Shift-Enter, stored `\\n`', () => {
 		const doc = load();
 		const { f, view } = leaf(doc, 'address');
 		caretAtEnd(view);
@@ -134,10 +134,7 @@ describe('a text field declaring `multiline: true`', () => {
 		expect(view.state.doc.toString()).toBe(
 			'doc(paragraph("12 Main St", hard_break, "Springfield"), paragraph("IL", hard_break, "USA"))'
 		);
-		expect(saved(doc, 'address')).toBe('12 Main St\nSpringfield\nIL\nUSA');
-		// A paragraph is a line: the stylesheet's rhythm between blocks answers to
-		// `data-qm-line`, so a boundary draws the one line down a break does.
-		expect([...view.dom.children].map((p) => p.hasAttribute('data-qm-line'))).toEqual([true, true]);
+		expect(saved(doc, 'address')).toBe('12 Main St\nSpringfield\n\nIL\nUSA');
 		f.destroy();
 		doc.free();
 	});
@@ -169,7 +166,7 @@ describe('a text field declaring `multiline: true`', () => {
 		);
 		expect(intercepted).toBeFalsy();
 		view.dispatch(view.state.tr.insertText('*'));
-		expect(doc.getStored('address')).toBe('12 Main St\nSpringfield **x**');
+		expect(literal(doc.getStored('address'))).toBe('12 Main St\nSpringfield **x**');
 		f.destroy();
 		doc.free();
 	});
@@ -192,10 +189,10 @@ describe('a one-line text field', () => {
 	// The newline a YAML `|` scalar keeps opens an empty second line, which the leaf
 	// drops rather than joins: a space there is one a click at the end types after.
 	it('holds a `|` scalar’s trailing newline as nothing, and an edit stores no space', () => {
-		const doc = core.Document.fromMarkdown(
+		const doc = core.Document.parse(
 			['~~~', '$quill: plain_probe@0.1.0', 'line: |', '  solo', '~~~', ''].join('\n')
 		);
-		expect(doc.getStored('line')).toBe('solo\n');
+		expect(literal(doc.getStored('line'))).toBe('solo\n');
 		const errors: string[] = [];
 		const { f, view } = leaf(doc, 'line', true, errors);
 
@@ -205,7 +202,7 @@ describe('a one-line text field', () => {
 		view.dispatch(view.state.tr.insertText('!'));
 
 		expect(errors).toEqual([]);
-		expect(doc.getStored('line')).toBe('solo!');
+		expect(literal(doc.getStored('line'))).toBe('solo!');
 		f.destroy();
 		doc.free();
 	});
@@ -222,7 +219,7 @@ describe('a one-line text field', () => {
 		const { f, view } = leaf(doc, 'line', true);
 		view.dispatch(view.state.tr.insertText('!', 1));
 
-		expect(doc.getStored('line')).toBe(`!${stored}`);
+		expect(literal(doc.getStored('line'))).toBe(`!${stored}`);
 		expect(saved(doc, 'line')).toBe(`!${stored}`);
 		f.destroy();
 		doc.free();
@@ -259,7 +256,7 @@ describe('a multiline text field over content `isPlain` refuses', () => {
 			'doc(paragraph("12 Main St", hard_break, "Springfield"))'
 		);
 		view.dispatch(view.state.tr.insertText('Z', 1));
-		expect(doc.getStored('address')).toBe('Z12 Main St\nSpringfield');
+		expect(literal(doc.getStored('address'))).toBe('Z12 Main St\nSpringfield');
 		f.destroy();
 		doc.free();
 	});

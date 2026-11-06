@@ -12,8 +12,8 @@ describe('what a Diagnostic carries', () => {
 	it('hands the validation lane the offending value under `args`', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('status', 'NOT_AN_OPTION');
-		doc.storeField('font_size', 'not a number');
+		doc.unchecked.storeField('status', 'NOT_AN_OPTION');
+		doc.unchecked.storeField('font_size', 'not a number');
 
 		const byCode = new Map(q.validate(doc).map((d) => [d.code, d]));
 
@@ -39,8 +39,8 @@ describe('what a Diagnostic carries', () => {
 		// anchors where `Addr` cannot reach. `nearestAddrForFieldPath` exists for this.
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('contact', { name: 'x', email: 'y', listed: 'not-a-boolean' });
-		doc.storeField('revisions', [{ note: 'n', pages: 'not-an-integer' }]);
+		doc.unchecked.storeField('contact', { name: 'x', email: 'y', listed: 'not-a-boolean' });
+		doc.unchecked.storeField('revisions', [{ note: 'n', pages: 'not-an-integer' }]);
 
 		const deep = q
 			.validate(doc)
@@ -65,7 +65,7 @@ describe('what a Diagnostic carries', () => {
 		// formatter is the correct answer rather than a concession.
 		let thrown: unknown;
 		try {
-			core.Document.fromMarkdown('~~~\n$quill: showcase@1.0.0\ntitle: [unclosed\n~~~\n\nBody.\n');
+			core.Document.parse('~~~\n$quill: showcase@1.0.0\ntitle: [unclosed\n~~~\n\nBody.\n');
 		} catch (e) {
 			thrown = e;
 		}

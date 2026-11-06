@@ -1,5 +1,6 @@
 export { bindDocument, cardOps, seedDocument, Diverged } from './document.js';
 export { init } from './core.js';
+export type { Delta } from './delta.js';
 export type {
 	BindDocumentOpts,
 	CardOp,

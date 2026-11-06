@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// A document a consumer loaded rather than seeded (`Document.fromMarkdown`, the
+// A document a consumer loaded rather than seeded (`Document.parse`, the
 // transport door every saved document comes back through) rests as authored: a
 // content field holds the string it parsed, not the `Content`. The leaf reads through
 // `reader.getContent`, which decodes by declared type, so it takes both rest forms
@@ -14,7 +14,7 @@ function loaded(): { q: Quill; doc: Document } {
 	const q = quill();
 	const seed = example();
 	q.writer(seed).set('title', 'Reloaded title');
-	const doc = core.Document.fromMarkdown(seed.toMarkdown());
+	const doc = core.Document.parse(seed.toMarkdown());
 	seed.free();
 	return { q, doc };
 }
@@ -29,9 +29,9 @@ describe('a document loaded from markdown', () => {
 		doc.free();
 	});
 
-	it('round-trips through toMarkdown → fromMarkdown', () => {
+	it('round-trips through toMarkdown → parse', () => {
 		const { doc } = loaded();
-		const again = core.Document.fromMarkdown(doc.toMarkdown());
+		const again = core.Document.parse(doc.toMarkdown());
 		expect(again.toMarkdown()).toBe(doc.toMarkdown());
 		expect(again.cardCount).toBe(doc.cardCount);
 		again.free();
@@ -75,8 +75,8 @@ describe('a document loaded from markdown', () => {
 		const kind = Object.keys(q.schema.card_kinds ?? {})[0];
 		const card = q.seedCard(kind, seeded.seedOverlay(kind));
 		expect(card).toBeTruthy();
-		seeded.insertCard(card!, 0);
-		const withCard = core.Document.fromMarkdown(seeded.toMarkdown());
+		seeded.unchecked.insertCard(card!, 0);
+		const withCard = core.Document.parse(seeded.toMarkdown());
 		expect(withCard.cardCount).toBeGreaterThan(0);
 
 		const field = createField({ doc: withCard, quill: q, addr: { card: 0 }, container: mount() });
@@ -97,7 +97,7 @@ describe('a document loaded from markdown', () => {
 		q.writer(seed).set('title', 'Reloaded title');
 		const md = seed.toMarkdown();
 		const parsed = q.parse(md);
-		const transported = core.Document.fromMarkdown(md);
+		const transported = core.Document.parse(md);
 
 		expect(typeof parsed.getStored({ field: 'title' })).toBe('object');
 		expect(q.reader(parsed).getContent('title')).toEqual(q.reader(transported).getContent('title'));

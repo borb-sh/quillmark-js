@@ -18,7 +18,7 @@ import {
 	typeLeaf,
 	unmountAll
 } from '../helpers/surface.svelte.js';
-import { quill, quillFromYaml, example } from '../helpers/fixtures.js';
+import { quill, quillFromYaml, example, literal } from '../helpers/fixtures.js';
 
 afterEach(unmountAll);
 
@@ -40,7 +40,7 @@ describe('the card header', () => {
 		const { target } = mounted;
 
 		expect(q.schema.card_kinds!.section.title).toBeUndefined();
-		const heading = fieldValues(doc.cards[kinds.indexOf('section')].payloadItems).heading;
+		const heading = literal(fieldValues(doc.cards[kinds.indexOf('section')].payloadItems).heading);
 		expect(heading).toBeTruthy();
 		expect(header(cardOf(target, kinds, 'section')).placeholder).toBe(heading);
 
