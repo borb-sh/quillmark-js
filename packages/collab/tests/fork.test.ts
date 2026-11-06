@@ -32,7 +32,7 @@ function session(): [Tab, Tab] {
 		ydoc.clientID = clientID;
 		Y.applyUpdate(ydoc, seed, 'net');
 		const doc = q.exampleDocument()!;
-		return { doc, ydoc, binding: bindDocument({ doc, quill: q, ydoc }) };
+		return { doc, ydoc, binding: bindDocument({ doc, quill: q, ydoc, leader: true }) };
 	}) as [Tab, Tab];
 	for (const tab of tabs)
 		tab.ydoc.on('update', (update: Uint8Array, origin: unknown) => {
@@ -262,6 +262,7 @@ describe('writeFrom', () => {
 			doc: a.doc,
 			quill: q,
 			ydoc: a.ydoc,
+			leader: true,
 			onError: (e) => errors.push(e)
 		});
 		a.ydoc.transact(() => a.ydoc.getMap('main').set('not a name', 1), 'net');

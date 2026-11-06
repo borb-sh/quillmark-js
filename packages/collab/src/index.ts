@@ -18,15 +18,17 @@ export type {
 	Opened,
 	Saved,
 	Session,
-	SessionLog
+	SessionLog,
+	Version
 } from './session.js';
-export { readLog, readVersion, saveVersion, writeLog } from './room.js';
+export { readLog, readVersion, restoreVersion, saveVersion, writeLog } from './room.js';
 export type {
 	LogRead,
 	LogWrite,
 	ReadLogOpts,
-	ReadVersionOpts,
+	RestoreVersionOpts,
 	Revision,
+	VersionOpts,
 	WriteLogOpts
 } from './room.js';
 export { localLog } from './local.js';

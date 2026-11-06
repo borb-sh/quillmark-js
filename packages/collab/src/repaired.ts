@@ -1,6 +1,6 @@
 // What a peer writes over a field whose merged state reads through a repair that inserts.
 //
-// Only a session's single writer writes back an inserting repair: two peers each writing one
+// Only a session's leader writes back an inserting repair: two peers each writing one
 // insert it twice, and the extra copy is valid, so it stays. Every other peer writes its own edit
 // alone. The Y state is the raw form, the Document the repaired one; a block the edit left as the
 // repair made it is written as Y holds it, and a block the edit changed is written as the Document

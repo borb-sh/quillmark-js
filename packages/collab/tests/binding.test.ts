@@ -127,7 +127,7 @@ describe('content', () => {
 		expect([`${merged} A B`, `${merged} B A`]).toContain(body(a).text);
 	});
 
-	it("the session's single writer writes a repair that inserts back, and every client then reads none", () => {
+	it('the leader writes a repair that inserts back, and every client then reads none', () => {
 		const tabled = () => {
 			const doc = example();
 			doc.replace({}, core.importMarkdown('lead\n\n| h |\n| - |\n\ntail').content);
@@ -135,15 +135,20 @@ describe('content', () => {
 		};
 		const inserting = (p: Peer) =>
 			project(readField(contentTypes(p.ydoc, contentRoot('main')))).repairs.filter(inserts);
-		for (const writer of [undefined, 2]) {
-			const [a, b, c] = peers(3, tabled, quill(), writer);
+		for (const leader of [undefined, 2, 'elected later'] as const) {
+			const [a, b, c] = peers(3, tabled, quill(), typeof leader === 'number' ? leader : undefined);
 			const slot = Array.from(body(a).text).indexOf('￼');
 			edit(a.doc, {}, [{ retain: slot + 1 }, { delete: '\ntail'.length }]);
 			a.binding.push();
 			edit(b.doc, {}, [{ retain: slot + 2 }, { insert: 'typed ' }]);
 			b.binding.push();
 			settle([a, b, c]);
-			expect(inserting(a)).toHaveLength(writer === undefined ? 1 : 0);
+			if (leader === 'elected later') {
+				expect(inserting(a)).toHaveLength(1);
+				c.binding.leader = true;
+				settle([a, b, c]);
+			}
+			expect(inserting(a)).toHaveLength(leader === undefined ? 1 : 0);
 			expect(snapshot(a.doc)).toBe(snapshot(c.doc));
 			expect(snapshot(b.doc)).toBe(snapshot(c.doc));
 			expect([a, b, c].flatMap((p) => p.errors)).toEqual([]);
@@ -325,13 +330,14 @@ describe('a remote value the Document refuses', () => {
 			doc,
 			quill: q,
 			ydoc: x,
+			leader: true,
 			onRemote: () => {
 				throw new Error('host');
 			},
 			onError: (e) => errors.push(e)
 		});
 		const other = example();
-		const binding = bindDocument({ doc: other, quill: q, ydoc: y });
+		const binding = bindDocument({ doc: other, quill: q, ydoc: y, leader: true });
 		for (const word of ['one ', 'two ']) {
 			edit(other, {}, [{ insert: word }]);
 			binding.push();

@@ -105,9 +105,10 @@ export interface BindDocumentOpts {
 	doc: Document;
 	quill: Quill;
 	ydoc: Y.Doc;
-	/** Whether this client is the session's single writer, which writes back a repair that
-	 *  inserts once it reads one, so the state no longer needs it. */
-	repairs?: boolean;
+	/** Whether this client leads: it writes back a repair that inserts once it reads one, so the
+	 *  state no longer needs it. A binding alone on its Y.Doc leads; one among peers leads only
+	 *  where its session elects it. */
+	leader: boolean;
 	onRemote?(change: RemoteChange): void;
 	/** A remote value the Document refused. The field keeps its last value. */
 	onError?(error: unknown): void;
@@ -126,6 +127,9 @@ export interface DocumentBinding {
 	/** Whether a remote value the Document refused is held: the Document is then not the Y
 	 *  state's projection, and a save of it would leave that value out. */
 	readonly holding: boolean;
+	/** Whether this client leads (`BindDocumentOpts.leader`). Set it as the session's election
+	 *  moves; a binding made leader writes back each repair that inserts it reads now. */
+	leader: boolean;
 	destroy(): void;
 }
 
@@ -158,6 +162,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	let mismatchReported = false;
 
 	const report = (error: unknown) => opts.onError?.(error);
+	let leader = opts.leader;
 	const nameOf = (c: CardRef): string => (c === MAIN ? MAIN : ids[c]);
 	const addrOf = (c: CardRef, field?: string): Addr => ({
 		...(c === MAIN ? {} : { card: c }),
@@ -218,11 +223,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 	const projectRoot = (root: string): Content => projectField(root).content;
 
-	/** Write `content` over the content root `root`. A peer other than the session's single
-	 *  writer writes back no repair that inserts: it reads it through `repair`. */
+	/** Write `content` over the content root `root`. A peer other than the leader writes back no
+	 *  repair that inserts: it reads it through `repair`. */
 	function writeField(root: string, content: Content): Map<string, string> {
 		const types = contentTypes(ydoc, root);
-		if (opts.repairs || !inserting.has(root)) return writeContent(types, content, mint);
+		if (leader || !inserting.has(root)) return writeContent(types, content, mint);
 		const raw = readField(types);
 		const projection = project(raw);
 		if (!projection.repairs.some(inserts)) {
@@ -275,7 +280,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 
 	/** Write each field's Document value to Y, where it landed under ids Y does not hold or,
-	 *  for the single writer, read through a repair that inserts. */
+	 *  for the leader, read through a repair that inserts. */
 	function writeBack(reminted: { root: string; addr: Addr }[]): void {
 		if (!reminted.length) return;
 		ydoc.transact(() => {
@@ -623,7 +628,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (change.content.some((x) => sameAddr(x.addr, addr))) return;
 		try {
 			const projection = projectField(root);
-			if (opts.repairs && projection.repairs.some(inserts)) reminted.push({ root, addr });
+			if (leader && projection.repairs.some(inserts)) reminted.push({ root, addr });
 			const before = storedContent(addr);
 			if (before && contentKey(before) === contentKey(projection.content)) {
 				held.delete(root);
@@ -703,6 +708,22 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		get holding() {
 			return held.size > 0;
 		},
+		get leader() {
+			return leader;
+		},
+		set leader(next: boolean) {
+			if (next === leader) return;
+			leader = next;
+			if (!leader || !inserting.size) return;
+			const change = pull('all');
+			if (change.cards.length || change.fields.length || change.content.length) {
+				try {
+					opts.onRemote?.(change);
+				} catch (e) {
+					report(e);
+				}
+			}
+		},
 		destroy() {
 			ydoc.off('afterTransaction', onAfter);
 			for (const [text, fn] of observed) text.unobserve(fn);
@@ -720,7 +741,7 @@ export function seedDocument(doc: Document, quill: Quill): Uint8Array {
 	const ydoc = new Y.Doc({ gc: false });
 	ydoc.clientID = 0;
 	const own = doc.clone();
-	bindDocument({ doc: own, quill, ydoc }).destroy();
+	bindDocument({ doc: own, quill, ydoc, leader: true }).destroy();
 	own.free();
 	const update = Y.encodeStateAsUpdate(ydoc);
 	ydoc.destroy();

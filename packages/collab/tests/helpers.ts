@@ -54,13 +54,13 @@ export interface Peer {
 	errors: unknown[];
 }
 
-/** `n` peers over one starting Document, each joining from the same seed, history kept. */
-/** `n` peers over one seed; the one at `writer`, if given, is the session's single writer. */
+/** `n` peers over one starting Document, each joining from the same seed, history kept; the
+ *  one at `leader`, if given, leads. */
 export function peers(
 	n: number,
 	start: () => Document,
 	q: Quill = quill(),
-	writer?: number
+	leader?: number
 ): Peer[] {
 	const first = start();
 	const seed = seedDocument(first, q);
@@ -76,7 +76,7 @@ export function peers(
 			doc,
 			quill: q,
 			ydoc,
-			repairs: i === writer,
+			leader: i === leader,
 			onRemote: (c) => peer.changes.push(c),
 			onError: (e) => peer.errors.push(e)
 		});

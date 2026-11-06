@@ -38,7 +38,7 @@ export function project(field: YField): Projection {
 	return { content, repairs };
 }
 
-/** Whether a mend's write-back inserts text or a slot, which only a session's single writer
+/** Whether a mend's write-back inserts text or a slot, which only a session's leader
  *  writes back. */
 export const inserts = (r: Repair): boolean =>
 	r.inserts === true || (r.repair === 'in_slot' && inserts(r.inner));

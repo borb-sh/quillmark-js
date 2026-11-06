@@ -151,6 +151,7 @@ function bind(ydoc: Y.Doc, quill: Quill, template: Document): Bound {
 		doc,
 		quill,
 		ydoc,
+		leader: false,
 		onError: (e) => {
 			if (e instanceof Diverged) diverged ??= e;
 		}
