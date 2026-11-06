@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.31.0 - 2026-11-06
+
 **On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. `Delta`, the text change `applyExternal` and `onCaretMove` map through, is declared by `@quillmark/svelte/core`, since the core no longer exports one. A `text` leaf commits its field as the engine's plain codec spells it: Enter opens a paragraph, stored as a blank line, and Shift-Enter opens a line, stored as `\n`; its paragraphs draw at a richtext leaf's block rhythm, and a trailing newline draws as the empty line it opens. A copy out of it writes a paragraph break as a blank line, and a paste reads one back. A matrix's added item reads its `title` off the plain content it rests as. A card add or retype places the card through `doc.unchecked.insertCard`.
 
 **An `object` array row is named by its number.** A row's summary reads `Item` and its 1-based number (`Item 2`) whatever the record holds, open or collapsed, and its accessible name is the label with that title (`Signers, item 2`). It read the first one-line text cell, which named a row by whichever cell the schema declared first and fell back to the label and number when that cell was empty. `VisualStrings` gains `elementItem` for the title; `elementUntitled` is the accessible name.
