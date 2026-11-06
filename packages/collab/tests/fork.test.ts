@@ -32,7 +32,7 @@ function session(): [Tab, Tab] {
 		ydoc.clientID = clientID;
 		Y.applyUpdate(ydoc, seed, 'net');
 		const doc = q.exampleDocument()!;
-		return { doc, ydoc, binding: bindDocument({ doc, quill: q, ydoc }) };
+		return { doc, ydoc, binding: bindDocument({ doc, quill: q, ydoc, leader: true }) };
 	}) as [Tab, Tab];
 	for (const tab of tabs)
 		tab.ydoc.on('update', (update: Uint8Array, origin: unknown) => {
@@ -56,11 +56,7 @@ describe('writeFrom', () => {
 		const [a, b] = session();
 		const base = revision(a);
 		type(a, 0, 'Typed. ');
-		const written = write(
-			a,
-			base,
-			(doc) => void q.writer(doc).reviseField('abstract', 'Rewritten.')
-		);
+		const written = write(a, base, (doc) => void q.writer(doc).revise('abstract', 'Rewritten.'));
 		expect(written.conflicts).toEqual([]);
 		expect(written.changes).toEqual([
 			expect.objectContaining({
@@ -82,7 +78,7 @@ describe('writeFrom', () => {
 		const old = authoring(a).body!;
 		type(a, Array.from(a.doc.main.body.text).length, ' Edited.');
 		const written = write(a, base, (doc) => {
-			q.writer(doc).reviseBody(old.replace('The body is a full block leaf', 'The body is new'));
+			q.writer(doc).revise({}, old.replace('The body is a full block leaf', 'The body is new'));
 		});
 		expect(written.conflicts).toEqual([]);
 		Y.applyUpdate(a.ydoc, written.update, 'ai');
@@ -95,7 +91,7 @@ describe('writeFrom', () => {
 	it('keeps a line typed into between two lines a rewrite changed where it was typed', () => {
 		const [a, b] = session();
 		const lines = ['Alpha one.', 'Bravo two.', 'Charlie three.', 'Delta four.', 'Echo five.'];
-		q.writer(a.doc).reviseBody(lines.join('\n\n'));
+		q.writer(a.doc).revise({}, lines.join('\n\n'));
 		a.binding.push();
 		const base = revision(a);
 		const at = Array.from(b.doc.main.body.text).join('').indexOf('three.');
@@ -104,7 +100,7 @@ describe('writeFrom', () => {
 			const next = [...lines];
 			next[1] += ' One.';
 			next[3] += ' Two.';
-			q.writer(doc).reviseBody(next.join('\n\n'));
+			q.writer(doc).revise({}, next.join('\n\n'));
 		});
 		expect(written.conflicts).toEqual([]);
 		Y.applyUpdate(a.ydoc, written.update, 'ai');
@@ -121,12 +117,12 @@ describe('writeFrom', () => {
 	it('reports a line both sides rewrote, and lines next to each other as apart', () => {
 		const [a] = session();
 		const lines = ['Alpha one.', 'Bravo two.', 'Charlie three.'];
-		q.writer(a.doc).reviseBody(lines.join('\n\n'));
+		q.writer(a.doc).revise({}, lines.join('\n\n'));
 		a.binding.push();
 		const base = revision(a);
 		type(a, Array.from(a.doc.main.body.text).join('').indexOf('two.'), 'typed ');
 		const same = write(a, base, (doc) => {
-			q.writer(doc).reviseBody(['Alpha one.', 'Bravo 2.', 'Charlie three.'].join('\n\n'));
+			q.writer(doc).revise({}, ['Alpha one.', 'Bravo 2.', 'Charlie three.'].join('\n\n'));
 		});
 		expect(same.conflicts).toEqual([
 			expect.objectContaining({
@@ -136,7 +132,7 @@ describe('writeFrom', () => {
 			})
 		]);
 		const next = write(a, base, (doc) => {
-			q.writer(doc).reviseBody(['Alpha 1.', 'Bravo two.', 'Charlie 3.'].join('\n\n'));
+			q.writer(doc).revise({}, ['Alpha 1.', 'Bravo two.', 'Charlie 3.'].join('\n\n'));
 		});
 		expect(next.conflicts).toEqual([]);
 	});
@@ -262,15 +258,12 @@ describe('writeFrom', () => {
 			doc: a.doc,
 			quill: q,
 			ydoc: a.ydoc,
+			leader: true,
 			onError: (e) => errors.push(e)
 		});
 		a.ydoc.transact(() => a.ydoc.getMap('main').set('not a name', 1), 'net');
 		expect(errors).toHaveLength(1);
-		const written = write(
-			a,
-			revision(a),
-			(doc) => void q.writer(doc).reviseField('abstract', 'Still.')
-		);
+		const written = write(a, revision(a), (doc) => void q.writer(doc).revise('abstract', 'Still.'));
 		Y.applyUpdate(a.ydoc, written.update, 'ai');
 		expect(authoring(a).fields?.abstract).toBe('Still.');
 	});

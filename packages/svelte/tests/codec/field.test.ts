@@ -10,7 +10,17 @@ import { createField, blockSchema, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Content, Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
-import { mount, quill, example, normalize, contentEqual, md, viewOf, press } from './_util.js';
+import {
+	mount,
+	quill,
+	example,
+	normalize,
+	contentEqual,
+	md,
+	viewOf,
+	press,
+	literal
+} from './_util.js';
 
 // jsdom lays nothing out, and `setCaret`'s flagged dispatch asks PM for the caret's
 // rect to reveal it. Stubbed rather than guarded in the source: a landing is right to
@@ -197,7 +207,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('releases when the value an external write leaves is inline, and then commits', () => {
 		const doc = example();
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		const holds: boolean[] = [];
 		const field = leaf(doc, 'title', holds);
 		const view = viewOf(field);
@@ -205,7 +215,7 @@ describe('the hold on a narrowed field', () => {
 		expect(view.editable).toBe(false);
 		expect(view.state.doc.firstChild?.type.name).toBe('bullet_list');
 		keystroke(view);
-		expect(doc.getStored('title')).toBe(STRUCTURED);
+		expect(literal(doc.getStored('title'))).toBe(STRUCTURED);
 
 		quill().writer(doc).set('title', 'plain');
 		field.applyExternal();
@@ -223,19 +233,19 @@ describe('the hold on a narrowed field', () => {
 		const view = viewOf(field);
 		expect(view.editable).toBe(true);
 
-		doc.storeField('title', STRUCTURED);
+		doc.unchecked.storeField('title', STRUCTURED);
 		field.applyExternal();
 		expect(holds).toEqual([true]);
 		expect(view.editable).toBe(false);
 		expect(view.state.doc.firstChild?.type.name).toBe('bullet_list');
 		keystroke(view);
-		expect(doc.getStored('title')).toBe(STRUCTURED);
+		expect(literal(doc.getStored('title'))).toBe(STRUCTURED);
 		field.destroy();
 	});
 
 	it('holds a one-line text field, whose refusal upstream names not_plain', () => {
 		const doc = example();
-		doc.replace({ field: 'subtitle' }, md(STRUCTURED));
+		doc.unchecked.storeField('subtitle', md(STRUCTURED));
 		expect(
 			quill()
 				.validate(doc)
@@ -255,7 +265,7 @@ describe('the hold on a narrowed field', () => {
 
 	it('does not hold for the trailing newline a YAML block scalar keeps', () => {
 		const doc = example();
-		doc.storeField('subtitle', 'one line\n');
+		doc.unchecked.storeField('subtitle', 'one line\n');
 		expect(
 			quill()
 				.validate(doc)
@@ -284,7 +294,7 @@ describe('text fields fire no markdown input rules', () => {
 
 	it('a text field does NOT fire the strong rule — delimiters and no-marks survive', () => {
 		const doc = example();
-		const before = doc.getStored('subtitle') as string;
+		const before = quill().reader(doc).get('subtitle') as string;
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -298,7 +308,7 @@ describe('text fields fire no markdown input rules', () => {
 		expect(fireClosingStar(view)).toBeFalsy(); // no rule to match → not intercepted
 		view.dispatch(view.state.tr.insertText('*', view.state.selection.head));
 		// The literal string, the field's rest form: no mark had anywhere to land.
-		expect(doc.getStored('subtitle')).toBe(`**x**${before}`);
+		expect(literal(doc.getStored('subtitle'))).toBe(`**x**${before}`);
 		field.destroy();
 	});
 
@@ -353,7 +363,7 @@ describe('createField over an ABSENT declared richtext field', () => {
 	it('installs on the first edit (apply throws on absent), then applies', () => {
 		const doc = example();
 		// `colophon` is `default:`-only, so it is absent from the seed.
-		expect(doc.getStored('colophon')).toBeUndefined();
+		expect(literal(doc.getStored('colophon'))).toBeUndefined();
 		const field = createField({
 			doc,
 			quill: quill(),
@@ -396,7 +406,7 @@ describe('a default the leaf holds', () => {
 		// A retype's new default re-seats the unset leaf, and writes nothing.
 		field.setFallback(said('New'));
 		expect(view.state.doc.textContent).toBe('New');
-		expect(doc.getStored('colophon')).toBeUndefined();
+		expect(literal(doc.getStored('colophon'))).toBeUndefined();
 
 		view.dispatch(view.state.tr.insertText('!', view.state.doc.content.size - 1));
 		expect((doc.getStored('colophon') as { text: string }).text).toBe('New!');
@@ -543,7 +553,7 @@ describe('the empty-leaf ghost', () => {
 		const q = quill();
 		const doc = example();
 		const card = q.seedCard('note', doc.seedOverlay('note'));
-		doc.insertCard(card!, doc.cardCount);
+		doc.unchecked.insertCard(card!, doc.cardCount);
 		return doc;
 	}
 	/** The card just added: the last one, whatever the document held ahead of it. */

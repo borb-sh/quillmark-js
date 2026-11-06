@@ -15,7 +15,7 @@ import { init } from '@quillmark/svelte/core';
 const { Quill } = await init();
 
 const quill = Quill.fromTree(tree); // the quill's files
-const doc = quill.seedDocument(); // or Document.fromMarkdown(md)
+const doc = quill.seedDocument(); // or Document.parse(md)
 const session = await new Engine().open(quill, doc);`;
 
 export const PREVIEW = `<script lang="ts">

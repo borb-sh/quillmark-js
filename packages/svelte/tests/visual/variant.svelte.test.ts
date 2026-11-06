@@ -10,7 +10,7 @@
 // content cell (`handling`'s two) is a leaf at the depth it sits.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
-import { core, quill, quillFromYaml } from '../helpers/fixtures.js';
+import { core, quill, quillFromYaml, literal } from '../helpers/fixtures.js';
 import {
 	field,
 	leaf,
@@ -45,7 +45,7 @@ function cellLeaf(target: HTMLElement, label: string): HTMLElement {
 	return leaf(prop);
 }
 
-const stored = (doc: Document) => doc.getStored('distribution');
+const stored = (doc: Document) => literal(doc.getStored('distribution'));
 
 describe('a variant enum field', () => {
 	it('draws the cells of the world the document renders as, and retires them on a flip', () => {
@@ -157,7 +157,7 @@ describe('a variant enum field', () => {
 // prose. Driven off `handling` on disk exactly as the block above is driven off
 // `distribution`.
 describe('a variant whose default is the blank', () => {
-	const held = (doc: Document) => doc.getStored('handling');
+	const held = (doc: Document) => literal(doc.getStored('handling'));
 	const handling = (target: HTMLElement) => trigger(field(target, 'Handling'));
 
 	it('draws the discriminant alone, ghosting the em dash the blank has no glyph for', () => {
@@ -272,7 +272,7 @@ main:
                 default: ""
 `;
 	const nested = () => quillFromYaml(NESTED);
-	const header = (doc: Document) => doc.getStored('header');
+	const header = (doc: Document) => literal(doc.getStored('header'));
 	const cell = (target: HTMLElement): HTMLElement | null =>
 		field(target, 'Header').querySelector<HTMLElement>(
 			'[data-qm-prop="controlled_by"] .ProseMirror'
@@ -280,7 +280,7 @@ main:
 
 	it('draws the discriminant and the live cells, and commits the container whole', () => {
 		const q = nested();
-		const doc = core.Document.fromMarkdown(
+		const doc = core.Document.parse(
 			[
 				'~~~',
 				'$quill: nested_variant@1.0.0',

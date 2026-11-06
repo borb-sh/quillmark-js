@@ -32,13 +32,14 @@ export function project(field: YField): Projection {
 			([id, record]) => ({ ...(record as object), id }) as ContentContainer
 		),
 		marks: deriveMarks(field.chars, field.attrs),
-		islands: field.islands.map(islandOf)
+		islands: field.islands.map(islandOf),
+		...(field.codec ? { codec: field.codec } : {})
 	};
 	const { content, repairs } = core().repair(raw);
 	return { content, repairs };
 }
 
-/** Whether a mend's write-back inserts text or a slot, which only a session's single writer
+/** Whether a mend's write-back inserts text or a slot, which only a session's leader
  *  writes back. */
 export const inserts = (r: Repair): boolean =>
 	r.inserts === true || (r.repair === 'in_slot' && inserts(r.inner));

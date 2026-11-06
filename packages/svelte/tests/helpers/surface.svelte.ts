@@ -2,9 +2,9 @@
 // Each file declares `@vitest-environment jsdom` and registers `afterEach(unmountAll)` itself: a
 // hook registered here would bind to the first importer.
 import { mount, unmount, flushSync, tick, type Component } from 'svelte';
-import type { Delta, Document, Quill, QuillCardSchema } from '@quillmark/wasm';
+import type { Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
-import type { EditorError } from '$lib/core';
+import type { Delta, EditorError } from '$lib/core';
 import type { ActiveLeaf, CardId, CardOp, EditorChange } from '$lib/visual';
 import type { ActiveProse } from '$lib/visual/leaves';
 import type { VisualEditorProps } from '$lib/visual/props';

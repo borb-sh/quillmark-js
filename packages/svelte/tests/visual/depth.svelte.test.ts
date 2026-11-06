@@ -10,7 +10,7 @@ import { flushSync } from 'svelte';
 import { DEFAULT_VISUAL_STRINGS as S } from '$lib/visual/strings';
 import type { Document, Quill } from '@quillmark/wasm';
 import { fieldTitle } from '$lib/visual/structure';
-import { quill, example } from '../helpers/fixtures.js';
+import { quill, example, literal } from '../helpers/fixtures.js';
 import {
 	leaf,
 	mountEditor,
@@ -179,7 +179,7 @@ describe('a container inside a variant cell', () => {
 		typeLeaf(row.querySelector<HTMLElement>('[data-qm-prop="party"]')!, 'Legal');
 		// A richtext cell inside a row inside a variant cell: a leaf at three rungs.
 		expect(row.querySelector('[data-qm-prop="text"] .ProseMirror')).not.toBeNull();
-		expect(doc.getStored('distribution')).toEqual({
+		expect(literal(doc.getStored('distribution'))).toEqual({
 			value: 'embargoed',
 			notices: [{ party: 'Legal' }]
 		});

@@ -39,7 +39,7 @@ const quill = Quill.fromTree(tree); // tree: Map<string, Uint8Array> of the quil
 const doc = quill.seedDocument();
 
 // An EXISTING document: parsed back from what you stored.
-const doc = Document.fromMarkdown(markdown); // canonical Quillmark markdown
+const doc = Document.parse(markdown); // canonical Quillmark markdown
 const doc = Document.fromStored(json); // the versioned storage DTO (`doc.toStored()`)
 
 const session = await new Engine().open(quill, doc);
@@ -53,7 +53,7 @@ const session = await new Engine().open(quill, doc);
 A stored document carries none of its quill's bytes, only a reference: `doc.quillRef` is `name@version`, persisted in the markdown itself. Resolution is **host code**: read the ref, map it to a `Quill`, open. No surface resolves, so one resolution per document holds by construction.
 
 ```ts
-const doc = Document.fromMarkdown(stored); // Document, from the gate above
+const doc = Document.parse(stored); // Document, from the gate above
 const quill = await registry.getQuill(doc.quillRef); // your ref → Quill mapping
 const session = await new Engine().open(quill, doc);
 ```

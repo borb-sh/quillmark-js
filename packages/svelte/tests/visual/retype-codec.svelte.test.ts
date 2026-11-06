@@ -10,7 +10,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Content, Document, Quill } from '@quillmark/wasm';
 import { hasMarks } from '$lib/core/codec';
-import { quillFromYaml } from '../helpers/fixtures.js';
+import { quillFromYaml, literal } from '../helpers/fixtures.js';
 import { activeView, mountInner, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -84,7 +84,7 @@ describe('a retype that changes the codec under a field name', () => {
 
 		expect(hasMarks(view.state.schema)).toBe(false);
 		expect(errors).toEqual([]);
-		expect(doc.getStored({ card: 0, field: 'note' })).toBe('x  y *z*');
+		expect(literal(doc.getStored({ card: 0, field: 'note' }))).toBe('x  y *z*');
 		expect(savedText(q, doc)).toBe('x  y *z*');
 	});
 });

@@ -52,7 +52,7 @@ const wide = (scope: HTMLElement) =>
 
 describe('object properties', () => {
 	it('place as card fields in a card-level object, and pack in a record', () => {
-		const doc = core.Document.fromMarkdown(
+		const doc = core.Document.parse(
 			['~~~', '$quill: object_placement@1.0.0', 'jobs:', '  - title: Archives', '~~~', ''].join(
 				'\n'
 			)

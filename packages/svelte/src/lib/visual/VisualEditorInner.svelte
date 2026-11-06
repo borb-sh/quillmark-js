@@ -37,7 +37,6 @@
 	import type {
 		Addr,
 		CardAddr,
-		Delta,
 		Diagnostic,
 		PathStep,
 		PayloadItem,
@@ -46,6 +45,7 @@
 		ResolvedField
 	} from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
+	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import type { FieldController, LeafViews } from '../core/codec/index.js';
@@ -420,7 +420,7 @@
 			const card = quill.seedCard(kind, overlay);
 			if (!card) return undefined;
 			const from = document.activeElement;
-			doc.insertCard(card, atIndex);
+			doc.unchecked.insertCard(card, atIndex);
 			const id = seq.next();
 			arm.arm();
 			cardIds = [...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)];
@@ -538,9 +538,9 @@
 			const card = doc.card(i);
 			doc.removeCard(i);
 			try {
-				doc.insertCard({ ...card, kind }, i);
+				doc.unchecked.insertCard({ ...card, kind }, i);
 			} catch (e) {
-				doc.insertCard(card, i);
+				doc.unchecked.insertCard(card, i);
 				throw e;
 			}
 			bump('structure', id, i);

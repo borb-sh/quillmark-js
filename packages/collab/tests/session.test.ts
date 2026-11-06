@@ -8,6 +8,9 @@ import {
 	localLog,
 	QuillMismatch,
 	readLog,
+	readVersion,
+	restoreVersion,
+	saveVersion,
 	writeFrom,
 	writeLog,
 	type Revision,
@@ -72,7 +75,7 @@ function open(
 	const tab: Tab = { join: undefined!, ended: {}, errors: [], remote: 0 };
 	tab.join = () =>
 		joinSession({
-			log: localLog({ room: 'r', ...origin.tab(), compactAt: extra.compactAt }),
+			log: localLog({ room: 'r', ...origin.tab(), compactAt: extra.compactAt, lease: extra.lease }),
 			quill: q,
 			initial: () => q.exampleDocument()!,
 			lease: extra.lease,
@@ -132,9 +135,23 @@ describe('sessions', () => {
 
 	it('opens one session from one seed, whoever asks second', async () => {
 		const log = localLog({ room: 'r', ...new Origin().tab() });
-		const first = await log.open(new Uint8Array([1]));
-		const second = await log.open(new Uint8Array([2]));
+		const first = await log.open(new Uint8Array([1]), 'q@1.0.0');
+		const second = await log.open(new Uint8Array([2]), 'q@1.0.0');
 		expect(second).toEqual(first);
+	});
+
+	it('elects one leader from the tabs present, and hands the lead on when it leaves', async () => {
+		const origin = new Origin();
+		const a = await open(origin, { lease: 60 }).join();
+		const b = await open(origin, { lease: 60 }).join();
+		await wait(30);
+		expect([a.leader, b.leader].filter(Boolean)).toHaveLength(1);
+		const [lead, other] = a.leader ? [a, b] : [b, a];
+		expect(lead.ydoc.clientID).toBeLessThan(other.ydoc.clientID);
+		await lead.leave();
+		await wait(150);
+		expect(other.leader).toBe(true);
+		await other.leave();
 	});
 
 	it('keeps a session whose last entry is unsaved, past its lease', async () => {
@@ -235,11 +252,11 @@ describe('sessions', () => {
 		const origin = new Origin();
 		const a = await open(origin).join();
 		const card = quill().seedCard('note', a.doc.seedOverlay('note'))!;
-		a.doc.insertCard(card, 0);
+		a.doc.unchecked.insertCard(card, 0);
 		a.push({ op: 'insert', at: 0 });
 		const was = a.doc.card(1);
 		a.doc.removeCard(1);
-		a.doc.insertCard({ ...was, kind: 'note' }, 1);
+		a.doc.unchecked.insertCard({ ...was, kind: 'note' }, 1);
 		a.push();
 		await settle();
 		const b = await open(origin).join();
@@ -293,26 +310,26 @@ describe('sessions', () => {
 describe('writes from a revision', () => {
 	const abstract = (s: Session) => quill().toAuthoring(s.doc).fields?.abstract;
 	const rewrite = (doc: Document, words: string) =>
-		void quill().writer(doc).reviseField('abstract', words);
+		void quill().writer(doc).revise('abstract', words);
 	const logOf = (origin: Origin) => localLog({ room: 'r', ...origin.tab() });
 	const write = (log: SessionLog, base: Revision, words: string, extra: { key?: string } = {}) =>
 		writeLog({
 			log,
 			quill: quill(),
 			base,
-			writer: 'ai:1',
+			author: 'ai:1',
 			edit: (doc) => rewrite(doc, words),
 			...extra
 		});
 
-	it('applies an edit made from an older state under its writer', async () => {
+	it('applies an edit made from an older state under its author', async () => {
 		const origin = new Origin();
-		const writers: (string | undefined)[] = [];
+		const authors: (string | undefined)[] = [];
 		const base = logOf(origin);
 		const log: SessionLog = {
 			...base,
 			append: (epoch, update, opts) => {
-				writers.push(opts?.writer);
+				authors.push(opts?.author);
 				return base.append(epoch, update, opts);
 			}
 		};
@@ -320,7 +337,7 @@ describe('writes from a revision', () => {
 		const a = await joinSession({
 			log,
 			quill: q,
-			writer: 'ada',
+			author: 'ada',
 			initial: () => q.exampleDocument()!,
 			saveDelay: 60_000
 		});
@@ -340,16 +357,18 @@ describe('writes from a revision', () => {
 		expect(abstract(a)).toBe('Rewritten.');
 		expect(text(a).startsWith('Typed. ')).toBe(true);
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
-		expect(writers).toEqual(['ada', 'ai:1']);
+		expect(authors).toEqual(['ada', 'ai:1']);
 	});
 
-	it('reads a room without changing it, and writes through its log', async () => {
+	it('reads a room changing nothing but the checkpoint it keeps, and writes through its log', async () => {
 		const origin = new Origin();
 		const a = await open(origin).join();
 		const log = logOf(origin);
-		const before = JSON.stringify([...origin.data]);
+		const content = () =>
+			JSON.stringify([...origin.data].filter(([k]) => !k.includes(':checkpoints:')));
+		const before = content();
 		const read = await readLog({ log, quill: quill() });
-		expect(JSON.stringify([...origin.data])).toBe(before);
+		expect(content()).toBe(before);
 		expect(read.revision.epoch).toBe(a.epoch);
 		expect(snapshot(read.doc)).toBe(snapshot(a.doc));
 		read.doc.free();
@@ -450,7 +469,7 @@ describe('writes from a revision', () => {
 				log,
 				quill: quill(),
 				base: read.revision,
-				writer: 'ai:1',
+				author: 'ai:1',
 				key: 'call-1',
 				edit: (doc) => {
 					quill().writer(doc).addCard('note', { label: 'Once' }, '', 0);
@@ -512,7 +531,7 @@ describe('writes from a revision', () => {
 			quill: quill(),
 			lease: 0,
 			base: read.revision,
-			writer: 'ai:1',
+			author: 'ai:1',
 			edit: (doc) => rewrite(doc, 'Rewritten.')
 		});
 		expect(written).toMatchObject({ status: 'written', revision: { count: 1 } });
@@ -533,14 +552,14 @@ describe('writes from a revision', () => {
 				log,
 				quill: quill(),
 				base: { epoch: '', count: 0, check: '' },
-				writer: 'ai:1',
+				author: 'ai:1',
 				edit: (doc) => void quill().writer(doc).addCard('note', { label: 'Lost' }, '', 0)
 			})
 		).rejects.toThrow();
 		expect(await log.current()).toBeUndefined();
 	});
 
-	it('refuses a revision compaction has merged past', async () => {
+	it('writes from a revision compaction has merged past through its checkpoint', async () => {
 		const origin = new Origin();
 		const a = await open(origin, { compactAt: 3 }).join();
 		const log = localLog({ room: 'r', ...origin.tab(), compactAt: 3 });
@@ -552,6 +571,41 @@ describe('writes from a revision', () => {
 			type(a, `${i} `);
 			await settle();
 		}
-		expect(await write(log, read.revision, 'Late.')).toEqual({ status: 'stale' });
+		const forged = {
+			...read.revision,
+			check: read.revision.check.replace(/./, (c) => (c === '0' ? '1' : '0'))
+		};
+		expect(await write(log, forged, 'Late.')).toEqual({ status: 'stale' });
+		expect((await write(log, read.revision, 'Late.')).status).toBe('written');
+		await settle();
+		expect(abstract(a)).toBe('Late.');
+	});
+
+	it('keeps a named version past its session, and restores it as one edit', async () => {
+		const origin = new Origin();
+		const a = await open(origin).join();
+		const log = logOf(origin);
+		rewrite(a.doc, 'Draft one.');
+		a.push();
+		await settle();
+		const kept = await saveVersion({ log, quill: quill(), label: 'v1' });
+		expect(kept.label).toBe('v1');
+		rewrite(a.doc, 'Draft two.');
+		a.push();
+		await settle();
+		const version = await readVersion({ log, quill: quill(), label: 'v1' });
+		expect(quill().reader(version!).get('abstract')).toBe('Draft one.');
+		version!.free();
+		expect(await readVersion({ log, quill: quill(), label: 'v2' })).toBeUndefined();
+		expect(
+			await restoreVersion({ log, quill: quill(), label: 'v2', author: 'ai:1' })
+		).toBeUndefined();
+		const restored = await restoreVersion({ log, quill: quill(), label: 'v1', author: 'ai:1' });
+		expect(restored?.status).toBe('written');
+		await settle();
+		expect(abstract(a)).toBe('Draft one.');
+		await a.leave();
+		await log.end(a.epoch);
+		expect((await log.versions()).map((v) => v.label)).toEqual(['v1']);
 	});
 });

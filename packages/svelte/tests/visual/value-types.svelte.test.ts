@@ -11,7 +11,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { DEFAULT_VISUAL_STRINGS as S } from '$lib/visual/strings';
 import { DocumentReader, type Content, type Quill, type Document } from '@quillmark/wasm';
-import { core, quill } from '../helpers/fixtures.js';
+import { core, quill, literal } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -159,7 +159,7 @@ describe('an object field', () => {
 
 		// The property rests as its literal string, the scalar `text` field's rest form
 		// one key in, and the cell beside it rides the commit as ever.
-		expect(doc.getStored('contact')).toEqual({
+		expect(literal(doc.getStored('contact'))).toEqual({
 			name: 'Ada Lovelace',
 			note: 'ask for *Ada*, not Augusta'
 		});
@@ -172,7 +172,7 @@ describe('an array of objects', () => {
 	 *  array a hand fills from empty, so they clear it and drive the adds themselves. */
 	function emptied(q: Quill): Document {
 		const doc = q.seedDocument();
-		doc.storeField('revisions', []);
+		doc.unchecked.storeField('revisions', []);
 		return doc;
 	}
 
@@ -242,7 +242,7 @@ describe('an array of objects', () => {
 	it('draws a list of one record open on mount', () => {
 		const q = quill();
 		const doc = emptied(q);
-		doc.storeField('revisions', [{ note: 'Only' }]);
+		doc.unchecked.storeField('revisions', [{ note: 'Only' }]);
 		const { target } = mountEditor(q, doc);
 
 		const arr = field(target, 'Revisions');
@@ -294,14 +294,14 @@ describe('an array of objects', () => {
 // so the rows are the render's reading and a gesture writes that list whole.
 describe('an array holding a bare value', () => {
 	const loaded = (...fields: string[]): Document =>
-		core.Document.fromMarkdown(['~~~', '$quill: showcase@1.0.0', ...fields, '~~~', ''].join('\n'));
+		core.Document.parse(['~~~', '$quill: showcase@1.0.0', ...fields, '~~~', ''].join('\n'));
 	const rendered = (q: Quill, doc: Document, name: string) =>
 		new DocumentReader(q, doc).resolve().main.fields.find((r) => r.name === name)?.value;
 
 	it('draws a bare string as one row, and an edit writes the list', () => {
 		const q = quill();
 		const doc = loaded('authors: Ada Lovelace');
-		expect(doc.getStored('authors')).toBe('Ada Lovelace');
+		expect(literal(doc.getStored('authors'))).toBe('Ada Lovelace');
 		const { target } = mountEditor(q, doc);
 		const leaves = () => [
 			...field(target, 'Authors').querySelectorAll<HTMLElement>(
@@ -313,7 +313,7 @@ describe('an array holding a bare value', () => {
 			(rendered(q, doc, 'authors') as Content[]).map((c) => c.text)
 		);
 		typeLeaf(leaves()[0], 'Grace Hopper');
-		expect(doc.getStored('authors')).toEqual(['Grace Hopper']);
+		expect(literal(doc.getStored('authors'))).toEqual(['Grace Hopper']);
 	});
 
 	it('draws a bare string as one prose row at its codec, and an add writes the list', () => {
@@ -330,7 +330,7 @@ describe('an array holding a bare value', () => {
 
 		field(target, 'Errata').querySelector<HTMLButtonElement>('.qm-add-el')!.click();
 		flushSync();
-		expect(doc.getStored('errata')).toEqual(['Page 9 omits the *colophon*.', '']);
+		expect(literal(doc.getStored('errata'))).toEqual(['Page 9 omits the *colophon*.', '']);
 		expect(rows('Errata')).toEqual(['Page 9 omits the *colophon*.', '']);
 	});
 });

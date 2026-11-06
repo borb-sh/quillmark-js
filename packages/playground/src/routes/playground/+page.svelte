@@ -74,12 +74,11 @@
 		ChangeSet,
 		Diagnostic,
 		FontFace,
-		OutputFormat,
-		Delta
+		OutputFormat
 	} from '@quillmark/wasm';
 	import type { Landing, Place, EditorError, DocPath } from '@quillmark/svelte/core';
 	import type { ActiveLeaf, CardOp, EditorChange } from '@quillmark/svelte/visual';
-	import type { RemoteChange, Session } from '@quillmark/collab';
+	import type { Delta, RemoteChange, Session } from '@quillmark/collab';
 	import { Preview } from '@quillmark/svelte/preview';
 	import { LABELS as fontLabels, loadSuite } from '@quillmark/fonts';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
@@ -422,14 +421,14 @@
 			const doc = example ?? quill.seedDocument();
 			created.unshift(doc);
 			// The seed variants. `?foreign` holds a card whose kind the schema cannot
-			// project: `Document.insertCard` is schema-agnostic where the Quill-bound
+			// project: `doc.unchecked.insertCard` is schema-agnostic where the Quill-bound
 			// writer would reject it, and the engine renders past it with a warning, so the
 			// seed reaches the recovery shell over a preview that leaves the card out.
 			// `?tips` seeds the guidance channel a quill or consumer supplies
 			// (`$ext`, not schema), through `patchEditorExt`, so a consumer seeding one key
 			// does not replace the map.
 			if (params.has('foreign')) {
-				doc.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
+				doc.unchecked.insertCard({ kind: 'legacy_kind', body: 'Trapped legacy body.' });
 			}
 			if (params.has('tips')) {
 				visual.patchEditorExt(doc, MAIN_CARD_ADDR, {

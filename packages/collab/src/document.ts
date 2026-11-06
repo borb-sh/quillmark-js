@@ -8,9 +8,9 @@
 // field through `replace`, which keeps the Document's own anchors. Nothing here knows the
 // editor; the host hears what moved through `onRemote`.
 //
-// A field's Y form follows its value: a content value is a content root, a string a plain root
-// where the kind declares `text` or Y already holds it plain, anything else a value in the card
-// map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
+// A field's Y form follows its value: a content value is a content root, a declared `text` or
+// `richtext` field always one, a string a plain root where Y already holds it plain, anything else
+// a value in the card map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
 // to the root racing the retype lands; the reader takes whichever form a field arrives in:
 // `@<field>` in the card map says which root holds it.
 import * as Y from 'yjs';
@@ -20,7 +20,6 @@ import type {
 	CardAddr,
 	CardInput,
 	Content,
-	Delta,
 	Document,
 	PayloadItem,
 	Quill,
@@ -29,6 +28,7 @@ import type {
 import {
 	CARDS,
 	COMPANIONS,
+	ID,
 	KIND,
 	MAIN,
 	SESSION,
@@ -43,7 +43,7 @@ import {
 import { inserts, project, type Projection } from './project.js';
 import { unrepaired } from './repaired.js';
 import { withoutAnchors, writeContent, type Mint } from './write.js';
-import { deltaOf } from './delta.js';
+import { deltaOf, type Delta } from './delta.js';
 import { changedRuns, commonRun } from './lines.js';
 
 /** A change to the composable card list, by index, as the Document takes it. */
@@ -94,9 +94,9 @@ export interface RemoteChange {
 	cards: CardOp[];
 	/** Cards, by their index after `cards`, whose kind, title or whole-value fields changed. */
 	fields: CardRef[];
-	/** Text and content fields that changed. A content field revised in place carries the delta
-	 *  from its previous text, which a host maps its selection through; one that landed whole,
-	 *  and a `text` field, carry none. A card `cards` inserted is new as a whole and is not
+	/** Text and content fields that changed. A field revised in place carries the change its text
+	 *  took in the Document, which a host maps its selection through; one that landed whole
+	 *  carries none. A card `cards` inserted is new as a whole and is not
 	 *  listed. */
 	content: { addr: Addr; delta?: Delta }[];
 }
@@ -105,6 +105,10 @@ export interface BindDocumentOpts {
 	doc: Document;
 	quill: Quill;
 	ydoc: Y.Doc;
+	/** Whether this client leads: it writes back a repair that inserts once it reads one, so the
+	 *  state no longer needs it. A binding alone on its Y.Doc leads; one among peers leads only
+	 *  where its session elects it. */
+	leader: boolean;
 	onRemote?(change: RemoteChange): void;
 	/** A remote value the Document refused. The field keeps its last value. */
 	onError?(error: unknown): void;
@@ -123,6 +127,9 @@ export interface DocumentBinding {
 	/** Whether a remote value the Document refused is held: the Document is then not the Y
 	 *  state's projection, and a save of it would leave that value out. */
 	readonly holding: boolean;
+	/** Whether this client leads (`BindDocumentOpts.leader`). Set it as the session's election
+	 *  moves; a binding made leader writes back each repair that inserts it reads now. */
+	leader: boolean;
 	destroy(): void;
 }
 
@@ -139,9 +146,6 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** Each root's value as last synced, both sides agreeing: a push skips a field whose
 	 *  Document value still reads this. */
 	const synced = new Map<string, string>();
-	/** The text event of the transaction in flight, per root, read by the pull. */
-	const events = new Map<string, Y.YTextEvent>();
-	const observed = new Map<Y.Text, (e: Y.YTextEvent) => void>();
 	/** Cards and fields, by Y name, whose last remote value the Document refused. A push leaves
 	 *  them as Y holds them: the Document's value is not one this client synced. */
 	const held = new Set<string>();
@@ -150,11 +154,14 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	const inserting = new Set<string>();
 	/** The fields a pull landed under ids Y does not hold, written back once it ends. */
 	let reminted: { root: string; addr: Addr }[] = [];
+	/** The cards a pull gave another `$id` than their map claims, written back once it ends. */
+	let claims: string[] = [];
 	/** The card list a remote change could not be applied to: nothing more is pulled or pushed. */
 	let diverged = false;
 	let mismatchReported = false;
 
 	const report = (error: unknown) => opts.onError?.(error);
+	let leader = opts.leader;
 	const nameOf = (c: CardRef): string => (c === MAIN ? MAIN : ids[c]);
 	const addrOf = (c: CardRef, field?: string): Addr => ({
 		...(c === MAIN ? {} : { card: c }),
@@ -172,12 +179,12 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	/** The form `schema` declares for field `name`; an undeclared field is a value. */
 	const declared = (schema: QuillCardSchema | undefined, name: string): Form =>
 		schema && Object.hasOwn(schema.fields, name) ? formOf(schema.fields[name].type) : 'value';
-	/** The form `value` is written in: the one `declared` names where the value fits it, else the
-	 *  one its shape names, a string staying plain where Y already holds it so (`held`). */
+	/** The form `value` is written in: a content root where the kind declares one or the value is
+	 *  content, else the one its shape names, a string staying plain where Y already holds it so
+	 *  (`held`). */
 	const formFor = (declared: Form, value: unknown, held: Form | undefined): Form => {
 		if (declared === 'content' || isContent(value)) return 'content';
-		if (typeof value !== 'string') return 'value';
-		return declared === 'plain' || held === 'plain' ? 'plain' : 'value';
+		return typeof value === 'string' && held === 'plain' ? 'plain' : 'value';
 	};
 	/** The form a field arrives in from Y; `undefined` where Y holds none. */
 	const arrived = (map: Y.Map<unknown>, key: string): Form | undefined => {
@@ -185,20 +192,6 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (at === 'content' || at === 'plain') return at;
 		return map.has(key) ? 'value' : undefined;
 	};
-
-	/** Observe a content root's text, so a pull reads the change's own delta. */
-	function watch(root: string): void {
-		const text = ydoc.getText(root);
-		if (observed.has(text)) return;
-		const fn = (e: Y.YTextEvent) => events.set(root, e);
-		text.observe(fn);
-		observed.set(text, fn);
-	}
-	function watchCard(name: string, schema: QuillCardSchema | undefined): void {
-		watch(contentRoot(name));
-		for (const [field, f] of Object.entries(schema?.fields ?? {}))
-			if (formOf(f.type) === 'content') watch(contentRoot(name, field));
-	}
 
 	/** A content field's value in the Document, as content; `undefined` where it is absent. */
 	function storedContent(addr: Addr): Content | undefined {
@@ -215,11 +208,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 	const projectRoot = (root: string): Content => projectField(root).content;
 
-	/** Write `content` over the content root `root`. A peer writes back no repair that inserts:
-	 *  the session has no single writer to leave it to, so every peer reads it through `repair`. */
+	/** Write `content` over the content root `root`. A peer other than the leader writes back no
+	 *  repair that inserts: it reads it through `repair`. */
 	function writeField(root: string, content: Content): Map<string, string> {
 		const types = contentTypes(ydoc, root);
-		if (!inserting.has(root)) return writeContent(types, content, mint);
+		if (leader || !inserting.has(root)) return writeContent(types, content, mint);
 		const raw = readField(types);
 		const projection = project(raw);
 		if (!projection.repairs.some(inserts)) {
@@ -255,26 +248,36 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 
 	/**
-	 * Write `content`, the projection of `root`, over the field at `addr`. `replace` re-mints an id
-	 * it introduces that the Document's own log holds, so the value it lands can differ from the
-	 * projection by ids; such a field is named in `reminted`, to be written back to Y.
+	 * Write `content`, the projection of `root`, over the field at `addr`. The value `replace`
+	 * lands can differ from the projection by ids; such a field is named in `reminted`, to be
+	 * written back to Y. A field the Document does not hold is stored whole, as `replace` would
+	 * write it in the rich codec. Returns the change the write made to the field's text, none for
+	 * one stored whole.
 	 */
 	function land(
 		root: string,
 		addr: Addr,
 		content: Content,
 		reminted: { root: string; addr: Addr }[]
-	): void {
-		doc.replace(writeAddr(addr), content);
+	): Delta | undefined {
+		const held = storedContent(addr) !== undefined;
+		const applied = held ? doc.replace(writeAddr(addr), content).applied : undefined;
+		if (!held) doc.unchecked.storeField(addr, content);
 		const landed = contentKey(storedContent(addr));
 		synced.set(root, landed);
 		if (landed !== contentKey(content)) reminted.push({ root, addr });
+		return applied && deltaOf(applied);
 	}
 
-	/** Write each field's Document value to Y, where it landed under ids Y does not hold. */
-	function writeBack(reminted: { root: string; addr: Addr }[]): void {
-		if (!reminted.length) return;
+	/** Write each field's Document value to Y, where it landed under ids Y does not hold or,
+	 *  for the leader, read through a repair that inserts. */
+	function writeBack(reminted: { root: string; addr: Addr }[], named: string[] = []): void {
+		if (!reminted.length && !named.length) return;
 		ydoc.transact(() => {
+			for (const name of named) {
+				const c = ids.indexOf(name);
+				if (c >= 0) ydoc.getMap<unknown>(name).set(ID, doc.card(c).id);
+			}
 			for (const { root, addr } of reminted) {
 				const content = storedContent(addr);
 				if (content) writeField(root, content);
@@ -323,13 +326,13 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const card = cardOf(c);
 		const map = ydoc.getMap<unknown>(name);
 		if (c !== MAIN && map.get(KIND) !== card.kind) map.set(KIND, card.kind);
+		if (c !== MAIN && map.get(ID) !== card.id) map.set(ID, card.id);
 		const title = titleOf(card.ext);
 		if ((map.get(TITLE) ?? null) !== (title ?? null)) {
 			if (title === undefined) map.delete(TITLE);
 			else map.set(TITLE, title);
 		}
 		const schema = schemaOf(c, card.kind);
-		watchCard(name, schema);
 		pushContent(contentRoot(name), addrOf(c), card.body, renames);
 
 		const seen = new Set<string>();
@@ -383,7 +386,6 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	): void {
 		const value = contentKey(content);
 		if (held.has(root) || synced.get(root) === value) return;
-		watch(root);
 		const renamed = writeField(root, content);
 		synced.set(root, value);
 		if (renamed.size) renames.push({ root, addr });
@@ -403,13 +405,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (diverged) return change;
 		const hit = (name: string) => touched === 'all' || touched.has(name);
 		reminted = [];
+		claims = [];
 		const hitRoot = (root: string) => hit(root) || COMPANIONS.some((s) => hit(`${root}${s}`));
 		const inserted = new Set<string>();
-		const known = new Set(ids);
 		const listMoved =
-			touched === 'all' ||
-			touched.has(CARDS) ||
-			order.toArray().some((id) => !known.has(id) && touched.has(id));
+			touched === 'all' || touched.has(CARDS) || order.toArray().some((id) => touched.has(id));
 		if (listMoved) pullCards(change, inserted);
 		if (diverged) return change;
 		for (const c of refs()) {
@@ -424,8 +424,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				if (hitRoot(contentRoot(name, field))) pullField(c, field, change);
 			}
 		}
-		events.clear();
-		writeBack(reminted);
+		writeBack(reminted, claims);
 		const session = ydoc.getMap<unknown>(SESSION).get('quill');
 		if (typeof session === 'string' && session !== doc.quillRef && !mismatchReported) {
 			mismatchReported = true;
@@ -441,34 +440,72 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			seen.add(id);
 			return true;
 		});
-		for (let i = ids.length - 1; i >= 0; i--) {
-			if (seen.has(ids[i])) continue;
-			doc.removeCard(i);
-			ids.splice(i, 1);
-			change.cards.push({ op: 'remove', at: i });
-		}
-		for (let i = 0; i < target.length; i++) {
-			if (ids[i] === target[i]) continue;
-			const j = ids.indexOf(target[i]);
-			try {
+		const want = cardIds(target);
+		try {
+			for (let i = ids.length - 1; i >= 0; i--) {
+				if (seen.has(ids[i])) continue;
+				doc.removeCard(i);
+				ids.splice(i, 1);
+				change.cards.push({ op: 'remove', at: i });
+			}
+			// A card whose `$id` the list now gives another card leaves, to return under its own.
+			const rekeyed = new Map<string, Card>();
+			for (let i = ids.length - 1; i >= 0; i--) {
+				if (doc.card(i).id === want.get(ids[i])) continue;
+				rekeyed.set(ids[i], doc.card(i));
+				doc.removeCard(i);
+				ids.splice(i, 1);
+				change.cards.push({ op: 'remove', at: i });
+			}
+			for (let i = 0; i < target.length; i++) {
+				if (ids[i] === target[i]) continue;
+				const j = ids.indexOf(target[i]);
 				if (j >= 0) {
 					doc.moveCard(j, i);
 					ids.splice(j, 1);
 					ids.splice(i, 0, target[i]);
 					change.cards.push({ op: 'move', from: j, to: i });
-				} else {
-					doc.insertCard(cardFromY(target[i]), i);
-					ids.splice(i, 0, target[i]);
-					inserted.add(target[i]);
-					change.cards.push({ op: 'insert', at: i });
-					markSynced(i);
+					continue;
 				}
-			} catch (e) {
-				diverged = true;
-				report(new Diverged(e));
-				return;
+				const was = rekeyed.get(target[i]);
+				const id = want.get(target[i])!;
+				doc.unchecked.insertCard(was ? { ...was, id } : cardFromY(target[i], id), i);
+				ids.splice(i, 0, target[i]);
+				change.cards.push({ op: 'insert', at: i });
+				if (was) continue;
+				inserted.add(target[i]);
+				markSynced(i);
 			}
+		} catch (e) {
+			diverged = true;
+			report(new Diverged(e));
+			return;
 		}
+		for (const name of target) if (ydoc.getMap(name).get(ID) !== want.get(name)) claims.push(name);
+	}
+
+	/**
+	 * The `$id` each card of `target`, in list order, takes: the one its map claims, where it is a
+	 * card id no card before it took, else its Y name. Two clients that place a card at once mint
+	 * one id, and every client hands it to the same card.
+	 */
+	function cardIds(target: readonly string[]): Map<string, string> {
+		const out = new Map<string, string>();
+		const taken = new Set<string>();
+		for (const name of target) {
+			const claim = ydoc.getMap(name).get(ID);
+			if (typeof claim !== 'string' || !CARD_ID.test(claim) || taken.has(claim)) continue;
+			out.set(name, claim);
+			taken.add(claim);
+		}
+		for (const name of target) {
+			if (out.has(name)) continue;
+			let id = name;
+			for (let k = 1; taken.has(id); k++) id = `${name}-${k}`;
+			out.set(name, id);
+			taken.add(id);
+		}
+		return out;
 	}
 
 	/** A field's value as Y holds it, in whichever form it arrived; `undefined` where absent. */
@@ -490,13 +527,12 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	}
 
 	/** A composable card built from its Y state, for a card another client inserted. */
-	function cardFromY(id: string): CardInput {
-		const map = ydoc.getMap<unknown>(id);
+	function cardFromY(name: string, id: string): CardInput {
+		const map = ydoc.getMap<unknown>(name);
 		const kind = map.get(KIND) as string;
 		const schema = quill.schema.card_kinds?.[kind];
-		watchCard(id, schema);
 		const order = Object.keys(schema?.fields ?? {});
-		const held = yFields(id);
+		const held = yFields(name);
 		const keys = [
 			...order.filter((k) => held.includes(k)),
 			...held.filter((k) => !order.includes(k)).sort()
@@ -504,8 +540,9 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		const title = map.get(TITLE);
 		return {
 			kind,
-			payloadItems: keys.map((key) => ({ type: 'field', key, value: yValue(id, key) })),
-			body: projectRoot(contentRoot(id)),
+			id,
+			payloadItems: keys.map((key) => ({ type: 'field', key, value: yValue(name, key) })),
+			body: projectRoot(contentRoot(name)),
 			...(typeof title === 'string' ? { ext: { editor: { title } } } : {})
 		};
 	}
@@ -534,12 +571,11 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			try {
 				doc.removeCard(c);
 				try {
-					doc.insertCard({ ...was, kind }, c);
+					doc.unchecked.insertCard({ ...was, kind }, c);
 				} catch (e) {
-					doc.insertCard(was, c);
+					doc.unchecked.insertCard(was, c);
 					throw e;
 				}
-				watchCard(name, schemaOf(c, kind));
 				moved = true;
 			} catch (e) {
 				held.add(name);
@@ -572,7 +608,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				} else {
 					const value = yValue(name, key);
 					if (canonical(doc.getStored(addr)) === canonical(value)) continue;
-					doc.storeField(addr, value);
+					doc.unchecked.storeField(addr, value);
 					if (form === 'plain') synced.set(contentRoot(name, key), JSON.stringify(value));
 				}
 				held.delete(root);
@@ -602,7 +638,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				return reviseFrom(root, addr, change);
 			const value = yValue(name, field);
 			if (value === undefined || canonical(doc.getStored(addr)) === canonical(value)) return;
-			doc.storeField(addr, value);
+			doc.unchecked.storeField(addr, value);
 			held.delete(root);
 			synced.set(root, form === 'plain' ? JSON.stringify(value) : canonical(value));
 			if (declared(schema, field) === 'value') {
@@ -619,17 +655,16 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		if (change.content.some((x) => sameAddr(x.addr, addr))) return;
 		try {
 			const projection = projectField(root);
+			if (leader && projection.repairs.some(inserts)) reminted.push({ root, addr });
 			const before = storedContent(addr);
 			if (before && contentKey(before) === contentKey(projection.content)) {
 				held.delete(root);
 				synced.set(root, contentKey(before));
 				return;
 			}
-			const event = events.get(root);
-			land(root, addr, projection.content, reminted);
+			const delta = land(root, addr, projection.content, reminted);
 			held.delete(root);
-			if (!before || !event) change.content.push({ addr });
-			else change.content.push({ addr, delta: deltaOf(event) });
+			change.content.push(delta ? { addr, delta } : { addr });
 		} catch (e) {
 			held.add(root);
 			report(e);
@@ -651,7 +686,6 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 
 	const onAfter = (tr: Y.Transaction) => {
 		if (tr.origin === origin) {
-			events.clear();
 			return;
 		}
 		const touched = new Set<string>();
@@ -677,8 +711,6 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			target.length === doc.cardCount &&
 			target.every((id, i) => ydoc.getMap(id).get(KIND) === doc.card(i).kind);
 		ids = adopted ? [...target] : Array.from({ length: doc.cardCount }, (_, i) => `\0${i}`);
-		watchCard(MAIN, schemaOf(MAIN));
-		if (adopted) for (let i = 0; i < ids.length; i++) watchCard(ids[i], schemaOf(i));
 		pull('all');
 	} else {
 		ydoc.transact(() => {
@@ -698,10 +730,24 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 		get holding() {
 			return held.size > 0;
 		},
+		get leader() {
+			return leader;
+		},
+		set leader(next: boolean) {
+			if (next === leader) return;
+			leader = next;
+			if (!leader || !inserting.size) return;
+			const change = pull('all');
+			if (change.cards.length || change.fields.length || change.content.length) {
+				try {
+					opts.onRemote?.(change);
+				} catch (e) {
+					report(e);
+				}
+			}
+		},
 		destroy() {
 			ydoc.off('afterTransaction', onAfter);
-			for (const [text, fn] of observed) text.unobserve(fn);
-			observed.clear();
 		}
 	};
 }
@@ -715,7 +761,7 @@ export function seedDocument(doc: Document, quill: Quill): Uint8Array {
 	const ydoc = new Y.Doc({ gc: false });
 	ydoc.clientID = 0;
 	const own = doc.clone();
-	bindDocument({ doc: own, quill, ydoc }).destroy();
+	bindDocument({ doc: own, quill, ydoc, leader: true }).destroy();
 	own.free();
 	const update = Y.encodeStateAsUpdate(ydoc);
 	ydoc.destroy();
@@ -740,9 +786,11 @@ const isContent = (v: unknown): v is Content =>
 	typeof (v as Content).text === 'string' &&
 	Array.isArray((v as Content).blocks);
 
+const CARD_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
 export function formOf(type: string): Form {
 	const base = type.endsWith('?') ? type.slice(0, -1) : type;
-	return base === 'richtext' ? 'content' : base === 'text' ? 'plain' : 'value';
+	return base === 'richtext' || base === 'text' ? 'content' : 'value';
 }
 
 function fieldItems(items: PayloadItem[]): { key: string; value: unknown }[] {

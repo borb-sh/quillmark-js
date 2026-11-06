@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 import type { Content, ContentContainer, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
 import { bindDocument, Diverged, seedDocument } from '../src/index.js';
+import { inserts, project } from '../src/project.js';
+import { contentRoot, contentTypes, readField } from '../src/shape.js';
 import { core, deliver, edit, peers, quill, settle, snapshot, type Peer } from './helpers.js';
+import type { Delta } from '../src/index.js';
 
 const example = () => quill().exampleDocument()!;
 const body = (p: Peer, card?: number): Content =>
@@ -125,6 +128,34 @@ describe('content', () => {
 		expect([`${merged} A B`, `${merged} B A`]).toContain(body(a).text);
 	});
 
+	it('the leader writes a repair that inserts back, and every client then reads none', () => {
+		const tabled = () => {
+			const doc = example();
+			doc.replace({}, core.importMarkdown('lead\n\n| h |\n| - |\n\ntail').content);
+			return doc;
+		};
+		const inserting = (p: Peer) =>
+			project(readField(contentTypes(p.ydoc, contentRoot('main')))).repairs.filter(inserts);
+		for (const leader of [undefined, 2, 'elected later'] as const) {
+			const [a, b, c] = peers(3, tabled, quill(), typeof leader === 'number' ? leader : undefined);
+			const slot = Array.from(body(a).text).indexOf('￼');
+			edit(a.doc, {}, [{ retain: slot + 1 }, { delete: '\ntail'.length }]);
+			a.binding.push();
+			edit(b.doc, {}, [{ retain: slot + 2 }, { insert: 'typed ' }]);
+			b.binding.push();
+			settle([a, b, c]);
+			if (leader === 'elected later') {
+				expect(inserting(a)).toHaveLength(1);
+				c.binding.leader = true;
+				settle([a, b, c]);
+			}
+			expect(inserting(a)).toHaveLength(leader === undefined ? 1 : 0);
+			expect(snapshot(a.doc)).toBe(snapshot(c.doc));
+			expect(snapshot(b.doc)).toBe(snapshot(c.doc));
+			expect([a, b, c].flatMap((p) => p.errors)).toEqual([]);
+		}
+	});
+
 	it('text split off a table by repair is not split twice by two clients typing', () => {
 		const [a, b] = peers(2, () => {
 			const doc = example();
@@ -151,7 +182,7 @@ describe('content', () => {
 		const [a, b] = peers(2, withBody('one\ntwo'));
 		a.doc.apply({}, { steps: [{ setBlock: { id: 'b1', kind: 'heading', attrs: { level: 2 } } }] });
 		a.binding.push();
-		b.doc.apply({}, core.splitBlock(body(b), 4, 'bn'));
+		b.doc.splitBlock({}, 4, { id: 'bn' });
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
@@ -183,6 +214,38 @@ describe('content', () => {
 		const { delta } = change.content.find((c) => c.addr.card === undefined && !c.addr.field)!;
 		expect(delta).toEqual({ ops: [{ retain: 2 }, { insert: 'xy' }] });
 	});
+
+	it("hands the host the Document's own text change where a repair inserts", () => {
+		const [a, b] = peers(2, () => {
+			const doc = example();
+			doc.replace({}, core.importMarkdown('lead\n\n| h |\n| - |\n\ntail').content);
+			return doc;
+		});
+		const slot = Array.from(body(a).text).indexOf('￼');
+		edit(a.doc, {}, [{ retain: slot + 1 }, { delete: '\ntail'.length }]);
+		a.binding.push();
+		edit(b.doc, {}, [{ retain: slot + 2 }, { insert: 'typed ' }]);
+		b.binding.push();
+		const before = body(a).text;
+		deliver(a);
+		const { delta } = a.changes.at(-1)!.content.find((c) => !c.addr.card && !c.addr.field)!;
+		expect(
+			project(readField(contentTypes(a.ydoc, contentRoot('main')))).repairs.some(inserts)
+		).toBe(true);
+		expect(applyDelta(before, delta!)).toBe(body(a).text);
+	});
+
+	it('a text field keeps its plain codec through Y', () => {
+		const [a, b] = peers(2, example);
+		quill().writer(b.doc).revise('subtitle', 'A *plain* line');
+		b.binding.push();
+		deliver(a);
+		expect(a.doc.getStored({ field: 'subtitle' })).toMatchObject({
+			text: 'A *plain* line',
+			codec: 'plain'
+		});
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+	});
 });
 
 describe('cards', () => {
@@ -201,12 +264,30 @@ describe('cards', () => {
 	it('a remote insert arrives as a card op with the card whole', () => {
 		const [a, b] = peers(2, example);
 		const card = quill().seedCard('note', b.doc.seedOverlay('note'))!;
-		b.doc.insertCard(card, 1);
+		b.doc.unchecked.insertCard(card, 1);
 		b.binding.push({ op: 'insert', at: 1 });
 		deliver(a);
 		expect(a.changes.at(-1)!.cards).toEqual([{ op: 'insert', at: 1 }]);
 		expect(a.doc.card(1).kind).toBe('note');
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+	});
+
+	it('two cards placed at once take one $id each, the same on every client', () => {
+		const [a, b] = peers(2, example);
+		for (const p of [a, b]) {
+			p.doc.unchecked.insertCard(quill().seedCard('note', p.doc.seedOverlay('note'))!, 0);
+			p.binding.push({ op: 'insert', at: 0 });
+		}
+		expect(a.doc.card(0).id).toBe(b.doc.card(0).id);
+		settle([a, b]);
+		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
+		const ids = a.doc.cards.map((c) => c.id);
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const p of [a, b])
+			p.binding.ids.forEach((name, i) =>
+				expect(p.ydoc.getMap(name).get('$id')).toBe(p.doc.card(i).id)
+			);
+		expect([a, b].flatMap((p) => p.errors)).toEqual([]);
 	});
 
 	it('syncs a card title and keeps the rest of $ext local', () => {
@@ -223,7 +304,7 @@ describe('cards', () => {
 		const at = a.doc.cards.findIndex((c) => c.kind === 'figure');
 		const was = a.doc.card(at);
 		a.doc.removeCard(at);
-		a.doc.insertCard({ ...was, kind: 'section' }, at);
+		a.doc.unchecked.insertCard({ ...was, kind: 'section' }, at);
 		a.binding.push();
 		edit(b.doc, { card: at, field: 'caption' }, [{ insert: 'b ' }]);
 		b.binding.push();
@@ -242,7 +323,7 @@ describe('cards', () => {
 		a.binding.push();
 		const was = b.doc.card(at);
 		b.doc.removeCard(at);
-		b.doc.insertCard({ ...was, kind: 'signoff' }, at);
+		b.doc.unchecked.insertCard({ ...was, kind: 'signoff' }, at);
 		b.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
@@ -250,7 +331,7 @@ describe('cards', () => {
 		expect((a.doc.getStored(lead) as Content).text.startsWith('a ')).toBe(true);
 		const now = a.doc.card(at);
 		a.doc.removeCard(at);
-		a.doc.insertCard({ ...now, kind: 'section' }, at);
+		a.doc.unchecked.insertCard({ ...now, kind: 'section' }, at);
 		a.binding.push();
 		settle([a, b]);
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
@@ -300,13 +381,14 @@ describe('a remote value the Document refuses', () => {
 			doc,
 			quill: q,
 			ydoc: x,
+			leader: true,
 			onRemote: () => {
 				throw new Error('host');
 			},
 			onError: (e) => errors.push(e)
 		});
 		const other = example();
-		const binding = bindDocument({ doc: other, quill: q, ydoc: y });
+		const binding = bindDocument({ doc: other, quill: q, ydoc: y, leader: true });
 		for (const word of ['one ', 'two ']) {
 			edit(other, {}, [{ insert: word }]);
 			binding.push();
@@ -316,3 +398,14 @@ describe('a remote value the Document refuses', () => {
 		expect((doc.getStored({}) as Content).text.startsWith('two one ')).toBe(true);
 	});
 });
+
+function applyDelta(text: string, delta: Delta): string {
+	let out = '';
+	let at = 0;
+	for (const op of delta.ops) {
+		if ('retain' in op) out += text.slice(at, (at += op.retain));
+		else if ('delete' in op) at += op.delete;
+		else out += op.insert;
+	}
+	return out + text.slice(at);
+}

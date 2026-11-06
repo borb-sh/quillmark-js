@@ -26,7 +26,7 @@
 	import { untrack } from 'svelte';
 	import { reportRebindIgnored } from '../core/rebind.svelte.js';
 	import type { DocPath, Landing } from '../core/address.js';
-	import type { Delta } from '@quillmark/wasm';
+	import type { Delta } from '../core/codec/positions.js';
 	import type { CardId, CardOp } from './signals.js';
 	import type { VisualEditorProps } from './props.js';
 	import VisualEditorInner from './VisualEditorInner.svelte';

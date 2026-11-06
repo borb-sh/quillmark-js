@@ -23,7 +23,7 @@ describe('changes the host made', () => {
 		const seeded = slots(target).length;
 		const firstBody = leaf(target, 'c0:$body').querySelector('[contenteditable]');
 
-		doc.insertCard(q.seedCard('section', doc.seedOverlay('section'))!, 0);
+		doc.unchecked.insertCard(q.seedCard('section', doc.seedOverlay('section'))!, 0);
 		doc.moveCard(1, 2);
 		doc.removeCard(seeded);
 		editor.applyCardOps([
@@ -59,7 +59,7 @@ describe('changes the host made', () => {
 		const at = doc.cards.findIndex((c) => c.kind === 'section');
 		const card = doc.card(at);
 		doc.removeCard(at);
-		doc.insertCard({ ...card, kind: 'note' }, at);
+		doc.unchecked.insertCard({ ...card, kind: 'note' }, at);
 		editor.refresh();
 		flushSync();
 		expect(leafKeys(slots(target)[at])).toContain(`c${at}:label`);

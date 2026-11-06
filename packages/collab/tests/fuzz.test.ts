@@ -5,7 +5,7 @@
 // (container runs), tables edited and typed around (slots), and cards moved and edited at once.
 // Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are.
 import { describe, expect, it } from 'vitest';
-import type { Addr, Change, Content, Quill } from '@quillmark/wasm';
+import type { Addr, Change, Content, Document, Quill } from '@quillmark/wasm';
 import { writeFrom, type CardOp } from '../src/index.js';
 import * as Y from 'yjs';
 import { project } from '../src/project.js';
@@ -49,9 +49,20 @@ const blockRanges = (rt: Content) => {
 };
 const fresh = (r: Rng) => `f${r.int(2 ** 30).toString(36)}`;
 
-/** One random content edit over `rt`; `undefined` where the pick does not apply. */
-function contentEdit(r: Rng, rt: Content): Change | undefined {
-	const { splitBlock, deleteRange, indent, outdent, wrap, importMarkdown } = core;
+type Write = (doc: Document, at: Addr) => unknown;
+
+/** One random content edit over `rt`: a change, or a structural edit the Document makes at an
+ *  address; `undefined` where the pick does not apply. */
+function contentEdit(r: Rng, rt: Content): Change | Write | undefined {
+	const { importMarkdown } = core;
+	const deleteRange =
+		(s: number, e: number): Write =>
+		(d, a) =>
+			d.deleteRange(a, s, e);
+	const splitBlock =
+		(at: number, id: string): Write =>
+		(d, a) =>
+			d.splitBlock(a, at, { id });
 	const len = Array.from(rt.text).length;
 	const u = (k: number) => unit(rt.text, k);
 	const ranges = blockRanges(rt);
@@ -84,24 +95,24 @@ function contentEdit(r: Rng, rt: Content): Change | undefined {
 		case 'delete': {
 			if (!len) return undefined;
 			const at = r.int(len);
-			return deleteRange(rt, u(at), u(at + 1 + r.int(Math.min(4, len - at))));
+			return deleteRange(u(at), u(at + 1 + r.int(Math.min(4, len - at))));
 		}
 		case 'enter':
-			return splitBlock(rt, u(r.int(len + 1)), fresh(r));
+			return splitBlock(u(r.int(len + 1)), fresh(r));
 		case 'item': {
 			// Enter at the end of a block inside a list.
 			const listed = ranges.filter((x) => x.block.path?.length);
 			if (!listed.length) return undefined;
-			return splitBlock(rt, u(r.pick(listed).end), fresh(r));
+			return splitBlock(u(r.pick(listed).end), fresh(r));
 		}
 		case 'list':
-			return wrap(rt, block.id, block.id, { kind: 'list', ordered: r.next() < 0.5 });
+			return (d, a) => d.wrap(a, block.id, block.id, { kind: 'list', ordered: r.next() < 0.5 });
 		case 'quote':
 			return block.path?.length
-				? outdent(rt, block.id)
-				: wrap(rt, block.id, block.id, { kind: 'quote' });
+				? (d, a) => d.outdent(a, block.id, block.id)
+				: (d, a) => d.wrap(a, block.id, block.id, { kind: 'quote' });
 		case 'nest':
-			return indent(rt, block.id);
+			return (d, a) => d.indent(a, block.id, block.id);
 		case 'heading':
 			return {
 				steps: [{ setBlock: { id: block.id, kind: 'heading', attrs: { level: 1 + r.int(3) } } }]
@@ -157,7 +168,7 @@ function contentEdit(r: Rng, rt: Content): Change | undefined {
 			if (!slots.length) return undefined;
 			const s = r.pick(slots);
 			const at = Math.max(0, s - r.int(3));
-			return deleteRange(rt, u(at), u(Math.min(len, s + 1 + r.int(2))));
+			return deleteRange(u(at), u(Math.min(len, s + 1 + r.int(2))));
 		}
 	}
 }
@@ -225,7 +236,8 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 				const at = typeof addr.card === 'number' ? { ...addr, card: doc.card(addr.card).id } : addr;
 				const change = contentEdit(r, doc.read(at));
 				if (!change) return false;
-				doc.apply(at, change);
+				if (typeof change === 'function') change(doc, at);
+				else doc.apply(at, change);
 				break;
 			}
 			case 'text':
@@ -249,7 +261,7 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 				const card = q.seedCard(kind, doc.seedOverlay(kind));
 				if (!card) return false;
 				const at = r.int(doc.cardCount + 1);
-				doc.insertCard(card, at);
+				doc.unchecked.insertCard(card, at);
 				op = { op: 'insert', at };
 				break;
 			}
@@ -275,9 +287,9 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 				const was = doc.card(at);
 				doc.removeCard(at);
 				try {
-					doc.insertCard({ ...was, kind: r.pick(kinds) }, at);
+					doc.unchecked.insertCard({ ...was, kind: r.pick(kinds) }, at);
 				} catch (e) {
-					doc.insertCard(was, at);
+					doc.unchecked.insertCard(was, at);
 					throw e;
 				}
 				break;

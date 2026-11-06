@@ -28,6 +28,11 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js",
 			"default": "./dist/index.js"
+		},
+		"./conformance": {
+			"types": "./dist/conformance.d.ts",
+			"import": "./dist/conformance.js",
+			"default": "./dist/conformance.js"
 		}
 	},
 	"sideEffects": false,
@@ -36,7 +41,7 @@
 		"NOTICE"
 	],
 	"peerDependencies": {
-		"@quillmark/wasm": ">=0.134.1-0 <0.135.0-0",
+		"@quillmark/wasm": ">=0.135.0-0",
 		"yjs": "^13.6.0"
 	},
 	"devDependencies": {

@@ -28,7 +28,7 @@ describe('the round trip through Y', () => {
 		Y.applyUpdate(ydoc, seedDocument(saved, q));
 		const doc = q.emptyDocument();
 		const errors: unknown[] = [];
-		bindDocument({ doc, quill: q, ydoc, onError: (e) => errors.push(e) });
+		bindDocument({ doc, quill: q, ydoc, leader: true, onError: (e) => errors.push(e) });
 		expect(errors).toEqual([]);
 		expect(snapshot(doc)).toBe(snapshot(saved));
 	});

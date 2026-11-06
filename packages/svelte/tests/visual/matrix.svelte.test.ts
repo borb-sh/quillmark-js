@@ -8,7 +8,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { fieldTitle } from '$lib/visual/structure';
-import { quill, quillFromYaml } from '../helpers/fixtures.js';
+import { quill, quillFromYaml, literal } from '../helpers/fixtures.js';
 import {
 	field,
 	mountEditor,
@@ -23,7 +23,7 @@ import {
 
 afterEach(unmountAll);
 
-const stored = (doc: Document) => doc.getStored('checks');
+const stored = (doc: Document) => literal(doc.getStored('checks'));
 const checks = quill().schema.main.fields.checks;
 const titles = checks.members!;
 const roster = Object.values(titles);
@@ -123,7 +123,7 @@ describe('a matrix field', () => {
 	it('reads the bare true spelling as held, and keeps it held through an edit elsewhere', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { fonts: true });
+		doc.unchecked.storeField('checks', { fonts: true });
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 		expect(tick(m, titles.fonts).checked).toBe(true);
@@ -146,7 +146,7 @@ describe('a matrix field', () => {
 	it('reads a mapping naming no tick as held, and one storing `held` as held too', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { fonts: {}, margins: { held: true, note: 'x' } });
+		doc.unchecked.storeField('checks', { fonts: {}, margins: { held: true, note: 'x' } });
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 		expect(tick(m, titles.fonts).checked).toBe(true);
@@ -176,7 +176,7 @@ describe('a matrix field', () => {
 	it('lands a member address on its tick and a column address on that column', async () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { fonts: { note: 'kerning off' } });
+		doc.unchecked.storeField('checks', { fonts: { note: 'kerning off' } });
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 
@@ -207,7 +207,7 @@ describe('a matrix field', () => {
 	it('draws a diagnostic under the member it names, and under its column when drawn', () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { fonts: { severity: 'major' } });
+		doc.unchecked.storeField('checks', { fonts: { severity: 'major' } });
 		const diagnostics = [
 			{ severity: 'error' as const, message: 'not a severity', path: 'main.checks.fonts.severity' },
 			{ severity: 'error' as const, message: 'no such column', path: 'main.checks.margins.note' }
@@ -253,7 +253,10 @@ describe('an open matrix', () => {
 	it('retitles an added item in place and removes it whole', async () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { spelling: true, kerning: { title: 'Kerning', severity: 'major' } });
+		doc.unchecked.storeField('checks', {
+			spelling: true,
+			kerning: { title: 'Kerning', severity: 'major' }
+		});
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 		const item = () => m.querySelector<HTMLElement>('.qm-member.added');
@@ -275,7 +278,7 @@ describe('an open matrix', () => {
 	it("draws the engine's refusal of an emptied title under its item", () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { kerning: { title: 'Kerning' } });
+		doc.unchecked.storeField('checks', { kerning: { title: 'Kerning' } });
 		const first = mountEditor(q, doc);
 		const title = matrix(first.target).querySelector<HTMLInputElement>('.qm-member-title-input')!;
 
@@ -295,7 +298,7 @@ describe('an open matrix', () => {
 	it("draws added items after the roster in id order, the plate's order", () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { zeta: { title: 'Zeta' }, alpha: { title: 'Alpha' } });
+		doc.unchecked.storeField('checks', { zeta: { title: 'Zeta' }, alpha: { title: 'Alpha' } });
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 		const titles = [...m.querySelectorAll<HTMLInputElement>('.qm-member-title-input')].map(
@@ -308,7 +311,7 @@ describe('an open matrix', () => {
 	it("lands an added item's address and its title's on the title, a column on the column", async () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', { kerning: { title: 'Kerning', note: 'tight' } });
+		doc.unchecked.storeField('checks', { kerning: { title: 'Kerning', note: 'tight' } });
 		const mounted = mountEditor(q, doc);
 		const m = matrix(mounted.target);
 		const item = m.querySelector<HTMLElement>('.qm-member.added')!;
@@ -413,7 +416,7 @@ describe('an open matrix', () => {
 	it('hands the caret to the next added item when one is removed', async () => {
 		const q = quill();
 		const doc = q.seedDocument();
-		doc.storeField('checks', {
+		doc.unchecked.storeField('checks', {
 			a_one: { title: 'A' },
 			b_two: { title: 'B' },
 			c_three: { title: 'C' }
@@ -467,7 +470,7 @@ describe('an open checklist', () => {
 
 		press(typeAdd(tags, 'Reviewed'), 'Enter', { cancelable: true });
 		await settle();
-		expect(doc.getStored('tags')).toEqual({ reviewed: { title: 'Reviewed' } });
+		expect(literal(doc.getStored('tags'))).toEqual({ reviewed: { title: 'Reviewed' } });
 		expect(document.activeElement).toBe(addBox(tags));
 		expect(addBox(tags).value).toBe('');
 
@@ -488,11 +491,11 @@ describe('a matrix declaring a default', () => {
 		const preset = field(mounted.target, 'Preset');
 		expect(tick(preset, 'Alpha').checked).toBe(true);
 		expect(preset.querySelector('.qm-matrix-roster')?.hasAttribute('data-default')).toBe(true);
-		expect(doc.getStored('preset')).toBeUndefined();
+		expect(literal(doc.getStored('preset'))).toBeUndefined();
 
 		tick(preset, 'Beta').click();
 		flushSync();
-		expect(doc.getStored('preset')).toEqual({ a: true, b: true });
+		expect(literal(doc.getStored('preset'))).toEqual({ a: true, b: true });
 		expect(preset.querySelector('.qm-matrix-roster')?.hasAttribute('data-default')).toBe(false);
 
 		// Nothing held is an answer that outranks the default, not a return to it.
@@ -500,7 +503,7 @@ describe('a matrix declaring a default', () => {
 		flushSync();
 		tick(preset, 'Beta').click();
 		flushSync();
-		expect(doc.getStored('preset')).toEqual({});
+		expect(literal(doc.getStored('preset'))).toEqual({});
 		expect(tick(preset, 'Alpha').checked).toBe(false);
 	});
 });

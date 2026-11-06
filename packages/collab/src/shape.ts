@@ -12,6 +12,8 @@ export const CARDS = '$cards';
 export const SESSION = '$session';
 export const KIND = '$kind';
 export const TITLE = '$title';
+/** A composable card's `$id`, as its Document holds it. */
+export const ID = '$id';
 export const BODY = '$body';
 
 /** The card-map key that says a content field is present: an empty `Y.Text` is otherwise
@@ -29,6 +31,10 @@ export const BLOCK_ID = 'qm:id';
 const BLOCK_KIND = 'qm:kind';
 const BLOCK_PATH = 'qm:path';
 export const LINE_KEYS = [BLOCK_ID, BLOCK_KIND, BLOCK_PATH] as const;
+
+/** The block-0 map's key naming the field's codec: `plain` for a `text` field's value, absent for
+ *  rich content. */
+export const CODEC = 'qm:codec';
 
 /** The formatting marks a character attribute carries. */
 export const MARK_KEYS = [
@@ -58,6 +64,7 @@ export interface YField {
 	blocks: YBlock[];
 	islands: Y.Map<unknown>[];
 	containers: Y.Map<unknown>;
+	codec?: 'plain';
 }
 
 export interface ContentTypes {
@@ -105,7 +112,14 @@ export function readField(types: ContentTypes): YField {
 			islands.push(op.insert as Y.Map<unknown>);
 		}
 	}
-	return { chars, attrs, blocks, islands, containers };
+	return {
+		chars,
+		attrs,
+		blocks,
+		islands,
+		containers,
+		...(meta.get(CODEC) === 'plain' ? { codec: 'plain' as const } : {})
+	};
 }
 
 function blockOf(a: Attrs): YBlock {
