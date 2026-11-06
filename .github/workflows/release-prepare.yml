@@ -61,8 +61,10 @@ jobs:
           PKG="${{ inputs.package }}"
           CURRENT=$(node -p "require('./packages/$PKG/package.json').version")
 
+          # No reify here: a sibling pinned at the old version, which the registry may
+          # not hold, is moved below and the lock is written after it.
           npm version "${{ inputs.bump }}" -w "packages/$PKG" \
-            --no-git-tag-version --allow-same-version >/dev/null
+            --no-git-tag-version --allow-same-version --no-workspaces-update >/dev/null
           NEXT=$(node -p "require('./packages/$PKG/package.json').version")
 
           # quillkit carries the quiver and the font suite at exactly their workspace
