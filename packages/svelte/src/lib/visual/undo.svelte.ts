@@ -64,6 +64,9 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		if (timer !== undefined) clearTimeout(timer);
 		timer = undefined;
 	};
+	const lapse = (): void => {
+		timer = setTimeout(clear, OFFER_MS);
+	};
 	const clear = (): void => {
 		stop();
 		paused = false;
@@ -78,7 +81,7 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			clear();
 			current = { notice, restore };
 			latest = self;
-			timer = setTimeout(clear, OFFER_MS);
+			lapse();
 		},
 		hand(el) {
 			if (!current || !el) return;
@@ -105,7 +108,7 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		resume() {
 			if (!current || !paused) return;
 			paused = false;
-			timer = setTimeout(clear, OFFER_MS);
+			lapse();
 		},
 		take() {
 			const offer = current;
@@ -126,19 +129,19 @@ export function setStructuralUndo(undo: StructuralUndo): void {
 	setContext(KEY, undo);
 }
 
-/** The editor's undo, or one that offers nothing off-tree, so a component rendered outside
- *  the editor removes as it always did. */
+/** What a component rendered outside the editor gets: no offer, so it removes as it always did. */
+const NO_UNDO: StructuralUndo = {
+	current: undefined,
+	offer() {},
+	hand() {},
+	accepts: () => false,
+	pause() {},
+	resume() {},
+	take: () => false,
+	withdraw() {}
+};
+
+/** The editor's undo, or {@link NO_UNDO} off-tree. */
 export function structuralUndo(): StructuralUndo {
-	return (
-		getContext<StructuralUndo>(KEY) ?? {
-			current: undefined,
-			offer() {},
-			hand() {},
-			accepts: () => false,
-			pause() {},
-			resume() {},
-			take: () => false,
-			withdraw() {}
-		}
-	);
+	return getContext<StructuralUndo>(KEY) ?? NO_UNDO;
 }
