@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
 import { core, quill, example } from '../helpers/fixtures.js';
-import { field, mountEditor, press, unmountAll } from '../helpers/surface.svelte.js';
+import { field, mountEditor, paste, press, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -184,5 +184,60 @@ Body.
 			"Raynor's Raiders Field Report, 2504, Zerg Hive Cluster Activity on Char"
 		]);
 		expect(text.some((t) => t?.includes('*'))).toBe(false);
+	});
+});
+
+// An empty list draws one row to type into, which is no element until it holds one.
+describe('an empty list of lines', () => {
+	const emptied = (): Document => {
+		const doc = example();
+		doc.removeField('errata');
+		return doc;
+	};
+	const errata = (target: HTMLElement) => field(target, 'Errata');
+	const standingRows = (target: HTMLElement) =>
+		errata(target).querySelectorAll('.qm-array-row.standing');
+
+	it('draws an empty standing row with no remove, and writes nothing for a key', () => {
+		const q = quill();
+		const doc = emptied();
+		const { target, changes } = mountEditor(q, doc);
+
+		expect(rows(target)).toHaveLength(1);
+		expect(standingRows(target)).toHaveLength(1);
+		expect(rows(target)[0].querySelector('.qm-prose-placeholder')).toBeNull();
+		expect(errata(target).querySelector('.qm-remove')).toBeNull();
+
+		press(rows(target)[0], 'Enter');
+		press(rows(target)[0], 'Backspace');
+		expect(doc.getStored('errata')).toBeUndefined();
+		expect(changes).toHaveLength(0);
+		expect(rows(target)).toHaveLength(1);
+	});
+
+	it('becomes the first element at its first edit, keeping its leaf', () => {
+		const q = quill();
+		const doc = emptied();
+		const { target } = mountEditor(q, doc);
+
+		const leaf = rows(target)[0];
+		paste(leaf, 'Page 3 transposes two figures.');
+		expect(doc.getStored('errata')).toEqual(['Page 3 transposes two figures.']);
+		expect(rows(target)).toEqual([leaf]);
+		expect(standingRows(target)).toHaveLength(0);
+		expect(errata(target).querySelectorAll('.qm-remove')).toHaveLength(1);
+	});
+
+	it('stands again once the last element is removed', () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('errata', ['Only']);
+		const { target } = mountEditor(q, doc);
+
+		errata(target).querySelector<HTMLButtonElement>('.qm-remove')!.click();
+		flushSync();
+		expect(doc.getStored('errata')).toEqual([]);
+		expect(standingRows(target)).toHaveLength(1);
+		expect(rows(target)).toHaveLength(1);
 	});
 });
