@@ -20,7 +20,14 @@ import * as Y from 'yjs';
 import type { Document, Quill } from '@quillmark/wasm';
 import { init } from './core.js';
 import { cardOps, seedDocument, type CardOp } from './document.js';
-import { changesSince, projectDocument, writeFrom, type Change } from './fork.js';
+import {
+	changesSince,
+	projectDocument,
+	writeFrom,
+	type Change,
+	type Held,
+	type WriteFromOpts
+} from './fork.js';
 import {
 	QuillMismatch,
 	settled,
@@ -103,12 +110,17 @@ export interface WriteLogOpts extends ReadLogOpts {
 	key?: string;
 	/** Make the edit on the Document as it stood at `base`; return its card operations, if any. */
 	edit(doc: Document): CardOp | CardOp[] | void;
+	/** `writeFrom`'s: where an edit meets a change made since, and what of it to hold back. A
+	 *  held part is written with the rest and answered in `held`, for a client of the session to
+	 *  write with `writeHeld` on request. */
+	scope?: WriteFromOpts['scope'];
+	hold?: WriteFromOpts['hold'];
 }
 
 export type LogWrite =
-	/** Appended. `revision` holds the edit, to read from next. */
-	| { status: 'written'; revision: Revision; changes: Change[] }
-	/** Not appended: changes since `base` touch what the edit does. Read again and redo it. */
+	/** Appended. `revision` holds the edit, to read from next; `held` the parts `hold` held back. */
+	| { status: 'written'; revision: Revision; changes: Change[]; held: Held[] }
+	/** Not appended: changes since `base` touch what the edit does, and `hold` held none of them. */
 	| { status: 'conflict'; conflicts: Change[] }
 	/** Not appended: `base` names a session that has ended or a state the log no longer holds,
 	 *  or the log kept moving. Read again. */
@@ -148,7 +160,9 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 					base: at,
 					quill,
 					doc: room.template,
-					edit: opts.edit
+					edit: opts.edit,
+					...(opts.scope ? { scope: opts.scope } : {}),
+					...(opts.hold ? { hold: opts.hold } : {})
 				});
 				if (written.conflicts.length) return { status: 'conflict', conflicts: written.conflicts };
 				if (!opened) {
@@ -171,7 +185,8 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 				return {
 					status: 'written',
 					revision: { epoch: opened.epoch, count: read.count + 1, check: checkOf(snapshot) },
-					changes: written.changes
+					changes: written.changes,
+					held: written.held
 				};
 			} finally {
 				read.ydoc.destroy();

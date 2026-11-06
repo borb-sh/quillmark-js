@@ -11,8 +11,16 @@
 // History is a `Y.Doc` with garbage collection off: a state at an older snapshot can only be
 // rebuilt from one that kept the content deleted since.
 import * as Y from 'yjs';
-import type { Addr, AuthoringCard, Content, Document, Quill } from '@quillmark/wasm';
-import { bindWith, Diverged, formOf, type CardOp, type CardRef } from './document.js';
+import type {
+	Addr,
+	AuthoringCard,
+	Card,
+	CardInput,
+	Content,
+	Document,
+	Quill
+} from '@quillmark/wasm';
+import { bindWith, cardOps, Diverged, formOf, type CardOp, type CardRef } from './document.js';
 import { changedRuns, commonRun, meet, type Run } from './lines.js';
 import {
 	BODY,
@@ -33,16 +41,19 @@ import { project as projectField } from './project.js';
 import { core } from './core.js';
 
 /** What differs between two states of one session, by the cards' place in each. A card moved
- *  is named by `from`, its index in the older state, and `at`, its index in the newer one. */
+ *  is named by `from`, its index in the older state, and `at`, its index in the newer one, and
+ *  every composable card also by `id`, its `$id` in the state that names it first. */
 export type Change =
-	| { type: 'insert'; at: number; card: AuthoringCard }
-	| { type: 'remove'; from: number }
-	| { type: 'move'; from: number; at: number }
-	| { type: 'kind'; from: number; at: number; before: string; after: string }
+	| { type: 'insert'; at: number; id: string; card: AuthoringCard }
+	| { type: 'remove'; from: number; id: string }
+	| { type: 'move'; from: number; at: number; id: string }
+	| { type: 'kind'; from: number; at: number; id: string; before: string; after: string }
 	| {
 			type: 'field';
 			from: CardRef;
 			at: CardRef;
+			/** The card's `$id`; absent for the main card. */
+			id?: string;
 			/** The field's name; absent for the body. */
 			field?: string;
 			/** The value in the authoring form, a content field as Markdown; absent where the
@@ -68,7 +79,7 @@ export interface WriteFromOpts extends ForkOpts {
 	/** Make the edit on the Document as it stood at `base`. An edit that inserts, removes or
 	 *  moves cards returns those operations, in the order it made them, and makes no other
 	 *  card-list change. Where part of it is held, the edit runs a second time, on a fresh
-	 *  Document at `base`, and makes the same change there. */
+	 *  Document at `base`, and must make the same change there, or `Unwritable` is thrown. */
 	edit(doc: Document): CardOp | CardOp[] | void;
 	/** Where an edit to a text meets one made since: `word`, where the words they changed touch,
 	 *  or `line`, where they change one line. Default `word`. */
@@ -76,7 +87,8 @@ export interface WriteFromOpts extends ForkOpts {
 	/** What becomes of the part of the edit that meets a change made since: `none` writes it and
 	 *  reports the change it met in `conflicts`; `hunk` holds back each run of lines that meets
 	 *  one and writes the rest; `field` holds back each field that meets one. A whole-value field
-	 *  is held whole. Default `none`. */
+	 *  is held whole, and so is everything the edit did to a card that one side removed, moved or
+	 *  retyped while the other changed it. Default `none`. */
 	hold?: 'none' | 'hunk' | 'field';
 }
 
@@ -87,29 +99,41 @@ export interface Written {
 	changes: Change[];
 	/** What changed in `history` since `base` at a place the update changes too: words or lines
 	 *  of a text both wrote (`scope`), a field both set, a card both moved, or a card one side
-	 *  removed or retyped that the other wrote. A writer that rewrote words from their old text
+	 *  removed or retyped that the other changed. A writer that rewrote words from their old text
 	 *  would merge into text it never read. A part `hold` held back is not here but in `held`. */
 	conflicts: Change[];
-	/** The parts of the edit held back, each a run of lines of a text or a whole-value field. */
+	/** The parts of the edit held back: runs of lines of a text, whole-value fields, and cards. */
 	held: Held[];
 }
+
+/** A Y relative position in its JSON form, `Y.relativePositionToJSON`'s. */
+export type HeldPosition = Record<string, unknown>;
+
+/**
+ * A part of an edit `writeFrom` held back. Every held part is plain JSON, so a host can keep it,
+ * send it, and read it back. It belongs to the session it was made in: its places are Y names
+ * and positions of that session's state, so a host drops it when the session ends.
+ */
+export type Held = HeldText | HeldValue | HeldCard;
 
 /** A run of lines of a text field (or body) the edit changed and did not write. */
 export interface HeldText {
 	type: 'text';
-	/** The card, by its index at `base` and after the edit; `field` is absent for the body. */
+	/** The card, by its index at `base` and after the edit, and its `$id`; `field` is absent for
+	 *  the body. */
 	from: CardRef;
 	at: CardRef;
+	id?: string;
 	field?: string;
 	/** The lines as the edit read them, as `history` held them when the write was made, and as
 	 *  the edit wrote them: Markdown, or the text of a plain field. */
 	before: string;
 	theirs: string;
 	after: string;
-	/** Where the lines sit, as relative positions into the field's Y root, so they are found
-	 *  again whatever is written around them. `end` is absent where the edit only inserted
-	 *  lines, and `tail` says those come after the last line. */
-	span: { root: string; start: Uint8Array; end?: Uint8Array; tail?: boolean };
+	/** Where the lines sit, as relative positions into the field's Y root on the line breaks
+	 *  around them, so they are found again whatever is written around and in them. `end` is
+	 *  absent where the edit only inserted lines, and `tail` says those come after the last line. */
+	span: { root: string; start: HeldPosition; end?: HeldPosition; tail?: boolean };
 	/** The edit's value for the field and the run of its lines to write. */
 	proposal: { value: Content | string; from: number; to: number };
 }
@@ -119,6 +143,7 @@ export interface HeldValue {
 	type: 'value';
 	from: CardRef;
 	at: CardRef;
+	id?: string;
 	field: string;
 	/** The card's Y name. */
 	card: string;
@@ -127,17 +152,37 @@ export interface HeldValue {
 	before?: unknown;
 	theirs?: unknown;
 	after?: unknown;
-	/** The last two as stored, which `heldState` compares and `writeHeld` writes. */
-	stored: { theirs?: unknown; after?: unknown };
+	/** The edit's value as stored, which `writeHeld` writes; absent where the edit removed it. */
+	proposal?: unknown;
 }
 
-export type Held = HeldText | HeldValue;
+/** A composable card the edit removed, moved, retyped or wrote into, held whole because one side
+ *  removed, moved or retyped it while the other changed it. */
+export interface HeldCard {
+	type: 'card';
+	/** The card's index at `base`, and after the edit where the edit kept it. */
+	from: number;
+	at?: number;
+	/** The card's `$id` at `base`, and its Y name. */
+	id: string;
+	card: string;
+	/** The card as the edit read it, as `history` held it when the write was made (absent where
+	 *  it was removed), and as the edit left it (absent where the edit removed it). */
+	before: AuthoringCard;
+	theirs?: AuthoringCard;
+	after?: AuthoringCard;
+	/** The edit's card as stored, and the Y names of the cards it followed in the edit's order,
+	 *  nearest first; absent where the edit removed it. */
+	proposal?: { card: Card; follows: string[] };
+}
 
 /** Where a held part stands now: `open`, as when it was held; `edited`, changed since; `matched`,
- *  reading as the edit would have written it; `gone`, its text or card removed. */
+ *  reading as the edit would have written it; `gone`, its text or card removed. A held removal
+ *  is `matched` once the card is gone. */
 export interface HeldState {
 	state: 'open' | 'edited' | 'matched' | 'gone';
-	/** The held lines as they read now, or a held value as stored; absent when gone. */
+	/** The held lines as they read now, a held value or card in the authoring form; absent when
+	 *  gone. */
 	current?: unknown;
 }
 
@@ -154,13 +199,19 @@ export function writeFrom(opts: WriteFromOpts): Written {
 	const how = { scope: opts.scope ?? 'word', hold: opts.hold ?? 'none' } as const;
 	const edit = (doc: Document) => opts.edit(doc);
 	const first = attempt(opts, edit, how);
-	return first.holds ? attempt(opts, edit, how, first.holds).written : first.written;
+	if (!first.holds) return first.written;
+	return attempt(opts, edit, how, { plans: first.holds, made: first.made }).written;
 }
+
+/** What `writeHeld` and `heldState` read a held part against: the session's Y state as it
+ *  stands, the quill, and a Document of the room for what has no Y form. */
+export type HeldOpts = Omit<ForkOpts, 'base'>;
 
 /** Write a part `writeFrom` held over what its place holds now: the lines it spans, wherever
  *  they have moved and whatever was typed in them since, take the edit's lines; a whole value
- *  takes the edit's value. Throws `Unwritable` where the part is gone. */
-export function writeHeld(held: Held, opts: Omit<ForkOpts, 'base'>): Written {
+ *  takes the edit's value; a card takes the edit's card, in the place the edit gave it, or is
+ *  removed. Throws `Unwritable` where the part is gone. */
+export function writeHeld(held: Held, opts: HeldOpts): Written {
 	const { quill } = opts;
 	const base = Y.encodeSnapshot(Y.snapshot(opts.history));
 	const where = held.type === 'text' ? found(held, opts.history) : undefined;
@@ -170,11 +221,12 @@ export function writeHeld(held: Held, opts: Omit<ForkOpts, 'base'>): Written {
 		{ ...opts, base },
 		(doc, ids) => {
 			const c = name === MAIN ? MAIN : ids.indexOf(name);
+			if (held.type === 'card') return writeCard(doc, ids, held, c as number);
 			if (c === -1) throw new Unwritable('the held part’s card is gone');
 			const addr = addrOf(c, held.field);
 			if (held.type === 'value') {
-				if (held.stored.after === undefined) doc.removeField(addr);
-				else doc.unchecked.storeField(addr, held.stored.after);
+				if (held.proposal === undefined) doc.removeField(addr);
+				else doc.unchecked.storeField(addr, held.proposal);
 				return;
 			}
 			const { value, from, to } = held.proposal;
@@ -194,23 +246,65 @@ export function writeHeld(held: Held, opts: Omit<ForkOpts, 'base'>): Written {
 	).written;
 }
 
-/** Where a held part stands in `history` now. */
-export function heldState(held: Held, history: Y.Doc): HeldState {
-	if (held.type === 'value') {
-		if (!cardPresent(held.card, history)) return { state: 'gone' };
-		const current = (history.getMap(held.card).toJSON() as Record<string, unknown>)[held.field];
-		return { state: stateOf(current, held.stored.after, held.stored.theirs), current };
+/** Write a held card over card `c` of `doc`: remove it, or give it the edit's card and move it
+ *  after the first card it followed in the edit that is still there. */
+function writeCard(doc: Document, ids: readonly string[], held: HeldCard, c: number): CardOp[] {
+	if (!held.proposal) {
+		if (c === -1) return [];
+		doc.removeCard(c);
+		return [{ op: 'remove', at: c }];
 	}
-	const where = found(held, history);
-	if (!where) return { state: 'gone' };
-	const current = linesOf(where.field, where.plain, where.blocks[0], where.blocks[1]);
-	return { state: stateOf(current, held.after, held.theirs), current };
+	if (c === -1) throw new Unwritable('the held card is gone');
+	const id = doc.card(c).id ?? held.id;
+	doc.removeCard(c);
+	doc.unchecked.insertCard(inputOf(held.proposal.card, id), c);
+	const rest = ids.filter((n) => n !== held.card);
+	const lead = held.proposal.follows.find((n) => rest.includes(n));
+	const to = lead === undefined ? 0 : rest.indexOf(lead) + 1;
+	if (to === c) return [];
+	doc.moveCard(c, to);
+	return [{ op: 'move', from: c, to }];
+}
+
+/** Where a held part stands in `history` now. */
+export function heldState(held: Held, opts: HeldOpts): HeldState {
+	const { history } = opts;
+	if (held.type === 'text') {
+		const where = found(held, history);
+		if (!where) return { state: 'gone' };
+		const current = linesOf(where.field, where.plain, where.blocks[0], where.blocks[1]);
+		return { state: stateOf(current, held.after, held.theirs), current };
+	}
+	const now = current(history, opts.quill, opts.doc);
+	const c = held.card === MAIN ? MAIN : now.ids.indexOf(held.card);
+	if (held.type === 'value') {
+		if (c === -1) return { state: 'gone' };
+		const card = c === MAIN ? now.main : now.cards[c];
+		const current = card.fields?.[held.field] ?? undefined;
+		return { state: stateOf(current, held.after, held.theirs), current };
+	}
+	if (c === -1) return { state: held.proposal ? 'gone' : 'matched' };
+	const card = now.cards[c as number];
+	if (!held.proposal) return { state: stateOf(card, undefined, held.theirs), current: card };
+	const placed = (() => {
+		const rest = now.ids.filter((n) => n !== held.card);
+		const lead = held.proposal.follows.find((n) => rest.includes(n));
+		return (lead === undefined ? 0 : rest.indexOf(lead) + 1) === c;
+	})();
+	const state = stateOf(card, placed ? held.after : undefined, held.theirs);
+	return { state, current: card };
 }
 
 function stateOf(current: unknown, after: unknown, theirs: unknown): HeldState['state'] {
 	if (canonical(current ?? null) === canonical(after ?? null)) return 'matched';
 	return canonical(current ?? null) === canonical(theirs ?? null) ? 'open' : 'edited';
 }
+
+/** A stored card as an insert takes it, under `id`. */
+const inputOf = (card: Card, id: string): CardInput => {
+	const { kind, ext, seed, payloadItems, body } = card;
+	return { kind, id, payloadItems, body, ...(ext ? { ext } : {}), ...(seed ? { seed } : {}) };
+};
 
 const isContent = (v: unknown): v is Content =>
 	!!v && typeof v === 'object' && 'blocks' in v && 'text' in v;
@@ -249,8 +343,8 @@ function resolve(
 	if (form !== 'content' && form !== 'plain') return undefined;
 	const field = readField(contentTypes(history, span.root));
 	const plain = form === 'plain';
-	const at = (rel: Uint8Array) =>
-		Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(rel), history);
+	const at = (rel: HeldPosition) =>
+		Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(rel), history);
 	const start = at(span.start);
 	if (!start) return undefined;
 	const lineAt = (unit: number) => {
@@ -284,7 +378,8 @@ function markdown(content: Content): string {
 }
 
 /** A field change of the edit that meets a change made since, and what of it to hold. */
-interface Plan {
+interface FieldPlan {
+	kind: 'field';
 	from: CardRef;
 	at: CardRef;
 	field?: string;
@@ -294,21 +389,38 @@ interface Plan {
 	theirs: FieldChange;
 }
 
+/** A card one side removed, moved or retyped while the other changed it: everything the edit did
+ *  to it is held. `at` is its index after the edit, absent where the edit removed it. */
+interface CardPlan {
+	kind: 'card';
+	from: number;
+	at?: number;
+	moved: boolean;
+}
+
+type Plan = FieldPlan | CardPlan;
+
+/** A second attempt: what to hold, and what the edit made the first time, which it makes again. */
+interface Again {
+	plans: Plan[];
+	made: string;
+}
+
 interface How {
 	scope: 'word' | 'line';
 	hold: 'none' | 'hunk' | 'field';
 }
 
 /**
- * Rebuild `base`, make `edit` there, hold back what `holds` names, and write the rest. Without
- * `holds`, a hold mode that meets changes made since answers the plans for a second attempt.
+ * Rebuild `base`, make `edit` there, hold back what `again` names, and write the rest. Without
+ * `again`, a hold mode that meets changes made since answers the plans for a second attempt.
  */
 function attempt(
 	opts: ForkOpts,
 	edit: (doc: Document, ids: readonly string[]) => CardOp | CardOp[] | void,
 	how: How,
-	holds?: Plan[]
-): { written: Written; holds?: Plan[] } {
+	again?: Again
+): { written: Written; holds?: Plan[]; made: string } {
 	const { quill } = opts;
 	const at = Y.decodeSnapshot(opts.base);
 	const scratch = Y.createDocFromSnapshot(opts.history, at, new Y.Doc({ gc: false }));
@@ -319,23 +431,21 @@ function attempt(
 		const bound = base;
 		const before = state(bound, quill);
 		const count = bound.doc.cardCount;
-		if (holds) pristine = bound.doc.clone();
-		const made = edit(bound.doc, bound.binding.ids) ?? [];
-		const ops = Array.isArray(made) ? made : [made];
+		if (again) pristine = bound.doc.clone();
+		const result = edit(bound.doc, bound.binding.ids) ?? [];
+		let ops = Array.isArray(result) ? result : [result];
 		const step = bound.doc.cardCount - count;
 		const named = ops.reduce((n, o) => n + (o.op === 'insert' ? 1 : o.op === 'remove' ? -1 : 0), 0);
 		if (step !== named)
 			throw new Unwritable(
 				`the edit changed the card count by ${step} and its card operations by ${named}`
 			);
+		const made = () => canonical({ doc: quill.toAuthoring(bound.doc), ops });
 		const held: Held[] = [];
-		if (holds && pristine) {
-			const was = pristine;
-			const proposals = holds.map((p) => bound.doc.getStored(addrOf(p.at, p.field)));
-			for (const p of holds) restore(bound.doc, was, p);
-			holds.forEach((p, k) =>
-				held.push(...heldParts(p, proposals[k], was, before, scratch, opts.history))
-			);
+		if (again && pristine) {
+			if (made() !== again.made)
+				throw new Unwritable('the edit made another change when it ran again');
+			ops = hold(bound.doc, pristine, again.plans, ops, count, before, scratch, opts, held);
 		}
 		const touched = new Map<string, { root: string; base?: YField }>();
 		for (const key of before.lines.keys()) {
@@ -357,8 +467,17 @@ function attempt(
 		}
 		const update = Y.encodeStateAsUpdate(scratch, Y.encodeStateVector(at.sv));
 		const moved = diff(before, current(opts.history, quill, opts.doc));
-		const plans: Plan[] = [];
+		const holding = how.hold !== 'none' && !again;
+		const mineCards = cardsOf(changes);
+		const cards = new Map<number, CardPlan>();
+		const fields: FieldPlan[] = [];
 		const conflicts = overlap(changes, moved).filter((theirs) => {
+			const c = cardMet(theirs, mineCards);
+			if (holding && c !== undefined) {
+				const { at, moved } = mineCards.get(c)!;
+				cards.set(c, { kind: 'card', from: c, ...(at === undefined ? {} : { at }), moved });
+				return false;
+			}
 			if (theirs.type !== 'field') return true;
 			const mine = changes.find(
 				(c): c is FieldChange =>
@@ -369,20 +488,151 @@ function attempt(
 			const where = touched.get(`${mine.from}/${mine.field ?? ''}`);
 			const runs = meeting(mine, theirs, how.scope, lines, where, scratch, opts.history);
 			if (runs !== 'whole' && !runs.length) return false;
-			if (how.hold === 'none' || holds) return true;
+			if (!holding) return true;
 			const whole = how.hold === 'field' || runs === 'whole';
 			const plan = { from: mine.from, at: mine.at, field: mine.field, mine, theirs };
-			plans.push({ ...plan, runs: whole ? 'whole' : runs });
+			fields.push({ kind: 'field', ...plan, runs: whole ? 'whole' : runs });
 			return false;
 		});
+		const plans: Plan[] = [
+			...fields.filter((p) => typeof p.from !== 'number' || !cards.has(p.from)),
+			...cards.values()
+		];
 		const written = { update, changes, conflicts, held };
-		return plans.length ? { written, holds: plans } : { written };
+		return plans.length ? { written, holds: plans, made: made() } : { written, made: '' };
 	} finally {
 		pristine?.free();
 		base?.free();
 		scratch.destroy();
 	}
 }
+
+/** What the edit did to each card of `base` it kept or removed: its index after the edit, absent
+ *  where it removed the card, whether it moved it, and whether it removed or retyped it. */
+function cardsOf(changes: Change[]): Map<number, { at?: number; moved: boolean; whole: boolean }> {
+	const out = new Map<number, { at?: number; moved: boolean; whole: boolean }>();
+	for (const c of changes) {
+		if (c.type === 'insert' || c.from === MAIN) continue;
+		const card = out.get(c.from) ?? { moved: false, whole: false };
+		if (c.type === 'remove') card.whole = true;
+		else card.at = c.at as number;
+		if (c.type === 'move') card.moved = true;
+		if (c.type === 'kind') card.whole = true;
+		out.set(c.from, card);
+	}
+	return out;
+}
+
+/** The card a conflict is over as a whole, where it is: one side removed, moved or retyped it
+ *  while the other changed it. */
+function cardMet(
+	theirs: Change,
+	mine: Map<number, { at?: number; moved: boolean; whole: boolean }>
+): number | undefined {
+	if (theirs.type === 'insert' || !mine.has(theirs.from as number)) return undefined;
+	if (theirs.type !== 'field') return theirs.from;
+	return mine.get(theirs.from as number)!.whole ? (theirs.from as number) : undefined;
+}
+
+/**
+ * Put back on `doc`, the edited Document, what `plans` hold, from `pristine`, the Document at
+ * `base`, and add each held part to `held`. Returns the card operations that take `base` to the
+ * Document that results.
+ */
+function hold(
+	doc: Document,
+	pristine: Document,
+	plans: Plan[],
+	ops: CardOp[],
+	count: number,
+	before: State,
+	scratch: Y.Doc,
+	opts: ForkOpts,
+	held: Held[]
+): CardOp[] {
+	const cards = plans.filter((p): p is CardPlan => p.kind === 'card');
+	const fields = plans.filter((p): p is FieldPlan => p.kind === 'field');
+	const order = placesOf(count, ops);
+	const authored = opts.quill.toAuthoring(doc).cards ?? [];
+	const edits = cards.map((p) =>
+		p.at === undefined
+			? undefined
+			: {
+					card: structuredClone(doc.card(p.at)),
+					after: authoring(authored[p.at]),
+					follows: order
+						.slice(0, p.at)
+						.reverse()
+						.flatMap((b) => (b === null ? [] : [before.ids[b]]))
+				}
+	);
+	const proposals = fields.map((p) => doc.getStored(addrOf(p.at, p.field)));
+	const was = (c: number) => inputOf(pristine.card(c), pristine.card(c).id!);
+	for (const p of cards) {
+		if (p.at === undefined) continue;
+		doc.removeCard(p.at);
+		doc.unchecked.insertCard(was(p.from), p.at);
+	}
+	for (const p of fields) restore(doc, pristine, p);
+	let reordered = false;
+	for (const p of cards) {
+		if (p.at !== undefined && !p.moved) continue;
+		const c = p.from;
+		const now = order.indexOf(c);
+		if (now >= 0) order.splice(now, 1);
+		let to = 0;
+		for (let b = c - 1; b >= 0; b--) {
+			const k = order.indexOf(b);
+			if (k >= 0) {
+				to = k + 1;
+				break;
+			}
+		}
+		order.splice(to, 0, c);
+		if (now === -1) doc.unchecked.insertCard(was(c), to);
+		else if (now !== to) doc.moveCard(now, to);
+		reordered = true;
+	}
+	fields.forEach((p, k) =>
+		held.push(...heldParts(p, proposals[k], pristine, before, scratch, opts.history))
+	);
+	const now = current(opts.history, opts.quill, opts.doc);
+	cards.forEach((p, k) => {
+		const name = before.ids[p.from];
+		const c = now.ids.indexOf(name);
+		const edit = edits[k];
+		held.push({
+			type: 'card',
+			from: p.from,
+			...(p.at === undefined ? {} : { at: p.at }),
+			id: before.cardIds[p.from],
+			card: name,
+			before: before.cards[p.from],
+			...(c === -1 ? {} : { theirs: now.cards[c] }),
+			...(edit ? { after: edit.after, proposal: { card: edit.card, follows: edit.follows } } : {})
+		});
+	});
+	return reordered ? cardOps(order, count) : ops;
+}
+
+/** For each card after `ops`, in order, its index among the `count` cards before them, or `null`
+ *  for one they inserted. */
+function placesOf(count: number, ops: CardOp[]): (number | null)[] {
+	const out: (number | null)[] = Array.from({ length: count }, (_, i) => i);
+	for (const o of ops) {
+		if (o.op === 'insert') out.splice(o.at, 0, null);
+		else if (o.op === 'remove') out.splice(o.at, 1);
+		else out.splice(o.to, 0, ...out.splice(o.from, 1));
+	}
+	return out;
+}
+
+/** A card in the authoring form, as `State` holds it. */
+const authoring = (c: AuthoringCard): AuthoringCard => ({
+	kind: c.kind,
+	fields: c.fields ?? {},
+	body: c.body ?? ''
+});
 
 type FieldChange = Extract<Change, { type: 'field' }>;
 
@@ -434,7 +684,7 @@ const lineByLine = (r: Run): Run[] =>
 		: [r];
 
 /** Put back on `doc` what `plan` holds, from `pristine`, the Document as it stood at `base`. */
-function restore(doc: Document, pristine: Document, plan: Plan): void {
+function restore(doc: Document, pristine: Document, plan: FieldPlan): void {
 	const target = addrOf(plan.at, plan.field);
 	const was = pristine.getStored(addrOf(plan.from, plan.field));
 	const now = doc.getStored(target);
@@ -462,7 +712,7 @@ const toSplice = (r: Run): BlockSplice => ({ at: r.at, end: r.end, from: r.from,
 
 /** The parts a plan held, each found by where it sits in `scratch`, still at `base`. */
 function heldParts(
-	plan: Plan,
+	plan: FieldPlan,
 	proposal: unknown,
 	pristine: Document,
 	before: State,
@@ -474,19 +724,22 @@ function heldParts(
 	const root = contentRoot(name, plan.field);
 	const plain = typeof was === 'string' && typeof proposal === 'string';
 	const rich = isContent(was) && isContent(proposal);
-	const where = { from: plan.from, at: plan.at };
+	const where = {
+		from: plan.from,
+		at: plan.at,
+		...(plan.from === MAIN ? {} : { id: before.cardIds[plan.from] })
+	};
 	if ((!plain && !rich) || !scratch.share.has(root)) {
-		const current = (history.getMap(name).toJSON() as Record<string, unknown>)[plan.field ?? ''];
 		return [
 			{
 				type: 'value',
 				...where,
 				field: plan.field ?? '',
 				card: name,
-				before: plan.mine.before,
-				theirs: plan.theirs.after,
-				after: plan.mine.after,
-				stored: { theirs: current, after: proposal ?? undefined }
+				...(plan.mine.before === undefined ? {} : { before: plan.mine.before }),
+				...(plan.theirs.after === undefined ? {} : { theirs: plan.theirs.after }),
+				...(plan.mine.after === undefined ? {} : { after: plan.mine.after }),
+				...(proposal == null ? {} : { proposal })
 			}
 		];
 	}
@@ -510,7 +763,9 @@ function heldParts(
 			? textLines(v).slice(from, to).join('').replace(/\n$/, '')
 			: markdown(sliceBlocks(v, from, to));
 	const rel = (index: number, assoc: number) =>
-		Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text, index, assoc));
+		Y.relativePositionToJSON(
+			Y.createRelativePositionFromTypeIndex(text, index, assoc)
+		) as HeldPosition;
 	return runs.map((r) => {
 		const tail = r.from >= blocks;
 		const start = tail ? unit : offsets[r.from];
@@ -603,6 +858,8 @@ function bind(ydoc: Y.Doc, quill: Quill, template: Document): Bound {
  *  field's lines as Y holds them, by `<card index>/<field>` (the body is `''`). */
 interface State {
 	ids: string[];
+	/** Each composable card's `$id`, in order. */
+	cardIds: string[];
 	main: AuthoringCard;
 	cards: AuthoringCard[];
 	lines: Map<string, string[]>;
@@ -632,12 +889,9 @@ function state(bound: Bound, quill: Quill): State {
 	}
 	return {
 		ids: [...bound.binding.ids],
-		main: { kind: MAIN, fields: a.fields ?? {}, body: a.body ?? '' },
-		cards: (a.cards ?? []).map((c) => ({
-			kind: c.kind,
-			fields: c.fields ?? {},
-			body: c.body ?? ''
-		})),
+		cardIds: doc.cards.map((c) => c.id ?? ''),
+		main: authoring({ kind: MAIN, fields: a.fields, body: a.body }),
+		cards: (a.cards ?? []).map(authoring),
 		lines
 	};
 }
@@ -717,8 +971,8 @@ function diff(a: State, b: State): Change[] {
 	const out: Change[] = [];
 	const inB = new Map(b.ids.map((id, i) => [id, i]));
 	const inA = new Map(a.ids.map((id, i) => [id, i]));
-	a.ids.forEach((id, from) => {
-		if (!inB.has(id)) out.push({ type: 'remove', from });
+	a.ids.forEach((name, from) => {
+		if (!inB.has(name)) out.push({ type: 'remove', from, id: a.cardIds[from] });
 	});
 	const kept = a.ids.filter((id) => inB.has(id));
 	const stay = new Set(
@@ -727,18 +981,19 @@ function diff(a: State, b: State): Change[] {
 			b.ids.filter((id) => inA.has(id))
 		).map(([i]) => kept[i])
 	);
-	b.ids.forEach((id, at) => {
-		const from = inA.get(id);
-		if (from === undefined) out.push({ type: 'insert', at, card: b.cards[at] });
-		else if (!stay.has(id)) out.push({ type: 'move', from, at });
+	b.ids.forEach((name, at) => {
+		const from = inA.get(name);
+		if (from === undefined) out.push({ type: 'insert', at, id: b.cardIds[at], card: b.cards[at] });
+		else if (!stay.has(name)) out.push({ type: 'move', from, at, id: a.cardIds[from] });
 	});
 	out.push(...fields(MAIN, MAIN, a.main, b.main));
-	b.ids.forEach((id, at) => {
-		const from = inA.get(id);
+	b.ids.forEach((name, at) => {
+		const from = inA.get(name);
 		if (from === undefined) return;
 		const [x, y] = [a.cards[from], b.cards[at]];
-		if (x.kind !== y.kind) out.push({ type: 'kind', from, at, before: x.kind, after: y.kind });
-		out.push(...fields(from, at, x, y));
+		const id = a.cardIds[from];
+		if (x.kind !== y.kind) out.push({ type: 'kind', from, at, id, before: x.kind, after: y.kind });
+		out.push(...fields(from, at, x, y, id));
 	});
 	for (const c of out) {
 		if (c.type !== 'field') continue;
@@ -753,13 +1008,19 @@ function diff(a: State, b: State): Change[] {
  *  field change with none conflicts whole. */
 const runsOf = new WeakMap<Change, Run[]>();
 
-function fields(from: CardRef, at: CardRef, x: AuthoringCard, y: AuthoringCard): Change[] {
+function fields(
+	from: CardRef,
+	at: CardRef,
+	x: AuthoringCard,
+	y: AuthoringCard,
+	id?: string
+): Change[] {
 	const out: Change[] = [];
+	const card = { from, at, ...(id === undefined ? {} : { id }) };
 	if ((x.body ?? '') !== (y.body ?? ''))
 		out.push({
 			type: 'field',
-			from,
-			at,
+			...card,
 			before: x.body,
 			after: y.body,
 			...hunksOf(x.body, y.body)
@@ -771,8 +1032,7 @@ function fields(from: CardRef, at: CardRef, x: AuthoringCard, y: AuthoringCard):
 		if (canonical(before) === canonical(after)) continue;
 		out.push({
 			type: 'field',
-			from,
-			at,
+			...card,
 			field,
 			...(before === undefined ? {} : { before }),
 			...(after === undefined ? {} : { after }),
@@ -803,6 +1063,7 @@ function hunksOf(
 function overlap(mine: Change[], theirs: Change[]): Change[] {
 	const written = new Set<CardRef>();
 	const whole = new Set<CardRef>();
+	const removed = new Set<CardRef>();
 	const moved = new Set<CardRef>();
 	const fieldsOf = new Map<string, Change>();
 	for (const c of mine) {
@@ -812,6 +1073,7 @@ function overlap(mine: Change[], theirs: Change[]): Change[] {
 		} else if (c.type === 'remove' || c.type === 'kind') {
 			written.add(c.from);
 			whole.add(c.from);
+			if (c.type === 'remove') removed.add(c.from);
 		} else if (c.type === 'move') moved.add(c.from);
 	}
 	return theirs.filter((c) => {
@@ -824,7 +1086,7 @@ function overlap(mine: Change[], theirs: Change[]): Change[] {
 				return !x || !y || x.some((r) => y.some((q) => meet(r, q)));
 			}
 			case 'remove':
-				return written.has(c.from) || moved.has(c.from);
+				return !removed.has(c.from) && (written.has(c.from) || moved.has(c.from));
 			case 'kind':
 				return written.has(c.from);
 			case 'move':

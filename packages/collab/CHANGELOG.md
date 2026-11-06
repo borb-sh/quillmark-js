@@ -6,7 +6,9 @@
 
 **A write from a revision is compared and written word by word.** `writeFrom` reports a conflict only where the edit and a change made since touch the same words, compared as Y holds them, marks, block records, containers and islands included; `scope: 'line'` keeps the comparison by line. The update replaces whole words, so two words an edit changed far apart in a line are two splices and what was typed between them stays, and a word it replaced leaves no letter for a concurrent edit to land beside. `writeLog` compares by word too.
 
-**`writeFrom` holds back what meets a change and writes the rest.** `hold: 'hunk'` holds each line of the edit that meets a change made since and writes every other one in the same update; `hold: 'field'` holds each such field; a whole-value field is held whole. `Written.held` lists each held part with its text as the edit read it, as it stood when held and as the edit wrote it, and where it sits, by Y relative positions. `heldState(held, history)` reads a held part as `open`, `edited`, `matched` or `gone`, and `writeHeld(held, { history, quill, doc })` writes it over the lines its span covers now, leaving every other line. An edit runs a second time when part of it is held. `hold: 'none'` is the default and reports conflicts as before.
+**`writeFrom` holds back what meets a change and writes the rest.** `hold: 'hunk'` holds each line of the edit that meets a change made since and writes every other one in the same update; `hold: 'field'` holds each such field; a whole-value field is held whole, and so is everything the edit did to a card one side removed, moved or retyped while the other changed it, so a removal never deletes what someone typed and a move never brings back a card someone removed. `Written.held` lists each held part, a `HeldText`, `HeldValue` or `HeldCard`, with its text, value or card as the edit read it, as it stood when held and as the edit wrote it, in the authoring form. A held part is plain JSON, its lines placed by Y relative positions in their JSON form on the line breaks around them, and belongs to the session it was made in. `heldState(held, { history, quill, doc })` reads a held part as `open`, `edited`, `matched` or `gone`, and `writeHeld(held, { history, quill, doc })` writes it over the lines its span covers now, leaving every other line, or writes the held value or card. An edit runs a second time when part of it is held, and one that makes another change the second time is refused with `Unwritable`. `hold: 'none'` is the default and reports conflicts as before, two removals of one card no longer among them. `writeLog` takes `hold` and `scope` too and answers its held parts, for a client of the session to write with `writeHeld`.
+
+**`Change` names a card by `$id`.** Each change to a composable card carries `id`, its `$id`, beside its index.
 
 **`writeFrom` reads less.** The history's projection is kept for the snapshot it was made at, so the writes of one answer read it once, and the update is checked against a fresh projection only when the session holds a refused value. One call writing five fields costs about what one field did.
 
@@ -32,11 +34,15 @@
 
 ## v0.2.0 - 2026-11-02
 
+Tagged and never published: the release's npm publish was refused. Its changes ship in the next published version.
+
 **On the content model of `@quillmark/wasm` 0.134.1.** The peer range is `>=0.134.1-0 <0.135.0-0`. The Y shape follows the model: each `\n` carries its block's id, kind and container path, containers are records by id in `<root>#containers`, block 0's record sits in `<root>#block0`, and each island slot is its own key of the island's map. The projection reads a merged state through the store's `repair`, so two clients' concurrent edits that no single edit could make read as one valid value on every client. A remote value lands through `replace`, its card named by `$id`, and an id `replace` re-mints is written back to Y. `onRemote`'s delta counts UTF-16. A Y state an earlier version wrote carries no block ids or containers, so a host ends its open sessions before it upgrades, and the next one opens from the save.
 
 **`init()`.** The binding's sync verbs read the core's free functions, so a host awaits `init()` from `@quillmark/collab` before `bindDocument`, `seedDocument`, `writeFrom` or `changesSince`. `joinSession`, `readLog` and `writeLog` await it themselves.
 
 ## v0.1.1 - 2026-11-02
+
+Tagged and never published: the release's npm publish was refused. Its changes ship in the next published version.
 
 **The `@quillmark/wasm` peer range stops below 0.134.0.** 0.134 removes `overwrite` and `reviseContent`, which a bound document calls, so a range admitting it installed a wasm the binding throws on at its first remote edit.
 
