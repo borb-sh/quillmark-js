@@ -26,6 +26,7 @@ import type {
 	QuillCardSchema
 } from '@quillmark/wasm';
 import {
+	BODY,
 	CARDS,
 	COMPANIONS,
 	ID,
@@ -45,6 +46,7 @@ import { unrepaired } from './repaired.js';
 import { withoutAnchors, writeContent, type Mint } from './write.js';
 import { deltaOf, type Delta } from './delta.js';
 import { changedRuns, commonRun } from './lines.js';
+import { wordSplices, type Grain } from './words.js';
 
 /** A change to the composable card list, by index, as the Document takes it. */
 export type CardOp =
@@ -112,6 +114,10 @@ export interface BindDocumentOpts {
 	onRemote?(change: RemoteChange): void;
 	/** A remote value the Document refused. The field keeps its last value. */
 	onError?(error: unknown): void;
+	/** `holding` turned: a remote value the Document refused is now held, or the last one is
+	 *  released. While it holds one, the Document is not the Y state's projection, so a host
+	 *  that saves the Document waits. */
+	onHolding?(holding: boolean): void;
 }
 
 export interface DocumentBinding {
@@ -137,6 +143,11 @@ export interface DocumentBinding {
 type Form = 'content' | 'plain' | 'value';
 
 export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
+	return bindWith(opts, 'char');
+}
+
+/** `bindDocument` writing at `grain`: a write from a revision writes whole words. */
+export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding {
 	const { doc, quill, ydoc } = opts;
 	const origin = Symbol('quillmark-collab');
 	const mint = minter(ydoc);
@@ -212,14 +223,14 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	 *  repair that inserts: it reads it through `repair`. */
 	function writeField(root: string, content: Content): Map<string, string> {
 		const types = contentTypes(ydoc, root);
-		if (leader || !inserting.has(root)) return writeContent(types, content, mint);
+		if (leader || !inserting.has(root)) return writeContent(types, content, mint, grain);
 		const raw = readField(types);
 		const projection = project(raw);
 		if (!projection.repairs.some(inserts)) {
 			inserting.delete(root);
-			return writeContent(types, content, mint);
+			return writeContent(types, content, mint, grain);
 		}
-		return writeContent(types, unrepaired(raw, projection.content, content), mint);
+		return writeContent(types, unrepaired(raw, projection.content, content), mint, grain);
 	}
 
 	// ── Document → Y ─────────────────────────────────────────────────────────
@@ -394,7 +405,7 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	function pushPlain(root: string, value: string): void {
 		const json = JSON.stringify(value);
 		if (synced.get(root) === json) return;
-		spliceText(ydoc.getText(root), value);
+		spliceText(ydoc.getText(root), value, grain);
 		synced.set(root, json);
 	}
 
@@ -598,7 +609,10 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			const root = contentRoot(name, key);
 			try {
 				if (form === undefined) {
-					if (doc.getStored(addr) == null) continue;
+					if (doc.getStored(addr) == null) {
+						held.delete(root);
+						continue;
+					}
 					doc.removeField(addr);
 					synced.delete(contentRoot(name, key));
 				} else if (form === 'content' && isLeaf) {
@@ -618,6 +632,10 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 				held.add(root);
 				report(e);
 			}
+		}
+		for (const root of held) {
+			const key = root.slice(name.length + 1);
+			if (root.startsWith(`${name}/`) && key !== BODY && !keys.has(key)) held.delete(root);
 		}
 		if (moved && !change.fields.includes(c)) change.fields.push(c);
 	}
@@ -693,7 +711,14 @@ export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 			if (tr.changed.has(type) || tr.changedParentTypes.has(type as Y.AbstractType<Y.YEvent<any>>))
 				touched.add(name);
 		if (!touched.size) return;
+		const holding = held.size > 0;
 		const change = pull(touched);
+		if (holding !== held.size > 0)
+			try {
+				opts.onHolding?.(!holding);
+			} catch (e) {
+				report(e);
+			}
 		if (!change.cards.length && !change.fields.length && !change.content.length) return;
 		try {
 			opts.onRemote?.(change);
@@ -811,7 +836,7 @@ function contentKey(content: Content | undefined): string {
 
 /** Replace `text`'s content with `next`: a splice over each run of lines that differs, over its
  *  common prefix and suffix, so a change far from another leaves what lies between untouched. */
-function spliceText(text: Y.Text, next: string): void {
+function spliceText(text: Y.Text, next: string, grain: Grain): void {
 	const a = Array.from(text.toString());
 	const b = Array.from(next);
 	const x = linesOf(a);
@@ -825,6 +850,16 @@ function spliceText(text: Y.Text, next: string): void {
 	for (const run of runs.reverse()) {
 		const [a0, a1] = [at(x, a, run.from), at(x, a, run.to)];
 		const [b0, b1] = [at(y, b, run.at), at(y, b, run.end)];
+		if (grain === 'word') {
+			const key = (chars: string[]) => (s: number, e: number) => chars.slice(s, e).join('');
+			for (const w of wordSplices(a, a0, a1, key(a), b, b0, b1, key(b)).reverse()) {
+				const from = utf16(a, w.at);
+				const removed = utf16(a, w.end) - from;
+				if (removed) text.delete(from, removed);
+				if (w.to > w.from) text.insert(from, b.slice(w.from, w.to).join(''));
+			}
+			continue;
+		}
 		let p = 0;
 		while (a0 + p < a1 && b0 + p < b1 && a[a0 + p] === b[b0 + p]) p++;
 		let s = 0;

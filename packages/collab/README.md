@@ -48,18 +48,28 @@ A model answering a request reads the document at one state and answers after pe
 
 ```ts
 const base = session.snapshot();
-// … the model answers, the person accepts …
-const { update, conflicts } = writeFrom({
+// … the model answers …
+const { update, conflicts, held } = writeFrom({
 	history: session.ydoc,
 	base,
 	quill,
 	doc: session.doc,
-	edit: (doc) => void quill.writer(doc).revise('summary', markdown)
+	hold: 'hunk',
+	edit: (doc) => {
+		quill.writer(doc).revise('summary', summary);
+		quill.writer(doc).revise({}, body);
+	}
 });
 if (!conflicts.length) session.apply(update, 'ai:run-1');
+// later, for each held part the person accepts:
+if (heldState(part, session.ydoc).state !== 'gone')
+	session.apply(
+		writeHeld(part, { history: session.ydoc, quill, doc: session.doc }).update,
+		'ai:run-1'
+	);
 ```
 
-`conflicts` lists what changed since `base` at a place the edit changed too, such as lines someone rewrote meanwhile. Run `writeFrom` and `session.apply` in one task. An edit that inserts, removes or moves cards returns those `CardOp`s; a `reviseDocument` edit returns `cardOps(receipt.from, count)`, `count` the cards before it. A server with no editor open goes through the log: `readLog({ log, quill, since })` returns the Document, its `Revision` (`{ epoch, count, check }`, short enough to hand a model, and to be handed back as it was read) and what changed since an earlier one, and `writeLog({ log, quill, base, author, key, edit })` appends the edit and saves, or answers `conflict`, `stale` or `duplicate`. `saveVersion({ log, quill, label })` keeps the Document as it stands under a label, past every session; `readVersion` reads it back, and `restoreVersion({ log, quill, label, author })` writes the room back to it as one edit.
+Edits are compared word by word: a change lands unless someone changed the same words since (`scope: 'line'` compares whole lines). With `hold: 'hunk'`, each line that meets such a change is held back and the rest of the edit is written; `held` lists each held part with its text as the edit read it, as it stood when held, and as the edit wrote it. `heldState` says whether a held part is still `open`, `edited` since, `matched` by what someone typed, or `gone`, and `writeHeld` writes it over whatever its lines hold now, leaving every other line as it is. A whole-value field is held whole. With `hold: 'none'`, the default, nothing is held and `conflicts` lists what changed since `base` where the edit changed too. Run `writeFrom` and `session.apply` in one task. An edit that inserts, removes or moves cards returns those `CardOp`s; a `reviseDocument` edit returns `cardOps(receipt.from, count)`, `count` the cards before it. An edit runs a second time when part of it is held, so it makes the same change each time it runs. A server with no editor open goes through the log: `readLog({ log, quill, since })` returns the Document, its `Revision` (`{ epoch, count, check }`, short enough to hand a model, and to be handed back as it was read) and what changed since an earlier one, and `writeLog({ log, quill, base, author, key, edit })` appends the edit and saves, or answers `conflict`, `stale` or `duplicate`. `saveVersion({ log, quill, label })` keeps the Document as it stands under a label, past every session; `readVersion` reads it back, and `restoreVersion({ log, quill, label, author })` writes the room back to it as one edit.
 
 ## Without a session
 

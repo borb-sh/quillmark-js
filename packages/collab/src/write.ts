@@ -2,7 +2,8 @@
 //
 // Island slots the edit kept are fixed points: the text between two of them is diffed on its own,
 // by line and then by character, the lines both sides hold whole kept and each run of changed lines
-// one splice (common prefix and suffix over USV characters). Two changes far apart in a field are
+// one splice (common prefix and suffix over USV characters), or, for a write from a revision, one
+// splice per run of whole words that differs (`words.ts`). Two changes far apart in a field are
 // two splices, so an edit made meanwhile between them stays where it was typed; and a slot whose island
 // survived is never deleted and re-inserted. Re-inserting one would leave two slots holding its id
 // when two clients do it at once, and would drop a concurrent edit to its props. After the splices,
@@ -30,6 +31,7 @@ import {
 	type ContentTypes
 } from './shape.js';
 import { commonRun } from './lines.js';
+import { wordSplices, type Grain } from './words.js';
 
 export type Mint = () => string;
 
@@ -39,7 +41,12 @@ export type Mint = () => string;
  * held before, is not unique across clients, so the new island takes a minted id and the Document
  * has to take it too.
  */
-export function writeContent(types: ContentTypes, next: Content, mint: Mint): Map<string, string> {
+export function writeContent(
+	types: ContentTypes,
+	next: Content,
+	mint: Mint,
+	grain: Grain = 'char'
+): Map<string, string> {
 	const renamed = new Map<string, string>();
 	const { text, meta, containers } = types;
 	const cur = readField(types);
@@ -88,14 +95,23 @@ export function writeContent(types: ContentTypes, next: Content, mint: Mint): Ma
 		if (a1 - s > a0 + p || b1 - s > b0 + p)
 			splices.push({ at: a0 + p, end: a1 - s, from: b0 + p, to: b1 - s });
 	};
+	const keyA = (s: number, e: number): string =>
+		a[s] === '\n' ? `\n${idA(s)}` : a[s] === SLOT ? `${SLOT}a${s}` : a.slice(s, e).join('');
+	const keyB = (s: number, e: number): string =>
+		b[s] === '\n' ? `\n${idB(s)}` : b[s] === SLOT ? `${SLOT}b${s}` : b.slice(s, e).join('');
+	const change =
+		grain === 'char'
+			? splice
+			: (a0: number, a1: number, b0: number, b1: number) =>
+					splices.push(...wordSplices(a, a0, a1, keyA, b, b0, b1, keyB));
 	const idA = (i: number): string => String(cur.attrs[i][BLOCK_ID] ?? '');
 	const idB = (i: number): string => String(opens[i][BLOCK_ID] ?? '');
 	const stretch = (a0: number, a1: number, b0: number, b1: number) => {
 		for (const [[x0, x1], [y0, y1]] of sameLines(a, a0, a1, idA, b, b0, b1, idB)) {
-			splice(a0, x0, b0, y0);
+			change(a0, x0, b0, y0);
 			[a0, b0] = [x1, y1];
 		}
-		splice(a0, a1, b0, b1);
+		change(a0, a1, b0, b1);
 	};
 	let a0 = 0;
 	let b0 = 0;
