@@ -51,6 +51,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 
 	// ── Array control ─────────────────────────────────────────────────────────
 	arrayAdd: string;
+	/** The ghost in an empty list's standing row, which is no element until typed into. */
+	arrayStanding: string;
 	arrayRemove: string;
 	/** The drag handle on an `object` row: its tooltip. */
 	arrayDrag: string;
@@ -226,6 +228,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardTitle: 'Card title',
 	addCard: 'Add Card',
 	arrayAdd: '+ Add',
+	arrayStanding: 'Type to add',
 	arrayRemove: 'Remove',
 	arrayDrag: 'Drag to move',
 	arrayRowAction: (action, row) => `${action} ${row}`,

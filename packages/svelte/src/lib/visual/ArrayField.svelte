@@ -47,6 +47,14 @@
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
 
+ An empty list of lines (any element but an `object`) draws a standing row to type
+ into, so a list's first line takes no press of the add chip first. The row is not an
+ element and draws as one that is not there yet: a dashed edge round no fill, a ghost
+ saying to type, no remove. Nothing commits until it holds something, so the field
+ stays where it was, absent or `[]`, and Enter and Backspace have nothing to act on.
+ Its first non-empty edit or paste commits it as the list's first element, keeping its
+ id, so the caret stays in the leaf it is typing into.
+
  An unset array whose `default:` holds elements draws them as its rows, at the default
  rung (`data-default` on the rows' box), since they are what prints. The rows are the
  declared literal rather than resolve's form, which completes a record against `items`:
@@ -186,6 +194,13 @@
 	const seq = new IdSeq();
 	// svelte-ignore state_referenced_locally
 	let ids = $state<string[]>(seq.take(rowsOf(value).length));
+	// The standing row's id, taken at its first commit and replaced: the row it
+	// becomes keeps the id, so its leaf never remounts under the keystroke.
+	let standingId = $state(seq.next());
+	const standing = $derived(
+		!table && control !== 'object' && arr.length === 0 && (max == null || max > 0)
+	);
+	const rowIds = $derived(standing && ids.length === 0 ? [standingId] : ids);
 	// Length reconcile (defend against an out-of-band length change);
 	// order is maintained by the mutators, not here.
 	$effect(() => {
@@ -282,7 +297,19 @@
 		return '';
 	}
 
+	/** Whether the gesture lands on the standing row, which holds no element yet. */
+	const onStanding = (): boolean => standing && ids.length === 0;
+	/** The standing row becomes the list's first element, keeping its id. */
+	function claimStanding(): void {
+		ids = [standingId];
+		standingId = seq.next();
+	}
+
 	function commitElement(k: number, next: unknown): void {
+		if (onStanding()) {
+			if (next === undefined || cellBlank(next)) return;
+			claimStanding();
+		}
 		const copy = arr.slice();
 		// A cleared element control commits `undefined` (the unset rung), but an
 		// array slot is positional: an array defaults as a whole (`[]`), no
@@ -311,6 +338,7 @@
 	 *  several lines into a row, each line past the first a row as Enter would open it.
 	 *  The caret ends where the paste does, at the end of the last. */
 	function spill(k: number, row: Content, below: Content[]): void {
+		if (onStanding()) claimStanding();
 		const at = k + 1;
 		const fresh = seq.take(below.length);
 		ids = [...ids.slice(0, at), ...fresh, ...ids.slice(at)];
@@ -371,7 +399,7 @@
 	 * wants anyway. Reached by a label click and by the editor's landing verbs, which
 	 * ask one function so they cannot disagree (`Field`, `leaves.ts`). */
 	export function focus(): void {
-		if (ids.length === 0) return void addEl?.focus();
+		if (ids.length === 0) return void (onStanding() ? els[standingId] : addEl)?.focus();
 		if (table) return void cellEls[ids[0]]?.focus();
 		if (control === 'object') return focusObjectRow(ids[0]);
 		els[ids[0]]?.focus();
@@ -454,7 +482,7 @@
 		fromRemove = false
 	): Promise<void> {
 		if (!(await span.resumes(tick()))) return;
-		if (id === undefined) return void addEl?.focus();
+		if (id === undefined) return void (onStanding() ? els[standingId] : addEl)?.focus();
 		if (table) {
 			// Without the focus scroll: the remove is pinned, so it is in view where it
 			// stands, and the scroll the browser would make is to its unpinned place at
@@ -517,6 +545,11 @@
 	 */
 	function onElementKey(e: KeyboardEvent, k: number, column?: string): void {
 		if (e.isComposing) return;
+		if (onStanding()) {
+			// No element to insert after or remove: a line is typed first.
+			if (e.key === 'Enter' || e.key === 'Backspace') e.preventDefault();
+			return;
+		}
 		if (e.key === 'Enter') {
 			e.preventDefault();
 			insertAfter(k, column);
@@ -734,12 +767,16 @@
 		</div>
 	{:else}
 		<div
-			class={['qm-array-rows qm-wash', { empty: ids.length === 0 }]}
+			class={['qm-array-rows qm-wash', { empty: rowIds.length === 0 }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
-			{#each ids as id, k (id)}
-				<div class="qm-array-row qm-wash" data-qm-index={k} bind:this={rowEls[id]}>
+			{#each rowIds as id, k (id)}
+				<div
+					class={['qm-array-row qm-wash', { standing: id === standingId }]}
+					data-qm-index={k}
+					bind:this={rowEls[id]}
+				>
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
@@ -748,9 +785,10 @@
 							plaintext={items != null && literalText(items)}
 							cap={textCap(items)}
 							label={rowName(k)}
+							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onChange={(rt) => commitElement(k, rt)}
 							lines={{
-								room: () => (max == null ? Infinity : max - arr.length),
+								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
 								onLines: (rt, below) => spill(k, rt, below)
 							}}
 							onKey={(e) => onElementKey(e, k)}
@@ -760,13 +798,16 @@
 							bind:this={els[id]}
 							value={String(arr[k] ?? '')}
 							label={rowName(k)}
+							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onCommit={(v) => commitElement(k, v)}
 							onKey={(e) => onElementKey(e, k)}
 						/>
 					{/if}
-					<div class="qm-row-actions">
-						{@render removeButton(k)}
-					</div>
+					{#if id !== standingId}
+						<div class="qm-row-actions">
+							{@render removeButton(k)}
+						</div>
+					{/if}
 					<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
 				</div>
 			{/each}
@@ -857,6 +898,13 @@
 	.qm-array-rows[data-default] :global(.qm-select:not([data-ghosted])),
 	.qm-array-rows[data-default] .qm-element-title:not(.untitled) {
 		color: var(--_qm-ink-default);
+	}
+	/* A row that is not an element yet: the box's edge dashed round no fill, the
+	   placeholder idiom, until its first keystroke makes it one. */
+	.qm-array-row.standing > :global(:is(.qm-input, .qm-control-box)) {
+		background: transparent;
+		outline: var(--_qm-border-width) dashed var(--_qm-border);
+		outline-offset: calc(-1 * var(--_qm-border-width));
 	}
 	.qm-array-rows[data-default] :global(.qm-toggle[data-state='checked']) {
 		background: var(--_qm-accent-default);
