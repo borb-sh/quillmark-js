@@ -101,6 +101,17 @@ describe('conflicts by word', () => {
 		const written = write(a, base, ['Alpha confirms two things before lunch.', LINES[1], LINES[2]]);
 		expect(written.conflicts).toHaveLength(1);
 	});
+	it('reports two insertions at one place, however the words line up', () => {
+		const [a, b] = session(LINES);
+		const base = revision(a);
+		retype(b, 'Charlie files it.', 'Charlie files it. Typed.');
+		const written = write(a, base, [
+			'Alpha confirms three things before noon.',
+			LINES[1],
+			'Charlie files it. Drafted.'
+		]);
+		expect(written.conflicts).toHaveLength(1);
+	});
 });
 
 describe('held parts', () => {
@@ -227,6 +238,54 @@ describe('held parts', () => {
 		);
 		expect(q.toAuthoring(a.doc).fields?.keywords).toEqual(['model']);
 		expect(heldState(written.held[0], a.ydoc).state).toBe('matched');
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
+	it('holds only the line whose end meets a change, and writes it leaving the others', () => {
+		const [a, b] = session(LINES);
+		const base = revision(a);
+		retype(b, 'noon.', 'noon. Typed.');
+		retype(b, 'Bravo', 'Bravo now');
+		const written = write(
+			a,
+			base,
+			['Alpha confirms two things before noon. Drafted.', LINES[1], 'Charlie files it today.'],
+			{ hold: 'hunk' }
+		);
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		const typed = 'Bravo now reviews the draft and signs the memo at the end of the week.';
+		expect(body(a)).toEqual([
+			'Alpha confirms two things before noon. Typed.',
+			typed,
+			'Charlie files it today.'
+		]);
+		expect(written.held).toEqual([expect.objectContaining({ before: LINES[0] })]);
+		Y.applyUpdate(
+			a.ydoc,
+			writeHeld(written.held[0], { history: a.ydoc, quill: q, doc: a.doc }).update,
+			'ai'
+		);
+		expect(body(a)).toEqual([
+			'Alpha confirms two things before noon. Drafted.',
+			typed,
+			'Charlie files it today.'
+		]);
+	});
+
+	it('holds what both wrote into an empty field, and writes it', () => {
+		const [a, b] = session(['']);
+		const base = revision(a);
+		edit(b.doc, {}, [{ insert: 'Typed here.' }]);
+		b.binding.push();
+		const written = write(a, base, ['Drafted here.'], { hold: 'hunk' });
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		expect(heldState(written.held[0], a.ydoc)).toEqual({ state: 'open', current: 'Typed here.' });
+		Y.applyUpdate(
+			a.ydoc,
+			writeHeld(written.held[0], { history: a.ydoc, quill: q, doc: a.doc }).update,
+			'ai'
+		);
+		expect(body(a)).toEqual(['Drafted here.']);
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 });

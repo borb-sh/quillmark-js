@@ -269,7 +269,7 @@ function resolve(
 	}
 	const end = at(span.end);
 	if (!end || end.index <= start.index) return undefined;
-	return { blocks: [lineAt(start.index), lineAt(end.index - 1) + 1], field, plain };
+	return { blocks: [lineAt(start.index), lineAt(end.index) + 1], field, plain };
 }
 
 /** Blocks `[from, to)` of a field as a held part reads them: Markdown, or a plain field's text. */
@@ -518,7 +518,7 @@ function heldParts(
 		const span: HeldText['span'] =
 			r.from === r.to
 				? { root, start: rel(start, tail ? -1 : 0), ...(tail ? { tail } : {}) }
-				: { root, start: rel(start, 0), end: rel(end, -1) };
+				: { root, start: rel(start, -1), end: rel(end, 0) };
 		const now = resolve(span, history);
 		return {
 			type: 'text',
