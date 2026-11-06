@@ -207,16 +207,15 @@
 	const undo = createStructuralUndo();
 	setStructuralUndo(undo);
 	span.onEnd(undo.dispose);
-	/** ⌘Z/Ctrl+Z off a text leaf takes the standing offer. In a leaf the key is the
-	 *  leaf's own history, which a removal never entered. */
-	function onRootKey(e: KeyboardEvent): void {
-		raiseGuidance(e);
+	/** ⌘Z/Ctrl+Z takes the standing offer where the offer accepts it (`undo.accepts`).
+	 *  On the document, since a removal under the pointer leaves the focus on the body, and
+	 *  captured, so a leaf the removal handed the focus to hears the key after the offer. */
+	function onUndoKey(e: KeyboardEvent): void {
 		if (e.defaultPrevented || e.isComposing || e.shiftKey || e.altKey) return;
-		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' || !undo.current) return;
-		const target = e.target;
-		if (target instanceof Element && target.closest('input, textarea, [contenteditable="true"]'))
-			return;
+		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+		if (!undo.accepts(e.target, rootEl)) return;
 		e.preventDefault();
+		e.stopPropagation();
 		undo.take();
 	}
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
@@ -581,6 +580,7 @@
 		if (!(await span.resumes(tick()))) return;
 		if (cardIds.length) cardRefs[Math.max(at - 1, 0)]?.focusHeader();
 		else rootEl?.querySelector<HTMLElement>('.qm-add-btn')?.focus();
+		undo.hand(document.activeElement);
 	}
 	function retypeCardById(id: string, kind: string): void {
 		const i = cardIndexOf(id);
@@ -1020,6 +1020,8 @@
 	}
 </script>
 
+<svelte:document onkeydowncapture={onUndoKey} />
+
 <!-- The keydown is a control's, bubbled: the root resolves which description it raises. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
@@ -1027,7 +1029,7 @@
 	{style}
 	data-qm-root
 	bind:this={rootEl}
-	onkeydown={onRootKey}
+	onkeydown={raiseGuidance}
 >
 	<!-- `main` and the tips card are one block in the stack: the tips card tucks under
 	 `main`'s bottom corners, so the two share a seam rather than a gutter and the
@@ -1088,7 +1090,15 @@
 	 announced: a live region inserted along with its text is one a reader may not hear. -->
 	<div class="qm-toast-slot" role="status">
 		{#if undo.current}
-			<div class="qm-toast">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<!-- The handlers hold the lapse while the toast is in use and add no interaction. -->
+			<div
+				class="qm-toast"
+				onpointerenter={() => undo.pause()}
+				onpointerleave={() => undo.resume()}
+				onfocusin={() => undo.pause()}
+				onfocusout={() => undo.resume()}
+			>
 				<span class="qm-toast-notice">{undo.current.notice}</span>
 				<button
 					type="button"

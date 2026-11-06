@@ -306,21 +306,30 @@
  of one takes (`--cols-half`) land on a track boundary. A field ends on its track's
  own edge, so a rung is `n * 220px + gaps`. A subform three rungs in stands three
  `--_qm-nest` and three verticals narrower than its section, and steps down where the
- section does not: the count is the width the tracks actually get. */
+ section does not: the count is the width the tracks actually get.
+
+ The two tails are where a run's last cell takes the row (`RunTail`, `placeFields`): the
+ placement a capacity leaves it alone in, so it spans there and shares a row elsewhere. */
 :where(.qm-tracks) {
 	--cols: 1;
 	--cols-half: 1;
+	--tail-odd: span 1;
+	--tail-lone: span 1;
 }
 @container (min-width: 28rem) {
 	:where(.qm-tracks) {
 		--cols: 2;
 		--cols-half: 1;
+		--tail-odd: 1 / -1;
+		--tail-lone: 1 / -1;
 	}
 }
 @container (min-width: 57rem) {
 	:where(.qm-tracks) {
 		--cols: 4;
 		--cols-half: 2;
+		--tail-odd: span 1;
+		--tail-lone: 1 / -1;
 	}
 }
 

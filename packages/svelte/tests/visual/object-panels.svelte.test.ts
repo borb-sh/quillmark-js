@@ -48,6 +48,34 @@ describe('a card grouped by top-level objects', () => {
 		expect(expanded()).toEqual(['false', 'true']);
 	});
 
+	it('flags a closed panel holding a diagnostic, and links the message once open', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const at = doc.cards.findIndex((c) => c.kind === 'credits');
+		const { target } = mountEditor(q, doc, {
+			diagnostics: [
+				{
+					severity: 'error',
+					code: 'validation::type_mismatch',
+					path: `cards.credits[${at}].rights.holder`,
+					message: 'holder is wrong'
+				}
+			]
+		});
+		const card = target.querySelectorAll<HTMLElement>('.qm-card')[at + 1];
+		const rights = panel(card, 'Rights');
+		expect(rights.querySelector('.qm-group-flag')).not.toBeNull();
+		expect(panel(card, 'Publisher').querySelector('.qm-group-flag')).toBeNull();
+
+		rights.querySelector<HTMLButtonElement>('.qm-group-header')!.click();
+		flushSync();
+		expect(rights.querySelector('.qm-group-flag')).toBeNull();
+		const list = rights.querySelector<HTMLElement>('.qm-diag-list')!;
+		const control = list.parentElement!.querySelector<HTMLElement>('[aria-invalid="true"]')!;
+		expect(control.getAttribute('aria-errormessage')).toBe(list.id);
+		expect(control.getAttribute('aria-describedby')?.split(' ')).toContain(list.id);
+	});
+
 	it('stands its other fields unframed above the panels', () => {
 		const { card } = credits();
 		const groups = card.querySelector('.qm-groups')!;

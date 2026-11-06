@@ -8,7 +8,12 @@
 // One deep, and only the latest: a second removal replaces the first offer, and any other
 // structural edit withdraws it, because the restore reinserts at the index the removal left
 // and an edit between the two moves what that index names. The offer lapses on its own after
-// a while, so an Undo pressed long after the removal is not a surprise.
+// a while, so an Undo pressed long after the removal is not a surprise; the while holds as
+// long as the toast is under the pointer or the focus.
+//
+// The key listens on the document while an offer stands, not on the surface: a removal by
+// the pointer takes the pressed button with it and leaves the focus on the page's body,
+// which no keydown on the surface hears.
 import { getContext, setContext } from 'svelte';
 
 /** How long an offer stands, in ms. Long enough to read the toast and reach its button;
@@ -27,18 +32,38 @@ export interface StructuralUndo {
 	readonly current: UndoOffer | undefined;
 	/** Offer `restore` as the undo of the removal just made, replacing any standing offer. */
 	offer(notice: string, restore: () => void): void;
+	/** Name the control the removal handed the focus to. ⌘Z there is the offer's until the
+	 *  control takes an edit or the focus leaves it: the key that removed is the key that
+	 *  asks for it back, and the control has nothing of its own to undo yet. */
+	hand(el: Element | null): void;
+	/** Whether ⌘Z pressed at `target` is the offer's: the page's body, where a removal under
+	 *  the pointer leaves the focus; the handed control; or a control under `root` that keeps
+	 *  no history of its own. A text control that is not the handed one keeps its key. */
+	accepts(target: EventTarget | null, root: Element | undefined): boolean;
+	/** Hold the lapse while the toast is under the pointer or the focus, and let it run again. */
+	pause(): void;
+	resume(): void;
 	/** Run the standing offer and clear it. False when there was none to run. */
 	take(): boolean;
 	/** Drop the standing offer without running it. */
 	withdraw(): void;
 }
 
+const EDITABLE = 'input, textarea, select, [contenteditable="true"]';
+
 export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 	let current = $state<UndoOffer | undefined>();
+	let handed: Element | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
-	const clear = (): void => {
+	let paused = false;
+	const stop = (): void => {
 		if (timer !== undefined) clearTimeout(timer);
 		timer = undefined;
+	};
+	const clear = (): void => {
+		stop();
+		paused = false;
+		handed = undefined;
 		current = undefined;
 	};
 	return {
@@ -48,6 +73,32 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		offer(notice, restore) {
 			clear();
 			current = { notice, restore };
+			timer = setTimeout(clear, OFFER_MS);
+		},
+		hand(el) {
+			if (!current || !el) return;
+			handed = el;
+			const release = (): void => {
+				if (handed === el) handed = undefined;
+				el.removeEventListener('input', release);
+				el.removeEventListener('focusout', release);
+			};
+			el.addEventListener('input', release);
+			el.addEventListener('focusout', release);
+		},
+		accepts(target, root) {
+			if (!current || !(target instanceof Element)) return false;
+			if (target === document.body || target === handed) return true;
+			return !!root?.contains(target) && !target.closest(EDITABLE);
+		},
+		pause() {
+			if (!current || paused) return;
+			paused = true;
+			stop();
+		},
+		resume() {
+			if (!current || !paused) return;
+			paused = false;
 			timer = setTimeout(clear, OFFER_MS);
 		},
 		take() {
@@ -75,6 +126,10 @@ export function structuralUndo(): StructuralUndo {
 		getContext<StructuralUndo>(KEY) ?? {
 			current: undefined,
 			offer() {},
+			hand() {},
+			accepts: () => false,
+			pause() {},
+			resume() {},
 			take: () => false,
 			withdraw() {}
 		}

@@ -385,7 +385,9 @@
 		drop(dropped);
 		onCommit(arr.filter((_, i) => i !== k));
 		if (offer) undo.offer(t.strings.undoRemoved(name), () => restore(k, value));
-		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove);
+		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove).then(() => {
+			if (offer) undo.hand(document.activeElement);
+		});
 	}
 	/** A removal's undo: `value` back at `k`, under a fresh id, focused where a landing on
 	 *  it would focus. A no-op once this field is gone, the row with it. */
@@ -1108,25 +1110,17 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 	}
-	/* An open row's summary is the same line without its box: the cells under it are
-	 the record now, so the summary steps down from a value's box to a heading's line,
-	 at the tap rung rather than a control's height. Its words, its chevron and its
-	 slab keep their places, so the pointer finds them where it left them. */
-	.qm-element.open > .qm-element-head > .qm-element-summary {
+	/* A record's summary is a heading's line, open or closed, at the tap rung: a record is
+	 a thing you open, where a box with a fill and an edge is a thing you type into, which
+	 is what every well beside it is. Only the chevron turns between the two states, so
+	 the words, the chevron and the slab stay where the pointer left them. It carries
+	 `.qm-control-box` for the recipe's inline inset and type, so its words stand on the
+	 column the wells' text does, and gives up the box's fill, edge and block padding. */
+	.qm-element-summary {
 		min-height: var(--_qm-tap-min);
 		padding-block: 0;
 		background: transparent;
 		box-shadow: none;
-	}
-	/* A box, which the button family otherwise is not: the row IS the element, a value
-	 in collapsed form the way the enum trigger is one, and the slab's grammar — the
-	 box's two end-side corners — needs a box with corners to take. It carries
-	 `.qm-control-box`, so the radius, the inset, the edge and the type are the recipe's
-	 (controls.css) and a list of records measures like the list of inputs beside it. Its
-	 fill is the card's rather than the well's: a filled box is one you type into, and a
-	 closed record is one you open, so the two take the same box in different material. */
-	.qm-element-summary {
-		background: var(--_qm-surface);
 		display: flex;
 		align-items: center;
 		gap: var(--_qm-space);
@@ -1316,25 +1310,19 @@
 	 the two read as one register. Inner radius: the chip family is the card's, and this
 	 box is a line of type. The chip's tap floor is given back (`.qm-tap-floor`),
 	 and the padding with it, so the drawn box is the line and the target is the floor.
-	 It rests dim and comes up under the pointer; empty, it is the way in; at the cap it
-	 rests at the family's disabled rung and the count beside it says why. */
+	 It is words, so it rests at the label ink in full, where the glyph controls beside a
+	 row rest at the rest rung: a text control's floor is WCAG 1.4.3's 4.5:1, which the
+	 rest rung over the label ink does not clear. At the cap it rests at the family's
+	 disabled rung and the count beside it says why. */
 	.qm-add-el {
 		padding: 0 var(--_qm-space);
 		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		border-radius: var(--_qm-radius-inner);
-		opacity: var(--_qm-opacity-rest);
 		transition:
 			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
-	}
-	.qm-add-el:hover:not(:disabled),
-	.qm-add-el:focus-visible {
-		opacity: 1;
-	}
-	.qm-array.empty .qm-add-el {
-		opacity: 1;
 	}
 	.qm-add-el:disabled {
 		opacity: var(--_qm-opacity-idle);

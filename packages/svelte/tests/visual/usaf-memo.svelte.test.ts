@@ -92,12 +92,12 @@ describe('the shipped quill on the surface', () => {
 			field(target, label).classList.contains('cell') ? 'cell' : 'full';
 		// `Dissemination` asks to pack and stands alone between block leaves, so its run
 		// is one and it takes the row; `Letterhead seal` opens a run of three inline
-		// neighbours and packs, and `Tag line` ends it and takes the row the run leaves
-		// it alone in. What separates them is the run each lands in, not what either
-		// declares.
+		// neighbours and packs, and `Tag line` ends it, carrying the tail the grid spends
+		// where two tracks would leave it alone. What separates them is the run each lands
+		// in, not what either declares.
 		expect(span('Dissemination')).toBe('full');
 		expect(span('Letterhead seal')).toBe('cell');
-		expect(span('Tag line')).toBe('full');
+		expect(field(target, 'Tag line').dataset.tail).toBe('odd');
 	});
 
 	// What the cells rest as, both ways. The read is the one a variant's key answers

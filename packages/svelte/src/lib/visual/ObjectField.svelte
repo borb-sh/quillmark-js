@@ -141,10 +141,10 @@
 	const entries = $derived(Object.entries(properties ?? {}));
 	const obj = $derived((value ?? {}) as Record<string, unknown>);
 	const has = (key: string): boolean => Object.hasOwn(properties ?? {}, key);
-	const spans = $derived(
+	const placements = $derived(
 		placed
 			? new Map(
-					placeFields(fieldModels({ fields: properties ?? {} })).map((p) => [p.field.name, p.span])
+					placeFields(fieldModels({ fields: properties ?? {} })).map((p) => [p.field.name, p])
 				)
 			: undefined
 	);
@@ -303,10 +303,11 @@
 					'qm-object-prop',
 					{
 						'qm-prop-full': isContainer(kind),
-						'qm-prop-wide': block || (!isContainer(kind) && spans?.get(key) === 'full')
+						'qm-prop-wide': block || (!isContainer(kind) && placements?.get(key)?.span === 'full')
 					}
 				]}
 				data-qm-prop={key}
+				data-tail={placements?.get(key)?.tail}
 			>
 				{#if ids && kind !== 'array' && kind !== 'matrix'}
 					<FieldLabel
@@ -556,6 +557,13 @@
 	/* A block prose property holds paragraphs, so a track beside it stands in whitespace
 	   once it grows (`packable`); its label still rides the row above it. A placed
 	   property `placeFields` gives the whole row spans it the same way. */
+	/* A placed run's last cell where its capacity would leave it alone (`RunTail`). */
+	.qm-object-prop[data-tail='odd'] {
+		grid-column: var(--tail-odd);
+	}
+	.qm-object-prop[data-tail='lone'] {
+		grid-column: var(--tail-lone);
+	}
 	.qm-object-prop.qm-prop-wide,
 	.qm-object-prop.qm-prop-wide:only-child {
 		grid-column: 1 / -1;

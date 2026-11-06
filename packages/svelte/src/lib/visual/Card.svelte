@@ -269,6 +269,8 @@
 							{#each grouped as section (section.group)}
 								{@const group = section.group as string}
 								{@const isOpen = open.has(group)}
+								{@const flagged =
+									!isOpen && section.fields.some((f) => ops.diagFor(f.name)?.length)}
 								{@const panelId = ops.panelId(group)}
 								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
 								{@const headHint = section.head?.description}
@@ -291,6 +293,12 @@
 												class="qm-group-chevron"
 												size={CHEVRON}
 											/>{section.label}
+											{#if flagged}
+												<!-- A closed panel draws none of its fields, so what they would say is
+												     marked on the header that opens them. -->
+												<span class="qm-group-flag" aria-hidden="true"></span>
+												<span class="qm-visually-hidden">{t.strings.groupFlagged}</span>
+											{/if}
 										</button>
 										{#if headIds && headHint}
 											<FieldHint
@@ -350,10 +358,11 @@
 
 {#snippet sectionFields(fields: FieldModel[], head?: FieldModel)}
 	<div class="qm-fields qm-tracks">
-		{#each placeFields(fields) as { field: f, span } (mountKey(f.name, f.schema))}
+		{#each placeFields(fields) as { field: f, span, tail } (mountKey(f.name, f.schema))}
 			<Field
 				field={f}
 				{span}
+				{tail}
 				value={card.values[f.name]}
 				provenance={card.provenance[f.name]}
 				{doc}
@@ -509,14 +518,15 @@
 	 and inherit the same type tokens, which is what makes the two measure alike.
 
 	 The type is a rung over the group header's: the card holds its sections, so its name
-	 ranks above theirs, at the paper rung: the size ramp ranks, and the weight stays the
-	 chrome's one (ARCHITECTURE §Styling). */
+	 ranks above theirs, at the paper rung and at the header's weight: the size ramp ranks,
+	 and the weight stays the chrome's one (ARCHITECTURE §Styling). */
 	.qm-card-title-sizer {
 		display: inline-grid;
 		align-items: center;
 		min-width: 0;
 		max-width: 100%;
 		font-size: var(--_qm-text-paper);
+		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		font-family: inherit;
 	}
@@ -556,6 +566,16 @@
 	.qm-groups {
 		display: flex;
 		flex-direction: column;
+	}
+	/* The danger ink at the size a glyph's stroke reads at beside a word: a mark, not a
+	 badge, so it says something under here is wrong and leaves the saying to the fields. */
+	.qm-group-flag {
+		flex-shrink: 0;
+		width: calc(2 * var(--_qm-space));
+		height: calc(2 * var(--_qm-space));
+		margin-inline-start: var(--_qm-space);
+		border-radius: var(--_qm-radius-pill);
+		background: var(--_qm-danger);
 	}
 	/* One rung between the payload's two kinds of section, and none inside the panel stack:
 	 what stands one disclosure row off the next is the two headers' own block padding and

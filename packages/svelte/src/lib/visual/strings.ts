@@ -42,6 +42,10 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	/** The card-title input's accessible name. */
 	cardTitle: string;
 
+	/** A closed panel's header, spoken after its name (`Layout, has an issue`) when a field
+	 *  inside holds a diagnostic: the leading separator is part of the wording. */
+	groupFlagged: string;
+
 	// ── Structural undo (the toast a removal raises) ─────────────────────────
 	/** The toast's notice, named for what went: `Authors 2 removed`. */
 	undoRemoved: (what: string) => string;
@@ -244,6 +248,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardMoveDown: 'Move down',
 	cardDelete: 'Delete card',
 	cardTitle: 'Card title',
+	groupFlagged: ', has an issue',
 	undoRemoved: (what) => `${what} removed`,
 	undoAction: 'Undo',
 	addCard: 'Add Card',

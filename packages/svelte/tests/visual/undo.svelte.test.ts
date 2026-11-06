@@ -54,20 +54,38 @@ describe('structural undo', () => {
 		expect(toast(target)).toBeNull();
 	});
 
-	it('answers ⌘Z off a text leaf, and lapses on its own', () => {
+	it('answers ⌘Z off a text control, and lapses on its own when not in use', () => {
 		vi.useFakeTimers();
 		const doc = example();
 		const before = doc.toString();
 		const { target } = mountEditor(quill(), doc);
 
+		// A press on delete takes the button with it, so the key arrives at the body.
 		deleteButton(slots(target)[0]).click();
 		flushSync();
-		press(target.querySelector('.qm-editor')!, 'z', { metaKey: true });
+		press(document.body, 'z', { metaKey: true });
+		flushSync();
+		expect(doc.toString()).toBe(before);
+
+		// A text control keeps its own ⌘Z unless the removal handed it the focus.
+		deleteButton(slots(target)[0]).click();
+		flushSync();
+		const title = target.querySelector<HTMLInputElement>('.qm-card-title')!;
+		press(title, 'z', { ctrlKey: true });
+		flushSync();
+		expect(toast(target)).not.toBeNull();
+		undoButton(target).click();
 		flushSync();
 		expect(doc.toString()).toBe(before);
 
 		deleteButton(slots(target)[0]).click();
 		flushSync();
+		// The lapse holds while the toast is in use.
+		toast(target)!.dispatchEvent(new Event('pointerenter'));
+		vi.advanceTimersByTime(OFFER_MS + 1);
+		flushSync();
+		expect(toast(target)).not.toBeNull();
+		toast(target)!.dispatchEvent(new Event('pointerleave'));
 		vi.advanceTimersByTime(OFFER_MS + 1);
 		flushSync();
 		expect(toast(target)).toBeNull();

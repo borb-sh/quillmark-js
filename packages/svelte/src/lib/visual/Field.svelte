@@ -28,7 +28,7 @@
 	} from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
 	import { seatValueLeaves, stepsTo, type LandingBox, type LeafRegistry } from './leaves.js';
-	import type { FieldModel, FieldSpan } from './structure.js';
+	import type { FieldModel, FieldSpan, RunTail } from './structure.js';
 	import {
 		VARIANT_DISCRIMINANT,
 		arrayLayout,
@@ -62,6 +62,8 @@
 		field: FieldModel;
 		/** This field's width in the section grid, from `placeFields`. */
 		span: FieldSpan;
+		/** Where a cell takes the row its run's length would leave it alone in. */
+		tail?: RunTail;
 		value: unknown;
 		/** This field's resolved provenance row (FIELD_PROVENANCE): the ghost's
 		 * source. Feeds the placeholder / fallback only, never `value`. */
@@ -99,6 +101,7 @@
 	let {
 		field,
 		span,
+		tail,
 		value,
 		provenance,
 		doc,
@@ -285,12 +288,7 @@
 	);
 </script>
 
-<div
-	class={[
-		'qm-field',
-		{ cell: span === 'cell', inline: span !== 'cell' && field.control === 'boolean' }
-	]}
->
+<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail}>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
@@ -491,22 +489,12 @@
 		row-gap: var(--_qm-space);
 		align-items: start;
 	}
-	/* A switch with the row to itself sits on its label's line, at the row's end: a
-	 mark under a label stands a line of dead space beside it, and the end edge is where
-	 every well in the section ends. The stack gives up its box so the switch takes the
-	 second column and a diagnostic the line under both. In a shared row the label track
-	 is the neighbours' too, so a packed switch stays under its label. */
-	.qm-field.inline {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		align-items: center;
-		column-gap: var(--_qm-space-3);
+	/* A run's last cell where its capacity would leave it alone in the row (`RunTail`). */
+	.qm-field.cell[data-tail='odd'] {
+		grid-column: var(--tail-odd);
 	}
-	.qm-field.inline > .qm-field-stack {
-		display: contents;
-	}
-	.qm-field.inline > .qm-field-stack > :global(.qm-diag-list) {
-		grid-column: 1 / -1;
+	.qm-field.cell[data-tail='lone'] {
+		grid-column: var(--tail-lone);
 	}
 	/* The stack the control's track holds: the control, and the diagnostics when
 	 there are any. Its gap is the field's own, so a diagnostic sits the same rung

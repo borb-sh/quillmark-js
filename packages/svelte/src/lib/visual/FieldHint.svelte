@@ -281,6 +281,13 @@
 	.qm-field-hint[aria-expanded='true'] {
 		opacity: 1;
 	}
+	/* Without a hover there is no lift to wait for, and a tap is the glyph's only door, so
+	 it rests drawn at the rung a live glyph control rests at. */
+	@media (hover: none) {
+		.qm-field-hint {
+			opacity: var(--_qm-opacity-rest);
+		}
+	}
 	/* The lift, the translucency, the blur and the scale-in come from
 	 `.qm-popover-surface` (controls.css). This surface's own is a measure: guidance
 	 is prose, and prose past ~40 characters a line stops being scannable; plus the
