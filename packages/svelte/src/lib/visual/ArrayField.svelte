@@ -205,7 +205,9 @@
 	const standing = $derived(
 		!table && control !== 'object' && arr.length === 0 && (max == null || max > 0)
 	);
-	const rowIds = $derived(standing && ids.length === 0 ? [standingId] : ids);
+	/** Whether the standing row is drawn: a gesture lands on it, which holds no element yet. */
+	const onStanding = $derived(standing && ids.length === 0);
+	const rowIds = $derived(onStanding ? [standingId] : ids);
 	// Length reconcile (defend against an out-of-band length change);
 	// order is maintained by the mutators, not here.
 	$effect(() => {
@@ -309,16 +311,30 @@
 		return '';
 	}
 
-	/** Whether the gesture lands on the standing row, which holds no element yet. */
-	const onStanding = (): boolean => standing && ids.length === 0;
 	/** The standing row becomes the list's first element, keeping its id. */
 	function claimStanding(): void {
 		ids = [standingId];
 		standingId = seq.next();
 	}
+	/** An empty list's landing: the standing row where one is drawn, else the add chip. */
+	function focusEmpty(): void {
+		(onStanding ? els[standingId] : addEl)?.focus();
+	}
+	/** Splice `value` in at `at` under a fresh id and commit it. Every reshape withdraws
+	 *  the editor's standing undo offer: a restore reinserts at the index its removal left,
+	 *  which a reshape moves (`undo.svelte.ts`). */
+	function insertAt(at: number, value: unknown): string {
+		undo.withdraw();
+		const id = seq.next();
+		ids = [...ids.slice(0, at), id, ...ids.slice(at)];
+		const next = arr.slice();
+		next.splice(at, 0, value);
+		onCommit(next);
+		return id;
+	}
 
 	function commitElement(k: number, next: unknown): void {
-		if (onStanding()) {
+		if (onStanding) {
 			if (next === undefined || cellBlank(next)) return;
 			claimStanding();
 		}
@@ -335,12 +351,7 @@
 	 *  no-op at the cap: no editor gesture commits an element past `max:`. */
 	function insertAfter(k: number, column?: string): void {
 		if (atCap) return;
-		const id = seq.next();
-		const at = k + 1;
-		ids = [...ids.slice(0, at), id, ...ids.slice(at)];
-		const next = arr.slice();
-		next.splice(at, 0, emptyElement());
-		onCommit(next);
+		const id = insertAt(k + 1, emptyElement());
 		// A row added is a row to fill in, so an object element arrives open: landing on
 		// a collapsed empty summary would make adding one a two-press gesture.
 		if (control === 'object' && !table) open.add(id);
@@ -350,7 +361,8 @@
 	 *  several lines into a row, each line past the first a row as Enter would open it.
 	 *  The caret ends where the paste does, at the end of the last. */
 	function spill(k: number, row: Content, below: Content[]): void {
-		if (onStanding()) claimStanding();
+		if (onStanding) claimStanding();
+		undo.withdraw();
 		const at = k + 1;
 		const fresh = seq.take(below.length);
 		ids = [...ids.slice(0, at), ...fresh, ...ids.slice(at)];
@@ -385,6 +397,7 @@
 		drop(dropped);
 		onCommit(arr.filter((_, i) => i !== k));
 		if (offer) undo.offer(t.strings.undoRemoved(name), () => restore(k, value));
+		else undo.withdraw();
 		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove).then(() => {
 			if (offer) undo.hand(document.activeElement);
 		});
@@ -393,13 +406,7 @@
 	 *  it would focus. A no-op once this field is gone, the row with it. */
 	function restore(k: number, value: unknown): void {
 		if (!span.alive) return;
-		const at = Math.min(k, ids.length);
-		const id = seq.next();
-		ids = [...ids.slice(0, at), id, ...ids.slice(at)];
-		const next = arr.slice();
-		next.splice(at, 0, value);
-		onCommit(next);
-		void focusAfterFlush(id);
+		void focusAfterFlush(insertAt(Math.min(k, ids.length), value));
 	}
 	/** A collapsed record's remove key, on its summary: the remove is out of the tab order,
 	 *  and the summary is a button, where the key edits nothing. */
@@ -417,6 +424,7 @@
 	function move(k: number, to: number): void {
 		if (to === k || to < 0 || to >= ids.length) return;
 		const pressed = document.activeElement;
+		undo.withdraw();
 		arm.arm();
 		const nextIds = ids.slice();
 		const [id] = nextIds.splice(k, 1);
@@ -437,7 +445,7 @@
 	 * wants anyway. Reached by a label click and by the editor's landing verbs, which
 	 * ask one function so they cannot disagree (`Field`, `leaves.ts`). */
 	export function focus(): void {
-		if (ids.length === 0) return void (onStanding() ? els[standingId] : addEl)?.focus();
+		if (ids.length === 0) return focusEmpty();
 		if (table) return void cellEls[ids[0]]?.focus();
 		if (control === 'object') return focusObjectRow(ids[0]);
 		els[ids[0]]?.focus();
@@ -520,7 +528,7 @@
 		fromRemove = false
 	): Promise<void> {
 		if (!(await span.resumes(tick()))) return;
-		if (id === undefined) return void (onStanding() ? els[standingId] : addEl)?.focus();
+		if (id === undefined) return focusEmpty();
 		if (table) {
 			// Without the focus scroll: the remove is pinned, so it is in view where it
 			// stands, and the scroll the browser would make is to its unpinned place at
@@ -583,7 +591,7 @@
 	 */
 	function onElementKey(e: KeyboardEvent, k: number, column?: string): void {
 		if (e.isComposing) return;
-		if (onStanding()) {
+		if (onStanding) {
 			// No element to insert after or remove: a line is typed first.
 			if (e.key === 'Enter' || e.key === 'Backspace') e.preventDefault();
 			return;

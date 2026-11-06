@@ -32,6 +32,7 @@ main:
       type: array
       items: { type: text }
 `;
+const CAPPED = LIST.replace('items: { type: text }', 'items: { type: text }\n      max: 2');
 
 describe('structural undo', () => {
 	it('puts a deleted card back where it was, holding what it held', async () => {
@@ -136,5 +137,21 @@ describe('structural undo', () => {
 		undoButton(target).click();
 		flushSync();
 		expect(doc.toMarkdown()).toBe(before);
+	});
+
+	it("withdraws a row's offer when the list changes shape under it", () => {
+		const doc = core.Document.parse(
+			['~~~', '$quill: undo_list@1.0.0', 'lines:', '  - one', '  - two', '~~~', ''].join('\n')
+		);
+		const { target } = mountEditor(quillFromYaml(CAPPED), doc);
+		const lines = field(target, 'Lines');
+		lines.querySelector<HTMLButtonElement>('.qm-remove')!.click();
+		flushSync();
+		expect(toast(target)).not.toBeNull();
+
+		lines.querySelector<HTMLButtonElement>('.qm-add-el')!.click();
+		flushSync();
+		expect(toast(target)).toBeNull();
+		expect(doc.toMarkdown()).not.toContain('- one');
 	});
 });
