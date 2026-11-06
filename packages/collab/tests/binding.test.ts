@@ -355,6 +355,26 @@ describe('a remote value the Document refuses', () => {
 		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
 	});
 
+	it('tells the host when it starts holding one and when it lets the last go', () => {
+		const q = quill();
+		const seed = seedDocument(example(), q);
+		const ydoc = new Y.Doc();
+		Y.applyUpdate(ydoc, seed);
+		const heard: boolean[] = [];
+		const binding = bindDocument({
+			doc: example(),
+			quill: q,
+			ydoc,
+			leader: true,
+			onError: () => {},
+			onHolding: (holding) => heard.push(holding)
+		});
+		ydoc.transact(() => ydoc.getMap('main').set('bad-name', 1), 'net');
+		expect([binding.holding, heard]).toEqual([true, [true]]);
+		ydoc.transact(() => ydoc.getMap('main').delete('bad-name'), 'net');
+		expect([binding.holding, heard]).toEqual([false, [true, false]]);
+	});
+
 	it('in the card list stops the binding, which says so', () => {
 		const [a, b] = peers(2, example);
 		b.ydoc.transact(() => {

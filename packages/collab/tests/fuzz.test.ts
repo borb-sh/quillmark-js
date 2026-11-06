@@ -6,7 +6,7 @@
 // Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are.
 import { describe, expect, it } from 'vitest';
 import type { Addr, Change, Content, Document, Quill } from '@quillmark/wasm';
-import { writeFrom, type CardOp } from '../src/index.js';
+import { heldState, writeFrom, writeHeld, type CardOp } from '../src/index.js';
 import * as Y from 'yjs';
 import { project } from '../src/project.js';
 import { contentRoot, contentTypes, readField } from '../src/shape.js';
@@ -307,22 +307,32 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 	return true;
 }
 
-/** One random edit made from a revision `p` held earlier, applied to `p`; whether it landed. */
+/** One random edit made from a revision `p` held earlier, applied to `p`; whether it landed. Half
+ *  hold back what meets an edit made since, and write some of what they held at once. The edit
+ *  runs on its own seed, so a second run of it, when part is held, makes the same change. */
 function staleEdit(r: Rng, q: Quill, p: Peer, base: Uint8Array): boolean {
 	let landed = false;
-	const { update } = writeFrom({
+	const seed = r.int(2 ** 31);
+	const hold = r.next() < 0.5 ? 'hunk' : 'none';
+	const { update, held } = writeFrom({
 		history: p.ydoc,
 		base,
 		quill: q,
 		doc: p.doc,
+		hold,
 		edit(doc) {
 			let op: CardOp | undefined;
 			const scratch = { doc, binding: { push: (o?: CardOp) => void (op = o) } } as unknown as Peer;
-			landed = edit(r, q, scratch);
+			landed = edit(rng(seed), q, scratch);
 			return op;
 		}
 	});
 	Y.applyUpdate(p.ydoc, update, 'writer');
+	for (const part of held) {
+		if (r.next() < 0.5 || heldState(part, p.ydoc).state === 'gone') continue;
+		const written = writeHeld(part, { history: p.ydoc, quill: q, doc: p.doc });
+		Y.applyUpdate(p.ydoc, written.update, 'writer');
+	}
 	return landed;
 }
 

@@ -1,5 +1,6 @@
 export { bindDocument, cardOps, seedDocument, Diverged } from './document.js';
 export { init } from './core.js';
+export { deltaOf } from './delta.js';
 export type { Delta } from './delta.js';
 export type {
 	BindDocumentOpts,
@@ -8,8 +9,24 @@ export type {
 	DocumentBinding,
 	RemoteChange
 } from './document.js';
-export { writeFrom, changesSince, projectDocument, Unwritable } from './fork.js';
-export type { Change, ForkOpts, WriteFromOpts, Written } from './fork.js';
+export {
+	writeFrom,
+	writeHeld,
+	heldState,
+	changesSince,
+	projectDocument,
+	Unwritable
+} from './fork.js';
+export type {
+	Change,
+	ForkOpts,
+	Held,
+	HeldState,
+	HeldText,
+	HeldValue,
+	WriteFromOpts,
+	Written
+} from './fork.js';
 export { joinSession, QuillMismatch } from './session.js';
 export type {
 	Appended,

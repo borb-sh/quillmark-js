@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+**A write from a revision is compared and written word by word.** `writeFrom` reports a conflict only where the edit and a change made since touch the same words, compared as Y holds them, marks, block records, containers and islands included; `scope: 'line'` keeps the comparison by line. The update replaces whole words, so two words an edit changed far apart in a line are two splices and what was typed between them stays, and a word it replaced leaves no letter for a concurrent edit to land beside. `writeLog` compares by word too.
+
+**`writeFrom` holds back what meets a change and writes the rest.** `hold: 'hunk'` holds each line of the edit that meets a change made since and writes every other one in the same update; `hold: 'field'` holds each such field; a whole-value field is held whole. `Written.held` lists each held part with its text as the edit read it, as it stood when held and as the edit wrote it, and where it sits, by Y relative positions. `heldState(held, history)` reads a held part as `open`, `edited`, `matched` or `gone`, and `writeHeld(held, { history, quill, doc })` writes it over the lines its span covers now, leaving every other line. An edit runs a second time when part of it is held. `hold: 'none'` is the default and reports conflicts as before.
+
+**`writeFrom` reads less.** The history's projection is kept for the snapshot it was made at, so the writes of one answer read it once, and the update is checked against a fresh projection only when the session holds a refused value. One call writing five fields costs about what one field did.
+
+**`onHolding`.** `bindDocument` takes `onHolding(holding)`, called when a remote value the Document refused starts or stops being held, so a host that saves the Document waits. A refused value removed from Y is no longer held.
+
+**`deltaOf`** is exported: the `Delta` a write's receipt makes, as `onRemote` reports it.
+
 **On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. `Delta` is this package's own, exported beside `RemoteChange`, and `onRemote`'s delta for a revised field is the text change the Document's `replace` answers in its receipt, so a caret maps through exactly what the write did, a repair's insertion included. A `text` field's plain codec rides Y as `qm:codec` in its root's `#block0` record, so it lands on every client as plain content. A card's `$id` rides Y on its card map: the first valid claim in `$cards` order holds it, a card with none takes its Y name, and the resolved id is written back, so two cards placed at once take one id each, the same on every client. A Y state an earlier version wrote carries no `$id`, and its cards take their Y names.
 
 **The writer keeps a block's `\n` with its block, and places a lone insertion where it was typed.** A line is kept only where its text and the id of the block its `\n` opens both match, and a `\n` matches only the `\n` of the same block, so Enter at the start of a block another client re-kinds leaves that kind on the text rather than on the new empty block. An insertion with no deletion is written as far left as the text allows, so "the big " typed before "the cat" while another client deletes "the cat" converges to `"see the big "` and not `"see big the "`.
