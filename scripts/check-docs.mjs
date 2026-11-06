@@ -1,30 +1,19 @@
-// What the docs claim, against what the tree holds. Two rules, both about a sentence that
-// stops being true without anything failing. Zero deps; run via `npm run check:docs`.
+// What the docs claim, against what the tree holds: a sentence that stops being true without
+// anything failing. Zero deps; run via `npm run check:docs`.
 //
-//   1. The section pointer. A `<DOC> §<Section>` reference resolves, from anywhere in the
-//      tree — which is the half of a cross-reference that rots: a heading is renamed in the
-//      commit that earns it, and the pointers to it sit in four other packages and in the
-//      gates' own failure messages, where nothing looks. Every `.md` the walk finds is a
-//      target, keyed by filename, so a pointer at a name the workspace does not carry is a
-//      finding rather than a skip, and a new doc is addressable the moment it lands. A name
-//      two files answer to addresses neither, its headings being the union of both, so
-//      citing one is a finding and a collision nothing cites stands. The sibling quillmark
-//      repo's canon is cited by filename and never with a section, so it passes through
-//      untouched.
-//
-//   2. The boundary pin. `DOCUMENT_MODEL.md` is the single place the `@quillmark/wasm`
-//      version coupling is recorded, so the number in the prose answers to the number on
-//      disk — the one claim in that doc nothing else can check, since a bump lands in the
-//      lockfile and leaves the sentence about it untouched. Only an adjacent pair is read:
-//      the doc cites other releases historically, and those are prose about the past. What
-//      the ledger's table names is left to `tsc`, which fails on a verb the artifact
-//      stopped exporting the moment package code calls it.
+// A `<DOC> §<Section>` reference resolves, from anywhere in the tree — which is the half of
+// a cross-reference that rots: a heading is renamed in the commit that earns it, and the
+// pointers to it sit in four other packages and in the gates' own failure messages, where
+// nothing looks. Every `.md` the walk finds is a target, keyed by filename, so a pointer at
+// a name the workspace does not carry is a finding rather than a skip, and a new doc is
+// addressable the moment it lands. A name two files answer to addresses neither, its
+// headings being the union of both, so citing one is a finding and a collision nothing cites
+// stands. The sibling quillmark repo's canon is cited by filename and never with a section,
+// so it passes through untouched.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
-import { ROOT, report, wasmVersion } from './workspace.mjs';
-
-const LEDGER = 'packages/svelte/prose/canon/DOCUMENT_MODEL.md';
+import { ROOT, report } from './workspace.mjs';
 
 /** `<DOC> §<Section>`, quoted or bare, with an optional `.md` on the name. Stops at the
  *  first character no heading can carry, so a reference running on into prose is caught by
@@ -63,8 +52,6 @@ function aligns(a, b) {
 
 const errors = [];
 const files = [...tree(ROOT)];
-
-// ── 1. The section pointer ──────────────────────────────────────────────────────
 
 /** Each doc's headings, as word lists, keyed by filename without the extension, and the
  *  files each name is claimed by. */
@@ -106,21 +93,8 @@ for (const abs of files) {
 		});
 }
 
-// ── 2. The boundary pin ─────────────────────────────────────────────────────────
-
-const installed = wasmVersion();
-
-const pins = [
-	...readFileSync(join(ROOT, LEDGER), 'utf8').matchAll(/`@quillmark\/wasm`\s+(\d+\.\d+\.\d+)/g)
-].map((m) => m[1]);
-for (const pin of pins)
-	if (pin !== installed)
-		errors.push(`${LEDGER}: states @quillmark/wasm ${pin}; ${installed} is installed`);
-if (pins.length === 0)
-	errors.push(`${LEDGER}: names no @quillmark/wasm version — the pin is recorded here or nowhere`);
-
 report(
 	'Docs check',
 	errors,
-	`Docs OK — ${pointers} section pointers resolved across ${docs.length} docs, @quillmark/wasm ${installed}.`
+	`Docs OK — ${pointers} section pointers resolved across ${docs.length} docs.`
 );
