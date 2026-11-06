@@ -11,11 +11,15 @@
  draws the count beside it: a disabled button takes no focus, so a `title` reaches
  neither a screen reader nor a touch user, and the count is the carrier.
 
- An `object` element collapses: the row is its own summary — a box, titled by the
- row's first short text cell ({@link rowSummary}) — and opens onto {@link ObjectField}.
- Each row opens and closes on its own: a press on a summary toggles that row, and
- opening one leaves every other where it stands, so a landing never folds the row the
- author was in. Opening is part of a landing rather than something the user does first:
+ An `object` element collapses: the row is its own summary — a box titled `Item` and
+ its 1-based number, whatever the record holds — and opens onto {@link ObjectField}.
+ Open, the summary keeps its words, its chevron and its remove where they stood, and
+ lets its box go: a line at the tap rung over the subform, so the one thing a press
+ on it moves is the chevron. Each row opens and closes on its own: a
+ press on a summary toggles that row, and opening one leaves every other where it
+ stands, so a landing never folds the row the author was in. A list of one record
+ draws it open, on mount and whenever a remove leaves one: its summary would only be
+ a press in front of the one record there is. Opening is part of a landing rather than something the user does first:
  `focusPath` opens the row it is aimed at before it focuses, and hands the rest of the
  walk to that row's subform, which is how a row two closed boxes down is reached.
 
@@ -69,7 +73,7 @@
 	// The surface's words, ambient from the editor root; the package's English
 	// off-tree, so this component renders standalone too.
 	const t = wording();
-	import { onDestroy, tick } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
 	import { emptyContent } from '../core/codec/index.js';
 	import { createLifespan } from '../core/teardown.js';
@@ -80,7 +84,6 @@
 		declaredContent,
 		fieldTitle,
 		literalText,
-		rowSummary,
 		schemaAt,
 		textCap,
 		type ArrayLayout
@@ -258,15 +261,22 @@
 	// An open row's subform, on the row's id: the landing below walks into it.
 	const objEls: Record<string, Subform | undefined> = $state({});
 
-	/** A collapsed row's own words, or `undefined` while it has none. */
-	function elementTitle(k: number): string | undefined {
-		return rowSummary(items, arr[k]);
+	/** A row's accessible name: `label` + the title it draws. */
+	function elementName(k: number): string {
+		return label != null ? t.strings.elementUntitled(label, k + 1) : t.strings.elementItem(k + 1);
 	}
-	/** What an untitled row reads as: the name its `aria-label` already spends,
-	 *  `label` + the 1-based index. */
-	function untitled(k: number): string {
-		return label != null ? t.strings.elementUntitled(label, k + 1) : String(k + 1);
-	}
+	// A list of one record opens it. Keyed on the count moving, so a press that closes
+	// the one row holds until the count moves again; `pre`, so a mount draws it open.
+	let seenCount = -1;
+	$effect.pre(() => {
+		const n = ids.length;
+		if (n === seenCount) return;
+		seenCount = n;
+		if (n === 1 && control === 'object' && !table) {
+			const only = ids[0];
+			untrack(() => open.add(only));
+		}
+	});
 	function toggleRow(id: string): void {
 		if (open.has(id)) open.delete(id);
 		else open.add(id);
@@ -729,6 +739,7 @@
 							type="button"
 							class="qm-control-box qm-focus-ring qm-element-summary"
 							aria-expanded={open.has(id)}
+							aria-label={elementName(k)}
 							aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
 							onclick={() => toggleRow(id)}
 						>
@@ -736,11 +747,7 @@
 							     screen, where this unfolds in place. Same glyph, same rotation and
 							     same rung as the accordion's, so the surface has one disclosure. -->
 							<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
-							{#if elementTitle(k)}
-								<span class="qm-element-title">{elementTitle(k)}</span>
-							{:else}
-								<span class="qm-element-title untitled">{untitled(k)}</span>
-							{/if}
+							<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
 						</button>
 						<div class="qm-row-actions">
 							{@render removeButton(k)}
@@ -893,8 +900,7 @@
 	   the default rung (theme.css), a checked switch's track included, and the first
 	   gesture, writing them, takes it off. */
 	.qm-array-rows[data-default] :global(:is(.qm-input, .ProseMirror, .qm-date)),
-	.qm-array-rows[data-default] :global(.qm-select:not([data-ghosted])),
-	.qm-array-rows[data-default] .qm-element-title:not(.untitled) {
+	.qm-array-rows[data-default] :global(.qm-select:not([data-ghosted])) {
 		color: var(--_qm-ink-default);
 	}
 	/* A row that is not an element yet: the box a row draws, at the muted rung until it
@@ -1072,6 +1078,15 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 	}
+	/* An open row's summary is the same line without its box: the cells under it are
+	 the record now, so the summary steps down from a value's box to a heading's line,
+	 at the tap rung rather than a control's height. Its words, its chevron and its
+	 slab keep their places, so the pointer finds them where it left them. */
+	.qm-element.open > .qm-element-head > .qm-element-summary {
+		min-height: var(--_qm-tap-min);
+		padding-block: 0;
+		background: transparent;
+	}
 	/* A box, which the button family otherwise is not: the row IS the element, a value
 	 in collapsed form the way the enum trigger is one, and the slab's grammar — the
 	 box's two end-side corners — needs a box with corners to take. It carries
@@ -1085,6 +1100,7 @@
 		box-sizing: border-box;
 		text-align: start;
 		cursor: pointer;
+		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	/* No hover fill: a well does not fill under the pointer anywhere on this surface.
 	 The chevron's ink is the cue, which is the accordion header's own ladder. An open
@@ -1112,17 +1128,14 @@
 	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
 		transform: rotate(90deg);
 	}
-	/* The title is the element's own value, so it reads at the ink a written value
-	 takes, on one line however long the cell runs. An untitled row has nothing written
-	 in it yet and says so the way every other empty rung does. */
+	/* The title is the row's name and nothing written, so it reads at the label rung,
+	 on one line however long the label runs. */
 	.qm-element-title {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-	.qm-element-title.untitled {
 		color: var(--_qm-ink-label);
-		font-style: italic;
+		font-variant-numeric: tabular-nums;
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
 	 Every row of it is open, so it stands where an open row's subform stands: a rung

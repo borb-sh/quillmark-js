@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+**An `object` array row is named by its number.** A row's summary reads `Item` and its 1-based number (`Item 2`) whatever the record holds, open or collapsed, and its accessible name is the label with that title (`Signers, item 2`). It read the first one-line text cell, which named a row by whichever cell the schema declared first and fell back to the label and number when that cell was empty. `VisualStrings` gains `elementItem` for the title; `elementUntitled` is the accessible name.
+
+**An open `object` array row's summary is a line.** Open, the summary drops its box and stands at the tap rung over the subform, its title, chevron and remove where they stood collapsed.
+
+**A list of one record draws it open.** An `object` array in list layout holding one element shows that element open on mount and whenever a remove leaves one; a press on its summary still closes it.
+
 **An empty list of lines draws a row to type into.** An array whose elements are not `object`s, holding none, draws one standing row, a row's own box ghosted at the muted rung and empty, so its first line takes no press of `+ Add`. The row is no element: Enter and Backspace in it do nothing and nothing is written until it holds something, so the field stays absent or `[]`. Its first edit commits it as the first element, and the caret stays where it is.
 
 **A comment anchor survives delete and undo.** An anchor whose text a deletion swallowed came back without its anchor on undo, since anchors live beside ProseMirror's history rather than in it. The leaf now holds the anchor as a ghost of the deletion and puts it back at its range when an undo restores the deleted slice whole.

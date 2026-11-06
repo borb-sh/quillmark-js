@@ -15,7 +15,7 @@ import {
 	mountEditor,
 	paste,
 	press,
-	summaries,
+	openRow,
 	unmountAll
 } from '../helpers/surface.svelte.js';
 
@@ -97,8 +97,7 @@ describe('a block richtext cell on a record row', () => {
 		const doc = load();
 		const mounted = mountEditor(q, doc);
 		const jobs = field(mounted.target, 'Jobs');
-		summaries(jobs)[0].click();
-		flushSync();
+		openRow(jobs, 0);
 
 		const cell = jobs.querySelector<HTMLElement>('[data-qm-prop="details"]')!;
 		expect(cell.classList.contains('qm-prop-wide')).toBe(true);
@@ -121,8 +120,7 @@ describe('a multiline text cell on a record row', () => {
 		const doc = load();
 		const mounted = mountEditor(q, doc);
 		const jobs = field(mounted.target, 'Jobs');
-		summaries(jobs)[0].click();
-		flushSync();
+		openRow(jobs, 0);
 
 		const cell = jobs.querySelector<HTMLElement>('[data-qm-prop="address"]')!;
 		expect(cell.classList.contains('qm-prop-wide')).toBe(true);
@@ -146,8 +144,7 @@ describe('a multiline text cell on a record row', () => {
 		const before = JSON.stringify(doc.getStored('jobs'));
 		const mounted = mountEditor(q, doc);
 		const jobs = field(mounted.target, 'Jobs');
-		summaries(jobs)[0].click();
-		flushSync();
+		openRow(jobs, 0);
 		const leaf = jobs.querySelector<HTMLElement>('[data-qm-prop="address"] .ProseMirror')!;
 
 		expect(leaf.getAttribute('contenteditable')).toBe('false');
