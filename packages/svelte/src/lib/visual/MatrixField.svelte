@@ -445,9 +445,11 @@
 		width: var(--_qm-glyph-control);
 		height: var(--_qm-glyph-control);
 	}
-	/* The box is the switch's track (`BooleanField.svelte`): a fill and nothing else,
-	 which held swaps for the accent, so the surface's two marks for one boolean decode
-	 alike. */
+	/* Unticked is an outline, ticked a fill: a box drawn only as a tone over the card is
+	 a step of about 1.3:1, under WCAG 1.4.11's 3:1 for a control's boundary, and an empty
+	 box is the one figure every platform's checkbox shares. The edge is the label rung,
+	 which clears 3:1 over the card in both themes; ticking fills the box with the accent
+	 and the edge goes with the fill. */
 	.qm-tick-input {
 		appearance: none;
 		margin: 0;
@@ -455,16 +457,26 @@
 		height: 100%;
 		border: none;
 		border-radius: var(--_qm-radius-inner);
-		background: var(--_qm-surface-band);
+		background: transparent;
+		box-shadow: inset 0 0 0 calc(2 * var(--_qm-border-width)) var(--_qm-ink-label);
 		cursor: pointer;
-		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+		transition:
+			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+			box-shadow var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-tick-input:checked,
 	.qm-tick-fixed {
 		background: var(--_qm-accent);
+		box-shadow: none;
 	}
 	.qm-tick-fixed {
 		cursor: default;
+	}
+	/* Forced colours drop the inset shadow the outline is drawn with. */
+	@media (forced-colors: active) {
+		.qm-tick-input {
+			border: calc(2 * var(--_qm-border-width)) solid CanvasText;
+		}
 	}
 	/* The mark rides over the input and takes no press of its own; it is drawn by the
 	 input's state, in the ink the surface reads over the accent. */
@@ -518,7 +530,7 @@
 	.qm-member-remove {
 		flex-shrink: 0;
 		color: var(--_qm-ink-label);
-		opacity: var(--_qm-opacity-idle);
+		opacity: var(--_qm-opacity-rest);
 		transition:
 			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
@@ -531,11 +543,6 @@
 	.qm-member-remove:hover {
 		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
-	}
-	@media (hover: none) {
-		.qm-member-remove {
-			opacity: var(--_qm-opacity-muted);
-		}
 	}
 	/* The default's set is what prints and nothing written: its titles, its ticks and
 	 every value its columns draw take the default rung (theme.css), and the first

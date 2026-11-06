@@ -189,7 +189,12 @@
 		<span id={heldId} class="qm-prose-held-note">{t.strings.proseHeld}</span>
 	{/if}
 </div>
-<SlashMenu menu={slash} leaf={() => controller} label={t.strings.slashLabel} />
+<SlashMenu
+	menu={slash}
+	leaf={() => controller}
+	label={t.strings.slashLabel}
+	name={t.strings.slashName}
+/>
 
 <style>
 	/* A leaf the inline schema does not constrain grows, and opens at one line box: the

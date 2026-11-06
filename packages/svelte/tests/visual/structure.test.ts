@@ -320,14 +320,32 @@ describe('placeFields', () => {
 
 	it('shares a row across a compact run, solos the rest', () => {
 		expect(
-			spans([mk('a', false), mk('b', true), mk('c', true), mk('d', true), mk('e', false)])
+			spans([
+				mk('a', false),
+				mk('b', true),
+				mk('c', true),
+				mk('d', true),
+				mk('e', true),
+				mk('f', false)
+			])
 		).toEqual([
 			['a', 'full'],
 			['b', 'cell'],
 			['c', 'cell'],
 			['d', 'cell'],
-			['e', 'full']
+			['e', 'cell'],
+			['f', 'full']
 		]);
+	});
+
+	it("marks a run's last cell where a capacity would leave it alone", () => {
+		const tails = (n: number) =>
+			placeFields([...Array(n)].map((_, i) => mk(String(i), true))).map((p) => p.tail ?? p.span);
+		expect(tails(1)).toEqual(['full']);
+		expect(tails(2)).toEqual(['cell', 'cell']);
+		expect(tails(3)).toEqual(['cell', 'cell', 'odd']);
+		expect(tails(4)).toEqual(['cell', 'cell', 'cell', 'cell']);
+		expect(tails(5)).toEqual(['cell', 'cell', 'cell', 'cell', 'lone']);
 	});
 
 	it('spans a stranded compact field across the whole row, wherever it sits', () => {

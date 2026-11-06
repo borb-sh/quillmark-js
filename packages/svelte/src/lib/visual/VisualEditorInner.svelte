@@ -47,6 +47,7 @@
 	import type { VisualEditorProps } from './props.js';
 	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
+	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import type { FieldController, LeafViews } from '../core/codec/index.js';
 	import {
@@ -200,6 +201,23 @@
 	// going away as a whole, where a leaf's cleanup order relative to the parent's
 	// is Svelte's business and not something to depend on.
 	span.onEnd(() => leaves.clear());
+
+	// The removal's one step back (`undo.svelte.ts`), published so an array's row removal
+	// offers on the same toast a card's does.
+	const undo = createStructuralUndo();
+	setStructuralUndo(undo);
+	span.onEnd(undo.dispose);
+	/** ⌘Z/Ctrl+Z takes the standing offer where the offer accepts it (`undo.accepts`).
+	 *  On the document, since a removal under the pointer leaves the focus on the body, and
+	 *  captured, so a leaf the removal handed the focus to hears the key after the offer. */
+	function onUndoKey(e: KeyboardEvent): void {
+		if (e.defaultPrevented || e.isComposing || e.shiftKey || e.altKey) return;
+		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+		if (!undo.accepts(e.target, rootEl)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		undo.take();
+	}
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
 	// cannot do, since which group is open is the card's state (Card §revealLeaf).
 	type CardHandle = {
@@ -421,6 +439,7 @@
 			if (!card) return undefined;
 			const from = document.activeElement;
 			doc.unchecked.insertCard(card, atIndex);
+			undo.withdraw();
 			const id = seq.next();
 			arm.arm();
 			cardIds = [...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)];
@@ -483,6 +502,7 @@
 		if (to < 0 || to >= doc.cardCount) return;
 		arm.arm();
 		doc.moveCard(from, to);
+		undo.withdraw();
 		const w = cardIds.slice();
 		const [x] = w.splice(from, 1);
 		w.splice(to, 0, x);
@@ -499,6 +519,12 @@
 		// pressed button, and the hand-on is the keyboard's.
 		const focused = document.activeElement;
 		const held = !!focused && !!slotEls[i]?.contains(focused) && focused.matches(':focus-visible');
+		const card = doc.card(i);
+		const shown = model.cards[i];
+		const name =
+			shown?.titleOverride ||
+			shown?.titlePlaceholder ||
+			kindTitle(quill.schema.card_kinds?.[card.kind], card.kind);
 		doc.removeCard(i);
 		arm.arm();
 		cardIds = cardIds.filter((_, k) => k !== i);
@@ -506,7 +532,34 @@
 		// No addr: the removed card has none left and every survivor's shifted. The
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
 		bump('structure', id, undefined, { op: 'remove', at: i });
+		undo.offer(merged.undoRemoved(name), () => restoreCard(card, i));
 		if (held) void focusAfterRemove(i);
+	}
+	/** The removal's undo: the card back at the index it left, under a fresh session key
+	 *  (ids are never reused), with the focus on its title. The document holds what it held
+	 *  before the removal, so the insert is the removal's exact inverse. */
+	function restoreCard(card: ReturnType<typeof doc.card>, at: number): void {
+		if (!span.alive) return;
+		const i = Math.min(at, cardIds.length);
+		try {
+			doc.unchecked.insertCard(card, i);
+		} catch (e) {
+			reportError(onError, {
+				code: 'card-op-failed',
+				severity: 'error',
+				message: `restoring the ${card.kind} card failed: ${errorMessage(e)}`,
+				cause: e
+			});
+			return;
+		}
+		const id = seq.next();
+		arm.arm();
+		cardIds = [...cardIds.slice(0, i), id, ...cardIds.slice(i)];
+		bump('structure', id, i, { op: 'insert', at: i });
+		void (async () => {
+			if (!(await scrollCardIntoView(id, 'nearest'))) return;
+			cardRefs[cardIndexOf(id)]?.focusHeader();
+		})();
 	}
 	/** Drop what the surface holds for a removed card. Ids are never reused, so an entry
 	 *  keyed to the gone card is unreachable rather than mis-attributed to whichever card
@@ -527,6 +580,7 @@
 		if (!(await span.resumes(tick()))) return;
 		if (cardIds.length) cardRefs[Math.max(at - 1, 0)]?.focusHeader();
 		else rootEl?.querySelector<HTMLElement>('.qm-add-btn')?.focus();
+		undo.hand(document.activeElement);
 	}
 	function retypeCardById(id: string, kind: string): void {
 		const i = cardIndexOf(id);
@@ -537,6 +591,7 @@
 			// it validates the whole card before it mutates, so the document is as it was.
 			const card = doc.card(i);
 			doc.removeCard(i);
+			undo.withdraw();
 			try {
 				doc.unchecked.insertCard({ ...card, kind }, i);
 			} catch (e) {
@@ -895,6 +950,7 @@
 	 *  order it applied them, so every card that stays keeps its leaves. */
 	export function applyCardOps(ops: readonly CardOp[]): void {
 		if (!span.alive) return;
+		undo.withdraw();
 		const ids = cardIds.slice();
 		for (const op of ops) {
 			if (op.op === 'insert') ids.splice(op.at, 0, seq.next());
@@ -964,6 +1020,8 @@
 	}
 </script>
 
+<svelte:document onkeydowncapture={onUndoKey} />
+
 <!-- The keydown is a control's, bubbled: the root resolves which description it raises. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
@@ -1028,6 +1086,29 @@
 			{@render addAffordance(i + 1)}
 		</div>
 	{/each}
+	<!-- The removal's undo. The region stands empty between offers so the notice it takes is
+	 announced: a live region inserted along with its text is one a reader may not hear. -->
+	<div class="qm-toast-slot" role="status">
+		{#if undo.current}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<!-- The handlers hold the lapse while the toast is in use and add no interaction. -->
+			<div
+				class="qm-toast"
+				onpointerenter={() => undo.pause()}
+				onpointerleave={() => undo.resume()}
+				onfocusin={() => undo.pause()}
+				onfocusout={() => undo.resume()}
+			>
+				<span class="qm-toast-notice">{undo.current.notice}</span>
+				<button
+					type="button"
+					class="qm-toast-action qm-focus-ring"
+					aria-keyshortcuts="Meta+Z Control+Z"
+					onclick={() => undo.take()}>{merged.undoAction}</button
+				>
+			</div>
+		{/if}
+	</div>
 </div>
 
 <FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
@@ -1099,6 +1180,47 @@
 {/snippet}
 
 <style>
+	/* Pinned to the foot of whatever scrolls the surface, and taking no room in the stack:
+	   zero tall, its gap handed back, so an offer raises a toast over the cards without
+	   moving one. */
+	.qm-toast-slot {
+		position: sticky;
+		bottom: var(--toast-foot, var(--_qm-space-3));
+		z-index: 1;
+		display: flex;
+		justify-content: center;
+		align-items: flex-end;
+		height: 0;
+		margin-top: calc(-1 * var(--_qm-space-2));
+		pointer-events: none;
+	}
+	.qm-toast {
+		display: flex;
+		align-items: center;
+		gap: var(--_qm-space-3);
+		padding: var(--_qm-space) var(--_qm-space) var(--_qm-space) var(--_qm-space-3);
+		border: var(--_qm-border-width) solid var(--_qm-border);
+		border-radius: var(--_qm-radius-pill);
+		background: var(--_qm-surface-raised);
+		box-shadow: var(--_qm-lift);
+		font-size: var(--_qm-text-label);
+		color: var(--_qm-ink);
+		pointer-events: auto;
+	}
+	.qm-toast-action {
+		min-height: var(--_qm-tap-min);
+		padding-inline: var(--_qm-space-2);
+		border: 0;
+		border-radius: var(--_qm-radius-pill);
+		background: transparent;
+		font: inherit;
+		font-weight: var(--_qm-weight-strong);
+		color: var(--_qm-accent);
+		cursor: pointer;
+	}
+	.qm-toast-action:hover {
+		background: var(--_qm-accent-tint);
+	}
 	/* A detached root, carrying `data-qm-root` for the derivation core/theme.css applies
 	   to one — the baseline font and colour included, so nothing here restates them.
 
@@ -1164,6 +1286,10 @@
 		overscroll-behavior: contain;
 		padding: var(--_qm-space-4);
 		padding-block-end: var(--_qm-tail);
+		/* The pane is the toast's scroller, and a sticky box stops at its scroller's
+		   padding: the tail would hold the toast a tail's height off the pane's foot. On a
+		   page the viewport scrolls, and the surface's padding is no bar. */
+		--toast-foot: calc(var(--_qm-space-3) - var(--_qm-tail));
 	}
 	/* The stack's one gapless seam, which `TipsCard` draws and this holds the two
 	 blocks to. `main` has to paint over the tip: a later sibling paints over an earlier
@@ -1214,8 +1340,8 @@
 	 `.qm-tap-floor`'s (controls.css); what it overhangs is the card's own inset above and
 	 below, which holds no target, so the floor costs a neighbour nothing.
 
-	 Ink is pinned to the label tone in every state, taking back the family's hover step:
-	 the trigger arrives and leaves on opacity, and a tone moving under an opacity already
+	 A gap's ink is pinned to the label tone in every state, taking back the family's hover
+	 step: the trigger arrives and leaves on opacity, and a tone moving under an opacity already
 	 moving reads as two trips at different speeds.
 
 	 `:global`, because the multi-kind trigger is bits-ui's own element and a `class`
@@ -1233,13 +1359,22 @@
 			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	/* The strip that holds words at rest takes the height that centres them, and rests dim
-	   rather than absent, having something to be seen. */
+	/* The append point is the one strip read at rest, so it is a pill sized to its words
+	   at the ink, outlined by the well's hairline rather than dashed: the document's main
+	   structural action stands as plainly as the controls inside a card. */
+	.qm-add-card-marked {
+		justify-content: center;
+	}
 	.qm-add-card-marked :global(.qm-add-btn) {
+		width: auto;
 		height: var(--_qm-tap-min);
+		padding-inline: var(--_qm-space-3);
 		font-size: var(--_qm-text-label);
 		font-weight: var(--_qm-weight-mid);
-		opacity: var(--_qm-opacity-idle);
+		color: var(--_qm-ink);
+		background: var(--_qm-surface);
+		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-well-edge);
+		opacity: 1;
 	}
 	/* One arrival, three ways in. Keyboard focus, because the fill is the only thing that
 	   reads as the trigger on a bare strip; and an open menu, because it portals out of

@@ -141,10 +141,10 @@
 	const entries = $derived(Object.entries(properties ?? {}));
 	const obj = $derived((value ?? {}) as Record<string, unknown>);
 	const has = (key: string): boolean => Object.hasOwn(properties ?? {}, key);
-	const spans = $derived(
+	const placements = $derived(
 		placed
 			? new Map(
-					placeFields(fieldModels({ fields: properties ?? {} })).map((p) => [p.field.name, p.span])
+					placeFields(fieldModels({ fields: properties ?? {} })).map((p) => [p.field.name, p])
 				)
 			: undefined
 	);
@@ -303,10 +303,11 @@
 					'qm-object-prop',
 					{
 						'qm-prop-full': isContainer(kind),
-						'qm-prop-wide': block || (!isContainer(kind) && spans?.get(key) === 'full')
+						'qm-prop-wide': block || (!isContainer(kind) && placements?.get(key)?.span === 'full')
 					}
 				]}
 				data-qm-prop={key}
+				data-tail={placements?.get(key)?.tail}
 			>
 				{#if ids && kind !== 'array' && kind !== 'matrix'}
 					<FieldLabel
@@ -322,152 +323,157 @@
 						{countId}
 					/>
 				{/if}
-				{#if kind === 'enum'}
-					<EnumField
-						label={named}
-						id={ids?.control}
-						describedBy={describes}
-						value={obj[key] as string | undefined}
-						values={sub.values ?? []}
-						fallback={sub.default as string | undefined}
-						blankTitle={sub.ui?.blank_title}
-						optional={optionalCell(sub)}
-						onCommit={(v) => commitProp(key, v)}
-					/>
-				{:else if kind === 'number'}
-					<NumberField
-						label={named}
-						id={ids?.control}
-						describedBy={describes}
-						value={obj[key] as number | undefined}
-						integer={baseType(sub) === 'integer'}
-						fallback={textDefault(sub)}
-						placeholder={noneOf(key, sub)}
-						onCommit={(v) => commitProp(key, v)}
-					/>
-				{:else if kind === 'boolean'}
-					<BooleanField
-						label={named}
-						id={ids?.control}
-						describedBy={describes}
-						value={renderedBoolean(obj[key])}
-						fallback={sub.default as boolean | undefined}
-						optional={optionalCell(sub)}
-						onCommit={(v) => commitProp(key, v)}
-					/>
-				{:else if kind === 'date'}
-					<DateField
-						label={named}
-						labelledBy={ids?.label}
-						describedBy={describes}
-						value={obj[key] as string | undefined}
-						fallback={sub.default != null ? String(sub.default) : undefined}
-						datetime={baseType(sub) === 'datetime'}
-						onCommit={(v) => commitProp(key, v)}
-					/>
-				{:else if kind === 'text'}
-					<TextField
-						label={named}
-						id={ids?.control}
-						describedBy={describes}
-						value={obj[key] as string | undefined}
-						fallback={textDefault(sub)}
-						placeholder={noneOf(key, sub)}
-						onCommit={(v) => commitProp(key, v)}
-						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
-					/>
-				{:else if kind === 'prose'}
-					<!-- Keyed by name, so a re-derive of the container this cell commits whole
+				<!-- The control and its diagnostics share the control's track, as `Field`'s stack
+				     does: the property's subgrid holds two tracks, so a third child would land on
+				     the control. -->
+				<div class="qm-prop-stack">
+					{#if kind === 'enum'}
+						<EnumField
+							label={named}
+							id={ids?.control}
+							describedBy={describes}
+							value={obj[key] as string | undefined}
+							values={sub.values ?? []}
+							fallback={sub.default as string | undefined}
+							blankTitle={sub.ui?.blank_title}
+							optional={optionalCell(sub)}
+							onCommit={(v) => commitProp(key, v)}
+						/>
+					{:else if kind === 'number'}
+						<NumberField
+							label={named}
+							id={ids?.control}
+							describedBy={describes}
+							value={obj[key] as number | undefined}
+							integer={baseType(sub) === 'integer'}
+							fallback={textDefault(sub)}
+							placeholder={noneOf(key, sub)}
+							onCommit={(v) => commitProp(key, v)}
+						/>
+					{:else if kind === 'boolean'}
+						<BooleanField
+							label={named}
+							id={ids?.control}
+							describedBy={describes}
+							value={renderedBoolean(obj[key])}
+							fallback={sub.default as boolean | undefined}
+							optional={optionalCell(sub)}
+							onCommit={(v) => commitProp(key, v)}
+						/>
+					{:else if kind === 'date'}
+						<DateField
+							label={named}
+							labelledBy={ids?.label}
+							describedBy={describes}
+							value={obj[key] as string | undefined}
+							fallback={sub.default != null ? String(sub.default) : undefined}
+							datetime={baseType(sub) === 'datetime'}
+							onCommit={(v) => commitProp(key, v)}
+						/>
+					{:else if kind === 'text'}
+						<TextField
+							label={named}
+							id={ids?.control}
+							describedBy={describes}
+							value={obj[key] as string | undefined}
+							fallback={textDefault(sub)}
+							placeholder={noneOf(key, sub)}
+							onCommit={(v) => commitProp(key, v)}
+							onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
+						/>
+					{:else if kind === 'prose'}
+						<!-- Keyed by name, so a re-derive of the container this cell commits whole
 					     leaves the leaf mounted and the caret in it. -->
-					<ProseValue
-						bind:this={proseEls[key]}
-						content={() => contentAt([key])}
-						value={obj[key]}
-						fallback={contentDefault(sub)}
-						plaintext={literalText(sub)}
-						placeholder={noneOf(key, sub)}
-						{block}
-						label={named}
-						labelledBy={ids?.label}
-						describedBy={countId ? [describes, countId].filter(Boolean).join(' ') : describes}
-						cap={cap && { ...cap, onCount: (n) => (counts[key] = n) }}
-						onChange={(rt) =>
-							commitProp(key, optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
-						onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
-					/>
-				{:else if kind === 'array'}
-					<!-- The repeater owns its label row, the add chip sharing it (`Field` skips
+						<ProseValue
+							bind:this={proseEls[key]}
+							content={() => contentAt([key])}
+							value={obj[key]}
+							fallback={contentDefault(sub)}
+							plaintext={literalText(sub)}
+							placeholder={noneOf(key, sub)}
+							{block}
+							label={named}
+							labelledBy={ids?.label}
+							describedBy={countId ? [describes, countId].filter(Boolean).join(' ') : describes}
+							cap={cap && { ...cap, onCount: (n) => (counts[key] = n) }}
+							onChange={(rt) =>
+								commitProp(key, optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
+							onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
+						/>
+					{:else if kind === 'array'}
+						<!-- The repeater owns its label row, the add chip sharing it (`Field` skips
 					     its own label for one too), so the names are handed down rather than
 					     drawn here. Its rows are collapsed rows again: the depth an open row
 					     under an open row costs is two rungs of the ladder and one figure. -->
-					<ArrayField
-						bind:this={nestedEls[key]}
-						value={obj[key]}
-						fallback={Array.isArray(sub.default) ? sub.default : undefined}
-						items={sub.items}
-						layout={arrayLayout(sub)}
-						max={sub.max}
-						label={fieldTitle(key, sub)}
-						description={sub.description}
-						labelId={ids?.label}
-						descriptionId={describes}
-						idBase={ids?.control}
-						contentAt={(path) => contentAt([key, ...path])}
-						onCommit={(v) => commitProp(key, v)}
-						diagnostics={deep}
-					/>
-				{:else if kind === 'object'}
-					<ObjectField
-						bind:this={nestedEls[key]}
-						value={obj[key] as Record<string, unknown> | undefined}
-						properties={sub.properties}
-						{placed}
-						label={ids ? undefined : fallbackName(key, sub)}
-						idBase={ids?.control}
-						labelledBy={ids?.label}
-						describedBy={describes}
-						contentAt={(path) => contentAt([key, ...path])}
-						onCommit={(v) => commitProp(key, v)}
-						diagnostics={deep}
-					/>
-				{:else if kind === 'matrix'}
-					<MatrixField
-						bind:this={nestedEls[key]}
-						value={obj[key] as Record<string, unknown> | undefined}
-						schema={sub}
-						label={fieldTitle(key, sub)}
-						description={sub.description}
-						labelId={ids?.label}
-						descriptionId={describes}
-						idBase={ids?.control}
-						contentAt={(path) => contentAt([key, ...path])}
-						onCommit={(v) => commitProp(key, v)}
-						diagnostics={deep}
-					/>
-				{:else if kind === 'variant'}
-					<VariantField
-						bind:this={nestedEls[key]}
-						value={obj[key] as Record<string, unknown> | undefined}
-						schema={sub}
-						ghostMember={sub.default as string | undefined}
-						label={fieldTitle(key, sub)}
-						id={ids?.control}
-						labelledBy={ids?.label}
-						describedBy={describes}
-						contentAt={(path) => contentAt([key, ...path])}
-						onCommit={(v) => commitProp(key, v)}
-						diagnostics={deep}
-					/>
-				{:else}
-					<TextField
-						label={named}
-						id={ids?.control}
-						describedBy={describes}
-						value={obj[key] as string | undefined}
-						onCommit={(v) => commitProp(key, v)}
-					/>
-				{/if}
-				<DiagnosticList diagnostics={own} />
+						<ArrayField
+							bind:this={nestedEls[key]}
+							value={obj[key]}
+							fallback={Array.isArray(sub.default) ? sub.default : undefined}
+							items={sub.items}
+							layout={arrayLayout(sub)}
+							max={sub.max}
+							label={fieldTitle(key, sub)}
+							description={sub.description}
+							labelId={ids?.label}
+							descriptionId={describes}
+							idBase={ids?.control}
+							contentAt={(path) => contentAt([key, ...path])}
+							onCommit={(v) => commitProp(key, v)}
+							diagnostics={deep}
+						/>
+					{:else if kind === 'object'}
+						<ObjectField
+							bind:this={nestedEls[key]}
+							value={obj[key] as Record<string, unknown> | undefined}
+							properties={sub.properties}
+							{placed}
+							label={ids ? undefined : fallbackName(key, sub)}
+							idBase={ids?.control}
+							labelledBy={ids?.label}
+							describedBy={describes}
+							contentAt={(path) => contentAt([key, ...path])}
+							onCommit={(v) => commitProp(key, v)}
+							diagnostics={deep}
+						/>
+					{:else if kind === 'matrix'}
+						<MatrixField
+							bind:this={nestedEls[key]}
+							value={obj[key] as Record<string, unknown> | undefined}
+							schema={sub}
+							label={fieldTitle(key, sub)}
+							description={sub.description}
+							labelId={ids?.label}
+							descriptionId={describes}
+							idBase={ids?.control}
+							contentAt={(path) => contentAt([key, ...path])}
+							onCommit={(v) => commitProp(key, v)}
+							diagnostics={deep}
+						/>
+					{:else if kind === 'variant'}
+						<VariantField
+							bind:this={nestedEls[key]}
+							value={obj[key] as Record<string, unknown> | undefined}
+							schema={sub}
+							ghostMember={sub.default as string | undefined}
+							label={fieldTitle(key, sub)}
+							id={ids?.control}
+							labelledBy={ids?.label}
+							describedBy={describes}
+							contentAt={(path) => contentAt([key, ...path])}
+							onCommit={(v) => commitProp(key, v)}
+							diagnostics={deep}
+						/>
+					{:else}
+						<TextField
+							label={named}
+							id={ids?.control}
+							describedBy={describes}
+							value={obj[key] as string | undefined}
+							onCommit={(v) => commitProp(key, v)}
+						/>
+					{/if}
+					<DiagnosticList diagnostics={own} />
+				</div>
 			</div>
 		{/each}
 	</div>
@@ -535,6 +541,12 @@
 		align-items: start;
 		min-width: 0;
 	}
+	.qm-prop-stack {
+		display: flex;
+		flex-direction: column;
+		gap: var(--_qm-space);
+		min-width: 0;
+	}
 	/* A record of one cell takes half the capacity: at full capacity a single track reads
 	   as truncated, and there are no sibling properties for it to line up with. A placed
 	   property's span is `placeFields`', which strands a lone one to the whole row as it
@@ -545,6 +557,13 @@
 	/* A block prose property holds paragraphs, so a track beside it stands in whitespace
 	   once it grows (`packable`); its label still rides the row above it. A placed
 	   property `placeFields` gives the whole row spans it the same way. */
+	/* A placed run's last cell where its capacity would leave it alone (`RunTail`). */
+	.qm-object-prop[data-tail='odd'] {
+		grid-column: var(--tail-odd);
+	}
+	.qm-object-prop[data-tail='lone'] {
+		grid-column: var(--tail-lone);
+	}
 	.qm-object-prop.qm-prop-wide,
 	.qm-object-prop.qm-prop-wide:only-child {
 		grid-column: 1 / -1;

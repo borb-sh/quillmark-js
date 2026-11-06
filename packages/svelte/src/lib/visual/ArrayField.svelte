@@ -69,10 +69,12 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import { wording } from './strings.js';
+	import { structuralUndo } from './undo.svelte.js';
 
 	// The surface's words, ambient from the editor root; the package's English
 	// off-tree, so this component renders standalone too.
 	const t = wording();
+	const undo = structuralUndo();
 	import { onDestroy, tick, untrack } from 'svelte';
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
 	import { emptyContent } from '../core/codec/index.js';
@@ -101,7 +103,7 @@
 	import DiagnosticList from './DiagnosticList.svelte';
 	import './controls.css';
 
-	/** The disclosure glyph, at the size the accordion's own chevron takes: one
+	/** The disclosure glyph, at the size a panel header's own chevron takes: one
 	 *  disclosure figure per surface, so it is one glyph at one size. */
 	const CHEVRON = 16;
 
@@ -371,14 +373,40 @@
 	 *  the control the gesture came from: `column`, so Backspace keeps its column as
 	 *  Enter does, or the remove where `fromRemove` says one was pressed, which is
 	 *  pinned and so keeps the clip where the pointer left it, where the first cell
-	 *  would scroll the box back to its start on every press. */
-	function remove(k: number, column?: string, fromRemove = false): void {
+	 *  would scroll the box back to its start on every press. A removal the user asked for
+	 *  by name, the remove's press or its key, is offered back on the editor's toast
+	 *  (`undo.svelte.ts`); Backspace on an empty element takes nothing worth offering. */
+	function remove(k: number, column?: string, fromRemove = false, offer = false): void {
 		const dropped = ids[k];
+		const value = arr[k];
+		const name = rowName(k) ?? t.strings.elementItem(k + 1);
 		const next = ids.filter((_, i) => i !== k);
 		ids = next;
 		drop(dropped);
 		onCommit(arr.filter((_, i) => i !== k));
-		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove);
+		if (offer) undo.offer(t.strings.undoRemoved(name), () => restore(k, value));
+		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove).then(() => {
+			if (offer) undo.hand(document.activeElement);
+		});
+	}
+	/** A removal's undo: `value` back at `k`, under a fresh id, focused where a landing on
+	 *  it would focus. A no-op once this field is gone, the row with it. */
+	function restore(k: number, value: unknown): void {
+		if (!span.alive) return;
+		const at = Math.min(k, ids.length);
+		const id = seq.next();
+		ids = [...ids.slice(0, at), id, ...ids.slice(at)];
+		const next = arr.slice();
+		next.splice(at, 0, value);
+		onCommit(next);
+		void focusAfterFlush(id);
+	}
+	/** A collapsed record's remove key, on its summary: the remove is out of the tab order,
+	 *  and the summary is a button, where the key edits nothing. */
+	function onSummaryKey(e: KeyboardEvent, k: number): void {
+		if (e.key !== 'Backspace' || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+		e.preventDefault();
+		remove(k, undefined, false, true);
 	}
 	/**
 	 * Move element `k` to slot `to`: one splice of the ids and of the values together, so
@@ -703,7 +731,7 @@
 							onCellKey={(e, column) => onElementKey(e, k, column)}
 							diagnostics={routed.below.get(k)}
 						/>
-						{@render removeButton(k)}
+						{@render removeButton(k, true)}
 					</div>
 				{/each}
 			</div>
@@ -740,12 +768,13 @@
 							class="qm-control-box qm-focus-ring qm-element-summary"
 							aria-expanded={open.has(id)}
 							aria-label={elementName(k)}
-							aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+							aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Meta+Backspace Control+Backspace"
 							onclick={() => toggleRow(id)}
+							onkeydown={(e) => onSummaryKey(e, k)}
 						>
 							<!-- Leading, and it rotates: trailing is the figure for pushing a new
 							     screen, where this unfolds in place. Same glyph, same rotation and
-							     same rung as the accordion's, so the surface has one disclosure. -->
+							     same rung as a panel header's, so the surface has one disclosure. -->
 							<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
 							<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
 						</button>
@@ -822,14 +851,17 @@
 </div>
 
 <!-- The remove, one button wherever a row ends: a scalar row's slab, a record row's
-     slab after its reorder pair, a table row's last track. -->
-{#snippet removeButton(k: number)}
+     slab after its reorder pair, a table row's last track. Out of the tab order where the
+     row has a key that removes it: Backspace on an emptied line, ⌘/Ctrl+Backspace on a
+     record's summary. A table's filled row has none, so its remove stays a stop. -->
+{#snippet removeButton(k: number, stop = false)}
 	<button
 		type="button"
 		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
 		title={t.strings.arrayRemove}
 		aria-label={rowAction(t.strings.arrayRemove, k)}
-		onclick={() => remove(k, undefined, true)}><Icon name="minus" /></button
+		tabindex={stop ? undefined : -1}
+		onclick={() => remove(k, undefined, true, true)}><Icon name="minus" /></button
 	>
 {/snippet}
 
@@ -956,7 +988,7 @@
 		inset-inline-end: 0;
 		display: flex;
 		color: var(--_qm-ink-label);
-		opacity: var(--_qm-opacity-idle);
+		opacity: var(--_qm-opacity-rest);
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-row-btn {
@@ -1078,21 +1110,17 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 	}
-	/* An open row's summary is the same line without its box: the cells under it are
-	 the record now, so the summary steps down from a value's box to a heading's line,
-	 at the tap rung rather than a control's height. Its words, its chevron and its
-	 slab keep their places, so the pointer finds them where it left them. */
-	.qm-element.open > .qm-element-head > .qm-element-summary {
+	/* A record's summary is a heading's line, open or closed, at the tap rung: a record is
+	 a thing you open, where a box with a fill and an edge is a thing you type into, which
+	 is what every well beside it is. Only the chevron turns between the two states, so
+	 the words, the chevron and the slab stay where the pointer left them. It carries
+	 `.qm-control-box` for the recipe's inline inset and type, so its words stand on the
+	 column the wells' text does, and gives up the box's fill, edge and block padding. */
+	.qm-element-summary {
 		min-height: var(--_qm-tap-min);
 		padding-block: 0;
 		background: transparent;
-	}
-	/* A box, which the button family otherwise is not: the row IS the element, a value
-	 in collapsed form the way the enum trigger is one, and the slab's grammar — the
-	 box's two end-side corners — needs a box with corners to take. It carries
-	 `.qm-control-box`, so the fill, the radius, the inset and the type are the recipe's
-	 (controls.css) and a list of records measures like the list of inputs beside it. */
-	.qm-element-summary {
+		box-shadow: none;
 		display: flex;
 		align-items: center;
 		gap: var(--_qm-space);
@@ -1103,7 +1131,7 @@
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	/* No hover fill: a well does not fill under the pointer anywhere on this surface.
-	 The chevron's ink is the cue, which is the accordion header's own ladder. An open
+	 The chevron's ink is the cue, which is the panel header's own ladder. An open
 	 row's rule reaches its own head and stops: a row's subform holds rows of this same
 	 shape under this same scope, so a descendant's would turn every collapsed chevron
 	 inside an open row to the open face. */
@@ -1111,7 +1139,7 @@
 		flex-shrink: 0;
 		display: block;
 		stroke-width: var(--_qm-glyph-stroke);
-		color: var(--_qm-ink-label);
+		color: var(--_qm-ink);
 		transform: rotate(0deg);
 		transform-origin: center;
 		transition:
@@ -1121,20 +1149,16 @@
 	.qm-element-summary :global(.qm-el-chevron > *) {
 		vector-effect: non-scaling-stroke;
 	}
-	.qm-element-summary:hover :global(.qm-el-chevron),
-	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
-		color: var(--_qm-ink);
-	}
 	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
 		transform: rotate(90deg);
 	}
-	/* The title is the row's name and nothing written, so it reads at the label rung,
-	 on one line however long the label runs. */
+	/* The title is the row's name, at the ink as a card's is, on one line however long
+	 the label runs. */
 	.qm-element-title {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		color: var(--_qm-ink-label);
+		color: var(--_qm-ink);
 		font-variant-numeric: tabular-nums;
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
@@ -1286,33 +1310,25 @@
 	 the two read as one register. Inner radius: the chip family is the card's, and this
 	 box is a line of type. The chip's tap floor is given back (`.qm-tap-floor`),
 	 and the padding with it, so the drawn box is the line and the target is the floor.
-	 It rests dim and comes up under the pointer; empty, it is the way in; at the cap it
-	 rests at the family's disabled rung and the count beside it says why. */
+	 It is words, so it rests at the label ink in full, where the glyph controls beside a
+	 row rest at the rest rung: a text control's floor is WCAG 1.4.3's 4.5:1, which the
+	 rest rung over the label ink does not clear. At the cap it rests at the family's
+	 disabled rung and the count beside it says why. */
 	.qm-add-el {
 		padding: 0 var(--_qm-space);
 		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		border-radius: var(--_qm-radius-inner);
-		opacity: var(--_qm-opacity-idle);
 		transition:
 			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	.qm-add-el:hover:not(:disabled),
-	.qm-add-el:focus-visible {
-		opacity: 1;
+	.qm-add-el:disabled {
+		opacity: var(--_qm-opacity-idle);
 	}
-	.qm-array.empty .qm-add-el {
-		opacity: 1;
-	}
-	/* No hover to come up on: the controls stand at the muted rung, the handle with
-	 them. */
+	/* No hover to come up on: the handle stands with the controls, already at rest. */
 	@media (hover: none) {
-		.qm-add-el,
-		.qm-row-actions {
-			opacity: var(--_qm-opacity-muted);
-		}
 		.qm-row-handle {
 			opacity: 1;
 		}

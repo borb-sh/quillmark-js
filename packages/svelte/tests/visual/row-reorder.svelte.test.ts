@@ -71,7 +71,9 @@ describe('reorder on an object row', () => {
 		const grip = handle(arr, 0);
 		// Pointer-only: nothing a screen reader reaches, the summary declaring the keys.
 		expect(grip.getAttribute('aria-hidden')).toBe('true');
-		expect(summaries(arr)[0].getAttribute('aria-keyshortcuts')).toBe('Alt+ArrowUp Alt+ArrowDown');
+		expect(summaries(arr)[0].getAttribute('aria-keyshortcuts')).toMatch(
+			/^Alt\+ArrowUp Alt\+ArrowDown /
+		);
 
 		dragHandle(grip, [20, 70, 120]);
 		expect(order(q, doc)).toEqual(['B', 'C', 'A']);

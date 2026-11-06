@@ -312,30 +312,36 @@ describe('a default that prints', () => {
 		const tone = trigger(field(target, 'Tone'));
 		expect(tone.textContent?.trim()).toBe('high');
 		expect(tone.dataset.ghosted).toBe('default');
-		// The word is the quill's `ui.blank_title`, and the list offers no member row for
-		// it: the one row it heads is the unset sentinel's.
+		// The word is the quill's `ui.blank_title`, and the list offers no row for it: unset,
+		// the list is the members alone, none checked.
 		const marking = trigger(field(target, 'Marking'));
 		expect(marking.dataset.ghosted).toBe('');
 		expect(marking.textContent?.trim()).toBe('(no marking)');
 		openList(marking);
 		expect(
-			[...document.querySelectorAll<HTMLElement>('.qm-select-item')].map(
-				(r) => r.querySelector('.qm-select-ghost')?.textContent ?? r.textContent?.trim()
+			[...document.querySelectorAll<HTMLElement>('.qm-select-item')].map((r) =>
+				r.querySelector('.qm-select-label')?.textContent?.trim()
 			)
-		).toEqual(['(no marking)', 'low', 'high']);
+		).toEqual(['low', 'high']);
+		expect(document.querySelector('.qm-select-item[data-checked]')).toBeNull();
 	});
 
-	it('tags the unset row Default where it ghosts a member', () => {
+	it('checks and tags the default member while unset, with no reset row', () => {
 		openList(trigger(field(open(), 'Tone')));
-		expect(document.querySelector('.qm-select-unset .qm-select-tag')?.textContent).toBe(
+		const checked = document.querySelector<HTMLElement>('.qm-select-item[data-checked]')!;
+		expect(checked.querySelector('.qm-select-label')?.textContent?.trim()).toBe('high');
+		expect(checked.querySelector('.qm-select-tag')?.textContent).toBe(
 			DEFAULT_VISUAL_STRINGS.enumUnsetTag
 		);
+		expect(document.querySelector('.qm-select-unset')).toBeNull();
 	});
 
-	it('tags the unset row Unset where it ghosts none', () => {
-		openList(trigger(field(open(), 'Marking')));
-		expect(document.querySelector('.qm-select-unset .qm-select-tag')?.textContent).toBe(
-			DEFAULT_VISUAL_STRINGS.enumUnsetTagNone
+	it('offers a reset row under a stored value', () => {
+		openList(trigger(field(open({}, answering('tone: low')), 'Tone')));
+		const checked = document.querySelector<HTMLElement>('.qm-select-item[data-checked]')!;
+		expect(checked.querySelector('.qm-select-label')?.textContent?.trim()).toBe('low');
+		expect(document.querySelector('.qm-select-unset')?.textContent?.trim()).toBe(
+			DEFAULT_VISUAL_STRINGS.enumReset
 		);
 	});
 

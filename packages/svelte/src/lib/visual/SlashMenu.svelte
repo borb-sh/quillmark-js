@@ -30,8 +30,10 @@
 		leaf: () => FieldController | undefined;
 		/** The menu's accessible name. */
 		label: string;
+		/** A command's row name, by its token. */
+		name: (command: string) => string;
 	}
-	let { menu, leaf, label }: Props = $props();
+	let { menu, leaf, label, name: nameOf }: Props = $props();
 
 	let open = $derived(!!menu && menu.items.length > 0);
 
@@ -95,9 +97,10 @@
 						aria-label={label}
 						inert={!raised}
 					>
-						<!-- The row is the command as typed, leading `/` and all: the menu is a
-						     completion of the run in the text, so the row and the run read the
-						     same. -->
+						<!-- The row is the command's name, and at its end the command as typed,
+						     leading `/` and all: the menu is a completion of the run in the text,
+						     so the token is what the run reads as, and the name is what a reader
+						     who has not learned the tokens picks by. -->
 						{#each menu?.items ?? [] as name, i (name)}
 							<button
 								type="button"
@@ -107,7 +110,8 @@
 								onclick={() => leaf()?.slashPick(name)}
 								onpointerenter={() => leaf()?.slashFocus(name)}
 							>
-								/{name}
+								<span class="qm-slash-name">{nameOf(name)}</span>
+								<span class="qm-slash-token" aria-hidden="true">/{name}</span>
 							</button>
 						{/each}
 					</div>
@@ -122,15 +126,11 @@
 	   `.qm-menu-surface` / `.qm-menu-item` (controls.css): the same recipe the enum
 	   listbox and the card stack's kind menu draw, because all three are lists picked
 	   from. What is here is this menu's own: a measure, so a long label does not stretch
-	   the surface across the card, a scroll for a filtered list that stays long, and the
-	   face. Monospace, where the sibling menus are not: they offer values of the document
-	   and read as the prose around them, where these are commands, and the surface
-	   already spells a literal in that face (the `code` mark, `codec/prose.css`). */
+	   the surface across the card, and a scroll for a filtered list that stays long. */
 	.qm-slash-menu {
-		min-width: 12rem;
+		min-width: 14rem;
 		max-height: 16rem;
 		overflow-y: auto;
-		font-family: var(--_qm-font-mono);
 	}
 	/* An item is a row of text, not a glyph: the whole row is the target, and the label
 	   is the accessible name with nothing beside it. A button is a button, so the UA's
@@ -138,12 +138,24 @@
 	   taken back here: a scoped block is unlayered, so a reset would outrank the recipe's
 	   highlight; the resting transparent is the recipe's own (controls.css). */
 	.qm-slash-item {
-		display: block;
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--_qm-space-3);
 		width: 100%;
 		border: none;
 		font: inherit;
 		color: inherit;
 		text-align: left;
 		white-space: nowrap;
+	}
+	/* The token in the face the surface spells a literal in (the `code` mark,
+	   `codec/prose.css`), at the label ink and rung: the name is the row, and the token is
+	   the shortcut a menu row carries at its end. Hidden from the accessible name, which
+	   would read the command twice. */
+	.qm-slash-token {
+		font-family: var(--_qm-font-mono);
+		font-size: var(--_qm-text-label);
+		color: var(--_qm-ink-label);
 	}
 </style>

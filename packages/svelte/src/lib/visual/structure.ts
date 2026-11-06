@@ -741,7 +741,7 @@ export function cardSections(cardSchema: QuillCardSchema): GroupSection[] {
 }
 
 /**
- * The group section a card's accordion opens on first mount, or `null` when the card declares none.
+ * The group section a card opens on first mount, or `null` when the card declares none.
  * All-collapsed would disclose nothing of what is behind the chevrons, and a rule keyed on document
  * state would move the opening under a user as they fill.
  */
@@ -752,9 +752,18 @@ export function initialExpandedGroup(sections: GroupSection[]): string | null {
 /** How wide a field sits in its section grid. */
 export type FieldSpan = 'cell' | 'full';
 
+/**
+ * Where a run's last cell would stand alone in its row, by capacity: `odd` at two tracks
+ * (an odd run), `lone` at two and four (a run one past a multiple of four). The grid
+ * reads it against the capacity it stands at (`--tail-odd`, `--tail-lone`, the ladder in
+ * controls.css), so the field takes the row only where it would be alone in it.
+ */
+export type RunTail = 'odd' | 'lone';
+
 export interface PlacedField {
 	field: FieldModel;
 	span: FieldSpan;
+	tail?: RunTail;
 }
 
 /**
@@ -785,17 +794,22 @@ function packable(f: FieldModel): boolean {
 }
 
 /**
- * Consecutive packable fields are `cell`s the grid auto-places; a trailing orphan keeps its column
- * width. A run of one is `full`: a lone narrow track reads as truncated against the width it leaves
- * empty. Everything else is `full`. No width is measured.
+ * Consecutive packable fields are `cell`s the grid auto-places, and a run of one is `full`:
+ * alone, a field would stand in a narrow track that reads as truncated against the width it
+ * leaves empty. A longer run's last cell carries its `tail`, which the grid spends at the
+ * capacity it stands at, so the last of three spans the row at two tracks and shares it at
+ * four. Everything else is `full`. No width is measured.
  */
 export function placeFields(fields: FieldModel[]): PlacedField[] {
 	const out: PlacedField[] = [];
 	let run = 0;
-	// A run of one is only knowable at its end, so the span is patched back onto the
-	// field already placed.
+	// A run's length is only knowable at its end, so the span or tail is patched back onto
+	// the field already placed.
 	const flush = () => {
-		if (run === 1) out[out.length - 1].span = 'full';
+		const last = out[out.length - 1];
+		if (run === 1) last.span = 'full';
+		else if (run % 4 === 1) last.tail = 'lone';
+		else if (run % 2 === 1) last.tail = 'odd';
 		run = 0;
 	};
 	for (const f of fields) {

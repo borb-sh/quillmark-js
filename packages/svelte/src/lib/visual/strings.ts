@@ -42,6 +42,16 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	/** The card-title input's accessible name. */
 	cardTitle: string;
 
+	/** A closed panel's header, spoken after its name (`Layout, has an issue`) when a field
+	 *  inside holds a diagnostic: the leading separator is part of the wording. */
+	groupFlagged: string;
+
+	// ── Structural undo (the toast a removal raises) ─────────────────────────
+	/** The toast's notice, named for what went: `Authors 2 removed`. */
+	undoRemoved: (what: string) => string;
+	/** The toast's button, which puts it back. */
+	undoAction: string;
+
 	// ── The add affordance ────────────────────────────────────────────────────
 	/** The trailing strip's visible words, drawn after a `+`, and every
 	 * strip's accessible name. One string over
@@ -83,12 +93,22 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	 */
 	elementUntitled: (label: string, index: number) => string;
 
+	// ── Diagnostics ───────────────────────────────────────────────────────────
+	// A validation error a field draws, worded for whoever fills the form rather than for
+	// the quill's author: the label above it names the field, so no path. Each reads the
+	// diagnostic's `args`, below a consumer's `formatDiagnostic` and above the message.
+	/** `validation::type_mismatch`: the value is not the declared type (`args.expected`). */
+	diagTypeMismatch: (expected: string) => string;
+	/** `validation::format_violation`: the value misses a string format (`args.format`). */
+	diagFormatViolation: (format: string) => string;
+
 	// ── Enum control ──────────────────────────────────────────────────────────
-	/** The tag on the unset sentinel's row where it ghosts a member, which is what tells
-	 *  it from that member ({@link EnumField}). */
+	/** The tag on the `default:` member's row ({@link EnumField}). */
 	enumUnsetTag: string;
-	/** The same row's tag where it ghosts no member: no `default:`, or a blank one. */
-	enumUnsetTagNone: string;
+	/** The row under a stored value that clears it back to the `default:`. */
+	enumReset: string;
+	/** The same row where no `default:` prints: no `default:`, a blank one, or an `enum?`. */
+	enumClear: string;
 
 	// ── Matrix control ────────────────────────────────────────────────────────
 	/** The count in the matrix's label row: how many of its items are held. */
@@ -228,6 +248,9 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardMoveDown: 'Move down',
 	cardDelete: 'Delete card',
 	cardTitle: 'Card title',
+	groupFlagged: ', has an issue',
+	undoRemoved: (what) => `${what} removed`,
+	undoAction: 'Undo',
 	addCard: 'Add Card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
@@ -237,8 +260,23 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	textCount: (count, max) => `${count} / ${max}`,
 	elementItem: (index) => `Item ${index}`,
 	elementUntitled: (label, index) => `${label}, item ${index}`,
+	diagTypeMismatch: (expected) =>
+		expected === 'boolean'
+			? 'Needs to be on or off.'
+			: expected === 'integer'
+				? 'Needs a whole number, like 12.'
+				: expected === 'number'
+					? 'Needs a number, like 12.'
+					: `Needs a ${expected} value.`,
+	diagFormatViolation: (format) =>
+		format === 'date'
+			? 'Not a real date. Type it as YYYY-MM-DD, or press Today.'
+			: format === 'datetime'
+				? 'Not a real date and time. Type it as YYYY-MM-DDTHH:MM.'
+				: `Doesn't match the ${format} format.`,
 	enumUnsetTag: 'Default',
-	enumUnsetTagNone: 'Unset',
+	enumReset: 'Reset to default',
+	enumClear: 'Clear',
 	matrixHeld: (held, total) => `${held} of ${total} held`,
 	matrixAdd: (list) => (list ? `Add to ${list}…` : 'Add…'),
 	matrixItemTitle: (list, index) => `${list ? `${list} item` : 'Item'} ${index}`,
@@ -314,8 +352,31 @@ export function wording(): Wording {
 	);
 }
 
-/** A diagnostic's displayed text: the consumer's formatter, or its message. The
- *  fallback arm is permanent, not a courtesy ({@link FormatDiagnostic}). */
-export function diagnosticText(d: Diagnostic, format: FormatDiagnostic | undefined): string {
-	return (format ? format(d) : undefined) ?? d.message;
+/** A diagnostic's displayed text: the consumer's formatter, else the package's wording for
+ *  a validation code whose `args` carry what it needs, else its message. The last arm is
+ *  permanent, not a courtesy ({@link FormatDiagnostic}). */
+export function diagnosticText(
+	d: Diagnostic,
+	format: FormatDiagnostic | undefined,
+	strings?: VisualStrings
+): string {
+	return (format ? format(d) : undefined) ?? (strings && builtIn(d, strings)) ?? d.message;
+}
+
+function builtIn(d: Diagnostic, strings: VisualStrings): string | undefined {
+	const args = (d.args ?? {}) as Record<string, unknown>;
+	const str = (k: string): string | undefined =>
+		typeof args[k] === 'string' ? (args[k] as string) : undefined;
+	switch (d.code) {
+		case 'validation::type_mismatch': {
+			const expected = str('expected');
+			return expected ? strings.diagTypeMismatch(expected) : undefined;
+		}
+		case 'validation::format_violation': {
+			const format = str('format');
+			return format ? strings.diagFormatViolation(format) : undefined;
+		}
+		default:
+			return undefined;
+	}
 }

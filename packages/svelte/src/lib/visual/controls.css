@@ -90,15 +90,25 @@
 	color: var(--_qm-ink);
 	caret-color: currentColor;
 }
-/* The box is a fill and not an edge (ARCHITECTURE §Styling), and the fill is the
- well rung: a field is a hole cut into the card rather than a plane of its own,
- and with no edge to carry it the step is the whole of what says so. */
+/* The box is the well rung with a hairline inside it (ARCHITECTURE §Styling): a
+ field is a hole cut into the card, and the edge is what finds it at a glance, the
+ fill alone standing too close to the card to. Inset, so the edge costs no layout
+ and a focus ring draws outside it. */
 :where(.qm-control-box),
 :where(.qm-input) {
 	padding: var(--_qm-inset-control);
 	border: none;
 	border-radius: var(--_qm-radius-inner);
 	background: var(--_qm-surface-well);
+	box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-well-edge);
+}
+/* A control with an error drawn under it takes the danger hue on its edge and in its
+ fill, so the field the message is about is the one that changed. The message stays
+ beside it: colour is never the whole of the state. */
+:where(.qm-field-stack:has(> .qm-diag-list) .qm-control-box),
+:where(.qm-prop-stack:has(> .qm-diag-list) .qm-control-box) {
+	box-shadow: inset 0 0 0 var(--_qm-ring-width) var(--_qm-danger);
+	background-image: linear-gradient(var(--_qm-danger-tint), var(--_qm-danger-tint));
 }
 /* What a form control adds over the box: it does not fill its row on its own. */
 :where(.qm-input) {
@@ -296,21 +306,30 @@
  of one takes (`--cols-half`) land on a track boundary. A field ends on its track's
  own edge, so a rung is `n * 220px + gaps`. A subform three rungs in stands three
  `--_qm-nest` and three verticals narrower than its section, and steps down where the
- section does not: the count is the width the tracks actually get. */
+ section does not: the count is the width the tracks actually get.
+
+ The two tails are where a run's last cell takes the row (`RunTail`, `placeFields`): the
+ placement a capacity leaves it alone in, so it spans there and shares a row elsewhere. */
 :where(.qm-tracks) {
 	--cols: 1;
 	--cols-half: 1;
+	--tail-odd: span 1;
+	--tail-lone: span 1;
 }
 @container (min-width: 28rem) {
 	:where(.qm-tracks) {
 		--cols: 2;
 		--cols-half: 1;
+		--tail-odd: 1 / -1;
+		--tail-lone: 1 / -1;
 	}
 }
 @container (min-width: 57rem) {
 	:where(.qm-tracks) {
 		--cols: 4;
 		--cols-half: 2;
+		--tail-odd: span 1;
+		--tail-lone: 1 / -1;
 	}
 }
 
@@ -418,5 +437,24 @@
 	to {
 		opacity: 0;
 		transform: scale(0.94);
+	}
+}
+
+/* Forced colours drop every fill and shadow, which is every edge a field and a chip
+ draw here, and keep opacity, which would leave a resting control a ghost against a
+ system palette. The system's own strokes stand in for both. */
+@media (forced-colors: active) {
+	:where(.qm-control-box),
+	:where(.qm-input) {
+		border: var(--_qm-border-width) solid CanvasText;
+	}
+	:where(.qm-chip),
+	:where(.qm-add-affordance) {
+		border: var(--_qm-border-width) solid ButtonText;
+	}
+	:where(.qm-icon-btn),
+	:where(.qm-add-affordance),
+	:where(.qm-chip) {
+		opacity: 1;
 	}
 }

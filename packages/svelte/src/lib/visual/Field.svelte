@@ -28,7 +28,7 @@
 	} from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
 	import { seatValueLeaves, stepsTo, type LandingBox, type LeafRegistry } from './leaves.js';
-	import type { FieldModel, FieldSpan } from './structure.js';
+	import type { FieldModel, FieldSpan, RunTail } from './structure.js';
 	import {
 		VARIANT_DISCRIMINANT,
 		arrayLayout,
@@ -62,6 +62,8 @@
 		field: FieldModel;
 		/** This field's width in the section grid, from `placeFields`. */
 		span: FieldSpan;
+		/** Where a cell takes the row its run's length would leave it alone in. */
+		tail?: RunTail;
 		value: unknown;
 		/** This field's resolved provenance row (FIELD_PROVENANCE): the ghost's
 		 * source. Feeds the placeholder / fallback only, never `value`. */
@@ -99,6 +101,7 @@
 	let {
 		field,
 		span,
+		tail,
 		value,
 		provenance,
 		doc,
@@ -285,7 +288,7 @@
 	);
 </script>
 
-<div class={['qm-field', { cell: span === 'cell' }]}>
+<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail}>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
@@ -330,7 +333,7 @@
 				<EnumField
 					value={value as string | undefined}
 					values={field.schema.values ?? []}
-					fallback={ghost as string | undefined}
+					fallback={(ghost as string | undefined) ?? declared}
 					blankTitle={field.schema.ui?.blank_title}
 					{optional}
 					id={domIds.control}
@@ -485,6 +488,13 @@
 		grid-template-rows: subgrid;
 		row-gap: var(--_qm-space);
 		align-items: start;
+	}
+	/* A run's last cell where its capacity would leave it alone in the row (`RunTail`). */
+	.qm-field.cell[data-tail='odd'] {
+		grid-column: var(--tail-odd);
+	}
+	.qm-field.cell[data-tail='lone'] {
+		grid-column: var(--tail-lone);
 	}
 	/* The stack the control's track holds: the control, and the diagnostics when
 	 there are any. Its gap is the field's own, so a diagnostic sits the same rung

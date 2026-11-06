@@ -3,6 +3,7 @@
 // `credits` kind declares no `ui.groups`, so each top-level object is a panel,
 // headed by the object, and everything else stands unframed above them.
 import { describe, it, expect, afterEach } from 'vitest';
+import { flushSync } from 'svelte';
 import { quill } from '../helpers/fixtures.js';
 import { field, mountEditor, openField, settle, unmountAll } from '../helpers/surface.svelte.js';
 
@@ -34,6 +35,45 @@ describe('a card grouped by top-level objects', () => {
 		expect(headers(card).map((h) => h.textContent?.trim())).toEqual(['Publisher', 'Rights']);
 		expect(headers(card).map((h) => h.getAttribute('aria-expanded'))).toEqual(['true', 'false']);
 		expect(panel(card, 'Rights').querySelector<HTMLElement>('.qm-group-panel')?.inert).toBe(true);
+	});
+
+	it('opens and closes each panel on its own', () => {
+		const { card } = credits();
+		const expanded = () => headers(card).map((h) => h.getAttribute('aria-expanded'));
+		headers(card)[1].click();
+		flushSync();
+		expect(expanded()).toEqual(['true', 'true']);
+		headers(card)[0].click();
+		flushSync();
+		expect(expanded()).toEqual(['false', 'true']);
+	});
+
+	it('flags a closed panel holding a diagnostic, and links the message once open', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const at = doc.cards.findIndex((c) => c.kind === 'credits');
+		const { target } = mountEditor(q, doc, {
+			diagnostics: [
+				{
+					severity: 'error',
+					code: 'validation::type_mismatch',
+					path: `cards.credits[${at}].rights.holder`,
+					message: 'holder is wrong'
+				}
+			]
+		});
+		const card = target.querySelectorAll<HTMLElement>('.qm-card')[at + 1];
+		const rights = panel(card, 'Rights');
+		expect(rights.querySelector('.qm-group-flag')).not.toBeNull();
+		expect(panel(card, 'Publisher').querySelector('.qm-group-flag')).toBeNull();
+
+		rights.querySelector<HTMLButtonElement>('.qm-group-header')!.click();
+		flushSync();
+		expect(rights.querySelector('.qm-group-flag')).toBeNull();
+		const list = rights.querySelector<HTMLElement>('.qm-diag-list')!;
+		const control = list.parentElement!.querySelector<HTMLElement>('[aria-invalid="true"]')!;
+		expect(control.getAttribute('aria-errormessage')).toBe(list.id);
+		expect(control.getAttribute('aria-describedby')?.split(' ')).toContain(list.id);
 	});
 
 	it('stands its other fields unframed above the panels', () => {
