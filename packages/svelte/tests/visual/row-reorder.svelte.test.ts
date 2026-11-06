@@ -67,7 +67,7 @@ describe('reorder on an object row', () => {
 		const mounted = mountEditor(q, doc);
 		const arr = revisions(mounted.target);
 		layOut(arr);
-		expect(summaryTexts(arr)).toEqual(['A', 'B', 'C']);
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
 		const grip = handle(arr, 0);
 		// Pointer-only: nothing a screen reader reaches, the summary declaring the keys.
 		expect(grip.getAttribute('aria-hidden')).toBe('true');
@@ -75,7 +75,6 @@ describe('reorder on an object row', () => {
 
 		dragHandle(grip, [20, 70, 120]);
 		expect(order(q, doc)).toEqual(['B', 'C', 'A']);
-		expect(summaryTexts(arr)).toEqual(['B', 'C', 'A']);
 		expect(mounted.changes.at(-1)).toMatchObject({ source: 'field', path: 'main.revisions' });
 		// Past either end lands at that end.
 		layOut(arr);
@@ -243,13 +242,15 @@ describe('reorder on an object row', () => {
 		const summary = summaries(arr)[1];
 		summary.click();
 		flushSync();
-		expect(arr.querySelector('.qm-element.open .qm-element-title')?.textContent).toBe('B');
+		const row = arr.querySelector<HTMLElement>('.qm-element.open')!;
+		expect(row.dataset.qmIndex).toBe('1');
 		summary.focus();
 		press(summary, 'ArrowUp', { altKey: true });
 		expect(order(q, doc)).toEqual(['B', 'A', 'C']);
 		// The same row, still open, now first: the id moved with the value.
 		expect(arr.querySelectorAll('.qm-element.open')).toHaveLength(1);
-		expect(arr.querySelector('.qm-element.open .qm-element-title')?.textContent).toBe('B');
+		expect(arr.querySelector('.qm-element.open')).toBe(row);
+		expect(row.dataset.qmIndex).toBe('0');
 		expect(summaries(arr)[0]).toBe(summary);
 		await settle();
 		expect(document.activeElement).toBe(summary);
@@ -292,15 +293,21 @@ describe('reorder on an object row', () => {
 		flushSync();
 		// The open appendix's own list, a rung in: its rows are its own, not this field's.
 		const inner = outer.querySelector<HTMLElement>('.qm-element.open .qm-array')!;
-		const [first, second] = summaryTexts(inner);
+		type Appendix = { title: string; entries: Array<{ label: string }> };
+		const tree = () => q.reader(doc).get('appendices') as Appendix[];
+		const [first, second] = tree()[0].entries.map((e) => e.label);
 		expect(first).not.toBe(second);
-		const appendices = summaryTexts(outer);
+		const titles = tree().map((a) => a.title);
 		const n = mounted.changes.length;
 
 		press(summaries(inner)[0], 'ArrowDown', { altKey: true });
 		flushSync();
-		expect(summaryTexts(inner)).toEqual([second, first]);
-		expect(summaryTexts(outer)).toEqual(appendices);
+		expect(
+			tree()[0]
+				.entries.map((e) => e.label)
+				.slice(0, 2)
+		).toEqual([second, first]);
+		expect(tree().map((a) => a.title)).toEqual(titles);
 		// One move, one commit: the key reached the appendix row and was not its to answer.
 		expect(mounted.changes.length).toBe(n + 1);
 	});

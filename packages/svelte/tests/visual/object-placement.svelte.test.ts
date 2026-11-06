@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
-import { field, mountEditor, summaries, unmountAll } from '../helpers/surface.svelte.js';
+import { field, mountEditor, openRow, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -72,8 +72,7 @@ describe('object properties', () => {
 		});
 
 		const jobs = field(target, 'Jobs');
-		summaries(jobs)[0].click();
-		flushSync();
+		openRow(jobs, 0);
 		expect(wide(jobs)).toEqual({ title: false, started: false });
 	});
 });

@@ -23,7 +23,6 @@ import {
 	variantMember,
 	variantCells,
 	commitDiscriminant,
-	rowSummary,
 	shortCell,
 	arrayLayout,
 	schemaAt,
@@ -128,7 +127,7 @@ describe('the text field', () => {
 		]);
 	});
 
-	it('holds a one-line `text` cell as a short cell: a table column and a row title', () => {
+	it('holds a one-line `text` cell as a short cell: a table column', () => {
 		const items = f({
 			type: 'object',
 			properties: { page: { type: 'integer' }, label: { type: 'text' } }
@@ -136,7 +135,6 @@ describe('the text field', () => {
 		expect(shortCell(f({ type: 'text' }))).toBe(true);
 		expect(shortCell(f({ type: 'text', multiline: true }))).toBe(false);
 		expect(arrayLayout(f({ type: 'array', ui: { layout: 'table' }, items }))).toBe('table');
-		expect(rowSummary(items, { page: 3, label: 'Primary' })).toBe('Primary');
 	});
 
 	it('remounts a field whose line shape moves under its name', () => {
@@ -623,53 +621,6 @@ describe('resolveBodyGhost', () => {
 	});
 });
 
-describe('rowSummary', () => {
-	const row = (properties: Record<string, QuillFieldSchema>) =>
-		({ type: 'object', properties }) as QuillFieldSchema;
-	const content = (text: string) => ({ text, lines: [], marks: [], islands: [] });
-
-	it('reads the first short text cell, and no other while it is empty', () => {
-		const items = row({ title: f({ type: 'text' }), note: f({ type: 'text' }) });
-		expect(rowSummary(items, { title: 'Sources', note: 'n' })).toBe('Sources');
-		expect(rowSummary(items, { title: ' ', note: 'n' })).toBeUndefined();
-		expect(rowSummary(items, { note: 'n' })).toBeUndefined();
-		expect(rowSummary(items, {})).toBeUndefined();
-	});
-
-	it('takes one-line prose as a text cell, in either rest form', () => {
-		const items = row({
-			page: f({ type: 'integer' }),
-			label: f({ type: 'text' }),
-			note: f({ type: 'richtext', multiline: false })
-		});
-		// The one-line `text` is the first title-bearing cell, read through `titleText`
-		// whichever rest form it has.
-		expect(rowSummary(items, { page: 3, label: 'Primary' })).toBe('Primary');
-		expect(rowSummary(items, { page: 3, label: content('Primary') })).toBe('Primary');
-		expect(rowSummary(items, { page: 3, note: content('only a note') })).toBeUndefined();
-		expect(rowSummary(items, { page: 3 })).toBeUndefined();
-	});
-
-	it('skips a block prose cell and every non-text cell', () => {
-		const items = row({
-			body: f({ type: 'richtext', multiline: true }),
-			address: f({ type: 'text', multiline: true }),
-			n: f({ type: 'number' }),
-			on: f({ type: 'boolean' })
-		});
-		expect(
-			rowSummary(items, { body: content('para'), address: 'a', n: 1, on: true })
-		).toBeUndefined();
-		expect(rowSummary(undefined, { x: 'y' })).toBeUndefined();
-	});
-
-	it('reads a cell by own key: a declared name can be one every object inherits', () => {
-		const items = row({ constructor: f({ type: 'text' }) });
-		expect(rowSummary(items, {})).toBeUndefined();
-		expect(rowSummary(items, { constructor: 'Ada' })).toBe('Ada');
-	});
-});
-
 // The `?` moves the render floor and nothing else, so an optional cell reads as its
 // base type everywhere a type is read.
 describe('optional cells', () => {
@@ -705,7 +656,6 @@ describe('optional cells', () => {
 			properties: { note: f({ type: 'text?' }), on: f({ type: 'boolean?' }) }
 		});
 		expect(arrayLayout(f({ type: 'array', items, ui: { layout: 'table' } }))).toBe('table');
-		expect(rowSummary(items, { note: 'Primary' })).toBe('Primary');
 	});
 
 	it('project as the base type', () => {

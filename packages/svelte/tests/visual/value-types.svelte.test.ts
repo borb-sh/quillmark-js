@@ -9,6 +9,7 @@
 // than by a captured callback argument.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
+import { DEFAULT_VISUAL_STRINGS as S } from '$lib/visual/strings';
 import { DocumentReader, type Content, type Quill, type Document } from '@quillmark/wasm';
 import { core, quill, literal } from '../helpers/fixtures.js';
 import {
@@ -203,7 +204,7 @@ describe('an array of objects', () => {
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut', pages: 3 }]);
 	});
 
-	it('titles a collapsed row by its first text cell, and opens each row on its own', () => {
+	it('names a row by its number, and opens each row on its own', () => {
 		const q = quill();
 		const doc = emptied(q);
 		const { target } = mountEditor(q, doc);
@@ -223,10 +224,14 @@ describe('an array of objects', () => {
 		flushSync();
 		expect(summaries(arr).map((s) => s.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
 
-		// A titled row reads as its own value; an untitled one falls back to the name its
-		// accessible label already spends.
-		expect(rows[0].textContent?.trim()).toBe('Fig. 2 relabelled');
-		expect(rows[1].textContent?.trim()).toBe('Revisions 2');
+		// A row reads as its number whatever it holds, the same words open or collapsed,
+		// and the words it draws are inside the name it is spoken by.
+		const titles = rows.map((r) => r.textContent?.trim());
+		expect(titles).toEqual([S.elementItem(1), S.elementItem(2)]);
+		rows.forEach((r, k) => {
+			expect(r.getAttribute('aria-label')).toBe(S.elementUntitled('Revisions', k + 1));
+			expect(r.getAttribute('aria-label')!.toLowerCase()).toContain(titles[k]!.toLowerCase());
+		});
 
 		// Pressing an open row closes it, so an array can rest with nothing unfolded.
 		rows[1].click();
@@ -234,7 +239,20 @@ describe('an array of objects', () => {
 		expect(summaries(arr).map((s) => s.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
 	});
 
-	it('drops the open row with its element, leaving no row opened in its place', () => {
+	it('draws a list of one record open on mount', () => {
+		const q = quill();
+		const doc = emptied(q);
+		doc.storeField('revisions', [{ note: 'Only' }]);
+		const { target } = mountEditor(q, doc);
+
+		const arr = field(target, 'Revisions');
+		expect(summaries(arr).map((s) => s.getAttribute('aria-expanded'))).toEqual(['true']);
+		expect(
+			arr.querySelector('.qm-element.open [data-qm-prop="note"] .ProseMirror')?.textContent
+		).toBe('Only');
+	});
+
+	it('drops the open row with its element, and opens the one row a remove leaves', () => {
 		const q = quill();
 		const doc = emptied(q);
 		const { target } = mountEditor(q, doc);
@@ -246,21 +264,28 @@ describe('an array of objects', () => {
 		typeLeaf(arr.querySelector<HTMLElement>('.qm-object-prop')!, 'Kept');
 		add.click();
 		flushSync();
-		expect(read(q, doc, 'revisions')).toEqual([{ note: 'Kept' }, {}]);
+		add.click();
+		flushSync();
+		expect(read(q, doc, 'revisions')).toEqual([{ note: 'Kept' }, {}, {}]);
 
 		// Removing an open row takes its open state with it: the closed row sliding into
-		// its place stays closed and opens on its own press.
+		// its place stays closed.
 		summaries(arr)[0].click();
+		summaries(arr)[2].click();
 		flushSync();
 		arr.querySelectorAll<HTMLButtonElement>('.qm-remove')[1].click();
 		flushSync();
-		expect(read(q, doc, 'revisions')).toEqual([{ note: 'Kept' }]);
-		const rows = summaries(arr);
-		expect(rows).toHaveLength(1);
-		expect(rows[0].getAttribute('aria-expanded')).toBe('false');
-		rows[0].click();
+		const expanded = () => summaries(arr).map((s) => s.getAttribute('aria-expanded'));
+		expect(expanded()).toEqual(['false', 'false']);
+
+		// A remove that leaves one record draws it open, and a press still closes it.
+		arr.querySelectorAll<HTMLButtonElement>('.qm-remove')[1].click();
 		flushSync();
-		expect(summaries(arr)[0].getAttribute('aria-expanded')).toBe('true');
+		expect(read(q, doc, 'revisions')).toEqual([{ note: 'Kept' }]);
+		expect(expanded()).toEqual(['true']);
+		summaries(arr)[0].click();
+		flushSync();
+		expect(expanded()).toEqual(['false']);
 	});
 });
 

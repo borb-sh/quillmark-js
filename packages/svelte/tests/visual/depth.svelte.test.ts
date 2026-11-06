@@ -7,6 +7,7 @@
 // document rather than off a captured callback.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
+import { DEFAULT_VISUAL_STRINGS as S } from '$lib/visual/strings';
 import type { Document, Quill } from '@quillmark/wasm';
 import { fieldTitle } from '$lib/visual/structure';
 import { quill, example, literal } from '../helpers/fixtures.js';
@@ -39,8 +40,8 @@ describe('a nested array property', () => {
 		const outer = appendices(mounted.target);
 		const tree = appendixTree(q, doc);
 
-		// The outer rows, summarized by their `title` cell.
-		expect(summaryTexts(outer)).toEqual(tree.map((a) => a.title));
+		// The outer rows, named by their number.
+		expect(summaryTexts(outer)).toEqual(tree.map((_, k) => S.elementUntitled('Appendices', k + 1)));
 
 		summaries(outer)[0].click();
 		flushSync();
@@ -52,9 +53,10 @@ describe('a nested array property', () => {
 		expect(inner.querySelector('.qm-field-label span')?.textContent).toBe(
 			fieldTitle('entries', q.schema.main.fields.appendices.items!.properties!.entries)
 		);
-		// Its rows are collapsed rows again, summarized by the `label` cell, the row's
-		// first short text.
-		expect(summaryTexts(inner)).toEqual(tree[0].entries.map((e) => e.label));
+		// Its rows are collapsed rows again, named by their number.
+		expect(summaryTexts(inner)).toEqual(
+			tree[0].entries.map((_, k) => S.elementUntitled('Entries', k + 1))
+		);
 	});
 
 	it('opens one entry at a time, two rungs in, and commits the whole tree by value', () => {
@@ -120,19 +122,18 @@ describe('a nested array property', () => {
 		summaries(outer)[1].click();
 		flushSync();
 		const inner = repeater(outer.querySelector('.qm-element.open .qm-object')!);
-		expect(summaryTexts(inner)).toEqual(['Terms']);
+		// A list of one record draws it open.
+		expect(summaryTexts(inner)).toEqual([S.elementUntitled('Entries', 1)]);
+		expect(inner.querySelectorAll('.qm-element.open')).toHaveLength(1);
 
 		inner.querySelector<HTMLButtonElement>('.qm-add-el')!.click();
 		flushSync();
 		const tree = read(q, doc, 'appendices') as Array<{ entries: unknown[] }>;
 		expect(tree[1].entries).toEqual([{ label: 'Terms', page: 20 }, {}]);
-		// A row added is a row to fill in: it arrives open.
+		// A row added is a row to fill in: it arrives open, and the row it joins stays so.
 		expect(inner.querySelectorAll('.qm-element')).toHaveLength(2);
-		expect(inner.querySelectorAll('.qm-element.open')).toHaveLength(1);
-		// Scoped to the row itself: the appendix around `inner` is an open element too,
-		// and a descendant selector's ancestor clause reaches outside its root.
-		const added = inner.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(added.querySelector('.qm-element-title')?.textContent).toBe('Entries 2');
+		expect(summaries(inner).map((s) => s.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+		expect(summaryTexts(inner)).toEqual([1, 2].map((n) => S.elementUntitled('Entries', n)));
 
 		inner.querySelectorAll<HTMLButtonElement>('.qm-row-btn.qm-remove')[1].click();
 		flushSync();
@@ -182,7 +183,8 @@ describe('a container inside a variant cell', () => {
 			value: 'embargoed',
 			notices: [{ party: 'Legal' }]
 		});
-		// The row summarizes by its `party` cell once it has one.
-		expect(summaryTexts(notices)).toEqual(['Legal']);
+		// The row keeps its number whatever it holds, and as the list's one row stays open.
+		expect(summaryTexts(notices)).toEqual([S.elementUntitled('Notices', 1)]);
+		expect(notices.querySelectorAll('.qm-element.open')).toHaveLength(1);
 	});
 });
