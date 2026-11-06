@@ -242,7 +242,7 @@ describe('an array of objects', () => {
 	it('draws a list of one record open on mount', () => {
 		const q = quill();
 		const doc = emptied(q);
-		doc.storeField('revisions', [{ note: 'Only' }]);
+		doc.unchecked.storeField('revisions', [{ note: 'Only' }]);
 		const { target } = mountEditor(q, doc);
 
 		const arr = field(target, 'Revisions');
