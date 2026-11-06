@@ -16,7 +16,7 @@
 	import type { LeafRegistry } from './leaves.js';
 	import type { CardModel, FieldModel } from './structure.js';
 	import { placeFields, humanize, initialExpandedGroup, kindTitle, mountKey } from './structure.js';
-	import { holdInView } from './hold.js';
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { FieldDomIds } from './domid.js';
 	import Field from './Field.svelte';
 	import FieldHint from './FieldHint.svelte';
@@ -134,43 +134,39 @@
 	// the width, and the card's gap counts the block twice besides.
 	const hasMeta = $derived(ungrouped.length > 0 || grouped.length > 0);
 
-	// Seeded once from the card's shape. Card is keyed by stable id, so this survives the
-	// VisualEditor re-derive that reassigns `card` and resets only on a remount. Not
-	// reconciled to later section changes: a retype is the one reshape, and the open
-	// group stays where it still exists.
+	// The open panels, seeded once from the card's shape: the first is open on mount.
+	// Card is keyed by stable id, so the set survives the VisualEditor re-derive that
+	// reassigns `card` and resets only on a remount. Not reconciled to later section
+	// changes: a retype is the one reshape, and an open group stays open where it still
+	// exists.
 	// svelte-ignore state_referenced_locally
-	let expanded = $state<string | null>(initialExpandedGroup(card.sections));
+	const first = initialExpandedGroup(card.sections);
+	const open = new SvelteSet<string>(first == null ? [] : [first]);
 	let headers = $state<Record<string, HTMLButtonElement | undefined>>({});
 	let panels = $state<Record<string, HTMLElement | undefined>>({});
-	/** Whether the panels animate the move `expanded` is about to make. False for a reveal
+	/** Whether the panels animate the move about to happen. False for a reveal
 	 *  ({@link revealLeaf}), restored by the header gesture the motion is there for, so its
 	 *  return needs no timer. */
 	let animate = $state(true);
 	/**
-	 * Move to `next` (`null` = all closed). A closing panel goes `inert` with whatever it
-	 * held still focused, and `inert` does not say where focus should go — the browser
-	 * drops it on the body — so the close hands focus to the header, which is what
-	 * reopens the section. Every write to `expanded` goes through here: a group also
-	 * closes when another opens.
+	 * Open or close one panel; the others stay as they are. A closing panel goes `inert`
+	 * with whatever it held still focused, and `inert` does not say where focus should go
+	 * (the browser drops it on the body), so the close hands focus to the header, which is
+	 * what reopens the section. Nothing above the header moves, so the header stays where
+	 * it was pressed.
 	 */
-	function setExpanded(next: string | null): void {
-		const closing = expanded;
-		if (closing !== null && closing !== next && panels[closing]?.contains(document.activeElement))
-			headers[closing]?.focus();
-		expanded = next;
-	}
-	/** The header is the anchor: a section closing above it is what would carry it off the
-	 *  fold, and a section opens under its own header (`hold.ts`). */
 	function toggleGroup(group: string): void {
 		animate = true;
-		holdInView(headers[group], () => setExpanded(expanded === group ? null : group));
+		if (!open.has(group)) return void open.add(group);
+		if (panels[group]?.contains(document.activeElement)) headers[group]?.focus();
+		open.delete(group);
 	}
 
 	/**
 	 * Open the group holding leaf `key`: a caret placed in a collapsed panel does not
 	 * land at all. `VisualEditor.setCaret` calls this on every card and then waits a
 	 * flush before landing, since `inert` clears when the panel renders open, not when
-	 * `expanded` is assigned.
+	 * the set is written.
 	 *
 	 * The move is instant, because that same flush is when the landing measures its target:
 	 * an animating track still reads its start value there, and the trip would be computed
@@ -179,20 +175,20 @@
 	 *
 	 * A call, not a prop: a reveal is an event, and modelling it as state needs a
 	 * fresh-identity wrapper to re-fire and an `untrack` to keep the per-keystroke
-	 * re-derive from reopening the accordion under the user.
+	 * re-derive from reopening a panel under the user.
 	 */
 	export function revealLeaf(key: string): void {
 		const section = grouped.find((s) => s.fields.some((f) => ops.leafKey(f.name) === key));
 		if (!section?.group) return;
 		animate = false;
-		setExpanded(section.group);
+		open.add(section.group);
 	}
 
 	let el = $state<HTMLElement | undefined>(undefined);
 	/**
 	 * Bring this card into view after the structure mutation that placed it: `center` for
 	 * an insert, `nearest` for a reorder. The reduced-motion guard is JS rather than the
-	 * CSS the accordion uses: a scroll's behaviour is an argument, not a transition a
+	 * CSS the panels use: a scroll's behaviour is an argument, not a transition a
 	 * media query can cancel.
 	 *
 	 * The caller is what waits out a reorder's own trip before asking: the run holds the
@@ -266,13 +262,13 @@
 						</div>
 					{/each}
 
-					<!-- One open at a time. Rendered only when a card has groups, so an empty
-				     accordion does not stand a gap under the ungrouped fields. -->
+					<!-- Each panel opens on its own. Rendered only when a card has groups, so an
+				     empty stack does not stand a gap under the ungrouped fields. -->
 					{#if grouped.length}
 						<div class={['qm-groups', { 'qm-instant': !animate }]}>
 							{#each grouped as section (section.group)}
 								{@const group = section.group as string}
-								{@const isOpen = expanded === group}
+								{@const isOpen = open.has(group)}
 								{@const panelId = ops.panelId(group)}
 								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
 								{@const headHint = section.head?.description}
@@ -488,6 +484,14 @@
 	.qm-card:focus-within :global(.qm-card-controls) {
 		opacity: 1;
 	}
+	/* Without a hover there is nothing to reveal the row on but a caret, which a tap on the
+	 header never places: a touch reader would find delete only by typing in the card. So
+	 the row rests drawn, at the rung a live control rests at. */
+	@media (hover: none) {
+		.qm-card :global(.qm-card-controls) {
+			opacity: var(--_qm-opacity-rest);
+		}
+	}
 	/* The rename hit region is the header's free width at full height, so a press
 	 anywhere left of the controls enters the title edit. `align-self: stretch` beats the
 	 header's centring, which is also what keeps the target legal with no padding: WCAG
@@ -504,16 +508,15 @@
 	 overlaid input tracks its content width. Both carry the same nothing for a box model
 	 and inherit the same type tokens, which is what makes the two measure alike.
 
-	 The type is the group header's: a card title and a section header both name a block
-	 of fields, so they read as one register and what ranks them is position rather than
-	 a size step. */
+	 The type is a rung over the group header's: the card holds its sections, so its name
+	 ranks above theirs, at the paper rung: the size ramp ranks, and the weight stays the
+	 chrome's one (ARCHITECTURE §Styling). */
 	.qm-card-title-sizer {
 		display: inline-grid;
 		align-items: center;
 		min-width: 0;
 		max-width: 100%;
-		font-size: var(--_qm-text-body);
-		font-weight: var(--_qm-weight-mid);
+		font-size: var(--_qm-text-paper);
 		line-height: var(--_qm-leading-tight);
 		font-family: inherit;
 	}
@@ -525,9 +528,9 @@
 		min-width: 2ch;
 	}
 	/* The title draws no box in any state: a card title is already the one line that
-	 reads as the card's name, and the region's `cursor: text` answers the pointer. A
-	 typed title is a value, at the ink, and the automatic one a placeholder, at label
-	 ink, as in every field. */
+	 reads as the card's name, and the region's `cursor: text` answers the pointer. The
+	 automatic title is the input's placeholder and still the card's name, so it draws at
+	 the ink a typed one does: a reader names the card by it either way. */
 	.qm-card-title {
 		grid-area: 1 / 1;
 		width: 100%;
@@ -540,9 +543,8 @@
 		padding: 0;
 		background: transparent;
 	}
-	/* The label ink every placeholder takes rather than the UA's grey. */
 	.qm-card-title::placeholder {
-		color: var(--_qm-ink-label);
+		color: var(--_qm-ink);
 		opacity: 1;
 	}
 	.qm-card-body {
@@ -555,7 +557,7 @@
 		display: flex;
 		flex-direction: column;
 	}
-	/* One rung between the payload's two kinds of section, and none inside the accordion:
+	/* One rung between the payload's two kinds of section, and none inside the panel stack:
 	 what stands one disclosure row off the next is the two headers' own block padding and
 	 nothing else, so the rows tile and their targets with them. A run of one-line rows
 	 wants the tighter rhythm — the `--_qm-space-3` the fields keep between their own rows
@@ -584,8 +586,8 @@
 	.qm-meta-bottom {
 		border-bottom: var(--_qm-border-width) solid var(--_qm-border);
 	}
-	/* A section's share of the boundary between sections, one rung at each end. The
-	 accordion spends the same rung from its header and its panel, where it also caps the
+	/* A section's share of the boundary between sections, one rung at each end. A
+	 panel spends the same rung from its header and its panel, where it also caps the
 	 vertical those two edges hold.
 
 	 No stroke: a vertical would mark a section a reader has no name for. The inset is
@@ -681,7 +683,7 @@
 
 	 `font: inherit` because a UA button inherits no face, then the body rung, one step
 	 over the field labels beneath it: at the label rung the two read as one register and
-	 the accordion stops looking like structure. Size, weight and leading sit after
+	 the panel stack stops looking like structure. Size, weight and leading sit after
 	 `font`, a shorthand that carries `line-height`. */
 	.qm-group-header {
 		display: flex;
@@ -765,8 +767,7 @@
 	/* What a toggle moves is the panel's track, and the box's own bottom edge where the
 	 last section is the one toggling. A reveal's landing measures its target one flush
 	 after asking — where either, mid-flight, still reads its start value — so nothing
-	 about the accordion animates for it. Both panels of the move are inside the group box,
-	 so the opening one and the closing one above it stand still together (`revealLeaf`). */
+	 about the panels animates for it (`revealLeaf`). */
 	.qm-groups.qm-instant .qm-group-panel,
 	.qm-groups.qm-instant .qm-group {
 		transition: none;

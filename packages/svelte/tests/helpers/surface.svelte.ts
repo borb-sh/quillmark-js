@@ -223,14 +223,15 @@ export function openList(scope: HTMLElement): HTMLElement {
 }
 
 /** Pick an option off an enum as a pointer does, the primitive committing on
- *  `pointerup`. `null` picks the unset sentinel, found by class rather than text: it
- *  ghosts the resolved default, so its row can read as a member. */
+ *  `pointerup`. `null` picks the reset row, the unset sentinel, found by class: it
+ *  stands only under a stored value. A member is found by its label, the default's
+ *  row carrying a tag beside it. */
 export function pick(scope: HTMLElement, text: string | null): void {
 	openList(scope);
 	const row = [...document.querySelectorAll<HTMLElement>('.qm-select-item')].find((el) =>
 		text === null
-			? el.querySelector('.qm-select-ghost')
-			: !el.querySelector('.qm-select-ghost') && el.textContent?.trim() === text
+			? el.classList.contains('qm-select-unset')
+			: el.querySelector('.qm-select-label')?.textContent?.trim() === text
 	);
 	if (!row) throw new Error(`no option ${text ?? 'unset'} in the open list`);
 	row.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));

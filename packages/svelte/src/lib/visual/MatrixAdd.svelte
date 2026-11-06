@@ -76,10 +76,10 @@
 		color: var(--_qm-ink-label);
 	}
 	/* At rest the box is the add chip it stands in for: no well, its words at the label
-	 ink, and the line at the chip's idle rung. The line comes up under the pointer with
+	 ink, and the line at the chip's resting rung. The line comes up under the pointer with
 	 the well, and both stay while the box holds the focus or typed words. */
 	.qm-matrix-add-field {
-		opacity: var(--_qm-opacity-idle);
+		opacity: var(--_qm-opacity-rest);
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-matrix-add-field:hover,

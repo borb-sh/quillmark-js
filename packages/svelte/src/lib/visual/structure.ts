@@ -741,7 +741,7 @@ export function cardSections(cardSchema: QuillCardSchema): GroupSection[] {
 }
 
 /**
- * The group section a card's accordion opens on first mount, or `null` when the card declares none.
+ * The group section a card opens on first mount, or `null` when the card declares none.
  * All-collapsed would disclose nothing of what is behind the chevrons, and a rule keyed on document
  * state would move the opening under a user as they fill.
  */
@@ -785,17 +785,18 @@ function packable(f: FieldModel): boolean {
 }
 
 /**
- * Consecutive packable fields are `cell`s the grid auto-places; a trailing orphan keeps its column
- * width. A run of one is `full`: a lone narrow track reads as truncated against the width it leaves
- * empty. Everything else is `full`. No width is measured.
+ * Consecutive packable fields are `cell`s the grid auto-places. The last of an odd run is
+ * `full`, a run of one included: two columns is the capacity a card's panel stands at, where
+ * that field would stand alone in a narrow track that reads as truncated against the width it
+ * leaves empty. Everything else is `full`. No width is measured.
  */
 export function placeFields(fields: FieldModel[]): PlacedField[] {
 	const out: PlacedField[] = [];
 	let run = 0;
-	// A run of one is only knowable at its end, so the span is patched back onto the
+	// A run's parity is only knowable at its end, so the span is patched back onto the
 	// field already placed.
 	const flush = () => {
-		if (run === 1) out[out.length - 1].span = 'full';
+		if (run % 2 === 1) out[out.length - 1].span = 'full';
 		run = 0;
 	};
 	for (const f of fields) {

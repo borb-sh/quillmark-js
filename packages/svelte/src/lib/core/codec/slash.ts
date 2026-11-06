@@ -2,9 +2,9 @@
 // list of commands; a pick consumes exactly the trigger run and runs one.
 //
 // A command is one lowercase kebab-case token typed after the `/`. A token is not wording, so it is
-// the same in every locale and `SlashStrings` carries only the menu's accessible name and the hint,
-// the door's one mark on screen: on the empty line a focused caret holds, it names the key
-// (§`slashHint`).
+// the same in every locale and is what the query matches; the menu draws each row by its name, which
+// is wording (§`SlashStrings`), with the token beside it as what to type. The hint is the door's one
+// mark on screen: on the empty line a focused caret holds, it names the key (§`slashHint`).
 //
 // Every command but the island's is also a markdown shorthand, sharing one implementation
 // (`blocks.ts`).
@@ -39,19 +39,33 @@ export interface SlashState {
 }
 
 /**
- * The menu's wording: its accessible name and the empty line's hint. Offers are command names,
- * which are not translated.
+ * The menu's wording: its accessible name, the empty line's hint, and each row's name. The tokens
+ * a row shows beside its name are not translated: they are what is typed.
  */
 export interface SlashStrings {
 	slashLabel: string;
 	/** Drawn on the empty line a focused caret holds, naming the key that opens the menu. */
 	slashHint: string;
+	/** A command's row name, by its token: `numbered-list` → `Numbered list`. */
+	slashName: (command: string) => string;
 }
+
+const SLASH_NAMES: Record<string, string> = {
+	heading: 'Heading',
+	list: 'Bulleted list',
+	'numbered-list': 'Numbered list',
+	subparagraph: 'Subparagraph',
+	quote: 'Quote',
+	code: 'Code block',
+	table: 'Table'
+};
 
 /** The package's English, beside the surface that draws it; the visual `strings` set extends it. */
 export const DEFAULT_SLASH_STRINGS: SlashStrings = {
 	slashLabel: 'Insert',
-	slashHint: 'Type / to insert'
+	slashHint: 'Type / to insert',
+	slashName: (command) =>
+		SLASH_NAMES[command] ?? command.charAt(0).toUpperCase() + command.slice(1).replace(/-/g, ' ')
 };
 
 /**

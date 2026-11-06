@@ -84,7 +84,7 @@
 	 is a thumb's width at every setting of `--qm-space`, where a track sized apart from
 	 its inset ran the checked thumb into the end cap as the inset grew. */
 	.qm-toggle-wrap {
-		--thumb: 0.75rem;
+		--thumb: 0.875rem;
 		display: flex;
 		align-items: center;
 		min-height: var(--_qm-box-line);
@@ -125,7 +125,7 @@
 	 `--_qm-accent` checked. The card's own tone over the band is a step of about
 	 1.3:1 in light and 1.5:1 in dark, a state indicator under WCAG 1.4.11's 3:1; the
 	 label rung clears it at both, at 4.6:1 and 3.3:1. No edge of its own: a hairline
-	 around a 12px pill is a second box inside the track's. */
+	 around a 14px pill is a second box inside the track's. */
 	.qm-toggle-wrap :global(.qm-toggle-thumb) {
 		width: var(--thumb);
 		height: var(--thumb);

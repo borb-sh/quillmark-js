@@ -141,6 +141,11 @@
 	--_qm-surface: var(--_qm-bg);
 	--_qm-surface-well: oklab(from var(--_qm-bg) calc(l - (0.04 + 0.0202 * (1 - l))) a b);
 	--_qm-surface-sunken: var(--_qm-surface-well);
+	/* The well's own edge, drawn inside it: the fill alone stands about 1.1:1 off the
+	   card, too faint to find a field by. A step toward the ink laid over the well,
+	   translucent as `hover` is, so it darkens a light well and lightens a dark one by
+	   the same measure. */
+	--_qm-well-edge: color-mix(in oklab, var(--_qm-fg) 10%, transparent);
 	/* `raised` is the same ramp spelled as a mix, its step 0.08 × (1 − l): the light
 	   arm is zero, a white card having nowhere further to go, so a floating surface
 	   separates on its hairline and `--_qm-lift` there and the step joins them in
@@ -244,9 +249,9 @@
 	/* ── Ratios and effects ──────────────────────────────────────────────────
 	   No palette fixes these, so they are their own rungs. */
 	--_qm-blur: 8px;
-	/* The popover's translucency: the raised surface mixed toward transparent, so
-	   the page reads faintly through the pill. */
-	--_qm-surface-popover: color-mix(in oklab, var(--_qm-surface-raised) 82%, transparent);
+	/* The popover's surface: the raised rung all but opaque, so the blur softens what
+	   is behind it and a line of text under a toolbar never reads through it. */
+	--_qm-surface-popover: color-mix(in oklab, var(--_qm-surface-raised) 96%, transparent);
 	/* What a surface with no plane under it lifts on. A tone rung cannot carry that at
 	   both poles: `raised` is a no-op against a white card (§Colour), so in light the
 	   hairline is otherwise the whole separation over the body prose these float on.
@@ -256,10 +261,13 @@
 	   the cue means one thing whichever way the scale runs. Spent only on what floats,
 	   and the one shadow any surface casts, which is review's to hold. */
 	--_qm-lift: 0 0 12px color-mix(in oklab, #000 16%, transparent);
-	/* The recede ladder: a hover-revealed or disabled affordance at rest, and a
-	   muted one. Opacity recedes toward whatever is behind, so these invert
-	   correctly given the element's own colour is a rung. */
+	/* The recede ladder: a disabled affordance, a muted one, and a live one at rest
+	   that comes up under the pointer. Opacity recedes toward whatever is behind, so
+	   these invert correctly given the element's own colour is a rung. `rest` keeps a
+	   label-ink control over 3:1 on the card and the well (WCAG 1.4.11), where `idle`
+	   is a disabled control's, which owes no contrast. */
 	--_qm-opacity-idle: 0.35;
+	--_qm-opacity-rest: 0.75;
 	--_qm-opacity-muted: 0.5;
 
 	/* ── Focus ───────────────────────────────────────────────────────────────

@@ -1,13 +1,11 @@
 <!--
- A `type: enum` field → a styled listbox over its `values`, on bits-ui. When
- nothing is authored the list shows a distinct unset
- sentinel that ghosts the `default:` (muted, shown-never-written), distinguishable
- from an authored pick and re-selectable; so re-picking the default fires a
- change. The sentinel commits nothing; any real pick: including the
- value that equals the default: commits via the parent's typed `writer.set`.
- Explicitly picking the default is the one place "commit the default" is genuine
- intent, expressible. The sentinel stays in the list once a value is authored, as
- the "clear back to default" (unset) affordance.
+ A `type: enum` field → a styled listbox over its `values`, on bits-ui. The list is
+ the members, one row each, the current one checked and the `default:`'s tagged.
+ Unset, the trigger ghosts the default (muted, shown-never-written) and the default's
+ row carries the check, since that is what prints; picking it writes it, so "commit
+ the default" stays expressible as genuine intent. Once a value is authored a reset
+ row stands under a divider, the unset sentinel: it commits nothing, clearing back to
+ the default (or to nothing, where none prints).
 
  Styled rather than a native `<select>`: the dropdown list is UA-owned and reaches
  no dial. Listbox semantics and typeahead come with the primitive.
@@ -80,8 +78,10 @@
 	 *  `none`: it draws at the default rung (theme.css). */
 	const ghostsMember = $derived(!optional && !!fallback);
 	const ghostText = $derived(optional ? t.strings.optionalGhost : dash(fallback));
-	/** The sentinel's tag says what picking it does: return to the default, or unset. */
-	const tag = $derived(ghostsMember ? t.strings.enumUnsetTag : t.strings.enumUnsetTagNone);
+	/** The reset row says where it goes: back to the default, or to nothing. */
+	const reset = $derived(ghostsMember ? t.strings.enumReset : t.strings.enumClear);
+	/** The member the list checks: the pick, or the default that prints while unset. */
+	const checked = $derived(unset ? (ghostsMember ? fallback : undefined) : local);
 	/** What the closed trigger shows: the pick, or the ghosted default while unset. */
 	const shown = $derived(unset ? ghostText : dash(local));
 
@@ -130,24 +130,6 @@
 				     plain string and never picks up the scoping hash. -->
 				<div class="qm-menu-surface qm-select-content" data-qm-root>
 					<Select.Viewport>
-						<!-- The sentinel renders the `default:`'s own text, so a defaulted enum
-						     lists that word twice: this row, and the member below it. The tag has
-						     to be a word rather than a tone — the ghost is already `ink-label`,
-						     and while the field is unset this is the selected row, so the weight
-						     step pulls the other way. It rides the accessible name for the same
-						     reason. -->
-						<!-- An optional cell's row is untagged: it ghosts no default, and `None`
-						     names no member to tell it from. -->
-						<Select.Item
-							class="qm-menu-item qm-select-item qm-select-unset"
-							value={UNSET}
-							label={optional ? ghostText : `${ghostText} ${tag}`}
-						>
-							<span class="qm-select-ghost">{ghostText}</span>
-							{#if !optional}
-								<span class="qm-select-tag">{tag}</span>
-							{/if}
-						</Select.Item>
 						<!-- A refused option still draws under `'disable'`, and under either
 						     policy when it is the one selected: a listbox whose selected value
 						     has no row shows nothing for what the document says, and offers none
@@ -163,11 +145,31 @@
 									value={v}
 									label={dash(v)}
 									disabled={!allowed}
+									data-checked={v === checked ? '' : undefined}
 								>
-									{dash(v)}
+									<span class="qm-select-check" aria-hidden="true">
+										{#if v === checked}<Icon name="check" />{/if}
+									</span>
+									<span class="qm-select-label">{dash(v)}</span>
+									{#if ghostsMember && v === fallback}
+										<span class="qm-select-tag">{t.strings.enumUnsetTag}</span>
+									{/if}
 								</Select.Item>
 							{/if}
 						{/each}
+						<!-- The reset is the sentinel, offered once there is something to reset:
+						     unset, the list's check already stands where a reset would land. -->
+						{#if !unset}
+							<div class="qm-select-divider" role="separator"></div>
+							<Select.Item
+								class="qm-menu-item qm-select-item qm-select-unset"
+								value={UNSET}
+								label={reset}
+							>
+								<span class="qm-select-check" aria-hidden="true"></span>
+								<span class="qm-select-ghost">{reset}</span>
+							</Select.Item>
+						{/if}
 					</Select.Viewport>
 				</div>
 			</Select.Content>
@@ -229,8 +231,30 @@
 		max-height: 16rem;
 		overflow-y: auto;
 	}
-	.qm-select-content :global(.qm-select-item[data-selected]) {
-		font-weight: var(--_qm-weight-strong);
+	/* A row is a check track, the member, and the default's tag at the end. */
+	.qm-select-content :global(.qm-select-item) {
+		display: flex;
+		align-items: center;
+		gap: var(--_qm-space);
+	}
+	.qm-select-check {
+		flex-shrink: 0;
+		display: inline-flex;
+		width: var(--_qm-glyph-control);
+		height: var(--_qm-glyph-control);
+	}
+	.qm-select-check :global(svg) {
+		width: 100%;
+		height: 100%;
+	}
+	.qm-select-label {
+		flex: 1;
+		min-width: 0;
+	}
+	.qm-select-divider {
+		height: var(--_qm-border-width);
+		margin: var(--_qm-space) var(--_qm-space-2);
+		background: var(--_qm-border);
 	}
 	/* Consumer policy, for a refused option the list still draws: offered, unpickable. */
 	.qm-select-content :global(.qm-select-item[data-disabled]) {
@@ -240,18 +264,8 @@
 	.qm-select-ghost {
 		color: var(--_qm-ink-label);
 	}
-	/* The sentinel's row: the ghost at one end, the tag at the other, so the pair reads
-	   as a value and a note about it rather than as two words. Only this row takes the
-	   split; a member's row is one string and has nothing to distribute. */
-	.qm-select-content :global(.qm-select-unset) {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--_qm-space-2);
-	}
-	/* A step down the size ramp, which is what says this is chrome and the word beside
-	   it is the value. The ink is the ghost's own: a second tone here would rank the
-	   tag against the thing it annotates, and there is no rung under `label` to take
+	/* A step down the size ramp, which is what says this is chrome and the member beside
+	   it is the value. The ink is the label rung, there being none under it to take
 	   (theme.css, "nothing under the last"). */
 	.qm-select-tag {
 		flex-shrink: 0;

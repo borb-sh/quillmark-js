@@ -285,7 +285,12 @@
 	);
 </script>
 
-<div class={['qm-field', { cell: span === 'cell' }]}>
+<div
+	class={[
+		'qm-field',
+		{ cell: span === 'cell', inline: span !== 'cell' && field.control === 'boolean' }
+	]}
+>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
@@ -330,7 +335,7 @@
 				<EnumField
 					value={value as string | undefined}
 					values={field.schema.values ?? []}
-					fallback={ghost as string | undefined}
+					fallback={(ghost as string | undefined) ?? declared}
 					blankTitle={field.schema.ui?.blank_title}
 					{optional}
 					id={domIds.control}
@@ -485,6 +490,23 @@
 		grid-template-rows: subgrid;
 		row-gap: var(--_qm-space);
 		align-items: start;
+	}
+	/* A switch with the row to itself sits on its label's line, at the row's end: a
+	 mark under a label stands a line of dead space beside it, and the end edge is where
+	 every well in the section ends. The stack gives up its box so the switch takes the
+	 second column and a diagnostic the line under both. In a shared row the label track
+	 is the neighbours' too, so a packed switch stays under its label. */
+	.qm-field.inline {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		column-gap: var(--_qm-space-3);
+	}
+	.qm-field.inline > .qm-field-stack {
+		display: contents;
+	}
+	.qm-field.inline > .qm-field-stack > :global(.qm-diag-list) {
+		grid-column: 1 / -1;
 	}
 	/* The stack the control's track holds: the control, and the diagnostics when
 	 there are any. Its gap is the field's own, so a diagnostic sits the same rung

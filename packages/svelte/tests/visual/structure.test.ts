@@ -320,13 +320,30 @@ describe('placeFields', () => {
 
 	it('shares a row across a compact run, solos the rest', () => {
 		expect(
-			spans([mk('a', false), mk('b', true), mk('c', true), mk('d', true), mk('e', false)])
+			spans([
+				mk('a', false),
+				mk('b', true),
+				mk('c', true),
+				mk('d', true),
+				mk('e', true),
+				mk('f', false)
+			])
 		).toEqual([
 			['a', 'full'],
 			['b', 'cell'],
 			['c', 'cell'],
 			['d', 'cell'],
-			['e', 'full']
+			['e', 'cell'],
+			['f', 'full']
+		]);
+	});
+
+	it('spans the last of an odd run across the row, which would stand alone in it', () => {
+		expect(spans([mk('a', true), mk('b', true), mk('c', true), mk('d', false)])).toEqual([
+			['a', 'cell'],
+			['b', 'cell'],
+			['c', 'full'],
+			['d', 'full']
 		]);
 	});
 

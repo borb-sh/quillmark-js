@@ -28,9 +28,9 @@ function open(props: Partial<VisualEditorProps> = {}, seed?: (q: Quill, doc: Doc
  *  policy. */
 function options(target: HTMLElement): { text: string; disabled: boolean }[] {
 	return [...target.querySelectorAll<HTMLElement>('.qm-select-item')]
-		.filter((el) => !el.querySelector('.qm-select-ghost'))
+		.filter((el) => !el.classList.contains('qm-select-unset'))
 		.map((el) => ({
-			text: el.textContent?.trim() ?? '',
+			text: el.querySelector('.qm-select-label')?.textContent?.trim() ?? '',
 			disabled: el.hasAttribute('data-disabled')
 		}));
 }

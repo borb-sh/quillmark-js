@@ -91,10 +91,13 @@ describe('the shipped quill on the surface', () => {
 		const span = (label: string) =>
 			field(target, label).classList.contains('cell') ? 'cell' : 'full';
 		// `Dissemination` asks to pack and stands alone between block leaves, so its run
-		// is one and it takes the row; `Tag line` sits in a run of inline neighbours and
-		// packs. What separates them is the run each lands in, not what either declares.
+		// is one and it takes the row; `Letterhead seal` opens a run of three inline
+		// neighbours and packs, and `Tag line` ends it and takes the row the run leaves
+		// it alone in. What separates them is the run each lands in, not what either
+		// declares.
 		expect(span('Dissemination')).toBe('full');
-		expect(span('Tag line')).toBe('cell');
+		expect(span('Letterhead seal')).toBe('cell');
+		expect(span('Tag line')).toBe('full');
 	});
 
 	// What the cells rest as, both ways. The read is the one a variant's key answers

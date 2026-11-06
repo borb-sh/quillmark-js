@@ -104,7 +104,8 @@
 
 	// The stored form may carry a time (`datetime`); the date half is what a date
 	// field edits, so anything past `YYYY-MM-DD` is not this control's. `parseDate`
-	// throws on a malformed authored value: an empty field is the honest render.
+	// throws on a malformed authored value: the segments stand empty and the stored
+	// string draws beside them (`unread`), so the value an error names is on screen.
 	function toDateValue(s: string): DateValue | undefined {
 		if (!s) return undefined;
 		if (s === TODAY) return renderDate;
@@ -115,6 +116,9 @@
 		}
 	}
 
+	const unread = $derived(
+		value && value !== TODAY && !toDateValue(value.slice(0, 10)) ? value : undefined
+	);
 	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
 	/** The default is the primitive's value: from entering an unset field until an
 	 *  edit or leaving. Part of the projection, so a re-derivation keeps it. */
@@ -276,6 +280,9 @@
 							{shown.text}
 						</BitsDateField.Segment>
 					{/each}
+					{#if unread}
+						<span class="qm-date-unread">{unread}</span>
+					{/if}
 					{#if !datetime}
 						<button
 							type="button"
@@ -348,6 +355,14 @@
 	 the box stands as tall as the inputs beside it. Its pad sits inside the box's
 	 inset, so its label ends on the column the digits start on from the other side,
 	 and its fill stands about as far off the box's end as off its top and bottom. */
+	.qm-date-unread {
+		margin-inline-start: var(--_qm-space-2);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-family: var(--_qm-font-mono);
+		color: var(--_qm-ink);
+	}
 	.qm-date-today {
 		margin-inline-start: auto;
 		margin-inline-end: calc(-1 * var(--_qm-space-2));

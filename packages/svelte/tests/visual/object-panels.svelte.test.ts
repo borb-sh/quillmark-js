@@ -3,6 +3,7 @@
 // `credits` kind declares no `ui.groups`, so each top-level object is a panel,
 // headed by the object, and everything else stands unframed above them.
 import { describe, it, expect, afterEach } from 'vitest';
+import { flushSync } from 'svelte';
 import { quill } from '../helpers/fixtures.js';
 import { field, mountEditor, openField, settle, unmountAll } from '../helpers/surface.svelte.js';
 
@@ -34,6 +35,17 @@ describe('a card grouped by top-level objects', () => {
 		expect(headers(card).map((h) => h.textContent?.trim())).toEqual(['Publisher', 'Rights']);
 		expect(headers(card).map((h) => h.getAttribute('aria-expanded'))).toEqual(['true', 'false']);
 		expect(panel(card, 'Rights').querySelector<HTMLElement>('.qm-group-panel')?.inert).toBe(true);
+	});
+
+	it('opens and closes each panel on its own', () => {
+		const { card } = credits();
+		const expanded = () => headers(card).map((h) => h.getAttribute('aria-expanded'));
+		headers(card)[1].click();
+		flushSync();
+		expect(expanded()).toEqual(['true', 'true']);
+		headers(card)[0].click();
+		flushSync();
+		expect(expanded()).toEqual(['false', 'true']);
 	});
 
 	it('stands its other fields unframed above the panels', () => {
