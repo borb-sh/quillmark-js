@@ -8,6 +8,7 @@ import type {
 	ContentMark
 } from '@quillmark/wasm';
 import { core } from './core.js';
+import type { Splice } from './lines.js';
 import { SLOT, units } from './shape.js';
 
 /** One block of a value, its marks counted from the block's start, its `\n` not included. */
@@ -75,16 +76,8 @@ export function sliceBlocks(content: Content, from: number, to: number): Content
 	return compose(partsOf(content).slice(from, to), pool(content), content.codec);
 }
 
-/** A run of blocks to replace: `target`'s `[at, end)` takes `source`'s `[from, to)`. */
-export interface BlockSplice {
-	at: number;
-	end: number;
-	from: number;
-	to: number;
-}
-
 /** `target` with each run of its blocks replaced by a run of `source`'s, runs in order and apart. */
-export function spliceBlocks(target: Content, source: Content, runs: BlockSplice[]): Content {
+export function spliceBlocks(target: Content, source: Content, runs: Splice[]): Content {
 	const t = partsOf(target);
 	const s = partsOf(source);
 	const out: Part[] = [];
@@ -95,24 +88,4 @@ export function spliceBlocks(target: Content, source: Content, runs: BlockSplice
 	}
 	out.push(...t.slice(k));
 	return compose(out, pool(target, source), target.codec);
-}
-
-/** A plain text's lines, each up to and including its `\n`. */
-export function textLines(text: string): string[] {
-	return text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
-}
-
-/** `target` with each run of its lines replaced by a run of `source`'s. */
-export function spliceLines(target: string, source: string, runs: BlockSplice[]): string {
-	const t = textLines(target);
-	const s = textLines(source);
-	const out: string[] = [];
-	let k = 0;
-	for (const r of runs) {
-		out.push(...t.slice(k, r.at), ...s.slice(r.from, r.to));
-		k = r.end;
-	}
-	out.push(...t.slice(k));
-	const last = (target.endsWith('\n') ? '\n' : '') as string;
-	return out.map((l) => l.replace(/\n$/, '')).join('\n') + (out.length ? last : '');
 }

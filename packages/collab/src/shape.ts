@@ -196,3 +196,7 @@ export function canonical(value: unknown): string {
 			: v
 	);
 }
+
+export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+	return a.length === b.length && a.every((x, i) => x === b[i]);
+}

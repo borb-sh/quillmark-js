@@ -9,8 +9,7 @@
 // editor; the host hears what moved through `onRemote`.
 //
 // A field's Y form follows its value: a content value is a content root, a declared `text` or
-// `richtext` field always one, a string a plain root where Y already holds it plain, anything else
-// a value in the card map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
+// `richtext` field always one, anything else a value in the card map. A retype to a kind that does not declare the field leaves its root where it is, so an edit
 // to the root racing the retype lands; the reader takes whichever form a field arrives in:
 // `@<field>` in the card map says which root holds it.
 import * as Y from 'yjs';
@@ -38,15 +37,14 @@ import {
 	contentRoot,
 	contentTypes,
 	present,
-	readField,
-	utf16
+	readField
 } from './shape.js';
 import { inserts, project, type Projection } from './project.js';
 import { unrepaired } from './repaired.js';
 import { withoutAnchors, writeContent, type Mint } from './write.js';
 import { deltaOf, type Delta } from './delta.js';
-import { changedRuns, commonRun } from './lines.js';
-import { wordSplices, type Grain } from './words.js';
+import { commonRun } from './lines.js';
+import type { Grain } from './words.js';
 
 /** A change to the composable card list, by index, as the Document takes it. */
 export type CardOp =
@@ -139,8 +137,8 @@ export interface DocumentBinding {
 	destroy(): void;
 }
 
-/** Which form a field takes in Y: a content root, a plain-text root, or a card-map value. */
-type Form = 'content' | 'plain' | 'value';
+/** Which form a field takes in Y: a content root, or a card-map value. */
+type Form = 'content' | 'value';
 
 export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
 	return bindWith(opts, 'char');
@@ -191,16 +189,12 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 	const declared = (schema: QuillCardSchema | undefined, name: string): Form =>
 		schema && Object.hasOwn(schema.fields, name) ? formOf(schema.fields[name].type) : 'value';
 	/** The form `value` is written in: a content root where the kind declares one or the value is
-	 *  content, else the one its shape names, a string staying plain where Y already holds it so
-	 *  (`held`). */
-	const formFor = (declared: Form, value: unknown, held: Form | undefined): Form => {
-		if (declared === 'content' || isContent(value)) return 'content';
-		return typeof value === 'string' && held === 'plain' ? 'plain' : 'value';
-	};
+	 *  content, else a value. */
+	const formFor = (declared: Form, value: unknown): Form =>
+		declared === 'content' || isContent(value) ? 'content' : 'value';
 	/** The form a field arrives in from Y; `undefined` where Y holds none. */
 	const arrived = (map: Y.Map<unknown>, key: string): Form | undefined => {
-		const at = map.get(present(key));
-		if (at === 'content' || at === 'plain') return at;
+		if (map.get(present(key)) === 'content') return 'content';
 		return map.has(key) ? 'value' : undefined;
 	};
 
@@ -349,7 +343,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 		const seen = new Set<string>();
 		for (const item of fieldItems(card.payloadItems)) {
 			const addr = addrOf(c, item.key);
-			const form = formFor(declared(schema, item.key), item.value, arrived(map, item.key));
+			const form = formFor(declared(schema, item.key), item.value);
 			const root = contentRoot(name, item.key);
 			if (held.has(root)) {
 				seen.add(item.key).add(present(item.key));
@@ -366,11 +360,8 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 				clearRoot(root);
 				map.set(present(item.key), form);
 			}
-			if (form === 'plain') pushPlain(root, item.value as string);
-			else {
-				const content = storedContent(addr);
-				if (content) pushContent(root, addr, content, renames);
-			}
+			const content = storedContent(addr);
+			if (content) pushContent(root, addr, content, renames);
 		}
 		for (const key of [...map.keys()]) {
 			if (key.startsWith('$') || seen.has(key)) continue;
@@ -400,13 +391,6 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 		const renamed = writeField(root, content);
 		synced.set(root, value);
 		if (renamed.size) renames.push({ root, addr });
-	}
-
-	function pushPlain(root: string, value: string): void {
-		const json = JSON.stringify(value);
-		if (synced.get(root) === json) return;
-		spliceText(ydoc.getText(root), value, grain);
-		synced.set(root, json);
 	}
 
 	// ── Y → Document ─────────────────────────────────────────────────────────
@@ -524,7 +508,6 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 		const map = ydoc.getMap<unknown>(name);
 		const form = arrived(map, key);
 		if (form === 'content') return projectRoot(contentRoot(name, key));
-		if (form === 'plain') return ydoc.getText(contentRoot(name, key)).toString();
 		return form === 'value' ? structuredClone(map.get(key)) : undefined;
 	}
 	/** The field names Y holds for card `name`, in either form. */
@@ -563,13 +546,9 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 		const name = nameOf(c);
 		synced.set(contentRoot(name), contentKey(storedContent(addrOf(c))));
 		const map = ydoc.getMap<unknown>(name);
-		for (const key of yFields(name)) {
-			const form = arrived(map, key);
-			const root = contentRoot(name, key);
-			const v = doc.getStored(addrOf(c, key));
-			if (form === 'plain') synced.set(root, JSON.stringify(v));
-			else if (form === 'content') synced.set(root, contentKey(storedContent(addrOf(c, key))));
-		}
+		for (const key of yFields(name))
+			if (arrived(map, key) === 'content')
+				synced.set(contentRoot(name, key), contentKey(storedContent(addrOf(c, key))));
 	}
 
 	function pullCard(c: CardRef, change: RemoteChange): void {
@@ -623,7 +602,6 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 					const value = yValue(name, key);
 					if (canonical(doc.getStored(addr)) === canonical(value)) continue;
 					doc.unchecked.storeField(addr, value);
-					if (form === 'plain') synced.set(contentRoot(name, key), JSON.stringify(value));
 				}
 				held.delete(root);
 				if (isLeaf) change.content.push({ addr });
@@ -658,7 +636,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 			if (value === undefined || canonical(doc.getStored(addr)) === canonical(value)) return;
 			doc.unchecked.storeField(addr, value);
 			held.delete(root);
-			synced.set(root, form === 'plain' ? JSON.stringify(value) : canonical(value));
+			synced.set(root, canonical(value));
 			if (declared(schema, field) === 'value') {
 				if (!change.fields.includes(c)) change.fields.push(c);
 			} else change.content.push({ addr });
@@ -832,52 +810,6 @@ const sameAddr = (a: Addr, b: Addr): boolean => a.card === b.card && a.field ===
 /** A content value's key for comparing what Y carries: its anchors are the Document's own. */
 function contentKey(content: Content | undefined): string {
 	return canonical(content ? withoutAnchors(content) : null);
-}
-
-/** Replace `text`'s content with `next`: a splice over each run of lines that differs, over its
- *  common prefix and suffix, so a change far from another leaves what lies between untouched. */
-function spliceText(text: Y.Text, next: string, grain: Grain): void {
-	const a = Array.from(text.toString());
-	const b = Array.from(next);
-	const x = linesOf(a);
-	const y = linesOf(b);
-	const at = (lines: number[], chars: string[], k: number) =>
-		k < lines.length ? lines[k] : chars.length;
-	const runs = changedRuns(
-		x.map((from, k) => a.slice(from, at(x, a, k + 1)).join('')),
-		y.map((from, k) => b.slice(from, at(y, b, k + 1)).join(''))
-	);
-	for (const run of runs.reverse()) {
-		const [a0, a1] = [at(x, a, run.from), at(x, a, run.to)];
-		const [b0, b1] = [at(y, b, run.at), at(y, b, run.end)];
-		if (grain === 'word') {
-			const key = (chars: string[]) => (s: number, e: number) => chars.slice(s, e).join('');
-			for (const w of wordSplices(a, a0, a1, key(a), b, b0, b1, key(b)).reverse()) {
-				const from = utf16(a, w.at);
-				const removed = utf16(a, w.end) - from;
-				if (removed) text.delete(from, removed);
-				if (w.to > w.from) text.insert(from, b.slice(w.from, w.to).join(''));
-			}
-			continue;
-		}
-		let p = 0;
-		while (a0 + p < a1 && b0 + p < b1 && a[a0 + p] === b[b0 + p]) p++;
-		let s = 0;
-		while (s < a1 - a0 - p && s < b1 - b0 - p && a[a1 - 1 - s] === b[b1 - 1 - s]) s++;
-		const from = utf16(a, a0 + p);
-		const removed = utf16(a, a1 - s) - from;
-		if (removed) text.delete(from, removed);
-		if (b1 - s > b0 + p) text.insert(from, b.slice(b0 + p, b1 - s).join(''));
-	}
-}
-
-/** Where each line of `chars` starts: a line runs up to and including its `\n`. */
-function linesOf(chars: string[]): number[] {
-	const out = [0];
-	chars.forEach((ch, i) => {
-		if (ch === '\n' && i + 1 < chars.length) out.push(i + 1);
-	});
-	return chars.length ? out : [];
 }
 
 function minter(ydoc: Y.Doc): Mint {
