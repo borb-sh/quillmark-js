@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.2.1 - 2026-11-06
+
 **The 0.2 suite, published.** v0.2.0 was tagged and never published; its changes ship in this version.
 
 ## v0.2.0 - 2026-11-06
