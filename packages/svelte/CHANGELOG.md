@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+**An `object` array row is named by its number.** A row's summary reads as the label and its 1-based number (`Signers 1`) whatever the record holds; it read the first one-line text cell, which named a row by whichever cell the schema declared first and fell back to the number when that cell was empty.
+
+**An open `object` array row draws no head line.** The summary narrows to the chevron over the row's number in a gutter at the subform's start, with the remove under it, so the first cell stands where the head line stood.
+
+**A list of one record draws it open.** An `object` array in list layout holding one element shows that element open on mount and whenever a remove leaves one; a press on its summary still closes it.
+
 **A comment anchor survives delete and undo.** An anchor whose text a deletion swallowed came back without its anchor on undo, since anchors live beside ProseMirror's history rather than in it. The leaf now holds the anchor as a ghost of the deletion and puts it back at its range when an undo restores the deleted slice whole.
 
 ## v0.30.0 - 2026-11-02

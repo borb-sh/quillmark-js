@@ -248,8 +248,15 @@ export function summaries(scope: HTMLElement): HTMLButtonElement[] {
 		)
 	];
 }
+/** The rows' names, open or collapsed: an open row's summary draws its number alone. */
 export const summaryTexts = (arr: HTMLElement): string[] =>
-	summaries(arr).map((s) => s.querySelector('.qm-element-title')?.textContent?.trim() ?? '');
+	summaries(arr).map((s) => s.getAttribute('aria-label') ?? '');
+/** Opens row `k` where it is collapsed: a list of one record already draws it open. */
+export function openRow(scope: HTMLElement, k: number): void {
+	const summary = summaries(scope)[k];
+	if (summary.getAttribute('aria-expanded') !== 'true') summary.click();
+	flushSync();
+}
 
 /** The repeater inside a field or a cell: the `.qm-array` box a `Field` or a subform
  *  cell mounts. */

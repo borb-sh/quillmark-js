@@ -73,9 +73,9 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	 */
 	textCount: (count: number, max: number) => string;
 	/**
-	 * A collapsed array element with nothing to summarize itself by: the label and the
-	 * 1-based index, which is what its accessible name already says. Parametric, so
-	 * word order stays the translator's.
+	 * An `object` array element's name: the label and the 1-based index, which is what
+	 * its accessible name already says. Parametric, so word order stays the
+	 * translator's.
 	 */
 	elementUntitled: (label: string, index: number) => string;
 
