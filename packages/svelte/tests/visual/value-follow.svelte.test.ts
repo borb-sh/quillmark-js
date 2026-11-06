@@ -15,7 +15,7 @@ import {
 	mountEditor,
 	paste,
 	press,
-	summaries,
+	openRow,
 	type,
 	unmountAll,
 	type Mounted
@@ -80,8 +80,7 @@ const noteLeaf = (m: Mounted): HTMLElement =>
 /** The open first row's summary cell. */
 function summaryLeaf(m: Mounted): HTMLElement {
 	const jobs = field(m.target, 'Jobs');
-	summaries(jobs)[0].click();
-	flushSync();
+	openRow(jobs, 0);
 	return jobs.querySelector<HTMLElement>('[data-qm-prop="summary"] .ProseMirror')!;
 }
 

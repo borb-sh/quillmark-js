@@ -73,9 +73,13 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
 	 */
 	textCount: (count: number, max: number) => string;
 	/**
-	 * A collapsed array element with nothing to summarize itself by: the label and the
-	 * 1-based index, which is what its accessible name already says. Parametric, so
-	 * word order stays the translator's.
+	 * An `object` array element's title, open or collapsed: the 1-based index, the label
+	 * standing over the list already. Parametric, so word order stays the translator's.
+	 */
+	elementItem: (index: number) => string;
+	/**
+	 * An `object` array element's accessible name: the label and {@link elementItem},
+	 * so the words the row draws are inside the name it is spoken by.
 	 */
 	elementUntitled: (label: string, index: number) => string;
 
@@ -231,7 +235,8 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
 	textCount: (count, max) => `${count} / ${max}`,
-	elementUntitled: (label, index) => `${label} ${index}`,
+	elementItem: (index) => `Item ${index}`,
+	elementUntitled: (label, index) => `${label}, item ${index}`,
 	enumUnsetTag: 'Default',
 	enumUnsetTagNone: 'Unset',
 	matrixHeld: (held, total) => `${held} of ${total} held`,

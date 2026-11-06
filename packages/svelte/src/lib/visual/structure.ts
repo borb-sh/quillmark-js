@@ -531,10 +531,10 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
 	}
 }
 
-// ── Row summaries and layouts ────────────────────────────────────────────────
+// ── Short cells and layouts ──────────────────────────────────────────────────
 
 /**
- * Whether a cell is one line tall by declaration: what a table column and a row summary can hold.
+ * Whether a cell is one line tall by declaration: what a table column can hold.
  */
 export function shortCell(sub: QuillFieldSchema): boolean {
 	const kind = controlKind(sub);
@@ -558,11 +558,6 @@ function firstShortText(
 	});
 	if (!named) return undefined;
 	return titleText(own(values, named[0])).trim() || undefined;
-}
-
-/** A collapsed row's own words ({@link firstShortText}). */
-export function rowSummary(items: QuillFieldSchema | undefined, row: unknown): string | undefined {
-	return firstShortText(items?.properties, (row ?? {}) as Record<string, unknown>);
 }
 
 /** How an `array` draws its elements. */

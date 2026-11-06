@@ -46,10 +46,10 @@ describe('a landing at depth', () => {
 		// label leaf at the offset the compile resolved.
 		const label = tree[0].entries[1].label;
 		const appendix = outer.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(appendix.querySelector('.qm-element-title')?.textContent).toBe(tree[0].title);
+		expect(appendix.dataset.qmIndex).toBe('0');
 		const inner = repeater(appendix.querySelector('.qm-object')!);
 		const entry = inner.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(entry.querySelector('.qm-element-title')?.textContent).toBe(label);
+		expect(entry.dataset.qmIndex).toBe('1');
 		expect(entry.contains(document.activeElement)).toBe(true);
 		expect(caret()).toEqual({ text: label, offset: 3 });
 		// The wash marks the innermost row the address named, not the appendix around it.
@@ -88,9 +88,7 @@ describe('a landing at depth', () => {
 		expect(header.getAttribute('aria-expanded')).toBe('true');
 		const outer = field(mounted.target, fieldTitle('appendices', schema));
 		const open = outer.querySelector<HTMLElement>('.qm-element.open')!;
-		expect(open.querySelector('.qm-element-title')?.textContent).toBe(
-			appendixTree(q, doc)[1].title
-		);
+		expect(open.dataset.qmIndex).toBe('1');
 		expect(open.contains(document.activeElement)).toBe(true);
 		expect(washHost(mounted.target)).toBe(open);
 	});
