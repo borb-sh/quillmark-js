@@ -1,5 +1,5 @@
-// Node, no environment shim. `src/__tests__` is the bin's half, run against quivers
-// `helpers/collection.ts` copies out of the workspace's reference quiver; `app/__tests__` is
+// Node, no environment shim. `tests/` is the bin's half, run against quivers
+// `helpers/collection.ts` copies out of the workspace's reference quiver; `tests/app/` is
 // the app client's readings that need no browser. What a browser has to show is
 // `deploy.browser.test.ts`'s, over a deploy the built bin lays.
 //
@@ -13,6 +13,6 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	test: {
-		include: ['src/__tests__/**/*.test.ts', 'app/__tests__/**/*.test.ts']
+		include: ['tests/**/*.test.ts']
 	}
 });

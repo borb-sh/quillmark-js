@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { cp, rm, readFile, readdir } from 'node:fs/promises';
 import { join, sep } from 'node:path';
-import { Quiver, build, fromBuiltDir } from '../node.js';
+import { Quiver, build, fromBuiltDir } from '../src/node.js';
 import { mockQuillLoad } from './helpers/mock-engine.js';
 import { scratch } from './helpers/scratch.js';
 

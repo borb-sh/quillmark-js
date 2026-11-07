@@ -1,7 +1,8 @@
 // The type check, which reaches the tests that `tsconfig.json` keeps out of `dist`.
 //
 // The three configs come in with it: they run in Node, and `svelte-check` reads none of
-// them, the clients' program being `tsconfig.client.json`.
+// them, the clients' program being `tsconfig.client.json`. `tests/app/` reads the app's
+// modules, so it is that program's.
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
@@ -10,6 +11,6 @@
 		// files beside it come into the program.
 		"rootDir": "."
 	},
-	"include": ["src", "vitest.config.ts", "vite.config.ts", "vite.app.config.ts"],
-	"exclude": []
+	"include": ["src", "tests", "vitest.config.ts", "vite.config.ts", "vite.app.config.ts"],
+	"exclude": ["tests/app"]
 }

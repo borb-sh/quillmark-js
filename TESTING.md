@@ -6,4 +6,4 @@ A committed browser assertion takes one of two shapes. **Presence against absenc
 
 No assertion, browser or node, restates a value another file defines, such as a size, a color token, or a count of a fixture's fields: it fails on the next edit there, and the fix is pasting the new value.
 
-The one committed browser test is `packages/quillkit/src/__tests__/deploy.browser.test.ts`, which loads a built site through `scripts/browser.mjs`.
+The one committed browser test is `packages/quillkit/tests/deploy.browser.test.ts`, which loads a built site through `scripts/browser.mjs`.

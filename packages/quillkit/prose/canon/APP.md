@@ -26,7 +26,7 @@ Then the core wasm, the quiver and the store, with the font suite downloading be
 
 **A document is kept from its first edit**, saved after each settled burst and when the tab hides, so nothing typed is lost to a debounce. A blank form a reader looked at and left leaves nothing behind.
 
-**What is kept is markdown**: a record of the canonical markdown, the canonical ref it was made on, a title and an edit time. Markdown for the reason studio's import takes it (STUDIO §"The document has doors"): it reads as a file, re-conforms on the way in, and rides no coupling to the wasm's storage DTO. The record carries a shape version, and the suite holds records as shipped releases wrote them (`app/__tests__/fixtures/`), each of which must still open.
+**What is kept is markdown**: a record of the canonical markdown, the canonical ref it was made on, a title and an edit time. Markdown for the reason studio's import takes it (STUDIO §"The document has doors"): it reads as a file, re-conforms on the way in, and rides no coupling to the wasm's storage DTO. The record carries a shape version, and the suite holds records as shipped releases wrote them (`tests/app/fixtures/`), each of which must still open.
 
 **IndexedDB, one database per app**, keyed by the app's base URL so two apps on one origin never read each other's documents. A private window that refuses the store leaves the app working on the document in hand and saying it keeps nothing.
 

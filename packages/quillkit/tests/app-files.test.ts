@@ -9,10 +9,10 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fromDir, isDraft } from '@quillmark/quiver/node';
-import { APP_YAML, PROMISED, appRefs, readAppYaml, scanCss } from '../app-files.js';
+import { APP_YAML, PROMISED, appRefs, readAppYaml, scanCss } from '../src/app-files.js';
 import { scratch } from './helpers/collection.js';
 
-const THEMING = fileURLToPath(new URL('../../../svelte/THEMING.md', import.meta.url));
+const THEMING = fileURLToPath(new URL('../../svelte/THEMING.md', import.meta.url));
 
 const temp = scratch('quillkit-app-');
 afterEach(() => temp.cleanup());

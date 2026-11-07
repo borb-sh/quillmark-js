@@ -4,8 +4,8 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init, Engine } from '@quillmark/wasm';
-import { FAMILIES, LABELS, loadSuite } from '../node.js';
-import { loadSuite as fetchSuite } from '../index.js';
+import { FAMILIES, LABELS, loadSuite } from '../src/node.js';
+import { loadSuite as fetchSuite } from '../src/index.js';
 
 const core = await init();
 
@@ -17,15 +17,13 @@ interface Manifest {
 	}[];
 }
 const manifest: Manifest = JSON.parse(
-	await readFile(new URL('../../manifest.json', import.meta.url), 'utf8')
+	await readFile(new URL('../manifest.json', import.meta.url), 'utf8')
 );
 const faces = manifest.families.flatMap((f) =>
 	f.faces.map((face) => ({ family: f.name, ...face }))
 );
 
-const SHOWCASE = fileURLToPath(
-	new URL('../../../../fixtures/quills/showcase/1.0.0', import.meta.url)
-);
+const SHOWCASE = fileURLToPath(new URL('../../../fixtures/quills/showcase/1.0.0', import.meta.url));
 
 async function treeOf(root: string): Promise<Map<string, Uint8Array>> {
 	const tree = new Map<string, Uint8Array>();

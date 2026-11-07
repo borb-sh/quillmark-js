@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { unzipSync } from 'fflate';
-import { packFiles } from '../bundle.js';
-import { QuiverError } from '../errors.js';
+import { packFiles } from '../src/bundle.js';
+import { QuiverError } from '../src/errors.js';
 
 const enc = new TextEncoder();
 

@@ -7,8 +7,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { within } from '../paths.js';
-import { serialize, settle, watchCollection } from '../watch.js';
+import { within } from '../src/paths.js';
+import { serialize, settle, watchCollection } from '../src/watch.js';
 import { scratch } from './helpers/collection.js';
 
 describe('the watch filter', () => {
