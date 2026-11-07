@@ -4,86 +4,46 @@
 
 ## TL;DR
 
-`@quillmark/fonts` is the default host font library for every Quillmark client: a fixed set of openly licensed families, and a loader that answers them as `new Engine({ fonts })` takes them. Its promise is to stored documents. A `font_family` mark saves a family name, and any host that loads the suite sets that name the same way, so a document written in studio prints the same in an app, in the gate and in a third-party client. The engine, `@quillmark/quiver` and `App.yaml` know nothing of it: the suite is the value a client passes to the engine, and the faces the engine lists from it are what the editor's `fonts` prop takes.
+`@quillmark/fonts` is the default host font library for every Quillmark client: a fixed set of openly licensed families, and a loader that answers them as `new Engine({ fonts })` takes them. Its promise is to stored documents. A `font_family` mark saves a family name, and any host that loads the suite sets that name the same way, so a document written in studio prints the same in an app, in the gate and in a third-party client. The engine, `@quillmark/quiver` and `App.yaml` know nothing of it.
 
 ## The suite
 
-Eleven families, each under a licence that allows redistribution in an app, embedding in a PDF and subsetting under the family's own name: OFL 1.1 for eight, the GUST Font License for TeXGyreTermes and TeXGyreSchola, and the Bitstream Vera licence for DejaVu Sans. Each is in regular, italic, bold and bold italic, except Cinzel, which is drawn in capitals with no italic and ships regular and bold. The first five and TeXGyreSchola match the metrics of the Office fonts people paste from, so line breaks survive a move out of Word.
+The roster is `manifest.json`: each family's name, optional label, licence, upstream source, and per face its weight, style, file and hashes. Its family names are the package's public contract.
 
-| Family | Role |
-| --- | --- |
-| TeXGyreTermes | Times New Roman metrics |
-| Arimo | Arial and Helvetica metrics |
-| Cousine | Courier New metrics |
-| Caladea | Cambria metrics |
-| Gelasio | Georgia metrics |
-| Libertinus Serif | Typst's default text face |
-| Cinzel | inscriptional capitals for titles and certificates |
-| DejaVu Sans | wide humanist sans, the Linux desktop default |
-| Inter | screen-first UI sans |
-| JetBrains Mono | code monospace, for code blocks and listings |
-| TeXGyreSchola | Century Schoolbook metrics, the face court rules ask of briefs |
+What earns a family a place: metric compatibility with the Office fonts people paste from, so line breaks survive a move out of Word (Times New Roman, Arial, Courier New, Cambria, Georgia, Century Schoolbook), plus Typst's default text face, a display face, a UI sans and a code monospace. Each ships regular, italic, bold and bold italic where the design has them.
 
-**Family names are the engine's.** A family is listed under the name Typst reads from the face, which is the name a document saves and the name an upstream copy of the face is found by in any other client. TeX Gyre Termes is filed by Typst as `TeXGyreTermes`, so that is its name here, and TeX Gyre Schola as `TeXGyreSchola`. Where that name reads badly, the manifest gives the family an optional `label`, the name a picker shows; TeXGyreTermes shows as "Termes" and TeXGyreSchola as "Schola". A label is display only: the mark saves the family, and a label can change in any version.
+**Family names are the engine's.** A family is listed under the name Typst reads from the face, which is the name a document saves and the name an upstream copy of the face is found by in any other client. Where that name reads badly, the manifest gives a `label` for pickers; a label is display only and can change in any version.
 
-**Subset to Latin.** Each file holds the Latin range Google Fonts serves as `latin`, every layout feature and every name record kept, which brings the suite to about 2.6 MB where the full files are near 14 MB. A character outside the subset falls back to the surrounding font. DejaVu Sans's regular face also drops its `MATH` table, which would file it as a math face no mark can set text in, and whose math glyphs the subset has already cut.
+**Subset to Latin.** Each file holds the Latin range Google Fonts serves as `latin`, with every layout feature and name record kept, which cuts the suite to a fraction of the full files. A character outside the subset falls back to the surrounding font.
 
-**Every licence lets a subset keep its name.** A subset is a modified version under each licence the suite admits, so each must let a modified version keep the family's name:
+**Every licence must let a subset keep its name.** A subset is a modified version, so a family ships only under a licence that allows redistribution, PDF embedding and subsetting under the family's own name. An OFL family that reserves the name it ships under is therefore out. The admitted licences are OFL 1.1, the GUST Font License and the Bitstream Vera licence, and `check:fonts` holds each family to one.
 
-- **OFL 1.1** forbids a Modified Version to use a Reserved Font Name, so an OFL family ships only if it reserves no name it ships under. None of the eight reserves its own; Cinzel's licence reserves "Cinzel Decorative", a family the suite does not ship. Carlito (Calibri metrics) reserves "Carlito", and Source Serif 4 and Source Sans 3 reserve "Source", so they are out.
-- **The GUST Font License** is LPPL 1.3c with a request, not a requirement, that a modified font be renamed. TeXGyreTermes and TeXGyreSchola keep their names; their subset files carry names apart from upstream's, and the manifest records what each was cut from.
-- **The Bitstream Vera licence** requires renaming only a modified font whose name contains "Bitstream" or "Vera", which "DejaVu Sans" does not.
-
-Noto CJK is tens of MB a weight, and New Computer Modern, also under the GUST licence, is left to Libertinus for the academic look.
+Left out on purpose: Carlito and the Source families, whose licences reserve the names they ship under; Noto CJK, at tens of MB a weight; and New Computer Modern, whose academic look Libertinus already covers.
 
 ## Package shape
 
-- **`files/`**: one subset TTF or OTF a face, named `<Family>-<Style>.<sha256:16>.<ttf|otf>` after the outlines it holds, and each family's licence text as `<Family>-<Licence>.txt`, which each licence requires beside the files.
-- **`manifest.json`**: per family, its name, its optional label, SPDX licence id, licence file and upstream source, a repository at a commit or a release archive; per face, its CSS weight and style, its file and sha256, and the upstream file and sha256 it was subset from. The list of family names is the package's public contract.
-- **The main entry**: `loadSuite(): Promise<Uint8Array[]>` fetches every face through `new URL(file, import.meta.url)`, which Vite and webpack 5 emit as hashed static assets with no plugin. The hashed names make every visit after the first a cache hit.
-- **`/node`**: the same loader reading the files off disk, for a test, a server render or a gate. It mirrors `@quillmark/quiver`'s split between a browser-pure entry and a `/node` one, and neither imports the other.
-- **`FAMILIES`** and **`LABELS`**: the family names, and the label of each family the manifest gives one, from both entries.
+- **`files/`**: one subset TTF or OTF a face, named after a hash of its outlines, and each family's licence text beside its files.
+- **The main entry**: `loadSuite(): Promise<Uint8Array[]>` fetches every face through `new URL(file, import.meta.url)`, which Vite and webpack emit as hashed static assets with no plugin. `src/suite.ts` is written from the manifest, one literal a face, since a bundler emits an asset only for a literal it can read.
+- **`/node`**: the same loader reading the files off disk, for a test, a server render or a gate, mirroring `@quillmark/quiver`'s browser and `/node` split.
+- **`FAMILIES`** and **`LABELS`** from both entries.
 
-`src/suite.ts` is written from the manifest, one `new URL` literal a face, since a bundler emits an asset only for a literal it can read. A client writes `new Engine({ fonts: [...(await loadSuite()), ...extras] })` and hands the editor `engine.fontFaces(quill)` and `LABELS`.
+A client writes `new Engine({ fonts: [...(await loadSuite()), ...extras] })` and hands the editor `engine.fontFaces(quill)` and `LABELS`.
 
 ## Rules
 
 A family name in the suite is a promise to every document that uses it, so the package changes only in ways that keep an old document rendering the same.
 
-- **Append-only within a line.** A family is removed or renamed only in a breaking version, where the leading nonzero component of the version moves: a major, or a minor while the major is 0. Removing one sets every run that names it in the surrounding font, with a `typst::unknown_font_family` warning.
-- **Pinned bytes.** A face's file changes only in a breaking version, since new metrics or a new subset can reflow a stored document. Adding a family is not breaking.
-- **TTF/OTF only.** The engine's library refuses WOFF and WOFF2 (`engine::font_unsupported`), so the package never ships them.
-- **A check enforces it.** `check:fonts` (`scripts/check-fonts.mjs`) holds every file to its manifest hash and its name, reads its format off its magic and holds its extension to it, holds each family to an admitted licence with its text beside its files and `src/suite.ts` to the manifest. Run where a release is cut, with `--published`, it also holds the family list and every published face's bytes against the registry's latest release, unless the version being cut breaks from it.
+- **Append-only within a line.** A family is removed or renamed only in a breaking version. Adding one is not breaking.
+- **Pinned bytes.** A face's file changes only in a breaking version, since new metrics or a new subset can reflow a stored document.
+- **TTF/OTF only.** The engine refuses WOFF and WOFF2.
+- **A check enforces it.** `check:fonts` (`scripts/check-fonts.mjs`) holds every file to its manifest hash, name and format, each family to an admitted licence with its text beside it, and `src/suite.ts` to the manifest. With `--published` at release, it also holds the family list and every face's bytes against the latest release unless the version breaks from it.
 
 ## Size and loading
 
-The engine reads its whole library when it first loads a Typst backend and never grows it, so the suite sits on the path to the first page, and never to the form, which stands on the core alone. A client starts `loadSuite()` at boot, beside the core and the quiver, and builds its engine over it.
-
-- **One download serves both sides.** `engine.fontFaces` hands the editor the same bytes for the browser's `FontFace`.
-- **Served compressed.** With no WOFF2, a host serves the files with brotli, which roughly halves them; their immutable hashed names make a repeat visit free.
+The engine reads its whole library when it first loads a Typst backend, so the suite sits on the path to the first page and never to the form. A client starts `loadSuite()` at boot, beside the core and the quiver. One download serves both sides, since `engine.fontFaces` hands the editor the same bytes. With no WOFF2, a host serves the files with brotli; the immutable hashed names make a repeat visit free.
 
 ## Boundaries
 
-The font library belongs to the client that builds the engine, never to the content it opens.
+The font library belongs to the client that builds the engine, never to the content it opens. The engine embeds no suite; a quiver carries none; a quill's own fonts set its plate and travel in its bundle; `App.yaml` names the app and nothing else. Studio, the app, the playground and `quillkit check` all build their engine over this suite, so the gate renders as the clients do.
 
-| Piece | Role in fonts |
-| --- | --- |
-| quillmark engine | takes whatever library the host passes and embeds no suite |
-| `@quillmark/quiver` | carries no `fonts/`, no `quiver.json` field, no format change |
-| quill fonts | set the plate, ride inside each `.quill` bundle, never a writer's choice |
-| `App.yaml` | names the app and nothing else |
-| `@quillmark/svelte` | the editor's `fonts` prop takes the faces the engine lists, and `fontLabels` the suite's labels |
-| studio, the app, the playground | build the engine over `loadSuite()` |
-| `quillkit check` | renders over the `/node` suite, as the clients it gates do |
-| quillmark CLI | renders with `--font`; parity with the browser is passing this package's files |
-
-**Extras are each host's own.** A host appends files to the `fonts` array after the suite. A third-party client opening the same quiver does not get them, and a document using them falls back with a warning, so the suite is the only portable promise. A quillkit project-level `fonts/` folder, read as `app.css` is and served to studio and the app alike, waits for a request.
-
-## Not
-
-Not a font picker: the editor draws one over the faces it is handed. Not a quill's fonts: those set a plate and travel in its bundle. Not a CDN: the files ride with the client that bundles them.
-
-## Links
-
-- [`@quillmark/svelte` HOSTING.md](../../../svelte/prose/canon/HOSTING.md): the library arriving behind the editor.
-- [quillkit QUILLKIT.md](../../../quillkit/prose/canon/QUILLKIT.md): the one pin the gate and the clients share.
+**Extras are each host's own.** A host appends files after the suite, but a third-party client opening the same quiver does not get them, and a document using them falls back with a warning. The suite is the only portable promise.

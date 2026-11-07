@@ -9,9 +9,9 @@
 //
 // A rule declines only where what it would mint is unrepresentable, or is a shape
 // another gesture owns — never on how a quill renders it. What a quill typesets is not
-// knowable here (a quill this build has not seen is the open-sets case, CODEC §"Open
-// sets"), and a construct that arrives through `importMarkdown` must stay authorable or
-// a document opens carrying a shape the editor refuses to make. So one rule answers
+// knowable here (a quill this build has not seen is the open-sets case,
+// CODEC §Vocabularies), and a construct that arrives through `importMarkdown` must stay
+// authorable or a document opens carrying a shape the editor refuses to make. So one rule answers
 // otherwise: `- ` / `1. ` at the head of an existing item retypes the item's list, where
 // a wrap would nest and Tab owns the nesting. A marker the item already shows, and `a. `,
 // `(1) `, `(a) ` in a nested item, are taken as typed and change nothing.

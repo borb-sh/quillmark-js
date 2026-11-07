@@ -1025,7 +1025,7 @@ function ghostPlugin(opts: {
  * body's structural keys; Enter suppressed inline.
  *
  * Tab forks on the leaf's role: a one-line or `text` leaf is a form field, Tab unbound so field
- * navigation is open for a shell keymap (VISUAL_EDITOR §Settled and open); a block-schema body
+ * navigation is open for a shell keymap (VISUAL_EDITOR §Chrome); a block-schema body
  * takes Tab structurally, a chain each nested surface prepends to (`keymap.ts`).
  */
 function editorKeymap(schema: Schema, inline: boolean, slash?: boolean): Record<string, Command> {
