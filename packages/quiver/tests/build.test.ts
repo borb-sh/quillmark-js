@@ -3,8 +3,8 @@ import { mkdir, writeFile, readFile, access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { unzipSync } from 'fflate';
-import { buildQuiver } from '../build.js';
-import { FORMAT } from '../format.js';
+import { buildQuiver } from '../src/build.js';
+import { FORMAT } from '../src/format.js';
 import { scratch } from './helpers/scratch.js';
 
 /** An OpenType signature and then `tail`: bytes the build takes as a font. */

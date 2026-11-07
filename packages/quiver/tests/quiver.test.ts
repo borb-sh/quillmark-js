@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { fromDir } from '../node.js';
+import { fromDir } from '../src/node.js';
 import { mockQuillLoad } from './helpers/mock-engine.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;

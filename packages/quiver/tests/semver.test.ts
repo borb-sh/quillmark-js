@@ -5,7 +5,7 @@ import {
 	compareSemver,
 	isDraft,
 	MIN_PUBLISHED_VERSION
-} from '../semver.js';
+} from '../src/semver.js';
 
 describe('isCanonicalSemver', () => {
 	it.each(['1.0.0', '0.0.0', '10.20.30', '0.0.1'])('accepts %s', (v) =>

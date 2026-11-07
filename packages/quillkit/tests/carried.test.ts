@@ -13,10 +13,10 @@ import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { carried } from '../../../../scripts/carried.mjs';
+import { carried } from '../../../scripts/carried.mjs';
 import { scratch } from './helpers/collection.js';
 
-const WORKSPACE = fileURLToPath(new URL('../../../..', import.meta.url));
+const WORKSPACE = fileURLToPath(new URL('../../..', import.meta.url));
 const WORKSPACE_MODULES = join(WORKSPACE, 'node_modules');
 
 const files = scratch('quillkit-carried-');

@@ -27,7 +27,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init, Engine } from '@quillmark/wasm';
-import { build, fromBuiltDir, fromDir } from '../node.js';
+import { build, fromBuiltDir, fromDir } from '../src/node.js';
 import { scratch } from './helpers/scratch.js';
 
 const core = await init();
@@ -40,7 +40,7 @@ const RENDER_FIXTURE = fileURLToPath(new URL('./fixtures/render-quiver', import.
 // The workspace's reference quiver: `showcase@1.0.0`, a published-shape quill with a
 // Typst package tree, an image asset, and five fonts its bundle carries; beside it
 // `usaf_memo@0.0.0`, which a build leaves out as a draft.
-const REFERENCE_QUIVER = fileURLToPath(new URL('../../../../fixtures', import.meta.url));
+const REFERENCE_QUIVER = fileURLToPath(new URL('../../../fixtures', import.meta.url));
 
 describe('Engine.render against a quiver quill', () => {
 	it('renders a fixture quill, and clones it on render — the same handle renders twice', async () => {

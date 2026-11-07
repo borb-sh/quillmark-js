@@ -19,15 +19,15 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { APP_JSON, APP_YAML } from '../app-files.js';
-import { DEFAULT_TARGET, TARGETS } from '../deploy.js';
+import { APP_JSON, APP_YAML } from '../src/app-files.js';
+import { DEFAULT_TARGET, TARGETS } from '../src/deploy.js';
 import { scratch } from './helpers/collection.js';
 
 const run = promisify(execFile);
 
 /** The bin as npm links it, not the TypeScript behind it. */
-const BIN = fileURLToPath(new URL('../../dist/bin/quillkit.js', import.meta.url));
-const MANIFEST = fileURLToPath(new URL('../../package.json', import.meta.url));
+const BIN = fileURLToPath(new URL('../dist/bin/quillkit.js', import.meta.url));
+const MANIFEST = fileURLToPath(new URL('../package.json', import.meta.url));
 
 /** A real Typst backend load and one page compiled. */
 const RENDER_MS = 120_000;

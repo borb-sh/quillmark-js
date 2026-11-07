@@ -4,11 +4,11 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { filesReader, httpReader, loadBuiltQuiver } from '../built-loader.js';
-import type { ArtifactReader } from '../built-loader.js';
-import { packFiles } from '../bundle.js';
-import { QuiverError } from '../errors.js';
-import { FORMAT } from '../format.js';
+import { filesReader, httpReader, loadBuiltQuiver } from '../src/built-loader.js';
+import type { ArtifactReader } from '../src/built-loader.js';
+import { packFiles } from '../src/bundle.js';
+import { QuiverError } from '../src/errors.js';
+import { FORMAT } from '../src/format.js';
 import { mockQuillLoad } from './helpers/mock-engine.js';
 
 // The Quiver load path is private (`getQuill` → the loader). To observe the
