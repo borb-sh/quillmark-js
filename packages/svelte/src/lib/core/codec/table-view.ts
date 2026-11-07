@@ -1867,7 +1867,7 @@ class TableIslandView implements NodeView {
 			},
 			// Escape climbs a rung a press: the caret's row (the keyboard's only route to a held
 			// rectangle), then the island. What a press past the island means is the shell's
-			// (VISUAL_EDITOR §"Settled and open").
+			// (VISUAL_EDITOR §Chrome).
 			Escape: () => {
 				if (this.selected) this.selectIsland();
 				else this.selectLine({ axis: 'row', index: r });
