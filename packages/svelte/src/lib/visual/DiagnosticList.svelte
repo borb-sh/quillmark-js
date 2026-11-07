@@ -1,5 +1,5 @@
 <!--
- Inline diagnostic display (VISUAL_EDITOR §Diagnostics). Errors only, non-gating:
+ Inline diagnostic display (INVARIANTS §Diagnostics). Errors only, non-gating:
  purely additive, never disables the field it sits under. Shared by `Field.svelte`
  (a scalar/prose field) and `Card.svelte` (the body leaf, which has no
  `Field.svelte` wrapper), so a card's body diagnostics render the same way a

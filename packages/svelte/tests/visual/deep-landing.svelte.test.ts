@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// A landing resolves the whole path through nested rows (VISUAL_EDITOR §Surface): the
+// A landing resolves the whole path through nested rows (INVARIANTS §Surface): the
 // ladder reads every step past the field against the schema, each rung opens what it
 // names and hands the rest down, the arrival wash blooms the innermost row, and a
 // diagnostic anchored at a nested leaf draws at the nearest cell the tree holds.

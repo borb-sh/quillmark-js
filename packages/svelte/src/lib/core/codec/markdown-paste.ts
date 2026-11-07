@@ -1,5 +1,5 @@
-// Markdown on the clipboard as text lands parsed in a block leaf (CODEC §"Markdown at the
-// edges"). A line opening a block is the shape a draft written in Notepad or copied out of
+// Markdown on the clipboard as text lands parsed in a block leaf (INVARIANTS §"Markdown at
+// the edges"). A line opening a block is the shape a draft written in Notepad or copied out of
 // an LLM chat carries, and text holding one runs through `importMarkdown` and `decode`, so
 // the paste stores what the source editor stores of the same text. Text holding none stays
 // literal: a sentence with a dash in it, or a `**` with no block around it, keeps every

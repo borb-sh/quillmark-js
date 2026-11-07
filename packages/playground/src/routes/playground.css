@@ -2,8 +2,8 @@
    carries: `@quillmark/svelte/preset` is the endorsed page scale, imported in
    `+layout.svelte`, and the app reads `--qmh-*` throughout. What survives here is the
    app's own (a page maximum, a display run, a demo frame's height), which no consumer
-   mounting a surface has and no preset should ship (PLAYGROUND.md is the language; the
-   recipes are `routes/chrome.css`).
+   mounting a surface has and no preset should ship (svelte/INVARIANTS §"The
+   playground" is the language; the recipes are `routes/chrome.css`).
 
    Literals live here and nowhere else under `src/routes`: `check:style` runs its axes
    over this scope too, with this file exempt as the place these defaults are minted. A

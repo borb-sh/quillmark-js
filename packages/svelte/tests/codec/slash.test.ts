@@ -159,7 +159,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 	});
 });
 
-// Every caret-placing command scrolls the minimum (VISUAL_EDITOR §"Focus and the preview bridge"), and a
+// Every caret-placing command scrolls the minimum (INVARIANTS §"Focus and the preview bridge"), and a
 // pick is one: a heading or a fence opened at the fold would otherwise sit under it.
 describe('a pick scrolls the caret it places into view', () => {
 	it.each(['heading', 'list', 'quote', 'code', 'table'])('`/%s`', (name) => {

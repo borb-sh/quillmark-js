@@ -25,12 +25,12 @@
   server and over `quillkit serve`'s event stream otherwise, and is answered by
   minting a fresh `Quiver`: a repack writes a new `quiver.json`, and the quill cache
   lives as long as the quiver does, so the quiver is dropped rather than invalidated.
-  The document crosses (STUDIO §"The document survives the quill"), which is what
+  The document crosses (INVARIANTS §"The document survives the quill"), which is what
   makes an edit to a schema an edit to the thing the author is holding.
 
   Studio stores no document, so a boot is a seed or the quill's example and a reload is
   the reseed: the carry is what keeps an edited `default:` off a field the document
-  holds, and F5 is what puts it back (STUDIO §"The document is the blueprint's"). What
+  holds, and F5 is what puts it back (INVARIANTS §"The document is the blueprint's"). What
   outlives a boot is which quill, in the URL, since a link names it (`link.ts`), and
   whether a quill opens on its example, in the browser, since it is the author's habit
   rather than the link's (`examples.ts`).
@@ -208,7 +208,7 @@
 	/**
 	 * Land `text` as the document, which is the repack's carry with a different source.
 	 * Resolves to what refused it, or to `undefined` once it is mounted. The file names its
-	 * own quill and is believed (STUDIO §"The document has doors").
+	 * own quill and is believed (INVARIANTS §"The document has doors").
 	 */
 	async function applyMarkdown(text: string): Promise<string | undefined> {
 		let at = picked;
@@ -304,7 +304,7 @@
 	}
 
 	// The address bar names the quill on screen, whichever way it got there
-	// (STUDIO §"Opened, not stood on"). It waits on a quill so it does not clear the URL
+	// (INVARIANTS §"Opened, not stood on"). It waits on a quill so it does not clear the URL
 	// before the boot has read it.
 	$effect(() => {
 		if (picked) sayRef(`${picked.name}@${picked.version}`);
@@ -493,7 +493,7 @@
 			disabled={busy}
 			onclick={toggleExamples}>Examples</button
 		>
-		<!-- The document's two doors (STUDIO §"Opened, not stood on"). The source goes both
+		<!-- The document's two doors (INVARIANTS §"Opened, not stood on"). The source goes both
 		     ways through the panel; the file goes one way and needs none, so the press is
 		     the whole of it. -->
 		<button
@@ -582,7 +582,7 @@
 					{#if halt}
 						<!-- A document that reaches no paint is a state of the paint, not a row under
 						     it: the failure at the surface it is about, carrying the place to open
-						     (STUDIO §"The errors"). The label says which it stands over: a stale
+						     (INVARIANTS §"The errors"). The label says which it stands over: a stale
 						     paint, none, a paint an editor error may have left behind the editor, or
 						     a paint that is whole and would not be written out. -->
 						<div class="stalled" data-testid="stalled" role="status">

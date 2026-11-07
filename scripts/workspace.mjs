@@ -1,6 +1,6 @@
 // The workspace's shape, for the gates that read it: where the root is, what the
-// packages are, where canon lives, and how a gate reports. Stated once, so three
-// scripts cannot disagree about the answer.
+// packages are, and how a gate reports. Stated once, so the scripts cannot disagree
+// about the answer.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';

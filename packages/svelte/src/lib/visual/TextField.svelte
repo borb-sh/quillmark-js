@@ -9,7 +9,7 @@
  default taken, whatever the edit left of it. Tabbing through writes nothing; a
  keystroke typed and removed pins the default.
 
- An emptied input writes what empty means for this field (VISUAL_EDITOR §"The
+ An emptied input writes what empty means for this field (INVARIANTS §"The
  commitment ladder"): `""` over a default that prints, the only answer that prints empty there;
  the unset rung elsewhere, where unset already prints nothing and the field stays
  unanswered, and an optional cell returns to `none`.

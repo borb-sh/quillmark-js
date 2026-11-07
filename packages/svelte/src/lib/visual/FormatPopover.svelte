@@ -1,5 +1,5 @@
 <!--
- The formatting selection popover (VISUAL_EDITOR §Chrome). One popover,
+ The formatting selection popover (INVARIANTS §Chrome). One popover,
  shell-owned, observing the active leaf through
  `getActiveLeaf`: the VisualEditor's accessor over its `leaves` registry, and
  the whole of what this surface knows about the editor. The active leaf is a

@@ -2,7 +2,7 @@
  * `build`: a target laid out for a static host. Every target lays the whole packed quiver
  * at `quiver/`; `studio` and `app` lay their client at the root beside it, which is where
  * each client looks (`document.baseURI`), and `app` lays `app.json` and the author's files
- * too (QUILLKIT §"The deploy layout").
+ * too (INVARIANTS §"The deploy layout").
  */
 
 import { existsSync } from 'node:fs';
@@ -38,7 +38,7 @@ interface LayOptions {
 	root: string;
 	/** The deploy's root, owned outright: cleared before it is written. */
 	out: string;
-	/** Pack the draft space too (QUIVER §"The draft floor"). */
+	/** Pack the draft space too (quiver/INVARIANTS §"The draft floor"). */
 	drafts?: boolean;
 	/** Defaults to the client the target ships; the suite passes a stub. */
 	client?: string;

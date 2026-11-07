@@ -105,7 +105,7 @@ export function addrForFieldPath(path: DocPath): Addr | undefined {
  * The nearest ancestor a commit address can name: {@link addrForFieldPath} where the path has one,
  * else the root and its first field (`main.contact.email` and `main.keywords[0]` land on their
  * field). `undefined` for a field-rooted (config-space) or malformed path. An `Addr` reaches a root
- * and one field, so the truncation is a consumer's to make (VISUAL_EDITOR §Diagnostics).
+ * and one field, so the truncation is a consumer's to make (INVARIANTS §Diagnostics).
  */
 export function nearestAddrForFieldPath(path: DocPath): Addr | undefined {
 	const segs = segsOf(path);

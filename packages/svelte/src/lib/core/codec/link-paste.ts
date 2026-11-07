@@ -1,4 +1,4 @@
-// A URL pasted over a selection links it (CODEC §"Markdown at the edges"). Selecting words
+// A URL pasted over a selection links it (INVARIANTS §"Markdown at the edges"). Selecting words
 // and pasting an address is how a writer links them in every editor they have used, and
 // the words are what they meant to keep.
 import type { MarkType } from 'prosemirror-model';

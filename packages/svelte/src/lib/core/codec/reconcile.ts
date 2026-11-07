@@ -1,4 +1,4 @@
-// Reconciliation: the field-scoped external-change gate (CODEC §Reconciliation).
+// Reconciliation: the field-scoped external-change gate (INVARIANTS §Reconciliation).
 // The content normalizes on write, so `decode ∘ lower` is idempotent only up to
 // normalization: the optimistic PM state and the re-decoded stored content agree
 // after normalize, not byte-for-byte. So the field holds its PM state and

@@ -1,6 +1,6 @@
 <!--
  An `enum` declaring `variants:` → the discriminant's select, and under it the cells
- the chosen world brings into play (VISUAL_EDITOR §"Enum variants"). The field rests as
+ the chosen world brings into play (INVARIANTS §Enums). The field rests as
  a container, `{value: <member>, …that member's fields}`, and commits whole: it is one
  cell to `Addr`, so there is no per-cell write address.
 

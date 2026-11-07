@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Object panels (VISUAL_EDITOR §"Structure mirrors the schema"): the reference quill's
+// Object panels (INVARIANTS §"Structure mirrors the schema"): the reference quill's
 // `credits` kind declares no `ui.groups`, so each top-level object is a panel,
 // headed by the object, and everything else stands unframed above them.
 import { describe, it, expect, afterEach } from 'vitest';

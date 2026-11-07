@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// An object alone in its group (VISUAL_EDITOR §"Structure mirrors the schema"): the
+// An object alone in its group (INVARIANTS §"Structure mirrors the schema"): the
 // reference quill's `imprint` draws no label and no figure of its own; the section
 // header names it and carries its description.
 import { describe, it, expect, afterEach } from 'vitest';

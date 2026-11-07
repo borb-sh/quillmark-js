@@ -1,5 +1,5 @@
 // Alt+↑/↓ in a list moves the caret's item past the item beside it, its sub-items going
-// with it: the twin of an array row's move and a table line's (VISUAL_EDITOR §Chrome).
+// with it: the twin of an array row's move and a table line's (INVARIANTS §Chrome).
 // A selection across items of one list moves them together. The number an item draws
 // is its position, so a move renumbers and writes nothing else. At the list's edge the
 // key declines: an item leaving its list is a different edit.

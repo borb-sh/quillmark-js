@@ -140,7 +140,7 @@ describe('an array of `text`', () => {
 
 	// The landing is the row's, not the field's: a `text` element rides the same
 	// lowering a `richtext` one does, so the compile answers it cluster-exact and the
-	// element lane carries the offset down (VISUAL_EDITOR.md §Surface).
+	// element lane carries the offset down (INVARIANTS §Surface).
 	it('lands a caret at the offset the compile resolved, counting by code point', async () => {
 		const q = quill();
 		const doc = example();

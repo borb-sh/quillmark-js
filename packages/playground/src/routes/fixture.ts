@@ -1,5 +1,5 @@
 // The playground's quills come from a built quiver served under `/quiver/`, packed by
-// `packages/playground/scripts/build-quiver.mjs` (PLAYGROUND §"Quiver, not bundler"). One `Quiver`
+// `packages/playground/scripts/build-quiver.mjs` (svelte/INVARIANTS §"Every quill comes from a quiver"). One `Quiver`
 // serves the page, so routes share its quill cache across client-side navigation.
 import { Quiver } from '@quillmark/quiver';
 import { resolve } from '$app/paths';
@@ -18,7 +18,7 @@ function quiver(): Promise<Quiver> {
 	}));
 }
 
-/** Every quill the served quiver holds (PLAYGROUND §"Which quill, and what is seeded into it"). */
+/** Every quill the served quiver holds (README §Routes). */
 export async function fixtureNames(): Promise<string[]> {
 	return (await quiver()).quillNames();
 }

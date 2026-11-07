@@ -1,4 +1,4 @@
-// The Svelte 5 forms (ARCHITECTURE §"Core vs chrome"): where Svelte 5 names a successor to a
+// The Svelte 5 forms (svelte/INVARIANTS §"Core vs chrome"): where Svelte 5 names a successor to a
 // Svelte 4 idiom, the successor is what the code writes. Forced runes mode holds half of it —
 // `export let`, `$:`, `$$props`, `$$restProps` and the `beforeUpdate` pair are compile errors,
 // so the compiler is their gate and this one does not restate them. The rest still compile,
@@ -29,7 +29,7 @@ import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { ROOT, filesUnder, packages, report } from './workspace.mjs';
 
-const DOC = 'ARCHITECTURE §"Core vs chrome"';
+const DOC = 'svelte/INVARIANTS §"Core vs chrome"';
 
 /** Each form, the files it is looked for in, and whether a component's markup alone is read. */
 const RULES = [

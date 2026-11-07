@@ -2,7 +2,7 @@
 /**
  * The quill author's toolchain, one bin over the whole lifecycle: verbs are its steps and a
  * verb's argument is a target, `quiver`, `studio` or `app`, studio where none is named
- * (QUILLKIT §"Verbs and targets"). `usage()` below is the spelling of every verb and its
+ * (INVARIANTS §"Verbs and targets"). `usage()` below is the spelling of every verb and its
  * flags. The quiver is the working directory.
  */
 
@@ -19,7 +19,7 @@ import { serialize, watchCollection } from '../watch.js';
 
 const HOST = 'localhost';
 /** What the loop's stream says after each repack lands. Studio answers it with the carry
- *  it answers the dev server's signal with (STUDIO §"The document survives the quill"). */
+ *  it answers the dev server's signal with (INVARIANTS §"The document survives the quill"). */
 const REPACKED = 'repacked';
 /** The live loop's port, and a built deploy's beside it, so both can run at once. */
 const PORTS = { serve: 5174, preview: 4174 };
@@ -145,7 +145,7 @@ async function build(args: string[]): Promise<void> {
 /**
  * The local loop: pack the quiver into a served tree, serve the target's client over it,
  * and repack when the source changes. It always packs the drafts, being the author looking
- * at their own quiver (QUILLKIT §"The local loop").
+ * at their own quiver (INVARIANTS §"The local loop").
  */
 async function serve(args: string[]): Promise<void> {
 	const parsed = parse('serve', args, { values: ['--port'], switches: ['--open'], words: 1 });
@@ -219,7 +219,7 @@ function builtTarget(dir: string): Target {
 }
 
 /** A built deploy, served as a static host serves it: at the root, a missing path a 404, and
- *  the host's cache rules on every response (QUILLKIT §"The deploy layout"). */
+ *  the host's cache rules on every response (INVARIANTS §"The deploy layout"). */
 async function preview(args: string[]): Promise<void> {
 	const parsed = parse('preview', args, {
 		values: ['--out', '--port'],

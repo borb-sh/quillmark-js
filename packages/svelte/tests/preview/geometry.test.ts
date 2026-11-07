@@ -91,7 +91,7 @@ describe('geometry: synthetic round-trip', () => {
 describe('geometry: against a real compiled session (showcase)', () => {
 	it('every fieldBoxes rect round-trips through positionAt back to its own field, somewhere in the box', () => {
 		// Not the box's geometric center: fieldBoxes unions same-page segments into
-		// one rect (PREVIEW.md), so a field whose content is two non-adjacent lines
+		// one rect, so a field whose content is two non-adjacent lines
 		// (e.g. main.body: two disjoint line segments with a real vertical gap between
 		// them) has a bounding box whose center falls in that gap, off any ink.
 		const fieldNames = new Set(showcase.regions().map((r) => r.field));
@@ -246,7 +246,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 
 	it('regions a matrix member at its own address, unticked or added, and a cell under it', () => {
 		// A member's address is its tick, so a click on any row the roster prints lands on
-		// the tick the row stands for (VISUAL_EDITOR §"The matrix").
+		// the tick the row stands for (INVARIANTS §"The matrix").
 		const fields = new Set(showcase.regions().map((r) => r.field));
 		for (const field of [
 			'main.checks.fonts',
@@ -301,7 +301,7 @@ describe('geometry: the addresses a compile serves (showcase)', () => {
 		// The nested-row address a landing has to resolve through, and the reason the
 		// fixture declares a content cell in a row at all: a content value carries its own
 		// spans, so it regions wherever a plate places it, while a scalar's address is the
-		// read path's and the codegen tracks a literal one only (PREVIEW.md §"Click bridge").
+		// read path's and the codegen tracks a literal one only (INVARIANTS §"Click bridge").
 		// The plate loops, so `note` and `pages` reach the preview through the array and
 		// `detail` reaches it as its own row; `pages` is the row's one scalar.
 		const session = await open((doc) =>

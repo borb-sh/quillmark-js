@@ -461,7 +461,7 @@ function sinkIntoList(itemType: NodeType): Command {
  * no list nodes.
  *
  * `Tab` / `Shift-Tab` hold the list link of the body's Tab chain; surfaces owning Tab more locally
- * prepend a link in `keymap.ts` (`prose/canon/VISUAL_EDITOR.md` §Chrome). `Tab` sinks an unnumbered
+ * prepend a link in `keymap.ts` (INVARIANTS §Chrome). `Tab` sinks an unnumbered
  * line alone into a sub-list, any other line its whole item, and a block right after a list into
  * the list's last item. `Mod-Shift-7` / `Mod-Shift-8` are the list toggle (`list-toggle.ts`).
  * `Mod-Enter` ticks the task item around the caret (`toggleTask`).

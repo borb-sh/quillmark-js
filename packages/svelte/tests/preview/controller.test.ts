@@ -41,7 +41,7 @@ describe('preview controller empty-state across page-count transitions', () => {
 	});
 });
 
-// `refresh` re-asks `locate` for the followed caret (PREVIEW §"Follow-the-caret scroll"); jsdom has
+// `refresh` re-asks `locate` for the followed caret (INVARIANTS §"Follow-the-caret scroll"); jsdom has
 // no geometry, so the query is asserted, not a scrollTop.
 describe('a recompile re-locates the followed caret', () => {
 	let located: Array<[string, number]>;

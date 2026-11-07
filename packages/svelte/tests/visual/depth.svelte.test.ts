@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-// The mirror reaching the schema's depth (VISUAL_EDITOR §"Structure mirrors the
-// schema"). A nested `array` or `object` property mounts its own control at the next
+// The mirror reaching the schema's depth (INVARIANTS §"Structure mirrors the schema"). A nested `array` or `object` property mounts its own control at the next
 // rung, and the figure it draws is the same one at every depth: collapsed rows, a subform under each.
 // Driven off the reference quill's `appendices` — an `array<object<array<object>>>` —
 // and off the variant cell `distribution.embargoed.notices`, read back through the
@@ -146,7 +145,7 @@ describe('a nested array property', () => {
 		// The capacity ladder is CSS's (`.qm-tracks`, controls.css) and jsdom computes no
 		// layout, so what is checkable here is the shape the rules key on: every subform
 		// carries the recipe class on its grid, and no subform draws the section's count
-		// by inheriting it. What `container-type` then does is the browser's (PLAYGROUND
+		// by inheriting it. What `container-type` then does is the browser's (playground/README
 		// §"Reaching it from source").
 		const q = quill();
 		const mounted = mountEditor(q, example());

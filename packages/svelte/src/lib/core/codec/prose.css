@@ -147,7 +147,7 @@ li.ProseMirror-selectednode::after {
 	pointer-events: none;
 }
 
-/* A footnote and an equation are read, not edited (CODEC §Decode), and draw as what
+/* A footnote and an equation are read, not edited (INVARIANTS §Decode), and draw as what
    their markdown writes: a footnote its reference mark, numbered in reading order off a
    counter each leaf resets, its note the marker's title (`islands.ts`); an equation its
    TeX between its dollars, in the code face. */
@@ -589,7 +589,7 @@ li.ProseMirror-selectednode::after {
 	top: 100%;
 	height: var(--_qm-tap-min);
 }
-/* The reveal is the control's own (CODEC §"The table island"): one comes up while the
+/* The reveal is the control's own (INVARIANTS §"The table island"): one comes up while the
    pointer is on that control, or while it is what a gesture is about — the selected line's grip, and the lifted one, which is drawn through a drag the
    pointer has travelled off. A cell under the pointer draws its row's and its column's
    grips (`table-view.ts` §`onHover`), one pill on each axis and none anywhere else.
@@ -651,7 +651,7 @@ li.ProseMirror-selectednode::after {
    first row, the band's top edge being the grips'. Up only while its column is held and
    absent otherwise (`table-view.ts` §`alignCluster`), so the reveal is `hidden` rather
    than the band's opacity. It is a row of glyphs floating over text, the format popover's
-   family (ARCHITECTURE §Styling), and takes that recipe: the popover's translucent
+   family (INVARIANTS §Styling), and takes that recipe: the popover's translucent
    surface over a blur, the edge and `--_qm-lift` for its separation, and a scale-in on
    arrival, stated from its starting style since the codec shows it by clearing
    `hidden`. Its geometry is the popover's too, a row of toggles held one rung in from

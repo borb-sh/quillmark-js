@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The DOM rung. A copy and a paste inside one body run the document through the
-// schema's own `toDOM`/`parseDOM` pair and nothing else (CODEC §"Markdown at the
+// schema's own `toDOM`/`parseDOM` pair and nothing else (INVARIANTS §"Markdown at the
 // edges"), so what crosses is asserted through that pair rather than read off a spec:
 // an attribute a node writes and does not read back is a value an ordinary copy
 // destroys.
@@ -254,7 +254,7 @@ describe('what the parse rules refuse', () => {
 	});
 
 	// A `start` the store would normalize away is one the leaf would go on drawing: a
-	// leaf re-hydrates only on an external change (CODEC §Reconciliation).
+	// leaf re-hydrates only on an external change (INVARIANTS §Reconciliation).
 	it.each(['-3', '1e21', 'abc'])('an ol starting at %s starts at one', (start) => {
 		expect(parse(`<ol start="${start}"><li>a</li></ol>`).child(0).attrs.start).toBe(1);
 	});

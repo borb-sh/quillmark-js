@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The matrix control (VISUAL_EDITOR §"The matrix"): ticks over the roster, columns
+// The matrix control (INVARIANTS §"The matrix"): ticks over the roster, columns
 // unfolding under a held member, one sparse map committed whole, a member held by being
 // present. Driven off the reference quill's `checks` — one flat roster, open to added
 // items, with columns — and read back through the document; a probe quill

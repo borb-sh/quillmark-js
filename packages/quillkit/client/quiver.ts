@@ -1,10 +1,10 @@
 // Where studio's quills come from: the built quiver served beside the client, read back
-// with `Quiver.fromBuiltUrl` off the document's own base (STUDIO §"A client, and what serves it").
+// with `Quiver.fromBuiltUrl` off the document's own base (INVARIANTS §"A client, and what serves it").
 import { Quiver } from '@quillmark/quiver';
 
 /** The quiver's catalog, flattened for the picker. Sync, because `quillNames` and
  *  `versionsOf` are: the catalog is materialized as the quiver is built, so the picker
- *  needs no loading state of its own (QUIVER §getQuill). */
+ *  needs no loading state of its own (quiver/INVARIANTS §"getQuill is the seam"). */
 export interface Catalog {
 	/** The quiver's own name, from `Quiver.yaml`. */
 	name: string;

@@ -118,7 +118,7 @@ function twoSections(q: Quill): Document {
 
 // A card's address does not survive a `moveCard` (`Addr` and `DocPath` are both
 // positional), so every card-naming payload carries the session `cardId` beside it
-// (VISUAL_EDITOR §"The address is the spine"): after a move the address a host captured
+// (INVARIANTS §"The address is the spine"): after a move the address a host captured
 // names the other card, and the key still names the one that moved. The id-keyed
 // commit-error map rides the same fact, so a refused write travels with its card.
 describe('a reorder through the card control', () => {

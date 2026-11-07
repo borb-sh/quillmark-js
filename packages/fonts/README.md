@@ -88,4 +88,4 @@ pyftsubset <upstream file> \
   --layout-features='*' --name-IDs='*' --name-languages='*' --notdef-outline
 ```
 
-The design, the rules and what was left out are in [FONTS.md](prose/canon/FONTS.md).
+The rules, their reasons and what was left out are in [`prose/INVARIANTS.md`](prose/INVARIANTS.md).

@@ -5,7 +5,7 @@
  (the unset rung) where nothing is declared, the parent removing the field. The value-object a date field lowers to is a render-time
  concern: the editor only sees the stored string.
 
- `today` is the render date rather than a written one (canon `SCHEMAS.md`), so its
+ `today` is the render date rather than a written one (quillmark `docs/quills/quill-yaml-reference.md` §"Dated by the render"), so its
  digits take the default rung: they print, and nothing wrote them. The digits are
  the local date, which is what `resolve` and a session opened without a date both
  render. The Today toggle writes `today`, and pressed, writes those digits; `T` in a

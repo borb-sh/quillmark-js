@@ -1,5 +1,5 @@
 // The scale, from where it is minted to what a consumer is served. One rule over every
-// scope: a stylesheet reads a rung, it does not mint a value (ARCHITECTURE §Styling). The
+// scope: a stylesheet reads a rung, it does not mint a value (svelte/INVARIANTS §Styling). The
 // scopes differ only in which prefix they read and which file mints it, so they are a
 // table rather than a script apiece.
 //
@@ -67,7 +67,7 @@ const SCOPES = [
 		exclude: ['packages/svelte/src/lib/preset'],
 		prefix: '--_qm-',
 		derivation: 'packages/svelte/src/lib/core/theme.css',
-		doc: 'ARCHITECTURE §Styling',
+		doc: 'svelte/INVARIANTS §Styling',
 		census: true,
 		surface: true
 	},
@@ -83,7 +83,7 @@ const SCOPES = [
 		dir: 'packages/playground/src/routes',
 		prefix: '--pg-',
 		derivation: 'packages/playground/src/routes/playground.css',
-		doc: 'ARCHITECTURE §Styling'
+		doc: 'svelte/INVARIANTS §Styling'
 	},
 	{
 		dir: 'packages/quillkit/client',
@@ -91,13 +91,13 @@ const SCOPES = [
 		exclude: ['packages/quillkit/client/public'],
 		prefix: '--st-',
 		derivation: 'packages/quillkit/client/studio.css',
-		doc: 'ARCHITECTURE §Styling'
+		doc: 'svelte/INVARIANTS §Styling'
 	},
 	{
 		dir: 'packages/quillkit/app',
 		prefix: '--app-',
 		derivation: 'packages/quillkit/app/chrome.css',
-		doc: 'ARCHITECTURE §Styling'
+		doc: 'svelte/INVARIANTS §Styling'
 	}
 ];
 
@@ -105,7 +105,7 @@ const SCOPES = [
  *  than against a consumer, and carries no class THEMING promises. */
 const RANK_EXEMPT = ['packages/svelte/src/lib/core/codec/prose.css'];
 /** What a consumer is invited to aim a rule at, so every file drawing one answers to the
- *  rank rule (ARCHITECTURE §Styling for the form that satisfies it in a `<style>` block). */
+ *  rank rule (svelte/INVARIANTS §Styling for the form that satisfies it in a `<style>` block). */
 const SURFACE_CONTRACT = ['qm-editor', 'qm-preview', 'qm-pane'];
 
 /** A colour literal: hex, or a functional notation that names a colour space. */

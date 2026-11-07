@@ -1,5 +1,5 @@
 <!--
-  Moving a document made on an earlier form onto the latest one (APP §"Retired pins"). The
+  Moving a document made on an earlier form onto the latest one (INVARIANTS §"Retired pins"). The
   move re-conforms the document against a schema that may not take all of it, so it is
   never made without the document's markdown offered first, in the same place as the press
   that makes it.

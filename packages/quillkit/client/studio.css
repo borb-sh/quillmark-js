@@ -1,7 +1,7 @@
 /* What studio adds on top of the preset, and nothing the preset already carries:
    `@quillmark/svelte/preset` is the endorsed page scale and the recipes drawn with it,
-   imported in `main.ts`, and studio's chrome reads `--qmh-*` throughout (STUDIO.md is
-   the language).
+   imported in `main.ts`, and studio's chrome reads `--qmh-*` throughout (INVARIANTS
+   §Studio is the language).
 
    Studio has one screen, no reading column and no display type, and that screen is drawn
    as the preset's `.qm-workspace`, so what it adds to the endorsed look is one width.

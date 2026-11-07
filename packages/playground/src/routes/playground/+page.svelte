@@ -4,7 +4,7 @@
     • <VisualEditor> (left): the edit surface; commits land on `doc`.
     • <Preview>      (right): a pure view of the session; never mutates it.
 
-  It wires the glue the primitives push outward (ARCHITECTURE §Playground), all
+  It wires the glue the primitives push outward (svelte/INVARIANTS §"The playground"), all
   through the public API; no reach-through:
 
     edit ─► (debounced) session.update(doc) ─► preview.refresh(change)
@@ -50,7 +50,7 @@
   the document out as a file, and the strip says what it cost or what refused it.
 
   `?collab=<room>` opens the document as a live session over `localStorage`, so every tab
-  on the room edits one document (PLAYGROUND §"Live editing"):
+  on the room edits one document (README §Routes):
 
     edit ─► live.push(change.op) ─► editor.applyExternal(path)   (a minted island id)
     remote ─► editor.applyCardOps / refresh / applyExternal(path, delta) ─► recompile
@@ -59,8 +59,8 @@
   tears the shell down and stands it back up. `examples` is whether an open stands on the
   quill's example document rather than its seed, said in the URL as `?examples=off`
   where it does not. The seed variants are query flags with no chrome, read once per
-  open, for the branches a quill on disk reaches none of (PLAYGROUND §"Which quill, and
-  what is seeded into it").
+  open, for the branches a quill on disk reaches none of (README
+  §Routes).
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -557,7 +557,7 @@
 	<!-- The boundary's phase, and only while it is one: the route carries no title,
 	     since the running head names it and marks it current, and an open session says
 	     the rest by painting the page. So the band is gone at rest and the panes have
-	     the room (PLAYGROUND §"The routes"). -->
+	     the room (README §Routes). -->
 	{#if status.phase === 'loading'}
 		<p data-testid="status" class="qm-status phase">Opening…</p>
 	{:else if status.phase === 'error'}

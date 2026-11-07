@@ -50,7 +50,7 @@ export interface Mount {
 /**
  * What a response says about caching. `none` is the loop: an author repacks under it, and a
  * cache would answer about the last generation. `host` is the four rules a deploy's host
- * owes it (QUILLKIT §"The deploy layout"), so a built deploy served locally caches as the host will.
+ * owes it (INVARIANTS §"The deploy layout"), so a built deploy served locally caches as the host will.
  */
 type Caching = 'none' | 'host';
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Reorder on an `object` row (VISUAL_EDITOR §"Settled and open"): a drag handle on the
+// Reorder on an `object` row: a drag handle on the
 // row's head, and Alt+↑/↓ from anywhere in the row as the keyboard twin, the nearest row
 // answering. One splice of the ids and the values together, then the array commits
 // whole, so the element keeps its id and everything mounted under it. Driven off the

@@ -1,5 +1,6 @@
 // The `$ext.editor` namespace: editor-only chrome state that never reaches the
-// render backend (canon: `CARDS.md`; VISUAL_EDITOR §"Card operations"). Card rename
+// render backend (quillmark `docs/authoring/card-yaml.md` §"System Metadata";
+// INVARIANTS §"Card operations"). Card rename
 // keeps `title` here and the tips channel keeps `tips`; both, and every key added
 // later, write through the one verb below.
 //

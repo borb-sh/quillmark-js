@@ -9,7 +9,7 @@
 
  An unset field holds its resolved `default:` as its text, at the default rung
  (theme.css), and an edit that settles writes it as authored, as `TextField` takes
- its default. A number has no empty answer (canon `SCHEMAS.md` §"Native validation"),
+ its default. A number has no empty answer (quillmark/INVARIANTS §"A blank is a property of the field"),
  so a blank entry commits `undefined`, the unset rung: the parent removes the field,
  the engine renders the default, and the input holds it again.
 
@@ -25,8 +25,7 @@
 
  A settled entry in the grammar commits as a number. Anything else forwards the raw
  string to `onCommit`: the boundary's `writer.set` coercion is the judge (throws a
- `QuillmarkError` the parent turns into a field diagnostic, VISUAL_EDITOR
- §Diagnostics). `Number()` alone is no gate: it reads `0x1F` and `Infinity` as
+ `QuillmarkError` the parent turns into a field diagnostic, INVARIANTS §Diagnostics). `Number()` alone is no gate: it reads `0x1F` and `Infinity` as
  numbers, and `1.000` as a whole one.
 -->
 <script lang="ts">

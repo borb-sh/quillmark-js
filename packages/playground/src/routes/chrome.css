@@ -5,7 +5,7 @@
    thesis — stays in the route, since a recipe with one caller is that route's own.
 
    The rungs are the preset's `--qmh-*` and the local ones in `routes/playground.css`;
-   this file mints nothing (ARCHITECTURE §Styling). */
+   this file mints nothing (svelte/INVARIANTS §Styling). */
 
 /* Every band of the shell (head, route, foot) starts on the same two edges. The width
    must be stated: a band is a grid item and `margin-inline: auto` switches its stretch

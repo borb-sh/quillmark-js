@@ -1,6 +1,6 @@
 <!--
   The document's two doors, which are one panel: canonical Quillmark markdown out, the
-  same markdown in (STUDIO §"The document has doors").
+  same markdown in (INVARIANTS §"The document has doors").
 
   Nothing here parses, conforms or reports. `apply` hands the text to the caller, which
   lands it through the repack's own carry.

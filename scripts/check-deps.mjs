@@ -44,7 +44,7 @@
 //      `dependencies` on the artifact or on a sibling are exact: the root pin for the
 //      artifact, the sibling's own version for a sibling. A range there would let an install
 //      run the bin on a release its bundled clients were not built with, so what it renders
-//      locally and what a deploy renders could differ (QUILLKIT §"One pin").
+//      locally and what a deploy renders could differ (quillkit/INVARIANTS §"One pin").
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';

@@ -1,4 +1,4 @@
-// The prose leaf: `createField` (VISUAL_EDITOR §Surface). One content field, one PM view wired to
+// The prose leaf: `createField` (INVARIANTS §Surface). One content field, one PM view wired to
 // the WASM edit surface.
 //
 // `dispatchTransaction` applies the transaction optimistically, lowers it to a `Change` (or
@@ -97,7 +97,7 @@ export interface CreateFieldOpts {
 	 * Fired when the leaf holds or releases, and at mount when it mounts held. A one-line or `text`
 	 * leaf is held over a value its schema cannot hold (`fitsLeaf`): the decode would join lines
 	 * and drop containers and islands. Any leaf is held over what is read and not edited: a font
-	 * family, a footnote, an equation (CODEC §Decode). A held leaf draws on the block schema,
+	 * family, a footnote, an equation (INVARIANTS §Decode). A held leaf draws on the block schema,
 	 * read-only, and commits nothing. Judged on each mount and re-hydrate ({@link
 	 * FieldController.applyExternal}).
 	 */
@@ -162,7 +162,7 @@ export interface CreateFieldOpts {
 	onError?: EditorErrorHandler;
 }
 
-/** The prose-leaf handle (VISUAL_EDITOR §Surface). */
+/** The prose-leaf handle (INVARIANTS §Surface). */
 export interface FieldController {
 	/** The mounted `container`: the leaf's element, for a caller that has to reach the
 	 *  DOM the view sits in (the arrival wash, `core/bloom.ts`) rather than re-find it. */
@@ -373,7 +373,7 @@ function toPM(index: LineIndex, a: AnchorPos): AnchorPos {
 }
 
 /**
- * Read the leaf's `Content` for `addr` through `reader.getContent` (DOCUMENT_MODEL): the body when
+ * Read the leaf's `Content` for `addr` through `reader.getContent` (INVARIANTS §"A content field is read through the schema"): the body when
  * `addr.field` is absent. Bound by the declared type rather than a verbatim read, since a string a
  * markdown parse left means markdown for `richtext` and literal text for `text`; reading one as the
  * other eats every `*` the author typed. An absent field (a default-only richtext field before its
@@ -642,7 +642,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 
 	/**
 	 * A `text` leaf's commit: its whole text through the typed writer, resting the field as that
-	 * literal string (CODEC §Inline mode). The content-object rest form would emit markdown
+	 * literal string (INVARIANTS §"Inline mode"). The content-object rest form would emit markdown
 	 * (escaped `*`, backslash breaks) and read back changed. A refusal lands nothing and has no
 	 * fallback; the next edit writes the whole text again.
 	 */
@@ -846,7 +846,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 }
 
 /**
- * The prose-leaf plugin stack (VISUAL_EDITOR §Surface), shared by {@link createField} and
+ * The prose-leaf plugin stack (INVARIANTS §Surface), shared by {@link createField} and
  * `ProseValue` so the two never fork the plugin ordering. History first with the step-splitting
  * plugin (`undo.ts`), then `afterHistory` plugins (the addressed leaf's anchor plugin), {@link
  * linebreakPlugin}, the markdown-shorthand input rules and their Backspace, the field keymap over
@@ -1025,7 +1025,7 @@ function ghostPlugin(opts: {
  * body's structural keys; Enter suppressed inline.
  *
  * Tab forks on the leaf's role: a one-line or `text` leaf is a form field, Tab unbound so field
- * navigation is open for a shell keymap (VISUAL_EDITOR §Chrome); a block-schema body
+ * navigation is open for a shell keymap (INVARIANTS §Chrome); a block-schema body
  * takes Tab structurally, a chain each nested surface prepends to (`keymap.ts`).
  */
 function editorKeymap(schema: Schema, inline: boolean, slash?: boolean): Record<string, Command> {

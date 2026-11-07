@@ -72,7 +72,7 @@ export function createPaintLoop(
 	function makeSlot(page: number): PageSlot {
 		const size = session.pageSize(page);
 		// The paper edge is where `--_qm-surface` meets the container's `--_qm-surface-sunken`; no
-		// stroke is drawn (ARCHITECTURE §Styling).
+		// stroke is drawn (INVARIANTS §Styling).
 		const el = document.createElement('div');
 		// Not `.qm-page`: that is the preset's page baseline, whose `color-scheme` a slot must not
 		// take inside a mounted root (`core/theme.css`).

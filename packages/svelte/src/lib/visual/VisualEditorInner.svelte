@@ -1,6 +1,6 @@
 <!--
- The federated WYSIWYG surface (VISUAL_EDITOR). A thin composition over many
- small editors; not one PM document spanning the page.
+ The federated WYSIWYG surface (INVARIANTS §"Federated, not monolithic"). A thin
+ composition over many small editors; not one PM document spanning the page.
 
  Mounted once per document. `VisualEditor` keys this component on `doc`, so
  everything below seeds from a handle that cannot change under it: `cardIds`, the
@@ -141,7 +141,7 @@
 	// svelte-ignore state_referenced_locally
 	let cardIds = $state<string[]>(seq.take(doc.cardCount));
 
-	// Local commit-error diagnostics (VISUAL_EDITOR §Diagnostics, producer #2),
+	// Local commit-error diagnostics (INVARIANTS §Diagnostics, producer #2),
 	// id-keyed rather than positional so an error stays pinned to its field across a
 	// card reorder.
 	const commitErrors = new SvelteMap<string, RoutedDiagnostic>();
@@ -168,7 +168,7 @@
 		revision++;
 		liveTitles = {};
 	}
-	/** Read at the mutation boundary, never cached (VISUAL_EDITOR §"The address is the
+	/** Read at the mutation boundary, never cached (INVARIANTS §"The address is the
 	 * spine"). */
 	function cardIndexOf(id: string): number {
 		return cardIds.indexOf(id);
@@ -289,7 +289,7 @@
 	// the one it already followed is the one its recompile re-locates.
 	//
 	// A focus clears it, and must: a focus into a leaf with no caret to report ends a
-	// consumer's follow (PREVIEW §"Follow-the-caret scroll"), and the return to the
+	// consumer's follow (INVARIANTS §"Follow-the-caret scroll"), and the return to the
 	// offset the memo still names is the only thing that would restart it.
 	let lastCaretField: DocPath | undefined;
 	let lastCaretPos: number | undefined;
@@ -351,11 +351,11 @@
 		const keyStr = fieldKeyToString(key);
 		try {
 			if (value === undefined) {
-				// The unset rung (VISUAL_EDITOR §"The commitment ladder"): removing the field
+				// The unset rung (INVARIANTS §"The commitment ladder"): removing the field
 				// leaves Quillmark's authored › `default:` › blank-fill resolve to render the
-				// default, where writing one bakes a snapshot the schema cannot track (canon
-				// SCHEMAS.md: Quillmark never writes a default; the editor writes one only
-				// as the edit that takes it). Removal writes no value, so there is
+				// default, where writing one bakes a snapshot the schema cannot track
+				// (quillmark/INVARIANTS §"The commitment ladder": Quillmark never writes a
+				// default; the editor writes one only as the edit that takes it). Removal writes no value, so there is
 				// nothing for a schema to conform and the lane is the quill-free one.
 				if (isMain) {
 					doc.removeField(name);
@@ -648,10 +648,10 @@
 		return cardAddr(id, field);
 	}
 
-	// ── Diagnostics routing (VISUAL_EDITOR §Diagnostics) ────────────────────────
+	// ── Diagnostics routing (INVARIANTS §Diagnostics) ────────────────────────
 	// Producer #1: quill.validate(doc), re-run every revision.
 	const validation = $derived.by(() => {
-		revision; // re-run on every mutation, per VISUAL_EDITOR §Diagnostics
+		revision; // re-run on every mutation, per INVARIANTS §Diagnostics
 		try {
 			return quill.validate(doc);
 		} catch (e) {
@@ -988,7 +988,7 @@
 	 * row's cell as `main.vectors[0].tours[2].title`. The second rung reads the steps
 	 * past the field against the schema, rung by rung — an index under a declared
 	 * array, a key under a declared object, variant or matrix — which is why the ladder
-	 * is the editor's (VISUAL_EDITOR.md §Surface): the preview carries no schema, and
+	 * is the editor's (INVARIANTS §Surface): the preview carries no schema, and
 	 * truncating the address there is worse than guessing, since `pos` is an offset
 	 * into the leaf's own content.
 	 */
@@ -1054,7 +1054,7 @@
 
 		<!-- A fixed slot after `main`, ahead of the cards, so document-level guidance
 		 reads as document-level and never displaces a field. Dismissal empties the
-		 channel, so the card leaves for good (VISUAL_EDITOR §"Card operations"). -->
+		 channel, so the card leaves for good (INVARIANTS §"Card operations"). -->
 		{#if model.tips.length}
 			<TipsCard tips={model.tips} onDismiss={dismissTips} {onError} />
 		{/if}
@@ -1231,12 +1231,12 @@
 
 	   `:global(:where(…))` puts a promised class at zero rank, and both halves are
 	   load-bearing: `:global` drops the scoping class, `:where` drops the rest
-	   (ARCHITECTURE §Styling). The class is the surface's root wherever it mounts, so
+	   (INVARIANTS §Styling). The class is the surface's root wherever it mounts, so
 	   leaving the component's scope costs nothing.
 
 	   The sunken rung, which is what makes a card an island: the cards are the base
 	   plane and this is the one they float on, so the gutter reads as ground rather
-	   than as more card (ARCHITECTURE §Styling). The inset is the widest rung on the
+	   than as more card (INVARIANTS §Styling). The inset is the widest rung on the
 	   ramp, which is what gives the ground enough of itself to read as ground: at a
 	   narrower one the stack meets whatever frames the surface and the islands are
 	   back to being one block clipped at its edges. That is the page form; a pane's

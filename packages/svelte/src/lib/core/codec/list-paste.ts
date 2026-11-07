@@ -1,4 +1,4 @@
-// A pasted list takes the numbering of where it lands (CODEC §"Markdown at the edges").
+// A pasted list takes the numbering of where it lands (INVARIANTS §"Markdown at the edges").
 // An item's number is its position, so a paste counts where it stands: items pasted into
 // a list are that list's next items, of its kind and in its count, and items pasted on
 // the empty line a list was just left by are the same list's. A list pasted on a line of

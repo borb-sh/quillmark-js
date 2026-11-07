@@ -1,6 +1,6 @@
 // The engine both clients render through, built over `@quillmark/fonts`: the font library
 // every Quillmark client hands its engine, so a family a document names sets here as it
-// sets in any other client that loads the suite (FONTS §"The suite").
+// sets in any other client that loads the suite (fonts/INVARIANTS §"The promise").
 import { loadSuite } from '@quillmark/fonts';
 import { Engine } from '@quillmark/wasm';
 import type { FontFace, Quill } from '@quillmark/wasm';

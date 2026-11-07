@@ -106,7 +106,7 @@
 		border-radius: var(--_qm-radius-pill);
 		/* The track is a fill and nothing else: an edge around it would be a second
 		 statement of a shape the tone already draws, and the checked state swaps that
-		 one fill for the accent (ARCHITECTURE §Styling). The fill is the band, a
+		 one fill for the accent (INVARIANTS §Styling). The fill is the band, a
 		 resting tone: on the hover rung an off switch read as a button under the
 		 pointer. */
 		background: var(--_qm-surface-band);

@@ -1,6 +1,6 @@
 <!--
   The landing an app with several quills opens on: one card per quill, its title and its
-  sentence, and a press starts a blank document on it (APP §"The first screen").
+  sentence, and a press starts a blank document on it.
 -->
 <script lang="ts">
 	import type { AppQuill } from './records';

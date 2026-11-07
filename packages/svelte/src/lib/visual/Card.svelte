@@ -435,7 +435,7 @@
 
 <style>
 	/* An island: the card is the base plane and the column behind it the sunken one, and
-	 the step between the two tones is the whole of its edge (ARCHITECTURE §"A plane is a
+	 the step between the two tones is the whole of its edge (INVARIANTS §"A plane is a
 	 tone"). The block half is the same rung as the gap: the payload stands that far off
 	 the card's edge and off the body below it. The header insets itself to the
 	 section-heading column (`.qm-card-header`). The inline half stands a step tighter
@@ -519,7 +519,7 @@
 
 	 The type is a rung over the group header's: the card holds its sections, so its name
 	 ranks above theirs, at the paper rung and at the header's weight: the size ramp ranks,
-	 and the weight stays the chrome's one (ARCHITECTURE §Styling). */
+	 and the weight stays the chrome's one (INVARIANTS §Styling). */
 	.qm-card-title-sizer {
 		display: inline-grid;
 		align-items: center;
@@ -591,7 +591,7 @@
 	}
 	/* The card's two horizontals, and ranking is the one thing a horizontal is for: they
 	 stand the payload against the title above it and the body below it, where saying what
-	 sits inside what is the verticals' (ARCHITECTURE §"A plane is a tone"). Each is
+	 sits inside what is the verticals' (INVARIANTS §"A plane is a tone"). Each is
 	 conditional on what it ranks against: `main` is headerless, and a card with no body
 	 has nothing under the payload to divide it from.
 
@@ -641,7 +641,7 @@
 		row-gap: var(--row-gap);
 	}
 	/* The nesting vertical, on the card's inset with the panel's fields one `--_qm-nest`
-	 off it (ARCHITECTURE §"A plane is a tone"). The end inset is the column's, so the
+	 off it (INVARIANTS §"A plane is a tone"). The end inset is the column's, so the
 	 panel's wells end where a top-level field's do. `--_qm-border` and
 	 not `--_qm-accent`: the verticals and the rules beside them are one stroke at every
 	 depth, and a tone that changed as it went in would read as unrelated lines rather

@@ -1,4 +1,4 @@
-// What the app keeps of a document, and the readings it takes off one (APP §"Documents").
+// What the app keeps of a document, and the readings it takes off one (INVARIANTS §Documents).
 // Free of the browser and of the wasm, so the suite reads earlier records without either.
 
 /** One quill the app opens, as `app.json` names it. */

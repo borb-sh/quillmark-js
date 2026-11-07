@@ -1,4 +1,4 @@
-// Decode: content → PM, a pure function (CODEC §Decode). Each `\n`-separated segment is one
+// Decode: content → PM, a pure function (INVARIANTS §Decode). Each `\n`-separated segment is one
 // block, its record's `kind` selecting the node; blocks nest by the containers their paths name,
 // a run of blocks sharing a container id being that container; a `U+2028` is a break inside a
 // block; marks apply over their `[start,end)` ranges; island slots lower to leaf nodes. Anchors are
@@ -88,7 +88,7 @@ export function fitsInline(rt: Content): boolean {
 
 /**
  * Whether `rt` decodes under `plainSchema` losing nothing but its marks, which the next commit
- * heals (CODEC §Inline mode): upstream's `isPlain` with marks set aside.
+ * heals (INVARIANTS §"Inline mode"): upstream's `isPlain` with marks set aside.
  */
 export function fitsPlain(rt: Content): boolean {
 	return core().isPlain({ ...rt, marks: [] });

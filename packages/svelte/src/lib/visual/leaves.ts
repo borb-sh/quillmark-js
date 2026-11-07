@@ -1,5 +1,5 @@
 // The leaf registry: what a landing verb resolves a `DocPath` to, and the seam the
-// mounted tree registers itself into (VISUAL_EDITOR §"Focus and the preview bridge").
+// mounted tree registers itself into (INVARIANTS §"Focus and the preview bridge").
 //
 // Two lanes behind one lookup. Every mounted field registers a {@link FieldControl} —
 // take the caret, and a box to bloom — which is the whole of what a reveal and a

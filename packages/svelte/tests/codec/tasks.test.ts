@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// A task item (CODEC §"Task items"): `checked` rides the list item through decode and
+// A task item (INVARIANTS §"Task items"): `checked` rides the list item through decode and
 // lowering, a body holding one edits, its checkbox toggles as one undoable step, Enter
 // leaves a task item's new half an open task, Mod-Enter ticks the one around the caret,
 // and a markdown paste lands one editable.

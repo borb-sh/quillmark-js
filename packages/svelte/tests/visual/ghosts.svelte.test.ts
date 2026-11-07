@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// What an empty field shows, drawn (VISUAL_EDITOR §"The commitment ladder"). A default
+// What an empty field shows, drawn (INVARIANTS §"The commitment ladder"). A default
 // that prints is the value an unset control holds, at the default rung, and an edit
 // takes it. Where nothing prints, a control draws words: the `none` an optional cell
 // prints, worded `strings.optionalGhost`, and an enum's blank, worded `ui.blank_title`.

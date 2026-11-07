@@ -1,4 +1,4 @@
-// A task item is a `list_item` whose `checked` is a boolean (CODEC §"Task items"). Its
+// A task item is a `list_item` whose `checked` is a boolean (INVARIANTS §"Task items"). Its
 // `toDOM` draws a checkbox ahead of the item's blocks, disabled, which is the drawing a
 // held leaf, a copy and `renderContent` take; a leaf that edits mounts the item through
 // `taskItemView`, whose checkbox toggles, as `Mod-Enter` does (`toggleTask`). A task item

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// A date field holding `today` (canon `SCHEMAS.md` §"The render date"): the Today
+// A date field holding `today` (quillmark `docs/quills/quill-yaml-reference.md`
+// §"Dated by the render"): the Today
 // toggle writes it and, pressed, writes the render date's digits instead; `T` in a
 // segment writes it; a segment edit writes a whole date. The render date is read off
 // `resolve`, which reports a `today` cell as the date it renders.

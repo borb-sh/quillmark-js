@@ -1,10 +1,10 @@
-// Diagnostics routing (VISUAL_EDITOR §Diagnostics). Pure merge + route
+// Diagnostics routing (INVARIANTS §Diagnostics). Pure merge + route
 // of the three producers into a `Map<fieldKey, Diagnostic[]>` the card tree
 // reads. No runes, no Document: VisualEditor.svelte's `$derived.by` re-runs
 // this from its revision counter + the three raw sources, mirroring
 // structure.ts's split of pure projection math from reactive orchestration.
 //
-// Three producers (VISUAL_EDITOR §Diagnostics):
+// Three producers (INVARIANTS §Diagnostics):
 // 1. `quill.validate(doc)`: `Diagnostic[]`, `.path` a canonical `DocPath`.
 //      Routed here by `routeAndResolve`, errors only.
 // 2. Local commit errors: a `writer.set`/`writer.card(i).set` throw at
@@ -25,7 +25,7 @@
 // one grammar). Routing runs on the boundary's own `parseDocPath`, not a
 // hand-rolled parser. The editor's own addressing (VisualEditor's
 // `commitScalar`, the `leaves` registry) is stable-id keyed so a diagnostic stays
-// pinned to the right card across a reorder (VISUAL_EDITOR §"The address is the
+// pinned to the right card across a reorder (INVARIANTS §"The address is the
 // spine"); `resolveCardKey` bridges the absolute index → stable id, and
 // `fieldKeyToString` is the one shared string form both sides collapse to for the
 // `Map`.
@@ -53,7 +53,7 @@ export function fieldKeyToString(k: FieldKey): string {
  * Resolve a positional `FieldKey` (an absolute document-array index, straight off
  * `addrForFieldPath`) to the editor's stable-id keying using the live `cardIds`
  * array: re-resolved fresh on every call (never cached), the same "resolve only
- * at the point of use" discipline `cardIndexOf` applies to writes (VISUAL_EDITOR
+ * at the point of use" discipline `cardIndexOf` applies to writes (INVARIANTS
  * §"The address is the spine"). A key already id-keyed (`card` a string) or main
  * (`card` undefined) passes through unchanged. `undefined` when the index is out
  * of the current card array: the diagnostic is dropped rather than mis-routed.
@@ -74,7 +74,7 @@ export interface RoutedDiagnostic {
  * Route a path-keyed producer's raw `Diagnostic[]` (validate / external) to the
  * editor's stable-id keying: the one door producers #1/#3 take,
  * `nearestAddrForFieldPath` and `resolveCardKey` in a single pass. Warnings do not
- * draw (VISUAL_EDITOR §Diagnostics): obligation, completeness, a render note — none
+ * draw (INVARIANTS §Diagnostics): obligation, completeness, a render note — none
  * of them is a value the field cannot hold. An anchor deeper than a commit address
  * (`main.contact.email`, `main.keywords[0]`) draws at the nearest field holding it,
  * whose subform or repeater draws that leaf. An entry drops rather than mis-routes
@@ -104,7 +104,7 @@ export function routeAndResolve(
 // own foot the ones naming a step it does not hold. So `main.contact.email` draws under
 // the email cell, `main.revisions[0].pages` under the pages cell of an open row and
 // under the row's head while it is collapsed, and nothing is lost on the way down
-// (VISUAL_EDITOR §Diagnostics).
+// (INVARIANTS §Diagnostics).
 
 /** A diagnostic with the steps still to walk from the control holding it. */
 export interface DeepDiagnostic {

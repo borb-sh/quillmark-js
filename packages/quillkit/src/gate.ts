@@ -1,6 +1,6 @@
 /**
  * `check`, the gate: every quill's seed renders, and so does its example document where it
- * declares one, through the wasm every deployed client renders through (QUILLKIT §"One pin").
+ * declares one, through the wasm every deployed client renders through (INVARIANTS §"One pin").
  * With an `App.yaml` or an `app.css` beside the quiver, the app they describe resolves too.
  *
  * The only door onto the verdict: other runners spawn the bin rather than rebuild the loop.

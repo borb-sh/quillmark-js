@@ -1,5 +1,5 @@
 // The body leaf's structural keymap: where the chains are composed, and the one
-// place that fixes their precedence (VISUAL_EDITOR §Chrome).
+// place that fixes their precedence (INVARIANTS §Chrome).
 //
 // A body is a document, so its structural keys are structural; a surface nested in
 // it that owns a key more locally joins the chain rather than rewriting the binding.
@@ -69,7 +69,7 @@ function exitKeymap(schema: Schema): Record<string, Command> {
 /** A multi-block leaf's structural keys, each link binding only what its schema
  * declares: over `plainSchema`, which holds neither lists nor code blocks nor islands,
  * the block link and the break link alone. The argument list is the precedence order
- * VISUAL_EDITOR §Chrome states, so a new link is one more argument at its place in that
+ * INVARIANTS §Chrome, so a new link is one more argument at its place in that
  * order rather than a nesting to read inside out.
  *
  * The slash menu is innermost of the three, and it is conditional rather than

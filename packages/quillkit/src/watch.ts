@@ -1,6 +1,6 @@
 /**
  * The repack trigger: what counts as a source change, and how many changes one repack
- * answers. The pack is quiver's `build`, which lands whole (QUIVER §"The generation lands whole").
+ * answers. The pack is quiver's `build`, which lands whole (quiver/INVARIANTS §"The generation lands whole").
  */
 
 import { watch } from 'node:fs';

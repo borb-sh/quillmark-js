@@ -1,6 +1,6 @@
 <!--
  A `matrix` field → ticks over the roster, columns unfolding under a held member
- (VISUAL_EDITOR §"The matrix", canon `SCHEMAS.md` §Matrix). The roster is one flat
+ (INVARIANTS §"The matrix", quillmark `docs/quills/quill-yaml-reference.md` §Matrix). The roster is one flat
  list, one member to a row, or abreast on the section's track ladder under
  `ui.compact`; each member is a real checkbox whose checked state is the member's
  presence, with its title as the `<label for>`, an unheld member reading at the label

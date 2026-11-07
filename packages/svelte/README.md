@@ -46,7 +46,7 @@ const session = await new Engine().open(quill, doc);
 // free() on teardown the handles you MINTED: this quill, this doc, this session.
 ```
 
-`<VisualEditor>` needs no session, and the first `open` loads the render build, so a host that mounts the editor over `doc` and `quill` first shows it without waiting on that load. The session opens behind it: `await engine.load(quill)`, then `engine.open(quill, doc)`, so its first compile reads what was typed meanwhile ([HOSTING.md](prose/canon/HOSTING.md)).
+`<VisualEditor>` needs no session, and the first `open` loads the render build, so a host that mounts the editor over `doc` and `quill` first shows it without waiting on that load. The session opens behind it: `await engine.load(quill)`, then `engine.open(quill, doc)`, so its first compile reads what was typed meanwhile ([INVARIANTS.md](prose/INVARIANTS.md#hosting)).
 
 ## The quill resolves from the document
 
@@ -164,7 +164,7 @@ The package ships English and a seam to replace it. `strings` is keyed and **par
 />
 ```
 
-`formatDiagnostic` gets the whole `Diagnostic` and returns `undefined` to take its own message. Validation and edit diagnostics re-word from `code`, `path` and `args`; parse errors and render warnings carry their detail inside English text and stand as they are ([VISUAL_EDITOR.md](prose/canon/VISUAL_EDITOR.md)).
+`formatDiagnostic` gets the whole `Diagnostic` and returns `undefined` to take its own message. Validation and edit diagnostics re-word from `code`, `path` and `args`; parse errors and render warnings carry their detail inside English text and stand as they are ([INVARIANTS.md](prose/INVARIANTS.md#diagnostics)).
 
 ### Fonts
 
@@ -265,7 +265,7 @@ The surfaces carry the behavior against a neutral, overridable visual baseline: 
 
 ## Development
 
-This package is one workspace of [`quillmark-js`](../..); the gates are the root's, and the settled architecture lives in [`prose/`](prose/).
+This package is one workspace of [`quillmark-js`](../..); the gates are the root's, and the rules a change must keep live in [`prose/INVARIANTS.md`](prose/INVARIANTS.md).
 
 ```sh
 npm run build -w packages/svelte   # svelte-package → dist/

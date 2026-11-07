@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Text on the clipboard (CODEC §"Markdown at the edges"): a block leaf reads text holding a
+// Text on the clipboard (INVARIANTS §"Markdown at the edges"): a block leaf reads text holding a
 // block's line head through `importMarkdown`, so a paste stores what the source editor
 // would; any other text, any other leaf, a paste as plain text and a clipboard holding
 // HTML keep the reading they had. One URL over a selection links it instead. Each paste is

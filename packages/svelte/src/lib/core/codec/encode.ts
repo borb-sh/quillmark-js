@@ -1,4 +1,4 @@
-// Encode: PM → a `Change` for `apply` (CODEC §Encode). Content is truth and PM its projection, so
+// Encode: PM → a `Change` for `apply` (INVARIANTS §Encode). Content is truth and PM its projection, so
 // an edit is the change from the stored value to the projection of the doc the leaf holds:
 // `pmToContent` is decode's pure inverse, and `lower` asks the store's own word-aligned `diff` for
 // the change between the two. The projection carries every id the doc's nodes do and the anchors

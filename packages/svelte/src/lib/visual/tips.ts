@@ -1,7 +1,7 @@
 // The tips channel: `$ext.editor.tips`, a list of authoring hints a
 // quill or consumer seeds, which the editor only ever renders and clears.
 // Editor-only chrome; never reaches the render backend, never gates, absent when
-// the channel is empty (VISUAL_EDITOR §"Card operations").
+// the channel is empty (INVARIANTS §"Card operations").
 //
 // The channel narrowing the derive reads and the render the card paints. The write
 // is `patchEditorExt` (ext.ts), the one door into the namespace.

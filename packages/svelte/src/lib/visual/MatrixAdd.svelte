@@ -1,5 +1,5 @@
 <!--
- An open matrix's add box (VISUAL_EDITOR §"The matrix"): a plain text input. Enter adds
+ An open matrix's add box (INVARIANTS §"The matrix"): a plain text input. Enter adds
  what was typed, trimmed, and clears the box; Escape clears it. It is drawn as the item
  it adds, unwritten: the plus in the tick's column and the words in the title's.
 -->

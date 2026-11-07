@@ -1,10 +1,10 @@
 <!--
   The app, whole: one form to fill in, beside the page it prints, and the file it leaves as
-  (APP.md). Drawn for the person filling the form in rather than for its author, so nothing
+  (INVARIANTS §"The app"). Drawn for the person filling the form in rather than for its author, so nothing
   on it names a quill, a ref, a file or a line.
 
   One document at a time, under two surfaces over one `LiveSession`, the same bridge studio
-  draws (STUDIO §"A client, and what serves it"):
+  draws (INVARIANTS §"A client, and what serves it"):
 
     edit ─► (debounced) session.update(doc) ─► preview.refresh(change)
         └► (debounced) save to this browser
