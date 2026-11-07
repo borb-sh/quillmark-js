@@ -131,6 +131,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 - **The formatting popover answers a selection, never a pointer**, and asks the view it would act on, so it withholds itself over a `text` leaf. Font families come from the host's library, not the quill's.
 - **An input rule declines only where its result is unrepresentable or belongs to another gesture**, never on how a quill would render it, since what a quill typesets is not knowable here. Backspace right after a rule takes it back.
+- **An input rule runs the command its slash pick runs**, so a construct's two doors are one implementation and cannot drift apart.
 - **Each body key is one chain of links, innermost surface first**, so the nearest surface answers. A key edits its own block; an item's number is its position and no keystroke writes one; Tab is structural in a body and free for navigation in a one-line field; Escape gives the focus up; no gesture nests past the store's depth bound.
 - **A floating surface tracks a live element, never a rect measured once**, so it follows scroll and reflow, and portals into the nearest `[data-qm-root]` so the consumer's dials reach it.
 
@@ -195,6 +196,8 @@ The bidirectional codec between one content field and one ProseMirror document. 
 ### Marks
 
 **Identity is kept off PM's mark mechanism.** Formatting is a property of a range and maps to PM marks; an anchor is a zero-width handle and maps to plugin-held positions keyed by id. Overlap only bites where identity and formatting coexist, and they never share a mechanism.
+
+**An anchor's id is the caller's**: supplied at `insertAnchor`, unique, and never changed afterwards, since no content determines what a comment refers to and the codec mints none.
 
 **A link's scheme allowlist is the render's, not the model's**: a refused href stays on the mark and round-trips.
 
