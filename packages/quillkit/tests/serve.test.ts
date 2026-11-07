@@ -18,7 +18,7 @@ import {
 	listen,
 	type Mount,
 	type ServeOptions
-} from '../serve.js';
+} from '../src/serve.js';
 import { scratch } from './helpers/collection.js';
 
 const temp = scratch('quillkit-serve-');

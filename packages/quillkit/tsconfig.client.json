@@ -16,5 +16,11 @@
 		"noEmit": true,
 		"isolatedModules": true
 	},
-	"include": ["client/**/*.ts", "client/**/*.svelte", "app/**/*.ts", "app/**/*.svelte"]
+	"include": [
+		"client/**/*.ts",
+		"client/**/*.svelte",
+		"app/**/*.ts",
+		"app/**/*.svelte",
+		"tests/app/**/*.ts"
+	]
 }

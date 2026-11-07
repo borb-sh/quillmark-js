@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseQuillRef } from '../ref.js';
-import { QuiverError } from '../errors.js';
+import { parseQuillRef } from '../src/ref.js';
+import { QuiverError } from '../src/errors.js';
 
 describe('parseQuillRef — valid refs', () => {
 	it('parses bare name: showcase', () => {

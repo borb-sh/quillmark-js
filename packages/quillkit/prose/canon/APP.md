@@ -28,7 +28,7 @@ Then the core wasm, the quiver (`fromBuiltUrl` on `quiver/`), and the store, wit
 
 **A document is kept from its first edit.** A blank form a reader looked at and left leaves nothing behind. From the first edit it is saved after each settled burst of keystrokes, and when the tab is hidden or closed mid-burst, so nothing typed is lost to a debounce.
 
-**What is kept is markdown.** A record is `{ v, id, title, quill, edited, markdown }`: the canonical markdown, the canonical ref it was made on, and when. Markdown for the reason studio's import door takes it (STUDIO §"The document has doors"): it reads as a file, it re-conforms on the way in, and it rides no coupling to the wasm's storage DTO. `v` is the record's shape, and a later release reading an earlier one's records branches on it; the suite holds records as a shipped release wrote them (`app/__tests__/fixtures/`), and each must still open.
+**What is kept is markdown.** A record is `{ v, id, title, quill, edited, markdown }`: the canonical markdown, the canonical ref it was made on, and when. Markdown for the reason studio's import door takes it (STUDIO §"The document has doors"): it reads as a file, it re-conforms on the way in, and it rides no coupling to the wasm's storage DTO. `v` is the record's shape, and a later release reading an earlier one's records branches on it; the suite holds records as a shipped release wrote them (`tests/app/fixtures/`), and each must still open.
 
 **IndexedDB, one database per app.** Keyed by the app's base URL, so two apps on one origin, a project page and its branch preview, never read each other's documents. A private window may refuse the store, and the app then works on the document in hand and says it keeps nothing.
 

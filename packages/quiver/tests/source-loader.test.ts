@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { scanSourceQuiver, readQuillTree } from '../source-loader.js';
+import { scanSourceQuiver, readQuillTree } from '../src/source-loader.js';
 import { scratch } from './helpers/scratch.js';
 
 const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;

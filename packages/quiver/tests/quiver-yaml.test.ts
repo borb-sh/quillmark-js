@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseQuiverYaml } from '../quiver-yaml.js';
+import { parseQuiverYaml } from '../src/quiver-yaml.js';
 
 describe('parseQuiverYaml', () => {
 	it.each([

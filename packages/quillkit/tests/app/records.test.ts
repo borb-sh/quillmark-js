@@ -15,7 +15,7 @@ import {
 	toStored,
 	type AppConfig,
 	type DocRecord
-} from '../records';
+} from '../../app/records';
 
 const app: AppConfig = {
 	title: 'Forms',

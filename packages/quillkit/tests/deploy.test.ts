@@ -14,8 +14,8 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { APP_JSON, RESERVED } from '../app-files.js';
-import { APP, STUDIO } from '../paths.js';
+import { APP_JSON, RESERVED } from '../src/app-files.js';
+import { APP, STUDIO } from '../src/paths.js';
 import {
 	CLIENTS,
 	DEFAULT_TARGET,
@@ -24,7 +24,7 @@ import {
 	assertSafeOut,
 	layOut,
 	targetOf
-} from '../deploy.js';
+} from '../src/deploy.js';
 import { scratch } from './helpers/collection.js';
 
 const temp = scratch('quillkit-deploy-');

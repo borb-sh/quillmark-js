@@ -10,8 +10,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Quiver as MainQuiver } from '../index.js';
-import { Quiver as NodeQuiver, fromDir } from '../node.js';
+import { Quiver as MainQuiver } from '../src/index.js';
+import { Quiver as NodeQuiver, fromDir } from '../src/node.js';
 
 describe('node entry — the class is untouched', () => {
 	it('re-exports the same constructor as the main entry', () => {

@@ -21,13 +21,13 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import type { Server } from 'node:http';
-import { createStaticServer, listen } from '../serve.js';
+import { createStaticServer, listen } from '../src/serve.js';
 import { scratch } from './helpers/collection.js';
-import { load, type Viewport } from '../../../../scripts/browser.mjs';
+import { load, type Viewport } from '../../../scripts/browser.mjs';
 
 const run = promisify(execFile);
 
-const BIN = fileURLToPath(new URL('../../dist/bin/quillkit.js', import.meta.url));
+const BIN = fileURLToPath(new URL('../dist/bin/quillkit.js', import.meta.url));
 
 /**
  * Two segments deep, the shape a project page is served at. A client resolving its

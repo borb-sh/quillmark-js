@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const FIXTURES = fileURLToPath(new URL('../../../../../fixtures', import.meta.url));
+const FIXTURES = fileURLToPath(new URL('../../../../fixtures', import.meta.url));
 
 export interface Scratch {
 	/** A fresh temp directory, tracked for cleanup. */
