@@ -2,7 +2,7 @@
   Card controls, composable cards only.
   Right-aligned in the header: a move-up/move-down chevron pair (each disabled at its
   edge), then delete, the row revealed while the pointer or the caret is in the card.
-  Reorder is buttons, not drag (V1). All three are chips (controls.css): fill arrives
+  Reorder is buttons, not drag. All three are chips (controls.css): fill arrives
   on hover, and delete rests at the label ink beside them. The card scopes
   that reveal, so its condition lives in the parent's CSS; the row keeps the narrower
   guarantee here, that a focused control is a visible one.

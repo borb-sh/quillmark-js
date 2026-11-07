@@ -34,11 +34,11 @@ Runes mode makes `export let`, `$:` and `$$props` compile errors. The rest still
 
 ## Packaging
 
-**One package, `@quillmark/svelte`, with subpath exports**: `/core`, `/preview`, `/visual` ship, with `/preset` the opt-in stylesheet; `/form` is reserved for the metadata surface.
+**One package, `@quillmark/svelte`, with subpath exports**: `/core`, `/preview`, `/visual` ship, with `/preset` the opt-in stylesheet.
 
 **A subpath is a promise, so it carries a surface a consumer builds with.** Reading a document's canonical markdown is `doc.toMarkdown()` on the public `Document` handle, so a debug view over it is a recipe rather than an entry, and the README carries it whole in three lines. An entry adds an `exports` slot `publint` gates, a module root, a remount contract, and a compatibility promise, and it earns none of them by wrapping one public call.
 
-**The name is the binding, not the substance.** The headline surfaces are Svelte components, so the package says so: a host reads its framework off the specifier rather than off a README. That the vanilla-TS cores carry the substance is unchanged (§Core vs chrome), and `/core` stays framework-free under a framework-named package deliberately. The name draws the line at the door, which makes a second binding a re-export of `/core` rather than a rewrite and keeps the reserved `@quillmark/preview` promotion neutral: the paint loop it would carry reaches no Svelte and no editor-side code.
+**The name is the binding, not the substance.** The headline surfaces are Svelte components, so the package says so: a host reads its framework off the specifier rather than off a README. That the vanilla-TS cores carry the substance is unchanged (§Core vs chrome), and `/core` stays framework-free under a framework-named package deliberately. The name draws the line at the door, which makes a second binding a re-export of `/core` rather than a rewrite.
 
 Subpaths, not separate packages, because the thing a split would buy (a preview-only consumer not pulling ProseMirror) is a dependency-graph concern that subpath entries already solve: each subpath is its own module root, so a bundler pulls only what the imported entry reaches. The one thing separate packages add, independent versioning, is a cost here: the surfaces share a substrate (Document model, `@quillmark/wasm` boundary, `ContentHit`/`ChangeSet` types) and co-evolve, so a per-package version matrix is tax with no payer.
 

@@ -28,7 +28,7 @@ npm run check              # types, per package
 npm run lint               # prettier, over the repo
 npm run gate:fast          # lint, types and the checks through check:fonts, without a build
 npm run gate               # gate:fast, then build, bundle and the suite
-npm run check:docs         # every cross-doc section reference, and the stated wasm pin
+npm run check:docs         # every cross-doc section reference resolves
 npm run check:style        # the closed `--_qm-*` / `--pg-*` / `--st-*` scales
 npm run check:deps         # the dependency law
 npm run check:svelte       # the Svelte 5 forms, over every package that depends on svelte

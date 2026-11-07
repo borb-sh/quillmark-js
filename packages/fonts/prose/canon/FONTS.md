@@ -61,7 +61,6 @@ The engine reads its whole library when it first loads a Typst backend and never
 
 - **One download serves both sides.** `engine.fontFaces` hands the editor the same bytes for the browser's `FontFace`.
 - **Served compressed.** With no WOFF2, a host serves the files with brotli, which roughly halves them; their immutable hashed names make a repeat visit free.
-- **If first paint becomes the problem**, the follow-up is an engine change: take the family list up front and fetch a family's bytes when a document or the picker first names it.
 
 ## Boundaries
 
