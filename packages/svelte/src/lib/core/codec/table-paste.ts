@@ -1,4 +1,4 @@
-// A table on the clipboard lands as a table island (CODEC §"Markdown at the edges"). Two
+// A table on the clipboard lands as a table island (INVARIANTS §"Markdown at the edges"). Two
 // spellings carry one: an HTML `<table>`, and the tab-separated text a spreadsheet writes
 // beside it, which ProseMirror hands over only where the clipboard holds no HTML. Either
 // builds its props through `normalizeTable` and arrives with no id, which the paste's

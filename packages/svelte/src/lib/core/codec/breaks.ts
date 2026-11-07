@@ -76,7 +76,7 @@ export function linebreakPlugin(schema: Schema): Plugin {
  *
  * The break takes no marks and the caret keeps them: `decode` mints an unmarked break,
  * so an inherited mark would leave the leaf holding a shape a re-hydrate swaps out
- * (CODEC §Encode, one spelling of each shape), while dropping the marks from the
+ * (INVARIANTS §Encode, one spelling of each shape), while dropping the marks from the
  * *caret* would end a bold run at a line break the author only meant to wrap at.
  */
 function insertBreak(schema: Schema): Command {

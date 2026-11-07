@@ -1,5 +1,5 @@
 <!--
- Type dispatch (VISUAL_EDITOR §"Structure mirrors the schema"). Given one projected
+ Type dispatch (INVARIANTS §"Structure mirrors the schema"). Given one projected
  {@link FieldModel} and its live value, render the label + the control the type
  maps to. Array and matrix controls own their label (paired with the add affordance in
  {@link ArrayField}, with the held count in {@link MatrixField}); other types render
@@ -12,7 +12,7 @@
 
  `diagnostics` is the routed `Diagnostic[]` for this field (VisualEditor's
  `diagByKey`, merging `quill.validate`, local commit errors, and the external
- `diagnostics` prop (VISUAL_EDITOR §Diagnostics)) rendered via the shared
+ `diagnostics` prop (INVARIANTS §Diagnostics)) rendered via the shared
  `DiagnosticList`, non-gating; each set also re-evaluates a prose leaf's hold
  (`ProseField`).
 -->
@@ -129,7 +129,7 @@
 	// object-valued default has none. An array draws its declared literal instead,
 	// which is what a take writes (`ArrayField`).
 	// A default that prints stands in the control as the value it is, at the default
-	// rung, and the first edit takes it (VISUAL_EDITOR §"The commitment ladder"). Where
+	// rung, and the first edit takes it (INVARIANTS §"The commitment ladder"). Where
 	// nothing prints, a control draws words: the `none` an optional cell prints.
 	const ghost = $derived(ghostDefault(provenance));
 	const defaultStr = $derived(

@@ -1,7 +1,7 @@
 // The table island's model: the grid every row and column op works (`TableGrid`, a header row and
 // body rows of cells), its two crossings to the island the store holds (`gridOf`, `islandOf`), the
 // cell codec (a `GridCell` ↔ one inline-schema PM doc), and the rectangularizing constructors
-// (CODEC §Islands, §"The table island").
+// (INVARIANTS §Islands, §"The table island").
 //
 // The store's table is `columns` and `rows` of ids, each cell naming the slot holding its content,
 // and layout keyed by column and slot id. The grid holds it by place: each cell carries the row,
@@ -9,7 +9,7 @@
 // each rank's id off the first cell holding an unclaimed one, minting past the table's highest.
 //
 // The grid normalizes to one column count shared by `header`, every row, `aligns` and `widths`. The
-// editor keeps its optimistic PM and re-hydrates only on an external change (CODEC
+// editor keeps its optimistic PM and re-hydrates only on an external change (INVARIANTS
 // §Reconciliation), so an op that emitted a ragged table would leave the store rectangularized and
 // PM ragged with no repair. Every constructor therefore ends in {@link normalizeTable}, and a
 // caller reaches the shape only through them.

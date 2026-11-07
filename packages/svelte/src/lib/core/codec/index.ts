@@ -1,5 +1,5 @@
 // The codec barrel: the bidirectional bridge between one content field (`Content`)
-// and one ProseMirror document (CODEC.md). Decode (content → PM), lower (PM doc → a
+// and one ProseMirror document (INVARIANTS §"The codec"). Decode (content → PM), lower (PM doc → a
 // `Change` for `apply`), the UTF-16↔PM position map, and the `createField`
 // prose leaf. Consumed by the VisualEditor and the codec test suite.
 

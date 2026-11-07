@@ -72,7 +72,7 @@ describe('renderTip', () => {
 		// it; the mark's own gate does (`codec/schema.ts`).
 		//
 		// No anchor and no `href` is the whole of it: the refused value rides on the
-		// span under a `data-` name so a copy keeps the mark (CODEC §Marks), which is a
+		// span under a `data-` name so a copy keeps the mark (INVARIANTS §Marks), which is a
 		// value the DOM holds rather than a target anything follows.
 		for (const scheme of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>']) {
 			const el = document.createElement('div');

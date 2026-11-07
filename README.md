@@ -40,6 +40,6 @@ npm run check:registry     # each package's version against the registry's copy
 
 Everything runs against the reference quill, [`fixtures/quills/showcase/1.0.0`](fixtures/quills/showcase), a dev fixture at the workspace root, never published (beside it sits `usaf_memo`, a held copy of a shipped quill; see [`fixtures/Quiver.yaml`](fixtures/Quiver.yaml)): it declares a field for every control the tier draws and three card kinds, so a surface is exercised against a schema rather than against a mock.
 
-## Canon
+## Invariants
 
-The settled systems, per tier: [`svelte`'s](packages/svelte/prose/canon/INDEX.md), [`quiver`'s](packages/quiver/prose/canon/INDEX.md), [`fonts`'](packages/fonts/prose/canon/INDEX.md), [`collab`'s](packages/collab/prose/canon/INDEX.md), [`quillkit`'s](packages/quillkit/prose/canon/INDEX.md) (the tool and both clients), [the playground's](packages/playground/prose/canon/INDEX.md). Work that is not settled lives in GitHub issues.
+The rules each published package keeps, with the reason for each and the designs already rejected: [`svelte`'s](packages/svelte/prose/INVARIANTS.md), [`quiver`'s](packages/quiver/prose/INVARIANTS.md), [`fonts`'](packages/fonts/prose/INVARIANTS.md), [`collab`'s](packages/collab/prose/INVARIANTS.md), [`quillkit`'s](packages/quillkit/prose/INVARIANTS.md) (the tool and both clients). Work that is not settled lives in GitHub issues.

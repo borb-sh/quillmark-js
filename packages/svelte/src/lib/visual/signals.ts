@@ -1,5 +1,5 @@
 // What the editor emits. The editor is unaware of the preview
-// (VISUAL_EDITOR §"Focus and the preview bridge"), so nothing here imports it; what the two share
+// (INVARIANTS §"Focus and the preview bridge"), so nothing here imports it; what the two share
 // is `/core`'s address vocabulary, which is what lets a consumer wire the bridge
 // as a pass-through rather than a translation.
 import type { DocPath } from '../core/address.js';

@@ -23,7 +23,7 @@
  `focusPath` opens the row it is aimed at before it focuses, and hands the rest of the
  walk to that row's subform, which is how a row two closed boxes down is reached.
 
- The table (`layout: 'table'`, VISUAL_EDITOR §"Structure mirrors the schema") is the
+ The table (`layout: 'table'`, INVARIANTS §"Structure mirrors the schema") is the
  same row machine in another presentation: the same ids, the same splices, the same
  landing and the same cell keys, over rows that are always open, each cell the
  property's ordinary control on the track the header names ({@link ObjectField}
@@ -170,8 +170,8 @@
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
 	const defaulted = $derived(value == null && (fallback?.length ?? 0) > 0);
-	// A bare value is the one-element list the render floor wraps it into (canon
-	// `SCHEMAS.md` §"Type coercion"), and the reader answers no element of it.
+	// A bare value is the one-element list the render floor wraps it into (quillmark/INVARIANTS
+	// §"Coercion is the type predicate"), and the reader answers no element of it.
 	const bare = $derived(value != null && !Array.isArray(value));
 	const arr = $derived(rowsOf(value));
 	function rowsOf(v: unknown): unknown[] {
@@ -1108,7 +1108,7 @@
 	 summary that unfolded it, as a variant's cells hang at the discriminant's and a
 	 matrix's columns at the tick's. Every vertical hangs at the edge of the control it
 	 unfolds from, so a step in is one nesting distance wherever it is read, the
-	 `--_qm-nest` the subform keeps from its own stroke (ARCHITECTURE §"A plane is a
+	 `--_qm-nest` the subform keeps from its own stroke (INVARIANTS §"A plane is a
 	 tone"); a second rung here read as a deeper level than the object the row holds. */
 	/* The slabs measure the head, not the row: an open element is the head plus
 	 everything it unfolded, and the controls belong to the line they sit on rather than
@@ -1172,7 +1172,7 @@
 	/* ── A table ────────────────────────────────────────────────────────────────
 	 Every row of it is open, so it stands where an open row's subform stands: a rung
 	 inside the field, behind the subform's vertical and between its caps (`ObjectField`,
-	 ARCHITECTURE §"A plane is a tone"). The stroke is what says the header's labels are
+	 INVARIANTS §"A plane is a tone"). The stroke is what says the header's labels are
 	 the field's insides: on the field's own edge at the label's register, labels abreast
 	 over boxes are the figure a row of compact fields draws. A corner reads square at a
 	 stroke, so the wash takes none here.

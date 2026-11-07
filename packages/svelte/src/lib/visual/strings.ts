@@ -199,7 +199,7 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings {
  *
  * A formatter reads the whole `Diagnostic`, including `args`: the facts `message`
  * interpolates, keyed by name. What it can re-word tracks what that type carries per
- * lane (VISUAL_EDITOR §Diagnostics for why each lands where it does):
+ * lane (INVARIANTS §Diagnostics for why each lands where it does):
  *
  * - **`validation::enum_violation`, `type_mismatch`, `format_violation`**: the
  *   constraint re-words from the quill's schema at `path`, the offending value from

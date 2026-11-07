@@ -1,4 +1,4 @@
-// The schema × payload join, as pure functions (VISUAL_EDITOR §Structure). The reactive
+// The schema × payload join, as pure functions (INVARIANTS §"Structure mirrors the schema"). The reactive
 // orchestration lives in VisualEditor.svelte.
 import {
 	VARIANT_DISCRIMINANT_KEY,
@@ -14,7 +14,7 @@ import {
 import type { TextCap } from '../core/codec/index.js';
 import { core } from '../core/lifecycle.js';
 
-/** The control a field type maps to (VISUAL_EDITOR §"Structure mirrors the schema"). */
+/** The control a field type maps to (INVARIANTS §"Structure mirrors the schema"). */
 export type ControlKind =
 	| 'prose'
 	| 'text'
@@ -193,7 +193,8 @@ export function resolveBodyGhost(
 }
 
 /** Whether a cell is optional: a `t?` type, which renders `none` unanswered and so
- *  never declares a `default:` (canon `SCHEMAS.md` §"Optional cells"). */
+ *  never declares a `default:` (quillmark `docs/quills/quill-yaml-reference.md`
+ *  §"Optional fields"). */
 export function optionalCell(f: QuillFieldSchema): boolean {
 	return f.type.endsWith('?');
 }
@@ -271,8 +272,8 @@ export function controlKind(f: QuillFieldSchema): ControlKind {
 		case 'text':
 			return 'prose';
 		case 'enum':
-			// `variants:` is the one key that changes a field's resting shape (canon
-			// `SCHEMAS.md`): with it the field rests as a container, without it a bare string.
+			// `variants:` is the one key that changes a field's resting shape (quillmark
+			// `docs/quills/quill-yaml-reference.md` §Variants): with it the field rests as a container, without it a bare string.
 			return f.variants ? 'variant' : 'enum';
 		case 'number':
 		case 'integer':
@@ -300,7 +301,7 @@ export const VARIANT_DISCRIMINANT = VARIANT_DISCRIMINANT_KEY;
 
 /** The label key of an open matrix's added item, the one cell a roster member never
  *  stores. The boundary exports no constant for it, so the package spells it once
- *  (canon `SCHEMAS.md` §Matrix). */
+ *  (quillmark `docs/quills/quill-yaml-reference.md` §Matrix). */
 export const MATRIX_TITLE = 'title';
 
 // ── The matrix ───────────────────────────────────────────────────────────────
@@ -486,7 +487,7 @@ export function matrixMemberSchema(matrix: QuillFieldSchema, id: string): QuillF
  * under a `matrix` and a key under that member, a cell of any world (or the
  * discriminant) under a variant-bearing `enum`. The editor's copy of the boundary's
  * `schema_at`, held here because the landing lane checks an address against the schema
- * before it asks the mounted tree for it (VISUAL_EDITOR §Surface).
+ * before it asks the mounted tree for it (INVARIANTS §Surface).
  */
 export function schemaAt(
 	field: QuillFieldSchema,
@@ -568,7 +569,7 @@ export type ArrayLayout = 'list' | 'table';
  * and every cell of the row is short (a block prose cell declines it, at load width and
  * every width after), else `'list'`. That every column is a leaf is the loader's
  * contract (`quill::table_column_not_leaf`); whether a leaf fits a cell is the surface's
- * answer (canon `SCHEMAS.md`): a table composes by position, so a row that would stack
+ * answer (quillmark `docs/quills/quill-yaml-reference.md` §layout): a table composes by position, so a row that would stack
  * inside a cell is not one.
  */
 export function arrayLayout(field: QuillFieldSchema): ArrayLayout {
@@ -604,8 +605,8 @@ export function variantCells(
 /**
  * The container a discriminant pick commits, and the discriminant cell alone the unset
  * sentinel clears: sibling cells are **kept** either way, since the boundary carries an
- * answer its world does not select rather than dropping it (VISUAL_EDITOR §"Enum
- * variants"). A container left holding nothing is an unset field, which commits
+ * answer its world does not select rather than dropping it (INVARIANTS
+ * §Enums). A container left holding nothing is an unset field, which commits
  * `undefined`.
  */
 export function commitDiscriminant(
@@ -658,7 +659,7 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 }
 
 /**
- * Group-section order (VISUAL_EDITOR §"Structure mirrors the schema"): the `ui.groups` key order,
+ * Group-section order (INVARIANTS §"Structure mirrors the schema"): the `ui.groups` key order,
  * else first appearance of each field's `ui.group`.
  */
 export function groupOrder(cardSchema: QuillCardSchema): string[] {
@@ -709,7 +710,7 @@ export function groupSections(
 }
 
 /**
- * Object-panel sections (VISUAL_EDITOR §"Structure mirrors the schema"): every
+ * Object-panel sections (INVARIANTS §"Structure mirrors the schema"): every
  * top-level `object` is a panel of its own, headed by the object, in declaration
  * order; everything else stands in one unframed section above them. The section id
  * is the field name, which a card's keys hold unique.
@@ -874,7 +875,7 @@ export function bodyEnabled(cardSchema: QuillCardSchema | undefined): boolean {
 	return cardSchema?.body?.enabled !== false;
 }
 
-// ── Session identity (VISUAL_EDITOR §"The address is the spine") ─────────────
+// ── Session identity (INVARIANTS §"The address is the spine") ─────────────
 // Cards are positional in the content and `doc.cards` re-allocates on each read,
 // so a stable card-instance key cannot be the card object (a fresh object every
 // derive): it is a session id held in a parallel array, reordered in lockstep

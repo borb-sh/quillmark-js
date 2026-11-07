@@ -1,6 +1,6 @@
 /**
  * A consumer's quiver, on disk: the reference quiver copied somewhere writable, outside this
- * workspace. quillkit carries the packer and the engine itself (QUILLKIT §"One pin"), so the
+ * workspace. quillkit carries the packer and the engine itself (INVARIANTS §"One pin"), so the
  * copy installs nothing beside it.
  */
 

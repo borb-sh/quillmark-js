@@ -205,7 +205,7 @@ describe('Delete on an empty line takes the line', () => {
 	});
 
 	// Taken, not eaten: the island stands and the selection lands on it, which is the
-	// state `atoms.ts` draws before a press that would take it (CODEC §"The table
+	// state `atoms.ts` draws before a press that would take it (INVARIANTS §"The table
 	// island"). So the table goes on the press after, never on this one.
 	it('an island below the line stands, armed for the press after', () => {
 		const next = expectPress(

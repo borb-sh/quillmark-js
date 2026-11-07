@@ -3,7 +3,7 @@
 // other type inline. The node carries `id`, `islandType`, `props` and `slots` verbatim, and a block
 // island the id of the block it fills.
 //
-// `ContentIsland.props` is the typed union at the boundary (DOCUMENT_MODEL §Stability seams), so a
+// `ContentIsland.props` is the typed union at the boundary (INVARIANTS §"The boundary"), so a
 // discriminant check narrows it; `props` still crosses the DOM as opaque JSON, which
 // `table.ts` §`tableOfNode` guards.
 import {
@@ -35,7 +35,7 @@ const islandAttrs = {
 };
 
 // All three attributes cross the DOM, since a copy and a paste inside one body run the document
-// through `toDOM`/`parseDOM` (CODEC §"Markdown at the edges") and an island's tags alone say only
+// through `toDOM`/`parseDOM` (INVARIANTS §"Markdown at the edges") and an island's tags alone say only
 // `[table]`. `props` crosses as JSON. The names are `data-qm-*`, and the id is required: an island
 // is a leaf, so a rule reading someone else's tag would swallow that element's whole subtree.
 
@@ -53,7 +53,7 @@ function islandDOM(node: PMNode): Record<string, string> {
  * The island types the content model names, each with whether its markup is a block (deciding the
  * node its slot decodes to) and whether a leaf edits it. A `Record` over the boundary's union, so a
  * member added upstream is a missing key here. A footnote and an equation are read, not edited
- * (CODEC §Decode): a leaf holding one is held.
+ * (INVARIANTS §Decode): a leaf holding one is held.
  */
 type KnownIsland = Exclude<ContentIsland['type'], `x-${string}`>;
 const ISLANDS: Record<KnownIsland, { block: boolean; edited: boolean }> = {
@@ -153,7 +153,7 @@ function inlineIslandDOM(node: PMNode): DOMOutputSpec {
 
 /**
  * A PM island node's attributes: the content entry, with `islandType` because `type` on a PM node
- * is the node type; its set comes off the entry (DOCUMENT_MODEL §Stability seams).
+ * is the node type; its set comes off the entry (INVARIANTS §"The boundary").
  */
 export interface IslandNodeAttrs {
 	id: string;
@@ -205,7 +205,7 @@ export function isTableProps(props: unknown): props is TableProps {
 /**
  * A minter over one document: the positional `isl-{n}` sequence continued past the highest id the
  * field holds, so a caller placing several islands keeps one minter. A minted id is part of the
- * document's canonical bytes (CODEC §Islands): a counter over the projection in hand, never a UUID
+ * document's canonical bytes (INVARIANTS §Islands): a counter over the projection in hand, never a UUID
  * or clock reading, and never a re-numbering of existing ids.
  *
  * Reads the PM doc rather than stored content because that is what the caller holds and the commit

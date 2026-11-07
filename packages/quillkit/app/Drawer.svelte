@@ -1,6 +1,6 @@
 <!--
   "My documents": every document this browser keeps for this app, most recently edited
-  first, and what can be done with each (APP §"Documents"). Closed until asked for, and
+  first, and what can be done with each (INVARIANTS §Documents). Closed until asked for, and
   mounted only while open, so the list is read when it opens rather than kept in step.
 
   A native `<dialog>` carries the top layer, the focus trap and the escape key; what is

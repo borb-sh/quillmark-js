@@ -1,8 +1,8 @@
-// The table island's NodeView (CODEC §"The table island"): vanilla DOM holding one nested
+// The table island's NodeView (INVARIANTS §"The table island"): vanilla DOM holding one nested
 // `EditorView` per cell, each on its own schema (`table.ts`).
 //
 // A cell edit writes the projection back onto the node's `props` with `setNodeMarkup`, which the
-// field lowers to an `islandOps` `set` (CODEC §Encode), so every anchor stays in the field.
+// field lowers to an `islandOps` `set` (INVARIANTS §Encode), so every anchor stays in the field.
 //
 // The nested views carry no history (Mod-z routes to the field's), no anchor plugin (an anchor in a
 // cell is preserved, never minted), and no placeholder.
@@ -68,7 +68,7 @@ import {
 
 /** Everything the island's chrome says. Accessible names, not decoration: every
  *  control here is a bar, so an untranslated one reads the wrong language rather than
- *  merely inconsistent (VISUAL_EDITOR §"What the surface says"). */
+ *  merely inconsistent (INVARIANTS §"What the surface says"). */
 export interface TableChromeStrings {
 	/** The island's own name, on the wrapper. */
 	tableLabel: string;
@@ -539,7 +539,7 @@ class TableIslandView implements NodeView {
 	// ── The pointer ───────────────────────────────────────────────────────────
 
 	/**
-	 * Route a press to its band (CODEC §"The table island"): inside the frame the nearest cell's
+	 * Route a press to its band (INVARIANTS §"The table island"): inside the frame the nearest cell's
 	 * caret, outside it the document's, and a band control answers for itself.
 	 *
 	 * A press in a cell is a caret the nested view takes; only the promotion to a block is armed
@@ -683,7 +683,7 @@ class TableIslandView implements NodeView {
 
 	/**
 	 * The island as the selection: the Escape that climbs out of a cell or held rectangle.
-	 * Backspace there deletes the table, as over every island (CODEC §"The table island").
+	 * Backspace there deletes the table, as over every island (INVARIANTS §"The table island").
 	 */
 	private selectIsland(): void {
 		const pos = this.getPos();
@@ -785,7 +785,7 @@ class TableIslandView implements NodeView {
 	}
 
 	/** Select a line, and land the caret on it. The line verbs bind in the cell
-	 *  (CODEC §"The table island"), so the rectangle has to run through the caret for the
+	 *  (INVARIANTS §"The table island"), so the rectangle has to run through the caret for the
 	 *  next key to read a line off it. The focus moves first and the paint follows: a cell
 	 *  taking the focus retires whatever was held. */
 	private selectLine(line: Line): void {
@@ -927,7 +927,7 @@ class TableIslandView implements NodeView {
 	}
 
 	/**
-	 * What Backspace means over the selection (CODEC §"The table island"). Swept cells clear and
+	 * What Backspace means over the selection (INVARIANTS §"The table island"). Swept cells clear and
 	 * keep their lines. Named lines go; every rank on both axes is the table, which goes as the
 	 * island.
 	 */
@@ -1717,7 +1717,7 @@ class TableIslandView implements NodeView {
 
 	/**
 	 * A cell's keys. Traversal binds on the nested view, since the outer keymap never sees a
-	 * keystroke a cell handled (`stopEvent`; VISUAL_EDITOR §Chrome). Enter is the next row;
+	 * keystroke a cell handled (`stopEvent`; INVARIANTS §Chrome). Enter is the next row;
 	 * Shift-Enter is the body's line break (`breaks.ts`).
 	 */
 	private cellKeys(r: number, c: number): Record<string, Command> {
@@ -1867,7 +1867,7 @@ class TableIslandView implements NodeView {
 			},
 			// Escape climbs a rung a press: the caret's row (the keyboard's only route to a held
 			// rectangle), then the island. What a press past the island means is the shell's
-			// (VISUAL_EDITOR §Chrome).
+			// (INVARIANTS §Chrome).
 			Escape: () => {
 				if (this.selected) this.selectIsland();
 				else this.selectLine({ axis: 'row', index: r });

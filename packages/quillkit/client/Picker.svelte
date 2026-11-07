@@ -39,7 +39,7 @@
 	<span class="qm-label">{catalog.name}</span>
 	{#if catalog.description}
 		<!-- The collection's own sentence, beside the name it names. `About` holds it
-		     untruncated (STUDIO §"Opened, not stood on"). -->
+		     untruncated (INVARIANTS §"Opened, not stood on"). -->
 		<span class="said" data-testid="quiver-said" title={catalog.description}
 			>{catalog.description}</span
 		>

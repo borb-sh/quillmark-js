@@ -31,7 +31,7 @@
 	   the page sinks from it by the same ramp. That is what puts a host page and
 	   an editor's own column on one tone rather than a plane apart. Planes step by
 	   light and everything else by ink, which is the package's own split
-	   (ARCHITECTURE §Styling); the figures are its figures. */
+	   (INVARIANTS §Styling); the figures are its figures. */
 	--qmh-surface: var(--qm-bg, light-dark(#fff, #272729));
 	--qmh-page: oklab(from var(--qmh-surface) calc(l - (0.04 + 0.0202 * (1 - l))) a b);
 	--qmh-ink: var(--qm-fg, light-dark(#1c1c1c, #d7dadc));

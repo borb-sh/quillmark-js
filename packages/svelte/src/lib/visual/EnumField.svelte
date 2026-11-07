@@ -134,7 +134,7 @@
 						     policy when it is the one selected: a listbox whose selected value
 						     has no row shows nothing for what the document says, and offers none
 						     for the primitive to mark, type-ahead to, or key onto
-						     (VISUAL_EDITOR §"Enum policy"). Off `local`, not `value`: the
+						     (INVARIANTS §Enums). Off `local`, not `value`: the
 						     row that exists is the row the control has selected, through the
 						     window where an own pick has not reconciled back. -->
 						{#each values as v (v)}

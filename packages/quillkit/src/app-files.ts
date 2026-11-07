@@ -1,6 +1,6 @@
 /**
  * The app target's inputs and what they resolve to: `App.yaml`, `app.css` and the icon,
- * each found by name, resolved against the quiver into `app.json` (QUILLKIT §"The app target").
+ * each found by name, resolved against the quiver into `app.json` (INVARIANTS §"The app target").
  * Everything that can refuse is read before a build clears anything.
  */
 
@@ -65,7 +65,7 @@ export function readAppYaml(root: string): AppYaml | undefined {
 
 /**
  * The canonical refs an app opens: every quill the quiver holds, at its latest version. A
- * draft is admitted only under `drafts`, as a pack admits one (QUIVER §"The draft floor").
+ * draft is admitted only under `drafts`, as a pack admits one (quiver/INVARIANTS §"The draft floor").
  */
 export function appRefs(quiver: Quiver, drafts: boolean): string[] {
 	const refs = quiver.quillNames().flatMap((name) => {

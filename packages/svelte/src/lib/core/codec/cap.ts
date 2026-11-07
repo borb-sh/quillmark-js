@@ -1,5 +1,5 @@
 // A content field's `max:`, the character count past which its value overflows its box
-// or its record (quillmark canon `SCHEMAS.md` §"Cardinality"): held as a bound no edit
+// or its record (quillmark `docs/quills/quill-yaml-reference.md` §max): held as a bound no edit
 // crosses, so an over-length value is never authored rather than authored and warned of.
 import type { Node as PMNode, Slice } from 'prosemirror-model';
 import { isHistoryTransaction } from 'prosemirror-history';

@@ -72,4 +72,4 @@ Edits are compared word by word: a change lands unless someone changed the same 
 
 `bindDocument({ doc, quill, ydoc, leader, onRemote })` binds a Document to any `Y.Doc` and leaves the transport to the host, once `await init()` from this package has instantiated the core it reads. `leader` is whether this binding writes back a repair that inserts: `true` for a binding alone on its `Y.Doc`, and for exactly one of several. `seedDocument(doc, quill)` is the update a Y state starts from, the same bytes on every client that seeds the same Document.
 
-The design, its invariants and its pitfalls: [`prose/canon/COLLAB.md`](prose/canon/COLLAB.md).
+The invariants, the reasons behind them and the host rules: [`prose/INVARIANTS.md`](prose/INVARIANTS.md).

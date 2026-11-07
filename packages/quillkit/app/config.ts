@@ -1,4 +1,4 @@
-// `app.json`, read at boot (APP §"Boot"): the tab's title and icon, and the author's
+// `app.json`, read at boot (INVARIANTS §Boot): the tab's title and icon, and the author's
 // stylesheet, linked after the client's own.
 import type { AppConfig } from './records';
 

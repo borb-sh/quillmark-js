@@ -1,5 +1,5 @@
 /**
- * `init`: a quiver from nothing (QUILLKIT §"Where a quiver comes from"). The quills come out
+ * `init`: a quiver from nothing (INVARIANTS §"Where a quiver comes from"). The quills come out
  * of the tarball's `starter/`; the files that name versions are written here.
  */
 

@@ -109,7 +109,7 @@
 	   `touch-action` leaves a pinch to the viewport, which zooms the pages rather than
 	   the host's page.
 
-	   `:global(:where(…))` puts this promised class at zero rank (ARCHITECTURE §Styling). */
+	   `:global(:where(…))` puts this promised class at zero rank (INVARIANTS §Styling). */
 	:global(:where(.qm-preview)) {
 		box-sizing: border-box;
 		position: relative;
@@ -157,8 +157,7 @@
 		margin-top: auto;
 	}
 
-	/* Floats over the desk, so it lifts the way a floating surface does (ARCHITECTURE
-	   §Styling), and says only the zoom: the label never changes. Tabular figures and a
+	/* Floats over the desk, so it lifts the way a floating surface does (INVARIANTS §Styling), and says only the zoom: the label never changes. Tabular figures and a
 	   floor as wide as `100%`, so a third digit never shifts its edge. It arrives at once and leaves on the reveal, so a glance at
 	   it after a gesture still finds it. */
 	:global(:where(.qm-preview-zoom)) {

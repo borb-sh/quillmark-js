@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// The enum-option policy's two arms and the authored-value escape (VISUAL_EDITOR
-// §"Enum policy"), driven the way a pointer opens the listbox and judged on the rows
+// The enum-option policy's two arms and the authored-value escape (INVARIANTS
+// §Enums), driven the way a pointer opens the listbox and judged on the rows
 // it draws. `status` is the case the distinction exists for, and the five stages the
 // reference quill declares leave a deployment carrying two with both kinds of row
 // in one list.

@@ -1919,7 +1919,7 @@ describe('a selection is the subject of the next command', () => {
 
 // ── The clipboard ──────────────────────────────────────────────────────────
 //
-// A table on the clipboard lands as an island (CODEC §"Markdown at the edges"): the HTML
+// A table on the clipboard lands as an island (INVARIANTS §"Markdown at the edges"): the HTML
 // every source writes, or, where the clipboard holds no HTML, the tab-separated text a
 // spreadsheet writes. Each fixture is what its source app puts on the clipboard
 // (`_clipboard.ts`), pasted through the leaf's own handler, and asserted twice: the props

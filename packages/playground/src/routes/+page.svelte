@@ -2,7 +2,7 @@
   The front page, one scroll in two parts: a first screen carrying the thesis and
   its two actions, and the quickstart under it, in two columns — the steps down the
   reading column, the surfaces they reach standing beside them
-  (PLAYGROUND §"The routes").
+  (README §Routes).
 
   Two documents off one quill: one the preview's session paints, one the editor
   holds. No apply loop runs here, so a shared document would let typing in the
@@ -226,8 +226,8 @@
 		padding-block-end: var(--pg-space-16);
 	}
 
-	/* The first screen: a thesis, two actions, no mount (PLAYGROUND §"Two jobs on one
-	   page"). It takes the small viewport less the running head, so everything else is
+	/* The first screen: a thesis, two actions, no mount (svelte/INVARIANTS §"The front
+	   page mounts what it describes"). It takes the small viewport less the running head, so everything else is
 	   under the fold and mobile chrome expanding cannot push the actions off the screen
 	   they are the point of. Centred there and held to the
 	   measure at the page's start edge, which is the column every step below reads down:

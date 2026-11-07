@@ -108,7 +108,7 @@
 
 	   Planes are the half that does not read the ink pole, because what makes a
 	   card read as a card is that it is the brighter plane, in both schemes
-	   alike (ARCHITECTURE §Styling). A plane stepped toward the ink is right in
+	   alike (INVARIANTS §Styling). A plane stepped toward the ink is right in
 	   dark and inverted in light, where it darkens the card below the page it
 	   floats on. So `sunken` and `well` step toward shadow and `raised` toward
 	   light, and the base plane — a card, the preview's paper — is the pole
@@ -220,7 +220,7 @@
 
 	/* The tips card'S hue: the surface's one exit from the greyscale that is not
 	   a status, and what the amber and the typewriter face say together is
-	   draft (VISUAL_EDITOR §"Card operations"). A literal rather than a dial
+	   draft (INVARIANTS §"Card operations"). A literal rather than a dial
 	   because there is nothing left to turn: the rungs under it mix over
 	   the surface and the ink a consumer already tuned, so the card follows a
 	   brand untold. The mixes are faint on purpose: a warmth, not a badge.

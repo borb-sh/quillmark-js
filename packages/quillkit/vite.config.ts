@@ -98,7 +98,7 @@ export default defineConfig({
 	root: ROOT,
 	// Relative asset URLs, and the client resolves the quiver off `document.baseURI`
 	// for the same reason: the base is a runtime fact, so a built studio serves from
-	// wherever it is put (STUDIO §"A client, and what serves it").
+	// wherever it is put (INVARIANTS §"A client, and what serves it").
 	base: './',
 	plugins: [
 		svelte({

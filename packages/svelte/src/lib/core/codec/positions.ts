@@ -1,4 +1,4 @@
-// Positions: the content ↔ PM map that carries the caret (CODEC §Positions). A content offset is a
+// Positions: the content ↔ PM map that carries the caret (INVARIANTS §Positions). A content offset is a
 // UTF-16 index into the flat `text`; a PM position counts node tokens. The map is a list of runs
 // (built by the shared `scanDoc` walk, so it can never disagree with the content projection) that
 // tile the text: a `text` run where PM and the content advance together, an `nl` run for a `\n`

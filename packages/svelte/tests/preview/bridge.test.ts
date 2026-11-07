@@ -99,7 +99,7 @@ describe('the click ladder', () => {
 	});
 });
 
-// The clearance the continuous hop moves on (PREVIEW §"Follow-the-caret scroll").
+// The clearance the continuous hop moves on (INVARIANTS §"Follow-the-caret scroll").
 describe('the fold guard', () => {
 	/** A span `height` tall whose top edge sits at `top`. */
 	const span = (top: number, height: number) => ({ top, bottom: top + height, height });

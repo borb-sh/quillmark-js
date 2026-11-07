@@ -4,7 +4,7 @@
 // delete against one edits nothing (§`againstAtom`).
 //
 // This is the neighbour half of the rule the leaf already holds for a key typed over a
-// selection (CODEC §"The table island"): a selection is the subject of the next
+// selection (INVARIANTS §"The table island"): a selection is the subject of the next
 // command, never a thing armed for replacement. Without it the base keymap's
 // `joinBackward` / `joinForward` reach their "the neighbour is an atom, delete it" arm
 // and a table goes in one keystroke, from the paragraph a table insert parks the caret

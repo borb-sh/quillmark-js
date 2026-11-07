@@ -1,5 +1,5 @@
 // The client's one entry. Both stylesheets are global imports so the chrome reaches every
-// component's markup (ARCHITECTURE §Styling).
+// component's markup (svelte/INVARIANTS §Styling).
 import { mount } from 'svelte';
 import '@quillmark/svelte/preset';
 import './studio.css';

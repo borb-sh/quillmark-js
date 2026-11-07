@@ -1,5 +1,5 @@
 // The documents a browser keeps for one app: IndexedDB, one database per app base URL
-// (APP §"Documents"), plus which document was open.
+// (INVARIANTS §Documents), plus which document was open.
 
 import { readRecord, toStored, type DocRecord } from './records';
 

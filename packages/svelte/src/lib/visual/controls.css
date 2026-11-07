@@ -90,7 +90,7 @@
 	color: var(--_qm-ink);
 	caret-color: currentColor;
 }
-/* The box is the well rung with a hairline inside it (ARCHITECTURE §Styling): a
+/* The box is the well rung with a hairline inside it (INVARIANTS §Styling): a
  field is a hole cut into the card, and the edge is what finds it at a glance, the
  fill alone standing too close to the card to. Inset, so the edge costs no layout
  and a focus ring draws outside it. */
@@ -356,7 +356,7 @@
 
  A floating surface is the one place a hairline is still load-bearing: it hangs
  over content the surface did not choose, so there is no plane under it for a
- tone to step off (ARCHITECTURE §Styling). The edge and `--_qm-lift` carry it
+ tone to step off (INVARIANTS §Styling). The edge and `--_qm-lift` carry it
  there, and the raised rung joins them in dark, where a tone still has somewhere
  to go.
 

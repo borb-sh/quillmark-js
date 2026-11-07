@@ -10,7 +10,7 @@
 
  The nesting is a vertical at `--_qm-border`, the ladder's last stroke: an open section's
  vertical one `--_qm-nest` in from the card's edge where the field is in one, this one a
- rung further, the properties a rung inside it (ARCHITECTURE §"A plane is a tone").
+ rung further, the properties a rung inside it (INVARIANTS §"A plane is a tone").
 
  One figure wherever it mounts, and where its stroke lands is the stacker's. A
  variant's cells and a matrix member's columns sit at the depth a field-level subform
@@ -484,7 +484,7 @@
 	/* The vertical and the rung between it and the properties, `--_qm-nest` being the step
 	   the card and the section hold too.
 
-	   `--_qm-border`: this is the stroke that structures (ARCHITECTURE §"A plane is a
+	   `--_qm-border`: this is the stroke that structures (INVARIANTS §"A plane is a
 	   tone"), the one the section's vertical reads.
 
 	   `padding-block` is the stroke's end caps, the same rung and the same reason as a

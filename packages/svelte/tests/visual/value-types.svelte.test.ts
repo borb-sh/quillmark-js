@@ -168,7 +168,7 @@ describe('an object field', () => {
 
 describe('an array of objects', () => {
 	/** A seeded document with `revisions` emptied. The fixture seeds one row so its plate
-	 *  has a nested row to region (PREVIEW.md §"Click bridge"); these three are about the
+	 *  has a nested row to region (INVARIANTS §"Click bridge"); these three are about the
 	 *  array a hand fills from empty, so they clear it and drive the adds themselves. */
 	function emptied(q: Quill): Document {
 		const doc = q.seedDocument();
@@ -290,7 +290,7 @@ describe('an array of objects', () => {
 });
 
 // The render reads a bare value under an `array` as the one-element list it spells
-// (canon `SCHEMAS.md` §"Type coercion"), and the transport door rests it as authored,
+// (quillmark/INVARIANTS §"Coercion is the type predicate"), and the transport door rests it as authored,
 // so the rows are the render's reading and a gesture writes that list whole.
 describe('an array holding a bare value', () => {
 	const loaded = (...fields: string[]): Document =>

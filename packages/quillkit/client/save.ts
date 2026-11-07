@@ -1,4 +1,4 @@
-// Both doors out of the document end here (STUDIO §"The document has doors").
+// Both doors out of the document end here (INVARIANTS §"The document has doors").
 
 /** Hand `content` to the browser as a download named `name`. `click` dispatches
  *  synchronously, so the URL is revoked on the same turn. */

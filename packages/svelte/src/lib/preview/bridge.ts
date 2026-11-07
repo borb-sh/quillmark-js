@@ -54,7 +54,7 @@ const MIN_CLEARANCE = 8;
 
 /**
  * What a click may miss a field's ink by and still land on it, in CSS px of the page as drawn
- * (PREVIEW.md §"Click bridge").
+ * (INVARIANTS §"Click bridge").
  */
 const CLICK_SLACK_PX = 2;
 
@@ -92,7 +92,7 @@ export function createBridge(
 	const unlisten: Array<() => void> = [];
 
 	// Two rungs: `positionAt` over span-tracked content, then `fieldAt` over every tracked
-	// placement (PREVIEW.md §"Click bridge"). The second carries no `pos`: a fabricated `0` would
+	// placement (INVARIANTS §"Click bridge"). The second carries no `pos`: a fabricated `0` would
 	// be an invented offset.
 	if (onPick) {
 		for (const { page, el } of slots) {

@@ -1,5 +1,5 @@
 <!--
- A Svelte mount of the codec's `createField` (VISUAL_EDITOR §Surface), which owns the
+ A Svelte mount of the codec's `createField` (INVARIANTS §Surface), which owns the
  PM state, the history and the per-keystroke commit, leaving this wrapper wiring and
  registration. `addr` is a live object the parent builds, so a card reorder re-targets
  this leaf's commits with the caret riding the untouched view.
@@ -103,7 +103,7 @@
 	const t = wording();
 
 	/** Pushed by the leaf's trigger plugin: the menu is the leaf's surface rather than
-	 * the shell's (VISUAL_EDITOR §Chrome). A constrained leaf never receives one, the
+	 * the shell's (INVARIANTS §Chrome). A constrained leaf never receives one, the
 	 * trigger mounting on the block schema alone. */
 	let slash: SlashState | undefined = $state();
 

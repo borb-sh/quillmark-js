@@ -104,7 +104,7 @@ jobs:
 
       # The font suite's promise to stored documents, held against the release it follows:
       # outside a breaking version, no family the registry's latest names is gone and no face
-      # it shipped changed its bytes (FONTS §Rules). Before the tag, since a published version is
+      # it shipped changed its bytes (fonts/INVARIANTS §Rules). Before the tag, since a published version is
       # permanent and a family it drops strands every document that named it.
       - name: Font suite, against the registry
         if: steps.release.outputs.pkg == 'fonts'

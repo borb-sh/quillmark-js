@@ -67,7 +67,7 @@ export interface VisualEditorProps {
 	onError?: EditorErrorHandler;
 	/**
 	 * External diagnostics, routed by `.path` and merged with `quill.validate`
-	 * and local commit errors (VISUAL_EDITOR §Diagnostics). Warnings do not draw.
+	 * and local commit errors (INVARIANTS §Diagnostics). Warnings do not draw.
 	 */
 	diagnostics?: Diagnostic[];
 	/**
@@ -84,7 +84,7 @@ export interface VisualEditorProps {
 	 * it in place, `'hide'` leaves it out of the list. One policy for the surface, not
 	 * a per-option verdict, and the selected value is drawn under either (disabled
 	 * when refused), so the control always shows what the document says
-	 * (VISUAL_EDITOR §"Enum policy").
+	 * (INVARIANTS §Enums).
 	 */
 	enumDisallowed?: 'hide' | 'disable';
 	/**

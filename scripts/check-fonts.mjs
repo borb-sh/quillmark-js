@@ -1,6 +1,6 @@
 // `@quillmark/fonts`' promise to stored documents, enforced. A `font_family` mark saves a
 // family name, so the suite changes only in ways that keep an old document rendering the
-// same (FONTS §Rules). Zero deps; run via `npm run check:fonts`.
+// same (fonts/INVARIANTS §Rules). Zero deps; run via `npm run check:fonts`.
 //
 // Four rules over the tree, and two more against the registry:
 //

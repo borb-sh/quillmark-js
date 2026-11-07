@@ -20,8 +20,8 @@ export interface PdfPoint {
 }
 
 /**
- * An address's boxes: `fieldBoxes`'s union, else every `regions()` rect at or under it
- * (PREVIEW.md §"Two responsibilities"). `fieldBoxes` answers `[]` for a scalar reference
+ * An address's boxes: `fieldBoxes`'s union, else every `regions()` rect at or under it.
+ * `fieldBoxes` answers `[]` for a scalar reference
  * the plate places without tracking its content and for an array itself; the fallback
  * takes the address and its descendants, matched at a path boundary (`.` or `[`):
  * `main.keywords` matches `main.keywords[0]`, not `main.keywords_note`.

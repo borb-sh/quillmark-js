@@ -7,7 +7,7 @@
 // with hard breaks, for a table cell. Anchors are not marks here (decorations).
 //
 // `toDOM` and `parseDOM` are one tier: a copy and a paste inside one body run the whole document
-// through them (CODEC §"Markdown at the edges"), so every attribute written here is read back here.
+// through them (INVARIANTS §"Markdown at the edges"), so every attribute written here is read back here.
 // Foreign HTML spells none of this package's `data-qm-*` names; the rules that widen that door on
 // purpose are the fence's and a span's styled marks, a `<table>` being the block leaf's clipboard
 // parser's (`table-paste.ts`).
@@ -221,7 +221,7 @@ const blockNodes: Record<string, NodeSpec> = {
 					// A list stating no `start` starts at one, the absence `toDOM` writes;
 					// `Number(null)` would read it as zero. A value the store would normalize away
 					// reads as that absence too, since a PM doc keeping one would disagree with the
-					// store for the session (CODEC §Reconciliation). Zero is not one: `0.` is an
+					// store for the session (INVARIANTS §Reconciliation). Zero is not one: `0.` is an
 					// ordinal `importMarkdown` produces.
 					const stated = el.getAttribute('start');
 					const start = stated ? Number(stated) : 1;
@@ -297,7 +297,7 @@ export const inlineSchema = new Schema({ nodes: inlineNodes, marks });
  * The inline schema with no mark types: a `plaintext(inline)` field, whose value is literal text
  * the boundary refuses to coerce back once it carries a mark. Declaring none makes that structural:
  * `toggleMark` has no type, the mark input rules build nothing, a paste parses marks away, and
- * `decode` drops any a stray content carries (CODEC §Inline mode).
+ * `decode` drops any a stray content carries (INVARIANTS §"Inline mode").
  */
 export const plaintextSchema = new Schema({ nodes: inlineNodes, marks: {} });
 
