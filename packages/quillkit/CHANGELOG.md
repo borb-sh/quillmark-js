@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A save flushed on leaving a document no longer marks it the open one** once a new document or the landing has opened, so a reload lands where the reader went.
+
 ## v0.23.0 - 2026-11-06
 
 **The carried `@quillmark/wasm` is 0.135.0.** A document opens through `Document.parse`, and a `text` field rests as plain content, its paragraphs a blank line apart and its lines `\n` apart.
