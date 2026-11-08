@@ -195,7 +195,7 @@ The bidirectional codec between one content field and one ProseMirror document. 
 
 ### Marks
 
-**Identity is kept off PM's mark mechanism.** Formatting is a property of a range and maps to PM marks; an anchor is a zero-width handle and maps to plugin-held positions keyed by id. Overlap only bites where identity and formatting coexist, and they never share a mechanism.
+**Identity is kept off PM's mark mechanism.** Formatting is a property of a range and maps to PM marks; an anchor is a zero-width handle and maps to plugin-held positions keyed by id. Overlap only bites where identity and formatting coexist, and they never share a mechanism. So an anchor draws as a decoration, a span carrying `data-qm-anchor` that the host styles, never as a mark the schema would serialize.
 
 **An anchor's id is the caller's**: supplied at `insertAnchor`, unique, and never changed afterwards, since no content determines what a comment refers to and the codec mints none.
 

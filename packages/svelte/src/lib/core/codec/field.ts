@@ -264,7 +264,8 @@ const GHOSTS = 100;
  * AnchorEdit} meta. The store's rule, so the commit has nothing to reconcile: a range keeps its
  * edges, text typed at either landing outside it, and a point stays left of text typed at it. A
  * range whose text is wholly deleted goes, and comes back with its text when history puts the
- * deleted slice back ({@link Ghost}); a point never goes.
+ * deleted slice back ({@link Ghost}); a point never goes. A range draws as a span carrying
+ * `data-qm-anchor`, its id, for a host to style and measure; a point draws nothing.
  */
 function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorState> {
 	return new Plugin<AnchorState>({
@@ -286,6 +287,19 @@ function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorState> {
 					ghosts = ghosts.filter((g) => g.id !== edit.id);
 				} else if (edit?.op === 'reset') anchors = edit.anchors;
 				return { anchors, ghosts: ghosts.slice(-GHOSTS) };
+			}
+		},
+		props: {
+			decorations: (state) => {
+				const ranged = anchorKey.getState(state)?.anchors.filter((a) => a.end > a.start) ?? [];
+				return ranged.length
+					? DecorationSet.create(
+							state.doc,
+							ranged.map((a) =>
+								Decoration.inline(a.start, a.end, { 'data-qm-anchor': a.id }, { id: a.id })
+							)
+						)
+					: DecorationSet.empty;
 			}
 		}
 	});

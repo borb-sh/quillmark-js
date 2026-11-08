@@ -500,6 +500,30 @@ describe('anchor insertion', () => {
 		field.destroy();
 	});
 
+	it('a ranged anchor draws as a span carrying its id, and a point draws nothing', () => {
+		const doc = example();
+		const container = mount();
+		const field = createField({ doc, quill: quill(), addr: {}, container });
+		field.insertAnchor('~a1', 1, 4);
+		field.insertAnchor('p1', 6);
+		const spans = [...container.querySelectorAll('[data-qm-anchor]')];
+		expect(spans.map((s) => s.getAttribute('data-qm-anchor'))).toEqual(['~a1']);
+		expect(spans[0].textContent).toBe(doc.main.body.text.slice(1, 4));
+		field.destroy();
+	});
+
+	it('an anchor the host places in the document draws once the leaf re-reads it', () => {
+		const doc = example();
+		const container = mount();
+		const field = createField({ doc, quill: quill(), addr: {}, container });
+		doc.apply({}, { steps: [{ anchor: { id: '~h1', start: 2, end: 6 } }] });
+		field.applyExternal();
+		expect(container.querySelector('[data-qm-anchor="~h1"]')?.textContent).toBe(
+			doc.main.body.text.slice(2, 6)
+		);
+		field.destroy();
+	});
+
 	it('anchorsInRange reports coverage for the popover active state', () => {
 		const doc = example();
 		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
