@@ -28,6 +28,7 @@ import type {
 	Document,
 	DocumentReader,
 	DocumentWriter,
+	Change,
 	Content,
 	Addr,
 	Quill
@@ -624,7 +625,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			if (!changeCommittable(doc, addr)) doc.replace(at, newRt);
 			else {
 				const change = lower(oldRt, newRt);
-				if (change) doc.apply(at, change);
+				if (change) {
+					const asked = askCore(oldRt, change);
+					const receipt = doc.apply(at, change);
+					if (asked.size) adopt(asked, receipt.minted);
+				}
 			}
 			reconciler.commit(readLeaf(reader, addr));
 			return true;
@@ -653,6 +658,55 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				return false;
 			}
 		}
+	}
+
+	/**
+	 * Each block id the projection minted for a block the store does not hold, swapped in
+	 * `change` for a placeholder the write fills, so the store is the one minter of block ids:
+	 * placeholder → projected id.
+	 */
+	function askCore(oldRt: Content, change: Change): Map<string, string> {
+		const held = new Set(oldRt.blocks.map((b) => b.id));
+		const asked = new Map<string, string>();
+		const named = new Map<string, string>();
+		for (const step of change.steps) {
+			if (!('splice' in step)) continue;
+			for (const b of step.splice.blocks ?? []) {
+				if (held.has(b.id)) continue;
+				const p = `?${asked.size}`;
+				asked.set(p, b.id);
+				named.set(b.id, p);
+				b.id = p;
+			}
+		}
+		for (const step of change.steps)
+			if ('setBlock' in step && named.has(step.setBlock.id))
+				step.setBlock.id = named.get(step.setBlock.id)!;
+		return asked;
+	}
+
+	/** Each block node takes the id the store gave the block it projects to, where the write minted it. */
+	function adopt(asked: Map<string, string>, minted: Record<string, string>): void {
+		const fresh = new Set(Object.values(minted));
+		const stored = (readLeaf(reader, addr) as Content).blocks.map((b) => b.id);
+		const nodes: { pos: number; key: string; id: unknown }[] = [];
+		view.state.doc.descendants((node, pos) => {
+			if (node.type.name === 'island_block') {
+				nodes.push({ pos, key: 'block', id: node.attrs.block });
+				return false;
+			}
+			if (node.isTextblock || node.type.name === 'horizontal_rule') {
+				nodes.push({ pos, key: 'id', id: node.attrs.id });
+				return false;
+			}
+			return true;
+		});
+		if (nodes.length !== stored.length || !asked.size) return;
+		const tr = view.state.tr;
+		nodes.forEach((n, i) => {
+			if (fresh.has(stored[i]) && n.id !== stored[i]) tr.setNodeAttribute(n.pos, n.key, stored[i]);
+		});
+		if (tr.docChanged) view.updateState(view.state.apply(tr.setMeta('addToHistory', false)));
 	}
 
 	/**
