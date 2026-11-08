@@ -19,6 +19,15 @@ export interface Store {
 	setOpened(id: string | undefined): Promise<void>;
 }
 
+/**
+ * Write `record`, then mark it the open document if `still` holds once the write lands: a
+ * save flushed on the way out of a document lands after whatever opened next.
+ */
+export async function keep(store: Store, record: DocRecord, still: () => boolean): Promise<void> {
+	await store.put(record);
+	if (still()) await store.setOpened(record.id);
+}
+
 const done = <T>(request: IDBRequest<T>): Promise<T> =>
 	new Promise((ok, no) => {
 		request.onsuccess = () => ok(request.result);

@@ -50,7 +50,7 @@
 		type DocRecord,
 		type Standing
 	} from './records';
-	import { openStore, type Store } from './store';
+	import { openStore, keep, type Store } from './store';
 
 	interface Props {
 		app: AppConfig;
@@ -296,7 +296,7 @@
 		if (!at || !store) return;
 		const record = recordOf(at);
 		at.kept = true;
-		void store.put(record).then(() => store?.setOpened(record.id));
+		void keep(store, record, () => open?.id === record.id);
 	}
 
 	// ── The bridge ──────────────────────────────────────────────────────────────

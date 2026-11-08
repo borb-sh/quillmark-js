@@ -23,6 +23,7 @@ import { withinNesting } from './nesting.js';
 import { toggleList } from './list-toggle.js';
 import { splitTaskItem, toggleTask } from './tasks.js';
 import { joinAll, joinLists, touching } from './touching.js';
+import { LIST_KEYS } from './shortcuts.js';
 
 /**
  * The caret's enclosing `list_item` when it sits at the very start of that item's first block,
@@ -484,11 +485,15 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 	if (!itemType || !paragraph) return {};
 	const backspace = chainCommands(markerOff(itemType), joinOntoList(itemType));
 	return {
-		'Mod-Shift-7': toggleList(true),
-		'Mod-Shift-8': toggleList(false),
-		Tab: chainCommands(sinkLine(itemType), sinkWithin(itemType), sinkIntoList(itemType)),
-		'Shift-Tab': outdent(itemType),
-		'Mod-Enter': toggleTask(itemType),
+		[LIST_KEYS.numbered]: toggleList(true),
+		[LIST_KEYS.bulleted]: toggleList(false),
+		[LIST_KEYS.indent]: chainCommands(
+			sinkLine(itemType),
+			sinkWithin(itemType),
+			sinkIntoList(itemType)
+		),
+		[LIST_KEYS.outdent]: outdent(itemType),
+		[LIST_KEYS.task]: toggleTask(itemType),
 		Enter: chainCommands(
 			lineAbove(itemType, paragraph),
 			lineOutOfMiddle(itemType),

@@ -6,6 +6,8 @@
 
 **An anchor draws as a span a host can find.** Each ranged anchor a prose leaf holds draws its text inside a span carrying `data-qm-anchor`, the anchor's id, with no style of its own, so a host styles an anchor by attribute and measures it for a popover. An anchor the host places in the document (`doc.apply` with an `anchor` step, or `reattach`) draws once `applyExternal` re-reads the leaf. A point anchor draws nothing.
 
+**The editor's shortcuts are exported.** `editorShortcuts(strings?)` from `@quillmark/svelte/visual` returns the prose leaf's shortcuts as `{ keys, label, scope }` entries, `keys` in `prosemirror-keymap` notation and `scope` one of `field`, `body`, `list` and `table`, read off the tables the keymaps bind from, so a host's shortcut list follows a rebinding. `VisualStrings` gains a `shortcut*` key per label.
+
 ## v0.31.0 - 2026-11-06
 
 **On `@quillmark/wasm` 0.135.** The peer range is `>=0.135.0-0`. `Delta`, the text change `applyExternal` and `onCaretMove` map through, is declared by `@quillmark/svelte/core`, since the core no longer exports one. A `text` leaf commits its field as the engine's plain codec spells it: Enter opens a paragraph, stored as a blank line, and Shift-Enter opens a line, stored as `\n`; its paragraphs draw at a richtext leaf's block rhythm, and a trailing newline draws as the empty line it opens. A copy out of it writes a paragraph break as a blank line, and a paste reads one back. A matrix's added item reads its `title` off the plain content it rests as. A card add or retype places the card through `doc.unchecked.insertCard`.
