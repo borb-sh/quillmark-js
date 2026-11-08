@@ -77,7 +77,13 @@
 	import { Popover } from 'bits-ui';
 	import Icon from './icons/Icon.svelte';
 	import type { IconName } from './icons/nodes.js';
-	import { hasMarks, rangeAnchor, toggleList, type RangeAnchor } from '../core/codec/index.js';
+	import {
+		FIELD_KEYS,
+		hasMarks,
+		rangeAnchor,
+		toggleList,
+		type RangeAnchor
+	} from '../core/codec/index.js';
 	import type { ActiveProse } from './leaves.js';
 	import { clearLink, hrefInSelection, normalizeHref, setLink } from './links.js';
 	import { familyInSelection, setFamily } from './fonts.js';
@@ -359,7 +365,7 @@
 	}
 
 	const linkKey = keydownHandler({
-		'Mod-k': (_state, _dispatch, view) => !!view && raiseLink(view)
+		[FIELD_KEYS.link]: (_state, _dispatch, view) => !!view && raiseLink(view)
 	});
 
 	function onKeyDown(e: KeyboardEvent): void {

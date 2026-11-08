@@ -6,6 +6,7 @@
 import type { Node as PMNode, Schema } from 'prosemirror-model';
 import type { Command } from 'prosemirror-state';
 import { isList } from './list-node.js';
+import { LIST_KEYS } from './shortcuts.js';
 
 /** The items the selection stands in, in the innermost list holding all of them, moved
  *  one place up (`-1`) or down (`1`). */
@@ -29,5 +30,5 @@ function moveItems(dir: -1 | 1): Command {
 
 export function listMoveKeymap(schema: Schema): Record<string, Command> {
 	if (!schema.nodes.list_item) return {};
-	return { 'Alt-ArrowUp': moveItems(-1), 'Alt-ArrowDown': moveItems(1) };
+	return { [LIST_KEYS.moveUp]: moveItems(-1), [LIST_KEYS.moveDown]: moveItems(1) };
 }
