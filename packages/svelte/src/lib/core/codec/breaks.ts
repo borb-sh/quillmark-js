@@ -19,6 +19,7 @@
 import type { Node as PMNode, Schema } from 'prosemirror-model';
 import { Plugin, TextSelection, type Command } from 'prosemirror-state';
 import { takesLineBreak } from './schema.js';
+import { BODY_KEYS } from './shortcuts.js';
 
 /**
  * Rewrite every `\n` a transaction leaves in a non-`code` textblock: to a `hard_break`
@@ -105,5 +106,5 @@ function insertBreak(schema: Schema): Command {
  */
 export function breakKeymap(schema: Schema): Record<string, Command> {
 	if (!schema.nodes.hard_break) return {};
-	return { 'Shift-Enter': insertBreak(schema) };
+	return { [BODY_KEYS.lineBreak]: insertBreak(schema) };
 }

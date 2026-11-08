@@ -40,6 +40,12 @@ export type { TableChromeStrings } from './table-view.js';
 export { DEFAULT_SLASH_STRINGS } from './slash.js';
 export type { SlashState, SlashStrings } from './slash.js';
 
+// The rich editor's shortcuts as a host lists them, read off the tables the keymaps bind from;
+// the visual tier's `strings` set extends their wording, and the formatting popover binds its
+// link chord from `FIELD_KEYS`.
+export { DEFAULT_SHORTCUT_STRINGS, FIELD_KEYS, editorShortcuts } from './shortcuts.js';
+export type { EditorShortcut, ShortcutScope, ShortcutStrings } from './shortcuts.js';
+
 // Schemas (the decode/encode target; the VisualEditor mounts them). `hasMarks` is
 // what a mark surface asks before offering itself over a leaf.
 export {

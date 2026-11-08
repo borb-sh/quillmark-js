@@ -7,7 +7,7 @@
 // committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through `onError`.
 // An external change re-hydrates through `applyExternal`, gated by `reconcile` except where the
 // hold it re-evaluates flips.
-import { baseKeymap, toggleMark } from 'prosemirror-commands';
+import { baseKeymap } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, isHistoryTransaction, redo, undo } from 'prosemirror-history';
 import type { StepMap } from 'prosemirror-transform';
@@ -53,6 +53,7 @@ import { contentEqual, createReconciler, type Reconciler } from './reconcile.js'
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap } from './keymap.js';
+import { FIELD_KEYS, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
@@ -1030,15 +1031,11 @@ function ghostPlugin(opts: {
  */
 function editorKeymap(schema: Schema, inline: boolean, slash?: boolean): Record<string, Command> {
 	const map: Record<string, Command> = {
-		'Mod-z': undo,
-		'Mod-y': redo,
-		'Shift-Mod-z': redo
+		[FIELD_KEYS.undo]: undo,
+		[FIELD_KEYS.redo]: redo,
+		[FIELD_KEYS.redoAlt]: redo,
+		...markKeymap(schema)
 	};
-	if (schema.marks.strong) map['Mod-b'] = toggleMark(schema.marks.strong);
-	if (schema.marks.em) map['Mod-i'] = toggleMark(schema.marks.em);
-	if (schema.marks.underline) map['Mod-u'] = toggleMark(schema.marks.underline);
-	if (schema.marks.strike) map['Mod-Shift-x'] = toggleMark(schema.marks.strike);
-	if (schema.marks.code) map['Mod-e'] = toggleMark(schema.marks.code);
 	if (inline) {
 		// One textblock only: swallow Enter, and Shift-Enter with it (the schema declares no break
 		// node; a declined key is the browser's native `<br>`).

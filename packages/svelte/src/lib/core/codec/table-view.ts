@@ -9,7 +9,7 @@
 //
 // Every control is absolutely positioned out of the grid; `codec/prose.css` draws the band, the
 // clusters and the selection wash.
-import { baseKeymap, chainCommands, selectAll, toggleMark } from 'prosemirror-commands';
+import { baseKeymap, chainCommands, selectAll } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import type { Node as PMNode } from 'prosemirror-model';
@@ -23,6 +23,7 @@ import {
 import { EditorView, type NodeView, type NodeViewConstructor } from 'prosemirror-view';
 import type { GridCell, TableGrid } from './table.js';
 import { decode } from './decode.js';
+import { FIELD_KEYS, markKeymap, TABLE_KEYS as T } from './shortcuts.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
 import { tableOfNode } from './table.js';
@@ -1721,12 +1722,6 @@ class TableIslandView implements NodeView {
 	 * Shift-Enter is the body's line break (`breaks.ts`).
 	 */
 	private cellKeys(r: number, c: number): Record<string, Command> {
-		const marks: Record<string, Command> = {};
-		if (cellSchema.marks.strong) marks['Mod-b'] = toggleMark(cellSchema.marks.strong);
-		if (cellSchema.marks.em) marks['Mod-i'] = toggleMark(cellSchema.marks.em);
-		if (cellSchema.marks.underline) marks['Mod-u'] = toggleMark(cellSchema.marks.underline);
-		if (cellSchema.marks.strike) marks['Mod-Shift-x'] = toggleMark(cellSchema.marks.strike);
-		if (cellSchema.marks.code) marks['Mod-e'] = toggleMark(cellSchema.marks.code);
 		// The arrows walk the grid, each leaving a cell only from the text's edge on its side. Up
 		// and down clamp at the top and bottom; left and right follow reading order and stop at the
 		// first and last cells. No arrow grows the table.
@@ -1828,28 +1823,28 @@ class TableIslandView implements NodeView {
 			return true;
 		};
 		return {
-			...marks,
+			...markKeymap(cellSchema),
 			...breakKeymap(cellSchema),
 			// One undo stack per leaf: Mod-z unwinds a cell keystroke and a row op in order.
-			'Mod-z': () => undo(this.outer.state, this.outer.dispatch),
-			'Mod-y': () => redo(this.outer.state, this.outer.dispatch),
-			'Shift-Mod-z': () => redo(this.outer.state, this.outer.dispatch),
-			Backspace: erase,
-			Delete: erase,
+			[FIELD_KEYS.undo]: () => undo(this.outer.state, this.outer.dispatch),
+			[FIELD_KEYS.redoAlt]: () => redo(this.outer.state, this.outer.dispatch),
+			[FIELD_KEYS.redo]: () => redo(this.outer.state, this.outer.dispatch),
+			[T.erase]: erase,
+			[T.eraseAlt]: erase,
 			ArrowUp: chainCommands(line('row', -1, false), walk('up')),
 			ArrowDown: chainCommands(line('row', 1, false), walk('down')),
 			ArrowLeft: chainCommands(line('column', -1, false), cross(-1)),
 			ArrowRight: chainCommands(line('column', 1, false), cross(1)),
-			'Alt-ArrowUp': line('row', -1, true),
-			'Alt-ArrowDown': line('row', 1, true),
-			'Alt-ArrowLeft': line('column', -1, true),
-			'Alt-ArrowRight': line('column', 1, true),
-			'Shift-ArrowLeft': slide(-1),
-			'Shift-ArrowRight': slide(1),
-			'Mod-a': grow,
-			Tab: () => this.step(r, c, 1),
-			'Shift-Tab': () => this.step(r, c, -1),
-			Enter: () => {
+			[T.moveUp]: line('row', -1, true),
+			[T.moveDown]: line('row', 1, true),
+			[T.moveLeft]: line('column', -1, true),
+			[T.moveRight]: line('column', 1, true),
+			[T.alignLeft]: slide(-1),
+			[T.alignRight]: slide(1),
+			[T.selectAll]: grow,
+			[T.next]: () => this.step(r, c, 1),
+			[T.previous]: () => this.step(r, c, -1),
+			[T.nextRow]: () => {
 				// Over a rectangle it hands the caret back: the caret never left the cell.
 				if (this.selected) {
 					this.clearSelection();
@@ -1868,7 +1863,7 @@ class TableIslandView implements NodeView {
 			// Escape climbs a rung a press: the caret's row (the keyboard's only route to a held
 			// rectangle), then the island. What a press past the island means is the shell's
 			// (INVARIANTS §Chrome).
-			Escape: () => {
+			[T.select]: () => {
 				if (this.selected) this.selectIsland();
 				else this.selectLine({ axis: 'row', index: r });
 				return true;

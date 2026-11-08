@@ -31,6 +31,11 @@ export { DEFAULT_VISUAL_STRINGS } from './strings.js';
 export type { VisualStrings, VisualStringsInput, FormatDiagnostic } from './strings.js';
 export type { BodyPlaceholder, BodyPlaceholderContext } from './structure.js';
 
+// The prose leaf's shortcuts, for a host's shortcut list: read off the keymaps' own tables and
+// worded by the same `strings` (pass the editor's, or none for the package's English).
+export { editorShortcuts } from '../core/codec/index.js';
+export type { EditorShortcut, ShortcutScope } from '../core/codec/index.js';
+
 // The `$ext.editor` write unit. A consumer seeding editor-side chrome
 // state (a card title, the tips channel) goes through this rather than `storeExt`,
 // which replaces the whole map and takes every sibling with it.

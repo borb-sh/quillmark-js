@@ -36,6 +36,7 @@ import { codeKeymap } from './code.js';
 import { listKeymap } from './lists.js';
 import { listMoveKeymap } from './list-move.js';
 import { slashKeymap } from './slash.js';
+import { BODY_KEYS } from './shortcuts.js';
 
 /** One chain per key, the maps taken in precedence order: on a key several bind, an
  * earlier map's command runs first and the next runs only if it declines. A key one
@@ -58,7 +59,7 @@ function exitKeymap(schema: Schema): Record<string, Command> {
 	return {
 		Tab: () => true,
 		'Shift-Tab': () => true,
-		Escape: (_state, _dispatch, view) => {
+		[BODY_KEYS.leave]: (_state, _dispatch, view) => {
 			if (!view) return false;
 			(view.dom as HTMLElement).blur();
 			return true;
