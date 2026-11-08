@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**An anchor draws as a span a host can find.** Each ranged anchor a prose leaf holds draws its text inside a span carrying `data-qm-anchor`, the anchor's id, with no style of its own, so a host styles an anchor by attribute and measures it for a popover. An anchor the host places in the document (`doc.apply` with an `anchor` step, or `reattach`) draws once `applyExternal` re-reads the leaf. A point anchor draws nothing.
+
 **The editor's shortcuts are exported.** `editorShortcuts(strings?)` from `@quillmark/svelte/visual` returns the prose leaf's shortcuts as `{ keys, label, scope }` entries, `keys` in `prosemirror-keymap` notation and `scope` one of `field`, `body`, `list` and `table`, read off the tables the keymaps bind from, so a host's shortcut list follows a rebinding. `VisualStrings` gains a `shortcut*` key per label.
 
 ## v0.31.0 - 2026-11-06
