@@ -182,6 +182,12 @@
 		view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 	}
 
+	/** The caret's UTF-16 offset in this leaf's content, `undefined` while it is held. */
+	export function caret(): number | undefined {
+		return view && !held
+			? pmToOffset(buildLineIndex(view.state.doc), view.state.selection.head)
+			: undefined;
+	}
 	/** This leaf's content as its view holds it, `undefined` while it is held. */
 	export function current(): Content | undefined {
 		return view && !held ? pmToContent(view.state.doc) : undefined;
@@ -321,6 +327,10 @@
 							if (tail.size) tr.delete(landed.pos, landed.end());
 							below = rows(groups, tail);
 						}
+						// A split or a paste over rows is the list's step to undo, so this row's half
+						// of it is no step of its own. A drop keeps its step: a move between two
+						// leaves pairs it with the source's (`drag-move.ts`).
+						if (below && event !== 'drop') tr.setMeta('addToHistory', false);
 						const next = mounted.state.apply(tr);
 						if (next === mounted.state) return;
 						const edit = tr.docChanged && !held;

@@ -169,7 +169,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 ### Declined
 
-Per-control render slots, which would hand reconciliation to consumer code; a pointer door onto the insert menu; image authoring, which has no asset story; touch as a target, and its accessory bar. Undo is per leaf: a card or row removal is the one structural op with a step back, offered on the toast.
+Per-control render slots, which would hand reconciliation to consumer code; a pointer door onto the insert menu; image authoring, which has no asset story; touch as a target, and its accessory bar. Undo is per leaf and per list, never one stack for the document: a list keeps the changes to its rows as steps of its own (ArrayField), and a card removal is the one card op with a step back, offered on the toast.
 
 ## The codec
 

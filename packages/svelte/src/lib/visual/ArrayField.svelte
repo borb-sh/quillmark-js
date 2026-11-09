@@ -57,6 +57,12 @@
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
 
+ A change to the rows (an insert, a remove, a split, a join, a paste over rows, a move)
+ is a step of the list's own, since no leaf's history holds it: ⌘/Ctrl+Z anywhere in the
+ list takes the latest back and ⌘/Ctrl+Shift+Z puts it forward, the nearest list
+ answering, while the rows stand as that step left them. An edit in a row since is the
+ row's to undo first. A removal offered on the toast is the same step.
+
  An empty list of lines (any element but an `object`) draws a standing row to type
  into, so a list's first line takes no press of the add chip first. The row is not an
  element and draws as one that is not there yet: a row's own box, ghosted and empty,
@@ -271,6 +277,7 @@
 		| {
 				focus: () => void;
 				setCaret?: (pos: number) => void;
+				caret?: () => number | undefined;
 				current?: () => Content | undefined;
 				appended?: (tail: Content) => { content: Content; caret: number } | undefined;
 		  }
@@ -378,12 +385,14 @@
 	 *  the editor's standing undo offer: a restore reinserts at the index its removal left,
 	 *  which a reshape moves (`undo.svelte.ts`). */
 	function insertAt(at: number, value: unknown): string {
+		const before = snapshot();
 		undo.withdraw();
 		const id = seq.next();
 		ids = [...ids.slice(0, at), id, ...ids.slice(at)];
 		const next = arr.slice();
 		next.splice(at, 0, value);
 		onCommit(next);
+		record(before, next, { id });
 		return id;
 	}
 
@@ -420,6 +429,7 @@
 	 *  a drop of several lines into a row, each line past the first a row as Enter would
 	 *  open it. The caret ends where the lines do, at `caret` in the last. */
 	function spill(k: number, row: Content, below: Content[], caret: number): void {
+		const before = onStanding ? undefined : snapshot();
 		if (onStanding) claimStanding();
 		undo.withdraw();
 		const at = k + 1;
@@ -429,6 +439,7 @@
 		next[k] = row;
 		next.splice(at, 0, ...below);
 		onCommit(next);
+		if (before) record(before, next, { id: fresh.at(-1)!, caret });
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
 			els[fresh.at(-1)!]?.setCaret?.(caret);
@@ -443,6 +454,7 @@
 		const tail = els[ids[upper + 1]]?.current?.();
 		const joined = tail && els[ids[upper]]?.appended?.(tail);
 		if (!joined) return false;
+		const before = snapshot();
 		undo.withdraw();
 		const [kept, gone] = [ids[upper], ids[upper + 1]];
 		ids = ids.filter((_, i) => i !== upper + 1);
@@ -450,6 +462,7 @@
 		const next = arr.slice();
 		next.splice(upper, 2, joined.content);
 		onCommit(next);
+		record(before, next, { id: kept, caret: joined.caret });
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
 			els[kept]?.setCaret?.(joined.caret);
@@ -486,14 +499,17 @@
 			addEl?.focus();
 			return;
 		}
+		const before = snapshot();
 		const dropped = ids[k];
 		const value = arr[k];
 		const name = rowName(k) ?? t.strings.elementItem(k + 1);
 		const next = ids.filter((_, i) => i !== k);
 		ids = next;
 		drop(dropped);
-		onCommit(arr.filter((_, i) => i !== k));
-		if (offer) undo.offer(t.strings.undoRemoved(name), () => restore(k, value));
+		const values = arr.filter((_, i) => i !== k);
+		onCommit(values);
+		const step = record(before, values, next.length ? { id: next[Math.max(k - 1, 0)] } : undefined);
+		if (offer) undo.offer(t.strings.undoRemoved(name), () => restore(k, value, step));
 		else undo.withdraw();
 		if (!land) return;
 		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove).then(() => {
@@ -502,8 +518,9 @@
 	}
 	/** A removal's undo: `value` back at `k`, under a fresh id, focused where a landing on
 	 *  it would focus. A no-op once this field is gone, the row with it. */
-	function restore(k: number, value: unknown): void {
+	function restore(k: number, value: unknown, step: Reshape): void {
 		if (!span.alive) return;
+		if (done.at(-1) === step && takeStep(false)) return;
 		void focusAfterFlush(insertAt(Math.min(k, ids.length), value));
 	}
 	/** A collapsed record's remove key, on its summary: the remove is out of the tab order,
@@ -521,6 +538,7 @@
 	 */
 	function move(k: number, to: number): void {
 		if (to === k || to < 0 || to >= ids.length) return;
+		const before = snapshot();
 		const pressed = document.activeElement;
 		undo.withdraw();
 		arm.arm();
@@ -532,12 +550,90 @@
 		const [v] = next.splice(k, 1);
 		next.splice(to, 0, v);
 		onCommit(next);
+		record(before, next, before.focus?.id === id ? before.focus : { id });
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
 			if (pressed instanceof HTMLElement && pressed.isConnected && rowEls[id]?.contains(pressed))
 				pressed.focus();
 		})();
 	}
+	// ── The list's own undo ──────────────────────────────────────────────────────
+	// A change to the rows (an insert, a remove, a split, a join, a spill, a move) lives
+	// in no leaf's history, so the list keeps its steps itself. A step is taken back only
+	// while the rows stand as the step left them: an edit in a row since is the row's to
+	// undo first, and once its own undo brings the rows back, the step is next.
+	type Focus = { id: string; caret?: number };
+	type Rows = { ids: string[]; values: unknown[]; focus?: Focus };
+	type Reshape = { before: Rows; after: Rows };
+	/** How many steps the list keeps each way. */
+	const DEPTH = 100;
+	let done: Reshape[] = [];
+	let undone: Reshape[] = [];
+	/** Where the focus is in the list: the row holding it, and a prose row's caret. */
+	function focusNow(): Focus | undefined {
+		const at = document.activeElement;
+		const id = ids.find((i) => rowEls[i]?.contains(at));
+		return id === undefined ? undefined : { id, caret: els[id]?.caret?.() };
+	}
+	function snapshot(): Rows {
+		return { ids: ids.slice(), values: arr, focus: focusNow() };
+	}
+	/** Record the step from `before` to the rows just committed. Its `after` takes the
+	 *  rows as the store hands them back once the commit lands, which is what a later
+	 *  read compares against. */
+	function record(before: Rows, values: unknown[], focus?: Focus): Reshape {
+		const step: Reshape = { before, after: { ids: ids.slice(), values, focus } };
+		done = [...done.slice(1 - DEPTH), step];
+		undone = [];
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			step.after = { ...step.after, values: arr };
+		})();
+		return step;
+	}
+	const same = (a: unknown[], b: unknown[]): boolean =>
+		a === b || JSON.stringify(a) === JSON.stringify(b);
+	/** Take the latest step back (`redo` false) or forward again, where the rows still
+	 *  stand where it would start from. Whether it did. */
+	function takeStep(redo: boolean): boolean {
+		const stack = redo ? undone : done;
+		const step = stack.at(-1);
+		if (!step) return false;
+		const [from, to] = redo ? [step.before, step.after] : [step.after, step.before];
+		if (!same(arr, from.values)) return false;
+		if (redo) {
+			undone = undone.slice(0, -1);
+			done = [...done, step];
+		} else {
+			done = done.slice(0, -1);
+			undone = [...undone, step];
+		}
+		undo.withdraw();
+		for (const id of ids) if (!to.ids.includes(id)) drop(id);
+		ids = to.ids.slice();
+		onCommit(to.values);
+		const focus = to.focus;
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			if (!focus || !ids.includes(focus.id)) return focusEmpty();
+			await focusAfterFlush(focus.id);
+			if (focus.caret !== undefined) els[focus.id]?.setCaret?.(focus.caret);
+		})();
+		return true;
+	}
+	/** ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Ctrl+Y) anywhere in the list, ahead of the
+	 *  control's own: the nearest list answers, never the one around a nested list. */
+	function onUndoChord(e: KeyboardEvent): void {
+		if (e.defaultPrevented || e.isComposing || e.altKey || !(e.metaKey || e.ctrlKey)) return;
+		const key = e.key.toLowerCase();
+		const redo = (key === 'z' && e.shiftKey) || (key === 'y' && !e.shiftKey && e.ctrlKey);
+		if (!redo && (key !== 'z' || e.shiftKey)) return;
+		if (!(e.target instanceof Element) || e.target.closest('.qm-array') !== e.currentTarget) return;
+		if (drag.held() || !takeStep(redo)) return;
+		e.preventDefault();
+		e.stopPropagation();
+	}
+
 	/** Take the caret: the first element, or the add affordance when the list is empty;
 	 * which is then the only thing there is to land on, and the next thing the user
 	 * wants anyway. Reached by a label click and by the editor's landing verbs, which
@@ -726,7 +822,18 @@
 	const drag = rowDrag({
 		count: () => ids.length,
 		box: (i) => rowEls[ids[i]]?.getBoundingClientRect(),
-		move
+		move: (k, to) => {
+			const id = ids[k];
+			move(k, to);
+			// The row's summary takes the focus, so the keys that move it or take the move
+			// back act on the row the pointer just moved.
+			void (async () => {
+				if (!(await span.resumes(tick()))) return;
+				const summary = rowEls[id]?.querySelector<HTMLElement>('.qm-element-summary');
+				if (summary && !rowEls[id]?.contains(document.activeElement))
+					summary.focus({ preventScroll: true });
+			})();
+		}
 	});
 	onDestroy(drag.release);
 
@@ -755,6 +862,7 @@
 <div
 	class={['qm-array', { empty: ids.length === 0 }]}
 	role="group"
+	onkeydowncapture={onUndoChord}
 	aria-labelledby={label != null ? labelId : undefined}
 	aria-describedby={description ? descriptionId : undefined}
 >
