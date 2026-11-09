@@ -14,6 +14,9 @@
 
  An `object` element collapses: the row is its own summary — a box titled `Item` and
  its 1-based number, whatever the record holds — and opens onto {@link ObjectField}.
+ Collapsed, the summary draws the words of the record's first one-line text cell after
+ the title, at the label ink: what tells one closed row from the next, and no part of
+ the row's name.
  Open, the summary keeps its words, its chevron and its remove where they stood, and
  lets its box go: a line at the tap rung over the subform, so the one thing a press
  on it moves is the chevron. Each row opens and closes on its own: a
@@ -91,6 +94,7 @@
 		IdSeq,
 		baseType,
 		controlKind,
+		firstShortText,
 		declaredContent,
 		fieldTitle,
 		literalText,
@@ -319,6 +323,9 @@
 		if (open.has(id)) open.delete(id);
 		else open.add(id);
 	}
+	/** What a collapsed row shows of its record: the cell a card's title reads. */
+	const preview = (k: number): string | undefined =>
+		firstShortText(items?.properties, (arr[k] ?? {}) as Record<string, unknown>);
 	const rowName = (k: number): string | undefined =>
 		label != null ? `${label} ${k + 1}` : undefined;
 	/** A row control's name: its action, and the row, where the row has a name. */
@@ -843,6 +850,9 @@
 							     same rung as a panel header's, so the surface has one disclosure. -->
 							<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
 							<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
+							{#if !open.has(id) && preview(k)}
+								<span class="qm-element-preview">{preview(k)}</span>
+							{/if}
 						</button>
 						<div class="qm-row-actions">
 							{@render removeButton(k)}
@@ -1263,6 +1273,20 @@
 		white-space: nowrap;
 		color: var(--_qm-ink);
 		font-variant-numeric: tabular-nums;
+	}
+	/* What the closed record holds, after its name and a rung under it: the label ink,
+	 on the line's remainder, and the first to give way where the line runs short. */
+	.qm-element-preview {
+		flex: 1 1 0;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		text-align: start;
+		color: var(--_qm-ink-label);
+	}
+	.qm-element-summary:has(.qm-element-preview) > .qm-element-title {
+		flex-shrink: 0;
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
 	 Every row of it is open, so it stands where an open row's subform stands: a rung

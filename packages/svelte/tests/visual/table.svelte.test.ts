@@ -197,7 +197,9 @@ main:
 		await settle();
 		expect(rows(q, doc).map((r) => r.name)).toEqual(['Ada Lovelace', 'Grace Hopper']);
 
-		t.querySelector<HTMLElement>('.qm-array-table-row')!.querySelector<HTMLButtonElement>('.qm-row-btn.qm-remove')!.click();
+		t.querySelector<HTMLElement>('.qm-array-table-row')!
+			.querySelector<HTMLButtonElement>('.qm-row-btn.qm-remove')!
+			.click();
 		flushSync();
 		expect(rows(q, doc).map((r) => r.name)).toEqual(['Grace Hopper']);
 		expect(nameText(t, 0)).toBe('Grace Hopper');
