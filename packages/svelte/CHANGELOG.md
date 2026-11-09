@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.33.0 - 2026-11-09
+
 **An applied prose commit leaves new block ids to the store.** A commit that lands as a change sends each block the store does not hold as a placeholder, and each block node then takes the id the store holds, outside history. The id a node carries for a new block before its commit is provisional, so a host reads block ids from the store.
 
 ## v0.32.0 - 2026-11-08
