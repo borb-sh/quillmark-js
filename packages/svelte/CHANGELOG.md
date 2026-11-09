@@ -30,6 +30,8 @@
 
 **Text dragged from one field to another moves.** A drag from one prose leaf into another, a table cell among them, deletes the dragged text from the leaf it left once the other has taken the drop, where it was left in both. Holding the copy modifier (Option on Apple platforms, Ctrl elsewhere) copies, as it does inside one field. Undo in either leaf takes the whole move back and redo puts it forward again, the two leaves keeping separate histories.
 
+**A text drag between a table cell and its own field undoes as one step.** A word dragged out of a table cell into the prose around its table, or into the cell from that prose, is two edits to one field; one ⌘/Ctrl+Z takes both back, where the first left the word in both places and it took a second to finish.
+
 **A `datetime` field edits its time.** The date control draws hour and minute segments after the date's for a `datetime` and writes `YYYY-MM-DDThh:mm`, keeping the seconds of a stored value that carries them. It wrote `YYYY-MM-DD`, which the writer refuses for the type, and hid a stored time.
 
 **Several lines pasted or dropped into a line split it where they land.** In a list of lines, the text after the caret or the drop point goes on with the last line, as a textarea's split leaves it, where it stayed behind the first; the caret ends between the two.

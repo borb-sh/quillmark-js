@@ -8,7 +8,8 @@ import { TextSelection } from 'prosemirror-state';
 import { closeHistory, redo, undo } from 'prosemirror-history';
 import type { EditorView } from 'prosemirror-view';
 import { createField } from '$lib/core/codec';
-import { mount, quill, viewOf } from './_util.js';
+import type { FieldController, LeafViews } from '$lib/core/codec';
+import { md, mount, quill, viewOf } from './_util.js';
 
 // jsdom implements no `Range` rects, and PM reads them to scroll the caret a history step
 // moved into view.
@@ -110,5 +111,40 @@ describe('a text drag between two leaves', () => {
 		const reader = quill().reader(doc);
 		expect(reader.getContentAt({ field: 'title' }, [])?.text).toBe('two');
 		expect(reader.getContentAt({ field: 'subtitle' }, [])?.text).toBe('ThreeOne ');
+	});
+});
+
+describe('a text drag between a table cell and the leaf its island stands in', () => {
+	function body() {
+		const doc = quill().seedDocument();
+		doc.replace({}, md('para\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\ntail'));
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const leaf = field as FieldController & LeafViews;
+		leaf.view.dispatch(closeHistory(leaf.view.state.tr));
+		const read = () => [
+			leaf.view.state.doc.firstChild!.textContent,
+			leaf.nestedViews()[0].state.doc.textContent
+		];
+		return { outer: leaf.view, cell: () => leaf.nestedViews()[0], read };
+	}
+
+	it('undoes a move out of the cell as one step', async () => {
+		const { outer, cell, read } = body();
+		await drag(cell(), 0, 1, outer, 4);
+		expect(read()).toEqual(['paraa', '']);
+		undo(outer.state, outer.dispatch);
+		expect(read()).toEqual(['para', 'a']);
+		redo(outer.state, outer.dispatch);
+		expect(read()).toEqual(['paraa', '']);
+	});
+
+	it('undoes a move into the cell as one step', async () => {
+		const { outer, cell, read } = body();
+		await drag(outer, 0, 2, cell(), 1);
+		expect(read()).toEqual(['ra', 'apa']);
+		undo(outer.state, outer.dispatch);
+		expect(read()).toEqual(['para', 'a']);
+		redo(outer.state, outer.dispatch);
+		expect(read()).toEqual(['ra', 'apa']);
 	});
 });
