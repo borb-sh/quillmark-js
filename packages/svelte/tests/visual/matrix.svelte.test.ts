@@ -434,6 +434,48 @@ describe('an open matrix', () => {
 		expect(stored(doc)).toEqual({ a_one: { title: 'A' }, c_three: { title: 'C' } });
 		expect((document.activeElement as HTMLInputElement).value).toBe('C');
 	});
+
+	it('offers a removed item back, as it was stored and where it stood', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const before = {
+			a_one: { title: 'A', severity: 'major' },
+			b_two: { title: 'B' }
+		};
+		doc.unchecked.storeField('checks', before);
+		const mounted = mountEditor(q, doc);
+		const m = matrix(mounted.target);
+		m.querySelector<HTMLButtonElement>('.qm-member-remove')!.click();
+		await settle();
+		expect(addedTitles(m)).toEqual(['B']);
+
+		mounted.target.querySelector<HTMLButtonElement>('.qm-toast-action')!.click();
+		await settle();
+		expect(stored(doc)).toEqual(before);
+		expect(addedTitles(m)).toEqual(['A', 'B']);
+		expect((document.activeElement as HTMLInputElement).value).toBe('A');
+		expect(mounted.errors).toHaveLength(0);
+	});
+
+	it('adds what was typed when the focus leaves the box, and leaves the focus where it went', async () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		const mounted = mountEditor(q, doc);
+		const m = matrix(mounted.target);
+		typeAdd(m, 'Kerning pairs');
+		const elsewhere = tick(m, roster[0]);
+		elsewhere.focus();
+		await settle();
+		expect(stored(doc)).toEqual({ kerning_pairs: { title: 'Kerning pairs' } });
+		expect(addBox(m).value).toBe('');
+		expect(document.activeElement).toBe(elsewhere);
+
+		// A box left empty, or holding only spaces, adds nothing.
+		typeAdd(m, '   ');
+		elsewhere.focus();
+		await settle();
+		expect(addedTitles(m)).toEqual(['Kerning pairs']);
+	});
 });
 
 const LISTS = `quill:

@@ -549,7 +549,7 @@ export function shortCell(sub: QuillFieldSchema): boolean {
  * The words of the first one-line `text` or `richtext` cell in declaration order, picked by schema
  * alone so one cell names an instance whatever the others hold.
  */
-function firstShortText(
+export function firstShortText(
 	cells: Record<string, QuillFieldSchema> | undefined,
 	values: Record<string, unknown>
 ): string | undefined {

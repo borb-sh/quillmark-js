@@ -1,5 +1,5 @@
 <!--
- A `date` (or `datetime`) field → a styled segmented date field on bits-ui. The
+ A `date` or `datetime` field → a styled segmented date field on bits-ui. The
  stored value is a string, `YYYY-MM-DD` or `today`; a cleared control commits as its
  last segment empties, the blank `""` over a `default:`, which stays blank, and `undefined`
  (the unset rung) where nothing is declared, the parent removing the field. The value-object a date field lowers to is a render-time
@@ -18,12 +18,20 @@
  calendar) rather than `DatePicker`: the segments are the entry affordance, and a
  calendar is a second surface this field does not need.
 
+ A `datetime` is the same control with the time's segments after the date's, to the
+ minute. It stores `YYYY-MM-DDThh:mm`, and `:ss` after it where the stored value
+ carried seconds, which no segment shows and an edit keeps. `today` is no value of its
+ type, so it draws no toggle and takes no `T`. The value is whole only with every
+ segment filled, the time's too, so a date typed with no time is held and, on
+ leaving, put back as any half-typed date is.
+
  The boundary is a string, and the local is too. The primitive speaks
- `CalendarDate`; the document speaks `YYYY-MM-DD`. `CalendarDate` carries no time
- and no zone, so the round-trip is lossless and no local-midnight shift can occur:
- the hazard that makes `new Date('2026-07-25')` the wrong tool here. Authored
- values are data, not input: `parseDate` throws on anything malformed, so a bad
- string degrades to an empty field rather than taking the editor down with it.
+ `CalendarDate`, or `CalendarDateTime` for a `datetime`; the document speaks
+ `YYYY-MM-DD` and `YYYY-MM-DDThh:mm`. Neither carries a zone, so the round-trip is
+ lossless and no local-midnight shift can occur: the hazard that makes
+ `new Date('2026-07-25')` the wrong tool here. Authored values are data, not input:
+ the parse throws on anything malformed, so a bad string degrades to an empty field
+ rather than taking the editor down with it.
 
  The local is a `$derived`, which compares by identity, so it holds the string, not
  the parsed value: a fresh `CalendarDate` is never `===` the last one, so the
@@ -57,7 +65,14 @@
 <script lang="ts">
 	import { flushSync } from 'svelte';
 	import { DateField as BitsDateField } from 'bits-ui';
-	import { getLocalTimeZone, parseDate, today, type DateValue } from '@internationalized/date';
+	import {
+		getLocalTimeZone,
+		parseDate,
+		parseDateTime,
+		toCalendarDateTime,
+		today,
+		type DateValue
+	} from '@internationalized/date';
 	import Icon from './icons/Icon.svelte';
 	import { wording } from './strings.js';
 	import './controls.css';
@@ -87,8 +102,8 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel): announced after the name. */
 		describedBy?: string;
-		/** A `datetime`: `today` is no value of its type, so it draws no toggle and
-		 * takes no `T`. */
+		/** A `datetime`: the time's segments stand after the date's, and `today` is no
+		 * value of its type, so it draws no toggle and takes no `T`. */
 		datetime?: boolean;
 		onCommit: (v: string | undefined) => void;
 	}
@@ -103,24 +118,36 @@
 		wrapEl?.querySelector<HTMLElement>('[data-segment]:not([data-segment="literal"])')?.focus();
 	}
 
-	// The stored form may carry a time (`datetime`); the date half is what a date
-	// field edits, so anything past `YYYY-MM-DD` is not this control's. `parseDate`
-	// throws on a malformed authored value: the segments stand empty and the stored
-	// string draws beside them (`unread`), so the value an error names is on screen.
+	/** The part of a stored string this control edits: all of a `datetime`, and the date
+	 *  half of a `date`, anything past `YYYY-MM-DD` being no part of its type. */
+	const span = (s: string | undefined): string | undefined => (datetime ? s : s?.slice(0, 10));
+	// The parse throws on a malformed authored value: the segments stand empty and the
+	// stored string draws beside them (`unread`), so the value an error names is on
+	// screen.
 	function toDateValue(s: string): DateValue | undefined {
 		if (!s) return undefined;
-		if (s === TODAY) return renderDate();
 		try {
-			return parseDate(s);
+			if (datetime) return parseDateTime(s);
+			return s === TODAY ? renderDate() : parseDate(s);
 		} catch {
 			return undefined;
 		}
 	}
+	/** A value as the document spells it. A `datetime` to the minute, its seconds
+	 *  written only where it holds some. */
+	const spell = (d: DateValue | undefined): string =>
+		d ? (datetime ? d.toString().replace(/:00$/, '') : d.toString()) : '';
 
 	const unread = $derived(
-		value && value !== TODAY && !toDateValue(value.slice(0, 10)) ? value : undefined
+		value && value !== TODAY && !toDateValue(span(value)!) ? value : undefined
 	);
-	const fallbackDate = $derived(toDateValue(fallback?.slice(0, 10) ?? ''));
+	const fallbackDate = $derived(toDateValue(span(fallback) ?? ''));
+	/** Where an empty segment counts from: the default, else, for a `datetime`, the
+	 *  render date's midnight, a placeholder with a time being what stands the time's
+	 *  segments. */
+	const placeholder = $derived(
+		fallbackDate ?? (datetime ? toCalendarDateTime(renderDate()) : undefined)
+	);
 	/** The default is the primitive's value: from entering an unset field until an
 	 *  edit or leaving. Part of the projection, so a re-derivation keeps it. */
 	let seat = $state(false);
@@ -133,7 +160,7 @@
 	// Driven controlled (`value` + `onValueChange`, never `bind:`) so reconciliation
 	// stays the package's.
 	let local = $derived(
-		held ? '' : (value?.slice(0, 10) ?? (seat && fallbackDate ? fallbackDate.toString() : ''))
+		held ? '' : (span(value) ?? (seat && fallbackDate ? spell(fallbackDate) : ''))
 	);
 	const parsed = $derived(toDateValue(local));
 	// The date the empty segments ghost, or undefined when there is nothing to ghost:
@@ -207,20 +234,39 @@
 	// alphabetic in every locale bits ships (`mm`/`yyyy`, `аа`, `年`), a filled one
 	// is digits.
 	//
-	// The separators are `literal` parts, never unfilled; substitution covers the
-	// date parts only, so any time part keeps the primitive's text. Digits are
-	// zero-padded to the segment widths the field displays.
+	// The separators are `literal` parts, never unfilled. Digits are zero-padded to
+	// the segment widths the field displays. A day period holds letters filled or not,
+	// so it is filled where its hour is: `hour` is the hour segment's own text, and
+	// `twelve` whether the field draws a day period, and so counts its hours to twelve.
 	type Rung = 'default' | 'hint' | undefined;
-	function segmentText(part: string, text: string): { text: string; ghosted: Rung } {
-		if (part === 'literal' || /\d/.test(text)) return { text, ghosted: undefined };
+	function segmentText(
+		part: string,
+		text: string,
+		hour = '',
+		twelve = false
+	): { text: string; ghosted: Rung } {
+		const filled = /\d/.test(part === 'dayPeriod' ? hour : text);
+		if (part === 'literal' || filled) return { text, ghosted: undefined };
 		if (!ghost) return { text, ghosted: 'hint' };
+		const pad = (n: number, width = 2) => String(n).padStart(width, '0');
+		const clock = 'hour' in ghost ? ghost : undefined;
 		switch (part) {
 			case 'year':
-				return { text: String(ghost.year).padStart(4, '0'), ghosted: 'default' };
+				return { text: pad(ghost.year, 4), ghosted: 'default' };
 			case 'month':
-				return { text: String(ghost.month).padStart(2, '0'), ghosted: 'default' };
+				return { text: pad(ghost.month), ghosted: 'default' };
 			case 'day':
-				return { text: String(ghost.day).padStart(2, '0'), ghosted: 'default' };
+				return { text: pad(ghost.day), ghosted: 'default' };
+			case 'hour':
+				return clock
+					? { text: pad(twelve ? ((clock.hour + 11) % 12) + 1 : clock.hour), ghosted: 'default' }
+					: { text, ghosted: 'hint' };
+			case 'minute':
+				return clock ? { text: pad(clock.minute), ghosted: 'default' } : { text, ghosted: 'hint' };
+			case 'dayPeriod':
+				return clock
+					? { text: clock.hour < 12 ? 'AM' : 'PM', ghosted: 'default' }
+					: { text, ghosted: 'hint' };
 			default:
 				return { text, ghosted: 'hint' };
 		}
@@ -237,14 +283,15 @@
 	{#key generation}
 		<BitsDateField.Root
 			value={parsed}
-			placeholder={fallbackDate}
+			{placeholder}
+			granularity={datetime ? 'minute' : 'day'}
 			onValueChange={(d) => {
-				// `CalendarDate.toString()` is exactly `YYYY-MM-DD`. A cleared or
-				// half-typed field yields undefined, held until the focus leaves. The
-				// primitive reports its own value again as a segment loses focus, which is
-				// no edit, and over a seated default or `today` would write it.
-				const next = d?.toString() ?? '';
-				if (next === (parsed?.toString() ?? '')) return;
+				// A cleared or half-typed field yields undefined, held until the focus
+				// leaves. The primitive reports its own value again as a segment loses
+				// focus, which is no edit, and over a seated default or `today` would
+				// write it.
+				const next = spell(d);
+				if (next === spell(parsed)) return;
 				if (!d) {
 					held = true;
 					return;
@@ -271,8 +318,10 @@
 				{#snippet children({ segments })}
 					<!-- Keyed by index: `part` repeats (the `literal` separators between
 					 segments all carry it) so a part-keyed block collides. -->
+					{@const hour = segments.find((seg) => seg.part === 'hour')?.value}
+					{@const twelve = segments.some((seg) => seg.part === 'dayPeriod')}
 					{#each segments as seg, i (i)}
-						{@const shown = segmentText(seg.part, seg.value)}
+						{@const shown = segmentText(seg.part, seg.value, hour, twelve)}
 						<BitsDateField.Segment
 							class="qm-date-segment"
 							part={seg.part}

@@ -58,6 +58,21 @@ describe('a nested array property', () => {
 		);
 	});
 
+	it('shows a collapsed row its record’s first text cell after the title, and drops it open', () => {
+		const q = quill();
+		const doc = example();
+		const outer = appendices(mountEditor(q, doc).target);
+		const tree = appendixTree(q, doc);
+		const previews = () =>
+			summaries(outer).map((s) => s.querySelector('.qm-element-preview')?.textContent);
+		expect(previews()).toEqual(tree.map((a) => a.title));
+		// The preview is no part of the row's name.
+		expect(summaryTexts(outer)).toEqual(tree.map((_, k) => S.elementUntitled('Appendices', k + 1)));
+		summaries(outer)[0].click();
+		flushSync();
+		expect(previews()).toEqual([undefined, ...tree.slice(1).map((a) => a.title)]);
+	});
+
 	it('opens one entry at a time, two rungs in, and commits the whole tree by value', () => {
 		const q = quill();
 		const doc = example();

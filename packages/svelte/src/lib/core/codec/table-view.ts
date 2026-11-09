@@ -26,12 +26,14 @@ import { decode } from './decode.js';
 import { FIELD_KEYS, markKeymap, TABLE_KEYS as T } from './shortcuts.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
+import { dragMovePlugin } from './drag-move.js';
 import { tableOfNode } from './table.js';
 import type { IslandNodeAttrs } from './islands.js';
 import { tableElement, tableText } from './table-copy.js';
 import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
 import { revealProps } from './reveal.js';
+import { followDrag } from '../dragfollow.js';
 import {
 	ALIGNS,
 	canMerge,
@@ -237,6 +239,7 @@ function cellPlugins(keys: Record<string, Command>) {
 		inputRulesPlugin(cellSchema),
 		undoRuleKeymap(),
 		linkPastePlugin(cellSchema.marks.link),
+		dragMovePlugin(),
 		keymap(keys),
 		keymap(baseKeymap)
 	];
@@ -349,12 +352,14 @@ const spanCells = (a: { r: number; c: number }, b: { r: number; c: number }): Ce
  * A drag in flight: the line lifted, where the press started, and whether it has passed the dead
  * zone.
  *
- * `lines` is read once at engage: nothing reflows during the drag, and a rect per pointermove
- * would force ~150 layouts an event at 20x8.
+ * `lines` is read at engage and again when something scrolls (`core/dragfollow.ts`): nothing
+ * reflows during the drag, and a rect per pointermove would force ~150 layouts an event at 20x8.
  */
 interface Drag {
 	line: Line;
 	origin: Point;
+	/** The pointer along the drag's axis, as last reported. */
+	at: number;
 	engaged: boolean;
 	/** Escape called the drag off: the release that follows moves nothing and selects nothing. */
 	cancelled: boolean;
@@ -367,6 +372,8 @@ interface Drag {
 	/** Each line's extent along the drag's axis, by index, plus the frame's origin. */
 	lines: { index: number; start: number; end: number; cross: number; span: number }[];
 	origin0: { left: number; top: number };
+	/** Stops following the scrolls under an engaged drag. */
+	unfollow?: () => void;
 }
 
 /**
@@ -1034,6 +1041,7 @@ class TableIslandView implements NodeView {
 		this.drag = {
 			line,
 			origin: { x: event.clientX, y: event.clientY },
+			at: line.axis === 'row' ? event.clientY : event.clientX,
 			engaged: false,
 			cancelled: false,
 			drop: line.index,
@@ -1056,18 +1064,42 @@ class TableIslandView implements NodeView {
 		if (!drag || drag.cancelled) return;
 		const travel = Math.hypot(event.clientX - drag.origin.x, event.clientY - drag.origin.y);
 		if (!drag.engaged && travel < DEAD_ZONE) return;
+		drag.at = drag.line.axis === 'row' ? event.clientY : event.clientX;
 		if (!drag.engaged) this.engage(drag);
-		drag.drop = this.dropIndex(drag, drag.line.axis === 'row' ? event.clientY : event.clientX);
+		drag.drop = this.dropIndex(drag, drag.at);
 		this.paintDrop(drag);
 	};
 
-	/** The drag becomes one: lift the line, and measure the table once. */
+	/** The drag becomes one: lift the line, measure the table, and follow what scrolls under it. */
 	private engage(drag: Drag): void {
 		drag.engaged = true;
 		addEventListener('keydown', this.onDragKey, true);
 		this.dom.classList.add('qm-table-dragging');
 		drag.grip.classList.add('qm-table-lifted');
 		for (const cell of this.boxesOf(drag.line)) cell.classList.add('qm-table-lifted');
+		this.measure(drag);
+		drag.unfollow = followDrag({
+			grip: drag.grip,
+			axis: drag.line.axis === 'row' ? 'y' : 'x',
+			at: () => drag.at,
+			extent: () =>
+				drag.lines.length
+					? { start: drag.lines[0].start, end: drag.lines[drag.lines.length - 1].end }
+					: undefined,
+			moved: () => {
+				if (this.drag !== drag || drag.cancelled) return;
+				this.measure(drag);
+				drag.drop = this.dropIndex(drag, drag.at);
+				drag.painted = -1;
+				this.paintDrop(drag);
+			},
+			lost: () => this.drag === drag && this.endDrag()
+		});
+	}
+
+	/** Each line's extent where it stands now. */
+	private measure(drag: Drag): void {
+		drag.lines = [];
 		const frame = this.frame;
 		if (!frame) return;
 		const box = frame.getBoundingClientRect();
@@ -1128,6 +1160,7 @@ class TableIslandView implements NodeView {
 	};
 
 	private unlift(): void {
+		this.drag?.unfollow?.();
 		removeEventListener('keydown', this.onDragKey, true);
 		this.dropMark?.remove();
 		this.dropMark = undefined;
@@ -1139,8 +1172,8 @@ class TableIslandView implements NodeView {
 	private endDrag(): void {
 		const drag = this.drag;
 		if (!drag) return;
-		this.drag = undefined;
 		this.unlift();
+		this.drag = undefined;
 		drag.grip.removeEventListener('pointermove', this.onGripMove);
 		drag.grip.removeEventListener('pointerup', this.onGripUp);
 		drag.grip.removeEventListener('pointercancel', this.onGripUp);
@@ -1149,8 +1182,8 @@ class TableIslandView implements NodeView {
 	}
 
 	/**
-	 * Which line the pointer is over along the drag's axis: the nearest by the extents measured at
-	 * engage. One dimension suffices: the cross-axis term is identical across the candidates.
+	 * Which line the pointer is over along the drag's axis: the nearest by the extents last
+	 * measured. One dimension suffices: the cross-axis term is identical across the candidates.
 	 */
 	private dropIndex(drag: Drag, at: number): number {
 		let best = drag.line.index;

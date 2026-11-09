@@ -12,7 +12,8 @@
  held by being present, so each draws a fixed tick, its `title` as an input, a remove,
  and the same columns. The add box closes the list ({@link MatrixAdd}): what is typed
  there is added under an id minted from it past every id the list holds, so a title the
- list already carries is a second item.
+ list already carries is a second item. A removed item is offered back on the editor's
+ toast (`undo.svelte.ts`), under its own id while the list has not taken it.
 
  The control owns its label row, as an array does: the count of held items sits
  where an array's add chip sits, so {@link Field} skips its own label for it.
@@ -25,12 +26,16 @@
  gesture writes it whole with the change in it.
 -->
 <script lang="ts">
-	import { tick as flush } from 'svelte';
+	import { onDestroy, tick as flush } from 'svelte';
 	import { wording } from './strings.js';
+	import { structuralUndo } from './undo.svelte.js';
 
 	// The surface's words, ambient from the editor root; the package's English
 	// off-tree, so this component renders standalone too.
 	const t = wording();
+	const undo = structuralUndo();
+	let alive = true;
+	onDestroy(() => (alive = false));
 	import type { Content, PathStep, QuillFieldSchema } from '@quillmark/wasm';
 	import {
 		MATRIX_TITLE,
@@ -191,19 +196,37 @@
 	function retitle(id: string, title: string): void {
 		commit(commitMember(map, id, memberWrite(matrixColumns(own(map, id)), title)));
 	}
-	async function removeItem(id: string): Promise<void> {
+	const taken = (id: string): boolean =>
+		onRoster(schema, id) || (map != null && Object.hasOwn(map, id));
+	async function removeItem(id: string, name: string): Promise<void> {
 		const at = added.findIndex((item) => item.id === id);
+		const item = own(map, id);
 		commit(commitMember(map, id, undefined));
+		undo.offer(t.strings.undoRemoved(name), () => restore(id, item));
 		await flush();
 		// The caret goes where the row was: the next added item, else the add box.
 		const next = added[at] ?? added[at - 1];
 		if (next) own(titleEls, next.id)?.focus();
 		else addEl?.focus();
+		undo.hand(document.activeElement);
+	}
+	/** A removal's undo: the item back as it was stored, under its own id unless the list
+	 *  has since taken it. A no-op once this field is gone. */
+	async function restore(id: string, item: unknown): Promise<void> {
+		if (!alive) return;
+		const back = taken(id)
+			? addedId(titleText((item as Record<string, unknown>)[MATRIX_TITLE]), taken)
+			: id;
+		commit(commitMember(map, back, item));
+		await flush();
+		own(titleEls, back)?.focus();
 	}
 
 	// ── The add box ────────────────────────────────────────────────────────────
-	async function add(title: string): Promise<void> {
-		const taken = (id: string) => onRoster(schema, id) || (map != null && Object.hasOwn(map, id));
+	/** Add an item titled `title`. `land` off leaves the focus where it is: the add a
+	 *  blur made, the focus having gone where the user sent it. */
+	async function add(title: string, land = true): Promise<void> {
+		undo.withdraw();
 		const id = addedId(title, taken);
 		commit(commitMember(map, id, memberWrite({}, title)));
 		await flush();
@@ -211,7 +234,7 @@
 		// The item's columns are what the author came to fill; a checklist has none, and
 		// the box stays where the next item is typed.
 		const first = Object.keys(schema.properties ?? {})[0];
-		if (first !== undefined) own(colEls, id)?.focusPath([first]);
+		if (land && first !== undefined) own(colEls, id)?.focusPath([first]);
 		if (box) bloom(box);
 	}
 
@@ -334,7 +357,7 @@
 						class="qm-icon-btn qm-focus-ring qm-member-remove"
 						title={t.strings.matrixRemove(name)}
 						aria-label={t.strings.matrixRemove(name)}
-						onclick={() => removeItem(item.id)}><Icon name="minus" /></button
+						onclick={() => removeItem(item.id, name)}><Icon name="minus" /></button
 					>
 				</div>
 				{@render columns(item.id, name, true)}

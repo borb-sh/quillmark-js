@@ -10,12 +10,17 @@
  threaded through a generation token.
 
  Reactivity across the WASM handle. The `Document` is opaque to Svelte, so a
- `revision` counter is bumped after every scalar/structure mutation and the card
+ `revision` counter is bumped after a scalar/structure mutation and the card
  tree is `$derived` by re-reading `doc.main`/`doc.cards`/`quill.schema`. Prose
  leaves are mounted once per stable leaf key (keyed `<Card>`/`<ProseField>`);
  they commit to the doc directly and do not bump `revision`, so a re-derive never
  remounts them or drops a caret. `doc.main`/`doc.cards` allocate per read: read
  once per derive.
+
+ A run of commits to one field is typing in a by-value cell, and a derive per
+ keystroke is a whole-document read, resolve and validate under each one. So the
+ run's commits past its first rebuild the one card from the one field's value
+ (`patched`), and the derive lands once the run rests.
 -->
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
@@ -160,13 +165,67 @@
 	 */
 	function bump(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		rederive();
+		report(source, cardId, at, op);
+	}
+	function report(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
 	}
 	function rederive(): void {
+		clearTimeout(rest);
+		rest = undefined;
+		patched = {};
 		revision++;
 		liveTitles = {};
+	}
+
+	/** How long after a field's commit the next one to it still counts as the same run:
+	 *  the gap between two keys of slow typing. */
+	const RUN_MS = 2000;
+	/** How long after a run's last commit its derive lands: a pause in the typing. */
+	const REST_MS = 300;
+	let run: { key: string; at: number } | undefined;
+	let rest: ReturnType<typeof setTimeout> | undefined;
+	/** The cards a run rebuilt, by session key, over the derive they stand on. */
+	let patched = $state.raw<Record<CardId, CardModel>>({});
+	/**
+	 * A field's commit, re-derived. A run's commits past its first rebuild the one card:
+	 * the committed field's value re-read, every other value the object the last derive
+	 * read, so no control beside the one typed in is handed anything new. Validation and
+	 * the resolved rows hold as the last derive left them until the run rests, which is
+	 * exact for the rows a control reads: a default's, which an authored field has none
+	 * of before or after. A commit that sets or unsets the field moves a row, so it
+	 * derives at once.
+	 */
+	function fieldCommitted(id: CardId, isMain: boolean, name: string, value: unknown): void {
+		const key = fieldKeyToString({ card: isMain ? undefined : id, field: name });
+		const now = performance.now();
+		const running = run?.key === key && now - run.at < RUN_MS;
+		run = { key, at: now };
+		const at = cardIndexOf(id);
+		const shown = isMain ? model.main : model.cards[at];
+		if (!running || value === undefined || !shown || !Object.hasOwn(shown.values, name))
+			return rederive();
+		const fresh = fieldValues((isMain ? doc.main : doc.card(at)).payloadItems);
+		const cardSchema = isMain ? quill.schema.main : quill.schema.card_kinds?.[shown.kind];
+		patched = {
+			...patched,
+			[id]: {
+				...shown,
+				values: { ...shown.values, [name]: fresh[name] },
+				titlePlaceholder: cardTitle(cardSchema, shown.kind, fresh, undefined)
+			}
+		};
+		if (id in liveTitles) {
+			const titles = { ...liveTitles };
+			delete titles[id];
+			liveTitles = titles;
+		}
+		clearTimeout(rest);
+		rest = setTimeout(() => {
+			if (span.alive) rederive();
+		}, REST_MS);
 	}
 	/** Read at the mutation boundary, never cached (INVARIANTS §"The address is the
 	 * spine"). */
@@ -191,6 +250,7 @@
 	// the span holds nothing to release.
 	const span = createLifespan();
 	onDestroy(() => span.end());
+	span.onEnd(() => clearTimeout(rest));
 
 	// ── Leaf registry (landing target lookup + the active-leaf seam) ────────────
 	// Every mounted field is in it, prose leaf and form control alike (`leaves.ts`):
@@ -375,7 +435,8 @@
 				}
 			}
 			commitErrors.delete(keyStr);
-			bump('field', id, makeAddr(id, isMain, name));
+			fieldCommitted(id, isMain, name, value);
+			report('field', id, makeAddr(id, isMain, name));
 		} catch (e) {
 			const diagnostic: Diagnostic = (isQuillmarkError(e) ? e.diagnostics[0] : undefined) ?? {
 				severity: 'error',
@@ -738,7 +799,7 @@
 		};
 	}
 
-	const model = $derived.by(() => {
+	const tree = $derived.by(() => {
 		revision; // re-derive on every mutation
 		const schema = quill.schema;
 		const main = doc.main;
@@ -779,6 +840,12 @@
 				)
 			)
 		};
+	});
+
+	const model = $derived({
+		tips: tree.tips,
+		main: patched.main ?? tree.main,
+		cards: tree.cards.map((c) => patched[c.id] ?? c)
 	});
 
 	// ── Public entry points ─────────────────────────────────────────────────────

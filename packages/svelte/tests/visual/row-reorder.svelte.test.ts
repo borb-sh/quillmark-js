@@ -78,9 +78,9 @@ describe('reorder on an object row', () => {
 		dragHandle(grip, [20, 70, 120]);
 		expect(order(q, doc)).toEqual(['B', 'C', 'A']);
 		expect(mounted.changes.at(-1)).toMatchObject({ source: 'field', path: 'main.revisions' });
-		// Past either end lands at that end.
+		// Just past either end lands at that end.
 		layOut(arr);
-		dragHandle(handle(arr, 2), [120, -300]);
+		dragHandle(handle(arr, 2), [120, -10]);
 		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
 	});
 
@@ -223,6 +223,29 @@ describe('reorder on an object row', () => {
 			expect(arr.querySelector('.lifted, [data-drop]')).toBeNull();
 			expect(order(q, doc)).toEqual(['A', 'B', 'C']);
 		});
+	});
+
+	it('drops the rule and moves nothing once the pointer is a row past the list', () => {
+		const q = quill();
+		const doc = threeRows();
+		const arr = revisions(mountEditor(q, doc).target);
+		layOut(arr);
+		const grip = handle(arr, 0);
+		const at = (type: string, y: number) =>
+			grip.dispatchEvent(new PointerEvent(type, { bubbles: true, clientY: y }));
+		const [last] = rows(arr).slice(-1);
+		const { top, bottom } = last.getBoundingClientRect();
+		at('pointerdown', 20);
+		// Within a row's height of the end, the last row still answers.
+		at('pointermove', bottom + (bottom - top) / 2);
+		flushSync();
+		expect(last.dataset.drop).toBe('after');
+		at('pointermove', bottom + 2 * (bottom - top));
+		flushSync();
+		expect(arr.querySelector('[data-drop]')).toBeNull();
+		at('pointerup', bottom + 2 * (bottom - top));
+		flushSync();
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
 	});
 
 	it('moves nothing on a press that stays in the dead zone, or a drop on its own row', () => {
