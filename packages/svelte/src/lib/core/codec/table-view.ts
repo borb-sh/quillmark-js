@@ -27,6 +27,7 @@ import { FIELD_KEYS, markKeymap, TABLE_KEYS as T } from './shortcuts.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
 import { dragMovePlugin } from './drag-move.js';
+import { TYPING } from './undo.js';
 import { tableOfNode } from './table.js';
 import type { IslandNodeAttrs } from './islands.js';
 import { tableElement, tableText } from './table-copy.js';
@@ -460,6 +461,9 @@ class TableIslandView implements NodeView {
 	private resize: Resize | undefined;
 	/** A drag's trailing `click`, which would otherwise re-select the moved line. */
 	private suppressClick = false;
+	/** The seat the last cell edit was typed in, so the next keystroke there joins its undo
+	 *  step; any other write clears it. */
+	private typedIn: string | undefined;
 	/** The grips of the row and column under the pointer, drawn up. */
 	private near: HTMLButtonElement[] = [];
 
@@ -1670,7 +1674,7 @@ class TableIslandView implements NodeView {
 				const now = this.props();
 				const cell = cellFromDoc(next.doc, cellAt(now, r, c));
 				mounted.shown = cell;
-				this.write(withCell(now, r, c, cell), undefined, from);
+				this.write(withCell(now, r, c, cell), undefined, from, `${r}:${c}`);
 			},
 			handleDOMEvents: {
 				focus: () => {
@@ -1711,12 +1715,13 @@ class TableIslandView implements NodeView {
 	/**
 	 * Commit a new rectangle onto the node. `setNodeMarkup` is an ordinary PM transaction, so the
 	 * field lowers it through the island channel: one commit, one undo step, which is why every op
-	 * writes a whole table.
+	 * writes a whole table. A run of keystrokes in one cell (`typedIn` its seat) is one step.
 	 */
 	private write(
 		next: TableGrid,
 		focus?: { r: number; c: number },
-		from = this.focusedSeat()
+		from = this.focusedSeat(),
+		typedIn?: string
 	): void {
 		const pos = this.getPos();
 		if (pos == null) return;
@@ -1724,12 +1729,13 @@ class TableIslandView implements NodeView {
 		if (!node || node.type !== this.node.type) return;
 		const left = valueKey(node);
 		if (left && from) departures.set(left, from);
-		this.outer.dispatch(
-			this.outer.state.tr.setNodeMarkup(pos, undefined, {
-				...node.attrs,
-				...islandOf(next)
-			})
-		);
+		const tr = this.outer.state.tr.setNodeMarkup(pos, undefined, {
+			...node.attrs,
+			...islandOf(next)
+		});
+		if (typedIn !== undefined && typedIn === this.typedIn) tr.setMeta(TYPING, true);
+		this.typedIn = typedIn;
+		this.outer.dispatch(tr);
 		if (focus) this.focusCell(focus.r, focus.c);
 	}
 

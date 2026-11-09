@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**Typing in a table cell undoes as a run.** A run of keystrokes in one cell of a table island is one undo step, as typing in a paragraph is, where each keystroke was a step of its own; a keystroke in another cell, or any other change to the table, opens the next.
+
+**A date left half typed shows what it stores.** Digits typed into a date or `datetime` storing nothing, short of a whole value, are put back as the focus leaves, where they stayed on screen with nothing written; a `datetime` given its date and no time is one.
+
 **Typing in a by-value cell costs its card, not the document.** A run of commits to one field, which is typing in an array element, a subform cell or a table cell, rebuilds only the card it is in past its first commit, and the whole-document derive, `quill.validate` with it, lands 300 ms after the run's last commit. A validation diagnostic therefore follows a pause in the typing; a refused commit still draws at once. A host that writes the document itself calls `refresh()` as before.
 
 **An array of numbers, enums, booleans or dates draws its type's control per element.** Each row is the number input, listbox, switch or date control its `items` type maps to, where it was a text input that offered an enum no members and wrote a number as text. `+ Add` adds the blank for an enum or a date and `false` for a boolean. A number has no empty answer, so `+ Add` opens a standing row after the last element that writes nothing until it holds a number, and emptying a number row removes its element, offered back on the undo toast. The remove of a scalar row is a tab stop, Enter and Backspace being its control's.

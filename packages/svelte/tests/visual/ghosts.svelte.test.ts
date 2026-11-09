@@ -477,6 +477,20 @@ describe('a default that prints', () => {
 		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
 	});
 
+	it('puts back a segment typed into a stored blank as the focus leaves', () => {
+		const target = open({}, answering('dated: ""'));
+		const month = segment(target, 'month');
+		month.focus();
+		flushSync();
+		press(month, '1');
+		expect(rungs(target)).toEqual(['hint', undefined, 'hint']);
+
+		month.blur();
+		flushSync();
+		expect(q.reader(doc).get('dated')).toBe('');
+		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
+	});
+
 	it('writes the blank for a seated default emptied whole, and the blank stays', () => {
 		const target = open();
 		for (const [part, presses] of [

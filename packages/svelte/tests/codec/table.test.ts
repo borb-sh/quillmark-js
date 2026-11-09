@@ -925,6 +925,24 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
+	it('a run of keystrokes in one cell is one undo step, and a keystroke in another cell opens one', () => {
+		const { field } = tableLeaf(LETTERED);
+		const type = (view: EditorView, text: string) => {
+			view.focus();
+			for (const ch of text) view.dispatch(view.state.tr.insertText(ch));
+		};
+		type(cellViews(field)[0], 'alpha');
+		expect(undoDepth(outerView(field).state)).toBe(1);
+		type(cellViews(field)[1], 'beta');
+		expect(undoDepth(outerView(field).state)).toBe(2);
+		press(cellViews(field)[1], 'z', { ctrlKey: true });
+		expect(leafProps(field).header[1].text).toBe(LETTERED.header[1].text);
+		expect(leafProps(field).header[0].text).toContain('alpha');
+		press(cellViews(field)[0], 'z', { ctrlKey: true });
+		expect(leafProps(field)).toEqual(LETTERED);
+		field.destroy();
+	});
+
 	it('an undo in the middle of a cell puts the caret where the edit was', () => {
 		const { field } = tableLeaf(withCell(LETTERED, 0, 0, cell('hello')));
 		const view = cellViews(field)[0];
