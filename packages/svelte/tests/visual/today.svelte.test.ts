@@ -132,6 +132,41 @@ describe('a `datetime`', () => {
 		press(segment(logged, 'month'), 't');
 		expect(stored('logged')).toBeUndefined();
 	});
+
+	it('draws the stored time after the date', () => {
+		const logged = field(open('logged: "2026-03-04T10:30"'), 'Logged');
+		expect(digits(logged)).toBe('2026-03-04');
+		expect(Number(segment(logged, 'hour').textContent)).toBe(10);
+		expect(Number(segment(logged, 'minute').textContent)).toBe(30);
+		expect(logged.querySelector('.qm-date-unread')).toBeNull();
+	});
+
+	it('writes a segment edit as a whole datetime, to the minute', () => {
+		const target = open('logged: "2026-03-04T10:30"');
+		const logged = field(target, 'Logged');
+		press(segment(logged, 'minute'), 'ArrowUp');
+		expect(stored('logged')).toBe('2026-03-04T10:31');
+		expect(target.querySelector('.qm-diag-line')).toBeNull();
+	});
+
+	it('keeps the seconds a stored value carries', () => {
+		const logged = field(open('logged: "2026-03-04T10:30:15"'), 'Logged');
+		press(segment(logged, 'minute'), 'ArrowUp');
+		expect(stored('logged')).toBe('2026-03-04T10:31:15');
+	});
+
+	it('is whole once every segment is filled, the time’s too', () => {
+		const target = open();
+		const logged = field(target, 'Logged');
+		const parts = [...logged.querySelectorAll<HTMLElement>('[data-segment]')].filter(
+			(s) => s.getAttribute('data-segment') !== 'literal'
+		);
+		for (const part of parts.slice(0, 3)) press(part, 'ArrowUp');
+		expect(stored('logged')).toBeUndefined();
+		for (const part of parts.slice(3)) press(part, 'ArrowUp');
+		expect(stored('logged')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+		expect(target.querySelector('.qm-diag-line')).toBeNull();
+	});
 });
 
 describe('a `default: today`', () => {

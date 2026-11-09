@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**Typing in a by-value cell costs its card, not the document.** A run of commits to one field, which is typing in an array element, a subform cell or a table cell, rebuilds only the card it is in past its first commit, and the whole-document derive, `quill.validate` with it, lands 300 ms after the run's last commit. A validation diagnostic therefore follows a pause in the typing; a refused commit still draws at once. A host that writes the document itself calls `refresh()` as before.
+
+**A `datetime` field edits its time.** The date control draws hour and minute segments after the date's for a `datetime` and writes `YYYY-MM-DDThh:mm`, keeping the seconds of a stored value that carries them. It wrote `YYYY-MM-DD`, which the writer refuses for the type, and hid a stored time.
+
 ## v0.33.0 - 2026-11-09
 
 **An applied prose commit leaves new block ids to the store.** A commit that lands as a change sends each block the store does not hold as a placeholder, and each block node then takes the id the store holds, outside history. The id a node carries for a new block before its commit is provisional, so a host reads block ids from the store.

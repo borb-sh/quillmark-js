@@ -10,7 +10,15 @@ import type { Document, Quill } from '@quillmark/wasm';
 import { addrForFieldPath } from '$lib/core';
 import { humanize } from '$lib/visual/structure';
 import { quill, quillFromYaml, example } from '../helpers/fixtures.js';
-import { caret, field, mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	caret,
+	field,
+	mountEditor,
+	press,
+	settle,
+	type,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(() => {
 	unmountAll();
@@ -99,22 +107,18 @@ describe('the card verbs', () => {
 	});
 });
 
-/**
- * Exactly two `section` cards, the smallest stack a reorder is visible in. `section`
- * carries the fixture's card-side `datetime` (`reviewed_at`), the one commit a mounted
- * control cannot satisfy: the date control emits `YYYY-MM-DD` whatever the declared
- * type, and a `datetime` coerces none (`edit::field_coercion_failed`).
- */
-function twoSections(q: Quill): Document {
+/** Exactly two cards of `kind`, the smallest stack a reorder is visible in. */
+function twoCards(q: Quill, kind: string): Document {
 	const doc = q.seedDocument();
-	for (let i = doc.cardCount - 1; i >= 0; i--) {
-		if (doc.card(i).kind !== 'section') doc.removeCard(i);
+	for (let i = doc.cardCount - 1; i >= 0; i--) doc.removeCard(i);
+	for (const at of [0, 1]) {
+		const card = q.seedCard(kind, doc.seedOverlay(kind));
+		if (!card) throw new Error(`fixture drift: the quill seeds no ${kind} card`);
+		doc.unchecked.insertCard(card, at);
 	}
-	const card = q.seedCard('section', doc.seedOverlay('section'));
-	if (!card) throw new Error('fixture drift: the quill seeds no section card');
-	doc.unchecked.insertCard(card, 1);
 	return doc;
 }
+const twoSections = (q: Quill): Document => twoCards(q, 'section');
 
 // A card's address does not survive a `moveCard` (`Addr` and `DocPath` are both
 // positional), so every card-naming payload carries the session `cardId` beside it
@@ -162,11 +166,14 @@ describe('a reorder through the card control', () => {
 
 	it('carries a refused commit with the card, not with the index', () => {
 		const q = quill();
-		const { target } = mountEditor(q, twoSections(q));
+		// `credits` carries the fixture's card-side `integer` (`rights.year`), whose input
+		// hands an entry outside its grammar to the writer, which refuses it.
+		const { target } = mountEditor(q, twoCards(q, 'credits'));
 
-		// One ArrowUp per segment completes the date, which the writer refuses.
-		for (const seg of slots(target)[0].querySelectorAll<HTMLElement>('[data-date-field-segment]'))
-			if (seg.getAttribute('data-segment') !== 'literal') press(seg, 'ArrowUp');
+		const year = [...slots(target)[0].querySelectorAll('label')].find(
+			(l) => l.textContent?.trim() === 'Year'
+		)!;
+		type(document.getElementById(year.htmlFor) as HTMLInputElement, '20x6');
 		expect(refusal(slots(target)[0])?.textContent).toContain('could not be coerced');
 		expect(refusal(slots(target)[1])).toBeNull();
 
@@ -174,7 +181,7 @@ describe('a reorder through the card control', () => {
 		const after = slots(target);
 		expect(refusal(after[0])).toBeNull();
 		expect(refusal(after[1])?.textContent).toContain('could not be coerced');
-		expect(leafKeys(after[1])).toContain('c0:$body');
+		expect(leafKeys(after[1])).toContain('c0:edition');
 	});
 
 	// The post-mutation scroll is one per tick, on the terms of that tick's last mutation.
