@@ -9,7 +9,9 @@
  third: the thumb at the track's centre. `role="switch"` admits no third state (a
  `mixed` there reads as false), so an optional boolean's control is a `checkbox`, the
  toggle role that does, announcing `mixed` while unset. A press from unset writes
- `true`; nothing here returns the cell to unset.
+ `true`, and a press only ever answers. Delete or Backspace on an answered optional cell
+ unsets it: the answer taken back is a key's, as emptying any other control is, and no
+ control is drawn for it.
 
  An unset switch draws its `default:` at the default rung, as every control draws a
  printed default: a checked track takes the accent's default rung.
@@ -34,7 +36,8 @@
 		id?: string;
 		/** The parked `description` (FieldLabel): announced after the name. */
 		describedBy?: string;
-		onCommit: (v: boolean) => void;
+		/** The answer, or `undefined` where an optional cell's was taken back. */
+		onCommit: (v: boolean | undefined) => void;
 	}
 	let { value, fallback, optional = false, label, id, describedBy, onCommit }: Props = $props();
 
@@ -46,8 +49,22 @@
 	const unset = $derived(local === undefined);
 	const defaulted = $derived(value === undefined && fallback !== undefined);
 	const tristate = $derived(
-		optional ? { role: 'checkbox', 'aria-checked': unset ? ('mixed' as const) : !!local } : {}
+		optional
+			? {
+					role: 'checkbox',
+					'aria-checked': unset ? ('mixed' as const) : !!local,
+					'aria-keyshortcuts': 'Delete Backspace'
+				}
+			: {}
 	);
+	function unsetKey(e: KeyboardEvent): void {
+		if (!optional || value === undefined) return;
+		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+		if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+		e.preventDefault();
+		e.stopPropagation();
+		onCommit(undefined);
+	}
 </script>
 
 <!-- Not `.qm-switch`: that name is the preset's pane band, whose narrow-viewport rule
@@ -71,7 +88,15 @@
 		}}
 	>
 		{#snippet child({ props })}
-			<button {...props} {...tristate}><Switch.Thumb class="qm-toggle-thumb" /></button>
+			<button
+				{...props}
+				{...tristate}
+				onkeydown={(e) => {
+					unsetKey(e);
+					if (!e.defaultPrevented)
+						(props.onkeydown as ((e: KeyboardEvent) => void) | undefined)?.(e);
+				}}><Switch.Thumb class="qm-toggle-thumb" /></button
+			>
 		{/snippet}
 	</Switch.Root>
 </span>
