@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
 import { core, quill, example, literal } from '../helpers/fixtures.js';
-import { field, mountEditor, paste, press, unmountAll } from '../helpers/surface.svelte.js';
+import { field, mountEditor, paste, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -104,6 +104,23 @@ describe('an array of `text`', () => {
 		press(rows(target).at(-1)!, 'Backspace');
 		expect(rows(target).map((r) => r.textContent)).toEqual(seeded);
 		expect(read(q, doc, 'errata')).toEqual(seeded);
+	});
+
+	it('moves a line on Alt+↑/↓, its leaf and the caret with it', async () => {
+		const q = quill();
+		const doc = example();
+		const { target } = mountEditor(q, doc);
+		const seeded = literal(doc.getStored('errata')) as string[];
+		const first = rows(target)[0];
+		first.focus();
+		press(first, 'ArrowDown', { altKey: true, cancelable: true });
+		await settle();
+		expect(read(q, doc, 'errata')).toEqual([seeded[1], seeded[0], ...seeded.slice(2)]);
+		expect(rows(target)[1]).toBe(first);
+		expect(document.activeElement).toBe(first);
+		// The first line has nowhere to go up.
+		press(rows(target)[0], 'ArrowUp', { altKey: true, cancelable: true });
+		expect(read(q, doc, 'errata')).toEqual([seeded[1], seeded[0], ...seeded.slice(2)]);
 	});
 
 	it('inserts a sibling on Enter', () => {

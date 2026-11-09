@@ -172,7 +172,7 @@ main:
 		expect(rows(q, doc)).toHaveLength(2);
 	});
 
-	it('carries the remove alone: no reorder by button, and none by key', async () => {
+	it('carries the remove alone, and reorders by key from a cell', async () => {
 		const q = quill();
 		const doc = example();
 		const mounted = mountEditor(q, doc);
@@ -186,12 +186,18 @@ main:
 			'Remove Contributors 1'
 		);
 
-		// The list's keyboard twin has no sibling here, so it answers nothing.
-		press(nameCell(t, 0), 'ArrowDown', { altKey: true });
+		// The row draws no handle; Alt+↑/↓ from a cell moves it, the caret riding with it.
+		const cell = nameCell(t, 0);
+		cell.focus();
+		press(cell, 'ArrowDown', { altKey: true, cancelable: true });
+		await settle();
+		expect(rows(q, doc).map((r) => r.name)).toEqual(['Grace Hopper', 'Ada Lovelace']);
+		expect(document.activeElement).toBe(nameCell(t, 1));
+		press(nameCell(t, 1), 'ArrowUp', { altKey: true, cancelable: true });
 		await settle();
 		expect(rows(q, doc).map((r) => r.name)).toEqual(['Ada Lovelace', 'Grace Hopper']);
 
-		first.querySelector<HTMLButtonElement>('.qm-row-btn.qm-remove')!.click();
+		t.querySelector<HTMLElement>('.qm-array-table-row')!.querySelector<HTMLButtonElement>('.qm-row-btn.qm-remove')!.click();
 		flushSync();
 		expect(rows(q, doc).map((r) => r.name)).toEqual(['Grace Hopper']);
 		expect(nameText(t, 0)).toBe('Grace Hopper');

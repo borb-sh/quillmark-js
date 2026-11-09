@@ -63,6 +63,17 @@ describe('an array of numbers', () => {
 		expect(stored('counts')).toEqual([5, 8]);
 	});
 
+	it('moves a row on Alt+↑/↓, and the standing row nowhere', () => {
+		const counts = field(open('counts: [5, 6]').target, 'Counts');
+		press(input(rows(counts)[1]), 'ArrowUp', { altKey: true, cancelable: true });
+		flushSync();
+		expect(stored('counts')).toEqual([6, 5]);
+		add(counts);
+		press(input(rows(counts)[2]), 'ArrowUp', { altKey: true, cancelable: true });
+		flushSync();
+		expect(stored('counts')).toEqual([6, 5]);
+	});
+
 	it('adds through a standing row that writes nothing until it holds a number', () => {
 		const { target, errors } = open('counts: [5]');
 		const counts = field(target, 'Counts');

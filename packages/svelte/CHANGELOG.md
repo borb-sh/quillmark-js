@@ -12,6 +12,8 @@
 
 **A matrix's added item is offered back when removed, and its add box keeps what was typed.** The remove of an added item offers it on the undo toast, columns and all, as an array row's does. Words typed in the add box are added when the focus leaves it, the focus staying where it went, where a click elsewhere discarded them; Escape still clears the box unadded.
 
+**Alt+↑/↓ moves a table's row and a line of a list.** The chord that moves a record's row moves a row of a `layout: table` array and an element of a list of lines or scalars, from any cell of the row or from its remove, the focus riding with the row; neither draws a handle. A control that takes the chord itself, a listbox or a date segment, keeps it.
+
 **Text dragged from one field to another moves.** A drag from one prose leaf into another, a table cell among them, deletes the dragged text from the leaf it left once the other has taken the drop, where it was left in both. Holding the copy modifier (Option on Apple platforms, Ctrl elsewhere) copies, as it does inside one field.
 
 **A `datetime` field edits its time.** The date control draws hour and minute segments after the date's for a `datetime` and writes `YYYY-MM-DDThh:mm`, keeping the seconds of a stored value that carries them. It wrote `YYYY-MM-DD`, which the writer refuses for the type, and hid a stored time.

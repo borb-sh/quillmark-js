@@ -39,15 +39,15 @@
  every other field's control does. On an object element that box is the summary rather
  than the open row: a destructive control belongs to the line it sits on, not to
  everything that line has unfolded. A table's row carries the remove alone, in its last
- track and pinned to the end edge of the box the table scrolls in: every cell of the
- row is on the line, so a mis-order is a retype as it is in a list of strings, and the
- one gesture the row keeps never needs a scroll to reach.
+ track and pinned to the end edge of the box the table scrolls in, so the one control
+ the row draws never needs a scroll to reach. A table's row and a line carry no handle:
+ their reorder is the key's alone.
 
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
  caret there, a paste of several lines into a prose row opens a row per line,
  Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
- anywhere in an `object` row of the list moves it, the nearest row answering and never
- the record around a nested one, and is the twin of the handle's drag. A move is one splice of the ids
+ anywhere in a row of the list moves it, the nearest row answering and never
+ the record around a nested one, and on an `object` row is the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
@@ -663,13 +663,14 @@
 			remove(k, column);
 		}
 	}
-	/** The reorder's keyboard twin, on the row so it answers from the summary and from
-	 *  any cell an open row holds: Alt+↑/↓, the table island's own binding. The nearest
-	 *  row answers, or none does: a press inside a nested row is that row's whether it
-	 *  holds a reorder or not, so a key in a table's cell or a list of strings' input
-	 *  moves nothing, and never the record around it. A held drag owns the row until its
-	 *  release. */
+	/** The reorder's key, on the row so it answers from the summary, from any cell the
+	 *  row holds and from its remove: Alt+↑/↓, the table island's own binding. The nearest
+	 *  row answers, so a key in a nested list's row moves that row and never the record
+	 *  around it. A control that takes the chord keeps it: a listbox opens on it and a
+	 *  date segment steps, and their rows move from the remove. The standing row is no
+	 *  element and moves nowhere. A held drag owns the row until its release. */
 	function onRowKey(e: KeyboardEvent, k: number): void {
+		if (k >= ids.length) return;
 		if (!e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || e.isComposing || drag.held()) return;
 		// A cell that took the key — a select opening, a date segment stepping, a prose
 		// leaf joining — owns it.
@@ -777,10 +778,12 @@
 					<span class="qm-array-table-head-end"></span>
 				</div>
 				{#each ids as id, k (id)}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="qm-array-row qm-array-table-row qm-wash"
 						data-qm-index={k}
 						bind:this={rowEls[id]}
+						onkeydown={(e) => onRowKey(e, k)}
 					>
 						<ObjectField
 							bare
@@ -871,10 +874,12 @@
 			bind:this={rowsEl}
 		>
 			{#each rowIds as id, k (id)}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
 					class={['qm-array-row qm-wash', { standing: id === standingId }]}
 					data-qm-index={k}
 					bind:this={rowEls[id]}
+					onkeydown={(e) => onRowKey(e, k)}
 				>
 					{#if control === 'prose'}
 						<ProseValue
@@ -954,6 +959,7 @@
 		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
 		title={t.strings.arrayRemove}
 		aria-label={rowAction(t.strings.arrayRemove, k)}
+		aria-keyshortcuts={control === 'object' && !table ? undefined : 'Alt+ArrowUp Alt+ArrowDown'}
 		tabindex={stop ? undefined : -1}
 		onclick={() => remove(k, undefined, true, true)}><Icon name="minus" /></button
 	>
@@ -962,7 +968,8 @@
 <!-- An `object` row's drag handle, a table grip's twin hung off the row's start edge.
      Pointer-only and out of the accessibility tree: a press on it does nothing, so a
      button there would be one a screen reader activates to no effect. Its twin is
-     Alt+↑/↓ from anywhere in the row, which the summary announces. -->
+     Alt+↑/↓ from anywhere in the row, which the summary announces, as a table's or a
+     line's remove does for its own row. -->
 {#snippet handle(k: number)}
 	<span
 		class="qm-row-handle"
