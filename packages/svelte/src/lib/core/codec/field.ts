@@ -627,8 +627,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				const change = lower(oldRt, newRt);
 				if (change) {
 					const asked = askCore(oldRt, change);
-					const receipt = doc.apply(at, change);
-					if (asked.size) adopt(asked, receipt.minted);
+					doc.apply(at, change);
+					if (asked.size) adopt();
 				}
 			}
 			reconciler.commit(readLeaf(reader, addr));
@@ -685,9 +685,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		return asked;
 	}
 
-	/** Each block node takes the id the store gave the block it projects to, where the write minted it. */
-	function adopt(asked: Map<string, string>, minted: Record<string, string>): void {
-		const fresh = new Set(Object.values(minted));
+	/** Each block node takes the id the store holds for the block it projects to. */
+	function adopt(): void {
 		const stored = (readLeaf(reader, addr) as Content).blocks.map((b) => b.id);
 		const nodes: { pos: number; key: string; id: unknown }[] = [];
 		view.state.doc.descendants((node, pos) => {
@@ -701,10 +700,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			}
 			return true;
 		});
-		if (nodes.length !== stored.length || !asked.size) return;
+		if (nodes.length !== stored.length) return;
 		const tr = view.state.tr;
 		nodes.forEach((n, i) => {
-			if (fresh.has(stored[i]) && n.id !== stored[i]) tr.setNodeAttribute(n.pos, n.key, stored[i]);
+			if (n.id !== stored[i]) tr.setNodeAttribute(n.pos, n.key, stored[i]);
 		});
 		if (tr.docChanged) view.updateState(view.state.apply(tr.setMeta('addToHistory', false)));
 	}

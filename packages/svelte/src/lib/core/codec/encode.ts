@@ -315,7 +315,8 @@ function mergeMarks(raw: ContentMark[]): ContentMark[] {
 
 /**
  * The change taking `oldRt` to `newRt`, or `null` where the two are one value: the store's own
- * `diff`, so what lands is the projection, ids and anchors and all.
+ * `diff`, carrying the projection's ids and anchors; a commit swaps the block ids the store does
+ * not hold for placeholders (`field.ts`).
  */
 export function lower(oldRt: Content, newRt: Content): Change | null {
 	const change = core().diff(oldRt, newRt);
