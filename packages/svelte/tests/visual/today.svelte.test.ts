@@ -4,7 +4,7 @@
 // toggle writes it and, pressed, writes the render date's digits instead; `T` in a
 // segment writes it; a segment edit writes a whole date. The render date is read off
 // `resolve`, which reports a `today` cell as the date it renders.
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill, ResolvedField } from '@quillmark/wasm';
 import { quillFromYaml } from '../helpers/fixtures.js';
@@ -80,6 +80,19 @@ describe('a stored `today`', () => {
 		expect(stored('dated')).toBe(renderDate());
 		expect(toggle(dated).getAttribute('aria-pressed')).toBe('false');
 		expect(dated.querySelector('.qm-date')!.hasAttribute('data-default')).toBe(false);
+	});
+
+	it('pressed off past midnight, writes the new day', () => {
+		const dated = field(open('dated: today'), 'Dated');
+		vi.useFakeTimers({ toFake: ['Date'] });
+		try {
+			vi.setSystemTime(new Date(2031, 0, 2, 0, 5));
+			toggle(dated).click();
+			flushSync();
+			expect(stored('dated')).toBe('2031-01-02');
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('takes a segment edit as a whole date, the other segments the render date’s', () => {

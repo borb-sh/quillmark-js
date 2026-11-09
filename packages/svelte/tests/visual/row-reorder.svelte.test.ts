@@ -102,6 +102,32 @@ describe('reorder on an object row', () => {
 		expect(arr.querySelector('.lifted, [data-drop]')).toBeNull();
 	});
 
+	it('ends the drag with no move on Escape, and the release after it moves nothing', () => {
+		const q = quill();
+		const doc = threeRows();
+		const mounted = mountEditor(q, doc);
+		const arr = revisions(mounted.target);
+		layOut(arr);
+		const grip = handle(arr, 0);
+		const at = (type: string, y: number) =>
+			grip.dispatchEvent(new PointerEvent(type, { bubbles: true, clientY: y }));
+		at('pointerdown', 20);
+		at('pointermove', 70);
+		flushSync();
+		expect(rows(arr)[1].dataset.drop).toBe('after');
+		const n = mounted.changes.length;
+		const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+		grip.dispatchEvent(esc);
+		flushSync();
+		expect(esc.defaultPrevented).toBe(true);
+		expect(arr.querySelector('.lifted, [data-drop]')).toBeNull();
+		at('pointermove', 120);
+		at('pointerup', 120);
+		flushSync();
+		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
+		expect(mounted.changes).toHaveLength(n);
+	});
+
 	it('re-picks the drop as the rows scroll under a held drag', () => {
 		const q = quill();
 		const doc = threeRows();
