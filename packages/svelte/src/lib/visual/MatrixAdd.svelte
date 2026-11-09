@@ -1,6 +1,8 @@
 <!--
  An open matrix's add box (INVARIANTS §"The matrix"): a plain text input. Enter adds
- what was typed, trimmed, and clears the box; Escape clears it. It is drawn as the item
+ what was typed, trimmed, and clears the box, and so does the focus leaving it: words
+ typed there are an item, not a draft a click elsewhere discards. Escape clears it
+ unadded. It is drawn as the item
  it adds, unwritten: the plus in the tick's column and the words in the title's.
 -->
 <script lang="ts">
@@ -11,8 +13,9 @@
 		id: string;
 		/** The input's accessible name and its words at rest. */
 		placeholder: string;
-		/** Add an item titled `title`, never empty. */
-		onAdd: (title: string) => void;
+		/** Add an item titled `title`, never empty. `land` is off where the focus has
+		 *  already gone elsewhere and stays there. */
+		onAdd: (title: string, land: boolean) => void;
 	}
 	let { id, placeholder, onAdd }: Props = $props();
 
@@ -23,13 +26,16 @@
 		inputEl?.focus();
 	}
 
+	function take(land: boolean): void {
+		const title = typed.trim();
+		typed = '';
+		if (title) onAdd(title, land);
+	}
 	function onkeydown(e: KeyboardEvent): void {
 		if (e.isComposing) return;
 		if (e.key === 'Enter' && typed.trim()) {
 			e.preventDefault();
-			const title = typed.trim();
-			typed = '';
-			onAdd(title);
+			take(true);
 		} else if (e.key === 'Escape' && typed) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -51,6 +57,7 @@
 			aria-label={placeholder}
 			{placeholder}
 			{onkeydown}
+			onblur={() => inputEl?.isConnected && take(false)}
 		/>
 	</label>
 </div>
