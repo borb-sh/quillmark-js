@@ -2,6 +2,8 @@
 // not travel past the dead zone does nothing. The drop is the row under the pointer, read
 // off the rows where they stand, so a scroll by any hand re-picks it, and held at an edge
 // of its scrollport the drag scrolls toward the rows out of view (`core/dragfollow.ts`).
+// A pointer more than a row's height past either end of the list is out of it: the drop
+// rule goes, and a release there moves nothing.
 // Nothing reflows until the release (the lift is a tone and the drop rule is out of flow),
 // and the release is the one splice `move` makes. Escape, a handle that loses the pointer,
 // or one that leaves the DOM ends the drag with no move.
@@ -37,10 +39,12 @@ export function rowDrag(rows: DragRows): RowDrag {
 	let grip: Element | undefined;
 	let unfollow: (() => void) | undefined;
 
-	/** The row the pointer is over, or the nearest one past either end. */
+	/** The row the pointer is over, or the nearest one within its own height past either
+	 *  end; `k`, the drag's own row and so no move, further out than that. */
 	function dropIndex(k: number, y: number): number {
 		let best = k;
 		let nearest = Infinity;
+		let reach = 0;
 		for (let i = 0; i < rows.count(); i++) {
 			const box = rows.box(i);
 			if (!box) continue;
@@ -48,9 +52,10 @@ export function rowDrag(rows: DragRows): RowDrag {
 			if (gap < nearest) {
 				nearest = gap;
 				best = i;
+				reach = box.bottom - box.top;
 			}
 		}
-		return best;
+		return nearest > reach ? k : best;
 	}
 	function repick(): void {
 		if (drag?.engaged) drag.drop = dropIndex(drag.k, drag.y);
