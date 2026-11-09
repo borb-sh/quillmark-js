@@ -31,6 +31,9 @@ function transfer() {
 	const data = new Map<string, string>();
 	return {
 		files: [],
+		get types() {
+			return [...data.keys()];
+		},
 		effectAllowed: '',
 		clearData: () => data.clear(),
 		setData: (type: string, value: string) => void data.set(type, value),
