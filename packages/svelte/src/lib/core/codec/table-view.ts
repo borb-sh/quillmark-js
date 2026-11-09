@@ -1183,18 +1183,22 @@ class TableIslandView implements NodeView {
 
 	/**
 	 * Which line the pointer is over along the drag's axis: the nearest by the extents last
-	 * measured. One dimension suffices: the cross-axis term is identical across the candidates.
+	 * measured, within that line's own extent past either end of the table, and the drag's own
+	 * line, so no move, further out than that. One dimension suffices: the cross-axis term is
+	 * identical across the candidates.
 	 */
 	private dropIndex(drag: Drag, at: number): number {
 		let best = drag.line.index;
 		let nearest = Infinity;
+		let reach = 0;
 		for (const line of drag.lines) {
 			const gap = at < line.start ? line.start - at : at > line.end ? at - line.end : 0;
 			if (gap >= nearest) continue;
 			nearest = gap;
 			best = line.index;
+			reach = line.end - line.start;
 		}
-		return best;
+		return nearest > reach ? drag.line.index : best;
 	}
 
 	private boxesOf(line: Line): HTMLElement[] {
@@ -1204,10 +1208,16 @@ class TableIslandView implements NodeView {
 
 	/**
 	 * The drop indicator: one rule on the boundary the line would land against, redrawn only when
-	 * the boundary changes.
+	 * the boundary changes, and none while the release would leave the line where it stands.
 	 */
 	private paintDrop(drag: Drag): void {
 		if (drag.drop === drag.painted) return;
+		if (drag.drop === drag.line.index) {
+			drag.painted = drag.drop;
+			this.dropMark?.remove();
+			this.dropMark = undefined;
+			return;
+		}
 		const line = drag.lines.find((l) => l.index === drag.drop);
 		const frame = this.frame;
 		if (!line || !frame) return;
