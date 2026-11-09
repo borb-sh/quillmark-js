@@ -1652,6 +1652,39 @@ describe('a grip drag moves its line', () => {
 		field.destroy();
 	});
 
+	it('re-picks the drop as the lines scroll under a held drag', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const grip = grips(field, 'row')[1];
+		const at = (type: string, [x, y]: [number, number]) =>
+			grip.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					clientX: x,
+					clientY: y
+				})
+			);
+		at('pointerdown', [35, 55]);
+		at('pointermove', [35, 60]);
+
+		// A scroll by any hand carries the next row up under a pointer that has not moved.
+		const rise = HOSTS[4].top - HOSTS[2].top;
+		layout(
+			field,
+			HOSTS.map((h) => ({ ...h, top: h.top - rise, bottom: h.bottom - rise }))
+		);
+		field.el.dispatchEvent(new Event('scroll'));
+		at('pointerup', [35, 60]);
+		expect(grid(leafProps(field))).toEqual([
+			['h1', 'h2'],
+			['b1', 'b2'],
+			['a1', 'a2']
+		]);
+		field.destroy();
+	});
+
 	it('a body row dragged onto the header becomes the header', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
