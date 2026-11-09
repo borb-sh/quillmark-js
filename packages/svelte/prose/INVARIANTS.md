@@ -201,6 +201,8 @@ The bidirectional codec between one content field and one ProseMirror document. 
 
 **A link's scheme allowlist is the render's, not the model's**: a refused href stays on the mark and round-trips.
 
+**An applied commit leaves new block ids to the store.** A commit that lands as a change sends each block the store does not hold as a placeholder, and the nodes then take the ids the store holds, because the store does not mint an id it retired except on a write against the value it was minted on, which in practice is an undo: a writer naming a retired id, a model among them, is refused rather than landing on a stranger. The projection's own id for a new block is provisional, and a `replace` writes it as it stands.
+
 ### Islands
 
 **A minted island id continues the field's `isl-{n}` sequence**, never a UUID or a clock, because the id is part of the document's canonical bytes.

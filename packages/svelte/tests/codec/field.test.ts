@@ -124,6 +124,30 @@ describe('field-level reconciliation', () => {
 		expect(text.includes('mine')).toBe(false);
 		field.destroy();
 	});
+
+	it('gives a block an Enter opens the id the store minted for it', () => {
+		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		const view = viewOf(field);
+		const nodeIds = (): unknown[] => {
+			const ids: unknown[] = [];
+			view.state.doc.descendants((node) => {
+				const leaf = node.isTextblock || node.type.name === 'horizontal_rule';
+				if (node.type.name === 'island_block') ids.push(node.attrs.block);
+				else if (leaf) ids.push(node.attrs.id);
+				else return true;
+				return false;
+			});
+			return ids;
+		};
+		const stored = () => field.getContent().blocks.map((b) => b.id);
+		const before = stored();
+		field.setCaret(4);
+		press(view, 'Enter');
+		const after = stored();
+		expect(after.length).toBe(before.length + 1);
+		expect(nodeIds()).toEqual(after);
+		field.destroy();
+	});
 });
 
 describe('the hold on a body over what no node holds', () => {
