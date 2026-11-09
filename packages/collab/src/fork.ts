@@ -362,8 +362,8 @@ function lineStarts(field: YField): { starts: number[]; length: number } {
 
 /** Blocks `[from, to)` of a value as a held part reads them, as Markdown. */
 function linesOf(value: Content, from: number, to: number): string {
+	if (from >= to) return '';
 	const part = sliceBlocks(value, from, to);
-	if (!part.blocks.length) return '';
 	return part.codec === 'plain' ? part.text : (core().exportMarkdown(part) as string);
 }
 

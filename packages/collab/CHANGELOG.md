@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`writeFrom` holds the removal of a line.** An edit that removes a line someone changed since is held with an empty `after`, and `writeHeld` removes the line; it threw `not a Content` before.
+
 ## v0.3.0 - 2026-11-06
 
 **A write from a revision is compared and written word by word.** `writeFrom` reports a conflict only where the edit and a change made since touch the same words, compared as Y holds them, marks, block records, containers and islands included; `scope: 'line'` keeps the comparison by line. The update replaces whole words, so two words an edit changed far apart in a line are two splices and what was typed between them stays, and a word it replaced leaves no letter for a concurrent edit to land beside. `writeLog` compares by word too.

@@ -203,6 +203,21 @@ describe('held parts', () => {
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 
+	it('holds the removal of a line someone typed in, and removes it on request', () => {
+		const [a, b] = session(LINES);
+		const base = revision(a);
+		retype(b, 'reviews', 'checks');
+		const written = write(a, base, [LINES[0], LINES[2]], { hold: 'hunk' });
+		Y.applyUpdate(a.ydoc, written.update, 'ai');
+		const held = written.held[0] as HeldText;
+		expect(held).toMatchObject({ type: 'text', before: LINES[1], after: '' });
+		expect(body(a)).toHaveLength(LINES.length);
+		const removal = writeHeld(held, { history: a.ydoc, quill: q, doc: a.doc });
+		Y.applyUpdate(a.ydoc, removal.update, 'ai');
+		expect(body(a)).toEqual([LINES[0], LINES[2]]);
+		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
+	});
+
 	it('reads a held line whose text was deleted as gone', () => {
 		const { a, b, held } = heldAnswer();
 		retype(b, 'Bravo reviews the draft and signs the memo on Thursday.', '');
