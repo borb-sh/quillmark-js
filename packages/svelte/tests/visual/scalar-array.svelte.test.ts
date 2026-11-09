@@ -6,7 +6,15 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
 import { quillFromYaml } from '../helpers/fixtures.js';
-import { field, mountEditor, pick, press, type, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	field,
+	mountEditor,
+	pick,
+	press,
+	settle,
+	type,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -84,6 +92,39 @@ describe('an array of numbers', () => {
 		expect(stored('counts')).toEqual([5, 7]);
 		expect(rows(counts)).toHaveLength(2);
 		expect(errors).toEqual([]);
+	});
+
+	it('moves on at Enter: from the last row to a standing row, from another to the next', async () => {
+		const counts = field(open('counts: [5]').target, 'Counts');
+		add(counts);
+		const entry = (row: HTMLElement, value: string) => {
+			input(row).focus();
+			input(row).value = value;
+			input(row).dispatchEvent(new Event('input', { bubbles: true }));
+			press(input(row), 'Enter', { cancelable: true });
+		};
+		entry(rows(counts)[1], '12');
+		await settle();
+		expect(stored('counts')).toEqual([5, 12]);
+		expect(rows(counts)).toHaveLength(3);
+		expect(document.activeElement).toBe(input(rows(counts)[2]));
+		entry(rows(counts)[0], '4');
+		await settle();
+		expect(stored('counts')).toEqual([4, 12]);
+		const next = input(rows(counts)[1]);
+		expect(document.activeElement).toBe(next);
+		expect([next.selectionStart, next.selectionEnd]).toEqual([0, 2]);
+	});
+
+	it('stays put at Enter in a row holding no number', async () => {
+		const counts = field(open('counts: [5]').target, 'Counts');
+		add(counts);
+		input(rows(counts)[1]).focus();
+		press(input(rows(counts)[1]), 'Enter', { cancelable: true });
+		await settle();
+		expect(rows(counts)).toHaveLength(2);
+		expect(document.activeElement).toBe(input(rows(counts)[1]));
+		expect(stored('counts')).toEqual([5]);
 	});
 
 	it('dismisses the standing row by its remove, writing nothing', () => {

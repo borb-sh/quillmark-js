@@ -86,3 +86,24 @@ export function rangeAnchor(view: EditorView, from: number, to: number): RangeAn
 		}
 	};
 }
+
+/**
+ * `anchor`'s horizontal extent over the vertical extent of `boxes`: a surface hung off it
+ * clears every one, as a surface over a selection in a table cell clears the cell's row.
+ */
+export function across(anchor: RangeAnchor, boxes: readonly Element[]): RangeAnchor {
+	return {
+		contextElement: anchor.contextElement,
+		getBoundingClientRect: () => {
+			const { left, width } = anchor.getBoundingClientRect();
+			let top = Infinity;
+			let bottom = -Infinity;
+			for (const box of boxes) {
+				const rect = box.getBoundingClientRect();
+				top = Math.min(top, rect.top);
+				bottom = Math.max(bottom, rect.bottom);
+			}
+			return new DOMRect(left, top, width, bottom - top);
+		}
+	};
+}

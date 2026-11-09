@@ -4,8 +4,10 @@
  (`-`, `1.`) is never a document state worth a boundary round-trip, and
  committing it live flashes a coercion diagnostic + `console.error` on every
  intermediate prefix, announced by `DiagnosticList`'s `role="status"` live
- region. Escape takes a pending entry back to what the field holds, as it takes a
- card rename back, and the focus stays; with nothing pending the key is not claimed.
+ region. Where the parent moves on at Enter (`onEnter`), Enter commits at once and
+ the move follows a number, never a blank or a refused entry. Escape takes a pending
+ entry back to what the field holds, as it takes a card rename back, and the focus
+ stays; with nothing pending the key is not claimed.
 
  An unset field holds its resolved `default:` as its text, at the default rung
  (theme.css), and an edit that settles writes it as authored, as `TextField` takes
@@ -49,8 +51,12 @@
 		/** The parked `description` (FieldLabel): announced after the name. */
 		describedBy?: string;
 		onCommit: (v: number | string | undefined) => void;
+		/** Enter settled the entry as a number: a list's row moves on from it. Enter
+		 *  claimed here commits at once rather than at the browser's own `change`. */
+		onEnter?: () => void;
 	}
-	let { value, integer, fallback, placeholder, label, id, describedBy, onCommit }: Props = $props();
+	let { value, integer, fallback, placeholder, label, id, describedBy, onCommit, onEnter }: Props =
+		$props();
 
 	const resting = $derived(value != null ? String(value) : (fallback ?? ''));
 	let local = $derived(resting);
@@ -83,8 +89,19 @@
 	// which clears the refusal drawn on the field.
 	let reverted = false;
 	let offered = false;
+	// The text Enter last settled, which the browser's `change` on leaving would settle again.
+	let settled: string | undefined;
+	function onKey(e: KeyboardEvent): void {
+		if (e.key === 'Escape') return revert(e);
+		if (e.key !== 'Enter' || !onEnter || e.isComposing) return;
+		const el = e.currentTarget as HTMLInputElement;
+		e.preventDefault();
+		if (el.value !== settled && el.value !== resting) commit(el);
+		settled = el.value;
+		if (!offered && el.value.trim() !== '') onEnter();
+	}
 	function revert(e: KeyboardEvent): void {
-		if (e.key !== 'Escape' || e.isComposing) return;
+		if (e.isComposing) return;
 		const el = e.currentTarget as HTMLInputElement;
 		if (el.value === resting) return;
 		e.preventDefault();
@@ -134,9 +151,13 @@
 	oninput={(e) => {
 		local = (e.currentTarget as HTMLInputElement).value;
 		reverted = false;
+		settled = undefined;
 	}}
-	onkeydown={revert}
-	onchange={(e) => commit(e.currentTarget as HTMLInputElement)}
+	onkeydown={onKey}
+	onchange={(e) => {
+		const el = e.currentTarget as HTMLInputElement;
+		if (el.value !== settled) commit(el);
+	}}
 />
 
 <style>

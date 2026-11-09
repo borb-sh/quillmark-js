@@ -247,6 +247,22 @@ main:
         compact: true
       description: Stamp DRAFT across the page. Also bound to a checkbox widget, so a boolean reaches the region table.
 
+    tab_stops:
+      type: array
+      items:
+        type: number
+      default: []
+      ui:
+        group: layout
+      description: "Where the body's tab stops fall, in points. An array of numbers, so each row is a number input: a number has no empty answer, so the add chip opens a standing row that commits once it holds one."
+
+    duplex:
+      type: boolean?
+      ui:
+        group: layout
+        compact: true
+      description: "Print on both sides. An optional boolean, so the switch has a third answer, unset, which Delete takes it back to."
+
     accent:
       type: enum
       values:
@@ -349,6 +365,37 @@ main:
         group: meta
         compact: true
       description: When the document was last revised. Blank to omit.
+
+    audiences:
+      type: array
+      items:
+        type: enum
+        values:
+          - staff
+          - partners
+          - press
+      default: []
+      ui:
+        group: meta
+      description: Who it is written for. An array of enums, so each row is a listbox and a new row starts blank.
+
+    proofs_passed:
+      type: array
+      items:
+        type: boolean
+      default: []
+      ui:
+        group: meta
+      description: One switch per proof round, on where the round passed. An array of booleans, so a new row starts off.
+
+    review_dates:
+      type: array
+      items:
+        type: date
+      default: []
+      ui:
+        group: meta
+      description: When it was reviewed. An array of dates, so each row is the date control and a new row starts blank.
 
     tracking_id:
       type: text
