@@ -4,8 +4,8 @@
 // of its scrollport, the drag scrolls it toward the rows out of view, once the pointer has
 // been outside the band: a press on a row already in the band does not scroll. Nothing
 // reflows until the release (the lift is a tone and the drop rule is out of flow), and the
-// release is the one splice `move` makes. A handle that loses the pointer, or leaves the
-// DOM, ends the drag with no move.
+// release is the one splice `move` makes. Escape, a handle that loses the pointer, or one
+// that leaves the DOM ends the drag with no move.
 
 const DEAD_ZONE = 3;
 /** The band at a scrollport's top and bottom edges that scrolls it under a held drag, and
@@ -91,10 +91,18 @@ export function rowDrag(rows: DragRows): RowDrag {
 			port.scrollBy({ top: STEP * Math.max(-1, Math.min(1, into / EDGE)), behavior: 'instant' });
 		follow.frame = requestAnimationFrame(edgeScroll);
 	}
+	function cancel(e: KeyboardEvent): void {
+		if (e.key !== 'Escape' || !drag?.engaged) return;
+		e.preventDefault();
+		e.stopPropagation();
+		drag = undefined;
+		release();
+	}
 	function release(): void {
 		if (follow) cancelAnimationFrame(follow.frame);
 		follow = undefined;
 		removeEventListener('scroll', repick, { capture: true });
+		removeEventListener('keydown', cancel, { capture: true });
 	}
 
 	return {
@@ -120,6 +128,7 @@ export function rowDrag(rows: DragRows): RowDrag {
 				if (Math.abs(e.clientY - drag.origin) < DEAD_ZONE) return;
 				drag.engaged = true;
 				addEventListener('scroll', repick, { capture: true, passive: true });
+				addEventListener('keydown', cancel, { capture: true });
 				if (follow) follow.frame = requestAnimationFrame(edgeScroll);
 			}
 			repick();

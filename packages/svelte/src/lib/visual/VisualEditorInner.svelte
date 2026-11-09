@@ -1018,11 +1018,20 @@
 		const card = addr.card == null ? schema.main : kind ? schema.card_kinds?.[kind] : undefined;
 		return card?.fields?.[addr.field];
 	}
+
+	/** A file dropped anywhere in the editor is refused, or the browser opens it in place
+	 *  of the page. Text drops carry no `Files` and pass. */
+	function refuseFiles(e: DragEvent): void {
+		if (!e.dataTransfer?.types.includes('Files')) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'none';
+	}
 </script>
 
 <svelte:document onkeydowncapture={onUndoKey} />
 
-<!-- The keydown is a control's, bubbled: the root resolves which description it raises. -->
+<!-- The keydown is a control's, bubbled: the root resolves which description it raises.
+     A file dragged over or dropped is refused here, after any control has seen it. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="qm-editor {className ?? ''}"
@@ -1030,6 +1039,8 @@
 	data-qm-root
 	bind:this={rootEl}
 	onkeydown={raiseGuidance}
+	ondragover={refuseFiles}
+	ondrop={refuseFiles}
 >
 	<!-- `main` and the tips card are one block in the stack: the tips card tucks under
 	 `main`'s bottom corners, so the two share a seam rather than a gutter and the

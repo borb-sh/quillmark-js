@@ -1619,6 +1619,39 @@ describe('a grip drag moves its line', () => {
 		field.destroy();
 	});
 
+	it('Escape calls the drag off: no lift, no drop rule, and the release moves nothing', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const grip = grips(field, 'row')[1];
+		const at = (type: string, [x, y]: [number, number]) =>
+			grip.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					clientX: x,
+					clientY: y
+				})
+			);
+		at('pointerdown', [35, 55]);
+		at('pointermove', [35, 60]);
+		at('pointermove', [35, 80]);
+		expect(field.el.querySelector('.qm-table-lifted, .qm-table-drop')).not.toBeNull();
+		const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+		grip.dispatchEvent(esc);
+		expect(esc.defaultPrevented).toBe(true);
+		expect(
+			field.el.querySelector('.qm-table-lifted, .qm-table-drop, .qm-table-dragging')
+		).toBeNull();
+		at('pointermove', [35, 85]);
+		at('pointerup', [35, 85]);
+		grip.click();
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
+		// The release's click is swallowed: the cancelled press selects nothing.
+		expect(washed(field)).toEqual([]);
+		field.destroy();
+	});
+
 	it('a body row dragged onto the header becomes the header', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);

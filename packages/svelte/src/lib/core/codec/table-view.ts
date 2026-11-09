@@ -356,6 +356,8 @@ interface Drag {
 	line: Line;
 	origin: Point;
 	engaged: boolean;
+	/** Escape called the drag off: the release that follows moves nothing and selects nothing. */
+	cancelled: boolean;
 	/** Where the line would land on release, in the same space as `line.index`. */
 	drop: number;
 	/** The last drop index painted, so a move inside the same line draws nothing. */
@@ -1033,6 +1035,7 @@ class TableIslandView implements NodeView {
 			line,
 			origin: { x: event.clientX, y: event.clientY },
 			engaged: false,
+			cancelled: false,
 			drop: line.index,
 			painted: -1,
 			pointerId: event.pointerId,
@@ -1050,7 +1053,7 @@ class TableIslandView implements NodeView {
 
 	private readonly onGripMove = (event: PointerEvent): void => {
 		const drag = this.drag;
-		if (!drag) return;
+		if (!drag || drag.cancelled) return;
 		const travel = Math.hypot(event.clientX - drag.origin.x, event.clientY - drag.origin.y);
 		if (!drag.engaged && travel < DEAD_ZONE) return;
 		if (!drag.engaged) this.engage(drag);
@@ -1061,6 +1064,7 @@ class TableIslandView implements NodeView {
 	/** The drag becomes one: lift the line, and measure the table once. */
 	private engage(drag: Drag): void {
 		drag.engaged = true;
+		addEventListener('keydown', this.onDragKey, true);
 		this.dom.classList.add('qm-table-dragging');
 		drag.grip.classList.add('qm-table-lifted');
 		for (const cell of this.boxesOf(drag.line)) cell.classList.add('qm-table-lifted');
@@ -1096,7 +1100,7 @@ class TableIslandView implements NodeView {
 	private readonly onGripUp = (event: PointerEvent): void => {
 		const drag = this.drag;
 		if (!drag) return;
-		const { line, drop, engaged } = drag;
+		const { line, drop, engaged, cancelled } = drag;
 		this.endDrag();
 		if (!engaged) return;
 		// A cancel is not a release: no `click` follows, so arming the guard would swallow the next
@@ -1105,19 +1109,38 @@ class TableIslandView implements NodeView {
 		// The press that ends a drag must not re-select the line it just moved off, so the
 		// following click is swallowed.
 		this.suppressClick = true;
+		if (cancelled) return;
 		if (drop !== line.index) this.moveLine(line, drop - line.index);
 		else this.selectLine(line);
 	};
 
-	private endDrag(): void {
+	/**
+	 * Escape over an engaged drag drops the lift and the drop rule. The grip keeps the pointer, so
+	 * the release still arrives here and swallows its click.
+	 */
+	private readonly onDragKey = (event: KeyboardEvent): void => {
 		const drag = this.drag;
-		if (!drag) return;
-		this.drag = undefined;
+		if (event.key !== 'Escape' || !drag?.engaged || drag.cancelled) return;
+		event.preventDefault();
+		event.stopPropagation();
+		drag.cancelled = true;
+		this.unlift();
+	};
+
+	private unlift(): void {
+		removeEventListener('keydown', this.onDragKey, true);
 		this.dropMark?.remove();
 		this.dropMark = undefined;
 		this.dom.classList.remove('qm-table-dragging');
 		for (const lifted of this.dom.querySelectorAll('.qm-table-lifted'))
 			lifted.classList.remove('qm-table-lifted');
+	}
+
+	private endDrag(): void {
+		const drag = this.drag;
+		if (!drag) return;
+		this.drag = undefined;
+		this.unlift();
 		drag.grip.removeEventListener('pointermove', this.onGripMove);
 		drag.grip.removeEventListener('pointerup', this.onGripUp);
 		drag.grip.removeEventListener('pointercancel', this.onGripUp);

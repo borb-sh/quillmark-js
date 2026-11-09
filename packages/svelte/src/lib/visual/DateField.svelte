@@ -64,7 +64,8 @@
 
 	const t = wording();
 	const TODAY = 'today';
-	const renderDate = today(getLocalTimeZone());
+	/** Read at each use: a session left open past midnight renders the new day. */
+	const renderDate = (): DateValue => today(getLocalTimeZone());
 
 	interface Props {
 		value: string | undefined;
@@ -108,7 +109,7 @@
 	// string draws beside them (`unread`), so the value an error names is on screen.
 	function toDateValue(s: string): DateValue | undefined {
 		if (!s) return undefined;
-		if (s === TODAY) return renderDate;
+		if (s === TODAY) return renderDate();
 		try {
 			return parseDate(s);
 		} catch {
@@ -154,7 +155,7 @@
 		onCommit(next);
 	}
 	function toggle(): void {
-		write(follows ? renderDate.toString() : TODAY);
+		write(follows ? renderDate().toString() : TODAY);
 	}
 	function shortcut(e: KeyboardEvent): void {
 		if (datetime || e.key.toLowerCase() !== 't' || e.ctrlKey || e.metaKey || e.altKey) return;
