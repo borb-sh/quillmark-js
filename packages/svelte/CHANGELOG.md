@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Undo takes back a change to a list's rows.** ⌘/Ctrl+Z anywhere in an array takes back its latest insert, remove, split, join, paste over several rows or move, the focus and caret returning to where they were, and ⌘/Ctrl+Shift+Z or Ctrl+Y puts it forward again, where each did nothing. A step is taken while the rows stand as it left them, so an edit typed in a row since undoes first, and a nested list answers for its own rows. A split's or a paste's own row keeps no step of its own for it.
+
 **Typing in a table cell undoes as a run.** A run of keystrokes in one cell of a table island is one undo step, as typing in a paragraph is, where each keystroke was a step of its own; a keystroke in another cell, or any other change to the table, opens the next.
 
 **A date left half typed shows what it stores.** Digits typed into a date or `datetime` storing nothing, short of a whole value, are put back as the focus leaves, where they stayed on screen with nothing written; a `datetime` given its date and no time is one.
