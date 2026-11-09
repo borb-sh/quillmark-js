@@ -26,6 +26,8 @@
 
 **A `datetime` field edits its time.** The date control draws hour and minute segments after the date's for a `datetime` and writes `YYYY-MM-DDThh:mm`, keeping the seconds of a stored value that carries them. It wrote `YYYY-MM-DD`, which the writer refuses for the type, and hid a stored time.
 
+**Several lines pasted or dropped into a line split it where they land.** In a list of lines, the text after the caret or the drop point goes on with the last line, as a textarea's split leaves it, where it stayed behind the first; the caret ends between the two.
+
 ## v0.33.0 - 2026-11-09
 
 **An applied prose commit leaves new block ids to the store.** A commit that lands as a change sends each block the store does not hold as a placeholder, and each block node then takes the id the store holds, outside history. The id a node carries for a new block before its commit is provisional, so a host reads block ids from the store.

@@ -31,9 +31,9 @@
  declaring `multiline: true` takes the full row ({@link ObjectField}), a `richtext` one
  on the block schema and a `text` one on the plain schema, paragraphs and hard breaks.
  An array element is one textblock whatever it declares, since Enter there is the
- repeater's, and a paste of several lines into one is a row per line, as Enter would
- open them, up to the array's `max:`, the last row taking what is left joined
- (`lines`). There is no slash menu at either width, and no island view.
+ repeater's, and a paste or a drop of several lines into one is a row per line, as Enter
+ would open them, up to the array's `max:`, the last row taking what is left joined and
+ then the row's text after the landing point (`lines`). There is no slash menu at either width, and no island view.
 
  A leaf over content it cannot edit is held (`fitsLeaf`): a narrowed one over anything
  but one plain paragraph, a plain one over anything but plain lines, where the decode
@@ -45,7 +45,7 @@
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { Slice, type Node as PMNode } from 'prosemirror-model';
+	import { Fragment, Slice, type Node as PMNode } from 'prosemirror-model';
 	import { EditorState, Selection } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import {
@@ -108,10 +108,15 @@
 		/** The declared `max:`, a character count no edit takes the leaf past. */
 		cap?: TextCap;
 		onChange: (rt: Content) => void;
-		/** Where a paste's lines past the first go: rows of their own below this one, at
-		 * most `room()` of them, the last taking the rest joined. The row's own edit comes
-		 * up beside them, the two one commit. Absent, the leaf joins them into its line. */
-		lines?: { room: () => number; onLines: (rt: Content, below: Content[]) => void };
+		/** Where a paste's or a drop's lines past the first go: rows of their own below this
+		 * one, at most `room()` of them, the last taking the rest joined and then what
+		 * followed the landing point in this row. The row's own edit comes up beside them,
+		 * the two one commit, with `caret` the offset in the last row where the lines end.
+		 * Absent, the leaf joins them into its line. */
+		lines?: {
+			room: () => number;
+			onLines: (rt: Content, below: Content[], caret: number) => void;
+		};
 		/** Raw keydown, for a container whose own keys run through this leaf: the
 		 * array repeater's Enter/Backspace (`ArrayField`). Fires before the view's own
 		 * keymap, so the state it reads is the one this keystroke has yet to change. */
@@ -193,13 +198,20 @@
 			let seen = value;
 			let defaulted = stored === undefined && !!fallback;
 			const reconciler = createReconciler(shown(stored));
-			// The rows a paste's later lines become, held from the parse to the edit that
-			// lands the first line.
-			let spill: Content[] | undefined;
-			const row = (group: PMNode[]): Content => {
+			// The line groups a paste's later lines become rows of, held from the parse to the
+			// edit that lands the first line.
+			let spill: PMNode[][] | undefined;
+			/** `groups` as rows, the last carrying `tail` after its lines, and the caret
+			 *  offset in the last between the two. */
+			const rows = (groups: PMNode[][], tail: Fragment): { below: Content[]; caret: number } => {
 				const { schema } = mounted.state;
-				const line = schema.nodes.paragraph.create(null, joinLines(group, schema));
-				return pmToContent(schema.node('doc', null, [line]));
+				const doc = (inline: Fragment) =>
+					schema.node('doc', null, [schema.nodes.paragraph.create(null, inline)]);
+				const below = groups.map((g) => pmToContent(doc(joinLines(g, schema))));
+				const joined = joinLines(groups.at(-1)!, schema);
+				const last = doc(joined.append(tail));
+				below[below.length - 1] = pmToContent(last);
+				return { below, caret: pmToOffset(buildLineIndex(last), 1 + joined.size) };
 			};
 			held = !fitsLeaf(reconciler.last, leaf);
 			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
@@ -239,20 +251,31 @@
 						const room = Math.min(pasted.length - 1, lines.room());
 						if (room < 1) return slice;
 						const below = pasted.slice(1);
-						spill = [...below.slice(0, room - 1).map((l) => row([l])), row(below.slice(room - 1))];
+						spill = [...below.slice(0, room - 1).map((l) => [l]), below.slice(room - 1)];
 						return new Slice(pasted[0]!.content, 0, 0);
 					},
 					dispatchTransaction(tr) {
 						const event = tr.getMeta('uiEvent');
-						const below = event === 'paste' || event === 'drop' ? spill : undefined;
+						const groups = event === 'paste' || event === 'drop' ? spill : undefined;
 						spill = undefined;
+						// What followed the landing point goes on with the last line, as a
+						// textarea's split leaves it, rather than staying behind the first.
+						let below: { below: Content[]; caret: number } | undefined;
+						if (groups && lines) {
+							const landed = tr.doc.resolve(tr.selection.to);
+							const tail = landed.parent.isTextblock
+								? landed.parent.content.cut(landed.parentOffset)
+								: Fragment.empty;
+							if (tail.size) tr.delete(landed.pos, landed.end());
+							below = rows(groups, tail);
+						}
 						const next = mounted.state.apply(tr);
 						if (next === mounted.state) return;
 						const edit = tr.docChanged && !held;
 						if (edit) defaulted = false;
 						mounted.updateState(next);
 						if (!edit && !below) return;
-						if (below && lines) lines.onLines(pmToContent(next.doc), below);
+						if (below && lines) lines.onLines(pmToContent(next.doc), below.below, below.caret);
 						else onChange(pmToContent(next.doc));
 						// The commit as the store took it, so its echo through the re-derive is no move.
 						seen = value;

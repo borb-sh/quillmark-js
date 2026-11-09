@@ -155,6 +155,24 @@ describe('an array of `text`', () => {
 		expect(rows(target).map((r) => r.textContent)).toEqual(['one', 'two', 'three']);
 	});
 
+	it('splits the row at the caret, its rest following the last line pasted', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('errata', ['abcdef']);
+		const { target, editor } = mountEditor(q, doc);
+
+		await editor.setCaret({ field: 'main.errata[0]', pos: 3, granularity: 'cluster' });
+		await tick();
+		paste(rows(target)[0], 'one\ntwo');
+		await new Promise((r) => setTimeout(r, 0));
+		expect(literal(doc.getStored('errata'))).toEqual(['abcone', 'twodef']);
+		expect(rows(target).map((r) => r.textContent)).toEqual(['abcone', 'twodef']);
+		expect(document.activeElement?.getAttribute('aria-label')).toBe('Errata 2');
+		const sel = window.getSelection();
+		expect(sel?.anchorNode?.textContent).toBe('twodef');
+		expect(sel?.anchorOffset).toBe(3);
+	});
+
 	// The landing is the row's, not the field's: a `text` element rides the same
 	// lowering a `richtext` one does, so the compile answers it cluster-exact and the
 	// element lane carries the offset down (INVARIANTS §Surface).
