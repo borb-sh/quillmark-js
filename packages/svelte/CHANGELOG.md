@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The store mints every new block id.** A prose commit sends each block the store does not hold as a placeholder, and the block's node takes the id the receipt's `minted` names, outside history. The id a node carries for a new block before its commit is provisional, so a host reads block ids from the store.
+
 ## v0.32.0 - 2026-11-08
 
 **An anchor draws as a span a host can find.** Each ranged anchor a prose leaf holds draws its text inside a span carrying `data-qm-anchor`, the anchor's id, with no style of its own, so a host styles an anchor by attribute and measures it for a popover. An anchor the host places in the document (`doc.apply` with an `anchor` step, or `reattach`) draws once `applyExternal` re-reads the leaf. A point anchor draws nothing.
