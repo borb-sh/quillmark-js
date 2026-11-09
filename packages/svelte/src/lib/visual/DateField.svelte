@@ -209,11 +209,12 @@
 	}
 	function leave(e: FocusEvent): void {
 		if (within(e)) return;
+		const seated = seat;
 		seat = false;
-		if (!held) return;
+		const emptied = held;
 		held = false;
-		if (!filled()) clear();
-		else if (!value) generation++;
+		if (emptied && !filled()) clear();
+		else if (!value && (emptied || (!seated && filled()))) generation++;
 	}
 	/** The keystroke that empties the last segment, after the primitive has drawn it. */
 	function settle(): void {
