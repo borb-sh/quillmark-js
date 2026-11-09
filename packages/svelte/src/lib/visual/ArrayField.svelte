@@ -612,12 +612,13 @@
 		for (const id of ids) if (!to.ids.includes(id)) drop(id);
 		ids = to.ids.slice();
 		onCommit(to.values);
-		const focus = to.focus;
+		const focus = to.focus && ids.includes(to.focus.id) ? to.focus : undefined;
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
-			if (!focus || !ids.includes(focus.id)) return focusEmpty();
-			await focusAfterFlush(focus.id);
-			if (focus.caret !== undefined) els[focus.id]?.setCaret?.(focus.caret);
+			const caret = focus?.caret;
+			const row = focus && els[focus.id];
+			if (caret !== undefined && row?.setCaret) row.setCaret(caret);
+			else void focusAfterFlush(focus?.id);
 		})();
 		return true;
 	}
