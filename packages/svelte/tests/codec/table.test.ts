@@ -1939,6 +1939,87 @@ function type(view: EditorView, text: string): boolean {
 	return !!view.someProp('handleTextInput', (f) => f(view, from, to, text, () => view.state.tr));
 }
 
+/** jsdom has no `DragEvent`: the drop a table dispatches again over a cell's text is
+ *  this one, carrying what the browser's carried. */
+globalThis.DragEvent ??= class extends MouseEvent {
+	readonly dataTransfer: DataTransfer | null;
+	constructor(type: string, init: DragEventInit = {}) {
+		super(type, init);
+		this.dataTransfer = init.dataTransfer ?? null;
+	}
+} as typeof DragEvent;
+
+/** A text drop at a viewport point, on the element under it. */
+function dropAt(target: Element, x: number, y: number, text: string): Event {
+	const dataTransfer = {
+		types: ['text/plain'],
+		files: [],
+		getData: (type: string) => (type === 'text/plain' ? text : '')
+	} as unknown as DataTransfer;
+	const event = new DragEvent('drop', {
+		bubbles: true,
+		cancelable: true,
+		clientX: x,
+		clientY: y,
+		dataTransfer
+	});
+	target.dispatchEvent(event);
+	return event;
+}
+
+describe('a drop anywhere in a cell lands in that cell', () => {
+	// Cell 2 (`a1`) is the host box `HOSTS[2]`, and its line is inset in it by the
+	// editor's own padding. The cell's view resolves a point on the line to the line's end
+	// and any other to the place before it, between blocks, as a browser's does.
+	const LINE: Box = { left: 36, top: 47, right: 94, bottom: 63 };
+	function withLine(field: FieldController): EditorView {
+		layout(field);
+		const view = cellViews(field)[2];
+		(view.dom.firstElementChild as HTMLElement).getBoundingClientRect = () => domRect(LINE);
+		view.posAtCoords = ({ left, top }) => ({
+			pos: left > LINE.left && left < LINE.right && top > LINE.top && top < LINE.bottom ? 3 : 0,
+			inside: -1
+		});
+		return view;
+	}
+
+	it("from the cell's padding, not the field beside the table", () => {
+		const { field } = tableLeaf(LETTERED);
+		const view = withLine(field);
+		const blocks = outerView(field).state.doc.childCount;
+		const event = dropAt(cellBox(field, 2), 31, 55, 'x');
+		expect(event.defaultPrevented).toBe(true);
+		expect(view.state.doc.textContent).toBe('a1x');
+		expect(outerView(field).state.doc.childCount).toBe(blocks);
+		expect(leafProps(field).rows[0][0].text).toBe('a1x');
+		field.destroy();
+	});
+
+	it("from the editor's padding, where the drop resolves between blocks", () => {
+		const { field } = tableLeaf(LETTERED);
+		const view = withLine(field);
+		dropAt(view.dom, 31, 55, 'x');
+		expect(view.state.doc.textContent).toBe('a1x');
+		field.destroy();
+	});
+
+	it('leaves a file to the editor root', () => {
+		const { field } = tableLeaf(LETTERED);
+		withLine(field);
+		outerView(field).posAtCoords = () => null;
+		const event = new DragEvent('drop', {
+			bubbles: true,
+			cancelable: true,
+			clientX: 31,
+			clientY: 55
+		});
+		Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'] } });
+		cellBox(field, 2).dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+		field.destroy();
+	});
+});
+
 describe('a pointer press on the island resolves to a caret', () => {
 	it('inside the frame it lands in the NEAREST cell, by geometry', () => {
 		const { field } = tableLeaf(LETTERED);

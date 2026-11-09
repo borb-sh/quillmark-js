@@ -212,7 +212,7 @@ The bidirectional codec between one content field and one ProseMirror document. 
 ### The table island
 
 - **The rectangle is an invariant with no error channel**, so every row and column op goes through one rectangularizing constructor. A ragged table would leave PM and the store disagreeing silently.
-- **A pointer press resolves to a caret.** Only a grip acts on a line.
+- **A pointer press resolves to a caret, and a drop to the cell it is over.** Only a grip acts on a line, and a drop on a cell's padding or beside its text lands in its text rather than in the field around the table.
 - **A selection is the subject of the next command**, never armed for replacement: a printable key over a selected island types after it.
 - **The chrome occupies no layout.** Grips, add bars and the alignment cluster hang outside the grid, positioned by construction rather than measured, and out of the tab order; the cells are the whole tab order.
 - **A cell edit is one `nested` step**, so every anchor in the field survives it.

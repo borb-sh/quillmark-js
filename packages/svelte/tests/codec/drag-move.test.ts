@@ -16,14 +16,14 @@ import { md, mount, quill, viewOf } from './_util.js';
 Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
 Range.prototype.getBoundingClientRect = () => new DOMRect();
 
-function leaves() {
+function leaves(titled = 'One two') {
 	const doc = quill().seedDocument();
 	const open = (field: string, text: string): EditorView => {
 		const view = viewOf(createField({ doc, quill: quill(), addr: { field }, container: mount() }));
 		view.dispatch(view.state.tr.insertText(text, 1, view.state.doc.content.size - 1));
 		return view;
 	};
-	return { doc, title: open('title', 'One two'), subtitle: open('subtitle', 'Three') };
+	return { doc, title: open('title', titled), subtitle: open('subtitle', 'Three') };
 }
 
 /** One drag's data, carried from its `dragstart` to its `drop`. */
@@ -111,6 +111,33 @@ describe('a text drag between two leaves', () => {
 		const reader = quill().reader(doc);
 		expect(reader.getContentAt({ field: 'title' }, [])?.text).toBe('two');
 		expect(reader.getContentAt({ field: 'subtitle' }, [])?.text).toBe('ThreeOne ');
+	});
+
+	it('closes the gap a whole word leaves to one space', async () => {
+		for (const [line, a, b, left] of [
+			['The Showcase Quill', 4, 12, 'The Quill'],
+			['The Showcase Quill', 0, 3, 'Showcase Quill'],
+			['The Showcase Quill', 13, 18, 'The Showcase'],
+			['The Showcase, Quill', 4, 12, 'The, Quill']
+		] as const) {
+			const { title, subtitle } = leaves(line);
+			await drag(title, a, b, subtitle, 5);
+			expect(text(title)).toBe(left);
+		}
+	});
+
+	it('leaves the spaces where part of a word moves', async () => {
+		const { title, subtitle } = leaves('The Showcase Quill');
+		await drag(title, 4, 8, subtitle, 5);
+		expect(text(title)).toBe('The case Quill');
+	});
+
+	it('takes the closed gap back with the move', async () => {
+		const { title, subtitle } = leaves('The Showcase Quill');
+		for (const view of [title, subtitle]) view.dispatch(closeHistory(view.state.tr));
+		await drag(title, 4, 12, subtitle, 5);
+		undo(subtitle.state, subtitle.dispatch);
+		expect([text(title), text(subtitle)]).toEqual(['The Showcase Quill', 'Three']);
 	});
 });
 

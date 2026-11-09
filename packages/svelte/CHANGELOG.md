@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+**A drop anywhere in a table cell lands in that cell.** Text dropped on a cell's padding, or on the edge of its text where no line is, lands in the cell at the nearest place in its text, where the first landed as a new paragraph above the table and the second was taken and dropped.
+
+**Enter in a list of numbers moves on.** Enter in a number row that holds a number commits it and takes the focus to the next row with its number selected, or from the last row to a standing row for the next number, where the caret stayed and the next digits ran onto the number just entered.
+
+**The format bar over a table cell stands below the cell's row.** A selection in a table cell raises the format bar under the row it is in, where it stood above the selection and covered the row above, header cells included, until it closed.
+
+**Dragging a whole word out of a line leaves one space.** A text drag that moves whole words from one field to another closes the gap they leave to a single space, or none at a line's start or end and before closing punctuation, where the two spaces around the words stayed.
+
 **Undo takes back a change to a list's rows.** ⌘/Ctrl+Z anywhere in an array takes back its latest insert, remove, split, join, paste over several rows or move, the focus and caret returning to where they were, and ⌘/Ctrl+Shift+Z or Ctrl+Y puts it forward again, where each did nothing. A step is taken while the rows stand as it left them, so an edit typed in a row since undoes first, and a nested list answers for its own rows. A split's or a paste's own row keeps no step of its own for it.
 
 **Typing in a table cell undoes as a run.** A run of keystrokes in one cell of a table island is one undo step, as typing in a paragraph is, where each keystroke was a step of its own; a keystroke in another cell, or any other change to the table, opens the next.
