@@ -62,6 +62,7 @@
 		proseAttributes,
 		proseLeafPlugins,
 		buildLineIndex,
+		capCount,
 		pmToOffset,
 		offsetToPM,
 		valueEqual,
@@ -112,10 +113,16 @@
 		 * one, at most `room()` of them, the last taking the rest joined and then what
 		 * followed the landing point in this row. The row's own edit comes up beside them,
 		 * the two one commit, with `caret` the offset in the last row where the lines end.
-		 * Absent, the leaf joins them into its line. */
+		 * Absent, the leaf joins them into its line.
+		 *
+		 * Enter short of the line's end splits it there, the rest of the line going to a
+		 * row of its own below with the caret at its start, by `onLines` too. Backspace at
+		 * the line's start and Delete at its end ask `onJoin` to join this row onto the
+		 * one above (`-1`) or the one below onto this (`1`), which answers whether it did. */
 		lines?: {
 			room: () => number;
 			onLines: (rt: Content, below: Content[], caret: number) => void;
+			onJoin?: (dir: -1 | 1) => boolean;
 		};
 		/** Raw keydown, for a container whose own keys run through this leaf: the
 		 * array repeater's Enter/Backspace (`ArrayField`). Fires before the view's own
@@ -175,6 +182,22 @@
 		view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 	}
 
+	/** This leaf's content as its view holds it, `undefined` while it is held. */
+	export function current(): Content | undefined {
+		return view && !held ? pmToContent(view.state.doc) : undefined;
+	}
+	/** This leaf's line with `tail`'s after it, and the offset between the two: a join's
+	 *  row, which the parent commits. `undefined` while held, or where the joined line
+	 *  would pass the cap. */
+	export function appended(tail: Content): { content: Content; caret: number } | undefined {
+		if (!view || held) return undefined;
+		const { doc, schema } = view.state;
+		const end = doc.content.size - 1;
+		const joined = doc.replace(end, end, new Slice(decode(tail, schema).content, 1, 1));
+		if (cap && capCount(joined, cap.trimEnd) > cap.max) return undefined;
+		return { content: pmToContent(joined), caret: pmToOffset(buildLineIndex(doc), end) };
+	}
+
 	/** What the view draws from the props. The effect below writes it and the view reads
 	 * it, never the props: ProseMirror's `destroy` redraws the decorations and attributes
 	 * once more, and a prop read there re-derives the card over handles the host has
@@ -201,6 +224,8 @@
 			// The line groups a paste's later lines become rows of, held from the parse to the
 			// edit that lands the first line.
 			let spill: PMNode[][] | undefined;
+			// The rest of a line Enter splits, held from the key to the edit that cuts it.
+			let split: Fragment | undefined;
 			/** `groups` as rows, the last carrying `tail` after its lines, and the caret
 			 *  offset in the last between the two. */
 			const rows = (groups: PMNode[][], tail: Fragment): { below: Content[]; caret: number } => {
@@ -235,6 +260,30 @@
 							})
 				});
 			};
+			/** Enter's split and the edge keys' join, where a row has `lines` to take them.
+			 *  Enter at the line's end is left to the repeater's insert, as is any key
+			 *  past the array's `max:`. */
+			const lineKey = (e: KeyboardEvent): boolean => {
+				if (!lines || held || e.isComposing || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey)
+					return false;
+				const { selection, doc } = mounted.state;
+				const end = doc.content.size - 1;
+				if (e.key === 'Enter') {
+					if (selection.empty && selection.head === end) return false;
+					if (lines.room() < 1) return false;
+					const tr = mounted.state.tr.deleteSelection();
+					const at = tr.doc.resolve(tr.selection.from);
+					split = at.parent.content.cut(at.parentOffset);
+					tr.delete(at.pos, at.end()).setMeta('addToHistory', false);
+					mounted.dispatch(tr);
+					split = undefined;
+					return true;
+				}
+				if (e.repeat || !selection.empty || doc.textContent.length === 0) return false;
+				if (e.key === 'Backspace' && selection.head === 1) return !!lines.onJoin?.(-1);
+				if (e.key === 'Delete' && selection.head === end) return !!lines.onJoin?.(1);
+				return false;
+			};
 			const mounted = new EditorView(
 				{ mount },
 				{
@@ -257,11 +306,14 @@
 					dispatchTransaction(tr) {
 						const event = tr.getMeta('uiEvent');
 						const groups = event === 'paste' || event === 'drop' ? spill : undefined;
+						const rest = split;
 						spill = undefined;
+						split = undefined;
 						// What followed the landing point goes on with the last line, as a
 						// textarea's split leaves it, rather than staying behind the first.
 						let below: { below: Content[]; caret: number } | undefined;
-						if (groups && lines) {
+						if (rest) below = rows([[]], rest);
+						else if (groups && lines) {
 							const landed = tr.doc.resolve(tr.selection.to);
 							const tail = landed.parent.isTextblock
 								? landed.parent.content.cut(landed.parentOffset)
@@ -287,6 +339,10 @@
 							return false;
 						},
 						keydown: (_v, e) => {
+							if (lineKey(e)) {
+								e.preventDefault();
+								return true;
+							}
 							onKey?.(e);
 							return false;
 						}
