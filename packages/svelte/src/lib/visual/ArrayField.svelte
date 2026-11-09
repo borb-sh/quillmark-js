@@ -76,7 +76,9 @@
  what the type holds empty: the blank for an enum or a date, `false` for a boolean. A
  number has no empty answer, so the add chip opens a standing row after the last
  element, which commits once it holds a number and which its remove dismisses, and a
- number row emptied is a row removed, offered back on the toast.
+ number row emptied is a row removed, offered back on the toast. Enter in a number row
+ holding a number moves on, as on a line: to the next row with its number selected, or
+ from the last to the standing row.
 
  An unset array whose `default:` holds elements draws them as its rows, at the default
  rung (`data-default` on the rows' box), since they are what prints. The rows are the
@@ -468,6 +470,13 @@
 			els[kept]?.setCaret?.(joined.caret);
 		})();
 		return true;
+	}
+	/** Enter in a number row once it holds a number moves on, as Enter on a line does:
+	 *  to the row below with its number selected, or after the last to the standing row. */
+	function numberEntered(k: number): void {
+		if (k >= ids.length - 1) return add();
+		focusRow(ids[k + 1]);
+		rowEls[ids[k + 1]]?.querySelector('input')?.select();
 	}
 	function add(): void {
 		if (control !== 'number') return insertAfter(ids.length - 1);
@@ -1054,6 +1063,7 @@
 							integer={items != null && baseType(items) === 'integer'}
 							label={rowName(k)}
 							onCommit={(v) => commitElement(k, v)}
+							onEnter={() => numberEntered(k)}
 						/>
 					{:else if control === 'enum'}
 						<!-- The blank is an element's empty answer, drawn as an unanswered one. -->

@@ -2,7 +2,8 @@
 // ProseMirror moves a drag inside one view and treats a drop from anywhere else as a paste,
 // which between two leaves of one editor leaves the dragged text in both. The leaves are
 // one surface to the writer, so the leaf a drag started in gives its text up once another
-// leaf has taken the drop.
+// leaf has taken the drop. Whole words leave one space behind them, not the two they
+// stood between.
 //
 // Each leaf keeps its own history, so the move is two steps in two stacks. An undo in either
 // leaf that steps back over its half takes the other half back with it, and a redo puts both
@@ -10,7 +11,7 @@
 // text in neither leaf or in both. A table cell keeps no history, its edits being steps of
 // the leaf its island stands in, so that leaf answers for it.
 import type { Node } from 'prosemirror-model';
-import type { EditorState, NodeSelection } from 'prosemirror-state';
+import type { EditorState, NodeSelection, Transaction } from 'prosemirror-state';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { isHistoryTransaction, redo, undo } from 'prosemirror-history';
 import type { EditorView } from 'prosemirror-view';
@@ -52,6 +53,41 @@ function follow(view: EditorView, prev: EditorState): void {
 		bDoc: held.b.state.doc,
 		undone: !held.undone
 	};
+}
+
+/** One character of a line, an inline node reading as none of the characters below. */
+const charAt = (doc: Node, from: number, to: number): string =>
+	from < to ? doc.textBetween(from, to, '', '\ufffc') : '';
+
+/** What may follow a word with no space between: the end of the line, a space, or
+ *  punctuation that closes. */
+const closesWord = (c: string): boolean => c === '' || c === ' ' || /[.,;:!?)\]}'"”’]/.test(c);
+
+/**
+ * Whether the text from `from` to `to` is whole words standing between spaces or a line's
+ * ends, which a word processor's smart cut closes the gap behind.
+ */
+function wholeWords(doc: Node, from: number, to: number): boolean {
+	const $from = doc.resolve(from);
+	const $to = doc.resolve(to);
+	if (!$from.sameParent($to) || !$from.parent.inlineContent || from === to) return false;
+	const text = charAt(doc, from, to);
+	if (text.startsWith(' ') || text.endsWith(' ')) return false;
+	const before = charAt(doc, Math.max($from.start(), from - 1), from);
+	return (
+		(before === '' || before === ' ') && closesWord(charAt(doc, to, Math.min($to.end(), to + 1)))
+	);
+}
+
+/** Close the gap whole words left at `pos`: the space before it goes where another space,
+ *  closing punctuation or the line's end follows, and the space after it where the line
+ *  starts there. */
+function closeGap(tr: Transaction, pos: number): void {
+	const $pos = tr.doc.resolve(pos);
+	const before = charAt(tr.doc, Math.max($pos.start(), pos - 1), pos);
+	const after = charAt(tr.doc, pos, Math.min($pos.end(), pos + 1));
+	if (before === ' ' && closesWord(after)) tr.delete(pos - 1, pos);
+	else if (before === '' && after === ' ') tr.delete(pos, pos + 1);
 }
 
 /** ProseMirror's own modifier for a drag that copies. */
@@ -99,8 +135,13 @@ export function dragMovePlugin(owner?: () => EditorView): Plugin {
 				queueMicrotask(() => {
 					if (from.isDestroyed || view.isDestroyed || view.state.doc === before) return;
 					const tr = from.state.tr;
+					const { from: start, to: end } = from.state.selection;
 					if (dragging.node) dragging.node.replace(tr);
-					else tr.deleteSelection();
+					else {
+						const words = wholeWords(tr.doc, start, end);
+						tr.deleteSelection();
+						if (words) closeGap(tr, tr.mapping.map(start));
+					}
 					if (!tr.docChanged) return;
 					from.dispatch(tr);
 					const a = owners.get(from)?.() ?? from;

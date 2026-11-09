@@ -257,6 +257,9 @@ const CONTROLS = '.qm-table-grip, .qm-table-add, .qm-table-align, .qm-table-resi
  *  keeps from PM. */
 const OWNED = `.qm-table-cell-host, ${CONTROLS}`;
 
+/** The drops a table dispatched again over a cell's text, which it lets through. */
+const redropped = new WeakSet<Event>();
+
 /** How far a press travels before it is a drag rather than a click. */
 const DEAD_ZONE = 3;
 
@@ -480,6 +483,7 @@ class TableIslandView implements NodeView {
 		this.dom.addEventListener('mouseover', this.onHover);
 		this.dom.addEventListener('mouseleave', this.onLeave);
 		this.dom.addEventListener('copy', this.onCopy, true);
+		this.dom.addEventListener('drop', this.onDrop, true);
 		this.render();
 	}
 
@@ -544,6 +548,7 @@ class TableIslandView implements NodeView {
 		this.dom.removeEventListener('mouseover', this.onHover);
 		this.dom.removeEventListener('mouseleave', this.onLeave);
 		this.dom.removeEventListener('copy', this.onCopy, true);
+		this.dom.removeEventListener('drop', this.onDrop, true);
 		this.endDrag();
 		this.endSweep();
 		this.endResize();
@@ -591,8 +596,10 @@ class TableIslandView implements NodeView {
 		event.preventDefault();
 		event.stopPropagation();
 		const grid = this.dom.querySelector('.qm-table');
-		if (grid && within(grid.getBoundingClientRect(), point)) this.focusNearestCell(point);
-		else this.caretBeside(point);
+		if (grid && within(grid.getBoundingClientRect(), point)) {
+			const nearest = this.nearestCell(point);
+			if (nearest) this.focusCell(nearest.r, nearest.c);
+		} else this.caretBeside(point);
 	};
 
 	/**
@@ -632,11 +639,68 @@ class TableIslandView implements NodeView {
 	};
 
 	/**
-	 * The cell a press inside the frame belongs to: the nearest by rect. Row cells share a vertical
+	 * A drop anywhere in a cell's box lands in that cell, at the text nearest the pointer, as a
+	 * press there does. The cell's padding is the table's, and the editor's own padding resolves
+	 * to a place between blocks no text fits, so left alone the first drop lands in the field
+	 * beside the table and the second nowhere. The drop is dispatched again over the cell's text, so the cell's view runs
+	 * its whole drop, a move's delete in the leaf it came from included. Captured, ahead of both
+	 * views.
+	 */
+	private readonly onDrop = (event: DragEvent): void => {
+		if (redropped.has(event) || !this.rendered) return;
+		// A file is the editor root's to refuse.
+		if (event.dataTransfer?.types.includes('Files')) return;
+		const target = event.target as Element | null;
+		if (target?.closest?.(CONTROLS)) return;
+		const point = { x: event.clientX, y: event.clientY };
+		const box = target?.closest?.('.qm-table-cell');
+		const grid = this.dom.querySelector('.qm-table');
+		const cell = box
+			? this.cells.find((m) => m.box === box)
+			: grid && within(grid.getBoundingClientRect(), point)
+				? this.nearestCell(point)
+				: undefined;
+		if (!cell) return;
+		const { view } = cell;
+		if (target && view.dom.contains(target)) {
+			const over = view.posAtCoords({ left: point.x, top: point.y });
+			if (over && view.state.doc.resolve(over.pos).parent.inlineContent) return;
+		}
+		let line: Element | undefined;
+		let nearest = Infinity;
+		for (const block of view.dom.children) {
+			const at = distance(block.getBoundingClientRect(), point);
+			if (at < nearest) [line, nearest] = [block, at];
+		}
+		if (!line) return;
+		const rect = line.getBoundingClientRect();
+		const x = Math.min(Math.max(point.x, rect.left + 1), rect.right - 1);
+		const y = Math.min(Math.max(point.y, rect.top + 1), rect.bottom - 1);
+		event.preventDefault();
+		event.stopPropagation();
+		const again = new DragEvent('drop', {
+			bubbles: true,
+			cancelable: true,
+			clientX: x,
+			clientY: y,
+			screenX: event.screenX + x - point.x,
+			screenY: event.screenY + y - point.y,
+			dataTransfer: event.dataTransfer,
+			altKey: event.altKey,
+			ctrlKey: event.ctrlKey,
+			metaKey: event.metaKey,
+			shiftKey: event.shiftKey
+		});
+		redropped.add(again);
+		line.dispatchEvent(again);
+	};
+
+	/**
+	 * The cell a point inside the frame belongs to: the nearest by rect. Row cells share a vertical
 	 * extent and column cells a horizontal one, so the nearest cell is the nearest row crossed with
 	 * the nearest column: R+C rects rather than R×C (27 layouts a press at 20x8, not 160).
 	 */
-	private focusNearestCell(point: Point): void {
+	private nearestCell(point: Point): MountedCell | undefined {
 		let row: number | undefined;
 		let column: number | undefined;
 		let nearestRow = Infinity;
@@ -659,7 +723,8 @@ class TableIslandView implements NodeView {
 				}
 			}
 		}
-		if (row !== undefined && column !== undefined) this.focusCell(row, column);
+		if (row === undefined || column === undefined) return undefined;
+		return this.cells.find((m) => covers(m, row, column));
 	}
 
 	/**
