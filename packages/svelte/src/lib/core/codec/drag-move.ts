@@ -9,12 +9,14 @@
 // leaf that steps back over its half takes the other half back with it, and a redo puts both
 // forward again: one gesture is one step to the writer, and half of it undone alone is the
 // text in neither leaf or in both. A table cell keeps no history, its edits being steps of
-// the leaf its island stands in, so that leaf answers for it.
+// the leaf its island stands in, so that leaf answers for it, and where that leaf holds both
+// halves they are one step of its history (`undo.ts`).
 import type { Node } from 'prosemirror-model';
 import type { EditorState, NodeSelection, Transaction } from 'prosemirror-state';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { isHistoryTransaction, redo, undo } from 'prosemirror-history';
 import type { EditorView } from 'prosemirror-view';
+import { joinStep } from './undo.js';
 
 /** The history owner of a view that keeps none, named by the view's own plugin. */
 const owners = new WeakMap<EditorView, () => EditorView>();
@@ -143,9 +145,11 @@ export function dragMovePlugin(owner?: () => EditorView): Plugin {
 						if (words) closeGap(tr, tr.mapping.map(start));
 					}
 					if (!tr.docChanged) return;
-					from.dispatch(tr);
 					const a = owners.get(from)?.() ?? from;
 					const b = owner?.() ?? view;
+					// One history holds both halves: the delete joins the drop's step.
+					if (a === b) joinStep(() => from.dispatch(tr));
+					else from.dispatch(tr);
 					pair =
 						a === b ? undefined : { a, aDoc: a.state.doc, b, bDoc: b.state.doc, undone: false };
 				});
