@@ -1685,6 +1685,72 @@ describe('a grip drag moves its line', () => {
 		field.destroy();
 	});
 
+	it('a release more than a line past the table moves nothing, and no rule draws out there', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const grip = grips(field, 'row')[1];
+		const at = (type: string, [x, y]: [number, number]) =>
+			grip.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					clientX: x,
+					clientY: y
+				})
+			);
+		const last = HOSTS[4];
+		const reach = last.bottom - last.top;
+		at('pointerdown', [35, 55]);
+		at('pointermove', [35, 80]);
+		expect(field.el.querySelector('.qm-table-drop')).not.toBeNull();
+		at('pointermove', [35, last.bottom + reach + 1]);
+		expect(field.el.querySelector('.qm-table-drop')).toBeNull();
+		at('pointerup', [35, last.bottom + reach + 1]);
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
+		field.destroy();
+	});
+
+	it('a release within a line past the table lands on the end line', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const last = HOSTS[4];
+		dragGrip(grips(field, 'row')[1], [
+			[35, 55],
+			[35, 80],
+			[35, last.bottom + last.bottom - last.top]
+		]);
+		expect(grid(leafProps(field))).toEqual([
+			['h1', 'h2'],
+			['b1', 'b2'],
+			['a1', 'a2']
+		]);
+		field.destroy();
+	});
+
+	it('draws no rule while the pointer is back over the lifted line', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const grip = grips(field, 'row')[1];
+		const at = (type: string, [x, y]: [number, number]) =>
+			grip.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					clientX: x,
+					clientY: y
+				})
+			);
+		at('pointerdown', [35, 55]);
+		at('pointermove', [35, 80]);
+		expect(field.el.querySelector('.qm-table-drop')).not.toBeNull();
+		at('pointermove', [35, 55]);
+		expect(field.el.querySelector('.qm-table-drop')).toBeNull();
+		at('pointerup', [35, 55]);
+		field.destroy();
+	});
+
 	it('a body row dragged onto the header becomes the header', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);

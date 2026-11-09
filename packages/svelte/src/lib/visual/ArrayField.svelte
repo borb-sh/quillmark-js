@@ -406,10 +406,10 @@
 		if (control === 'object' && !table) open.add(id);
 		void focusAfterFlush(id, column);
 	}
-	/** Element `k` as `row` and `below` as new elements after it, one commit: a paste of
-	 *  several lines into a row, each line past the first a row as Enter would open it.
-	 *  The caret ends where the paste does, at the end of the last. */
-	function spill(k: number, row: Content, below: Content[]): void {
+	/** Element `k` as `row` and `below` as new elements after it, one commit: a paste or
+	 *  a drop of several lines into a row, each line past the first a row as Enter would
+	 *  open it. The caret ends where the lines do, at `caret` in the last. */
+	function spill(k: number, row: Content, below: Content[], caret: number): void {
 		if (onStanding) claimStanding();
 		undo.withdraw();
 		const at = k + 1;
@@ -421,7 +421,7 @@
 		onCommit(next);
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
-			els[fresh.at(-1)!]?.setCaret?.(Number.MAX_SAFE_INTEGER);
+			els[fresh.at(-1)!]?.setCaret?.(caret);
 		})();
 	}
 	function add(): void {
@@ -902,7 +902,7 @@
 							onChange={(rt) => commitElement(k, rt)}
 							lines={{
 								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
-								onLines: (rt, below) => spill(k, rt, below)
+								onLines: (rt, below, caret) => spill(k, rt, below, caret)
 							}}
 							onKey={(e) => onElementKey(e, k)}
 						/>

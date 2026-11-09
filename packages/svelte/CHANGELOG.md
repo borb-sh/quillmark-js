@@ -20,9 +20,13 @@
 
 **A record row released outside its list stays where it was.** A handle drag whose pointer is more than a row's height past either end of the list draws no drop rule and moves nothing on release, where it landed the row at the nearest end however far away the release was.
 
+**A table line released outside its table stays where it was.** A grip drag whose pointer is more than a line's extent past either end of the table draws no drop rule and moves nothing on release, where it landed on the nearest line however far out; and over the lifted line itself, where a release moves nothing, no rule draws either.
+
 **Text dragged from one field to another moves.** A drag from one prose leaf into another, a table cell among them, deletes the dragged text from the leaf it left once the other has taken the drop, where it was left in both. Holding the copy modifier (Option on Apple platforms, Ctrl elsewhere) copies, as it does inside one field. Undo in either leaf takes the whole move back and redo puts it forward again, the two leaves keeping separate histories.
 
 **A `datetime` field edits its time.** The date control draws hour and minute segments after the date's for a `datetime` and writes `YYYY-MM-DDThh:mm`, keeping the seconds of a stored value that carries them. It wrote `YYYY-MM-DD`, which the writer refuses for the type, and hid a stored time.
+
+**Several lines pasted or dropped into a line split it where they land.** In a list of lines, the text after the caret or the drop point goes on with the last line, as a textarea's split leaves it, where it stayed behind the first; the caret ends between the two.
 
 ## v0.33.0 - 2026-11-09
 
