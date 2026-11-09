@@ -58,6 +58,7 @@ import { FIELD_KEYS, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
+import { dragMovePlugin } from './drag-move.js';
 import { linePastePlugin } from './line-paste.js';
 import { listPastePlugin } from './list-paste.js';
 import { markdownPastePlugin } from './markdown-paste.js';
@@ -918,7 +919,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
  * `ProseValue` so the two never fork the plugin ordering. History first with the step-splitting
  * plugin (`undo.ts`), then `afterHistory` plugins (the addressed leaf's anchor plugin), {@link
  * linebreakPlugin}, the markdown-shorthand input rules and their Backspace, the field keymap over
- * the base keymap, the URL paste that links a selection (`link-paste.ts`), and last the block
+ * the base keymap, the URL paste that links a selection (`link-paste.ts`), the drag that moves
+ * between leaves (`drag-move.ts`), and last the block
  * leaf's own shapes: the gap cursor, {@link pastAtomPlugin}, the island paste (`islands.ts`), table
  * paste (`table-paste.ts`), markdown paste (`markdown-paste.ts`) and the task checkbox
  * (`tasks.ts`). A one-line leaf's paste joins its lines (`line-paste.ts`).
@@ -957,6 +959,7 @@ export function proseLeafPlugins(
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));
 	if (schema.marks.link) list.push(linkPastePlugin(schema.marks.link));
+	list.push(dragMovePlugin());
 	// Each answers to something only the block schema holds.
 	if (isBlockSchema(schema))
 		list.push(

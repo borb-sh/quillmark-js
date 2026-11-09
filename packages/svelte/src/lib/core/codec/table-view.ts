@@ -26,6 +26,7 @@ import { decode } from './decode.js';
 import { FIELD_KEYS, markKeymap, TABLE_KEYS as T } from './shortcuts.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
+import { dragMovePlugin } from './drag-move.js';
 import { tableOfNode } from './table.js';
 import type { IslandNodeAttrs } from './islands.js';
 import { tableElement, tableText } from './table-copy.js';
@@ -237,6 +238,7 @@ function cellPlugins(keys: Record<string, Command>) {
 		inputRulesPlugin(cellSchema),
 		undoRuleKeymap(),
 		linkPastePlugin(cellSchema.marks.link),
+		dragMovePlugin(),
 		keymap(keys),
 		keymap(baseKeymap)
 	];

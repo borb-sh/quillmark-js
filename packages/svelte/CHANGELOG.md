@@ -8,6 +8,8 @@
 
 **An array of numbers, enums, booleans or dates draws its type's control per element.** Each row is the number input, listbox, switch or date control its `items` type maps to, where it was a text input that offered an enum no members and wrote a number as text. `+ Add` adds the blank for an enum or a date and `false` for a boolean. A number has no empty answer, so `+ Add` opens a standing row after the last element that writes nothing until it holds a number, and emptying a number row removes its element, offered back on the undo toast. The remove of a scalar row is a tab stop, Enter and Backspace being its control's.
 
+**Text dragged from one field to another moves.** A drag from one prose leaf into another, a table cell among them, deletes the dragged text from the leaf it left once the other has taken the drop, where it was left in both. Holding the copy modifier (Option on Apple platforms, Ctrl elsewhere) copies, as it does inside one field.
+
 **A `datetime` field edits its time.** The date control draws hour and minute segments after the date's for a `datetime` and writes `YYYY-MM-DDThh:mm`, keeping the seconds of a stored value that carries them. It wrote `YYYY-MM-DD`, which the writer refuses for the type, and hid a stored time.
 
 ## v0.33.0 - 2026-11-09
