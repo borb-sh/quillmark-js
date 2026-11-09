@@ -234,12 +234,12 @@ function chromeButton(className: string, label: string, run: () => void): HTMLBu
 
 /** A cell's plugin stack: marks, the markdown shorthands and a pasted URL's link, and
  *  nothing that belongs to the field (history, anchors, the ghost). */
-function cellPlugins(keys: Record<string, Command>) {
+function cellPlugins(keys: Record<string, Command>, outer: () => EditorView) {
 	return [
 		inputRulesPlugin(cellSchema),
 		undoRuleKeymap(),
 		linkPastePlugin(cellSchema.marks.link),
-		dragMovePlugin(),
+		dragMovePlugin(outer),
 		keymap(keys),
 		keymap(baseKeymap)
 	];
@@ -503,7 +503,7 @@ class TableIslandView implements NodeView {
 			const head = mounted.view.state.selection.head;
 			const fresh = EditorState.create({
 				doc: decode(cellContent(stored), cellSchema),
-				plugins: cellPlugins(this.cellKeys(mounted.r, mounted.c))
+				plugins: cellPlugins(this.cellKeys(mounted.r, mounted.c), () => this.outer)
 			});
 			mounted.view.updateState(fresh);
 			mounted.shown = stored;
@@ -1642,7 +1642,7 @@ class TableIslandView implements NodeView {
 		const view: EditorView = new EditorView(host, {
 			state: EditorState.create({
 				doc: decode(cellContent(seed), cellSchema),
-				plugins: cellPlugins(this.cellKeys(r, c))
+				plugins: cellPlugins(this.cellKeys(r, c), () => this.outer)
 			}),
 			attributes: { 'aria-label': name, class: 'qm-table-cell-editor' },
 			// A cell is one of the leaf's lines, so a reveal keeps the leaf's clearance, not PM's

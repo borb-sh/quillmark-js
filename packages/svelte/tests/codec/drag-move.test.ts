@@ -5,9 +5,15 @@
 // nothing out, so where the pointer is comes from the view's own `posAtCoords`, stubbed.
 import { describe, it, expect } from 'vitest';
 import { TextSelection } from 'prosemirror-state';
+import { closeHistory, redo, undo } from 'prosemirror-history';
 import type { EditorView } from 'prosemirror-view';
 import { createField } from '$lib/core/codec';
 import { mount, quill, viewOf } from './_util.js';
+
+// jsdom implements no `Range` rects, and PM reads them to scroll the caret a history step
+// moved into view.
+Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+Range.prototype.getBoundingClientRect = () => new DOMRect();
 
 function leaves() {
 	const doc = quill().seedDocument();
@@ -72,6 +78,30 @@ describe('a text drag between two leaves', () => {
 		const { title } = leaves();
 		await drag(title, 0, 4, title, 7);
 		expect(text(title)).toBe('twoOne ');
+	});
+
+	it('takes both halves back on an undo in either leaf, and forward on a redo', async () => {
+		for (const side of ['subtitle', 'title'] as const) {
+			const both = leaves();
+			const { title, subtitle } = both;
+			// The typing that filled the leaves is a step of its own, behind the move.
+			for (const view of [title, subtitle]) view.dispatch(closeHistory(view.state.tr));
+			await drag(title, 0, 4, subtitle, 5);
+			const stepper = both[side];
+			undo(stepper.state, stepper.dispatch);
+			expect([text(title), text(subtitle)]).toEqual(['One two', 'Three']);
+			redo(stepper.state, stepper.dispatch);
+			expect([text(title), text(subtitle)]).toEqual(['two', 'ThreeOne ']);
+		}
+	});
+
+	it('leaves an undo to its own leaf once the other has been edited', async () => {
+		const { title, subtitle } = leaves();
+		for (const view of [title, subtitle]) view.dispatch(closeHistory(view.state.tr));
+		await drag(title, 0, 4, subtitle, 5);
+		title.dispatch(closeHistory(title.state.tr).insertText('!', 1));
+		undo(subtitle.state, subtitle.dispatch);
+		expect([text(title), text(subtitle)]).toEqual(['!two', 'Three']);
 	});
 
 	it('writes both leaves to the document', async () => {
