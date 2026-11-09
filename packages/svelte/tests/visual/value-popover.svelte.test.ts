@@ -23,7 +23,6 @@ import {
 	mountInner,
 	press,
 	settle,
-	type,
 	unmountAll,
 	type InnerRef,
 	type Mounted
@@ -184,9 +183,10 @@ const SIX = [
 	DEFAULT_VISUAL_STRINGS.formatLink
 ];
 
-/** Commit the number beside the leaves: a revision, and so a re-derive. */
+/** A host's own write, said: the tree re-reads the document. */
 function rederive(m: Mounted<InnerRef>): void {
-	type(field(m.target, 'Pages').querySelector<HTMLInputElement>('input')!, '7');
+	m.editor.refresh();
+	flushSync();
 }
 
 describe('the formatting popover over a by-value prose leaf', () => {

@@ -72,6 +72,8 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **Commit is by value below a field's address.** A nested row has no op address, so at depth a keystroke commits the whole field, a bound the design accepts.
 
+**A run of commits to one field derives once.** Its commits past the first rebuild the one card from the one field's value, and the whole-document derive, validation with it, lands when the run rests, so a by-value keystroke costs what its card holds rather than what the document does. A commit that sets or unsets the field derives at once, since it moves what the field's default shows.
+
 **`ui` hints drive layout, not structure.**
 
 **Layout is CSS's, not JavaScript's.** A section is one grid and a container query steps the column count. Nothing measures, so there is no observer to loop and no resize that remounts a prose leaf.
