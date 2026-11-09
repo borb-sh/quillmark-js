@@ -47,8 +47,10 @@
  their reorder is the key's alone.
 
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
- caret there, a paste of several lines into a prose row opens a row per line,
- Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
+ caret there, and short of a prose line's end splits the line there, as a bulleted list
+ does; a paste of several lines into a prose row opens a row per line; Backspace at a
+ prose line's start joins it onto the line above and Delete at its end joins the next
+ onto it, each one commit; Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
  anywhere in a row of the list moves it, the nearest row answering and never
  the record around a nested one, and on an `object` row is the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
@@ -264,8 +266,16 @@
 	// it says so once per element per render. Thirteen lines on one memo's first paint,
 	// in the console a consumer is reading to find its own defects. Same shape
 	// {@link Card} keeps its header/panel refs in.
-	const els: Record<string, { focus: () => void; setCaret?: (pos: number) => void } | undefined> =
-		$state({});
+	const els: Record<
+		string,
+		| {
+				focus: () => void;
+				setCaret?: (pos: number) => void;
+				current?: () => Content | undefined;
+				appended?: (tail: Content) => { content: Content; caret: number } | undefined;
+		  }
+		| undefined
+	> = $state({});
 	/** Focus row `id`'s control: through its handle where it exports one, else the first
 	 *  control the row's markup holds, its remove aside. */
 	function focusRow(id: string): void {
@@ -423,6 +433,28 @@
 			if (!(await span.resumes(tick()))) return;
 			els[fresh.at(-1)!]?.setCaret?.(caret);
 		})();
+	}
+	/** Element `upper + 1` joined onto the end of element `upper`, one commit, the caret
+	 *  landing between the two: Backspace at a prose line's start, Delete at its end.
+	 *  Whether it joined: not past either end of the list, nor where a leaf is held or
+	 *  the joined line would pass the cap. */
+	function join(upper: number): boolean {
+		if (upper < 0 || upper + 1 >= ids.length) return false;
+		const tail = els[ids[upper + 1]]?.current?.();
+		const joined = tail && els[ids[upper]]?.appended?.(tail);
+		if (!joined) return false;
+		undo.withdraw();
+		const [kept, gone] = [ids[upper], ids[upper + 1]];
+		ids = ids.filter((_, i) => i !== upper + 1);
+		drop(gone);
+		const next = arr.slice();
+		next.splice(upper, 2, joined.content);
+		onCommit(next);
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			els[kept]?.setCaret?.(joined.caret);
+		})();
+		return true;
 	}
 	function add(): void {
 		if (control !== 'number') return insertAfter(ids.length - 1);
@@ -902,7 +934,8 @@
 							onChange={(rt) => commitElement(k, rt)}
 							lines={{
 								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
-								onLines: (rt, below, caret) => spill(k, rt, below, caret)
+								onLines: (rt, below, caret) => spill(k, rt, below, caret),
+								onJoin: (dir) => join(dir < 0 ? k - 1 : k)
 							}}
 							onKey={(e) => onElementKey(e, k)}
 						/>

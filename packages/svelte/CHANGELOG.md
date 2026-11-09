@@ -28,6 +28,8 @@
 
 **Several lines pasted or dropped into a line split it where they land.** In a list of lines, the text after the caret or the drop point goes on with the last line, as a textarea's split leaves it, where it stayed behind the first; the caret ends between the two.
 
+**Enter splits a line of a list, and Backspace and Delete join two.** In a list of lines, `text` or `richtext`, Enter short of a line's end moves the rest of the line, marks and all, to a new row below with the caret at its start, where it opened an empty row and left the rest behind; at the end Enter still opens an empty row. Backspace at a line's start joins it onto the line above, and Delete at a line's end joins the next one onto it, the caret between the two, where both did nothing. A join that would pass the items' `max:` does nothing.
+
 ## v0.33.0 - 2026-11-09
 
 **An applied prose commit leaves new block ids to the store.** A commit that lands as a change sends each block the store does not hold as a placeholder, and each block node then takes the id the store holds, outside history. The id a node carries for a new block before its commit is provisional, so a host reads block ids from the store.
