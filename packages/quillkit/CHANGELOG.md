@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The app prints.** A **Print** button beside **Download PDF** hands the same PDF to the browser's print dialog, opening it in a tab to print from on a phone and in Safari.
+
 ## v0.24.0 - 2026-11-09
 
 **The carried `@quillmark/wasm` is 0.137.0.** A write mints a new block id from a digest of the value it lands on, so a retired id returns only on a write against the value it was minted on, and acroform option boxes stamp as one radio field.
