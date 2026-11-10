@@ -95,7 +95,8 @@ export interface ReviewChannel {
 	/** The item whose card is up, and the way to lower it. */
 	shown(): string | undefined;
 	dismiss(): void;
-	act(id: string, action: ReviewAction): void;
+	/** A reader's answer, `chord` where a key gave it. */
+	act(id: string, action: ReviewAction, chord?: boolean): void;
 	/** The item the pointer or the caret is in, `undefined` once it has left. */
 	point(id: string | undefined, via: ReviewVia): void;
 	/** What the leaf draws and what it holds and does not draw, on each change of either. */
@@ -453,15 +454,25 @@ function rewrites(
 	return { outdated: false, stretches: out };
 }
 
-/** A reader's answer to an item, from a button or a chord. */
-type Act = (id: string, action: ReviewAction) => void;
+/** An answer to an item: from a button, from a chord, or `quiet` from a host's call, which moves
+ *  neither the caret nor the focus. False where it could not be given, and the item stands. */
+type Act = (
+	id: string,
+	action: ReviewAction,
+	how?: { chord?: boolean; quiet?: boolean }
+) => boolean;
+
+/** A chord as `aria-keyshortcuts` spells it, `Mod` as either platform's. */
+const ariaKeys = (chord: string): string =>
+	['Meta', 'Control'].map((mod) => chord.replace('Mod', mod).replaceAll('-', '+')).join(' ');
 
 function button(
 	act: Act,
 	id: string,
 	action: 'accept' | 'dismiss',
 	label: string,
-	title: string
+	title: string,
+	keys: string
 ): HTMLButtonElement {
 	const el = document.createElement('button');
 	el.type = 'button';
@@ -469,6 +480,7 @@ function button(
 	el.className = `qm-review-act qm-review-${action}`;
 	el.textContent = label;
 	el.title = title;
+	el.setAttribute('aria-keyshortcuts', ariaKeys(keys));
 	// The press keeps the caret where it is: the answer is about the text, not a move off it.
 	el.addEventListener('mousedown', (e) => e.preventDefault());
 	el.addEventListener('click', (e) => {
@@ -504,8 +516,15 @@ function chip(
 		acts.append(label);
 	}
 	acts.append(
-		button(act, id, 'accept', strings.reviewAccept, strings.reviewAcceptTitle),
-		button(act, id, 'dismiss', strings.reviewDismiss, strings.reviewDismissTitle)
+		button(act, id, 'accept', strings.reviewAccept, strings.reviewAcceptTitle, REVIEW_KEYS.accept),
+		button(
+			act,
+			id,
+			'dismiss',
+			strings.reviewDismiss,
+			strings.reviewDismissTitle,
+			REVIEW_KEYS.reject
+		)
 	);
 	// The space a run of answers stands off its line by, which a wrapped run leaves behind.
 	el.append(row ? '' : ' ', acts);
@@ -819,6 +838,9 @@ export interface ReviewLayer {
 	/** Put the caret in item `id` and take the focus, so the item's chords answer. False for
 	 *  an item the leaf does not draw. */
 	enter(view: EditorView, id: string): boolean;
+	/** Answer item `id` as its button would, moving neither the caret nor the focus. False
+	 *  where the leaf does not draw it or cannot write it. */
+	answer(id: string, action: ReviewAction): boolean;
 }
 
 /**
@@ -845,14 +867,14 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	/** Answer an item. Taking a proposal writes it first, and one that can no longer be written
 	 *  stays as it is. A proposal taken by a press while the focus is elsewhere leaves the caret
 	 *  after what landed, in a focused leaf: the edit is the reader's, and so is its undo. */
-	const act: Act = (id, action) => {
+	const act: Act = (id, action, how = {}) => {
 		const view = host;
-		if (!view) return;
+		if (!view || !drawn(view.state).spans.some((span) => span.id === id)) return false;
 		if (action === 'accept') {
 			const plan = drawn(view.state).plans.get(id);
 			const tr = plan && taking(view.state, plan);
-			if (!tr || !plan) return;
-			const away = !view.hasFocus();
+			if (!tr || !plan) return false;
+			const away = !how.quiet && !view.hasFocus();
 			if (away) {
 				const end = tr.mapping.map(Math.max(...plan.map((piece) => piece.to)), 1);
 				tr.setSelection(Selection.near(tr.doc.resolve(Math.min(end, tr.doc.content.size)), -1));
@@ -866,7 +888,8 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 					.setMeta('addToHistory', false)
 			);
 		}
-		channel.act(id, action);
+		channel.act(id, action, how.chord);
+		return true;
 	};
 	const drawn = (state: EditorState): Drawn => {
 		const review = reviewKey.getState(state)!;
@@ -937,7 +960,9 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				action === 'accept'
 			);
 			if (!span) return false;
-			act(span.id, span.proposed ? (action === 'accept' ? 'accept' : 'dismiss') : 'undo');
+			act(span.id, span.proposed ? (action === 'accept' ? 'accept' : 'dismiss') : 'undo', {
+				chord: true
+			});
 			return true;
 		};
 	/** Escape lowers the card over the item the caret is in, before it is anything else's. */
@@ -1020,6 +1045,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				(el) => el.getAttribute('data-qm-review') === id
 			);
 		},
+		answer: (id, action) => act(id, action, { quiet: true }),
 		enter(view, id) {
 			const span = drawn(view.state).spans.find((s) => s.id === id);
 			if (!span) return false;

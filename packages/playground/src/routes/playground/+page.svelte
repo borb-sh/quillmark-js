@@ -65,7 +65,8 @@
   `?review` stands another writer over the opened document (`reviewer.ts`): changes it wrote
   and proposals it holds, handed to the editor as `review`, and its answers to `onReview`.
 
-    seed ─► doc.apply (text + anchor) ─► review = items
+    seed ─► doc.apply (text + anchor) ─► review = items ─► onReviewDrawn ─► the bar's count
+    bar ─► stepReview / answerReview('all', …) ─► onReview per item
     accept ─► the editor's own edit ─► onChange ─► onReview ─► the item leaves the list
     undo ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
                                            └► editor.offerUndo (the step back from it)
@@ -89,6 +90,7 @@
 		ActiveLeaf,
 		CardOp,
 		EditorChange,
+		ReviewDrawn,
 		ReviewEvent,
 		ReviewItem
 	} from '@quillmark/svelte/visual';
@@ -131,6 +133,8 @@
 				refresh(): void;
 				applyCardOps(ops: readonly CardOp[]): void;
 				revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
+				answerReview(ids: readonly string[] | 'all', action: 'accept' | 'dismiss'): string[];
+				stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
 				offerUndo(notice: string, undo: () => void): () => void;
 		  }
 		| undefined = $state();
@@ -140,8 +144,9 @@
 	let reviewer: Reviewer | undefined;
 	let reviewItems = $state<ReviewItem[] | undefined>();
 	let reviewFocus = $state('none');
-	// The item the walk last stood on: the focus leaves the editor for the button that walks.
-	let reviewAt: string | undefined;
+	// What the editor draws of the list: the bar counts and walks this, not the list itself, so
+	// its count and the page agree.
+	let reviewDrawn = $state<ReviewDrawn | undefined>();
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -326,12 +331,12 @@
 	function handleReview(event: ReviewEvent): void {
 		if (editorRef) reviewer?.answer(event, editorRef);
 	}
-	// A host's own way through the list: the next item after the one in focus, brought to the
-	// reader wherever it is.
-	function nextReview(): void {
-		if (!reviewItems?.length) return;
-		const at = reviewItems.findIndex((item) => item.id === reviewAt);
-		void editorRef?.revealReview(reviewItems[(at + 1) % reviewItems.length].id, { focus: true });
+	// The review bar, built from the public verbs alone: the reference a host copies.
+	function stepReview(dir: 1 | -1): void {
+		void editorRef?.stepReview(dir);
+	}
+	function answerAll(action: 'accept' | 'dismiss'): void {
+		editorRef?.answerReview('all', action);
 	}
 	function handleError(err: EditorError): void {
 		lastError = `${err.code}: ${err.message}`;
@@ -421,6 +426,7 @@
 		room = 'none';
 		reviewer = undefined;
 		reviewItems = undefined;
+		reviewDrawn = undefined;
 		reviewFocus = 'none';
 		fonts = [];
 		refused = undefined;
@@ -672,9 +678,17 @@
 				<span class="stat"
 					><span class="qm-label">review</span>
 					<span class="qm-readout" data-testid="review-focus"
-						>{reviewFocus} · {reviewItems.length} open</span
+						>{reviewFocus} · {reviewDrawn?.order.length ?? 0} open</span
 					></span
 				>
+				{#if reviewDrawn?.undrawn.length}
+					<span class="stat"
+						><span class="qm-label">undrawn</span>
+						<span class="qm-readout" data-testid="review-undrawn"
+							>{reviewDrawn.undrawn.map(({ id, reason }) => `${id} (${reason})`).join(', ')}</span
+						></span
+					>
+				{/if}
 			{/if}
 			<span class="stat"
 				><span class="qm-label">error</span>
@@ -723,13 +737,37 @@
 					>
 				{/if}
 				{#if reviewItems}
-					<button
-						class="qm-control"
-						type="button"
-						data-testid="review-next"
-						disabled={opening || !reviewItems.length}
-						onclick={nextReview}>Next change</button
-					>
+					{@const none = opening || !reviewDrawn?.order.length}
+					<span class="review-bar" role="group" aria-label="Review">
+						<button
+							class="qm-control"
+							type="button"
+							data-testid="review-previous"
+							disabled={none}
+							onclick={() => stepReview(-1)}>Previous</button
+						>
+						<button
+							class="qm-control"
+							type="button"
+							data-testid="review-next"
+							disabled={none}
+							onclick={() => stepReview(1)}>Next</button
+						>
+						<button
+							class="qm-control"
+							type="button"
+							data-testid="review-accept-all"
+							disabled={none}
+							onclick={() => answerAll('accept')}>Accept all</button
+						>
+						<button
+							class="qm-control"
+							type="button"
+							data-testid="review-dismiss-all"
+							disabled={none}
+							onclick={() => answerAll('dismiss')}>Dismiss all</button
+						>
+					</span>
 				{/if}
 				<button
 					class="qm-control"
@@ -790,7 +828,9 @@
 						onReview={handleReview}
 						onReviewFocus={(id) => {
 							reviewFocus = id ?? 'none';
-							reviewAt = id ?? reviewAt;
+						}}
+						onReviewDrawn={(drawn) => {
+							reviewDrawn = drawn;
 						}}
 						{fonts}
 						{fontLabels}
@@ -881,6 +921,13 @@
 		.strip:not([data-stats]) .strip-actions {
 			margin-inline-start: 0;
 		}
+	}
+
+	/* The review bar's controls stand together, a cluster inside the cluster. */
+	.review-bar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--qmh-space-2);
 	}
 
 	/* The one pair on the strip whose value is a control rather than a readout, so the

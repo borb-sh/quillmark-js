@@ -20,6 +20,7 @@ function store(refuse = false) {
 	const review = createReview({
 		items: () => items,
 		keyFor: (path) => path,
+		exact: () => true,
 		answer(item, action) {
 			answers.push([item.id, action]);
 			return !refuse;

@@ -333,13 +333,13 @@
 	const reviewKeys = keydownHandler({
 		[REVIEW_KEYS.accept]: () => {
 			if (!proposed) return false;
-			reviewing.act(proposed.id, 'accept');
+			reviewing.act(proposed.id, 'accept', true);
 			return true;
 		},
 		[REVIEW_KEYS.reject]: () => {
 			const item = proposed ?? changed;
 			if (!item) return false;
-			reviewing.act(item.id, proposed ? 'dismiss' : 'undo');
+			reviewing.act(item.id, proposed ? 'dismiss' : 'undo', true);
 			return true;
 		}
 	});
@@ -386,9 +386,9 @@
 			{@attach registerControl}
 			onfocusin={(e) => {
 				reportFocus?.(e);
-				if (attended) reviewing.point(attended.id, 'caret');
+				if (attended) reviewing.point(attended.id, 'caret', leafKey);
 			}}
-			onfocusout={() => attended && reviewing.point(undefined, 'caret')}
+			onfocusout={() => attended && reviewing.point(undefined, 'caret', leafKey)}
 			oninput={() => changed && reviewing.point(undefined, 'caret')}
 			onpointerenter={() => changed && reviewing.point(changed.id, 'pointer')}
 			onpointerleave={() => changed && reviewing.point(undefined, 'pointer')}
