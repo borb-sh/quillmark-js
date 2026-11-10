@@ -16,6 +16,11 @@
  second highlight the keyboard cannot reach (controls.css, the shared menu recipe).
  The keyboard's one claim here is the scroll: the arrows move an index, and only the
  chrome knows the port that index has to stay inside.
+
+ Focus never reaches an item, so nothing a screen reader follows says which one is
+ highlighted: a polite live region beside the menu speaks the highlighted row and its
+ place as the index moves. It is mounted with the leaf, since a region inserted with the
+ text it carries is not announced.
 -->
 <script lang="ts">
 	import { Popover } from 'bits-ui';
@@ -32,10 +37,15 @@
 		label: string;
 		/** A command's row name, by its token. */
 		name: (command: string) => string;
+		/** What the live region says of the highlighted row. */
+		position: (name: string, index: number, count: number) => string;
 	}
-	let { menu, leaf, label, name: nameOf }: Props = $props();
+	let { menu, leaf, label, name: nameOf, position }: Props = $props();
 
 	let open = $derived(!!menu && menu.items.length > 0);
+	const announced = $derived(
+		open && menu ? position(nameOf(menu.items[menu.index]), menu.index + 1, menu.items.length) : ''
+	);
 
 	/** The root to portal into, resolved from the leaf's own DOM so the menu lands
 	 * inside whichever `[data-qm-root]` raised it and inherits the consumer's dials;
@@ -56,6 +66,8 @@
 		e.preventDefault();
 	}
 </script>
+
+<span class="qm-slash-live" aria-live="polite">{announced}</span>
 
 <Popover.Root bind:open>
 	<Popover.Portal to={portalTarget}>
@@ -122,6 +134,15 @@
 </Popover.Root>
 
 <style>
+	/* The parked description's recipe (`FieldLabel`): heard and not drawn. */
+	.qm-slash-live {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
 	/* The surface, its inset, its item pad and the rung a highlight fills with are all
 	   `.qm-menu-surface` / `.qm-menu-item` (controls.css): the same recipe the enum
 	   listbox and the card stack's kind menu draw, because all three are lists picked

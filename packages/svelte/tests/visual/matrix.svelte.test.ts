@@ -8,6 +8,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { fieldTitle } from '$lib/visual/structure';
+import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quill, quillFromYaml, literal } from '../helpers/fixtures.js';
 import {
 	field,
@@ -27,7 +28,7 @@ const stored = (doc: Document) => literal(doc.getStored('checks'));
 const checks = quill().schema.main.fields.checks;
 const titles = checks.members!;
 const roster = Object.values(titles);
-const held = (n: number, added = 0) => `${n} of ${roster.length + added} held`;
+const held = (n: number, added = 0) => DEFAULT_VISUAL_STRINGS.matrixHeld(n, roster.length + added);
 const matrix = (target: HTMLElement) => openField(target, quill().schema.main, 'checks');
 /** A member's box, by its title. */
 function member(m: HTMLElement, title: string): HTMLElement {

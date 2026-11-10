@@ -29,6 +29,7 @@
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
 	import {
 		addrForFieldPath,
+		nearestAddrForFieldPath,
 		cardPath,
 		nestedAddrForFieldPath,
 		fieldPathForAddr,
@@ -53,8 +54,10 @@
 	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
+	import { createReview, setReview } from './review.svelte.js';
+	import type { FieldProposal } from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
-	import type { FieldController, LeafViews } from '../core/codec/index.js';
+	import { markAnchor, type FieldController, type LeafViews } from '../core/codec/index.js';
 	import {
 		IdSeq,
 		controlKind,
@@ -93,6 +96,7 @@
 	import Card from './Card.svelte';
 	import TipsCard from './TipsCard.svelte';
 	import FormatPopover from './FormatPopover.svelte';
+	import ReviewPopover, { type ReviewTarget } from './ReviewPopover.svelte';
 	// The add trigger and the kind menu draw shared recipes; a component carrying a
 	// shared class without also pulling its rule ships unstyled (controls.css).
 	import './controls.css';
@@ -111,6 +115,9 @@
 		fontLabels,
 		strings,
 		formatDiagnostic,
+		review,
+		onReview,
+		onReviewFocus,
 		class: className,
 		style
 	}: VisualEditorProps = $props();
@@ -175,7 +182,7 @@
 	function report(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
-		undo.touch();
+		undo.settle();
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
 	}
 	function rederive(): void {
@@ -269,7 +276,7 @@
 	// is Svelte's business and not something to depend on.
 	span.onEnd(() => leaves.clear());
 
-	/** ⌘Z/Ctrl+Z takes the removal's step back where the undo accepts it (`undo.accepts`).
+	/** ⌘Z/Ctrl+Z takes the step back where the undo accepts it (`undo.accepts`).
 	 *  On the document, since a removal under the pointer leaves the focus on the body, and
 	 *  captured, so a leaf the removal handed the focus to hears the key after the offer. */
 	function onUndoKey(e: KeyboardEvent): void {
@@ -280,6 +287,76 @@
 		e.stopPropagation();
 		undo.take();
 	}
+	// ── Review (`review.svelte.ts`): the host's list, published to the tree ─────
+	// A field item's path resolves here, against the live card keys, as a diagnostic's does:
+	// the nearest field holding it.
+	const reviewed = (path: DocPath): FieldKey | undefined => {
+		const addr = nearestAddrForFieldPath(path);
+		return addr?.field != null ? resolveCardKey(addr, cardIds) : undefined;
+	};
+	const reviewing = createReview({
+		items: () => review,
+		keyFor: (path) => {
+			const key = reviewed(path);
+			return key && fieldKeyToString(key);
+		},
+		answer(item, action) {
+			if (action === 'accept' && item.state === 'proposed' && 'field' in item && !takeField(item))
+				return false;
+			onReview?.({ id: item.id, action });
+			return true;
+		}
+	});
+	/**
+	 * Take a field's proposal: its value down the lane the field's own control commits by, so
+	 * the writer checks it and `onChange` reports it, with the step back offered as a host's
+	 * step is. A text leaf re-reads what was written. False where the writer refused the value,
+	 * which the field then says as it says any refused commit.
+	 */
+	function takeField(item: FieldProposal): boolean {
+		const key = reviewed(item.field);
+		if (!key?.field || typeof key.card === 'number') return false;
+		const isMain = key.card === undefined;
+		const id = key.card ?? model.main.id;
+		const name = key.field;
+		const leaf = fieldKeyToString(key);
+		const before = doc.getStored(makeAddr(id, isMain, name));
+		const write = (value: unknown): boolean => {
+			commitScalar(id, isMain, name, value);
+			if (commitErrors.has(leaf)) return false;
+			leaves.prose(leaf)?.applyExternal();
+			return true;
+		};
+		if (!write(item.after)) return false;
+		undo.offer(merged.reviewAccepted, () => void write(before), { standing: true });
+		return true;
+	}
+	setReview(reviewing);
+	span.onEnd(reviewing.dispose);
+	// The lit item, to a host lighting its own list: each change, and not the nothing a mount
+	// starts from.
+	let reported: string | undefined;
+	$effect(() => {
+		const id = reviewing.lit;
+		if (id === reported) return;
+		reported = id;
+		onReviewFocus?.(id);
+	});
+	/** Where item `id` is drawn, for the card that hangs off it. */
+	function reviewTarget(id: string): ReviewTarget | undefined {
+		const key = reviewing.keyOf(id);
+		if (key === undefined) return undefined;
+		const prose = leaves.prose(key);
+		const mark = prose?.reviewElements(id)[0];
+		if (prose && mark)
+			return {
+				anchor: markAnchor(prose.el, () => prose.reviewElements(id)[0]),
+				removed: mark.classList.contains('qm-review-gone')
+			};
+		const control = leaves.control(key);
+		return control && { anchor: control.el, removed: false };
+	}
+
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
 	// cannot do, since which group is open is the card's state (Card §revealLeaf).
 	type CardHandle = {
@@ -370,7 +447,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
-		undo.touch();
+		undo.settle();
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
 
@@ -564,6 +641,8 @@
 		if (from < 0) return;
 		const to = from + dir;
 		if (to < 0 || to >= doc.cardCount) return;
+		const focused = document.activeElement;
+		const held = focused instanceof HTMLElement && slotEls[from]?.contains(focused);
 		arm.arm();
 		doc.moveCard(from, to);
 		undo.withdraw();
@@ -572,9 +651,17 @@
 		w.splice(to, 0, x);
 		cardIds = w;
 		bump('structure', id, to, { op: 'move', from, to });
+		if (held) void keepFocus(focused);
 		// `nearest`: the card was already in view and only needs to stay there, so one
 		// that never left the viewport moves it not at all.
 		void scrollCardIntoView(id, 'nearest');
+	}
+	/** Give the focus back to the control a move was made from. The reconcile reorders by
+	 *  re-inserting slots, and a re-inserted node loses the focus to the page's body with no
+	 *  blur to say so; which of two swapped slots it re-inserts is its own choice. */
+	async function keepFocus(el: HTMLElement): Promise<void> {
+		if (!(await span.resumes(tick()))) return;
+		if (el.isConnected && document.activeElement !== el) el.focus({ preventScroll: true });
 	}
 	function removeCardById(id: string): void {
 		const i = cardIndexOf(id);
@@ -598,7 +685,9 @@
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
 		bump('structure', id, undefined, { op: 'remove', at: i });
 		removed.push(gone);
-		undo.offer(merged.undoRemoved(name), () => restoreCard(gone), merged.undoRestore(name));
+		undo.offer(merged.undoRemoved(name), () => restoreCard(gone), {
+			keptAs: merged.undoRestore(name)
+		});
 		if (held) void focusAfterRemove(i);
 	}
 	/** A removed card and the place it left, named by the cards either side of it: an index
@@ -1043,21 +1132,17 @@
 		if (!span.alive) return;
 		const target = leafTargetFor(field);
 		if (target && !target.steps) leaves.prose(target.key)?.applyExternal(delta);
-		undo.touch();
 		rederive();
 	}
 	/** Re-read the cards' kinds, titles and form fields from the document. */
 	export function refresh(): void {
-		if (!span.alive) return;
-		undo.touch();
-		rederive();
+		if (span.alive) rederive();
 	}
 	/** Move the card keys in step with card-list changes the document already holds, in the
 	 *  order it applied them, so every card that stays keeps its leaves. */
 	export function applyCardOps(ops: readonly CardOp[]): void {
 		if (!span.alive) return;
 		undo.withdraw();
-		undo.touch();
 		const ids = cardIds.slice();
 		for (const op of ops) {
 			if (op.op === 'insert') ids.splice(op.at, 0, seq.next());
@@ -1066,6 +1151,52 @@
 		}
 		cardIds = ids;
 		rederive();
+	}
+
+	// ── Review ──────────────────────────────────────────────────────────────────
+
+	/**
+	 * Bring the review item `id` to the reader: open the panel holding it, scroll it to the
+	 * middle of the view, light it, and raise its card where it has one. The focus stays
+	 * where it is, the reader having asked to look, unless `focus` asks for it: the caret
+	 * then goes into the item, or the focus to its field, so the chords answer it. False for
+	 * an item the editor does not draw.
+	 */
+	export async function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
+		if (!span.alive) return false;
+		const key = reviewing.keyOf(id);
+		if (key === undefined) return false;
+		mainCard?.revealLeaf(key);
+		for (const card of cardRefs) card?.revealLeaf(key);
+		if (!(await span.resumes(tick()))) return false;
+		reviewing.reveal(id);
+		if (opts.focus && !leaves.prose(key)?.enterReview(id)) leaves.control(key)?.focus();
+		// The lit item is drawn again, so its element is read once it has been.
+		if (!(await span.resumes(tick()))) return false;
+		const at =
+			leaves.prose(key)?.reviewElements(id)[0] ??
+			[...(rootEl?.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].find(
+				(el) => el.getAttribute('data-qm-review') === id
+			) ??
+			leaves.control(key)?.el;
+		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		at?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+		return true;
+	}
+
+	/**
+	 * Offer `undo` as the one step back from a write the host just made: `notice` on the
+	 * toast a removal's undo takes, with its button, and ⌘Z/Ctrl+Z anywhere in the editor
+	 * until the next edit lands. Runs at most once. Returns the withdrawal, for a host whose
+	 * step has gone stale some other way.
+	 */
+	export function offerUndo(notice: string, restore: () => void): () => void {
+		if (!span.alive) return () => {};
+		undo.offer(notice, restore, { standing: true });
+		const offered = undo.current;
+		return () => {
+			if (undo.holds(offered)) undo.withdraw();
+		};
 	}
 
 	function holds(cardId: CardId): boolean {
@@ -1241,6 +1372,7 @@
 </div>
 
 <FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
+<ReviewPopover review={reviewing} targetFor={reviewTarget} />
 
 <!-- The add affordance is gated on the schema declaring `card_kinds`, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to

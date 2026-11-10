@@ -12,6 +12,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
 import { core, quill, example, literal } from '../helpers/fixtures.js';
+import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { field, mountEditor, paste, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -317,14 +318,16 @@ describe('an empty list of lines', () => {
 	const standingRows = (target: HTMLElement) =>
 		errata(target).querySelectorAll('.qm-array-row.standing');
 
-	it('draws an empty standing row with no remove, and writes nothing for a key', () => {
+	it('draws an empty standing row with its ghost and no remove, and writes nothing for a key', () => {
 		const q = quill();
 		const doc = emptied();
 		const { target, changes } = mountEditor(q, doc);
 
 		expect(rows(target)).toHaveLength(1);
 		expect(standingRows(target)).toHaveLength(1);
-		expect(rows(target)[0].querySelector('.qm-prose-placeholder')).toBeNull();
+		expect(
+			rows(target)[0].querySelector('.qm-prose-placeholder')?.getAttribute('data-placeholder')
+		).toBe(DEFAULT_VISUAL_STRINGS.arrayStanding);
 		expect(errata(target).querySelector('.qm-remove')).toBeNull();
 
 		press(rows(target)[0], 'Enter');

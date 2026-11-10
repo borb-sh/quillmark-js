@@ -65,8 +65,8 @@
 
  An empty list of lines (any element but an `object`) draws a standing row to type
  into, so a list's first line takes no press of the add chip first. The row is not an
- element and draws as one that is not there yet: a row's own box, ghosted and empty,
- with no remove. Nothing commits until it holds something, so the field
+ element and draws as one that is not there yet: a row's own box with no remove, holding
+ the words `arrayStanding` where its control ghosts words and muted where it cannot. Nothing commits until it holds something, so the field
  stays where it was, absent or `[]`, and Enter and Backspace have nothing to act on.
  Its first non-empty edit or paste commits it as the list's first element, keeping its
  id, so the caret stays in the leaf it is typing into.
@@ -929,6 +929,7 @@
 								label={fieldTitle(key, sub)}
 								descriptionId={idBase != null ? propertyDomIds(idBase, key).description : undefined}
 								description={sub.description}
+								brief={false}
 							/>
 						</div>
 					{/each}
@@ -1049,6 +1050,7 @@
 							plaintext={items != null && literalText(items)}
 							cap={textCap(items)}
 							label={rowName(k)}
+							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onChange={(rt) => commitElement(k, rt)}
 							lines={{
 								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
@@ -1061,6 +1063,7 @@
 						<NumberField
 							value={arr[k] as number | undefined}
 							integer={items != null && baseType(items) === 'integer'}
+							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							label={rowName(k)}
 							onCommit={(v) => commitElement(k, v)}
 							onEnter={() => numberEntered(k)}
@@ -1092,6 +1095,7 @@
 						<TextField
 							bind:this={els[id]}
 							value={String(arr[k] ?? '')}
+							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							label={rowName(k)}
 							onCommit={(v) => commitElement(k, v)}
 							onKey={(e) => onElementKey(e, k)}
@@ -1123,7 +1127,7 @@
 		aria-label={rowAction(t.strings.arrayRemove, k)}
 		aria-keyshortcuts={control === 'object' && !table ? undefined : 'Alt+ArrowUp Alt+ArrowDown'}
 		tabindex={stop ? undefined : -1}
-		onclick={() => remove(k, undefined, true, true)}><Icon name="minus" /></button
+		onclick={() => remove(k, undefined, true, true)}><Icon name="x" /></button
 	>
 {/snippet}
 
@@ -1162,6 +1166,11 @@
 		justify-content: space-between;
 		gap: var(--_qm-space-2);
 	}
+	/* Under a label that carries its description in flow, the chip keeps the label's
+	 line rather than centring on the two. */
+	.qm-array-header:has(> :global(.qm-field-label-row.briefed)) {
+		align-items: baseline;
+	}
 	.qm-array-add-slot {
 		display: inline-flex;
 		align-items: center;
@@ -1199,8 +1208,13 @@
 		color: var(--_qm-ink-default);
 	}
 	/* A row that is not an element yet: the box a row draws, at the muted rung until it
-	   holds the caret, and its first keystroke makes it one. */
-	.qm-array-row.standing > :global(:is(.qm-input, .qm-control-box)) {
+	   holds the caret, and its first keystroke makes it one. A row whose control ghosts
+	   words says so in them instead, at the label rung, which a muted box would take
+	   under 3:1. */
+	.qm-array-row.standing
+		> :global(
+			:is(.qm-input, .qm-control-box):not(:has(.qm-prose-placeholder), :placeholder-shown)
+		) {
 		opacity: var(--_qm-opacity-muted);
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}

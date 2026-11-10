@@ -20,9 +20,11 @@
 	import type { FieldDomIds } from './domid.js';
 	import Field from './Field.svelte';
 	import FieldHint from './FieldHint.svelte';
+	import { guidanceText } from './guidance.js';
 	import ProseField from './ProseField.svelte';
 	import CardControls from './CardControls.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
+	import { review } from './review.svelte.js';
 
 	/** The per-card operation bundle the VisualEditor builds (all resolve id→index lazily). */
 	interface CardOps {
@@ -72,6 +74,8 @@
 		onError,
 		leaves
 	}: Props = $props();
+
+	const reviewing = review();
 
 	// The rename in flight, written once on blur or Enter. Held apart from the stored
 	// title because a re-derive mid-edit hands `card` back with the title it stored.
@@ -202,7 +206,9 @@
 	 *  recovery shell, which has no title to focus. */
 	export function focusHeader(): void {
 		handed = true;
-		el?.querySelector<HTMLElement>('.qm-card-header :is(input, button:not(:disabled))')?.focus();
+		el?.querySelector<HTMLElement>(
+			".qm-card-header :is(input, button:not(:disabled, [aria-disabled='true']))"
+		)?.focus();
 		handed = false;
 	}
 </script>
@@ -243,6 +249,7 @@
 					<CardControls
 						{isFirst}
 						{isLast}
+						name={shownTitle || card.titlePlaceholder}
 						onMoveUp={() => ops.move(-1)}
 						onMoveDown={() => ops.move(1)}
 						onDelete={() => ops.remove()}
@@ -271,6 +278,8 @@
 								{@const isOpen = open.has(group)}
 								{@const flagged =
 									!isOpen && section.fields.some((f) => ops.diagFor(f.name)?.length)}
+								{@const reviewed =
+									!isOpen && section.fields.some((f) => reviewing.marks(ops.leafKey(f.name)))}
 								{@const panelId = ops.panelId(group)}
 								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
 								{@const headHint = section.head?.description}
@@ -299,6 +308,10 @@
 												<span class="qm-group-flag" aria-hidden="true"></span>
 												<span class="qm-visually-hidden">{t.strings.groupFlagged}</span>
 											{/if}
+											{#if reviewed}
+												<span class="qm-group-flag qm-group-reviewed" aria-hidden="true"></span>
+												<span class="qm-visually-hidden">{t.strings.groupReviewed}</span>
+											{/if}
 										</button>
 										{#if headIds && headHint}
 											<FieldHint
@@ -306,7 +319,9 @@
 												label={section.label}
 												describedBy={headIds.description}
 											/>
-											<span class="qm-visually-hidden" id={headIds.description}>{headHint}</span>
+											<span class="qm-visually-hidden" id={headIds.description}
+												>{guidanceText(headHint)}</span
+											>
 										{/if}
 									</div>
 									<!-- The panel is clipped, not unmounted, so without `inert` every field
@@ -396,6 +411,7 @@
 			<CardControls
 				{isFirst}
 				{isLast}
+				name={humanize(card.kind)}
 				onMoveUp={() => ops.move(-1)}
 				onMoveDown={() => ops.move(1)}
 				onDelete={() => ops.remove()}
@@ -517,15 +533,15 @@
 	 overlaid input tracks its content width. Both carry the same nothing for a box model
 	 and inherit the same type tokens, which is what makes the two measure alike.
 
-	 The type is a rung over the group header's: the card holds its sections, so its name
-	 ranks above theirs, at the paper rung and at the header's weight: the size ramp ranks,
-	 and the weight stays the chrome's one (INVARIANTS §Styling). */
+	 The type is the title rung, over the group header's: the card holds its sections, so
+	 its name ranks above theirs, at the header's weight: the size ramp ranks, and the
+	 weight stays the chrome's one (INVARIANTS §Styling). */
 	.qm-card-title-sizer {
 		display: inline-grid;
 		align-items: center;
 		min-width: 0;
 		max-width: 100%;
-		font-size: var(--_qm-text-paper);
+		font-size: var(--_qm-text-title);
 		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		font-family: inherit;
@@ -576,6 +592,10 @@
 		margin-inline-start: var(--_qm-space);
 		border-radius: var(--_qm-radius-pill);
 		background: var(--_qm-danger);
+	}
+	/* The same mark in the review hue: something under here is someone else's to look at. */
+	.qm-group-reviewed {
+		background: var(--_qm-review);
 	}
 	/* One rung between the payload's two kinds of section, and none inside the panel stack:
 	 what stands one disclosure row off the next is the two headers' own block padding and
@@ -833,7 +853,7 @@
 	}
 	/* One typographic role with the editable title above. */
 	.qm-card-title-static {
-		font-size: var(--_qm-text-body);
+		font-size: var(--_qm-text-title);
 		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		color: var(--_qm-ink-label);
