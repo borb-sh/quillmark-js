@@ -27,7 +27,7 @@ describe('a body', () => {
 		expect(items).toEqual([
 			{
 				id: 'p0',
-				state: 'proposed',
+
 				field: 'main.body',
 				replace: [first.id],
 				before: first.markdown,
@@ -35,7 +35,7 @@ describe('a body', () => {
 			},
 			{
 				id: 'p1',
-				state: 'proposed',
+
 				field: 'main.body',
 				replace: [second.id],
 				before: second.markdown,
@@ -116,7 +116,7 @@ describe('a field', () => {
 		expect(items).toEqual([
 			{
 				id: 'p0',
-				state: 'proposed',
+
 				field: 'main.contributors[1].role',
 				before: 'reviewer',
 				after: 'editor'

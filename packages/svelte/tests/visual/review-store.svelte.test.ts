@@ -11,9 +11,9 @@ afterEach(() => void vi.useRealTimers());
 // `change` and `other` are accepted, in the body's leaf and on the title's control, and drawn
 // as the changes they made; `proposal` is open.
 const ITEMS: ReviewItem[] = [
-	{ id: 'change', state: 'proposed', field: 'main.body', replace: ['b0'], after: 'Now.' },
-	{ id: 'other', state: 'proposed', field: 'main.title', before: 'Old', after: 'New' },
-	{ id: 'proposal', state: 'proposed', field: 'main.body', insert: 'end', after: 'New.' }
+	{ id: 'change', field: 'main.body', replace: ['b0'], after: 'Now.' },
+	{ id: 'other', field: 'main.title', before: 'Old', after: 'New' },
+	{ id: 'proposal', field: 'main.body', insert: 'end', after: 'New.' }
 ];
 
 function store(refuse = false) {
@@ -137,8 +137,8 @@ describe('the leaves', () => {
 		const { review, list } = store();
 		list([
 			...ITEMS,
-			{ id: 'mine', state: 'proposed', field: 'main.body', replace: ['b1'], after: 'New.' },
-			{ id: 'theirs', state: 'proposed', field: 'main.abstract', insert: 'end', after: 'New.' }
+			{ id: 'mine', field: 'main.body', replace: ['b1'], after: 'New.' },
+			{ id: 'theirs', field: 'main.abstract', insert: 'end', after: 'New.' }
 		]);
 		expect(review.textAt('main.body').map((item) => item.id)).toEqual([
 			'change',

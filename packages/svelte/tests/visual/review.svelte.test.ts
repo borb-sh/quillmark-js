@@ -57,7 +57,7 @@ const stored = (doc: Document, name: string): unknown =>
 
 describe('an accepted field proposal', () => {
 	const proposed = (doc: Document): ReviewItem[] => [
-		{ id: 'r1', state: 'proposed', field: doc.pathFor('subtitle'), after: 'A newer subtitle' }
+		{ id: 'r1', field: doc.pathFor('subtitle'), after: 'A newer subtitle' }
 	];
 	/** The editor over `proposed`, `r1` accepted. */
 	function accepted(): Reviewed & { before: string } {
@@ -107,9 +107,7 @@ describe('an accepted field proposal', () => {
 describe('a proposed field value', () => {
 	const proposed =
 		(after: unknown) =>
-		(doc: Document): ReviewItem[] => [
-			{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after }
-		];
+		(doc: Document): ReviewItem[] => [{ id: 'r1', field: doc.pathFor('columns'), after }];
 	const row = (r: Reviewed) =>
 		openField(r.target, main, 'columns').querySelector<HTMLElement>('.qm-review-proposal')!;
 
@@ -174,7 +172,7 @@ describe('a proposed field value', () => {
 		const r = review((doc) => [
 			{
 				id: 'r1',
-				state: 'proposed',
+
 				field: doc.pathFor('subtitle'),
 				after: `${stored(doc, 'subtitle')}, revised`
 			}
@@ -192,7 +190,7 @@ describe('a proposed field value', () => {
 
 describe('an item in a closed group', () => {
 	const items = (doc: Document): ReviewItem[] => [
-		{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
+		{ id: 'r1', field: doc.pathFor('columns'), after: 2 }
 	];
 	const marked = (r: Reviewed) =>
 		[...r.target.querySelectorAll('.qm-group-reviewed')].map((flag) =>
@@ -225,7 +223,7 @@ describe('an item in the body', () => {
 	const first = (doc: Document): ReviewItem[] => [
 		{
 			id: 'r1',
-			state: 'proposed',
+
 			field: 'main.body',
 			replace: [doc.blocks({})[0].id],
 			after: 'A proposed line.'
@@ -276,9 +274,7 @@ describe('an item in the body', () => {
 
 describe('a removed card’s step', () => {
 	it('leaves a removed card the key’s once an answer given over it is taken back', () => {
-		const r = review((doc) => [
-			{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
-		]);
+		const r = review((doc) => [{ id: 'r1', field: doc.pathFor('columns'), after: 2 }]);
 		const before = r.doc.toMarkdown();
 		r.target.querySelector<HTMLButtonElement>('.qm-card-delete')!.click();
 		flushSync();

@@ -60,6 +60,7 @@
 	import { createReview, setReview } from './review.svelte.js';
 	import {
 		byBlocks,
+		isChange,
 		onField,
 		sameValue,
 		valueIn,
@@ -378,7 +379,7 @@
 		answer(id, item, action, key) {
 			let back: (() => void) | undefined;
 			if (action === 'reopen') taken.delete(id);
-			if (action === 'accept' && item?.state === 'proposed' && onField(item)) {
+			if (action === 'accept' && item && !isChange(item) && onField(item)) {
 				const took = takeField(item);
 				if (!took) return false;
 				back = took.back;

@@ -42,7 +42,7 @@ function batch(prefix: string, count: number, proposed = count) {
 	const blocks = doc.blocks({});
 	const items: TextReview[] = texts.slice(0, proposed).map((text, n) => ({
 		id: `${prefix}${n}`,
-		state: 'proposed',
+
 		replace: [blocks[n].id],
 		after: text.replace(`p${n}w3`, 'proposed')
 	}));

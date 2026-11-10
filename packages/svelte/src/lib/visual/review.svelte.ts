@@ -18,6 +18,7 @@ import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/
 import {
 	byBlocks,
 	locate,
+	isChange,
 	onField,
 	sameValue,
 	type DeepReview,
@@ -193,13 +194,13 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				const held = out.get(deep.key) ?? {};
 				const { steps, found } = locate(deep.value, deep.steps, item, claimed);
 				const same = (held.nested ?? []).some(
-					(e) => e.item.state === item.state && sameValue(e.steps, steps)
+					(e) => isChange(e.item) === isChange(item) && sameValue(e.steps, steps)
 				);
 				if (same) {
 					undrawn.push({ id: item.id, reason: 'taken' });
 					continue;
 				}
-				if (!found && item.state === 'proposed') moved.add(item.id);
+				if (!found && !isChange(item)) moved.add(item.id);
 				held.nested = [...(held.nested ?? []), { steps, item }];
 				out.set(deep.key, held);
 				continue;
@@ -210,11 +211,11 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				continue;
 			}
 			const held = out.get(key) ?? {};
-			if ((item.state === 'changed' ? held.changed : held.proposed) !== undefined) {
+			if ((isChange(item) ? held.changed : held.proposed) !== undefined) {
 				undrawn.push({ id: item.id, reason: 'taken' });
 				continue;
 			}
-			if (item.state === 'changed') held.changed = item;
+			if (isChange(item)) held.changed = item;
 			else held.proposed = item;
 			out.set(key, held);
 		}
@@ -249,11 +250,11 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		timer = setTimeout(then, ms);
 	};
 	const changed = (id: string | undefined): id is string =>
-		id !== undefined && byId.get(id)?.state === 'changed';
+		id !== undefined && !!byId.get(id) && isChange(byId.get(id)!);
 
 	const shown = $derived.by((): ShownReview | undefined => {
 		const item = card && byId.get(card.id);
-		return item?.state === 'changed' && card ? { item, via: card.via } : undefined;
+		return item && isChange(item) && card ? { item, via: card.via } : undefined;
 	});
 	const lit = $derived(
 		[shown?.item.id, revealed, caret, pointer].find((id) => id !== undefined && byId.has(id))

@@ -37,13 +37,12 @@ export type ReviewItem = FieldProposal | BlockProposal;
 export type BlockProposal =
 	| {
 			id: string;
-			state: 'proposed';
 			field: DocPath;
 			replace: readonly string[];
 			before?: string;
 			after: string;
 	  }
-	| { id: string; state: 'proposed'; field: DocPath; insert: BlockPlace; after: string };
+	| { id: string; field: DocPath; insert: BlockPlace; after: string };
 
 /** Whether an item names blocks of a rich text field, which its prose leaf draws. */
 export const byBlocks = (item: object): item is BlockProposal =>
@@ -95,12 +94,14 @@ export interface ReviewDrawn {
 }
 
 /** A field proposal accepted, as the change it made over its control, `before` the value it
- *  replaced. */
+ *  replaced. The editor's own, tagged as it takes the accept; a host lists proposals alone. */
 export type FieldChange = { id: string; state: 'changed'; field: DocPath; before?: unknown };
-/** A `proposed` item under a field's control. */
+/** Whether an item is an accepted proposal the editor holds, rather than one the host lists. */
+export const isChange = <T extends object>(item: T): item is Extract<T, { state: 'changed' }> =>
+	'state' in item && item.state === 'changed';
+/** A proposal under a field's control. */
 export type FieldProposal = {
 	id: string;
-	state: 'proposed';
 	field: DocPath;
 	before?: unknown;
 	after?: unknown;
@@ -229,7 +230,7 @@ export function locate(
 	item: FieldProposal | FieldChange,
 	claimed: Set<string>
 ): { steps: readonly PathStep[]; found: boolean } {
-	const read = item.state === 'proposed' && 'before' in item;
+	const read = !isChange(item) && 'before' in item;
 	const before = read ? item.before : undefined;
 	const at = steps.at(-1);
 	const head = steps.slice(0, -1);

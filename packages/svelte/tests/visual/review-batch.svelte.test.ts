@@ -51,7 +51,7 @@ function block(doc: Document, field?: string, n = 0): { field: string; id: strin
 /** A proposal rewriting the `n`th block of a rich text field, or of the body, to `after`. */
 function over(doc: Document, id: string, after: string, field?: string, n = 0): ReviewItem {
 	const at = block(doc, field, n);
-	return { id, state: 'proposed', field: at.field, replace: [at.id], after };
+	return { id, field: at.field, replace: [at.id], after };
 }
 
 /** The ids by where their first element stands in the page. */
@@ -67,7 +67,7 @@ function pageOrder(target: HTMLElement, ids: readonly string[]): string[] {
 
 const spread = (doc: Document): ReviewItem[] => [
 	over(doc, 'body', 'A body line, proposed.'),
-	{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
+	{ id: 'cols', field: doc.pathFor('columns'), after: 2 },
 	over(doc, 'abs', 'An abstract, proposed.', 'abstract')
 ];
 
@@ -87,20 +87,20 @@ describe('the drawn report', () => {
 			return [
 				{
 					id: 'nowhere',
-					state: 'proposed',
+
 					field: doc.pathFor({}),
 					replace: ['gone'],
 					after: 'Anything.'
 				},
 				{
 					id: 'inside',
-					state: 'proposed',
+
 					field: `${doc.pathFor('contact')}.no_such_cell`,
 					after: 'a@b.c'
 				},
-				{ id: 'unknown', state: 'proposed', field: 'main.no_such_field', after: 1 },
-				{ id: 'first', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
-				{ id: 'second', state: 'proposed', field: doc.pathFor('columns'), after: 3 },
+				{ id: 'unknown', field: 'main.no_such_field', after: 1 },
+				{ id: 'first', field: doc.pathFor('columns'), after: 2 },
+				{ id: 'second', field: doc.pathFor('columns'), after: 3 },
 				over(doc, 'same', first)
 			];
 		});
@@ -128,7 +128,7 @@ describe('a proposal by blocks', () => {
 		return [
 			{
 				id: 'body',
-				state: 'proposed',
+
 				field: doc.pathFor({}),
 				replace: [first.id],
 				before: first.markdown,
@@ -136,13 +136,13 @@ describe('a proposal by blocks', () => {
 			},
 			{
 				id: 'abs',
-				state: 'proposed',
+
 				field: doc.pathFor('abstract'),
 				insert: 'end',
 				after: 'Appended.'
 			},
-			{ id: 'lost', state: 'proposed', field: doc.pathFor({}), replace: ['nope'], after: 'X.' },
-			{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), before: 5, after: 2 }
+			{ id: 'lost', field: doc.pathFor({}), replace: ['nope'], after: 'X.' },
+			{ id: 'cols', field: doc.pathFor('columns'), before: 5, after: 2 }
 		];
 	};
 
@@ -172,7 +172,7 @@ describe('answering by the host', () => {
 		const r = batch((doc) => [
 			over(doc, 'p1', 'The first, proposed.'),
 			over(doc, 'p2', 'The second, proposed.', undefined, 1),
-			{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
+			{ id: 'cols', field: doc.pathFor('columns'), after: 2 }
 		]);
 		await settle();
 		const outside = document.createElement('button');
@@ -226,7 +226,7 @@ describe('stepping', () => {
 				over(doc, 'A', 'A rewrite.'),
 				{
 					id: 'B',
-					state: 'proposed',
+
 					field: first.field,
 					insert: { after: first.id },
 					after: 'Added after.'

@@ -172,7 +172,6 @@ An item names its place by the **blocks** of a rich text field or a body, by the
 type ReviewItem =
 	| {
 			id: string;
-			state: 'proposed';
 			field: DocPath;
 			replace: string[];
 			before?: string;
@@ -180,12 +179,11 @@ type ReviewItem =
 	  }
 	| {
 			id: string;
-			state: 'proposed';
 			field: DocPath;
 			insert: { after: string } | { before: string } | 'end';
 			after: string;
 	  }
-	| { id: string; state: 'proposed'; field: DocPath; before?: unknown; after?: unknown };
+	| { id: string; field: DocPath; before?: unknown; after?: unknown };
 ```
 
 - **A proposal in text** reads the blocks `replace` names as rewritten to `after`, Markdown: the words that would go are struck, the words that would come are tinted, and blocks it adds stand in flow where they would land, with **Accept** and **Dismiss** at the end of its last line. `''` proposes the blocks' removal. `insert` proposes new blocks after or before the block it names, or at the field's end; in a field holding one empty paragraph it proposes that paragraph's text. A paragraph takes one proposal that rewrites it and one that adds after it, the first of each, whole. A word the proposal keeps and formats anew is drawn as a word it changes. The proposal is an edit of `before`, the blocks as its writer read them, or without one of the paragraph as it stood when the item arrived: what the reader writes in the paragraph meanwhile and while it stands is theirs, neither struck nor lost when the proposal is taken. Where the reader's writing meets the proposal's own words, the chip says **Edited since** and `onReviewDrawn` names the item `outdated`; where it reaches past them, the proposal reads as the whole paragraph as it now stands giving way to the whole of `after`. A block `replace` names that is gone, or that `before` does not read as, makes the proposal outdated too; a block an undo puts back under a new id is still the block it named. A proposal that would write nothing, its paragraph already reading as proposed, draws nothing.

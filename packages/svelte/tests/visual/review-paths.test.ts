@@ -11,8 +11,8 @@ import {
 
 const proposal = (before?: unknown): FieldProposal =>
 	before === undefined
-		? { id: 'p', state: 'proposed', field: 'main.list[0]' }
-		: { id: 'p', state: 'proposed', field: 'main.list[0]', before };
+		? { id: 'p', field: 'main.list[0]' }
+		: { id: 'p', field: 'main.list[0]', before };
 
 describe('a value at a place', () => {
 	it('is read and written by steps, a member past the end appended and one set to nothing taken out', () => {

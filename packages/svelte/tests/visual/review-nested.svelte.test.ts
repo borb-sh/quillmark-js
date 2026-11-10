@@ -63,14 +63,14 @@ describe('a record’s cell', () => {
 	const contact = (doc: Document): ReviewItem[] => [
 		{
 			id: 'name',
-			state: 'proposed',
+
 			field: `${doc.pathFor('contact')}.name`,
 			before: 'Ada',
 			after: 'Grace'
 		},
 		{
 			id: 'email',
-			state: 'proposed',
+
 			field: `${doc.pathFor('contact')}.email`,
 			after: 'g@example.org'
 		}
@@ -114,7 +114,7 @@ describe('a record’s cell', () => {
 			(doc) => [
 				{
 					id: 'name',
-					state: 'proposed',
+
 					field: `${doc.pathFor('contact')}.name`,
 					before: 'Someone',
 					after: 'Grace'
@@ -135,13 +135,13 @@ describe('a list’s member', () => {
 		return [
 			{
 				id: 'change',
-				state: 'proposed',
+
 				field: `${path}[0]`,
 				before: 'A. LOVELACE',
 				after: 'ADA LOVELACE'
 			},
-			{ id: 'drop', state: 'proposed', field: `${path}[1]`, before: 'Author' },
-			{ id: 'add', state: 'proposed', field: `${path}[3]`, after: 'Countess' }
+			{ id: 'drop', field: `${path}[1]`, before: 'Author' },
+			{ id: 'add', field: `${path}[3]`, after: 'Countess' }
 		];
 	};
 
@@ -177,8 +177,8 @@ describe('a list’s member', () => {
 			(doc) => {
 				const path = doc.pathFor('signature_block');
 				return [
-					{ id: 'b', state: 'proposed', field: `${path}[1]`, before: 'B' },
-					{ id: 'd', state: 'proposed', field: `${path}[3]`, before: 'D' }
+					{ id: 'b', field: `${path}[1]`, before: 'B' },
+					{ id: 'd', field: `${path}[3]`, before: 'D' }
 				];
 			},
 			(doc) => void quill().writer(doc).set('signature_block', five)
@@ -197,7 +197,7 @@ describe('a list’s member', () => {
 			(doc) => [
 				{
 					id: 'drop',
-					state: 'proposed',
+
 					field: `${doc.pathFor('signature_block')}[1]`,
 					before: 'Editor'
 				}
@@ -215,7 +215,7 @@ describe('a record in a table', () => {
 			(doc) => [
 				{
 					id: 'role',
-					state: 'proposed',
+
 					field: `${doc.pathFor('contributors')}[1].role`,
 					before: 'author',
 					after: 'editor'
@@ -245,7 +245,7 @@ describe('a record in a table', () => {
 describe('a place inside a closed group', () => {
 	it('marks the header that opens it, and is brought to the reader by its id', async () => {
 		const r = nested((doc) => [
-			{ id: 'name', state: 'proposed', field: `${doc.pathFor('contact')}.name`, after: 'Grace' }
+			{ id: 'name', field: `${doc.pathFor('contact')}.name`, after: 'Grace' }
 		]);
 		const title = groupLabel(main, main.fields.contact.ui!.group!);
 		const header = [...r.target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>

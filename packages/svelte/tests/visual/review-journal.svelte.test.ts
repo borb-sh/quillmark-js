@@ -67,16 +67,16 @@ function accept(target: HTMLElement, id: string): void {
 }
 
 const mixed = (doc: Document): ReviewItem[] => [
-	{ id: 'A', state: 'proposed', ...first(doc), after: 'The body, proposed.' },
-	{ id: 'F', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
-	{ id: 'B', state: 'proposed', ...first(doc, 'abstract'), after: 'The abstract, proposed.' }
+	{ id: 'A', ...first(doc), after: 'The body, proposed.' },
+	{ id: 'F', field: doc.pathFor('columns'), after: 2 },
+	{ id: 'B', ...first(doc, 'abstract'), after: 'The abstract, proposed.' }
 ];
 
 describe('the answer journal', () => {
 	it('takes back two field proposals one ⌘Z each, and reopens both', async () => {
 		const r = journaled((doc) => [
-			{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
-			{ id: 'sub', state: 'proposed', field: doc.pathFor('subtitle'), after: 'A new subtitle' }
+			{ id: 'cols', field: doc.pathFor('columns'), after: 2 },
+			{ id: 'sub', field: doc.pathFor('subtitle'), after: 'A new subtitle' }
 		]);
 		const before = r.doc.getStored('subtitle');
 		openField(r.target, main, 'columns');

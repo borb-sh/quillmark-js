@@ -47,8 +47,8 @@ function first(doc: Document, field?: string): { field: string; replace: string[
 }
 
 const pair = (doc: Document): ReviewItem[] => [
-	{ id: 'A', state: 'proposed', ...first(doc), after: 'The body, proposed.' },
-	{ id: 'F', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
+	{ id: 'A', ...first(doc), after: 'The body, proposed.' },
+	{ id: 'F', field: doc.pathFor('columns'), after: 2 }
 ];
 
 describe('an accepted proposal still listed', () => {

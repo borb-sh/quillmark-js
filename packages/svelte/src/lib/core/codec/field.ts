@@ -1014,8 +1014,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			reviewItems = items;
 			reviewLit = lit;
 			for (const markdown of parsed.keys())
-				if (!items.some((item) => item.state === 'proposed' && item.after === markdown))
-					parsed.delete(markdown);
+				if (!items.some((item) => item.after === markdown)) parsed.delete(markdown);
 			review.refresh(view);
 		},
 		reviewElements(id: string): HTMLElement[] {

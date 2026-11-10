@@ -45,7 +45,7 @@ export type { SlashState, SlashStrings } from './slash.js';
 export { DEFAULT_LEAVE_STRINGS } from './leave.js';
 export type { LeaveStrings } from './leave.js';
 
-// The review layer a leaf draws over its anchors: the visual tier's `strings` set extends its
+// The review layer a leaf draws over its blocks: the visual tier's `strings` set extends its
 // wording and its `ReviewItem` narrows to the leaf's own.
 export { DEFAULT_REVIEW_STRINGS } from './review.js';
 export type {

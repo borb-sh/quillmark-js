@@ -57,8 +57,8 @@ import { REVIEW_KEYS } from './shortcuts.js';
  * an edit of the blocks as they stood when the leaf first drew it.
  */
 export type TextReview =
-	| { id: string; state: 'proposed'; replace: readonly string[]; before?: string; after: string }
-	| { id: string; state: 'proposed'; insert: BlockPlace; after: string };
+	| { id: string; replace: readonly string[]; before?: string; after: string }
+	| { id: string; insert: BlockPlace; after: string };
 
 /** Where a proposal adds blocks: after or before the block with the id, or at the leaf's end. */
 export type BlockPlace = { after: string } | { before: string } | 'end';
