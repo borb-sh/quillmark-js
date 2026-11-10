@@ -246,6 +246,7 @@
 					<CardControls
 						{isFirst}
 						{isLast}
+						name={shownTitle || card.titlePlaceholder}
 						onMoveUp={() => ops.move(-1)}
 						onMoveDown={() => ops.move(1)}
 						onDelete={() => ops.remove()}
@@ -405,6 +406,7 @@
 			<CardControls
 				{isFirst}
 				{isLast}
+				name={humanize(card.kind)}
 				onMoveUp={() => ops.move(-1)}
 				onMoveDown={() => ops.move(1)}
 				onDelete={() => ops.remove()}
@@ -526,15 +528,15 @@
 	 overlaid input tracks its content width. Both carry the same nothing for a box model
 	 and inherit the same type tokens, which is what makes the two measure alike.
 
-	 The type is a rung over the group header's: the card holds its sections, so its name
-	 ranks above theirs, at the paper rung and at the header's weight: the size ramp ranks,
-	 and the weight stays the chrome's one (INVARIANTS §Styling). */
+	 The type is the title rung, over the group header's: the card holds its sections, so
+	 its name ranks above theirs, at the header's weight: the size ramp ranks, and the
+	 weight stays the chrome's one (INVARIANTS §Styling). */
 	.qm-card-title-sizer {
 		display: inline-grid;
 		align-items: center;
 		min-width: 0;
 		max-width: 100%;
-		font-size: var(--_qm-text-paper);
+		font-size: var(--_qm-text-title);
 		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		font-family: inherit;
@@ -846,7 +848,7 @@
 	}
 	/* One typographic role with the editable title above. */
 	.qm-card-title-static {
-		font-size: var(--_qm-text-body);
+		font-size: var(--_qm-text-title);
 		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
 		color: var(--_qm-ink-label);

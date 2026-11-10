@@ -209,6 +209,7 @@
 	leaf={() => controller}
 	label={t.strings.slashLabel}
 	name={t.strings.slashName}
+	position={t.strings.slashPosition}
 />
 
 <style>

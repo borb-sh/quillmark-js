@@ -1,7 +1,7 @@
 <!--
   Card controls, composable cards only.
-  Right-aligned in the header: a move-up/move-down chevron pair (each disabled at its
-  edge), then delete, the row revealed while the pointer or the caret is in the card.
+  Right-aligned in the header: a move-up/move-down arrow pair (each disabled at its
+  edge), then delete, each named for the card it acts on, the row revealed while the pointer or the caret is in the card.
   Reorder is buttons, not drag. All three are chips (controls.css): fill arrives
   on hover, and delete rests at the label ink beside them. The card scopes
   that reveal, so its condition lives in the parent's CSS; the row keeps the narrower
@@ -19,11 +19,13 @@
 	interface Props {
 		isFirst: boolean;
 		isLast: boolean;
+		/** The title the card's header shows, which the controls' names carry. */
+		name: string;
 		onMoveUp: () => void;
 		onMoveDown: () => void;
 		onDelete: () => void;
 	}
-	let { isFirst, isLast, onMoveUp, onMoveDown, onDelete }: Props = $props();
+	let { isFirst, isLast, name, onMoveUp, onMoveDown, onDelete }: Props = $props();
 </script>
 
 <div class="qm-card-controls">
@@ -32,21 +34,24 @@
 			type="button"
 			class="qm-chip qm-focus-ring"
 			title={t.strings.cardMoveUp}
+			aria-label={t.strings.cardAction(t.strings.cardMoveUp, name)}
 			disabled={isFirst}
-			onclick={onMoveUp}><Icon name="chevron-up" /></button
+			onclick={onMoveUp}><Icon name="arrow-up" /></button
 		>
 		<button
 			type="button"
 			class="qm-chip qm-focus-ring"
 			title={t.strings.cardMoveDown}
+			aria-label={t.strings.cardAction(t.strings.cardMoveDown, name)}
 			disabled={isLast}
-			onclick={onMoveDown}><Icon name="chevron-down" /></button
+			onclick={onMoveDown}><Icon name="arrow-down" /></button
 		>
 	</div>
 	<button
 		type="button"
 		class="qm-chip qm-card-delete qm-focus-ring"
 		title={t.strings.cardDelete}
+		aria-label={t.strings.cardAction(t.strings.cardDelete, name)}
 		onclick={onDelete}><Icon name="trash-2" /></button
 	>
 </div>

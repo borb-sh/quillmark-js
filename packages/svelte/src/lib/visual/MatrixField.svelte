@@ -357,7 +357,7 @@
 						class="qm-icon-btn qm-focus-ring qm-member-remove"
 						title={t.strings.matrixRemove(name)}
 						aria-label={t.strings.matrixRemove(name)}
-						onclick={() => removeItem(item.id, name)}><Icon name="minus" /></button
+						onclick={() => removeItem(item.id, name)}><Icon name="x" /></button
 					>
 				</div>
 				{@render columns(item.id, name, true)}
@@ -548,7 +548,7 @@
 	.qm-member-title-input:focus {
 		background: var(--_qm-surface-well);
 	}
-	/* The remove is an array row's, the minus to the add box's plus: offered by the row
+	/* The remove is an array row's cross: offered by the row
 	 the pointer or the focus is in, and destructive under the pointer. */
 	.qm-member-remove {
 		flex-shrink: 0;

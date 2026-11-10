@@ -47,6 +47,12 @@ export interface VisualStrings
 	cardDelete: string;
 	/** The card-title input's accessible name. */
 	cardTitle: string;
+	/**
+	 * A card control's accessible name, the action and the card it acts on, by the title
+	 * the header shows: `Delete card, Findings`. The action alone stays the tooltip.
+	 * Parametric, so word order stays the translator's.
+	 */
+	cardAction: (action: string, card: string) => string;
 
 	/** A closed panel's header, spoken after its name (`Layout, has an issue`) when a field
 	 *  inside holds a diagnostic: the leading separator is part of the wording. */
@@ -92,8 +98,12 @@ export interface VisualStrings
 	// ── Array control ─────────────────────────────────────────────────────────
 	arrayAdd: string;
 	arrayRemove: string;
-	/** The drag handle on an `object` row: its tooltip. */
+	/** The drag handle on an `object` row: its tooltip, which names the keys that move
+	 *  the row too. */
 	arrayDrag: string;
+	/** What a list's standing row ghosts, the row that is not an element yet: the words
+	 *  say what typing there does. */
+	arrayStanding: string;
 	/**
 	 * A row control's accessible name, the action and the row it acts on: `Remove
 	 * Authors 2`. The action alone stays the tooltip. Parametric, so word order stays
@@ -141,7 +151,7 @@ export interface VisualStrings
 	enumClear: string;
 
 	// ── Matrix control ────────────────────────────────────────────────────────
-	/** The count in the matrix's label row: how many of its items are held. */
+	/** The count in the matrix's label row: how many of its items are ticked. */
 	matrixHeld: (held: number, total: number) => string;
 	/** An open matrix's add box at rest, naming the list it adds to: `Add to Staff…`. The box
 	 *  draws its own `+`. `list` is empty for a matrix mounted with no label. */
@@ -270,6 +280,15 @@ export function chord(
 	return `Ctrl+${shift ? 'Shift+' : ''}${bare}`;
 }
 
+/** An `Alt` chord as the writer's platform prints it: `⌥↑` on Apple's, `Alt+↑` elsewhere,
+ *  on the test {@link chord} reads. */
+export function alt(
+	key: string,
+	platform = typeof navigator === 'undefined' ? '' : navigator.platform
+): string {
+	return /Mac|iP(hone|[oa]d)/.test(platform) ? `⌥${key}` : `Alt+${key}`;
+}
+
 /** The package's English. Every key, so the merge below is total. */
 export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	...DEFAULT_TABLE_STRINGS,
@@ -279,6 +298,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardMoveDown: 'Move down',
 	cardDelete: 'Delete card',
 	cardTitle: 'Card title',
+	cardAction: (action, card) => `${action}, ${card}`,
 	groupFlagged: ', has an issue',
 	groupReviewed: ', has changes to review',
 	...DEFAULT_REVIEW_STRINGS,
@@ -296,10 +316,11 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	reviewOff: 'Off',
 	undoRemoved: (what) => `${what} removed`,
 	undoAction: 'Undo',
-	addCard: 'Add Card',
+	addCard: 'Add card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
-	arrayDrag: 'Drag to move',
+	arrayDrag: `Drag to move (${alt('↑/↓')})`,
+	arrayStanding: 'Add an item…',
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
 	textCount: (count, max) => `${count} / ${max}`,
@@ -315,20 +336,20 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 					: `Needs a ${expected} value.`,
 	diagFormatViolation: (format) =>
 		format === 'date'
-			? 'Not a real date. Type it as YYYY-MM-DD, or press Today.'
+			? 'Not a real date. Check the day and month, or press Today.'
 			: format === 'datetime'
-				? 'Not a real date and time. Type it as YYYY-MM-DDTHH:MM.'
+				? 'Not a real date and time. Check the day, month and time.'
 				: `Doesn't match the ${format} format.`,
 	enumUnsetTag: 'Default',
 	enumReset: 'Reset to default',
 	enumClear: 'Clear',
-	matrixHeld: (held, total) => `${held} of ${total} held`,
+	matrixHeld: (held, total) => `${held} of ${total} selected`,
 	matrixAdd: (list) => (list ? `Add to ${list}…` : 'Add…'),
 	matrixItemTitle: (list, index) => `${list ? `${list} item` : 'Item'} ${index}`,
 	matrixRemove: (title) => `Remove ${title}`,
 	dateToday: 'Today',
 	optionalGhost: 'None',
-	proseHeld: 'Holds more than this field can edit here.',
+	proseHeld: "This field has formatting it can't edit here. It is kept as it is.",
 	formatGroup: 'Formatting',
 	formatBold: `Bold (${chord('B')})`,
 	formatEmphasis: `Italic (${chord('I')})`,

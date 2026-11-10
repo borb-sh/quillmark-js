@@ -669,11 +669,15 @@ describe('an optional cell', () => {
 		expect(toggle.getAttribute('role')).toBe('checkbox');
 		expect(toggle.getAttribute('aria-checked')).toBe('mixed');
 		expect(flag.querySelector('.qm-toggle-wrap')!.hasAttribute('data-unset')).toBe(true);
+		expect(flag.querySelector('.qm-toggle-none')?.textContent).toBe(
+			DEFAULT_VISUAL_STRINGS.optionalGhost
+		);
 
 		toggle.click();
 		flushSync();
 		expect(toggle.getAttribute('aria-checked')).toBe('true');
 		expect(flag.querySelector('.qm-toggle-wrap')!.hasAttribute('data-unset')).toBe(false);
+		expect(flag.querySelector('.qm-toggle-none')).toBeNull();
 	});
 
 	it('unsets an answered `boolean?` on Delete or Backspace, and takes neither key while unset', () => {

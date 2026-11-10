@@ -18,6 +18,7 @@
 -->
 <script lang="ts">
 	import { Switch } from 'bits-ui';
+	import { wording } from './strings.js';
 	import './controls.css';
 
 	interface Props {
@@ -40,6 +41,8 @@
 		onCommit: (v: boolean | undefined) => void;
 	}
 	let { value, fallback, optional = false, label, id, describedBy, onCommit }: Props = $props();
+
+	const t = wording();
 
 	// The primitive is driven controlled (`checked` + `onCheckedChange`, never `bind:`)
 	// so reconciliation stays the package's: a two-way bind hands the primitive a lane
@@ -99,6 +102,7 @@
 			>
 		{/snippet}
 	</Switch.Root>
+	{#if unset}<span class="qm-toggle-none" aria-hidden="true">{t.strings.optionalGhost}</span>{/if}
 </span>
 
 <style>
@@ -164,8 +168,34 @@
 		translate: var(--thumb);
 		background: var(--_qm-surface);
 	}
-	/* Unset, the thumb stands at neither end: halfway along its travel. */
+	/* Unset, the thumb stands at neither end: halfway along its travel, with the word every
+	 other unset optional control ghosts beside it. The word is the eye's; the tristate's
+	 `mixed` is what a screen reader hears. */
 	.qm-toggle-wrap[data-unset] :global(.qm-toggle-thumb) {
 		translate: calc(var(--thumb) / 2);
+	}
+	.qm-toggle-none {
+		margin-inline-start: var(--_qm-space-2);
+		font-size: var(--_qm-text-body);
+		color: var(--_qm-ink-label);
+	}
+	/* Forced colours drop the track's fill and the thumb's with it, so the switch would
+	 draw nothing: the system's stroke draws the track, and its text and highlight colours
+	 the thumb at each end. */
+	@media (forced-colors: active) {
+		.qm-toggle-wrap :global(.qm-toggle) {
+			forced-color-adjust: none;
+			border: var(--_qm-border-width) solid ButtonText;
+			background: Canvas;
+		}
+		.qm-toggle-wrap :global(.qm-toggle[data-state='checked']) {
+			background: Highlight;
+		}
+		.qm-toggle-wrap :global(.qm-toggle-thumb) {
+			background: ButtonText;
+		}
+		.qm-toggle-wrap :global(.qm-toggle-thumb[data-state='checked']) {
+			background: HighlightText;
+		}
 	}
 </style>

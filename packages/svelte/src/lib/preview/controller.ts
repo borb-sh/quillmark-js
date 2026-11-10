@@ -74,6 +74,13 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 	const margin = opts.margin ?? 1;
 	const t = mergePreviewStrings(opts.strings);
 	container.classList.add(CONTAINER_CLASS);
+	// The pane is a tab stop (`viewport.ts`), so it is a named region a focus lands in; a
+	// role or a name the consumer gave the container stands.
+	const ownsRole = !container.hasAttribute('role');
+	const ownsName =
+		!container.hasAttribute('aria-label') && !container.hasAttribute('aria-labelledby');
+	if (ownsRole) container.setAttribute('role', 'region');
+	if (ownsName) container.setAttribute('aria-label', t.previewLabel);
 
 	// One element, restamped: the message states are mutually exclusive.
 	let message: HTMLElement | undefined;
@@ -127,6 +134,10 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		const countChanged = pageCount !== paintLoop.slots.length;
 		hideMessage();
 		paintLoop.refresh(dirtyPages, pageCount);
+		for (const slot of paintLoop.slots) {
+			slot.el.setAttribute('role', 'img');
+			slot.el.setAttribute('aria-label', t.pageLabel(slot.page + 1, pageCount));
+		}
 		if (countChanged || !bridge) {
 			detach();
 			attach();
@@ -178,6 +189,8 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 			paintLoop.destroy();
 			hideMessage();
 			container.classList.remove(CONTAINER_CLASS);
+			if (ownsRole) container.removeAttribute('role');
+			if (ownsName) container.removeAttribute('aria-label');
 		}
 	};
 }

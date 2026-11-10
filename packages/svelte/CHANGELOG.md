@@ -4,6 +4,22 @@
 
 ## Unreleased
 
+**The focus ring is two pixels, and more contrast steps the field edge.** The ring every control draws on focus is 2px wide, where its 1.5px rounded down to one device pixel on a 1× display. Under `prefers-contrast: more` a field's edge stands at 3:1 against the card and the ring at 3px.
+
+**A switch draws in forced colours.** Under Windows High Contrast and other forced palettes a switch draws its track in the system's button stroke and its thumb in the system's text or highlight colour, where it drew nothing.
+
+**An unset optional switch says None.** A `boolean?` with no answer writes `None` beside its centred thumb, the word every other unset optional control shows.
+
+**A card's name is a size up, and its controls name it.** The card title stands two steps up the type ramp, so a card reads above the sections inside it. Move up, Move down and Delete carry the card's title in their accessible names (`Delete card, Findings`), and the move buttons draw arrows, where they drew the chevrons a section's disclosure draws.
+
+**A list's standing row says what typing there does.** The row an empty list of text, prose or numbers draws to type into ghosts `Add an item…` (`arrayStanding`), where it was a muted empty box. A row's remove draws a cross, where it drew a minus.
+
+**The slash menu announces its highlighted row.** As the arrows move through the menu a polite live region speaks the row and its place (`Table, 6 of 6`, `slashPosition`), the caret never leaving the text.
+
+**The preview is a named region with named pages.** The pane is `role="region"` named `Document preview` and each page `role="img"` named `Page 1 of 3`, where the pane was an unnamed tab stop over canvases with no text. A role or name the host gave the container stands. The two strings are `previewLabel` and `pageLabel`.
+
+**Wording.** `Add card` is sentence case, a matrix counts `2 of 7 selected`, a held prose leaf says `This field has formatting it can't edit here. It is kept as it is.`, a date error says to check the day and month rather than to type `YYYY-MM-DD` under segments that read otherwise, and a record's drag handle names the `Alt+↑/↓` chord that moves it too.
+
 **The format bar has a key.** Alt+F10 over a selection raises the format bar at once and puts the focus on its first control, where a keyboard had chords for the marks and lists and no route to the font picker. Worked from there the bar keeps the focus through an action, Tab and Shift+Tab walk its controls and wrap, the arrows step between its buttons, and Escape returns the focus to the selection with the bar still up. Entered by a press, the bar is unchanged. `editorShortcuts` lists the key, and `ShortcutStrings` gains `shortcutFormatBar`.
 
 **Two marks over one range commit.** A second mark set over exactly the range of another, bold then italic over one selection, is written to the document, where the commit was refused (`commit-lost`), the document kept the first mark alone, and every later edit to that field was refused with it until the two ranges differed. The projection now orders marks as the store keeps them, by range and then by kind.
