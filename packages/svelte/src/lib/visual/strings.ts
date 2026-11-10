@@ -144,6 +144,13 @@ export interface VisualStrings
 	/** `validation::format_violation`: the value misses a string format (`args.format`). */
 	diagFormatViolation: (format: string) => string;
 
+	// ── Where a field stands against its default (the label row's end) ───────
+	/** The tag on a field whose `default:` is what prints. */
+	fieldDefault: string;
+	/** The button that unsets a field written over its `default:`; its accessible name
+	 *  is this word and then the field's label. */
+	fieldReset: string;
+
 	// ── Enum control ──────────────────────────────────────────────────────────
 	/** The tag on the `default:` member's row ({@link EnumField}). */
 	enumUnsetTag: string;
@@ -343,6 +350,8 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 			: format === 'datetime'
 				? 'Not a real date and time. Check the day, month and time.'
 				: `Doesn't match the ${format} format.`,
+	fieldDefault: 'Default',
+	fieldReset: 'Reset',
 	enumUnsetTag: 'Default',
 	enumReset: 'Reset to default',
 	enumClear: 'Clear',

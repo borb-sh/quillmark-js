@@ -105,6 +105,9 @@ export interface CreateFieldOpts {
 	/** The id of the note the caller draws inside `container` for a held leaf →
 	 *  `aria-describedby` while it holds. */
 	heldNoteId?: string;
+	/** The id of the tag the caller draws for a leaf holding its unwritten default →
+	 *  `aria-describedby` while it does. */
+	defaultNoteId?: string;
 	/**
 	 * Fired when the leaf holds or releases, and at mount when it mounts held. A one-line or `text`
 	 * leaf is held over a value its schema cannot hold (`fitsLeaf`): the decode would join lines
@@ -574,7 +577,13 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext, islands: true });
 	let held = holds(reconciler.last);
 	const named = proseAttributes(opts) ?? {};
-	const defaultNamed = { ...named, 'data-default': '' };
+	const defaultNamed = {
+		...proseAttributes({
+			...opts,
+			describedBy: [opts.describedBy, opts.defaultNoteId].filter(Boolean).join(' ') || undefined
+		}),
+		'data-default': ''
+	};
 	const heldNamed = heldAttributes(opts, opts.heldNoteId);
 
 	const seeded = buildState(reconciler.last);

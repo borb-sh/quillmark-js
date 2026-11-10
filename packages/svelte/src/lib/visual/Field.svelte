@@ -146,6 +146,26 @@
 	// resolves to digits, and the control has to know it follows the render date.
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
+	// Where the field stands against its default, for the label row's end (`FieldLabel`):
+	// unset with the default printing, or written over one that would. A container's
+	// source is its cells' composed, so only a control holding one value says either.
+	const scalar = $derived(!isContainer(field.control));
+	// A prose leaf commits past the derive (`VisualEditorInner` `proseChanged`), so its
+	// row stands as the last derive left it. The leaf's commit says whether the field is
+	// written since, and holds until the next derive hands a row that answers.
+	let since = $state.raw<{ row: ResolvedField | undefined; written: boolean }>();
+	const written = $derived(
+		since && since.row === provenance ? since.written : provenance?.source === 'authored'
+	);
+	const defaulted = $derived(
+		scalar && !written && provenance?.source === 'default' && printed !== undefined
+	);
+	const resettable = $derived(scalar && written && declared !== undefined);
+	const defaultId = $derived(`${domIds.control}-default`);
+	function proseCommitted(at: Addr): void {
+		since = { row: provenance, written: doc.getStored(at) != null };
+		onChange?.(at);
+	}
 	const none = $derived(optional && value == null ? t.strings.optionalGhost : undefined);
 	// A variant resolves as one rung whose value is the whole container, so the
 	// discriminant's ghost is that container's own discriminant cell.
@@ -169,14 +189,19 @@
 	// The parked description node renders only when the schema carries one, so the
 	// reference must vanish with it: `aria-describedby` pointing at nothing describes
 	// nothing, and silently.
-	const describedBy = $derived(field.description ? domIds.description : undefined);
+	const description = $derived(field.description ? domIds.description : undefined);
+	// The default tag describes the control while it stands. A prose leaf takes the tag's
+	// id apart and adds it itself, on the mark it keeps of its own default (`createField`).
+	const describedBy = $derived(
+		defaulted ? [description, defaultId].filter(Boolean).join(' ') : description
+	);
 	// A capped prose leaf reports its count, and the count describes it too: a keystroke
 	// the cap refuses changes nothing else a reader can perceive.
 	let chars = $state<number>();
 	const cap = $derived(field.control === 'prose' ? textCap(field.schema) : undefined);
 	const countId = $derived(`${domIds.control}-count`);
 	const proseDescribedBy = $derived(
-		cap ? [describedBy, countId].filter(Boolean).join(' ') : describedBy
+		cap ? [description, countId].filter(Boolean).join(' ') : description
 	);
 	// Two controls own their label row, the add chip and the held count sharing it.
 	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
@@ -236,6 +261,13 @@
 	// Only where `for` cannot reach; the labelable four are the browser's own, and a
 	// second handler over them would be a focus the label already placed.
 	const onActivate = $derived(labelable ? undefined : focusControl);
+	/** Back to the default: the field unset, and the focus on its control, the button
+	 *  that held it leaving with the written value. */
+	function reset(): void {
+		since = undefined;
+		onCommitScalar(undefined);
+		focusControl();
+	}
 
 	/**
 	 * This field's landing handle. The wrapper is the bloom host rather than the
@@ -338,6 +370,9 @@
 			description={field.description}
 			count={cap && chars != null ? t.strings.textCount(chars, cap.max) : undefined}
 			{countId}
+			{defaulted}
+			{defaultId}
+			onReset={resettable ? reset : undefined}
 		/>
 	{/if}
 	<!-- The control and what hangs under it, in one grid cell: the diagnostics stack
@@ -371,11 +406,12 @@
 					emptyUnsets={optional}
 					labelledBy={domIds.label}
 					describedBy={proseDescribedBy}
+					defaultNoteId={defaultId}
 					cap={cap && { ...cap, onCount: (n) => (chars = n) }}
 					{leafKey}
 					{onFocus}
 					{onCaretMove}
-					{onChange}
+					onChange={proseCommitted}
 					{onError}
 					{leaves}
 					{diagnostics}
@@ -518,6 +554,10 @@
 		gap: var(--_qm-space);
 		grid-column: 1 / -1;
 		min-width: 0;
+	}
+	/* The way back to the default arrives with the field's hover or focus (`FieldLabel`). */
+	.qm-field:is(:hover, :focus-within) > :global(.qm-field-label-row > .qm-field-reset) {
+		opacity: 1;
 	}
 	/* A row-sharing field subgrids onto the section's row tracks instead of sizing its
 	 own: two tracks, the label and the control's stack, taken from the parent, so
