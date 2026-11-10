@@ -1,22 +1,25 @@
 // @vitest-environment jsdom
 // What the review layer redoes as the reader works beside a batch of proposals, counted as work:
-// a keystroke diffs only the paragraph it changed, and the lit item moving diffs nothing and
-// reaches only a leaf that draws the item it left or the one it reached.
+// the paragraphs whose words are read to be diffed. A keystroke reads only the paragraph it
+// changed, and the lit item moving reads nothing and reaches only a leaf that draws the item it
+// left or the one it reached.
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { Node as PMNode } from 'prosemirror-model';
 import { createField, type FieldController, type TextReview } from '$lib/core/codec';
-import * as diff from '$lib/core/codec/review-diff.js';
 import { example, md, mount, quill, viewOf } from './_util.js';
 
-vi.mock('$lib/core/codec/review-diff.js', async (actual) => {
-	const real = await actual<typeof import('$lib/core/codec/review-diff.js')>();
-	const diffs = { count: 0 };
-	return {
-		...real,
-		diffs,
-		wordDiff: (a: string, b: string) => (diffs.count++, real.wordDiff(a, b))
-	};
+/** The text of each block read as words to diff: the layer reads one with a leaf node's stand-in
+ *  and no block separator, which no other reader of a block's text passes. */
+const read: string[] = [];
+const textBetween = PMNode.prototype.textBetween;
+vi.spyOn(PMNode.prototype, 'textBetween').mockImplementation(function (
+	this: PMNode,
+	...args: Parameters<PMNode['textBetween']>
+) {
+	if (args[2] === undefined && typeof args[3] === 'function') read.push(this.textContent);
+	return textBetween.apply(this, args);
 });
-const { diffs } = diff as unknown as { diffs: { count: number } };
+const reads = (): string[] => read.splice(0);
 
 Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
 Range.prototype.getBoundingClientRect ??= () => new DOMRect();
@@ -58,26 +61,27 @@ function batch(prefix: string, count: number, proposed = count) {
 }
 
 describe('typing beside a batch of proposals', () => {
-	it('diffs only the paragraph the keystroke changed', () => {
+	it('reads only the paragraph the keystroke changed', () => {
 		const leaf = batch('r', 8, 6);
-		diffs.count = 0;
+		reads();
 		leaf.type(2);
-		expect(diffs.count).toBe(1);
-		diffs.count = 0;
+		const typed = reads();
+		expect(typed).not.toEqual([]);
+		expect(typed.every((text) => text.includes('p2w'))).toBe(true);
 		leaf.type(7);
-		expect(diffs.count).toBe(0);
+		expect(reads()).toEqual([]);
 	});
 
-	it('diffs nothing when attention moves, and leaves a leaf that draws neither item alone', () => {
+	it('reads nothing when attention moves, and leaves a leaf that draws neither item alone', () => {
 		const here = batch('a', 4);
 		const there = batch('b', 4);
 		const reached = vi.spyOn(there.view, 'setProps');
-		diffs.count = 0;
+		reads();
 		for (const lit of ['a0', 'a1', 'a2', undefined]) {
 			here.field.setReview(here.items, lit);
 			there.field.setReview(there.items, lit);
 		}
-		expect(diffs.count).toBe(0);
+		expect(reads()).toEqual([]);
 		expect(reached).not.toHaveBeenCalled();
 		there.field.setReview(there.items, 'b1');
 		expect(reached).toHaveBeenCalledOnce();

@@ -489,6 +489,17 @@ function rewrites(
 	return { outdated: false, stretches: out };
 }
 
+/** {@link rewrites}, kept while its three blocks are. */
+const rewritten = (() => {
+	const kept = byPair(() => new WeakMap<PMNode, ReturnType<typeof rewrites>>());
+	return (was: PMNode, now: PMNode, to: PMNode): ReturnType<typeof rewrites> => {
+		const row = kept(was, now);
+		let out = row.get(to);
+		if (!out) row.set(to, (out = rewrites(was, now, to)));
+		return out;
+	};
+})();
+
 /** An answer to an item: from a button, from a chord, or `quiet` from a host's call, which moves
  *  neither the caret nor the focus. False where it could not be given, and the item stands. */
 type Act = (
@@ -727,7 +738,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 			if (whole) return strike(lo, hi);
 			const to = next[k].node;
 			const was = base[k].type === leaf.node.type ? base[k] : leaf.node;
-			const { outdated: past, stretches } = rewrites(was, leaf.node, to);
+			const { outdated: past, stretches } = rewritten(was, leaf.node, to);
 			stale ||= past;
 			stretches.forEach(({ at, end, content }, n) => {
 				strike(lo + at, lo + end);
