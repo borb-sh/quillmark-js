@@ -296,8 +296,14 @@ interface Piece {
 	lift?: boolean;
 }
 
+/** A decoration that reads differently on the lit item, made for one state or the other. */
+type Lighting = { id: string; make: (on: boolean) => Decoration };
+
 interface Drawn {
-	set: DecorationSet;
+	/** In document order, those that read the lit item made on asking. */
+	decos: (Decoration | Lighting)[];
+	/** The items a decoration of which reads the lit one. */
+	lighting: Set<string>;
 	spans: Span[];
 	/** Each drawn proposal's pieces, by its id. */
 	plans: Map<string, Piece[]>;
@@ -373,9 +379,23 @@ function formatRuns(
 	return out;
 }
 
+/** A value of two nodes, kept while both are: a node an edit leaves alone is the same object
+ *  after it, so a paragraph the reader did not touch is not diffed again. */
+function byPair<T>(of: (a: PMNode, b: PMNode) => T): (a: PMNode, b: PMNode) => T {
+	const kept = new WeakMap<PMNode, WeakMap<PMNode, T>>();
+	return (a, b) => {
+		let row = kept.get(a);
+		if (!row) kept.set(a, (row = new WeakMap()));
+		if (row.has(b)) return row.get(b)!;
+		const value = of(a, b);
+		row.set(b, value);
+		return value;
+	};
+}
+
 /** The hunks between two paired textblocks: their words', and inside the words they keep,
  *  each run whose formatting differs. */
-function hunksOf(a: PMNode, b: PMNode): Hunk[] {
+const hunksOf = byPair((a: PMNode, b: PMNode): Hunk[] => {
 	const before = textOf(a);
 	const after = textOf(b);
 	const words = before === after ? [] : wordDiff(before, after);
@@ -391,7 +411,12 @@ function hunksOf(a: PMNode, b: PMNode): Hunk[] {
 	}
 	out.push(...formatRuns(ma, mb, kept, before.length, shift, after));
 	return out;
-}
+});
+
+/** What the reader wrote in a block since a proposal arrived over it. */
+const sinceOf = byPair((was: PMNode, now: PMNode): DiffHunk[] =>
+	was === now ? [] : wordDiff(textOf(was), textOf(now))
+);
 
 /** One stretch of a held block a proposal rewrites: `[at, end)` of the block as it stands, and
  *  the words that would stand there. */
@@ -416,7 +441,7 @@ function rewrites(
 	now: PMNode,
 	to: PMNode
 ): { outdated: boolean; stretches: Rewrite[] } {
-	const since = was === now ? [] : wordDiff(textOf(was), textOf(now));
+	const since = sinceOf(was, now);
 	const hunks = hunksOf(was, to);
 	const past = since.some((s) =>
 		hunks.some((h) => s.at < h.end && h.at < s.end && !(h.at <= s.at && s.end <= h.end))
@@ -463,6 +488,17 @@ function rewrites(
 	}
 	return { outdated: false, stretches: out };
 }
+
+/** {@link rewrites}, kept while its three blocks are. */
+const rewritten = (() => {
+	const kept = byPair(() => new WeakMap<PMNode, ReturnType<typeof rewrites>>());
+	return (was: PMNode, now: PMNode, to: PMNode): ReturnType<typeof rewrites> => {
+		const row = kept(was, now);
+		let out = row.get(to);
+		if (!out) row.set(to, (out = rewrites(was, now, to)));
+		return out;
+	};
+})();
 
 /** An answer to an item: from a button, from a chord, or `quiet` from a host's call, which moves
  *  neither the caret nor the focus. False where it could not be given, and the item stands. */
@@ -570,12 +606,16 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 	const plans = new Map<string, Piece[]>();
 	const undrawn: Drawn['undrawn'] = [];
 	const outdated: string[] = [];
-	if (!items.length) return { set: DecorationSet.empty, spans: [], plans, outdated, undrawn };
+	const decos: Drawn['decos'] = [];
+	const lighting = new Set<string>();
+	if (!items.length) return { decos, lighting, spans: [], plans, outdated, undrawn };
 	const { doc } = state;
-	const lit = channel.lit();
 	const strings = channel.strings();
 	const serializer = DOMSerializer.fromSchema(state.schema);
-	const decos: Decoration[] = [];
+	const lights = (id: string, make: (on: boolean) => Decoration): void => {
+		lighting.add(id);
+		decos.push({ id, make });
+	};
 	const spans: Span[] = [];
 	let leaves: Leaf[] | undefined;
 	/** The paragraphs a proposal rewrites, and the places a proposal that only adds adds at:
@@ -586,19 +626,18 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 	for (const item of items) {
 		const anchor = anchors.get(item.anchor);
 		if (!anchor) continue;
-		const on = item.id === lit;
 		const name = { 'data-qm-review': item.id };
 
 		if (item.state === 'changed') {
 			if (anchor.end > anchor.start) {
-				decos.push(
+				lights(item.id, (on) =>
 					Decoration.inline(anchor.start, anchor.end, {
 						class: on ? 'qm-review-changed qm-review-lit' : 'qm-review-changed',
 						...name
 					})
 				);
 			} else {
-				decos.push(
+				lights(item.id, (on) =>
 					Decoration.widget(
 						anchor.start,
 						() => {
@@ -675,7 +714,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		covered.forEach((leaf, k) => {
 			const [lo, hi] = reach(leaf);
 			const whole = k >= paired;
-			decos.push(
+			lights(item.id, (on) =>
 				Decoration.node(leaf.pos, leaf.pos + leaf.node.nodeSize, {
 					class: ['qm-review-held', whole && 'qm-review-out', on && 'qm-review-lit']
 						.filter(Boolean)
@@ -699,7 +738,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 			if (whole) return strike(lo, hi);
 			const to = next[k].node;
 			const was = base[k].type === leaf.node.type ? base[k] : leaf.node;
-			const { outdated: past, stretches } = rewrites(was, leaf.node, to);
+			const { outdated: past, stretches } = rewritten(was, leaf.node, to);
 			stale ||= past;
 			stretches.forEach(({ at, end, content }, n) => {
 				strike(lo + at, lo + end);
@@ -724,6 +763,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 
 		if (!plan.length && !added.length) {
 			decos.length = mark;
+			lighting.delete(item.id);
 			undrawn.push({ id: item.id, reason: 'applied' });
 			continue;
 		}
@@ -767,7 +807,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 			const chipped = endsInLine(pieces[closing].node);
 			pieces.forEach((piece, n) => {
 				const holds = chipped && n === closing;
-				decos.push(
+				lights(item.id, (on) =>
 					Decoration.widget(
 						piece.at,
 						() => {
@@ -807,7 +847,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 			to: reach(last)[1]
 		});
 	}
-	return { set: DecorationSet.create(doc, decos), spans, plans, outdated, undrawn };
+	return { decos, lighting, spans, plans, outdated, undrawn };
 }
 
 /** Whether a block's last leaf is a textblock, so its last line can carry a run. */
@@ -870,11 +910,12 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				review: ReviewState;
 				anchors: readonly AnchorPos[];
 				items: readonly TextReview[];
-				lit: string | undefined;
 				strings: ReviewStrings;
 				drawn: Drawn;
 		  }
 		| undefined;
+	/** The decorations of what is drawn, with the lit item they were made for. */
+	let shown: { drawn: Drawn; lit: string | undefined; set: DecorationSet } | undefined;
 	const NOTHING = JSON.stringify({ ids: [], outdated: [], undrawn: [] } satisfies ReviewReport);
 	let reported = NOTHING;
 	let host: EditorView | undefined;
@@ -915,7 +956,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		const review = reviewKey.getState(state)!;
 		const anchors = channel.anchors(state);
 		const items = channel.items();
-		const lit = channel.lit();
 		const strings = channel.strings();
 		if (
 			memo &&
@@ -923,13 +963,32 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			memo.review === review &&
 			memo.anchors === anchors &&
 			memo.items === items &&
-			memo.lit === lit &&
 			memo.strings === strings
 		)
 			return memo.drawn;
 		const next = draw(state, channel, act, bases);
-		memo = { doc: state.doc, review, anchors, items, lit, strings, drawn: next };
+		memo = { doc: state.doc, review, anchors, items, strings, drawn: next };
 		return next;
+	};
+	/** Whether the lit item moving to `lit` changes how anything here reads. */
+	const relit = (lit: string | undefined): boolean =>
+		!shown ||
+		(shown.lit !== lit &&
+			((shown.lit !== undefined && shown.drawn.lighting.has(shown.lit)) ||
+				(lit !== undefined && shown.drawn.lighting.has(lit))));
+	const decorations = (state: EditorState): DecorationSet => {
+		const now = drawn(state);
+		const lit = channel.lit();
+		if (shown?.drawn === now && !relit(lit)) {
+			shown.lit = lit;
+			return shown.set;
+		}
+		const set = DecorationSet.create(
+			state.doc,
+			now.decos.map((d) => ('make' in d ? d.make(d.id === lit) : d))
+		);
+		shown = { drawn: now, lit, set };
+		return set;
 	};
 	/** Tell the channel what the leaf draws, where that moved. */
 	const report = (state: EditorState): void => {
@@ -1000,7 +1059,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			apply: applyReview
 		},
 		props: {
-			decorations: (state) => drawn(state).set,
+			decorations,
 			handleKeyDown: keydownHandler({
 				[REVIEW_KEYS.accept]: answer('accept'),
 				[REVIEW_KEYS.dismiss]: answer('dismiss'),
@@ -1052,6 +1111,12 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	return {
 		plugin,
 		refresh(view) {
+			// Only the lit item moved, and nothing here reads it: the leaf is left alone.
+			const lit = channel.lit();
+			if (memo?.items === channel.items() && memo.strings === channel.strings() && !relit(lit)) {
+				if (shown) shown.lit = lit;
+				return;
+			}
 			// An answer is held until a list arrives without its item.
 			const answered = reviewKey.getState(view.state)?.answered;
 			const listed = new Set(channel.items().map((item) => item.id));
