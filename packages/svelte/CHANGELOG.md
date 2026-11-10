@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A removed card can be put back for as long as the editor is mounted.** A control at the foot of the cards names the card removed last and restores it, then the one before it, where the undo toast was the only way back and lapsed after six seconds. ⌘/Ctrl+Z off a text control restores it too while its removal is the document's latest change. A restored card returns beside the card it stood under, so a card added, moved or removed since no longer withdraws the offer; one whose `$id` a card added since now holds is minted another. `VisualStrings` gains `undoRestore`.
+
 **A drop anywhere in a table cell lands in that cell.** Text dropped on a cell's padding, or on the edge of its text where no line is, lands in the cell at the nearest place in its text, where the first landed as a new paragraph above the table and the second was taken and dropped.
 
 **Enter in a list of numbers moves on.** Enter in a number row that holds a number commits it and takes the focus to the next row with its number selected, or from the last row to a standing row for the next number, where the caret stayed and the next digits ran onto the number just entered.

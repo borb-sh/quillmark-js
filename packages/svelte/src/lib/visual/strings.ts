@@ -54,6 +54,8 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings, Shortcu
 	undoRemoved: (what: string) => string;
 	/** The toast's button, which puts it back. */
 	undoAction: string;
+	/** The standing control that puts a removed card back, named for it: `Restore Findings`. */
+	undoRestore: (what: string) => string;
 
 	// ── The add affordance ────────────────────────────────────────────────────
 	/** The trailing strip's visible words, drawn after a `+`, and every
@@ -255,6 +257,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	groupFlagged: ', has an issue',
 	undoRemoved: (what) => `${what} removed`,
 	undoAction: 'Undo',
+	undoRestore: (what) => `Restore ${what}`,
 	addCard: 'Add Card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',

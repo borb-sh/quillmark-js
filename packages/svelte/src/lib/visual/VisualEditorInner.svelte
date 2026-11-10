@@ -153,6 +153,11 @@
 
 	const kinds = $derived(Object.keys(quill.schema.card_kinds ?? {}));
 
+	// The removal's step back (`undo.svelte.ts`), published so an array's row removal
+	// offers on the same toast a card's does.
+	const undo = createStructuralUndo();
+	setStructuralUndo(undo);
+
 	/**
 	 * Re-derive the card tree and report the edit. Called for the two lanes that go
 	 * through this component; a prose leaf commits itself and reports through
@@ -170,6 +175,7 @@
 	function report(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
+		undo.touch();
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
 	}
 	function rederive(): void {
@@ -251,6 +257,7 @@
 	const span = createLifespan();
 	onDestroy(() => span.end());
 	span.onEnd(() => clearTimeout(rest));
+	span.onEnd(undo.dispose);
 
 	// ── Leaf registry (landing target lookup + the active-leaf seam) ────────────
 	// Every mounted field is in it, prose leaf and form control alike (`leaves.ts`):
@@ -262,12 +269,7 @@
 	// is Svelte's business and not something to depend on.
 	span.onEnd(() => leaves.clear());
 
-	// The removal's one step back (`undo.svelte.ts`), published so an array's row removal
-	// offers on the same toast a card's does.
-	const undo = createStructuralUndo();
-	setStructuralUndo(undo);
-	span.onEnd(undo.dispose);
-	/** ⌘Z/Ctrl+Z takes the standing offer where the offer accepts it (`undo.accepts`).
+	/** ⌘Z/Ctrl+Z takes the removal's step back where the undo accepts it (`undo.accepts`).
 	 *  On the document, since a removal under the pointer leaves the focus on the body, and
 	 *  captured, so a leaf the removal handed the focus to hears the key after the offer. */
 	function onUndoKey(e: KeyboardEvent): void {
@@ -368,6 +370,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
+		undo.touch();
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
 
@@ -586,6 +589,7 @@
 			shown?.titleOverride ||
 			shown?.titlePlaceholder ||
 			kindTitle(quill.schema.card_kinds?.[card.kind], card.kind);
+		const gone: Removed = { id, card, above: cardIds[i - 1], below: cardIds[i + 1], at: i };
 		doc.removeCard(i);
 		arm.arm();
 		cardIds = cardIds.filter((_, k) => k !== i);
@@ -593,17 +597,44 @@
 		// No addr: the removed card has none left and every survivor's shifted. The
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
 		bump('structure', id, undefined, { op: 'remove', at: i });
-		undo.offer(merged.undoRemoved(name), () => restoreCard(card, i));
+		removed.push(gone);
+		undo.offer(merged.undoRemoved(name), () => restoreCard(gone), merged.undoRestore(name));
 		if (held) void focusAfterRemove(i);
 	}
-	/** The removal's undo: the card back at the index it left, under a fresh session key
-	 *  (ids are never reused), with the focus on its title. The document holds what it held
-	 *  before the removal, so the insert is the removal's exact inverse. */
-	function restoreCard(card: ReturnType<typeof doc.card>, at: number): void {
+	/** A removed card and the place it left, named by the cards either side of it: an index
+	 *  names whatever stands there after the next insert, move or removal, and a session key
+	 *  names one card for the surface's life. */
+	type Removed = {
+		readonly id: CardId;
+		readonly card: ReturnType<typeof doc.card>;
+		above: CardId | undefined;
+		below: CardId | undefined;
+		readonly at: number;
+	};
+	/** The removals not yet restored, each the step `undo` keeps for it. */
+	const removed: Removed[] = [];
+	/** Where a removed card goes back: under the card it stood below, else over the one it
+	 *  stood above, else the index it left, held to the stack's length. */
+	function placeOf(gone: Removed): number {
+		const above = gone.above === undefined ? -1 : cardIndexOf(gone.above);
+		if (above >= 0) return above + 1;
+		const below = gone.below === undefined ? -1 : cardIndexOf(gone.below);
+		return below >= 0 ? below : Math.min(gone.at, cardIds.length);
+	}
+	/** The removal's undo: the card back beside the neighbours it left, under a fresh session
+	 *  key (ids are never reused), with the focus on its title. A removal that named the
+	 *  gone card as its neighbour names the restored one. The document mints a card's `$id`
+	 *  from the ids it holds, so a card added since may hold the one this card left with,
+	 *  and the card then goes back without it and is minted another. */
+	function restoreCard(gone: Removed): void {
 		if (!span.alive) return;
-		const i = Math.min(at, cardIds.length);
+		const { card } = gone;
+		const i = placeOf(gone);
 		try {
-			doc.unchecked.insertCard(card, i);
+			const taken = card.id !== undefined && cardIds.some((_, k) => doc.card(k).id === card.id);
+			const back = { ...card };
+			if (taken) delete back.id;
+			doc.unchecked.insertCard(back, i);
 		} catch (e) {
 			reportError(onError, {
 				code: 'card-op-failed',
@@ -614,6 +645,11 @@
 			return;
 		}
 		const id = seq.next();
+		removed.splice(removed.indexOf(gone), 1);
+		for (const other of removed) {
+			if (other.above === gone.id) other.above = id;
+			if (other.below === gone.id) other.below = id;
+		}
 		arm.arm();
 		cardIds = [...cardIds.slice(0, i), id, ...cardIds.slice(i)];
 		bump('structure', id, i, { op: 'insert', at: i });
@@ -1007,17 +1043,21 @@
 		if (!span.alive) return;
 		const target = leafTargetFor(field);
 		if (target && !target.steps) leaves.prose(target.key)?.applyExternal(delta);
+		undo.touch();
 		rederive();
 	}
 	/** Re-read the cards' kinds, titles and form fields from the document. */
 	export function refresh(): void {
-		if (span.alive) rederive();
+		if (!span.alive) return;
+		undo.touch();
+		rederive();
 	}
 	/** Move the card keys in step with card-list changes the document already holds, in the
 	 *  order it applied them, so every card that stays keeps its leaves. */
 	export function applyCardOps(ops: readonly CardOp[]): void {
 		if (!span.alive) return;
 		undo.withdraw();
+		undo.touch();
 		const ids = cardIds.slice();
 		for (const op of ops) {
 			if (op.op === 'insert') ids.splice(op.at, 0, seq.next());
@@ -1164,6 +1204,17 @@
 			{@render addAffordance(i + 1)}
 		</div>
 	{/each}
+	<!-- The way back to a removed card once its toast has gone: the newest kept step, by
+	 name, at the stack's foot, where the control that adds a card is looked for. -->
+	{#if undo.kept}
+		<div class="qm-restore">
+			<button
+				type="button"
+				class="qm-restore-btn qm-tap-floor qm-focus-ring"
+				onclick={() => undo.takeKept()}>{undo.kept.label}</button
+			>
+		</div>
+	{/if}
 	<!-- The removal's undo. The region stands empty between offers so the notice it takes is
 	 announced: a live region inserted along with its text is one a reader may not hear. -->
 	<div class="qm-toast-slot" role="status">
@@ -1298,6 +1349,27 @@
 	}
 	.qm-toast-action:hover {
 		background: var(--_qm-accent-tint);
+	}
+	/* Words at the label ink, unboxed: the stack's foot already holds one outlined pill, and
+	   a second would stand as its equal. */
+	.qm-restore {
+		display: flex;
+		justify-content: center;
+	}
+	.qm-restore-btn {
+		min-height: var(--_qm-tap-min);
+		padding-inline: var(--_qm-space-2);
+		border: 0;
+		border-radius: var(--_qm-radius-pill);
+		background: transparent;
+		font: inherit;
+		font-size: var(--_qm-text-label);
+		color: var(--_qm-ink-label);
+		cursor: pointer;
+	}
+	.qm-restore-btn:hover {
+		background: var(--_qm-add-fill);
+		color: var(--_qm-ink);
 	}
 	/* A detached root, carrying `data-qm-root` for the derivation core/theme.css applies
 	   to one — the baseline font and colour included, so nothing here restates them.

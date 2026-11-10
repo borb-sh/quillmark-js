@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// A removal is offered back once, on a toast: the card or row returns where it left, with
-// what it held, and the document reads as it did before the removal.
+// A removal is offered back on a toast: the card or row returns where it left, with what it
+// held, and the document reads as it did before the removal. A card's step outlives its toast.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { core, quill, quillFromYaml, example } from '../helpers/fixtures.js';
@@ -18,6 +18,15 @@ const undoButton = (target: HTMLElement) =>
 	target.querySelector<HTMLButtonElement>('.qm-toast-action')!;
 const deleteButton = (slot: HTMLElement) =>
 	slot.querySelector<HTMLButtonElement>('.qm-card-delete')!;
+const restoreButton = (target: HTMLElement) =>
+	target.querySelector<HTMLButtonElement>('.qm-restore-btn');
+/** A document's markdown less its cards' ids: a card restored after another was added is
+ *  minted a new one when the added card took the id it left with. */
+const sansIds = (markdown: string) => markdown.replace(/^\$id: .*\n/gm, '');
+const lapse = () => {
+	vi.advanceTimersByTime(OFFER_MS + 1);
+	flushSync();
+};
 
 const LIST = `quill:
   name: undo_list
@@ -53,6 +62,7 @@ describe('structural undo', () => {
 		expect(slots(target)).toHaveLength(seeded);
 		expect(doc.toMarkdown()).toBe(before);
 		expect(toast(target)).toBeNull();
+		expect(restoreButton(target)).toBeNull();
 	});
 
 	it('answers ⌘Z off a text control, and lapses on its own when not in use', () => {
@@ -109,11 +119,90 @@ describe('structural undo', () => {
 		expect(toast(a.target)).not.toBeNull();
 	});
 
-	it('withdraws the offer when another structural edit moves what its index names', () => {
+	it('keeps a removed card past its toast, and puts it back beside the card it left', () => {
+		vi.useFakeTimers();
+		const doc = example();
+		const before = sansIds(doc.toMarkdown());
+		const { target, editor, errors } = mountEditor(quill(), doc);
+
+		deleteButton(slots(target)[1]).click();
+		flushSync();
+		lapse();
+		expect(toast(target)).toBeNull();
+
+		// A card added above moves every index; the neighbour the removed card left has not moved.
+		const added = editor.insertCard('section', 0)!;
+		flushSync();
+		restoreButton(target)!.click();
+		flushSync();
+		editor.removeCard(added);
+		flushSync();
+		expect(errors).toEqual([]);
+		expect(sansIds(doc.toMarkdown())).toBe(before);
+	});
+
+	it('puts two removed cards back in turn, the second beside the restored first', () => {
+		vi.useFakeTimers();
+		const doc = example();
+		const before = doc.toMarkdown();
+		const { target } = mountEditor(quill(), doc);
+
+		deleteButton(slots(target)[1]).click();
+		flushSync();
+		deleteButton(slots(target)[0]).click();
+		flushSync();
+		lapse();
+
+		restoreButton(target)!.click();
+		flushSync();
+		restoreButton(target)!.click();
+		flushSync();
+		expect(doc.toMarkdown()).toBe(before);
+		expect(restoreButton(target)).toBeNull();
+	});
+
+	it('answers ⌘Z for a kept card only while its removal is the latest change', () => {
+		vi.useFakeTimers();
+		const doc = example();
+		const before = doc.toMarkdown();
+		const { target, editor } = mountEditor(quill(), doc);
+
+		deleteButton(slots(target)[0]).click();
+		flushSync();
+		lapse();
+		press(document.body, 'z', { metaKey: true });
+		flushSync();
+		expect(doc.toMarkdown()).toBe(before);
+
+		deleteButton(slots(target)[0]).click();
+		flushSync();
+		lapse();
+		const added = editor.insertCard('section')!;
+		flushSync();
+		const changed = doc.toMarkdown();
+		press(document.body, 'z', { metaKey: true });
+		flushSync();
+		expect(doc.toMarkdown()).toBe(changed);
+
+		restoreButton(target)!.click();
+		flushSync();
+		editor.removeCard(added);
+		flushSync();
+		expect(sansIds(doc.toMarkdown())).toBe(sansIds(before));
+	});
+
+	it("keeps a card's toast through another card operation, and withdraws a row's", () => {
 		const { target, editor } = mountEditor(quill(), example());
 		deleteButton(slots(target)[0]).click();
 		flushSync();
+		editor.insertCard('section', 0);
+		flushSync();
 		expect(toast(target)).not.toBeNull();
+
+		const authors = field(target, 'Authors');
+		authors.querySelector<HTMLButtonElement>('.qm-remove')!.click();
+		flushSync();
+		expect(toast(target)?.textContent).toContain('Authors 1 removed');
 		editor.insertCard('section', 0);
 		flushSync();
 		expect(toast(target)).toBeNull();
