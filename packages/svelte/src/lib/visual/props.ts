@@ -125,16 +125,18 @@ export interface VisualEditorProps {
 	review?: readonly ReviewItem[];
 	/**
 	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-.` with the caret or the
-	 * focus in it, or a host's `answerReview`; or undid an answer with ⌘Z, `reopen`. The host
-	 * makes the write a `revert` asks for and tells the editor (`applyExternal`, `refresh`),
-	 * takes an answered item off `review` with its anchor left in place, and puts a reopened
-	 * one back.
+	 * focus in it, or a host's `answerReview`; or undid an answer, with ⌘Z or an accepted
+	 * change's Undo, `reopen`. The host makes the write a `revert` asks for and tells the editor
+	 * (`applyExternal`, `refresh`), takes a dismissed item off `review` with its anchor left in
+	 * place, leaves an accepted one on for as long as its change should stay marked, and puts a
+	 * reopened one back.
 	 */
 	onReview?: (event: ReviewEvent) => void;
 	/**
-	 * What the editor draws of `review`, on each change once the leaves have drawn: the open
-	 * items in document order, the proposals the reader has written past since, and every
-	 * listed item it does not draw with why. What a host counts and steps its own list by.
+	 * What the editor draws of `review`, on each change once the leaves have drawn: the items
+	 * in document order, the accepted proposals among them drawn as changes, the proposals the
+	 * reader has written past since, and every listed item it does not draw with why. What a
+	 * host counts and steps its own list by.
 	 */
 	onReviewDrawn?: (drawn: ReviewDrawn) => void;
 	/**

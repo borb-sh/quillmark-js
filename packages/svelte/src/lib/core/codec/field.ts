@@ -289,7 +289,8 @@ const NO_ANCHORS: AnchorPos[] = [];
 type AnchorEdit =
 	| { op: 'add'; id: string; start: number; end: number }
 	| { op: 'remove'; id: string }
-	| { op: 'reset'; anchors: AnchorPos[] };
+	| { op: 'reset'; anchors: AnchorPos[] }
+	| { op: 'restore'; anchors: readonly AnchorPos[] };
 
 /**
  * An anchor a deletion swallowed, held until the undo that puts its text back: where the deletion
@@ -341,6 +342,11 @@ function anchorPlugin(seed: AnchorPos[]): Plugin<AnchorState> {
 					anchors = anchors.filter((a) => a.id !== edit.id);
 					ghosts = ghosts.filter((g) => g.id !== edit.id);
 				} else if (edit?.op === 'reset') anchors = edit.anchors;
+				else if (edit?.op === 'restore') {
+					const back = new Set(edit.anchors.map((a) => a.id));
+					anchors = [...anchors.filter((a) => !back.has(a.id)), ...edit.anchors];
+					ghosts = ghosts.filter((g) => !back.has(g.id));
+				}
 				return { anchors, ghosts: ghosts.slice(-GHOSTS) };
 			}
 		},
@@ -564,6 +570,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				lit: () => reviewLit,
 				strings: () => opts.reviewStrings?.() ?? DEFAULT_REVIEW_STRINGS,
 				anchors: (state) => anchorKey.getState(state)?.anchors ?? NO_ANCHORS,
+				restore: (tr, anchors) => tr.setMeta(anchorKey, { op: 'restore', anchors }),
 				parse: (markdown) => {
 					if (!parsed.has(markdown)) {
 						let node: PMNode | undefined;

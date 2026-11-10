@@ -28,8 +28,9 @@ import type { ReviewAction } from '../core/codec/index.js';
  *   control, the value the field's writer would take, an absent one proposing the field cleared.
  *   A path into a container names its field.
  *
- * An item whose anchor or field the editor does not hold draws nothing, and an answered one is
- * drawn no more.
+ * An item whose anchor or field the editor does not hold draws nothing. A dismissed item is drawn
+ * no more, and an accepted proposal the list still holds is drawn as the change it made, with the
+ * card that takes it back, until the list lets it go.
  */
 export type ReviewItem =
 	| { id: string; state: 'changed'; anchor: string; before?: string }
@@ -64,8 +65,10 @@ export type ReviewUndrawn = 'anchor' | 'field' | 'parse' | 'taken' | 'applied';
 
 /** What the editor draws of the host's list. */
 export interface ReviewDrawn {
-	/** The open items the editor draws, in document order. */
+	/** The items the editor draws, in document order: the open ones and the accepted ones. */
 	order: readonly string[];
+	/** The proposals accepted and still listed, which the editor draws as the changes they made. */
+	accepted: readonly string[];
 	/** Drawn proposals whose paragraph the reader has rewritten past their words since. */
 	outdated: readonly string[];
 	/** Listed items the editor does not draw, each with why. */
