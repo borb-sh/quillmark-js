@@ -20,6 +20,7 @@
 	import type { FieldDomIds } from './domid.js';
 	import Field from './Field.svelte';
 	import FieldHint from './FieldHint.svelte';
+	import { guidanceText } from './guidance.js';
 	import ProseField from './ProseField.svelte';
 	import CardControls from './CardControls.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
@@ -318,7 +319,9 @@
 												label={section.label}
 												describedBy={headIds.description}
 											/>
-											<span class="qm-visually-hidden" id={headIds.description}>{headHint}</span>
+											<span class="qm-visually-hidden" id={headIds.description}
+												>{guidanceText(headHint)}</span
+											>
 										{/if}
 									</div>
 									<!-- The panel is clipped, not unmounted, so without `inert` every field

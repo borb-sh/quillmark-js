@@ -929,6 +929,7 @@
 								label={fieldTitle(key, sub)}
 								descriptionId={idBase != null ? propertyDomIds(idBase, key).description : undefined}
 								description={sub.description}
+								brief={false}
 							/>
 						</div>
 					{/each}
@@ -1164,6 +1165,11 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--_qm-space-2);
+	}
+	/* Under a label that carries its description in flow, the chip keeps the label's
+	 line rather than centring on the two. */
+	.qm-array-header:has(> :global(.qm-field-label-row.briefed)) {
+		align-items: baseline;
 	}
 	.qm-array-add-slot {
 		display: inline-flex;
