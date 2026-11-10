@@ -28,12 +28,23 @@ interface Journaled extends Mounted<EditorRef> {
 	events: ReviewEvent[];
 }
 
-function journaled(items: (doc: Document) => ReviewItem[]): Journaled {
+/** An editor over `items`; a `host` that lists as the README says takes an answered item off
+ *  the list and puts a reopened one back. */
+function journaled(items: (doc: Document) => ReviewItem[], host = false): Journaled {
 	const doc = example();
 	const events: ReviewEvent[] = [];
+	const all = items(doc);
 	const mounted = mountEditor(quill(), doc, {
-		review: items(doc),
-		onReview: (e) => events.push(e)
+		review: all,
+		onReview: (e) => {
+			events.push(e);
+			if (!host) return;
+			const listed = mounted.props.review ?? [];
+			mounted.props.review =
+				e.action === 'reopen'
+					? all.filter((it) => it.id === e.id || listed.includes(it))
+					: listed.filter((it) => it.id !== e.id);
+		}
 	});
 	return { ...mounted, doc, events };
 }
@@ -132,6 +143,21 @@ describe('the answer journal', () => {
 		expect(abstractText(r.doc)).toBe(before);
 		expect(r.doc.main.body.text).toBe(accepted);
 		expect(r.events.filter((e) => e.action === 'reopen')).toEqual([]);
+	});
+
+	it('reopens a dismissal the host took off its list', async () => {
+		const r = journaled(mixed, true);
+		await settle();
+		r.target.querySelector<HTMLButtonElement>('[data-qm-review="A"] .qm-review-dismiss')!.click();
+		flushSync();
+		expect(r.props.review!.map((it) => it.id)).not.toContain('A');
+		press(r.target.querySelector<HTMLElement>('.qm-editor')!, 'z', mod);
+		await settle();
+		expect(r.events).toEqual([
+			{ id: 'A', action: 'dismiss' },
+			{ id: 'A', action: 'reopen' }
+		]);
+		expect(r.target.querySelector('.ProseMirror [data-qm-review="A"]')).not.toBeNull();
 	});
 
 	it('takes back a whole batch with one ⌘Z', async () => {

@@ -336,6 +336,7 @@
 	function stepReview(dir: 1 | -1): void {
 		void editorRef?.stepReview(dir);
 	}
+	// Its batch buttons keep the focus where it was, so ⌘Z in the editor takes a batch back.
 	function answerAll(action: 'accept' | 'dismiss'): void {
 		editorRef?.answerReview('all', action);
 	}
@@ -759,6 +760,7 @@
 							type="button"
 							data-testid="review-accept-all"
 							disabled={none}
+							onmousedown={(e) => e.preventDefault()}
 							onclick={() => answerAll('accept')}>Accept all</button
 						>
 						<button
@@ -766,6 +768,7 @@
 							type="button"
 							data-testid="review-dismiss-all"
 							disabled={none}
+							onmousedown={(e) => e.preventDefault()}
 							onclick={() => answerAll('dismiss')}>Dismiss all</button
 						>
 					</span>

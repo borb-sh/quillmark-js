@@ -189,8 +189,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			const item = byId.get(id);
 			if (!item) return undefined;
 			if ('field' in item) return source.keyFor(item.field);
-			for (const [key, report] of drawn)
-				if (report.ids.includes(id) || report.undrawn.some((u) => u.id === id)) return key;
+			for (const [key, report] of drawn) if (report.ids.includes(id)) return key;
 			return undefined;
 		},
 		drew(key, report) {

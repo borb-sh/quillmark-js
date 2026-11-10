@@ -1396,7 +1396,7 @@
 
 	/**
 	 * Answer open items as their buttons would, in document order: `'all'` is every item drawn.
-	 * An accept passes over a change, which has none, and an item that cannot be answered (a
+	 * Both pass over a change, which has neither button, and an item that cannot be answered (a
 	 * proposal that no longer writes, a value the field's writer refuses) stands. `onReview`
 	 * hears each answer, and neither the focus nor the caret moves. Returns the ids answered.
 	 */
@@ -1414,7 +1414,7 @@
 		try {
 			for (const id of asked) {
 				const item = reviewing.items.find((it) => it.id === id);
-				if (!item || (action === 'accept' && item.state === 'changed')) continue;
+				if (!item || item.state === 'changed') continue;
 				const key = reviewing.keyOf(id);
 				// Each one is planned against the document the one before it left.
 				const answered =

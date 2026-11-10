@@ -851,8 +851,9 @@ export interface ReviewLayer {
 	/** Answer item `id` as its button would, moving neither the caret nor the focus. False
 	 *  where the leaf does not draw it or cannot write it. */
 	answer(id: string, action: ReviewAction): boolean;
-	/** Open a dismissal of item `id` again, and say so. False for one not dismissed here. */
-	reopen(view: EditorView, id: string): boolean;
+	/** Open a dismissal of item `id` again and say so, the dismissal still held here or
+	 *  already pruned by the host taking the item off its list. */
+	reopen(view: EditorView, id: string): void;
 	/** Undo the leaf's newest history step: an accept's, which reopens its item. */
 	undo(view: EditorView): boolean;
 }
@@ -1069,14 +1070,13 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		},
 		answer: (id, action) => act(id, action, { quiet: true }),
 		reopen(view, id) {
-			if (reviewKey.getState(view.state)?.answered.get(id) !== 'dismiss') return false;
-			view.dispatch(
-				view.state.tr
-					.setMeta(reviewKey, { answer: { id, to: undefined } } satisfies ReviewMeta)
-					.setMeta('addToHistory', false)
-			);
+			if (reviewKey.getState(view.state)?.answered.get(id) === 'dismiss')
+				view.dispatch(
+					view.state.tr
+						.setMeta(reviewKey, { answer: { id, to: undefined } } satisfies ReviewMeta)
+						.setMeta('addToHistory', false)
+				);
 			channel.act(id, 'reopen');
-			return true;
 		},
 		undo: (view) => undo(view.state, view.dispatch),
 		enter(view, id) {

@@ -117,6 +117,7 @@ describe('the drawn report', () => {
 				{ id: 'same', reason: 'applied' }
 			]
 		});
+		expect(await r.editor.revealReview('same')).toBe(false);
 	});
 });
 
@@ -147,6 +148,24 @@ describe('answering by the host', () => {
 		expect(r.doc.getStored('columns')).toBe(2);
 		expect(document.activeElement).toBe(outside);
 		outside.remove();
+	});
+
+	it('passes over a change when it dismisses them all, as it does when it accepts', async () => {
+		const r = batch((doc) => {
+			anchor(doc, undefined, '~c', 1);
+			anchor(doc, undefined, '~p', 3);
+			return [
+				{ id: 'c1', state: 'changed', anchor: '~c', before: 'was' },
+				{ id: 'p1', state: 'proposed', anchor: '~p', after: 'A proposed line.' }
+			];
+		});
+		await settle();
+		const body = r.doc.main.body.text;
+		expect(r.editor.answerReview('all', 'dismiss')).toEqual(['p1']);
+		flushSync();
+		expect(r.events).toEqual([{ id: 'p1', action: 'dismiss' }]);
+		expect(r.doc.main.body.text).toBe(body);
+		expect(r.target.querySelector('[data-qm-review="c1"]')).not.toBeNull();
 	});
 });
 

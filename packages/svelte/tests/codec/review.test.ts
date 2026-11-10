@@ -807,13 +807,33 @@ describe('taking a proposal', () => {
 		]);
 		leaf.el.querySelector<HTMLElement>('.qm-review-dismiss')!.click();
 		expect(leaf.el.querySelector('.qm-review-chip')).toBeNull();
-		expect(leaf.field.reopenReview('r1')).toBe(true);
+		leaf.field.reopenReview('r1');
 		expect(leaf.acts).toEqual([
 			['r1', 'dismiss'],
 			['r1', 'reopen']
 		]);
 		expect(leaf.el.querySelector('.qm-review-chip')).not.toBeNull();
-		expect(leaf.field.reopenReview('r1')).toBe(false);
+	});
+
+	it('is opened again after a dismissal the host took off its list', () => {
+		const leaf = leafOver('The quick brown fox.');
+		leaf.anchor('~p1', 'quick');
+		const item = {
+			id: 'r1',
+			state: 'proposed',
+			anchor: '~p1',
+			after: 'The quick red fox.'
+		} as const;
+		leaf.field.setReview([item]);
+		leaf.el.querySelector<HTMLElement>('.qm-review-dismiss')!.click();
+		leaf.field.setReview([]);
+		leaf.field.reopenReview('r1');
+		expect(leaf.acts).toEqual([
+			['r1', 'dismiss'],
+			['r1', 'reopen']
+		]);
+		leaf.field.setReview([item]);
+		expect(leaf.el.querySelector('.qm-review-chip')).not.toBeNull();
 	});
 
 	it('comes back with the words typed into its step, under one undo', () => {
