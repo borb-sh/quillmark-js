@@ -58,10 +58,13 @@ export const TABLE_KEYS = {
 	eraseAlt: 'Delete'
 } as const;
 
-/** An item of review under the caret (`review.ts`), ahead of every other binding of its keys. */
+/** An item of review under the caret (`review.ts`), ahead of every other binding of its keys;
+ *  `next` and `previous` step through the items from anywhere in the editor. */
 export const REVIEW_KEYS = {
 	accept: 'Mod-Enter',
-	reject: 'Mod-.'
+	reject: 'Mod-.',
+	next: 'Mod-Alt-ArrowDown',
+	previous: 'Mod-Alt-ArrowUp'
 } as const;
 
 /** The mark toggles, each bound only where the schema declares its mark. */
@@ -117,6 +120,8 @@ export interface ShortcutStrings {
 	shortcutDeleteCells: string;
 	shortcutReviewAccept: string;
 	shortcutReviewReject: string;
+	shortcutReviewNext: string;
+	shortcutReviewPrevious: string;
 }
 
 export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
@@ -146,7 +151,9 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutAlignColumn: 'Align a selected column',
 	shortcutDeleteCells: 'Delete the selected cells, rows or columns',
 	shortcutReviewAccept: 'Accept the proposed change',
-	shortcutReviewReject: 'Dismiss the proposed change, or undo the change made'
+	shortcutReviewReject: 'Dismiss the proposed change, or undo the change made',
+	shortcutReviewNext: 'Go to the next review item',
+	shortcutReviewPrevious: 'Go to the previous review item'
 };
 
 const F = FIELD_KEYS;
@@ -189,7 +196,9 @@ const SHORTCUTS: readonly {
 	{ scope: 'table', label: 'shortcutAlignColumn', keys: [T.alignLeft, T.alignRight] },
 	{ scope: 'table', label: 'shortcutDeleteCells', keys: [T.erase, T.eraseAlt] },
 	{ scope: 'review', label: 'shortcutReviewAccept', keys: [REVIEW_KEYS.accept] },
-	{ scope: 'review', label: 'shortcutReviewReject', keys: [REVIEW_KEYS.reject] }
+	{ scope: 'review', label: 'shortcutReviewReject', keys: [REVIEW_KEYS.reject] },
+	{ scope: 'review', label: 'shortcutReviewNext', keys: [REVIEW_KEYS.next] },
+	{ scope: 'review', label: 'shortcutReviewPrevious', keys: [REVIEW_KEYS.previous] }
 ];
 
 /**

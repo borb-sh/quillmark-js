@@ -25,6 +25,7 @@
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
+	import { keydownHandler } from 'prosemirror-keymap';
 	import { DropdownMenu } from 'bits-ui';
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
 	import {
@@ -55,9 +56,14 @@
 	import { mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
 	import { createReview, setReview } from './review.svelte.js';
-	import type { FieldProposal } from './review.js';
+	import type { FieldProposal, ReviewDrawn } from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
-	import { markAnchor, type FieldController, type LeafViews } from '../core/codec/index.js';
+	import {
+		markAnchor,
+		REVIEW_KEYS,
+		type FieldController,
+		type LeafViews
+	} from '../core/codec/index.js';
 	import {
 		IdSeq,
 		controlKind,
@@ -118,6 +124,8 @@
 		review,
 		onReview,
 		onReviewFocus,
+		onReviewDrawn,
+		reviewAdvance = true,
 		class: className,
 		style
 	}: VisualEditorProps = $props();
@@ -292,13 +300,21 @@
 	// the nearest field holding it.
 	const reviewed = (path: DocPath): FieldKey | undefined => {
 		const addr = nearestAddrForFieldPath(path);
-		return addr?.field != null ? resolveCardKey(addr, cardIds) : undefined;
+		return addr && declaredField(addr) ? resolveCardKey(addr, cardIds) : undefined;
 	};
 	const reviewing = createReview({
 		items: () => review,
 		keyFor: (path) => {
 			const key = reviewed(path);
 			return key && fieldKeyToString(key);
+		},
+		exact: (path) => addrForFieldPath(path) != null,
+		chorded(id) {
+			if (!reviewAdvance) return;
+			const index = drewOrder.indexOf(id);
+			void tick().then(() => {
+				if (span.alive) void step(1, true, index < 0 ? undefined : { id, index });
+			});
 		},
 		answer(item, action) {
 			if (action === 'accept' && item.state === 'proposed' && 'field' in item && !takeField(item))
@@ -342,6 +358,113 @@
 		reported = id;
 		onReviewFocus?.(id);
 	});
+	/** The open items drawn, in document order: each id's first element under the root, then
+	 *  any drawn one not yet in the DOM, in list order. */
+	function reviewOrder(): string[] {
+		const fieldUndrawn = new Set(reviewing.fieldUndrawn.map((u) => u.id));
+		const drawn = new Set<string>();
+		for (const report of reviewing.reports.values()) for (const id of report.ids) drawn.add(id);
+		for (const item of reviewing.items)
+			if ('field' in item && !fieldUndrawn.has(item.id)) drawn.add(item.id);
+		const order: string[] = [];
+		const seen = new Set<string>();
+		const take = (id: string | null): void => {
+			if (id === null || !drawn.has(id) || seen.has(id)) return;
+			seen.add(id);
+			order.push(id);
+		};
+		for (const el of rootEl?.querySelectorAll('[data-qm-review]') ?? [])
+			take(el.getAttribute('data-qm-review'));
+		for (const item of reviewing.items) take(item.id);
+		return order;
+	}
+	/** What the editor draws of the host's list, and why it draws what it does not. */
+	function reviewReport(): ReviewDrawn {
+		const reported = new Set<string>();
+		const outdated: string[] = [];
+		const why = new Map<string, ReviewDrawn['undrawn'][number]['reason']>();
+		for (const report of reviewing.reports.values()) {
+			for (const id of report.ids) reported.add(id);
+			outdated.push(...report.outdated);
+			for (const { id, reason } of report.undrawn) {
+				reported.add(id);
+				why.set(id, reason);
+			}
+		}
+		for (const { id, reason } of reviewing.fieldUndrawn) why.set(id, reason);
+		for (const item of reviewing.items)
+			if ('anchor' in item && !reported.has(item.id)) why.set(item.id, 'anchor');
+		return {
+			order: reviewOrder(),
+			outdated,
+			undrawn: reviewing.items.flatMap((item) => {
+				const reason = why.get(item.id);
+				return reason ? [{ id: item.id, reason }] : [];
+			})
+		};
+	}
+	// The report, to a host counting its own list: each change, read once the leaves the change
+	// mounted have drawn, so a list just handed over is not reported as anchored nowhere.
+	const NO_REPORT = JSON.stringify({ order: [], outdated: [], undrawn: [] } satisfies ReviewDrawn);
+	let drewReport = NO_REPORT;
+	let drewOrder: readonly string[] = [];
+	$effect(() => {
+		void reviewing.items;
+		void reviewing.fieldUndrawn;
+		for (const report of reviewing.reports.values()) void report;
+		let live = true;
+		void tick().then(() => {
+			if (!live || !span.alive) return;
+			const report = reviewReport();
+			drewOrder = report.order;
+			const joined = JSON.stringify(report);
+			if (joined === drewReport) return;
+			drewReport = joined;
+			onReviewDrawn?.(report);
+		});
+		return () => {
+			live = false;
+		};
+	});
+	/** The item a step last went to, and where it stood in the order then, so a step from an
+	 *  item since answered goes on from its place. */
+	let stepped: { id: string; index: number } | undefined;
+	async function step(
+		dir: 1 | -1,
+		focus: boolean,
+		from?: { id: string; index: number }
+	): Promise<string | undefined> {
+		if (!span.alive) return undefined;
+		const order = reviewOrder();
+		if (!order.length) return undefined;
+		const at = from ? -1 : order.indexOf(reviewing.lit ?? stepped?.id ?? '');
+		const past = from ?? stepped;
+		const next =
+			at >= 0 ? at + dir : past ? (dir > 0 ? past.index : past.index - 1) : dir > 0 ? 0 : -1;
+		const index = ((next % order.length) + order.length) % order.length;
+		const id = order[index];
+		stepped = { id, index };
+		await reveal(id, focus, true);
+		return id;
+	}
+	const stepKeys = keydownHandler({
+		[REVIEW_KEYS.next]: () => {
+			void step(1, true);
+			return true;
+		},
+		[REVIEW_KEYS.previous]: () => {
+			void step(-1, true);
+			return true;
+		}
+	});
+	/** The step chords, from anywhere under the root, ahead of a leaf's own arrows. */
+	function onStepKey(e: KeyboardEvent): void {
+		if (e.isComposing || !reviewing.items.length) return;
+		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
+		if (!stepKeys({} as never, e)) return;
+		e.preventDefault();
+		e.stopPropagation();
+	}
 	/** Where item `id` is drawn, for the card that hangs off it. */
 	function reviewTarget(id: string): ReviewTarget | undefined {
 		const key = reviewing.keyOf(id);
@@ -1162,7 +1285,12 @@
 	 * then goes into the item, or the focus to its field, so the chords answer it. False for
 	 * an item the editor does not draw.
 	 */
-	export async function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
+	export function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
+		return reveal(id, opts.focus ?? false, false);
+	}
+	/** {@link revealReview}; a step leaves an item already wholly in view where it is, so a walk
+	 *  down neighbouring items does not jump the page under each. */
+	async function reveal(id: string, focus: boolean, stepping: boolean): Promise<boolean> {
 		if (!span.alive) return false;
 		const key = reviewing.keyOf(id);
 		if (key === undefined) return false;
@@ -1170,7 +1298,7 @@
 		for (const card of cardRefs) card?.revealLeaf(key);
 		if (!(await span.resumes(tick()))) return false;
 		reviewing.reveal(id);
-		if (opts.focus && !leaves.prose(key)?.enterReview(id)) leaves.control(key)?.focus();
+		if (focus && !leaves.prose(key)?.enterReview(id)) leaves.control(key)?.focus();
 		// The lit item is drawn again, so its element is read once it has been.
 		if (!(await span.resumes(tick()))) return false;
 		const at =
@@ -1179,9 +1307,50 @@
 				(el) => el.getAttribute('data-qm-review') === id
 			) ??
 			leaves.control(key)?.el;
+		const box = at?.getBoundingClientRect();
+		if (stepping && box && box.top >= 0 && box.bottom <= window.innerHeight) return true;
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 		at?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
 		return true;
+	}
+
+	/**
+	 * Answer open items as their buttons would, in document order: `'all'` is every item drawn.
+	 * An accept passes over a change, which has none, and an item that cannot be answered (a
+	 * proposal that no longer writes, a value the field's writer refuses) stands. `onReview`
+	 * hears each answer, and neither the focus nor the caret moves. Returns the ids answered.
+	 */
+	export function answerReview(
+		ids: readonly string[] | 'all',
+		action: 'accept' | 'dismiss'
+	): string[] {
+		if (!span.alive) return [];
+		const order = reviewOrder();
+		const asked = ids === 'all' ? order : order.filter((id) => ids.includes(id));
+		const out: string[] = [];
+		for (const id of asked) {
+			const item = reviewing.items.find((it) => it.id === id);
+			if (!item || (action === 'accept' && item.state === 'changed')) continue;
+			const key = reviewing.keyOf(id);
+			// Each one is planned against the document the one before it left.
+			const answered =
+				'anchor' in item
+					? key !== undefined && !!leaves.prose(key)?.answerReview(id, action)
+					: reviewing.act(id, action);
+			if (answered) out.push(id);
+		}
+		return out;
+	}
+
+	/** Bring the next or previous open item to the reader, in document order and round from
+	 *  either end, from the lit item or the one last stepped to: the caret in it, or the
+	 *  focus in its field, unless `focus` is false. Resolves its id, `undefined` when none is
+	 *  drawn. */
+	export function stepReview(
+		dir: 1 | -1,
+		opts: { focus?: boolean } = {}
+	): Promise<string | undefined> {
+		return step(dir, opts.focus ?? true);
 	}
 
 	/**
@@ -1276,6 +1445,7 @@
 	{style}
 	data-qm-root
 	bind:this={rootEl}
+	onkeydowncapture={onStepKey}
 	onkeydown={raiseGuidance}
 	ondragover={refuseFiles}
 	ondrop={refuseFiles}

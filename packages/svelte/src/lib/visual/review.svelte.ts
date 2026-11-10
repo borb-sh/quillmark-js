@@ -13,8 +13,8 @@
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { DocPath } from '../core/address.js';
-import type { ReviewAction, ReviewVia, TextReview } from '../core/codec/index.js';
-import type { FieldChange, FieldProposal, ReviewItem } from './review.js';
+import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
+import type { FieldChange, FieldProposal, ReviewItem, ReviewUndrawn } from './review.js';
 
 /** How long the pointer or the caret rests on a change before its card rises, in ms. */
 export const HOVER_MS = 350;
@@ -30,8 +30,14 @@ export interface ShownReview {
 }
 
 export interface Review {
+	/** The host's list, less what was answered here. */
+	readonly items: readonly ReviewItem[];
 	/** The items a prose leaf draws, one identity until the list changes. */
 	readonly text: readonly TextReview[];
+	/** Each mounted prose leaf's report of what it draws, by leaf key. */
+	readonly reports: ReadonlyMap<string, ReviewReport>;
+	/** The field items no control draws, each with why. */
+	readonly fieldUndrawn: readonly { id: string; reason: ReviewUndrawn }[];
 	/** The item under attention. */
 	readonly lit: string | undefined;
 	readonly shown: ShownReview | undefined;
@@ -41,10 +47,13 @@ export interface Review {
 	marks(key: string): boolean;
 	/** The leaf drawing item `id`, where one does. */
 	keyOf(id: string): string | undefined;
-	/** A prose leaf's report of the ids it draws. */
-	drew(key: string, ids: readonly string[]): void;
-	point(id: string | undefined, via: ReviewVia): void;
-	act(id: string, action: ReviewAction): void;
+	/** A prose leaf's report of what it draws. */
+	drew(key: string, report: ReviewReport): void;
+	/** The item the pointer or the caret is in, from leaf `from`: a caret's leaving reported by
+	 *  a leaf the caret has already left for another is old news. */
+	point(id: string | undefined, via: ReviewVia, from?: string): void;
+	/** A reader's answer, `chord` where a key gave it. False where it could not be made. */
+	act(id: string, action: ReviewAction, chord?: boolean): boolean;
 	/** Hold the card up while the pointer or the focus is in it, and let it go again. */
 	hold(): void;
 	release(): void;
@@ -56,9 +65,13 @@ export interface ReviewSource {
 	items(): readonly ReviewItem[] | undefined;
 	/** The leaf key a field path names, `undefined` for one the editor does not hold. */
 	keyFor(path: DocPath): string | undefined;
+	/** Whether a path names a field itself, and not a place inside one. */
+	exact(path: DocPath): boolean;
 	/** A reader's answer, to make and to pass on. `false` where it could not be made, and the
 	 *  item stands. */
 	answer(item: ReviewItem, action: ReviewAction): boolean;
+	/** An answer a chord gave, once it is made. */
+	chorded?(id: string): void;
 }
 
 export function createReview(source: ReviewSource): Review & { dispose(): void } {
@@ -84,23 +97,34 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				: []
 		)
 	);
-	const fields = $derived.by(() => {
+	const placed = $derived.by(() => {
 		const out = new Map<string, { changed?: FieldChange; proposed?: FieldProposal }>();
+		const undrawn: { id: string; reason: ReviewUndrawn }[] = [];
 		for (const item of items) {
 			if (!('field' in item)) continue;
 			const key = source.keyFor(item.field);
-			if (key === undefined) continue;
+			// A proposal for a place inside a field would be written over the whole field.
+			if (key === undefined || (item.state === 'proposed' && !source.exact(item.field))) {
+				undrawn.push({ id: item.id, reason: 'field' });
+				continue;
+			}
 			const held = out.get(key) ?? {};
-			if (item.state === 'changed') held.changed ??= item;
-			else held.proposed ??= item;
+			if ((item.state === 'changed' ? held.changed : held.proposed) !== undefined) {
+				undrawn.push({ id: item.id, reason: 'taken' });
+				continue;
+			}
+			if (item.state === 'changed') held.changed = item;
+			else held.proposed = item;
 			out.set(key, held);
 		}
-		return out;
+		return { fields: out, undrawn };
 	});
-	const drawn = new SvelteMap<string, readonly string[]>();
+	const fields = $derived(placed.fields);
+	const drawn = new SvelteMap<string, ReviewReport>();
 
 	let pointer = $state<string | undefined>();
 	let caret = $state<string | undefined>();
+	let caretFrom: string | undefined;
 	let revealed = $state<string | undefined>();
 	let card = $state<{ id: string; via: ReviewVia | 'reveal' } | undefined>();
 	let held = false;
@@ -124,8 +148,17 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 	);
 
 	const self: Review & { dispose(): void } = {
+		get items() {
+			return items;
+		},
 		get text() {
 			return text;
+		},
+		get reports() {
+			return drawn;
+		},
+		get fieldUndrawn() {
+			return placed.undrawn;
 		},
 		get lit() {
 			return lit;
@@ -134,20 +167,23 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			return shown;
 		},
 		at: (key) => fields.get(key) ?? {},
-		marks: (key) => fields.has(key) || !!drawn.get(key)?.length,
+		marks: (key) => fields.has(key) || !!drawn.get(key)?.ids.length,
 		keyOf(id) {
 			const item = byId.get(id);
 			if (!item) return undefined;
 			if ('field' in item) return source.keyFor(item.field);
-			for (const [key, ids] of drawn) if (ids.includes(id)) return key;
+			for (const [key, report] of drawn)
+				if (report.ids.includes(id) || report.undrawn.some((u) => u.id === id)) return key;
 			return undefined;
 		},
-		drew(key, ids) {
-			if (ids.length) drawn.set(key, ids);
+		drew(key, report) {
+			if (report.ids.length || report.undrawn.length) drawn.set(key, report);
 			else drawn.delete(key);
 		},
-		point(id, via) {
+		point(id, via, from) {
 			if (via === 'caret') {
+				if (id === undefined && from !== undefined && caretFrom !== from) return;
+				caretFrom = from;
 				caret = id;
 				clearTimeout(rest);
 				if (changed(id)) {
@@ -181,12 +217,14 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				});
 			else clearTimeout(timer);
 		},
-		act(id, action) {
+		act(id, action, chord) {
 			const item = byId.get(id);
-			if (!item || !source.answer(item, action)) return;
+			if (!item || !source.answer(item, action)) return false;
 			if (card?.id === id) card = undefined;
 			answered.add(id);
 			answers++;
+			if (chord) source.chorded?.(id);
+			return true;
 		},
 		hold() {
 			held = true;
@@ -233,7 +271,10 @@ const NO_ITEMS: readonly TextReview[] = [];
 
 /** What a component rendered outside the editor gets: nothing to draw. */
 const NO_REVIEW: Review = {
+	items: [],
 	text: NO_ITEMS,
+	reports: new Map(),
+	fieldUndrawn: [],
 	lit: undefined,
 	shown: undefined,
 	at: () => ({}),
@@ -241,7 +282,7 @@ const NO_REVIEW: Review = {
 	keyOf: () => undefined,
 	drew() {},
 	point() {},
-	act() {},
+	act: () => false,
 	hold() {},
 	release() {},
 	dismiss() {},

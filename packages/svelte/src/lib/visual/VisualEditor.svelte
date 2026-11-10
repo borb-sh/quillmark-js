@@ -112,6 +112,22 @@
 	export async function revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean> {
 		return (await inner?.revealReview(id, opts)) ?? false;
 	}
+	/** Answer open items as their buttons would, in document order (`'all'`: every item
+	 *  drawn), moving neither the focus nor the caret. Returns the ids answered. */
+	export function answerReview(
+		ids: readonly string[] | 'all',
+		action: 'accept' | 'dismiss'
+	): string[] {
+		return inner?.answerReview(ids, action) ?? [];
+	}
+	/** Bring the next or previous open item to the reader, round from either end, the caret
+	 *  or the focus in it unless `focus` is false. Resolves its id, `undefined` for none. */
+	export async function stepReview(
+		dir: 1 | -1,
+		opts?: { focus?: boolean }
+	): Promise<string | undefined> {
+		return (await inner?.stepReview(dir, opts)) ?? undefined;
+	}
 	/** Offer `undo` as the one step back from a write the host just made: on the toast, and
 	 *  on ⌘Z/Ctrl+Z anywhere in the editor until the next edit. Returns the withdrawal. */
 	export function offerUndo(notice: string, undo: () => void): () => void {

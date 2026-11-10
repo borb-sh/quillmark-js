@@ -38,8 +38,9 @@ export type { EditorShortcut, ShortcutScope } from '../core/codec/index.js';
 
 // Review: what a host hands the editor to draw of another writer's changes and proposals, and
 // what the editor says back. The chords that answer an item are in `editorShortcuts`.
-export type { ReviewEvent, ReviewItem } from './review.js';
+export type { ReviewDrawn, ReviewEvent, ReviewItem, ReviewUndrawn } from './review.js';
 export type { ReviewAction } from '../core/codec/index.js';
+export { REVIEW_KEYS } from '../core/codec/index.js';
 
 // The `$ext.editor` write unit. A consumer seeding editor-side chrome
 // state (a card title, the tips channel) goes through this rather than `storeExt`,

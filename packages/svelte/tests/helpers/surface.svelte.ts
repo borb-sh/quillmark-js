@@ -41,6 +41,8 @@ export interface EditorRef {
 	refresh(): void;
 	applyCardOps(ops: readonly CardOp[]): void;
 	revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
+	answerReview(ids: readonly string[] | 'all', action: 'accept' | 'dismiss'): string[];
+	stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
 	offerUndo(notice: string, undo: () => void): () => void;
 }
 

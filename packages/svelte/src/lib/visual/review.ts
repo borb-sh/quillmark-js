@@ -49,6 +49,27 @@ export interface ReviewEvent {
 	action: ReviewAction;
 }
 
+/**
+ * Why a listed item draws nothing:
+ *
+ * - `anchor`: no mounted leaf holds its anchor.
+ * - `field`: its path names no field the editor holds, or a proposal names a place inside one.
+ * - `parse`: its `after` is not Markdown the leaf holding it reads.
+ * - `taken`: an earlier item has its paragraph, or its field.
+ * - `applied`: the text already reads as proposed, so it would write nothing.
+ */
+export type ReviewUndrawn = 'anchor' | 'field' | 'parse' | 'taken' | 'applied';
+
+/** What the editor draws of the host's list. */
+export interface ReviewDrawn {
+	/** The open items the editor draws, in document order. */
+	order: readonly string[];
+	/** Drawn proposals whose paragraph the reader has rewritten past their words since. */
+	outdated: readonly string[];
+	/** Listed items the editor does not draw, each with why. */
+	undrawn: readonly { id: string; reason: ReviewUndrawn }[];
+}
+
 /** A `changed` item over a field's control. */
 export type FieldChange = Extract<ReviewItem, { state: 'changed'; field: DocPath }>;
 /** A `proposed` item under a field's control. */

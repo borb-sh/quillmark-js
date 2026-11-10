@@ -8,7 +8,7 @@ import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
 import type { FormatDiagnostic, VisualStringsInput } from './strings.js';
-import type { ReviewEvent, ReviewItem } from './review.js';
+import type { ReviewDrawn, ReviewEvent, ReviewItem } from './review.js';
 
 export interface VisualEditorProps {
 	doc: Document;
@@ -124,11 +124,23 @@ export interface VisualEditorProps {
 	 */
 	review?: readonly ReviewItem[];
 	/**
-	 * A reader answered an item: a button on it, or `Mod-Enter` / `Mod-.` with the caret or
-	 * the focus in it. The host makes the write the answer asks for, tells the editor
-	 * (`applyExternal`, `refresh`), and drops the item from `review`.
+	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-.` with the caret or the
+	 * focus in it, or a host's `answerReview`. The host makes the write the answer asks for,
+	 * tells the editor (`applyExternal`, `refresh`), and drops the item from `review`.
 	 */
 	onReview?: (event: ReviewEvent) => void;
+	/**
+	 * What the editor draws of `review`, on each change once the leaves have drawn: the open
+	 * items in document order, the proposals the reader has written past since, and every
+	 * listed item it does not draw with why. What a host counts and steps its own list by.
+	 */
+	onReviewDrawn?: (drawn: ReviewDrawn) => void;
+	/**
+	 * Whether an answer given by a chord goes on to the next item, the caret in it, so a held
+	 * walk down a batch answers each in turn. An answer by pointer stays where it was given.
+	 * Default `true`.
+	 */
+	reviewAdvance?: boolean;
 	/**
 	 * The item under attention, `undefined` once nothing is: the pointer over one, the caret
 	 * in one, or one a `revealReview` named. What a host lights its own list by.
