@@ -20,16 +20,7 @@ import type {
 	Document,
 	Quill
 } from '@quillmark/wasm';
-import {
-	bindWith,
-	cardOps,
-	Diverged,
-	formOf,
-	storeTitle,
-	titleOf,
-	type CardOp,
-	type CardRef
-} from './document.js';
+import { bindWith, cardOps, Diverged, formOf, type CardOp, type CardRef } from './document.js';
 import { changedRuns, commonRun, meet, type Run } from './lines.js';
 import {
 	BODY,
@@ -105,8 +96,6 @@ export interface WriteFromOpts extends ForkOpts {
 export interface Written {
 	/** The edit as a Y update, to apply to the session or append to its log. */
 	update: Uint8Array;
-	/** `Y.encodeSnapshot` of the state the update was written from, which `revert` reads. */
-	base: Uint8Array;
 	/** What the update changes, from `base`. */
 	changes: Change[];
 	/** What changed in `history` since `base` at a place the update changes too: words or lines
@@ -217,99 +206,6 @@ export function writeFrom(opts: WriteFromOpts): Written {
 /** What `writeHeld` and `heldState` read a held part against: the session's Y state as it
  *  stands, the quill, and a Document of the room for what has no Y form. */
 export type HeldOpts = Omit<ForkOpts, 'base'>;
-
-export interface RevertOpts extends HeldOpts {
-	/** As `writeFrom`'s. Default `word`. */
-	scope?: 'word' | 'line';
-	/** As `writeFrom`'s, read against what changed since the write where the write changed too.
-	 *  Default `hunk`: lines someone has changed since stay as they are and come back in `held`,
-	 *  for `writeHeld` to write the earlier text over. */
-	hold?: 'none' | 'hunk' | 'field';
-}
-
-/**
- * Take a write back: an update that returns everything `written` changed, a card's title
- * included, to what its `base` held, and leaves what anyone else wrote, before it landed or since,
- * where it is. `history` holds the write already, or `Unwritable` is thrown. The update is a write
- * from the state the write left, so it merges as any other does, and reverting it writes the
- * write again.
- */
-export function revert(written: Pick<Written, 'update' | 'base'>, opts: RevertOpts): Written {
-	const how: How = { scope: opts.scope ?? 'word', hold: opts.hold ?? 'hunk' };
-	const at = Y.decodeSnapshot(written.base);
-	const wrote = Y.createDocFromSnapshot(opts.history, at, new Y.Doc({ gc: false }));
-	Y.applyUpdate(wrote, written.update);
-	const after = Y.snapshot(wrote);
-	wrote.destroy();
-	const have = Y.decodeStateVector(Y.encodeStateVector(opts.history));
-	for (const [client, clock] of after.sv)
-		if ((have.get(client) ?? 0) < clock)
-			throw new Unwritable('the history does not hold the write');
-	const was = Y.createDocFromSnapshot(opts.history, at, new Y.Doc({ gc: false }));
-	let source: Bound | undefined;
-	try {
-		source = bind(was, opts.quill, opts.doc);
-		const { doc, binding } = source;
-		const names = [...binding.ids];
-		const from = { ...opts, base: Y.encodeSnapshot(after) };
-		const edit = (now: Document, ids: readonly string[]) => unwrite(now, [...ids], doc, names);
-		const first = attempt(from, edit, how);
-		return first.again ? attempt(from, edit, how, first.again).written : first.written;
-	} finally {
-		source?.free();
-		was.destroy();
-	}
-}
-
-/**
- * Make `doc`, the Document a write left, read as `source`, the one it was made on: each card both
- * hold in its kind, title, body and every stored value, and the card list in its cards and their
- * order. `ids` and `names` are the two lists' Y names.
- */
-function unwrite(doc: Document, ids: string[], source: Document, names: string[]): CardOp[] {
-	const values = (card: Card) =>
-		new Map(card.payloadItems.flatMap((i) => (i.type === 'field' ? [[i.key, i.value]] : [])));
-	const differs = (a: unknown, b: unknown) => canonical(a ?? null) !== canonical(b ?? null);
-	[MAIN, ...ids].forEach((name, k) => {
-		const at: CardRef = k ? k - 1 : MAIN;
-		const from: CardRef = k ? names.indexOf(name) : MAIN;
-		if (from === -1) return;
-		const was = from === MAIN ? source.main : source.card(from);
-		const now = at === MAIN ? doc.main : doc.card(at);
-		if (at !== MAIN && was.kind !== now.kind) {
-			doc.removeCard(at);
-			doc.unchecked.insertCard(inputOf(was, was.id!), at);
-			return;
-		}
-		const [before, after] = [values(was), values(now)];
-		for (const field of new Set([...before.keys(), ...after.keys()])) {
-			if (!differs(before.get(field), after.get(field))) continue;
-			const value = source.getStored(addrOf(from, field));
-			const addr = addrOf(at, field);
-			if (value == null) doc.removeField(addr);
-			else if (isContent(value) && isContent(doc.getStored(addr)))
-				doc.replace(idAddr(doc, addr), value);
-			else doc.unchecked.storeField(addr, value);
-		}
-		if (differs(was.body, now.body)) doc.replace(idAddr(doc, addrOf(at)), was.body);
-		if (titleOf(was.ext) !== titleOf(now.ext))
-			storeTitle(doc, at === MAIN ? {} : { card: at }, titleOf(was.ext));
-	});
-	const back = names.flatMap((name, j) => (ids.includes(name) ? [] : [j]));
-	const ops = cardOps(
-		names.map((name) => (ids.includes(name) ? ids.indexOf(name) : null)),
-		ids.length
-	);
-	for (const op of ops) {
-		if (op.op === 'remove') doc.removeCard(op.at);
-		else if (op.op === 'move') doc.moveCard(op.from, op.to);
-		else {
-			const card = source.card(back.shift()!);
-			doc.unchecked.insertCard(inputOf(card, card.id!), op.at);
-		}
-	}
-	return ops;
-}
 
 /** Write a part `writeFrom` held over what its place holds now: the lines it spans, wherever
  *  they have moved and whatever was typed in them since, take the edit's lines; a whole value
@@ -579,7 +475,7 @@ function attempt(
 			fields.push({ mine, theirs, runs: how.hold === 'field' ? 'whole' : runs });
 			return false;
 		});
-		const written = { update, base: opts.base, changes, conflicts, held };
+		const written = { update, changes, conflicts, held };
 		if (!cards.size && !fields.length) return { written };
 		return {
 			written,
