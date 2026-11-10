@@ -401,9 +401,10 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 		expect(taken(leaf)).toBe(written);
 	});
 
-	it('strikes a word it rewrites as the reader has since rewritten it', () => {
+	it('strikes a word it rewrites as the reader has since rewritten it, and says it is outdated', () => {
 		const leaf = typed('grey', 'brown', 0, 'brown'.length);
 		expect(marks(leaf)).toEqual([['grey'], ['red']]);
+		expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
 		expect(taken(leaf)).toBe('The quick red fox.');
 	});
 
@@ -446,6 +447,163 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The slow brown fox.' }
 		]);
 		expect(marks(leaf)).toEqual([['Truly, ', 'quick'], ['slow']]);
+	});
+});
+
+describe('a proposal by blocks', () => {
+	/** The ids of the body's blocks, in order. */
+	const ids = (leaf: Leaf): string[] => leaf.doc.blocks({}).map((b) => b.id);
+	const marks = (leaf: Leaf) => [
+		texts(leaf.el, 'del.qm-review-del'),
+		texts(leaf.el, 'ins.qm-review-ins')
+	];
+	const accept = (leaf: Leaf): string => {
+		const drawn = proposedText(leaf.el);
+		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		expect(shownText(leaf.el)).toBe(drawn);
+		return leaf.doc.main.body.text;
+	};
+	/** Type `text` over `[from, to)` of the first `at` in the body. */
+	const type = (leaf: Leaf, text: string, at: string, from = 0, to = from): void => {
+		const view = viewOf(leaf.field);
+		const pos = 1 + leaf.doc.main.body.text.indexOf(at);
+		view.dispatch(view.state.tr.insertText(text, pos + from, pos + to));
+	};
+
+	it('rewrites the block it names, and no other', () => {
+		const leaf = leafOver('The quick brown fox.\n\nThe quick brown dog.');
+		const [, dog] = ids(leaf);
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', replace: [dog], after: 'The quick red dog.' }
+		]);
+		expect(marks(leaf)).toEqual([['brown'], ['red']]);
+		expect(accept(leaf)).toBe('The quick brown fox.\nThe quick red dog.');
+	});
+
+	it('removes the blocks it names where it proposes nothing', () => {
+		const leaf = leafOver('Keep this.\n\nDrop this.\n\nAnd this.');
+		const [, drop, and] = ids(leaf);
+		leaf.field.setReview([{ id: 'r1', state: 'proposed', replace: [drop, and], after: '' }]);
+		expect(accept(leaf)).toBe('Keep this.');
+	});
+
+	it.each([
+		['after a block', (b: string[]) => ({ after: b[0] }), 'One.\nAdded.\nTwo.'],
+		['before a block', (b: string[]) => ({ before: b[1] }), 'One.\nAdded.\nTwo.'],
+		['before the first', (b: string[]) => ({ before: b[0] }), 'Added.\nOne.\nTwo.'],
+		['at the end', () => 'end' as const, 'One.\nTwo.\nAdded.']
+	])('adds %s', (_where, insert, written) => {
+		const leaf = leafOver('One.\n\nTwo.');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', insert: insert(ids(leaf)), after: 'Added.' }
+		]);
+		expect(accept(leaf)).toBe(written);
+	});
+
+	it('draws nothing where no block it names stands, and says why', () => {
+		const leaf = leafOver('One.');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', replace: ['gone'], after: 'Two.' },
+			{ id: 'r2', state: 'proposed', insert: { after: 'gone' }, after: 'Two.' }
+		]);
+		expect(leaf.el.querySelector('del, ins, .qm-review-chip, .qm-review-add')).toBeNull();
+		expect(leaf.reports.at(-1)?.undrawn).toEqual([
+			{ id: 'r1', reason: 'block' },
+			{ id: 'r2', reason: 'block' }
+		]);
+	});
+
+	it('is outdated where a block it names is gone', () => {
+		const leaf = leafOver('One here.\n\nTwo here.');
+		const [one] = ids(leaf);
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', replace: [one, 'gone'], after: 'One there.\n\nTwo there.' }
+		]);
+		expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+	});
+
+	describe('with what its writer read', () => {
+		/** `before` read by the writer, the body standing as `live` by the time it arrives. */
+		function arrive(live: string, before: string, after: string): Leaf {
+			const leaf = leafOver(live);
+			const [first] = ids(leaf);
+			leaf.field.setReview([{ id: 'r1', state: 'proposed', replace: [first], before, after }]);
+			return leaf;
+		}
+
+		it('leaves what the reader wrote meanwhile unstruck, and keeps it when taken', () => {
+			const leaf = arrive(
+				'Truly, the quick brown fox.',
+				'The quick brown fox.',
+				'The quick red fox.'
+			);
+			expect(marks(leaf)).toEqual([['brown'], ['red']]);
+			expect(leaf.reports.at(-1)?.outdated).toEqual([]);
+			expect(accept(leaf)).toBe('Truly, the quick red fox.');
+		});
+
+		it('is put back by the leaf’s undo to the words that stood before it was taken', () => {
+			const leaf = arrive(
+				'The quick brown fox, mine.',
+				'The quick brown fox.',
+				'The quick red fox.'
+			);
+			accept(leaf);
+			expect(leaf.field.undoReview()).toBe(true);
+			expect(leaf.doc.main.body.text).toBe('The quick brown fox, mine.');
+		});
+
+		it('is outdated where the reader rewrote words it rewrites', () => {
+			const leaf = arrive('The quick grey fox.', 'The quick brown fox.', 'The quick red fox.');
+			expect(marks(leaf)).toEqual([['grey'], ['red']]);
+			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		});
+
+		it('is outdated where the reader wrote in a block it removes', () => {
+			const leaf = arrive('The quick brown fox, mine.', 'The quick brown fox.', '');
+			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		});
+
+		it('is outdated where the reader wrote in a block a rewrite into fewer drops', () => {
+			const leaf = leafOver('First here.\n\nSecond here, mine.');
+			leaf.field.setReview([
+				{
+					id: 'r1',
+					state: 'proposed',
+					replace: ids(leaf),
+					before: 'First here.\n\nSecond here.',
+					after: 'First and second here.'
+				}
+			]);
+			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		});
+
+		it('is not outdated where a block it takes out stands as it was read', () => {
+			const leaf = arrive('The quick brown fox.', 'The quick brown fox.', '');
+			expect(leaf.reports.at(-1)?.outdated).toEqual([]);
+		});
+
+		it('is outdated where the reader typed inside words it rewrites', () => {
+			const leaf = arrive('The quick, very brown fox.', 'The quick brown fox.', 'The fox.');
+			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		});
+
+		it('is outdated where what it read is not one block for each it names', () => {
+			const leaf = arrive('The quick brown fox.', 'The quick\n\nbrown fox.', 'The quick red fox.');
+			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		});
+
+		it('draws nothing where the reader wrote what it proposes', () => {
+			const leaf = arrive('The quick red fox.', 'The quick brown fox.', 'The quick red fox.');
+			expect(leaf.reports.at(-1)?.undrawn).toEqual([{ id: 'r1', reason: 'applied' }]);
+		});
+
+		it('carries what the reader types after it arrives as it carries what came before', () => {
+			const leaf = arrive('The quick brown fox.', 'The quick brown fox.', 'The quick red fox.');
+			type(leaf, 'Truly, ', 'The');
+			expect(marks(leaf)).toEqual([['brown'], ['red']]);
+			expect(accept(leaf)).toBe('Truly, The quick red fox.');
+		});
 	});
 });
 

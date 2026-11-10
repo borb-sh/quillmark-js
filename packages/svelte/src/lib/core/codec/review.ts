@@ -41,22 +41,34 @@ import { wordDiff, type DiffHunk } from './review-diff.js';
 import { REVIEW_KEYS } from './shortcuts.js';
 
 /**
- * One item of review over a prose leaf, by the anchor that places it.
+ * One item of review over a prose leaf, by the anchor or the blocks that place it.
  *
  * `changed` marks the anchor's range as written by someone else; a point anchor marks where text
- * was only removed. `proposed` reads the paragraphs the anchor touches as rewritten to `after`,
- * Markdown, where `''` proposes their removal. Its blocks pair with the paragraphs in order, each
- * drawn as an edit of the one it pairs with while the two are one kind of block; past the first
- * that is not, the paragraphs left are struck whole and the blocks left are added after the
- * outermost block holding the last paragraph, or as the next items of its list. A point anchor
- * proposes new blocks the same way after the paragraph holding it, or before the leaf's first
- * where the point opens the leaf; in an empty paragraph it proposes that paragraph's text. A
- * paragraph takes one proposal that rewrites it and one that adds after it, and a later item of
- * either kind naming it draws nothing.
+ * was only removed. `proposed` reads the paragraphs it covers as rewritten to `after`, Markdown,
+ * where `''` proposes their removal. It covers the blocks `replace` names by id, or the paragraphs
+ * its anchor touches. Its blocks pair with the paragraphs in order, each drawn as an edit of the one
+ * it pairs with while the two are one kind of block; past the first that is not, the paragraphs
+ * left are struck whole and the blocks left are added after the outermost block holding the last
+ * paragraph, or as the next items of its list. One that names where it adds, by `insert` or a
+ * point anchor, proposes new blocks the same way after the block it names, or before the leaf's
+ * first; in a leaf that holds one empty paragraph it proposes that paragraph's text. A paragraph
+ * takes one proposal that rewrites it and one that adds after it, and a later item of either kind
+ * naming it draws nothing.
+ *
+ * `before` is the blocks `replace` names as the proposal's writer read them, Markdown: the
+ * proposal is an edit of those, carried onto the blocks as they stand. Without it the proposal is
+ * an edit of the blocks as they stood when the leaf first drew it.
  */
 export type TextReview =
 	| { id: string; state: 'changed'; anchor: string }
-	| { id: string; state: 'proposed'; anchor: string; after: string };
+	| { id: string; state: 'proposed'; anchor: string; after: string }
+	| { id: string; state: 'proposed'; replace: readonly string[]; before?: string; after: string }
+	| { id: string; state: 'proposed'; insert: BlockPlace; after: string };
+
+/** Where a proposal adds blocks: after or before the block with the id, or at the leaf's end. */
+export type BlockPlace = { after: string } | { before: string } | 'end';
+
+type TextProposal = Extract<TextReview, { state: 'proposed' }>;
 
 /** What a reader did with an item: took a proposal, which the leaf has written by the time it
  *  says so, turned one down, asked for a change back, or undid an answer, so the item is open
@@ -115,18 +127,20 @@ export interface ReviewChannel {
 	drew(report: ReviewReport): void;
 }
 
-/** Why a listed item whose anchor the leaf holds draws nothing: `after` is not Markdown the
- *  leaf's schema holds, an earlier item has the paragraph, or the text already reads as
- *  proposed. */
-export type LeafUndrawn = 'parse' | 'taken' | 'applied';
+/** Why a listed item the leaf holds draws nothing: `after` is not Markdown the leaf's schema
+ *  holds, an earlier item has the paragraph, the text already reads as proposed, or no block it
+ *  names by id stands in the leaf. */
+export type LeafUndrawn = 'parse' | 'taken' | 'applied' | 'block';
 
 /** What a leaf draws of the items it was handed. */
 export interface ReviewReport {
 	/** The ids drawn, in the order the items were listed. */
 	ids: readonly string[];
-	/** The drawn proposals whose paragraph the reader has rewritten past their stretch since. */
+	/** The drawn proposals the reader's own writing meets: words both changed, or a block one
+	 *  names gone or no longer the block it read. */
 	outdated: readonly string[];
-	/** The items whose anchor the leaf holds and which it does not draw, each with why. */
+	/** The items the leaf holds and does not draw, each with why: by its anchor, or by the
+	 *  blocks it names, which only the leaf holding its field is handed. */
 	undrawn: readonly { id: string; reason: LeafUndrawn }[];
 	/** The drawn proposals taken here and still listed, drawn as changes, each with the text
 	 *  that stood where it wrote. */
@@ -552,14 +566,15 @@ interface Rewrite {
 }
 
 /**
- * What `to` rewrites of a block that read `was` when the proposal arrived and reads `now`. Each
+ * What `to` rewrites of a block that read `was` when the proposal was made and reads `now`. Each
  * stretch the proposal changes in `was` is carried through what was written since: words typed
  * at its edge stay outside it, and where a word it would rewrite was itself rewritten, the stretch
  * covers the rewriting. A stretch that already reads as proposed is left out.
  *
- * Where the reader rewrote words reaching past a stretch the proposal changes, the block is
- * `outdated`: the stretch carried onto words it was never computed against would write a sentence
- * nobody proposed, so the whole block as it now reads gives way to the whole proposed one.
+ * The block is `outdated` where the reader's writing meets a stretch the proposal changes, since
+ * taking it would write over words the reader wrote. Where that writing reaches past the stretch,
+ * the stretch carried onto words it was never computed against would write a sentence nobody
+ * proposed, so the whole block as it now reads gives way to the whole proposed one.
  */
 function rewrites(
 	was: PMNode,
@@ -568,6 +583,12 @@ function rewrites(
 ): { outdated: boolean; stretches: Rewrite[] } {
 	const since = sinceOf(was, now);
 	const hunks = hunksOf(was, to);
+	const meets = (s: DiffHunk, h: DiffHunk): boolean =>
+		s.at === s.end
+			? h.at < s.at && s.at < h.end
+			: h.at === h.end
+				? s.at < h.at && h.at < s.end
+				: s.at < h.end && h.at < s.end;
 	const past = since.some((s) =>
 		hunks.some((h) => s.at < h.end && h.at < s.end && !(h.at <= s.at && s.end <= h.end))
 	);
@@ -576,6 +597,7 @@ function rewrites(
 			outdated: true,
 			stretches: [{ at: 0, end: now.content.size, content: to.content }]
 		};
+	const outdated = since.some((s) => hunks.some((h) => meets(s, h)));
 	const text = since.length ? textOf(now) : '';
 	const nowMarks = since.length ? marksOf(now) : [];
 	const toMarks = since.length ? marksOf(to) : [];
@@ -611,7 +633,7 @@ function rewrites(
 			continue;
 		out.push({ at, end, content: to.content.cut(start, start + hunk.insert.length) });
 	}
-	return { outdated: false, stretches: out };
+	return { outdated, stretches: out };
 }
 
 /** {@link rewrites}, kept while its three blocks are. */
@@ -714,8 +736,104 @@ function lastLine(el: HTMLElement): HTMLElement | undefined {
 }
 
 /** The blocks a proposal covered when it arrived, by its id, with the `after` it then held and
- *  the anchor it named. */
-type Bases = Map<string, { after: string; anchor: string; blocks: PMNode[] }>;
+ *  the anchor or the blocks that placed it. */
+type Bases = Map<
+	string,
+	{ after: string; place: { anchor: string } | { blocks: string[] }; blocks: readonly PMNode[] }
+>;
+
+/** The id of the stored block a leaf decodes from: a block island's own, any other's `id`. */
+function blockOf(node: PMNode): string {
+	return String((node.type.name === 'island_block' ? node.attrs.block : node.attrs.id) ?? '');
+}
+
+/** Where a proposal stands among the leaves: the ones it rewrites, the one it adds after, and
+ *  whether it adds ahead of them all. `missing` where a block it names is gone. `undefined`
+ *  for an anchor the leaf does not hold, `'gone'` where no block it names stands. */
+interface Place {
+	cover: number[];
+	beside: number;
+	ahead: boolean;
+	missing: boolean;
+}
+
+function placeOf(
+	item: TextProposal,
+	leaves: readonly Leaf[],
+	anchors: ReadonlyMap<string, AnchorPos>
+): Place | 'gone' | undefined {
+	const index = (id: string): number => leaves.findIndex((leaf) => blockOf(leaf.node) === id);
+	// A leaf of one empty paragraph is filled by what is added to it.
+	const empty = (i: number): boolean =>
+		leaves.length === 1 && leaves[i].node.isTextblock && !leaves[i].node.content.size;
+	if ('replace' in item) {
+		const named = new Set(item.replace);
+		const cover = leaves.flatMap((leaf, i) => (named.has(blockOf(leaf.node)) ? [i] : []));
+		if (!cover.length) return 'gone';
+		const found = new Set(cover.map((i) => blockOf(leaves[i].node)));
+		return { cover, beside: -1, ahead: false, missing: found.size < named.size };
+	}
+	if ('insert' in item) {
+		const at = item.insert;
+		let beside = leaves.length - 1;
+		let ahead = false;
+		if (at !== 'end') {
+			const i = index('after' in at ? at.after : at.before);
+			if (i < 0) return 'gone';
+			if ('after' in at) beside = i;
+			else if (i === 0) [beside, ahead] = [0, true];
+			else beside = i - 1;
+		}
+		if (beside < 0) return 'gone';
+		if (empty(beside)) return { cover: [beside], beside, ahead: false, missing: false };
+		return { cover: [], beside, ahead, missing: false };
+	}
+	const anchor = anchors.get(item.anchor);
+	if (!anchor) return undefined;
+	const point = anchor.start === anchor.end;
+	const cover: number[] = [];
+	let beside = -1;
+	leaves.forEach((leaf, i) => {
+		const [lo, hi] = reach(leaf);
+		if (point) {
+			if (beside < 0 && lo <= anchor.start && anchor.start <= hi) beside = i;
+		} else if (
+			(lo < anchor.end && hi > anchor.start) ||
+			(lo === hi && anchor.start <= lo && lo <= anchor.end)
+		)
+			cover.push(i);
+	});
+	if (!point) return cover.length ? { cover, beside, ahead: false, missing: false } : undefined;
+	if (beside < 0) return undefined;
+	const leaf = leaves[beside];
+	if (leaf.node.isTextblock && !leaf.node.content.size)
+		return { cover: [beside], beside, ahead: false, missing: false };
+	return {
+		cover,
+		beside,
+		ahead: beside === 0 && anchor.start === reach(leaf)[0],
+		missing: false
+	};
+}
+
+/** The blocks a proposal's writer read, by the id each was read under; `undefined` where
+ *  `before` does not read as one block for each id. */
+const reads = new WeakMap<readonly string[], Map<string, Map<string, PMNode> | undefined>>();
+function readOf(
+	ids: readonly string[],
+	before: string,
+	channel: ReviewChannel
+): Map<string, PMNode> | undefined {
+	let row = reads.get(ids);
+	if (!row) reads.set(ids, (row = new Map()));
+	if (row.has(before)) return row.get(before);
+	const doc = before.trim() ? channel.parse(before) : undefined;
+	const blocks = doc ? leavesOf(doc) : [];
+	const out =
+		blocks.length === ids.length ? new Map(ids.map((id, k) => [id, blocks[k].node])) : undefined;
+	row.set(before, out);
+	return out;
+}
 
 function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases): Drawn {
 	const { answered, written } = reviewKey.getState(state)!;
@@ -725,7 +843,13 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 	// proposal brought back by an undo draws against the paragraph it first drew over.
 	if (bases.size) {
 		const ids = new Set(listed.map((item) => item.id));
-		for (const [id, base] of bases) if (!ids.has(id) && !anchors.has(base.anchor)) bases.delete(id);
+		let blocks: Set<string> | undefined;
+		const stands = (place: { anchor: string } | { blocks: string[] }): boolean => {
+			if ('anchor' in place) return anchors.has(place.anchor);
+			blocks ??= new Set(leavesOf(state.doc).map((leaf) => blockOf(leaf.node)));
+			return place.blocks.some((id) => blocks!.has(id));
+		};
+		for (const [id, base] of bases) if (!ids.has(id) && !stands(base.place)) bases.delete(id);
 	}
 	const items = answered.size
 		? listed.filter((item) => !answered.has(item.id) || written.has(item.id))
@@ -808,38 +932,24 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 			});
 			continue;
 		}
-		const anchor = anchors.get(item.anchor);
-		if (!anchor) continue;
 		const name = { 'data-qm-review': item.id };
 
 		if (item.state === 'changed') {
+			const anchor = anchors.get(item.anchor);
+			if (!anchor) continue;
 			changed(item.id, anchor.start, anchor.end);
 			spans.push({ id: item.id, proposed: false, from: anchor.start, to: anchor.end });
 			continue;
 		}
 
 		leaves ??= leavesOf(doc);
-		const point = anchor.start === anchor.end;
-		const cover: number[] = [];
-		let beside = -1;
-		leaves.forEach((leaf, i) => {
-			const [lo, hi] = reach(leaf);
-			if (point) {
-				if (beside < 0 && lo <= anchor.start && anchor.start <= hi) beside = i;
-			} else if (
-				(lo < anchor.end && hi > anchor.start) ||
-				(lo === hi && anchor.start <= lo && lo <= anchor.end)
-			)
-				cover.push(i);
-		});
-		let ahead = false;
-		if (point) {
-			if (beside < 0) continue;
-			const leaf = leaves[beside];
-			if (leaf.node.isTextblock && !leaf.node.content.size) cover.push(beside);
-			else ahead = beside === 0 && anchor.start === reach(leaf)[0];
+		const at = placeOf(item, leaves, anchors);
+		if (!at) continue;
+		if (at === 'gone') {
+			undrawn.push({ id: item.id, reason: 'block' });
+			continue;
 		}
-		if (!point && !cover.length) continue;
+		const { cover, beside, ahead } = at;
 		const place = ahead ? -1 : beside;
 		if (cover.length ? cover.some((i) => taken.has(i)) : adding.has(place)) {
 			undrawn.push({ id: item.id, reason: 'taken' });
@@ -864,13 +974,28 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		if (!covered.length && !added.length) continue;
 		const plan: Piece[] = [];
 		const mark = decos.length;
-		let stale = false;
-		const seen = bases.get(item.id);
-		const base =
-			seen?.after === item.after && seen.blocks.length === covered.length
-				? seen.blocks
-				: covered.map((leaf) => leaf.node);
-		bases.set(item.id, { after: item.after, anchor: item.anchor, blocks: base });
+		let stale = at.missing;
+		let base: readonly PMNode[];
+		if ('replace' in item && item.before !== undefined) {
+			const read = readOf(item.replace, item.before, channel);
+			const was = covered.map((leaf) => read?.get(blockOf(leaf.node)));
+			stale ||= was.some((node) => !node);
+			base = was.map((node, k) => node ?? covered[k].node);
+		} else {
+			const seen = bases.get(item.id);
+			base =
+				seen?.after === item.after && seen.blocks.length === covered.length
+					? seen.blocks
+					: covered.map((leaf) => leaf.node);
+			bases.set(item.id, {
+				after: item.after,
+				place:
+					'anchor' in item
+						? { anchor: item.anchor }
+						: { blocks: covered.map((l) => blockOf(l.node)) },
+				blocks: base
+			});
+		}
 
 		covered.forEach((leaf, k) => {
 			const [lo, hi] = reach(leaf);
@@ -882,13 +1007,16 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 						.join(' ')
 				})
 			);
-			if (whole)
+			if (whole) {
+				// Taking it removes what the reader wrote in the block since it was read.
+				stale ||= !base[k].content.eq(leaf.node.content);
 				plan.push({
 					from: leaf.pos,
 					to: leaf.pos + leaf.node.nodeSize,
 					content: Fragment.empty,
 					lift: true
 				});
+			}
 			if (!leaf.node.isTextblock) return;
 			const strike = (from: number, to: number): void => {
 				if (to > from)
@@ -898,8 +1026,9 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 			};
 			if (whole) return strike(lo, hi);
 			const to = next[k].node;
-			const was = base[k].type === leaf.node.type ? base[k] : leaf.node;
-			const { outdated: past, stretches } = rewritten(was, leaf.node, to);
+			const read = base[k].type === leaf.node.type;
+			stale ||= !read;
+			const { outdated: past, stretches } = rewritten(read ? base[k] : leaf.node, leaf.node, to);
 			stale ||= past;
 			stretches.forEach(({ at, end, content }, n) => {
 				strike(lo + at, lo + end);

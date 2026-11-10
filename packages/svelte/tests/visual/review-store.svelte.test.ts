@@ -21,6 +21,8 @@ function store(refuse = false) {
 		items: () => items,
 		keyFor: (path) => path,
 		exact: () => true,
+		leafFor: (path) => path,
+		valueAt: () => undefined,
 		answer(id, _item, action) {
 			answers.push([id, action]);
 			return !refuse;
@@ -120,19 +122,42 @@ describe('a reveal', () => {
 	});
 });
 
+describe('the leaves', () => {
+	it('each draw the anchored items and those by blocks of their own field', () => {
+		const { review, list } = store();
+		list([
+			...ITEMS,
+			{ id: 'mine', state: 'proposed', field: 'main.body', replace: ['b1'], after: 'New.' },
+			{ id: 'theirs', state: 'proposed', field: 'main.abstract', insert: 'end', after: 'New.' }
+		]);
+		expect(review.textAt('main.body').map((item) => item.id)).toEqual([
+			'change',
+			'proposal',
+			'mine'
+		]);
+		expect(review.textAt('main.abstract').map((item) => item.id)).toEqual([
+			'change',
+			'proposal',
+			'theirs'
+		]);
+		expect(review.textAt('main.title').map((item) => item.id)).toEqual(['change', 'proposal']);
+		expect(review.at('main.body')).toEqual({});
+	});
+});
+
 describe('an answer', () => {
 	it('takes the item off what is drawn until a list arrives without it', () => {
 		const { review, answers, list } = store();
 		review.act('change', 'revert');
 		expect(answers).toEqual([['change', 'revert']]);
-		expect(review.text.map((item) => item.id)).toEqual(['proposal']);
+		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['proposal']);
 
 		list([...ITEMS]);
-		expect(review.text.map((item) => item.id)).toEqual(['proposal']);
+		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['proposal']);
 		list(ITEMS.slice(1));
-		expect(review.text.map((item) => item.id)).toEqual(['proposal']);
+		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['proposal']);
 		list(ITEMS);
-		expect(review.text.map((item) => item.id)).toEqual(['change', 'proposal']);
+		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['change', 'proposal']);
 	});
 
 	it('leaves the item standing where it could not be made', () => {

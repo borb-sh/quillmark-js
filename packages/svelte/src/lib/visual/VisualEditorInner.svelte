@@ -58,7 +58,13 @@
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview } from './review.svelte.js';
-	import type { FieldChange, FieldProposal, ReviewDrawn } from './review.js';
+	import {
+		byBlocks,
+		onField,
+		type FieldChange,
+		type FieldProposal,
+		type ReviewDrawn
+	} from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import {
 		markAnchor,
@@ -332,6 +338,20 @@
 			return key && fieldKeyToString(key);
 		},
 		exact: (path) => addrForFieldPath(path) != null,
+		valueAt(path) {
+			const key = reviewed(path);
+			if (!key?.field) return undefined;
+			const card =
+				key.card === undefined ? model.main : model.cards[cardIndexOf(key.card as CardId)];
+			return card?.values[key.field];
+		},
+		leafFor(path) {
+			const addr = addrForFieldPath(path);
+			if (!addr) return undefined;
+			const key =
+				addr.field == null ? resolveCardKey({ card: addr.card }, cardIds) : reviewed(path);
+			return key && fieldKeyToString(key);
+		},
 		chorded(id) {
 			if (!reviewAdvance) return;
 			const index = drewOrder.indexOf(id);
@@ -345,7 +365,7 @@
 		answer(id, item, action, key) {
 			let back: (() => void) | undefined;
 			if (action === 'reopen') taken.delete(id);
-			if (action === 'accept' && item?.state === 'proposed' && 'field' in item) {
+			if (action === 'accept' && item?.state === 'proposed' && onField(item)) {
 				const took = takeField(item);
 				if (!took) return false;
 				back = took.back;
@@ -356,7 +376,7 @@
 			}
 			onReview?.({ id, action });
 			if (action !== 'accept' && action !== 'dismiss') return true;
-			const field = item && 'field' in item ? reviewed(item.field) : undefined;
+			const field = item && onField(item) ? reviewed(item.field) : undefined;
 			const leaf = key ?? (field && fieldKeyToString(field));
 			if (leaf === undefined) return true;
 			const prose = key !== undefined && !field;
@@ -487,7 +507,7 @@
 		const drawn = new Set<string>();
 		for (const report of reviewing.reports.values()) for (const id of report.ids) drawn.add(id);
 		for (const item of reviewing.items)
-			if ('field' in item && !fieldUndrawn.has(item.id)) drawn.add(item.id);
+			if (onField(item) && !fieldUndrawn.has(item.id)) drawn.add(item.id);
 		const order: string[] = [];
 		const seen = new Set<string>();
 		const take = (id: string | null): void => {
@@ -503,11 +523,11 @@
 	/** What the editor draws of the host's list, and why it draws what it does not. */
 	function reviewReport(): ReviewDrawn {
 		const reported = new Set<string>();
-		const outdated: string[] = [];
+		const outdated = new Set(reviewing.fieldOutdated);
 		const why = new Map<string, ReviewDrawn['undrawn'][number]['reason']>();
 		for (const report of reviewing.reports.values()) {
 			for (const id of report.ids) reported.add(id);
-			outdated.push(...report.outdated);
+			for (const id of report.outdated) outdated.add(id);
 			for (const { id, reason } of report.undrawn) {
 				reported.add(id);
 				why.set(id, reason);
@@ -515,12 +535,15 @@
 		}
 		for (const { id, reason } of reviewing.fieldUndrawn) why.set(id, reason);
 		for (const item of reviewing.items)
-			if ('anchor' in item && !reported.has(item.id)) why.set(item.id, 'anchor');
+			if (!reported.has(item.id) && !why.has(item.id)) {
+				if ('anchor' in item) why.set(item.id, 'anchor');
+				else if (byBlocks(item)) why.set(item.id, 'block');
+			}
 		const order = reviewOrder();
 		return {
 			order,
 			accepted: order.filter((id) => reviewing.accepted.has(id)),
-			outdated,
+			outdated: order.filter((id) => outdated.has(id) && !reviewing.accepted.has(id)),
 			undrawn: reviewing.items.flatMap((item) => {
 				const reason = why.get(item.id);
 				return reason ? [{ id: item.id, reason }] : [];
@@ -541,6 +564,7 @@
 		void reviewing.items;
 		void reviewing.accepted;
 		void reviewing.fieldUndrawn;
+		for (const id of reviewing.fieldOutdated) void id;
 		for (const report of reviewing.reports.values()) void report;
 		let live = true;
 		void tick().then(() => {
@@ -1451,10 +1475,9 @@
 				if (!item || item.state === 'changed' || reviewing.accepted.has(id)) continue;
 				const key = reviewing.keyOf(id);
 				// Each one is planned against the document the one before it left.
-				const answered =
-					'anchor' in item
-						? key !== undefined && !!leaves.prose(key)?.answerReview(id, action)
-						: reviewing.act(id, action);
+				const answered = !onField(item)
+					? key !== undefined && !!leaves.prose(key)?.answerReview(id, action)
+					: reviewing.act(id, action);
 				if (answered) out.push(id);
 			}
 		} finally {

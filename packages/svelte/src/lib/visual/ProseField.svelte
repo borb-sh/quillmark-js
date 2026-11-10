@@ -107,8 +107,8 @@
 	// locale swap reaches a mounted table without remounting the leaf and losing the caret.
 	const t = wording();
 
-	// The editor's review state: this leaf draws the items whose anchors it holds, and
-	// says which it drew.
+	// The editor's review state: this leaf draws the items whose anchors it holds and those
+	// placed by its own blocks, and says which it drew.
 	const reviewing = review();
 
 	/** Pushed by the leaf's trigger plugin: the menu is the leaf's surface rather than
@@ -189,7 +189,7 @@
 	});
 
 	$effect(() => {
-		controller?.setReview(reviewing.text, reviewing.lit);
+		controller?.setReview(reviewing.textAt(leafKey), reviewing.lit);
 	});
 
 	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.

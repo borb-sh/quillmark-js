@@ -14,7 +14,15 @@ import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { DocPath } from '../core/address.js';
 import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
-import type { FieldChange, FieldProposal, ReviewItem, ReviewUndrawn } from './review.js';
+import {
+	byBlocks,
+	onField,
+	sameValue,
+	type FieldChange,
+	type FieldProposal,
+	type ReviewItem,
+	type ReviewUndrawn
+} from './review.js';
 
 /** How long the pointer or the caret rests on a change before its card rises, in ms. */
 export const HOVER_MS = 350;
@@ -25,24 +33,28 @@ export const REVEAL_MS = 2400;
 
 /** The card on show: the `changed` item it is up for, and what raised it. */
 export interface ShownReview {
-	item: Extract<ReviewItem, { state: 'changed' }>;
+	item: FieldChange | TextChange;
 	via: ReviewVia | 'reveal';
 }
 
-/** A `changed` item over a prose leaf. */
-type TextChange = Extract<ReviewItem, { state: 'changed'; anchor: string }>;
+/** A change over a prose leaf: a `changed` item by its anchor, or a proposal taken there,
+ *  `before` the text it replaced. */
+export type TextChange = { id: string; state: 'changed'; anchor?: string; before?: string };
 
 export interface Review {
 	/** The host's list, less what was answered here. */
 	readonly items: readonly ReviewItem[];
 	/** The proposals accepted and still listed, each as the change it made. */
 	readonly accepted: ReadonlyMap<string, FieldChange | TextChange>;
-	/** The items a prose leaf draws, one identity until the list changes. */
-	readonly text: readonly TextReview[];
+	/** The items the prose leaf at `key` draws: those placed by an anchor, which any leaf may
+	 *  hold, and those placed by blocks of its own field. One identity until the list changes. */
+	textAt(key: string): readonly TextReview[];
 	/** Each mounted prose leaf's report of what it draws, by leaf key. */
 	readonly reports: ReadonlyMap<string, ReviewReport>;
 	/** The field items no control draws, each with why. */
 	readonly fieldUndrawn: readonly { id: string; reason: ReviewUndrawn }[];
+	/** The field proposals whose field no longer holds the value their `before` says was read. */
+	readonly fieldOutdated: ReadonlySet<string>;
 	/** The item under attention. */
 	readonly lit: string | undefined;
 	readonly shown: ShownReview | undefined;
@@ -77,10 +89,20 @@ export interface ReviewSource {
 	keyFor(path: DocPath): string | undefined;
 	/** Whether a path names a field itself, and not a place inside one. */
 	exact(path: DocPath): boolean;
+	/** The value the field at `path` holds, as its control is handed it. */
+	valueAt(path: DocPath): unknown;
+	/** The key of the prose leaf a rich text field's or a body's path names, `undefined` for
+	 *  one the editor does not hold. */
+	leafFor(path: DocPath): string | undefined;
 	/** A reader's answer, to make and to pass on: `item` where the list holds it, `key` the
 	 *  leaf that gave it where one did. `false` where it could not be made, and the item
 	 *  stands. */
-	answer(id: string, item: ReviewItem | undefined, action: ReviewAction, key?: string): boolean;
+	answer(
+		id: string,
+		item: ReviewItem | TextChange | undefined,
+		action: ReviewAction,
+		key?: string
+	): boolean;
 	/** An answer a chord gave, once it is made. */
 	chorded?(id: string): void;
 	writing?(on: boolean): void;
@@ -117,17 +139,38 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				const item = listed.get(id);
 				if (item && 'anchor' in item)
 					out.set(id, { id, state: 'changed', anchor: item.anchor, before });
+				else if (item && byBlocks(item)) out.set(id, { id, state: 'changed', before });
 			}
 		return out;
 	});
 	const byId = $derived(new Map(items.map((item) => [item.id, accepted.get(item.id) ?? item])));
-	const text: readonly TextReview[] = $derived(
-		items.filter((item): item is Extract<ReviewItem, { anchor: string }> => 'anchor' in item)
-	);
+	/** The items each prose leaf draws, by leaf key, and those every leaf is handed. */
+	const text = $derived.by(() => {
+		const anchored: TextReview[] = [];
+		const own = new Map<string, TextReview[]>();
+		for (const item of items) {
+			if ('anchor' in item) {
+				anchored.push(item);
+				for (const list of own.values()) list.push(item);
+			} else if (byBlocks(item)) {
+				const key = source.leafFor(item.field);
+				if (key === undefined) continue;
+				let list = own.get(key);
+				if (!list) own.set(key, (list = [...anchored]));
+				list.push(item);
+			}
+		}
+		return { anchored, own };
+	});
 	const placed = $derived.by(() => {
 		const out = new Map<string, { changed?: FieldChange; proposed?: FieldProposal }>();
 		const undrawn: { id: string; reason: ReviewUndrawn }[] = [];
 		for (const listed of items) {
+			if (byBlocks(listed)) {
+				if (source.leafFor(listed.field) === undefined)
+					undrawn.push({ id: listed.id, reason: 'field' });
+				continue;
+			}
 			const item = accepted.get(listed.id) ?? listed;
 			if (!('field' in item)) continue;
 			const key = source.keyFor(item.field);
@@ -148,6 +191,18 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return { fields: out, undrawn };
 	});
 	const fields = $derived(placed.fields);
+	// A proposal made from a value the field no longer holds would write over the reader's.
+	const outdated = $derived.by(() => {
+		const out = new Set<string>();
+		for (const { proposed } of fields.values())
+			if (
+				proposed &&
+				'before' in proposed &&
+				!sameValue(source.valueAt(proposed.field), proposed.before)
+			)
+				out.add(proposed.id);
+		return out;
+	});
 
 	let pointer = $state<string | undefined>();
 	let caret = $state<string | undefined>();
@@ -182,7 +237,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (card?.id === id) card = undefined;
 			// An accepted proposal stays, drawn as its change, while the list holds it.
 			if (action !== 'accept') answered.add(id);
-			else if (byId.get(id) && 'field' in byId.get(id)!) took.add(id);
+			else if (byId.get(id) && onField(byId.get(id)!)) took.add(id);
 		}
 		answers++;
 		if (chord) source.chorded?.(id);
@@ -195,14 +250,15 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		get accepted() {
 			return accepted;
 		},
-		get text() {
-			return text;
-		},
+		textAt: (key) => text.own.get(key) ?? text.anchored,
 		get reports() {
 			return drawn;
 		},
 		get fieldUndrawn() {
 			return placed.undrawn;
+		},
+		get fieldOutdated() {
+			return outdated;
 		},
 		get lit() {
 			return lit;
@@ -215,6 +271,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		keyOf(id) {
 			const item = byId.get(id);
 			if (!item) return undefined;
+			if (byBlocks(item)) return source.leafFor(item.field);
 			if ('field' in item) return source.keyFor(item.field);
 			for (const [key, report] of drawn) if (report.ids.includes(id)) return key;
 			return undefined;
@@ -319,9 +376,10 @@ const NO_ITEMS: readonly TextReview[] = [];
 const NO_REVIEW: Review = {
 	items: [],
 	accepted: new Map(),
-	text: NO_ITEMS,
+	textAt: () => NO_ITEMS,
 	reports: new Map(),
 	fieldUndrawn: [],
+	fieldOutdated: new Set(),
 	lit: undefined,
 	shown: undefined,
 	at: () => ({}),
