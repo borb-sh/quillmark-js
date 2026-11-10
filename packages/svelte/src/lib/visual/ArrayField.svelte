@@ -118,6 +118,14 @@
 	import type { LandingBox } from './leaves.js';
 	import { reorder, reorderArm } from './motion.js';
 	import { rowDrag } from './rowdrag.svelte.js';
+	import {
+		listHistory,
+		sameValues,
+		undoChord,
+		type ListFocus,
+		type ListRows,
+		type ListStep
+	} from './listhistory.js';
 	import Icon from './icons/Icon.svelte';
 	import TextField from './TextField.svelte';
 	import NumberField from './NumberField.svelte';
@@ -529,9 +537,9 @@
 	}
 	/** A removal's undo: `value` back at `k`, under a fresh id, focused where a landing on
 	 *  it would focus. A no-op once this field is gone, the row with it. */
-	function restore(k: number, value: unknown, step: Reshape): void {
+	function restore(k: number, value: unknown, step: ListStep): void {
 		if (!span.alive) return;
-		if (done.at(-1) === step && takeStep(false)) return;
+		if (history.latest() === step && takeStep(false)) return;
 		void focusAfterFlush(insertAt(Math.min(k, ids.length), value));
 	}
 	/** A collapsed record's remove key, on its summary: the remove is out of the tab order,
@@ -568,63 +576,40 @@
 				pressed.focus();
 		})();
 	}
-	// ── The list's own undo ──────────────────────────────────────────────────────
-	// A change to the rows (an insert, a remove, a split, a join, a spill, a move) lives
-	// in no leaf's history, so the list keeps its steps itself. A step is taken back only
-	// while the rows stand as the step left them: an edit in a row since is the row's to
-	// undo first, and once its own undo brings the rows back, the step is next.
-	type Focus = { id: string; caret?: number };
-	type Rows = { ids: string[]; values: unknown[]; focus?: Focus };
-	type Reshape = { before: Rows; after: Rows };
-	/** How many steps the list keeps each way. */
-	const DEPTH = 100;
-	let done: Reshape[] = [];
-	let undone: Reshape[] = [];
+	// ── The list's own undo (`listhistory.ts`) ───────────────────────────────────
+	const history = listHistory((a, b) =>
+		sameValues(a, b, (row) =>
+			control === 'object' && row !== null && typeof row === 'object'
+				? Object.fromEntries(Object.entries(row).filter(([, cell]) => !cellBlank(cell)))
+				: row
+		)
+	);
 	/** Where the focus is in the list: the row holding it, and a prose row's caret. */
-	function focusNow(): Focus | undefined {
+	function focusNow(): ListFocus | undefined {
 		const at = document.activeElement;
 		const id = ids.find((i) => rowEls[i]?.contains(at));
 		return id === undefined ? undefined : { id, caret: els[id]?.caret?.() };
 	}
-	function snapshot(): Rows {
+	function snapshot(): ListRows {
 		return { ids: ids.slice(), values: arr, focus: focusNow() };
 	}
 	/** Record the step from `before` to the rows just committed. Its `after` takes the
 	 *  rows as the store hands them back once the commit lands, which is what a later
 	 *  read compares against. */
-	function record(before: Rows, values: unknown[], focus?: Focus): Reshape {
-		const step: Reshape = { before, after: { ids: ids.slice(), values, focus } };
-		done = [...done.slice(1 - DEPTH), step];
-		undone = [];
+	function record(before: ListRows, values: unknown[], focus?: ListFocus): ListStep {
+		const step: ListStep = { before, after: { ids: ids.slice(), values, focus } };
+		history.record(step);
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
 			step.after = { ...step.after, values: arr };
 		})();
 		return step;
 	}
-	/** A row as a step compares it. A record's blank cells read as absent: a cell typed in
-	 *  and undone back to empty commits its empty answer where the step's row had no key. */
-	const compared = (row: unknown): unknown =>
-		control === 'object' && row !== null && typeof row === 'object'
-			? Object.fromEntries(Object.entries(row).filter(([, cell]) => !cellBlank(cell)))
-			: row;
-	const same = (a: unknown[], b: unknown[]): boolean =>
-		a === b || JSON.stringify(a.map(compared)) === JSON.stringify(b.map(compared));
-	/** Take the latest step back (`redo` false) or forward again, where the rows still
-	 *  stand where it would start from. Whether it did. */
+	/** Take the latest step back (`redo` false) or forward again, and put the rows and the
+	 *  focus where it leaves them. Whether it did. */
 	function takeStep(redo: boolean): boolean {
-		const stack = redo ? undone : done;
-		const step = stack.at(-1);
-		if (!step) return false;
-		const [from, to] = redo ? [step.before, step.after] : [step.after, step.before];
-		if (!same(arr, from.values)) return false;
-		if (redo) {
-			undone = undone.slice(0, -1);
-			done = [...done, step];
-		} else {
-			done = done.slice(0, -1);
-			undone = [...undone, step];
-		}
+		const to = history.take(redo, arr);
+		if (!to) return false;
 		undo.withdraw();
 		for (const id of ids) if (!to.ids.includes(id)) drop(id);
 		ids = to.ids.slice();
@@ -639,15 +624,13 @@
 		})();
 		return true;
 	}
-	/** ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Ctrl+Y) anywhere in the list, ahead of the
-	 *  control's own: the nearest list answers, never the one around a nested list. */
+	/** The list's chords anywhere in it, ahead of the control's own: the nearest list
+	 *  answers, never the one around a nested list. */
 	function onUndoChord(e: KeyboardEvent): void {
-		if (e.defaultPrevented || e.isComposing || e.altKey || !(e.metaKey || e.ctrlKey)) return;
-		const key = e.key.toLowerCase();
-		const redo = (key === 'z' && e.shiftKey) || (key === 'y' && !e.shiftKey && e.ctrlKey);
-		if (!redo && (key !== 'z' || e.shiftKey)) return;
+		const chord = undoChord(e);
+		if (!chord) return;
 		if (!(e.target instanceof Element) || e.target.closest('.qm-array') !== e.currentTarget) return;
-		if (drag.held() || !takeStep(redo)) return;
+		if (drag.held() || !takeStep(chord === 'redo')) return;
 		e.preventDefault();
 		e.stopPropagation();
 	}
