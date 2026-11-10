@@ -8,13 +8,23 @@
 // set in flow under it. None of it enters the document while it is proposed: the struck words are
 // the leaf's own text under a decoration, and every added word is a widget.
 //
+// A proposal is an edit of the paragraph as it stood when the proposal arrived. What the reader
+// writes in the paragraph since is theirs: the proposal's stretches ride past it, and only the
+// words it would rewrite are struck, as the reader has them now.
+//
 // Taking a proposal is the leaf's own edit, made from the plan the drawing was made from, so the
 // words that land are the words that were drawn. It goes down the lane a keystroke takes: one
 // transaction, one undo step, one commit.
 import { closeHistory } from 'prosemirror-history';
 import { DOMSerializer, Fragment, type Node as PMNode } from 'prosemirror-model';
 import { keydownHandler } from 'prosemirror-keymap';
-import { Plugin, PluginKey, type EditorState, type Transaction } from 'prosemirror-state';
+import {
+	Plugin,
+	PluginKey,
+	Selection,
+	type EditorState,
+	type Transaction
+} from 'prosemirror-state';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { arriving, HARD_BREAK, ISLAND_SLOT } from './islands.js';
 import type { AnchorPos } from './marks.js';
@@ -77,6 +87,9 @@ export interface ReviewChannel {
 	anchors(state: EditorState): readonly AnchorPos[];
 	/** `after` as a document under the leaf's schema; `undefined` where it does not parse. */
 	parse(markdown: string): PMNode | undefined;
+	/** The item whose card is up, and the way to lower it. */
+	shown(): string | undefined;
+	dismiss(): void;
 	act(id: string, action: ReviewAction): void;
 	/** The item the pointer or the caret is in, `undefined` once it has left. */
 	point(id: string | undefined, via: ReviewVia): void;
@@ -228,6 +241,51 @@ function hunksOf(a: PMNode, b: PMNode): DiffHunk[] {
 	return [{ at: Math.min(start, end), end: to, insert: after.slice(Math.min(start, end), to) }];
 }
 
+/** One stretch of a held block a proposal rewrites: `[at, end)` of the block as it stands, and
+ *  the words that would stand there. */
+interface Rewrite {
+	at: number;
+	end: number;
+	content: Fragment;
+}
+
+/**
+ * What `to` rewrites of a block that read `was` when the proposal arrived and reads `now`. Each
+ * stretch the proposal changes in `was` is carried through what was written since: words typed
+ * at its edge stay outside it, and where a word it would rewrite was itself rewritten, the stretch
+ * covers the rewriting. A stretch that already reads as proposed is left out.
+ */
+function rewrites(was: PMNode, now: PMNode, to: PMNode): Rewrite[] {
+	const since = was === now ? [] : wordDiff(textOf(was), textOf(now));
+	const text = since.length ? textOf(now) : '';
+	const through = (pos: number, edge: 'start' | 'end'): number => {
+		let moved = pos;
+		for (const hunk of since) {
+			const grew = hunk.insert.length - (hunk.end - hunk.at);
+			if (
+				hunk.at === hunk.end ? (edge === 'start' ? hunk.at <= pos : hunk.at < pos) : hunk.end <= pos
+			)
+				moved += grew;
+			else if (hunk.at < pos && pos < hunk.end)
+				return hunk.at + (moved - pos) + (edge === 'end' ? hunk.insert.length : 0);
+		}
+		return moved;
+	};
+	const out: Rewrite[] = [];
+	// Where each insert starts in the proposed block: its hunk's start in the block it was
+	// made on, moved by what the hunks before it added and took.
+	let shift = 0;
+	for (const hunk of hunksOf(was, to)) {
+		const start = hunk.at + shift;
+		shift += hunk.insert.length - (hunk.end - hunk.at);
+		const at = through(hunk.at, 'start');
+		const end = Math.max(at, through(hunk.end, 'end'));
+		if (since.length && text.slice(at, end) === hunk.insert) continue;
+		out.push({ at, end, content: to.content.cut(start, start + hunk.insert.length) });
+	}
+	return out;
+}
+
 /** A reader's answer to an item, from a button or a chord. */
 type Act = (id: string, action: ReviewAction) => void;
 
@@ -262,10 +320,14 @@ function chip(strings: ReviewStrings, act: Act, id: string, row: boolean): HTMLE
 	el.setAttribute('data-qm-review', id);
 	el.setAttribute('role', 'group');
 	el.setAttribute('aria-label', strings.reviewProposal);
-	el.append(
+	const acts = document.createElement('span');
+	acts.className = 'qm-review-acts';
+	acts.append(
 		button(act, id, 'accept', strings.reviewAccept, strings.reviewAcceptTitle),
 		button(act, id, 'dismiss', strings.reviewDismiss, strings.reviewDismissTitle)
 	);
+	// The space a run of answers stands off its line by, which a wrapped run leaves behind.
+	el.append(row ? '' : ' ', acts);
 	return el;
 }
 
@@ -280,11 +342,15 @@ function lastLine(el: HTMLElement): HTMLElement | undefined {
 	}
 }
 
+/** The blocks a proposal covered when it arrived, by its id, with the `after` it then held. */
+type Bases = Map<string, { after: string; blocks: PMNode[] }>;
+
 function draw(
 	state: EditorState,
 	channel: ReviewChannel,
 	act: Act,
-	answered: ReadonlySet<string>
+	answered: ReadonlySet<string>,
+	bases: Bases
 ): Drawn {
 	const items = channel.items().filter((item) => !answered.has(item.id));
 	const plans = new Map<string, Piece[]>();
@@ -374,6 +440,12 @@ function draw(
 		for (const i of cover) taken.add(i);
 		const plan: Piece[] = [];
 		plans.set(item.id, plan);
+		const seen = bases.get(item.id);
+		const base =
+			seen?.after === item.after && seen.blocks.length === covered.length
+				? seen.blocks
+				: covered.map((leaf) => leaf.node);
+		bases.set(item.id, { after: item.after, blocks: base });
 
 		covered.forEach((leaf, k) => {
 			const [lo, hi] = reach(leaf);
@@ -401,28 +473,23 @@ function draw(
 			};
 			if (whole) return strike(lo, hi);
 			const to = next[k].node;
-			// Where each insert starts in the proposed block: its hunk's start in the held one,
-			// moved by what the hunks before it added and took.
-			let shift = 0;
-			hunksOf(leaf.node, to).forEach((hunk, n) => {
-				strike(lo + hunk.at, lo + hunk.end);
-				const start = hunk.at + shift;
-				shift += hunk.insert.length - (hunk.end - hunk.at);
-				const slice = to.content.cut(start, start + hunk.insert.length);
-				plan.push({ from: lo + hunk.at, to: lo + hunk.end, content: slice });
-				if (!hunk.insert) return;
+			const was = base[k].type === leaf.node.type ? base[k] : leaf.node;
+			rewrites(was, leaf.node, to).forEach(({ at, end, content }, n) => {
+				strike(lo + at, lo + end);
+				plan.push({ from: lo + at, to: lo + end, content });
+				if (!content.size) return;
 				decos.push(
 					Decoration.widget(
-						lo + hunk.end,
+						lo + end,
 						() => {
 							const el = document.createElement('ins');
 							el.className = 'qm-review-ins';
 							el.contentEditable = 'false';
 							el.setAttribute('data-qm-review', item.id);
-							el.append(serializer.serializeFragment(slice));
+							el.append(serializer.serializeFragment(content));
 							return el;
 						},
-						{ side: -1, key: `ins:${item.id}:${n}:${slice.toString()}` }
+						{ side: -1, key: `ins:${item.id}:${n}:${content.toString()}` }
 					)
 				);
 			});
@@ -494,12 +561,13 @@ function draw(
 			);
 		} else row();
 
-		// What a proposal only adds to has the caret at the point it adds from.
-		spans.push(
-			covered.length
-				? { id: item.id, proposed: true, from: reach(covered[0])[0], to: reach(last)[1] }
-				: { id: item.id, proposed: true, from: anchor.start, to: anchor.start }
-		);
+		// What a proposal only adds to has the caret anywhere in the block it adds from.
+		spans.push({
+			id: item.id,
+			proposed: true,
+			from: reach(covered[0] ?? last)[0],
+			to: reach(last)[1]
+		});
 	}
 	return { set: DecorationSet.create(doc, decos), spans, plans };
 }
@@ -511,10 +579,16 @@ function endsInLine(node: PMNode): boolean {
 	return at.isTextblock;
 }
 
-/** The item the caret is in: a proposal before a change, where one sits inside the other. */
-function spanAt(spans: readonly Span[], pos: number): Span | undefined {
-	const hit = (s: Span): boolean => s.from <= pos && pos <= s.to;
-	return spans.find((s) => s.proposed && hit(s)) ?? spans.find(hit);
+/** The item the caret is in: the one that holds it closest, so a change inside a paragraph a
+ *  proposal covers is the change while the caret is in its words. `proposed` asks for the
+ *  proposal alone. */
+function spanAt(spans: readonly Span[], pos: number, proposed = false): Span | undefined {
+	let best: Span | undefined;
+	for (const s of spans) {
+		if (s.from > pos || pos > s.to || (proposed && !s.proposed)) continue;
+		if (!best || s.to - s.from < best.to - best.from) best = s;
+	}
+	return best;
 }
 
 /** The handle the leaf keeps on its review layer. */
@@ -524,6 +598,9 @@ export interface ReviewLayer {
 	refresh(view: EditorView): void;
 	/** The elements item `id` draws, in document order. */
 	elements(view: EditorView, id: string): HTMLElement[];
+	/** Put the caret in item `id` and take the focus, so the item's chords answer. False for
+	 *  an item the leaf does not draw. */
+	enter(view: EditorView, id: string): boolean;
 }
 
 /**
@@ -547,18 +624,26 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	/** The items answered here, drawn no more: an answer shows at once, whenever the list that
 	 *  held the item is next handed over. */
 	const answered = new Set<string>();
+	const bases: Bases = new Map();
 	/** Answer an item. Taking a proposal writes it first, and one that can no longer be written
-	 *  stays as it is. */
+	 *  stays as it is. A proposal taken by a press while the focus is elsewhere leaves the caret
+	 *  after what landed, in a focused leaf: the edit is the reader's, and so is its undo. */
 	const act: Act = (id, action) => {
 		const view = host;
 		if (!view) return;
 		if (action === 'accept') {
 			const plan = drawn(view.state).plans.get(id);
 			const tr = plan && taking(view.state, plan);
-			if (!tr) return;
+			if (!tr || !plan) return;
+			const away = !view.hasFocus();
+			if (away) {
+				const end = tr.mapping.map(Math.max(...plan.map((piece) => piece.to)), 1);
+				tr.setSelection(Selection.near(tr.doc.resolve(Math.min(end, tr.doc.content.size)), -1));
+			}
 			answered.add(id);
 			memo = undefined;
 			view.dispatch(tr);
+			if (away) view.focus();
 		} else {
 			answered.add(id);
 			memo = undefined;
@@ -569,8 +654,11 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	const drawn = (state: EditorState): Drawn => {
 		const anchors = channel.anchors(state);
 		const items = channel.items();
-		if (answered.size && memo?.items !== items)
-			for (const id of answered) if (!items.some((item) => item.id === id)) answered.delete(id);
+		if (memo?.items !== items) {
+			const listed = new Set(items.map((item) => item.id));
+			for (const id of answered) if (!listed.has(id)) answered.delete(id);
+			for (const id of bases.keys()) if (!listed.has(id)) bases.delete(id);
+		}
 		const lit = channel.lit();
 		const strings = channel.strings();
 		if (
@@ -582,7 +670,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			memo.strings === strings
 		)
 			return memo.drawn;
-		const next = draw(state, channel, act, answered);
+		const next = draw(state, channel, act, answered, bases);
 		memo = { doc: state.doc, anchors, items, lit, strings, drawn: next };
 		const ids = next.spans.map((s) => s.id);
 		const joined = ids.join('\u0000');
@@ -624,12 +712,18 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	const answer =
 		(action: 'accept' | 'reject') =>
 		(state: EditorState): boolean => {
-			const span = spanAt(drawn(state).spans, state.selection.head);
+			const span = spanAt(drawn(state).spans, state.selection.head, action === 'accept');
 			if (!span) return false;
-			if (!span.proposed && action === 'accept') return false;
 			act(span.id, span.proposed ? (action === 'accept' ? 'accept' : 'dismiss') : 'undo');
 			return true;
 		};
+	/** Escape lowers the card over the item the caret is in, before it is anything else's. */
+	const lower = (state: EditorState): boolean => {
+		const id = channel.shown();
+		if (id === undefined || !drawn(state).spans.some((span) => span.id === id)) return false;
+		channel.dismiss();
+		return true;
+	};
 
 	const plugin = new Plugin<number>({
 		key: reviewKey,
@@ -641,7 +735,8 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			decorations: (state) => drawn(state).set,
 			handleKeyDown: keydownHandler({
 				[REVIEW_KEYS.accept]: answer('accept'),
-				[REVIEW_KEYS.reject]: answer('reject')
+				[REVIEW_KEYS.reject]: answer('reject'),
+				Escape: lower
 			}),
 			handleDOMEvents: {
 				mouseover: (_view, e) => {
@@ -690,6 +785,14 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			return [...view.dom.querySelectorAll<HTMLElement>('[data-qm-review]')].filter(
 				(el) => el.getAttribute('data-qm-review') === id
 			);
+		},
+		enter(view, id) {
+			const span = drawn(view.state).spans.find((s) => s.id === id);
+			if (!span) return false;
+			const { doc, tr } = view.state;
+			view.dispatch(tr.setSelection(Selection.near(doc.resolve(span.to), -1)));
+			view.focus();
+			return true;
 		}
 	};
 }

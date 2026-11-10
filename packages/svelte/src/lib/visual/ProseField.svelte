@@ -147,6 +147,8 @@
 					slash = next;
 				},
 				reviewStrings: () => t.strings,
+				reviewShown: () => reviewing.shown?.item.id,
+				onReviewDismiss: () => reviewing.dismiss(),
 				onReview: (id, action) => reviewing.act(id, action),
 				onReviewPoint: (id, via) => reviewing.point(id, via),
 				onReviewDrawn: (ids) => reviewing.drew(leafKey, ids),

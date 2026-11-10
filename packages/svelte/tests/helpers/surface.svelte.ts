@@ -40,7 +40,7 @@ export interface EditorRef {
 	applyExternal(field: string, delta?: Delta): void;
 	refresh(): void;
 	applyCardOps(ops: readonly CardOp[]): void;
-	revealReview(id: string): Promise<boolean>;
+	revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
 	offerUndo(notice: string, undo: () => void): () => void;
 }
 

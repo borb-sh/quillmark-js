@@ -161,8 +161,11 @@ export interface CreateFieldOpts {
 	emptyUnsets?: boolean;
 	/** The review layer's wording, read per decoration pass (`review.ts`). */
 	reviewStrings?: () => ReviewStrings;
+	/** The review item whose card is up, and the reader's Escape lowering it. */
+	reviewShown?: () => string | undefined;
+	onReviewDismiss?(): void;
 	/** A reader answered the review item `id`: a proposal's button or its chord, or the chord
-	 *  that takes a change back. The leaf changes nothing itself. */
+	 *  that takes a change back. A proposal taken is written by then. */
 	onReview?(id: string, action: ReviewAction): void;
 	/** The review item under the pointer or holding the caret, `undefined` once it has left.
 	 *  The caret's report holds off while the reader types inside the item. */
@@ -226,6 +229,8 @@ export interface FieldController {
 	setReview(items: readonly TextReview[], lit?: string): void;
 	/** The elements the review item `id` draws, in document order; `[]` for one not drawn. */
 	reviewElements(id: string): HTMLElement[];
+	/** Put the caret in the review item `id` and focus the leaf; false for one not drawn. */
+	enterReview(id: string): boolean;
 	/** Ids of the anchors touching content range `[from, to]`: a selection's anchor state. */
 	anchorsInRange(from: number, to: number): string[];
 	/**
@@ -550,6 +555,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 					}
 					return parsed.get(markdown);
 				},
+				shown: () => opts.reviewShown?.(),
+				dismiss: () => opts.onReviewDismiss?.(),
 				act: (id, action) => opts.onReview?.(id, action),
 				point: (id, via) => opts.onReviewPoint?.(id, via),
 				drew: (ids) => opts.onReviewDrawn?.(ids)
@@ -947,6 +954,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		},
 		reviewElements(id: string): HTMLElement[] {
 			return review?.elements(view, id) ?? [];
+		},
+		enterReview(id: string): boolean {
+			return review?.enter(view, id) ?? false;
 		},
 		anchorsInRange(from: number, to: number): string[] {
 			return heldAnchors()

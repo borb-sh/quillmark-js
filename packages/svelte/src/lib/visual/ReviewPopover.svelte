@@ -9,7 +9,7 @@
  Focus discipline is the format popover's: the card never takes the focus, so the caret that
  raised it stays where it was, and its button swallows its own mousedown for the same reason.
  The pointer's card ends on a scroll, the page having moved under a pointer that did not; the
- caret's and a reveal's follow their mark.
+ caret's and a reveal's follow their mark, and hide while it is scrolled out of the pane.
 -->
 <script lang="ts" module>
 	import type { RangeAnchor } from '../core/codec/index.js';
@@ -84,6 +84,7 @@
 			side="bottom"
 			align="start"
 			trapFocus={false}
+			hideWhenDetached
 			sideOffset={spacePx(portalTarget, 1)}
 			onOpenAutoFocus={(e: Event) => e.preventDefault()}
 			onCloseAutoFocus={(e: Event) => e.preventDefault()}

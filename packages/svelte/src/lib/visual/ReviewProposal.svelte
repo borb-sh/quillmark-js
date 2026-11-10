@@ -17,8 +17,17 @@
 		item: FieldProposal;
 		/** The value the control holds. */
 		value: unknown;
+		/** Take the focus back to the control: an answer given from the row unmounts it. */
+		refocus?: () => void;
 	}
-	let { item, value }: Props = $props();
+	let { item, value, refocus }: Props = $props();
+
+	let row = $state<HTMLElement>();
+	function answer(action: 'accept' | 'dismiss'): void {
+		const held = !!row?.contains(document.activeElement);
+		reviewing.act(item.id, action);
+		if (held) refocus?.();
+	}
 
 	const t = wording();
 	const reviewing = review();
@@ -51,6 +60,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+	bind:this={row}
 	class={['qm-review-proposal', { 'qm-review-lit': reviewing.lit === item.id }]}
 	data-qm-review={item.id}
 	role="group"
@@ -73,26 +83,27 @@
 			type="button"
 			class="qm-review-act qm-review-accept qm-focus-ring"
 			title={t.strings.reviewAcceptTitle}
-			onclick={() => reviewing.act(item.id, 'accept')}>{t.strings.reviewAccept}</button
+			onclick={() => answer('accept')}>{t.strings.reviewAccept}</button
 		>
 		<button
 			type="button"
 			class="qm-review-act qm-review-dismiss qm-focus-ring"
 			title={t.strings.reviewDismissTitle}
-			onclick={() => reviewing.act(item.id, 'dismiss')}>{t.strings.reviewDismiss}</button
+			onclick={() => answer('dismiss')}>{t.strings.reviewDismiss}</button
 		>
 	</span>
 </div>
 
 <style>
 	/* The value starts on the control's own text column, so the proposal reads as the line the
-	   control would hold. No fill on the row: the tint is on the proposed words, as it is in
-	   prose, and a row is not a second well. */
+	   control would hold, and the answers trail it as they trail a paragraph's last line. No
+	   fill on the row: the tint is on the proposed words, as it is in prose, and a row is not a
+	   second well. */
 	.qm-review-proposal {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--_qm-space-3);
+		gap: var(--_qm-space-half) var(--_qm-space-3);
 		padding-inline-start: var(--_qm-space-3);
 		font-size: var(--_qm-text-body);
 	}
@@ -139,5 +150,10 @@
 		font-size: var(--_qm-text-label);
 		font-weight: var(--_qm-weight-mid);
 		line-height: var(--_qm-leading-tight);
+	}
+	@media (pointer: coarse) {
+		.qm-review-answers {
+			gap: var(--_qm-space-2);
+		}
 	}
 </style>

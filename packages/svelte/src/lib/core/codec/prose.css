@@ -778,14 +778,10 @@ li.ProseMirror-selectednode::after {
 .ProseMirror .qm-review-changed.qm-review-lit {
 	background: var(--_qm-review-tint);
 }
-/* A host brings an item to the reader by scrolling it into view, and the card that hangs off
-   it wants the room under it. */
-.ProseMirror [data-qm-review] {
-	scroll-margin-block: calc(3 * var(--_qm-tap-min));
-}
 /* Where text was only taken out there are no words to underline, so a wedge stands at the
    join, under the baseline the way a proofreader's caret does. It takes no width: the
-   line reads as the document has it. */
+   line reads as the document has it. What the pointer and a finger find is the join's
+   whole line, a letter to either side, since the wedge alone is too small to hit. */
 .ProseMirror .qm-review-gone {
 	position: relative;
 	display: inline-block;
@@ -793,13 +789,18 @@ li.ProseMirror-selectednode::after {
 	height: 1em;
 	vertical-align: text-bottom;
 }
+.ProseMirror .qm-review-gone::before {
+	content: '';
+	position: absolute;
+	inset: -0.15em -0.45em -0.4em;
+}
 .ProseMirror .qm-review-gone::after {
 	content: '';
 	position: absolute;
-	left: -0.3em;
-	bottom: -0.25em;
-	width: 0.6em;
-	height: 0.4em;
+	left: -0.35em;
+	bottom: -0.3em;
+	width: 0.7em;
+	height: 0.45em;
 	background: var(--_qm-review-line);
 	clip-path: polygon(50% 0, 100% 100%, 0 100%);
 	transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
@@ -871,24 +872,28 @@ li.ProseMirror-selectednode::after {
 /* A proposal's two answers, at the end of its last line: chrome set in the paragraph, so
    at the chrome's face and the label rung whatever the block around it is set in. A run
    rather than a row, so a proposal takes no line the paragraph did not have; the row is
-   for a block with no line to end. Accept carries the tint the proposed words carry, the
-   one filled thing in the pair, and Dismiss rests as a word. */
+   for a block with no line to end. The run stands a space off the words, and the space is
+   a real one, widened: it hangs at the end of a line the answers wrap from, where a margin
+   would indent them. Accept is the one outlined thing in the pair, on the card's own
+   ground so it reads as a button over a tinted block too, and Dismiss rests as a word. */
 .ProseMirror .qm-review-chip {
-	display: inline-flex;
-	gap: var(--_qm-space-half);
-	margin-inline-start: var(--_qm-space-2);
-	vertical-align: baseline;
 	font-family: var(--_qm-font);
 	font-size: var(--_qm-text-label);
 	font-style: normal;
 	font-weight: var(--_qm-weight-mid);
 	line-height: var(--_qm-leading-tight);
-	white-space: nowrap;
+	word-spacing: var(--_qm-space);
 	user-select: none;
 }
+.qm-review-acts {
+	display: inline-flex;
+	gap: var(--_qm-space-half);
+	vertical-align: baseline;
+	word-spacing: normal;
+	white-space: nowrap;
+}
 .ProseMirror .qm-review-chip-row {
-	display: flex;
-	margin-inline-start: 0;
+	display: block;
 	margin-block-start: var(--_qm-space);
 }
 .qm-review-act {
@@ -908,9 +913,19 @@ li.ProseMirror-selectednode::after {
 	color: var(--_qm-ink);
 }
 .qm-review-act.qm-review-accept {
-	background: var(--_qm-review-tint);
+	background: var(--_qm-bg);
+	box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	color: var(--_qm-ink);
 }
 .qm-review-act.qm-review-accept:hover {
-	background: var(--_qm-review-lit);
+	background: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint)) var(--_qm-bg);
+}
+/* Under a finger the two answers are a tap target each, and stand apart. */
+@media (pointer: coarse) {
+	.qm-review-act {
+		padding-block: var(--_qm-space);
+	}
+	.qm-review-acts {
+		gap: var(--_qm-space-2);
+	}
 }

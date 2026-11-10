@@ -1110,17 +1110,22 @@
 	// ── Review ──────────────────────────────────────────────────────────────────
 
 	/**
-	 * Bring the review item `id` to the reader: open the panel holding it, scroll it into view
-	 * by the least that shows it, light it, and raise its card where it has one. The focus
-	 * stays where it is, the reader having asked to look. False for an item the editor does
-	 * not draw.
+	 * Bring the review item `id` to the reader: open the panel holding it, scroll it to the
+	 * middle of the view, light it, and raise its card where it has one. The focus stays
+	 * where it is, the reader having asked to look, unless `focus` asks for it: the caret
+	 * then goes into the item, or the focus to its field, so the chords answer it. False for
+	 * an item the editor does not draw.
 	 */
-	export async function revealReview(id: string): Promise<boolean> {
+	export async function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
 		if (!span.alive) return false;
 		const key = reviewing.keyOf(id);
 		if (key === undefined) return false;
 		mainCard?.revealLeaf(key);
 		for (const card of cardRefs) card?.revealLeaf(key);
+		if (!(await span.resumes(tick()))) return false;
+		reviewing.reveal(id);
+		if (opts.focus && !leaves.prose(key)?.enterReview(id)) leaves.control(key)?.focus();
+		// The lit item is drawn again, so its element is read once it has been.
 		if (!(await span.resumes(tick()))) return false;
 		const at =
 			leaves.prose(key)?.reviewElements(id)[0] ??
@@ -1129,8 +1134,7 @@
 			) ??
 			leaves.control(key)?.el;
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-		at?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
-		reviewing.reveal(id);
+		at?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
 		return true;
 	}
 

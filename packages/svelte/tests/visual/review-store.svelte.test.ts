@@ -58,12 +58,31 @@ describe('the card', () => {
 		expect(review.shown).toBeUndefined();
 	});
 
-	it('rises at once for the caret, and goes with it', () => {
+	it('rises for the caret after the same beat, and goes with it', () => {
 		const { review } = store();
 		review.point('change', 'caret');
+		expect(review.lit).toBe('change');
+		vi.advanceTimersByTime(HOVER_MS - 1);
+		expect(review.shown).toBeUndefined();
+		review.point(undefined, 'caret');
+		vi.advanceTimersByTime(HOVER_MS);
+		expect(review.shown).toBeUndefined();
+
+		review.point('change', 'caret');
+		vi.advanceTimersByTime(HOVER_MS);
 		expect(review.shown).toMatchObject({ item: { id: 'change' }, via: 'caret' });
 		review.point(undefined, 'caret');
 		expect(review.shown).toBeUndefined();
+	});
+
+	it('stays with the caret that enters the item the pointer raised it for', () => {
+		const { review } = store();
+		review.point('change', 'pointer');
+		vi.advanceTimersByTime(HOVER_MS);
+		review.point('change', 'caret');
+		review.point(undefined, 'pointer');
+		vi.advanceTimersByTime(LEAVE_MS * 4);
+		expect(review.shown).toMatchObject({ item: { id: 'change' }, via: 'caret' });
 	});
 
 	it('is a change’s alone: a proposal is lit and raises none', () => {
@@ -80,6 +99,10 @@ describe('the card', () => {
 		vi.advanceTimersByTime(HOVER_MS);
 		expect(review.shown?.item.id).toBe('change');
 		expect(review.lit).toBe('change');
+		review.point(undefined, 'pointer');
+		review.point('other', 'pointer');
+		vi.advanceTimersByTime(HOVER_MS);
+		expect(review.shown?.item.id).toBe('change');
 	});
 });
 

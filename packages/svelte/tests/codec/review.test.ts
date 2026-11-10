@@ -20,6 +20,9 @@ interface Leaf {
 	acts: [string, ReviewAction][];
 	points: [string | undefined, ReviewVia][];
 	drawn: string[][];
+	/** The item whose card is up, and how often the leaf lowered it. */
+	shown?: string;
+	lowered: number;
 	/** Lay an anchor over the first `text` in the body, or a point at its start. */
 	anchor(id: string, text: string, point?: boolean): void;
 }
@@ -43,23 +46,40 @@ function leafOver(markdown: string): Leaf {
 		container: el,
 		onReview: (id, action) => acts.push([id, action]),
 		onReviewPoint: (id, via) => points.push([id, via]),
-		onReviewDrawn: (ids) => drawn.push([...ids])
+		onReviewDrawn: (ids) => drawn.push([...ids]),
+		reviewShown: () => leaf.shown,
+		onReviewDismiss: () => {
+			leaf.shown = undefined;
+			leaf.lowered++;
+		}
 	});
 	open.push(field);
-	return {
+	const leaf: Leaf = {
 		doc,
 		field,
 		el,
 		acts,
 		points,
 		drawn,
+		lowered: 0,
 		anchor(id, text, point = false) {
 			const at = doc.main.body.text.indexOf(text);
 			if (at < 0) throw new Error(`no ${text} in the body`);
 			field.insertAnchor(id, at, point ? at : at + text.length);
 		}
 	};
+	return leaf;
 }
+
+/** Put the caret a character into the first `text` of the body, in a focused leaf. */
+function caretIn(leaf: Leaf, text: string): void {
+	const view = viewOf(leaf.field);
+	const at = 2 + leaf.doc.main.body.text.indexOf(text);
+	view.focus();
+	view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
+}
+const mod = { ctrlKey: true };
+const keyOf = (chord: string): string => chord.slice(chord.lastIndexOf('-') + 1);
 
 /** What the reader would read were every proposal taken: the leaf's text less what is struck. */
 function proposedText(el: HTMLElement): string {
@@ -260,17 +280,65 @@ describe('a proposal', () => {
 		]);
 		expect(leaf.drawn.at(-1)).toEqual(['r1']);
 	});
+});
 
-	it('follows the reader’s own edits to the paragraph', () => {
+describe('a proposal over a paragraph the reader goes on writing', () => {
+	/** `The quick brown fox.` proposed as `The quick red fox.`, then `text` typed over `[from, to)`
+	 *  of the first `at` in the body. */
+	function typed(text: string, at: string, from = 0, to = from): Leaf {
 		const leaf = leafOver('The quick brown fox.');
 		leaf.anchor('~p1', 'quick');
-		const after = 'The quick red fox.';
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after }]);
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' }
+		]);
 		const view = viewOf(leaf.field);
-		const at = 1 + leaf.doc.main.body.text.indexOf('brown');
-		view.dispatch(view.state.tr.insertText('red', at, at + 'brown'.length));
+		const pos = 1 + leaf.doc.main.body.text.indexOf(at);
+		view.dispatch(view.state.tr.insertText(text, pos + from, pos + to));
+		return leaf;
+	}
+	const marks = (leaf: Leaf) => [
+		texts(leaf.el, 'del.qm-review-del'),
+		texts(leaf.el, 'ins.qm-review-ins')
+	];
+	const taken = (leaf: Leaf): string => {
+		const drawn = proposedText(leaf.el);
+		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		expect(shownText(leaf.el)).toBe(drawn);
+		return leaf.doc.main.body.text;
+	};
+
+	it.each([
+		['elsewhere in it', 'Truly, ', 'The', 'Truly, The quick red fox.'],
+		['against the head of a word it rewrites', 'very ', 'brown', 'The quick very red fox.'],
+		['against the tail of one', ' and grey', ' fox', 'The quick red and grey fox.']
+	])('leaves what was typed %s unstruck, and keeps it when taken', (_where, text, at, written) => {
+		const leaf = typed(text, at);
+		expect(marks(leaf)).toEqual([['brown'], ['red']]);
+		expect(taken(leaf)).toBe(written);
+	});
+
+	it('strikes a word it rewrites as the reader has since rewritten it', () => {
+		const leaf = typed('grey', 'brown', 0, 'brown'.length);
+		expect(marks(leaf)).toEqual([['grey'], ['red']]);
+		expect(taken(leaf)).toBe('The quick red fox.');
+	});
+
+	it('draws nothing where the reader wrote what it proposes', () => {
+		const leaf = typed('red', 'brown', 0, 'brown'.length);
 		expect(leaf.el.querySelector('del, ins')).toBeNull();
-		expect(proposedText(leaf.el)).toBe(after);
+		expect(leaf.drawn.at(-1)).toEqual(['r1']);
+	});
+
+	it('reads the paragraph anew under a proposal that arrives with another text', () => {
+		const leaf = typed('Truly, ', 'The');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' }
+		]);
+		expect(marks(leaf)).toEqual([['brown'], ['red']]);
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The slow brown fox.' }
+		]);
+		expect(marks(leaf)).toEqual([['Truly, ', 'quick'], ['slow']]);
 	});
 });
 
@@ -285,15 +353,6 @@ describe('answering', () => {
 		]);
 		return leaf;
 	}
-	function caretIn(leaf: Leaf, text: string): void {
-		const view = viewOf(leaf.field);
-		const at = 2 + leaf.doc.main.body.text.indexOf(text);
-		view.focus();
-		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
-	}
-	const mod = { ctrlKey: true };
-	const keyOf = (chord: string): string => chord.slice(chord.lastIndexOf('-') + 1);
-
 	it('a proposal carries its two buttons, named by the strings', () => {
 		const leaf = proposal();
 		const chip = leaf.el.querySelector('.qm-review-chip')!;
@@ -354,6 +413,83 @@ describe('answering', () => {
 		expect(leaf.acts).toEqual([]);
 		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.reject), mod);
 		expect(leaf.acts).toEqual([['r2', 'undo']]);
+	});
+
+	it('a pressed Accept leaves the caret after what landed, in a focused leaf', () => {
+		const leaf = proposal();
+		const view = viewOf(leaf.field);
+		expect(view.hasFocus()).toBe(false);
+		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		expect(view.hasFocus()).toBe(true);
+		const { $head } = view.state.selection;
+		expect($head.parent.textBetween(0, $head.parentOffset)).toBe('The quick red');
+	});
+
+	it('a pressed Accept leaves the caret the reader holds where it is', () => {
+		const leaf = proposal();
+		caretIn(leaf, 'second');
+		const view = viewOf(leaf.field);
+		const before = view.state.selection.$head.parentOffset;
+		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		const { $head } = view.state.selection;
+		expect($head.parent.textContent).toBe('A second paragraph.');
+		expect($head.parentOffset).toBe(before);
+	});
+
+	it('answers a proposal that only adds from anywhere in the paragraph it adds after', () => {
+		const leaf = leafOver('Opening line.\n\nClosing line.');
+		leaf.anchor('~p1', 'line', true);
+		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Inserted.' }]);
+		caretIn(leaf, 'Opening');
+		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
+		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.accept), mod);
+		expect(leaf.doc.main.body.text).toBe('Opening line.\nInserted.\nClosing line.');
+	});
+
+	it('gives the caret to the change inside a paragraph a proposal covers', () => {
+		const within = (): Leaf => {
+			const leaf = leafOver('The quick brown fox.');
+			leaf.anchor('~p1', 'brown');
+			leaf.anchor('~c1', 'fox');
+			leaf.field.setReview([
+				{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' },
+				{ id: 'r2', state: 'changed', anchor: '~c1' }
+			]);
+			caretIn(leaf, 'fox');
+			return leaf;
+		};
+		const back = within();
+		expect(back.points.at(-1)).toEqual(['r2', 'caret']);
+		press(viewOf(back.field), keyOf(REVIEW_KEYS.reject), mod);
+		expect(back.acts).toEqual([['r2', 'undo']]);
+
+		const taken = within();
+		press(viewOf(taken.field), keyOf(REVIEW_KEYS.accept), mod);
+		expect(taken.acts).toEqual([['r1', 'accept']]);
+	});
+
+	it('Escape lowers the card of an item the leaf draws, and is the leaf’s own key otherwise', () => {
+		const leaf = proposal();
+		caretIn(leaf, 'second');
+		const view = viewOf(leaf.field);
+		leaf.shown = 'r2';
+		press(view, 'Escape');
+		expect(leaf.lowered).toBe(1);
+		expect(view.hasFocus()).toBe(true);
+		leaf.shown = 'elsewhere';
+		press(view, 'Escape');
+		expect(leaf.lowered).toBe(1);
+	});
+
+	it('takes the caret into an item by its id', () => {
+		const leaf = proposal();
+		const view = viewOf(leaf.field);
+		expect(leaf.field.enterReview('r2')).toBe(true);
+		expect(view.hasFocus()).toBe(true);
+		expect(leaf.points.at(-1)).toEqual(['r2', 'caret']);
+		press(view, keyOf(REVIEW_KEYS.reject), mod);
+		expect(leaf.acts).toEqual([['r2', 'undo']]);
+		expect(leaf.field.enterReview('nowhere')).toBe(false);
 	});
 
 	it('the chords pass where the caret is in no item', () => {

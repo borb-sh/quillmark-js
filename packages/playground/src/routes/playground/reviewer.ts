@@ -1,7 +1,8 @@
 // `?review`: another writer's hand over the opened document, through the verbs a host's own
 // reviewer has. It writes a few changes and lays a few proposals where the document holds the
 // text for them, and answers the reader as a host does: an accepted or dismissed item leaves the
-// list, and a change taken back is written back.
+// list, a change taken back is written back, and a dismissal or a change taken back is offered
+// one step back on the editor's undo.
 import type { Addr, Content, Document, Quill } from '@quillmark/wasm';
 import type { ReviewEvent, ReviewItem } from '@quillmark/svelte/visual';
 
@@ -36,8 +37,9 @@ function anchorOf(
 	doc: Document,
 	addr: Addr,
 	id: string
-): { start: number; end: number } | undefined {
-	return doc.read(addr).anchors?.find((a) => a.id === id);
+): { id: string; start: number; end: number } | undefined {
+	const found = doc.read(addr).anchors?.find((a) => a.id === id);
+	return found && { id, start: found.start, end: found.end };
 }
 
 export function seedReview(doc: Document, quill: Quill, changed: () => void): Reviewer {
@@ -53,19 +55,21 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 		}
 	};
 
-	/** Write `insert` over the first `find` at `addr`, marked as a change. */
+	/** Write `insert` over the first `find` at `addr`, or after it where nothing is `before`,
+	 *  marked as a change over the words written. */
 	const rewrite = (addr: Addr, find: string, insert: string, before?: string): void => {
 		if (!has(addr)) return;
 		const at = doc.read(addr).text.indexOf(find);
 		if (at < 0) return;
 		const id = mint();
 		const start = before === undefined ? at + find.length : at;
+		const lead = insert.length - insert.trimStart().length;
 		doc.apply(addr, {
 			steps: [
 				before === undefined
 					? { splice: { at: start, insert } }
 					: { splice: { at, delete: find, insert } },
-				{ anchor: { id, start, end: start + insert.length } }
+				{ anchor: { id, start: start + lead, end: start + insert.length } }
 			]
 		});
 		held.push({
@@ -79,8 +83,8 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 						{ anchor: { id, remove: true } },
 						{
 							splice: {
-								at: now.start,
-								delete: doc.read(addr).text.slice(now.start, now.end),
+								at: now.start - lead,
+								delete: doc.read(addr).text.slice(now.start - lead, now.end),
 								insert: before ?? ''
 							}
 						}
@@ -156,15 +160,22 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 			if (action === 'undo') {
 				const written: Content | undefined = addr && doc.read(addr);
 				entry.revert?.();
-				editor.offerUndo('Change undone', () => {
+				editor.offerUndo('Change reverted', () => {
 					if (addr && written) doc.replace(addr, written);
 					else entry.redo?.();
 					held.splice(at, 0, entry);
 					land();
 				});
-			} else if (addr && 'anchor' in item && anchorOf(doc, addr, item.anchor)) {
+			} else {
 				// The editor wrote what an accept takes; either way the anchor has done its work.
-				doc.apply(addr, { steps: [{ anchor: { id: item.anchor, remove: true } }] });
+				const laid = addr && 'anchor' in item ? anchorOf(doc, addr, item.anchor) : undefined;
+				if (addr && laid) doc.apply(addr, { steps: [{ anchor: { id: laid.id, remove: true } }] });
+				if (action === 'dismiss')
+					editor.offerUndo('Proposal dismissed', () => {
+						if (addr && laid) doc.apply(addr, { steps: [{ anchor: laid }] });
+						held.splice(at, 0, entry);
+						land();
+					});
 			}
 			land();
 		}

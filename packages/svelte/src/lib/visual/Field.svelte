@@ -293,6 +293,9 @@
 	const changed = $derived(reviewed.changed);
 	const proposed = $derived(reviewed.proposed);
 	const lit = $derived(changed !== undefined && reviewing.lit === changed.id);
+	/** The item the focus in the field attends to: the change, whose card it raises, else the
+	 *  proposal. */
+	const attended = $derived(changed ?? proposed);
 	/** The chords, with the focus anywhere in the field: a proposal's answers, else the change
 	 *  taken back. A prose leaf's own items answer first, in the leaf. */
 	const reviewKeys = keydownHandler({
@@ -348,9 +351,9 @@
 			{@attach registerControl}
 			onfocusin={(e) => {
 				reportFocus?.(e);
-				if (changed) reviewing.point(changed.id, 'caret');
+				if (attended) reviewing.point(attended.id, 'caret');
 			}}
-			onfocusout={() => changed && reviewing.point(undefined, 'caret')}
+			onfocusout={() => attended && reviewing.point(undefined, 'caret')}
 			oninput={() => changed && reviewing.point(undefined, 'caret')}
 			onpointerenter={() => changed && reviewing.point(changed.id, 'pointer')}
 			onpointerleave={() => changed && reviewing.point(undefined, 'pointer')}
@@ -494,7 +497,7 @@
 		</div>
 
 		{#if proposed}
-			<ReviewProposal item={proposed} {value} />
+			<ReviewProposal item={proposed} {value} refocus={focusControl} />
 		{/if}
 		{#if !isContainer(field.control)}
 			<DiagnosticList {diagnostics} />
@@ -575,10 +578,6 @@
 		z-index: 1;
 		pointer-events: none;
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
-	}
-	/* Room for the card under a control a host scrolls to. */
-	.qm-field-control.qm-review-set {
-		scroll-margin-block: calc(3 * var(--_qm-tap-min));
 	}
 	.qm-field-control.qm-review-set.qm-review-lit::before {
 		background: var(--_qm-review-tint);

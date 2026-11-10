@@ -88,7 +88,7 @@
 	/* Neutral: the surface spends no hue on a state it can draw in grey. The pair
 	   clears WCAG 2.4.11's 3:1 against the card at both poles, at 4.8:1 and 5.8:1. */
 	--_qm-accent: var(--qm-accent, light-dark(#71717a, #a1a1aa));
-	/* The one hue the surface spends, and it spends it on a state. Each pole is
+	/* One of the two hues the surface spends, each on a state. Each pole is
 	   its own figure rather than one ink shown twice: a hue calibrated against
 	   white reads as a stain on a dark card. Both clear WCAG 1.4.3's 4.5:1 against
 	   the card, which is the bar the label rung asks for and the one the glyphs
@@ -98,9 +98,11 @@
 	   and a card's diagnostic carry one colour meaning error. */
 	--_qm-danger: var(--qm-danger, light-dark(#9e1518, #f9786c));
 	/* Review: what someone other than the reader wrote here, and what one proposes. The
-	   accent unless the host turns it: a review is a state, and the surface that spends no
-	   hue of its own on one lets a host give this state the hue it gives its reviewer. */
-	--_qm-review: var(--qm-review, var(--_qm-accent));
+	   other hue, and a state's again: drawn in the accent's grey, a proposed word reads as a
+	   code span and a changed field's line as its border, before either reads as someone
+	   else's writing. A figure per pole, as danger's are. Nothing is set in this hue: it runs
+	   under words and along them, and the words over it stay the ink. */
+	--_qm-review: var(--qm-review, light-dark(#4f46e5, #a5b4fc));
 	--_qm-font: var(--qm-font, ui-sans-serif, system-ui, sans-serif);
 	--_qm-font-mono: var(--qm-font-mono, ui-monospace, monospace);
 

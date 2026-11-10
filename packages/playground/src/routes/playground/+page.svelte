@@ -130,7 +130,7 @@
 				applyExternal(field: DocPath, delta?: Delta): void;
 				refresh(): void;
 				applyCardOps(ops: readonly CardOp[]): void;
-				revealReview(id: string): Promise<boolean>;
+				revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
 				offerUndo(notice: string, undo: () => void): () => void;
 		  }
 		| undefined = $state();
@@ -140,6 +140,8 @@
 	let reviewer: Reviewer | undefined;
 	let reviewItems = $state<ReviewItem[] | undefined>();
 	let reviewFocus = $state('none');
+	// The item the walk last stood on: the focus leaves the editor for the button that walks.
+	let reviewAt: string | undefined;
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -328,8 +330,8 @@
 	// reader wherever it is.
 	function nextReview(): void {
 		if (!reviewItems?.length) return;
-		const at = reviewItems.findIndex((item) => item.id === reviewFocus);
-		void editorRef?.revealReview(reviewItems[(at + 1) % reviewItems.length].id);
+		const at = reviewItems.findIndex((item) => item.id === reviewAt);
+		void editorRef?.revealReview(reviewItems[(at + 1) % reviewItems.length].id, { focus: true });
 	}
 	function handleError(err: EditorError): void {
 		lastError = `${err.code}: ${err.message}`;
@@ -786,7 +788,10 @@
 						diagnostics={externalDiagnostics}
 						review={reviewItems}
 						onReview={handleReview}
-						onReviewFocus={(id) => (reviewFocus = id ?? 'none')}
+						onReviewFocus={(id) => {
+							reviewFocus = id ?? 'none';
+							reviewAt = id ?? reviewAt;
+						}}
 						{fonts}
 						{fontLabels}
 					/>

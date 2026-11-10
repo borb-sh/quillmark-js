@@ -5,6 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { REVIEW_KEYS } from '$lib/core/codec';
+import { HOVER_MS } from '$lib/visual/review.svelte';
 import type { ReviewEvent, ReviewItem } from '$lib/visual';
 import { quill, example } from '../helpers/fixtures.js';
 import {
@@ -26,6 +27,11 @@ const card = (): HTMLElement | null => document.querySelector<HTMLElement>('.qm-
 const toast = (target: HTMLElement) => target.querySelector<HTMLElement>('.qm-toast');
 const keyOf = (chord: string): string => chord.slice(chord.lastIndexOf('-') + 1);
 const mod = { ctrlKey: true };
+/** The beat the focus rests in a changed field before its card rises. */
+const rested = async (): Promise<void> => {
+	await new Promise((done) => setTimeout(done, HOVER_MS));
+	flushSync();
+};
 
 interface Reviewed extends Mounted<EditorRef> {
 	doc: Document;
@@ -54,23 +60,24 @@ describe('a changed field', () => {
 		{ id: 'r1', state: 'changed', field: doc.pathFor('subtitle'), before: 'An older subtitle' }
 	];
 
-	it('marks the control, and raises its card with what the value was on focus', () => {
+	it('marks the control, and raises its card with what the value was once the focus rests', async () => {
 		const r = review(changed);
 		const control = openField(r.target, main, 'subtitle').querySelector('.qm-field-control')!;
 		expect(control.getAttribute('data-qm-review')).toBe('r1');
-		expect(card()).toBeNull();
 		leaf(control as HTMLElement).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
 		flushSync();
-		expect(card()?.textContent).toContain('An older subtitle');
 		expect(r.lit.at(-1)).toBe('r1');
+		expect(card()).toBeNull();
+		await rested();
+		expect(card()?.textContent).toContain('An older subtitle');
 	});
 
-	it('asks the host for the change back, and writes nothing', () => {
+	it('asks the host for the change back, and writes nothing', async () => {
 		const r = review(changed);
 		const before = r.doc.toMarkdown();
 		const control = openField(r.target, main, 'subtitle').querySelector('.qm-field-control')!;
 		leaf(control as HTMLElement).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-		flushSync();
+		await rested();
 		card()!.querySelector<HTMLButtonElement>('.qm-review-undo')!.click();
 		flushSync();
 		expect(r.events).toEqual([{ id: 'r1', action: 'undo' }]);
@@ -114,6 +121,24 @@ describe('a proposed field value', () => {
 		flushSync();
 		await settle();
 		expect(r.doc.getStored('columns')).toBeUndefined();
+	});
+
+	it('is the lit item while the focus is in its field', () => {
+		const r = review(proposed(2));
+		const control = openField(r.target, main, 'columns').querySelector('.qm-field-control')!;
+		control.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+		flushSync();
+		expect(r.lit.at(-1)).toBe('r1');
+	});
+
+	it('hands the focus back to the control when answered from its row', () => {
+		const r = review(proposed(2));
+		const columns = openField(r.target, main, 'columns');
+		const dismiss = row(r).querySelector<HTMLButtonElement>('.qm-review-dismiss')!;
+		dismiss.focus();
+		dismiss.click();
+		flushSync();
+		expect(columns.querySelector('.qm-field-control')!.contains(document.activeElement)).toBe(true);
 	});
 
 	it('is left alone when turned down', () => {
@@ -175,6 +200,14 @@ describe('an item in a closed group', () => {
 		expect(r.lit.at(-1)).toBe('r1');
 		expect(await r.editor.revealReview('nowhere')).toBe(false);
 	});
+
+	it('takes the focus to its field when asked to', async () => {
+		const r = review(items);
+		expect(await r.editor.revealReview('r1', { focus: true })).toBe(true);
+		flushSync();
+		const control = openField(r.target, main, 'columns').querySelector('.qm-field-control')!;
+		expect(control.contains(document.activeElement)).toBe(true);
+	});
 });
 
 describe('an item in the body', () => {
@@ -201,6 +234,18 @@ describe('an item in the body', () => {
 		expect(r.doc.main.body.text.startsWith('A proposed line.')).toBe(true);
 		expect(r.changes.map((c) => c.source)).toEqual(['prose']);
 		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
+	});
+
+	it('takes the caret when revealed with the focus, so its chords answer', async () => {
+		const r = review(anchored('changed'));
+		expect(await r.editor.revealReview('r1', { focus: true })).toBe(true);
+		flushSync();
+		const body = r.target
+			.querySelector('.qm-review-changed')!
+			.closest<HTMLElement>('.ProseMirror')!;
+		expect(document.activeElement).toBe(body);
+		press(body, keyOf(REVIEW_KEYS.reject), mod);
+		expect(r.events).toEqual([{ id: 'r1', action: 'undo' }]);
 	});
 
 	it('is drawn no more once answered, while the list still holds it', () => {

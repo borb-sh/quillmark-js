@@ -4,9 +4,9 @@
 // Attention has three sources and one answer. The pointer over an item, the caret in one and a
 // host's reveal each name an item; the lit one is the card's where a card is up, else the
 // revealed, the caret's, the pointer's, in that order. A card is the before-and-undo surface of a
-// `changed` item: it rises at once for the caret and a reveal, after a beat for the pointer so a
-// pointer crossing a paragraph raises nothing, and it waits a beat on the pointer's leaving so
-// the pointer can travel into it.
+// `changed` item: it rises at once for a reveal, and after a beat for the pointer and the caret,
+// so neither raises one on its way across a paragraph, and it waits a beat on the pointer's
+// leaving so the pointer can travel into it.
 //
 // An answered item is drawn no more, from the answer and not from the host's next list: the
 // reader's press shows at once however long the host takes to hand over a list without it.
@@ -16,7 +16,7 @@ import type { DocPath } from '../core/address.js';
 import type { ReviewAction, ReviewVia, TextReview } from '../core/codec/index.js';
 import type { FieldChange, FieldProposal, ReviewItem } from './review.js';
 
-/** How long the pointer rests on a change before its card rises, in ms. */
+/** How long the pointer or the caret rests on a change before its card rises, in ms. */
 export const HOVER_MS = 350;
 /** How long a card outlasts the pointer's leaving, in ms: the trip from the mark into the card. */
 export const LEAVE_MS = 200;
@@ -105,6 +105,8 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 	let card = $state<{ id: string; via: ReviewVia | 'reveal' } | undefined>();
 	let held = false;
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	/** The caret's rest on a change, its own so the pointer's passing does not restart it. */
+	let rest: ReturnType<typeof setTimeout> | undefined;
 	let fade: ReturnType<typeof setTimeout> | undefined;
 	const wait = (ms: number, then: () => void): void => {
 		clearTimeout(timer);
@@ -147,9 +149,19 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		point(id, via) {
 			if (via === 'caret') {
 				caret = id;
+				clearTimeout(rest);
 				if (changed(id)) {
-					clearTimeout(timer);
-					card = { id, via };
+					// A card already up for the item is the caret's from here: it stays while
+					// the caret does. The caret's card takes the pointer's place.
+					const raise = (): void => {
+						clearTimeout(timer);
+						card = { id, via };
+					};
+					if (card?.id === id) raise();
+					else
+						rest = setTimeout(() => {
+							if (caret === id) raise();
+						}, HOVER_MS);
 				} else if (card?.via === 'caret' || (id !== undefined && card)) card = undefined;
 				if (id !== undefined) revealed = undefined;
 				return;
@@ -161,7 +173,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				if (card) card = { id, via };
 				else
 					wait(HOVER_MS, () => {
-						if (pointer === id) card = { id, via };
+						if (pointer === id && (!card || card.via === 'pointer')) card = { id, via };
 					});
 			} else if (card?.via === 'pointer' && !held)
 				wait(LEAVE_MS, () => {
@@ -189,10 +201,12 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		},
 		dismiss() {
 			clearTimeout(timer);
+			clearTimeout(rest);
 			card = undefined;
 		},
 		reveal(id) {
 			clearTimeout(timer);
+			clearTimeout(rest);
 			clearTimeout(fade);
 			card = changed(id) ? { id, via: 'reveal' } : undefined;
 			revealed = id;
@@ -202,6 +216,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		},
 		dispose() {
 			clearTimeout(timer);
+			clearTimeout(rest);
 			clearTimeout(fade);
 		}
 	};
