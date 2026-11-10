@@ -559,6 +559,30 @@ describe('a proposal by blocks', () => {
 			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
 		});
 
+		it('is outdated where the reader wrote in a block it removes', () => {
+			const leaf = arrive('The quick brown fox, mine.', 'The quick brown fox.', '');
+			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		});
+
+		it('is outdated where the reader wrote in a block a rewrite into fewer drops', () => {
+			const leaf = leafOver('First here.\n\nSecond here, mine.');
+			leaf.field.setReview([
+				{
+					id: 'r1',
+					state: 'proposed',
+					replace: ids(leaf),
+					before: 'First here.\n\nSecond here.',
+					after: 'First and second here.'
+				}
+			]);
+			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		});
+
+		it('is not outdated where a block it takes out stands as it was read', () => {
+			const leaf = arrive('The quick brown fox.', 'The quick brown fox.', '');
+			expect(leaf.reports.at(-1)?.outdated).toEqual([]);
+		});
+
 		it('is outdated where the reader typed inside words it rewrites', () => {
 			const leaf = arrive('The quick, very brown fox.', 'The quick brown fox.', 'The fox.');
 			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);

@@ -22,6 +22,7 @@ function store(refuse = false) {
 		keyFor: (path) => path,
 		exact: () => true,
 		leafFor: (path) => path,
+		valueAt: () => undefined,
 		answer(id, _item, action) {
 			answers.push([id, action]);
 			return !refuse;

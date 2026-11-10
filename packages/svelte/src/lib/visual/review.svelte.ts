@@ -90,7 +90,7 @@ export interface ReviewSource {
 	/** Whether a path names a field itself, and not a place inside one. */
 	exact(path: DocPath): boolean;
 	/** The value the field at `path` holds, as its control is handed it. */
-	valueAt?(path: DocPath): unknown;
+	valueAt(path: DocPath): unknown;
 	/** The key of the prose leaf a rich text field's or a body's path names, `undefined` for
 	 *  one the editor does not hold. */
 	leafFor(path: DocPath): string | undefined;
@@ -198,7 +198,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (
 				proposed &&
 				'before' in proposed &&
-				!sameValue(source.valueAt?.(proposed.field), proposed.before)
+				!sameValue(source.valueAt(proposed.field), proposed.before)
 			)
 				out.add(proposed.id);
 		return out;

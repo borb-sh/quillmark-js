@@ -1007,13 +1007,16 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 						.join(' ')
 				})
 			);
-			if (whole)
+			if (whole) {
+				// Taking it removes what the reader wrote in the block since it was read.
+				stale ||= !base[k].content.eq(leaf.node.content);
 				plan.push({
 					from: leaf.pos,
 					to: leaf.pos + leaf.node.nodeSize,
 					content: Fragment.empty,
 					lift: true
 				});
+			}
 			if (!leaf.node.isTextblock) return;
 			const strike = (from: number, to: number): void => {
 				if (to > from)
