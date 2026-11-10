@@ -43,6 +43,9 @@
 		labelledBy?: string;
 		/** The parked `description` (FieldLabel) → `aria-describedby`. */
 		describedBy?: string;
+		/** The default tag's id (FieldLabel), which describes the leaf while it holds its
+		 * unwritten default (`createField`). */
+		defaultNoteId?: string;
 		/** The resolved `default:` where it prints: what an unset field's leaf holds
 		 * until an edit takes it (`createField`). */
 		fallback?: Content;
@@ -80,6 +83,7 @@
 		label,
 		labelledBy,
 		describedBy,
+		defaultNoteId,
 		fallback,
 		placeholder,
 		placeholderUntilEdit,
@@ -131,6 +135,7 @@
 				label,
 				labelledBy,
 				describedBy,
+				defaultNoteId,
 				fallback,
 				placeholder,
 				placeholderUntilEdit,
