@@ -203,7 +203,7 @@ Who writes an answer follows who holds the words:
 | `dismiss` | Turned a proposal down.  | No one.                                                                                                                                            |
 | `undo`    | Asked for a change back. | The host, which alone knows the inverse of what it wrote, followed by `applyExternal` or `refresh`.                                                |
 
-An answered item is drawn no more from the moment of the answer. The host takes it off the list and lifts its anchor (`{ anchor: { id, remove: true } }`). A field's proposal the schema refuses stays, unanswered, and the field says why as it does for any refused value.
+An answered item is drawn no more from the moment of the answer. The host takes it off the list and lifts its anchor (`{ anchor: { id, remove: true } }`). In a shared session the inverse of a write is `revert` from `@quillmark/collab`, which holds back what someone has typed in the write's lines since. A field's proposal the schema refuses stays, unanswered, and the field says why as it does for any refused value.
 
 Two verbs complete it. `revealReview(id)` brings an item to the reader, from a list of the host's own: it opens the group holding the item, scrolls it into view, lights it and raises its card, and resolves `false` for an item the editor does not draw. `offerUndo(notice, undo)` offers one step back from a write the host just made, such as an assistant's whole answer: `notice` on the toast a removal's undo takes, and ⌘Z/Ctrl+Z anywhere in the editor until the reader's next edit lands. It returns the offer's withdrawal.
 
