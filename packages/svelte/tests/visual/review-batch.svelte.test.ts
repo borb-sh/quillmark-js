@@ -96,7 +96,7 @@ describe('the drawn report', () => {
 				{
 					id: 'inside',
 					state: 'proposed',
-					field: `${doc.pathFor('contact')}.email`,
+					field: `${doc.pathFor('contact')}.no_such_cell`,
 					after: 'a@b.c'
 				},
 				{ id: 'unknown', state: 'proposed', field: 'main.no_such_field', after: 1 },

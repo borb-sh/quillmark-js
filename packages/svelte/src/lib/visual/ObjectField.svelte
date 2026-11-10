@@ -54,6 +54,8 @@
 		textCap
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
+	import { splitReview, type DeepReview } from './review.js';
+	import ReviewRows from './ReviewRows.svelte';
 	import type { LandingBox } from './leaves.js';
 	import { isEmptyContent } from '../core/codec/index.js';
 	import { wording } from './strings.js';
@@ -118,6 +120,11 @@
 		 * one naming a property draws under that property's control, and one naming
 		 * nothing this subform holds draws at its foot (`diagnostics.ts`). */
 		diagnostics?: readonly DeepDiagnostic[];
+		/** The review items naming a place inside this subform, each with its steps still to
+		 *  walk: one naming a cell draws under the cell's control, one naming a place inside a
+		 *  record or a list cell is handed to it, and the rest draw under the cell they are in
+		 *  or at the subform's foot (`ReviewRows`). */
+		review?: readonly DeepReview[];
 	}
 	let {
 		value,
@@ -132,7 +139,8 @@
 		flat = false,
 		placed = false,
 		onCellKey,
-		diagnostics
+		diagnostics,
+		review
 	}: Props = $props();
 
 	const t = wording();
@@ -150,6 +158,14 @@
 	);
 	const routed = $derived(splitDeep(diagnostics));
 	const foot = $derived(unrouted(routed, (step) => typeof step === 'string' && has(step)));
+	const reviewed = $derived(splitReview(review));
+	/** The items naming no cell this subform holds, drawn at its foot with where they are. */
+	const reviewFoot = $derived([
+		...reviewed.here,
+		...[...reviewed.below]
+			.filter(([step]) => typeof step !== 'string' || !has(step))
+			.flatMap(([step, list]) => list.map((e) => ({ steps: [step, ...e.steps], item: e.item })))
+	]);
 
 	/** What an unset optional cell ghosts, which is what it prints: `none`. An answered
 	 *  cell ghosts nothing, an empty answer printing empty. */
@@ -281,6 +297,8 @@
 			{@const describes =
 				sub.description && idBase ? propertyDomIds(idBase, key).description : undefined}
 			{@const deep = routed.below.get(key)}
+			{@const reviewHere = reviewed.below.get(key)}
+			{@const handsDown = kind === 'object' || kind === 'array'}
 			{@const own = isContainer(kind) ? undefined : deep?.map((d) => d.diagnostic)}
 			<!-- `for` reaches the labelable controls, a variant through its discriminant; the
 			     date field's focus lives on a segment and a prose cell is a `contenteditable`,
@@ -420,6 +438,7 @@
 							contentAt={(path) => contentAt([key, ...path])}
 							onCommit={(v) => commitProp(key, v)}
 							diagnostics={deep}
+							review={reviewHere}
 						/>
 					{:else if kind === 'object'}
 						<ObjectField
@@ -434,6 +453,7 @@
 							contentAt={(path) => contentAt([key, ...path])}
 							onCommit={(v) => commitProp(key, v)}
 							diagnostics={deep}
+							review={reviewHere}
 						/>
 					{:else if kind === 'matrix'}
 						<MatrixField
@@ -473,11 +493,15 @@
 						/>
 					{/if}
 					<DiagnosticList diagnostics={own} />
+					{#if !handsDown}
+						<ReviewRows entries={reviewHere} value={obj[key]} />
+					{/if}
 				</div>
 			</div>
 		{/each}
 	</div>
 	<DiagnosticList diagnostics={foot} />
+	<ReviewRows entries={reviewFoot} {value} />
 </div>
 
 <style>
