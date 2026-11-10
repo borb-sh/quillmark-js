@@ -61,6 +61,14 @@
   where it does not. The seed variants are query flags with no chrome, read once per
   open, for the branches a quill on disk reaches none of (README
   §Routes).
+
+  `?review` stands another writer over the opened document (`reviewer.ts`): changes it wrote
+  and proposals it holds, handed to the editor as `review`, and its answers to `onReview`.
+
+    seed ─► doc.apply (text + anchor) ─► review = items
+    accept ─► the editor's own edit ─► onChange ─► onReview ─► the item leaves the list
+    undo ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
+                                           └► editor.offerUndo (the step back from it)
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -77,11 +85,18 @@
 		OutputFormat
 	} from '@quillmark/wasm';
 	import type { Landing, Place, EditorError, DocPath } from '@quillmark/svelte/core';
-	import type { ActiveLeaf, CardOp, EditorChange } from '@quillmark/svelte/visual';
+	import type {
+		ActiveLeaf,
+		CardOp,
+		EditorChange,
+		ReviewEvent,
+		ReviewItem
+	} from '@quillmark/svelte/visual';
 	import type { Delta, RemoteChange, Session } from '@quillmark/collab';
 	import { Preview } from '@quillmark/svelte/preview';
 	import { LABELS as fontLabels, loadSuite } from '@quillmark/fonts';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
+	import { seedReview, type Reviewer } from './reviewer';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -115,8 +130,16 @@
 				applyExternal(field: DocPath, delta?: Delta): void;
 				refresh(): void;
 				applyCardOps(ops: readonly CardOp[]): void;
+				revealReview(id: string): Promise<boolean>;
+				offerUndo(notice: string, undo: () => void): () => void;
 		  }
 		| undefined = $state();
+
+	// The reviewer under `?review`, the list it hands the editor, and the item the editor says is
+	// under the reader's attention.
+	let reviewer: Reviewer | undefined;
+	let reviewItems = $state<ReviewItem[] | undefined>();
+	let reviewFocus = $state('none');
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -296,6 +319,18 @@
 		lastChangeSource = 'remote';
 		scheduleRecompile();
 	}
+	// The reader's answer to a review item. The editor has already written an accepted
+	// proposal, through `onChange`; the reviewer makes the write a change taken back asks for.
+	function handleReview(event: ReviewEvent): void {
+		if (editorRef) reviewer?.answer(event, editorRef);
+	}
+	// A host's own way through the list: the next item after the one in focus, brought to the
+	// reader wherever it is.
+	function nextReview(): void {
+		if (!reviewItems?.length) return;
+		const at = reviewItems.findIndex((item) => item.id === reviewFocus);
+		void editorRef?.revealReview(reviewItems[(at + 1) % reviewItems.length].id);
+	}
 	function handleError(err: EditorError): void {
 		lastError = `${err.code}: ${err.message}`;
 	}
@@ -382,6 +417,9 @@
 		engineHandle = undefined;
 		live = undefined;
 		room = 'none';
+		reviewer = undefined;
+		reviewItems = undefined;
+		reviewFocus = 'none';
 		fonts = [];
 		refused = undefined;
 		editorRef = undefined;
@@ -478,6 +516,15 @@
 			if (joined) {
 				live = joined;
 				room = `${roomName} · ${joined.epoch}`;
+			} else if (params.has('review')) {
+				// Seeded before the editor mounts, so the anchors are in the value each leaf opens on.
+				// A room's document is every tab's, and the items are this page's alone.
+				const seeded = seedReview(doc, quill, () => {
+					reviewItems = seeded.items();
+					scheduleRecompile();
+				});
+				reviewer = seeded;
+				reviewItems = seeded.items();
 			}
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
 			// suite and the render build; the engine and the session follow behind it.
@@ -619,6 +666,14 @@
 					<span class="qm-readout" data-testid="room">{room}</span></span
 				>
 			{/if}
+			{#if reviewItems}
+				<span class="stat"
+					><span class="qm-label">review</span>
+					<span class="qm-readout" data-testid="review-focus"
+						>{reviewFocus} · {reviewItems.length} open</span
+					></span
+				>
+			{/if}
 			<span class="stat"
 				><span class="qm-label">error</span>
 				<!-- The one reading on the strip that is a failure rather than a fact, so it
@@ -663,6 +718,15 @@
 						data-testid="download-doc"
 						disabled={opening || !session}
 						onclick={download}>Download PDF</button
+					>
+				{/if}
+				{#if reviewItems}
+					<button
+						class="qm-control"
+						type="button"
+						data-testid="review-next"
+						disabled={opening || !reviewItems.length}
+						onclick={nextReview}>Next change</button
 					>
 				{/if}
 				<button
@@ -720,6 +784,9 @@
 						onChange={handleChange}
 						onError={handleError}
 						diagnostics={externalDiagnostics}
+						review={reviewItems}
+						onReview={handleReview}
+						onReviewFocus={(id) => (reviewFocus = id ?? 'none')}
 						{fonts}
 						{fontLabels}
 					/>

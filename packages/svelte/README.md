@@ -147,6 +147,68 @@ Hand it a different `doc` and the editor **re-keys itself**: every leaf remounts
 
 `insertCard` hands back the new card's `cardId`; `removeCard`, `moveCard` and `setKind` take one. `focusField` reaches any mounted field: a prose leaf takes its view's focus, a form control the same handoff a click on its label takes, and either way the group holding it is revealed first. `washField` plays the same arrival wash over a field and nothing else, for a change the host wrote: focus, scroll and closed groups stay as they are, and a field in a closed group washes nothing. A card key or a path the surface does not hold is a no-op that reports `target-unknown` through `onError` at `dev` severity.
 
+### Review
+
+`review` is a list of what someone other than the reader, an assistant or a collaborator, changed in the document and what they propose to change. The editor draws each item where it is, in its own flow, and reports the reader's answers. The list is plain data, the host's to keep: an item is drawn while it is on the list.
+
+```svelte
+<VisualEditor
+	bind:this={editor}
+	{doc}
+	{quill}
+	review={items}
+	onReview={({ id, action }) => {
+		/* 'accept' | 'dismiss' | 'undo'; take the item off the list */
+	}}
+	onReviewFocus={(id) => {
+		/* the item under the reader's attention, or undefined */
+	}}
+/>
+```
+
+An item names its place by an **anchor** in a rich text field or a body, or by a **field**'s path:
+
+```ts
+type ReviewItem =
+	| { id: string; state: 'changed'; anchor: string; before?: string }
+	| { id: string; state: 'proposed'; anchor: string; after: string }
+	| { id: string; state: 'changed'; field: DocPath; before?: unknown }
+	| { id: string; state: 'proposed'; field: DocPath; after?: unknown };
+```
+
+- **A change in text** is a line under the words that were written, or a small wedge where words were only removed (a point anchor). The pointer resting on it, or the caret in it, raises a card with `before`, the words it replaced, and **Undo**.
+- **A proposal in text** reads the paragraphs its anchor touches as rewritten to `after`, Markdown: the words that would go are struck, the words that would come are tinted, and blocks it adds stand in flow where they would land, with **Accept** and **Dismiss** at the end of its last line. `''` proposes the paragraphs' removal, and a point anchor proposes new blocks after the paragraph holding it. A paragraph takes one proposal, whole.
+- **A change to a field** is a line along the foot of its control, with the same card. **A proposal for a field** stands under the control as the value that would go and the value that would come, with the same two answers. A `text` field holds no anchors, so its review is its field's.
+- An item in a closed group marks the group's header.
+
+The host lays an anchor with the document's own `apply`, in the write that changes the text or on its own, and tells the editor the field moved. An id prefixed `~` is transient and never reaches the stored value.
+
+```ts
+const at = doc.read(addr).text.indexOf('disjoint');
+doc.apply(addr, {
+	steps: [
+		{ splice: { at, delete: 'disjoint', insert: 'separate' } },
+		{ anchor: { id: '~r1', start: at, end: at + 'separate'.length } }
+	]
+});
+editor.applyExternal(doc.pathFor(addr));
+items = [...items, { id: 'r1', state: 'changed', anchor: '~r1', before: 'disjoint' }];
+```
+
+Who writes an answer follows who holds the words:
+
+| `action`  | What the reader did      | Who writes                                                                                                                                         |
+| --------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accept`  | Took a proposal.         | The editor, before the event: the proposal as it was drawn, as an edit of the reader's. `onChange` reports it and the reader's undo takes it back. |
+| `dismiss` | Turned a proposal down.  | No one.                                                                                                                                            |
+| `undo`    | Asked for a change back. | The host, which alone knows the inverse of what it wrote, followed by `applyExternal` or `refresh`.                                                |
+
+An answered item is drawn no more from the moment of the answer. The host takes it off the list and lifts its anchor (`{ anchor: { id, remove: true } }`). A field's proposal the schema refuses stays, unanswered, and the field says why as it does for any refused value.
+
+Two verbs complete it. `revealReview(id)` brings an item to the reader, from a list of the host's own: it opens the group holding the item, scrolls it into view, lights it and raises its card, and resolves `false` for an item the editor does not draw. `offerUndo(notice, undo)` offers one step back from a write the host just made, such as an assistant's whole answer: `notice` on the toast a removal's undo takes, and ⌘Z/Ctrl+Z anywhere in the editor until the reader's next edit lands. It returns the offer's withdrawal.
+
+With the caret in an item, or the focus in its field, `REVIEW_KEYS` answer it: ⌘/Ctrl+Enter accepts a proposal, and ⌘/Ctrl+. dismisses one or asks for a change back. Every word the review draws is a `strings` key, and its one hue is `--qm-review` ([THEMING.md](THEMING.md)).
+
 ### Wording
 
 The package ships English and a seam to replace it. `strings` is keyed and **partial**: set what you have translations for, and the rest stay the package's. Several keys are **accessible names** rather than decoration (the card controls, the add trigger), so an untranslated surface reads the wrong language to a screen reader. `DEFAULT_VISUAL_STRINGS` is the English, exported so you can compose against it. `<Preview>` takes its own three-key `strings` for the states it shows when there is nothing to paint.

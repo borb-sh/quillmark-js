@@ -23,6 +23,7 @@
 	import ProseField from './ProseField.svelte';
 	import CardControls from './CardControls.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
+	import { review } from './review.svelte.js';
 
 	/** The per-card operation bundle the VisualEditor builds (all resolve id→index lazily). */
 	interface CardOps {
@@ -72,6 +73,8 @@
 		onError,
 		leaves
 	}: Props = $props();
+
+	const reviewing = review();
 
 	// The rename in flight, written once on blur or Enter. Held apart from the stored
 	// title because a re-derive mid-edit hands `card` back with the title it stored.
@@ -271,6 +274,8 @@
 								{@const isOpen = open.has(group)}
 								{@const flagged =
 									!isOpen && section.fields.some((f) => ops.diagFor(f.name)?.length)}
+								{@const reviewed =
+									!isOpen && section.fields.some((f) => reviewing.marks(ops.leafKey(f.name)))}
 								{@const panelId = ops.panelId(group)}
 								{@const headIds = section.head ? ops.domIds(section.head.name) : undefined}
 								{@const headHint = section.head?.description}
@@ -298,6 +303,10 @@
 												     marked on the header that opens them. -->
 												<span class="qm-group-flag" aria-hidden="true"></span>
 												<span class="qm-visually-hidden">{t.strings.groupFlagged}</span>
+											{/if}
+											{#if reviewed}
+												<span class="qm-group-flag qm-group-reviewed" aria-hidden="true"></span>
+												<span class="qm-visually-hidden">{t.strings.groupReviewed}</span>
 											{/if}
 										</button>
 										{#if headIds && headHint}
@@ -576,6 +585,10 @@
 		margin-inline-start: var(--_qm-space);
 		border-radius: var(--_qm-radius-pill);
 		background: var(--_qm-danger);
+	}
+	/* The same mark in the review hue: something under here is someone else's to look at. */
+	.qm-group-reviewed {
+		background: var(--_qm-review);
 	}
 	/* One rung between the payload's two kinds of section, and none inside the panel stack:
 	 what stands one disclosure row off the next is the two headers' own block padding and

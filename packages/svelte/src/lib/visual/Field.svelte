@@ -57,6 +57,10 @@
 	import MatrixField from './MatrixField.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
 	import FieldLabel from './FieldLabel.svelte';
+	import ReviewProposal from './ReviewProposal.svelte';
+	import { review } from './review.svelte.js';
+	import { REVIEW_KEYS } from '../core/codec/index.js';
+	import { keydownHandler } from 'prosemirror-keymap';
 
 	interface Props {
 		field: FieldModel;
@@ -280,6 +284,36 @@
 	 * controller — the source that drives its caret signals too — and is excluded here
 	 * rather than counted twice.
 	 */
+	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
+	// A change rests as a line on the control's edge and a proposal as a row under it. The
+	// pointer over the control and the focus in it are the field's two ways of being attended
+	// to, as the pointer and the caret are a mark's.
+	const reviewing = review();
+	const reviewed = $derived(reviewing.at(leafKey));
+	const changed = $derived(reviewed.changed);
+	const proposed = $derived(reviewed.proposed);
+	const lit = $derived(changed !== undefined && reviewing.lit === changed.id);
+	/** The chords, with the focus anywhere in the field: a proposal's answers, else the change
+	 *  taken back. A prose leaf's own items answer first, in the leaf. */
+	const reviewKeys = keydownHandler({
+		[REVIEW_KEYS.accept]: () => {
+			if (!proposed) return false;
+			reviewing.act(proposed.id, 'accept');
+			return true;
+		},
+		[REVIEW_KEYS.reject]: () => {
+			const item = proposed ?? changed;
+			if (!item) return false;
+			reviewing.act(item.id, proposed ? 'dismiss' : 'undo');
+			return true;
+		}
+	});
+	function onReviewKey(e: KeyboardEvent): void {
+		if (e.defaultPrevented || (!changed && !proposed)) return;
+		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
+		if (reviewKeys({} as never, e)) e.preventDefault();
+	}
+
 	const reportFocus = $derived(
 		field.control === 'prose'
 			? undefined
@@ -288,7 +322,9 @@
 	);
 </script>
 
-<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- The keydown is a control's, bubbled: the field answers the review chords for it. -->
+<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail} onkeydown={onReviewKey}>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
@@ -306,7 +342,19 @@
 	 rule below holds why). One markup for both spans; a field owning its row nests a
 	 level and measures the same. -->
 	<div class="qm-field-stack">
-		<div class="qm-field-control qm-wash" {@attach registerControl} onfocusin={reportFocus}>
+		<div
+			class={['qm-field-control qm-wash', { 'qm-review-set': changed, 'qm-review-lit': lit }]}
+			data-qm-review={changed?.id}
+			{@attach registerControl}
+			onfocusin={(e) => {
+				reportFocus?.(e);
+				if (changed) reviewing.point(changed.id, 'caret');
+			}}
+			onfocusout={() => changed && reviewing.point(undefined, 'caret')}
+			oninput={() => changed && reviewing.point(undefined, 'caret')}
+			onpointerenter={() => changed && reviewing.point(changed.id, 'pointer')}
+			onpointerleave={() => changed && reviewing.point(undefined, 'pointer')}
+		>
 			{#if field.control === 'prose'}
 				<ProseField
 					{quill}
@@ -445,6 +493,9 @@
 			{/if}
 		</div>
 
+		{#if proposed}
+			<ReviewProposal item={proposed} {value} />
+		{/if}
 		{#if !isContainer(field.control)}
 			<DiagnosticList {diagnostics} />
 		{/if}
@@ -510,5 +561,26 @@
 	   a subform it bounds a group, where there is no single box for it to disagree with. */
 	.qm-field-control {
 		border-radius: var(--_qm-radius-inner);
+	}
+	/* A value someone else set is underlined as a changed word is: the same stroke along the
+	   control's foot, and under attention the tint a lit word takes. A plane over the
+	   control, as the wash is, so it reads the same over a well, a switch and a subform, and
+	   lifted over the control's own positioned box. */
+	.qm-field-control.qm-review-set::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		box-shadow: inset 0 calc(-1 * var(--_qm-vertical-width)) 0 var(--_qm-review-line);
+		z-index: 1;
+		pointer-events: none;
+		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	/* Room for the card under a control a host scrolls to. */
+	.qm-field-control.qm-review-set {
+		scroll-margin-block: calc(3 * var(--_qm-tap-min));
+	}
+	.qm-field-control.qm-review-set.qm-review-lit::before {
+		background: var(--_qm-review-tint);
 	}
 </style>

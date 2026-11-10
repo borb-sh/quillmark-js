@@ -97,6 +97,10 @@
 	   figures are the host scale's (`preset/scale.css`), so a page's status line
 	   and a card's diagnostic carry one colour meaning error. */
 	--_qm-danger: var(--qm-danger, light-dark(#9e1518, #f9786c));
+	/* Review: what someone other than the reader wrote here, and what one proposes. The
+	   accent unless the host turns it: a review is a state, and the surface that spends no
+	   hue of its own on one lets a host give this state the hue it gives its reviewer. */
+	--_qm-review: var(--qm-review, var(--_qm-accent));
 	--_qm-font: var(--qm-font, ui-sans-serif, system-ui, sans-serif);
 	--_qm-font-mono: var(--qm-font-mono, ui-monospace, monospace);
 
@@ -209,6 +213,16 @@
 	   ratio `default` steps the ink. What is drawn over it in the card's colour, the
 	   thumb and the check, holds 3:1 at both poles, at 3.3:1 and 4.2:1. */
 	--_qm-accent-default: color-mix(in oklab, var(--_qm-accent), var(--_qm-bg) 20%);
+	/* The review hue, three ways. `tint` is held under the words a proposal would add and
+	   over a field someone else set, at the strength the accent's own tint is held under
+	   body text plus what a state resting on a well has to clear. `lit` is that tint under
+	   attention: the pointer over the item, the caret in it, a host revealing it. `line` is
+	   the stroke: the line under changed words, the line through the words a proposal
+	   would take, and a changed field's edge, held back so it sits under a link's
+	   underline rather than beside it. */
+	--_qm-review-tint: color-mix(in oklab, var(--_qm-review) 20%, transparent);
+	--_qm-review-lit: color-mix(in oklab, var(--_qm-review) 34%, transparent);
+	--_qm-review-line: color-mix(in oklab, var(--_qm-review) 60%, transparent);
 	/* The danger hue held: what a destructive control fills with where the family's
 	   neutral hover rung would read as one more button. Mixed at the accent tint's
 	   strength, so a held tint is a held tint whichever hue it carries. */

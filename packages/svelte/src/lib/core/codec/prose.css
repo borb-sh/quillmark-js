@@ -759,3 +759,158 @@ li.ProseMirror-selectednode::after {
 .qm-table-drop[data-axis='column'] {
 	width: var(--_qm-ring-width);
 }
+
+/* ── Review (`review.ts`) ────────────────────────────────────────────────────
+   Drawn in the leaf's own flow and at the leaf's own type, so a reviewed paragraph still
+   reads as the paragraph. One hue throughout (`--_qm-review`), and three strengths of it.
+
+   A change someone else made is a line under the words that were written: quieter than a
+   link's, which is the ink's, and absent from the page the document prints. The tint
+   arrives with attention. */
+.ProseMirror .qm-review-changed {
+	text-decoration: underline;
+	text-decoration-color: var(--_qm-review-line);
+	text-decoration-thickness: var(--_qm-vertical-width);
+	text-underline-offset: 0.2em;
+	border-radius: var(--_qm-radius-inner);
+	transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-review-changed.qm-review-lit {
+	background: var(--_qm-review-tint);
+}
+/* A host brings an item to the reader by scrolling it into view, and the card that hangs off
+   it wants the room under it. */
+.ProseMirror [data-qm-review] {
+	scroll-margin-block: calc(3 * var(--_qm-tap-min));
+}
+/* Where text was only taken out there are no words to underline, so a wedge stands at the
+   join, under the baseline the way a proofreader's caret does. It takes no width: the
+   line reads as the document has it. */
+.ProseMirror .qm-review-gone {
+	position: relative;
+	display: inline-block;
+	width: 0;
+	height: 1em;
+	vertical-align: text-bottom;
+}
+.ProseMirror .qm-review-gone::after {
+	content: '';
+	position: absolute;
+	left: -0.3em;
+	bottom: -0.25em;
+	width: 0.6em;
+	height: 0.4em;
+	background: var(--_qm-review-line);
+	clip-path: polygon(50% 0, 100% 100%, 0 100%);
+	transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-review-gone.qm-review-lit::after {
+	background: var(--_qm-review);
+}
+
+/* A proposal is its paragraph read as an edit of itself. The words that would go step back
+   to the label ink under a line; the words that would come stand at the ink on the tint,
+   since they are what the reader is being asked to read. A struck word and the word
+   replacing it stand a space apart, having none of the paragraph's own between them. */
+.ProseMirror .qm-review-del {
+	color: var(--_qm-ink-label);
+	text-decoration: line-through;
+	text-decoration-color: var(--_qm-review-line);
+}
+/* The tint runs a hair past the words on either side, as a highlighter does, without moving
+   them: a shadow in the tint's own colour beside the fill, so the line sets as it would
+   without the proposal. */
+.ProseMirror .qm-review-ins {
+	text-decoration: none;
+	background: var(--_qm-review-tint);
+	box-shadow:
+		calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-tint),
+		var(--_qm-space-half) 0 0 var(--_qm-review-tint);
+	border-radius: var(--_qm-radius-inner);
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+	transition:
+		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+		box-shadow var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-review-del + .qm-review-ins {
+	margin-inline-start: calc(var(--_qm-space) + var(--_qm-space-half));
+}
+/* A block the proposal adds whole, in flow where it would stand. */
+.ProseMirror .qm-review-add {
+	background: var(--_qm-review-tint);
+	box-shadow:
+		calc(-1 * var(--_qm-space)) 0 0 var(--_qm-review-tint),
+		var(--_qm-space) 0 0 var(--_qm-review-tint);
+	border-radius: var(--_qm-radius-inner);
+	transition:
+		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+		box-shadow var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.ProseMirror .qm-review-lit .qm-review-ins {
+	background: var(--_qm-review-lit);
+	box-shadow:
+		calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-lit),
+		var(--_qm-space-half) 0 0 var(--_qm-review-lit);
+}
+.ProseMirror .qm-review-add.qm-review-lit {
+	background: var(--_qm-review-lit);
+	box-shadow:
+		calc(-1 * var(--_qm-space)) 0 0 var(--_qm-review-lit),
+		var(--_qm-space) 0 0 var(--_qm-review-lit);
+}
+/* A block the proposal takes whole that has no words to strike: a rule, an island. */
+.ProseMirror .qm-review-out:is(hr, div) {
+	opacity: var(--_qm-opacity-muted);
+}
+/* The empty paragraph a proposal writes into shows the proposal, not the leaf's ghost. */
+.ProseMirror .qm-review-held.qm-prose-placeholder[data-placeholder]::after {
+	content: none;
+}
+
+/* A proposal's two answers, at the end of its last line: chrome set in the paragraph, so
+   at the chrome's face and the label rung whatever the block around it is set in. A run
+   rather than a row, so a proposal takes no line the paragraph did not have; the row is
+   for a block with no line to end. Accept carries the tint the proposed words carry, the
+   one filled thing in the pair, and Dismiss rests as a word. */
+.ProseMirror .qm-review-chip {
+	display: inline-flex;
+	gap: var(--_qm-space-half);
+	margin-inline-start: var(--_qm-space-2);
+	vertical-align: baseline;
+	font-family: var(--_qm-font);
+	font-size: var(--_qm-text-label);
+	font-style: normal;
+	font-weight: var(--_qm-weight-mid);
+	line-height: var(--_qm-leading-tight);
+	white-space: nowrap;
+	user-select: none;
+}
+.ProseMirror .qm-review-chip-row {
+	display: flex;
+	margin-inline-start: 0;
+	margin-block-start: var(--_qm-space);
+}
+.qm-review-act {
+	padding: var(--_qm-space-half) var(--_qm-space-2);
+	border: none;
+	border-radius: var(--_qm-radius-inner);
+	background: transparent;
+	font: inherit;
+	color: var(--_qm-ink-label);
+	cursor: pointer;
+	transition:
+		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
+		color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+.qm-review-act:hover {
+	background: var(--_qm-surface-hover);
+	color: var(--_qm-ink);
+}
+.qm-review-act.qm-review-accept {
+	background: var(--_qm-review-tint);
+	color: var(--_qm-ink);
+}
+.qm-review-act.qm-review-accept:hover {
+	background: var(--_qm-review-lit);
+}

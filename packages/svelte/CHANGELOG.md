@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**Review draws in the editor.** `<VisualEditor review={items}>` takes a list of what someone other than the reader changed and what they propose, and draws each item in the editor's own flow, by an anchor in a rich text field or a body or by a field's path. A change is a line under its words, a wedge where words were only removed, or a line along the foot of a field's control, and the pointer or the caret raises a card with what it replaced and **Undo**. A proposal reads its paragraphs as rewritten to its Markdown, the words that would go struck and the words that would come tinted, with blocks it adds set in flow and **Accept** and **Dismiss** at its end; a field's proposal stands under its control the same way. Accepting is the editor's own edit: what lands is what was drawn, `onChange` reports it and undo takes it back. `onReview` reports each answer, `onReviewFocus` the item under attention, and ⌘/Ctrl+Enter and ⌘/Ctrl+. (`REVIEW_KEYS`) answer from the keyboard. `revealReview(id)` brings an item to the reader, opening the group that holds it; a closed group's header marks that it holds one. The words are `strings` keys and the hue is the new `--qm-review` dial, the accent by default.
+
+**A host's write can be undone with ⌘Z.** `offerUndo(notice, undo)` offers one step back from a write the host made for the reader, on the toast a removal's undo takes and on ⌘Z/Ctrl+Z anywhere in the editor, a text field included, until the reader's next edit.
+
 **A drop anywhere in a table cell lands in that cell.** Text dropped on a cell's padding, or on the edge of its text where no line is, lands in the cell at the nearest place in its text, where the first landed as a new paragraph above the table and the second was taken and dropped.
 
 **Enter in a list of numbers moves on.** Enter in a number row that holds a number commits it and takes the focus to the next row with its number selected, or from the last row to a standing row for the next number, where the caret stayed and the next digits ran onto the number just entered.

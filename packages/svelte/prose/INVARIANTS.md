@@ -167,9 +167,27 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **A nested address is a target through its field.** The boundary names elements and cells `Addr` cannot reach, so a landing checks each step against the schema and hands the walk to the field's control, each rung resolving its own step at the point of use.
 
+### Review
+
+**Review is the host's list, drawn in the editor's own flow.** An item is plain data naming an anchor a leaf holds or a field's path, and it draws where that is: a decoration in the leaf, a mark on the control. Nothing is measured from outside a view, so an item rides every edit and reflow, and nothing of it enters the document, the commit, a leaf's history or a collaborator's copy while it stands. Rejected: an overlay laid over the editor, which re-measures on every change and parts from the text it describes; a host render slot, which hands reconciliation to consumer code; and suggestion marks in the content, which every reader of the content would have to know to skip.
+
+**A proposal is drawn and taken from one plan.** The leaf pairs the proposal's blocks with the paragraphs its anchor touches and derives the pieces once: the stretches to replace, the blocks to lift, the blocks to add. The decorations are those pieces drawn, and taking the proposal is those pieces as one transaction, so what lands is what was read. Rejected: the host writing an accepted proposal with the store's block verbs, which place Markdown by rules of their own, so the drawn proposal and the written one part inside a list.
+
+**Who writes follows who holds the words.** A proposal carries what it would write, so taking it is the editor's edit, down the lane a reader's takes: a leaf's transaction, in its history; a field's value, through the typed writer, with the step back offered on the toast. A change carries at most the words it replaced, to show, so taking one back is the host's write, which alone has the inverse of what it wrote. Turning a proposal down writes nothing.
+
+**A paragraph takes one proposal, whole.** The diff inside it is drawn by the word and answered by the paragraph: a sentence taken a word at a time is one nobody proposed and nobody read. The first item naming a paragraph has it.
+
+**An answered item is drawn no more, from the answer.** The leaf and the surface each drop it at the press, until a list arrives without it, so the reader's answer shows at once however long the host takes to hand over the next list.
+
+**A change is the lighter mark and a proposal the stronger, in one hue.** A change is already the document's, so it is a line under its words, or along the foot of its control, and its card comes only to attention; a proposal is not, so its words are struck and tinted where they stand, with its two answers. `--qm-review` is the accent unless the host turns it: the surface spends no hue of its own on a state it can draw in grey.
+
+**The card never takes the focus, and waits a beat for a pointer.** The caret that raised it stays where it was, and a pointer crossing a paragraph raises nothing. One item is under attention at a time, the card's before a revealed one, the caret's before the pointer's.
+
+**A host's step back is one deep and stands until the next edit.** A write the host made for the reader lands outside every leaf's history, so `offerUndo` holds it where a removal's undo is held and gives it ⌘Z anywhere in the editor, a text leaf included, until an edit lands and it is no longer the last thing that happened.
+
 ### Declined
 
-Per-control render slots, which would hand reconciliation to consumer code; a pointer door onto the insert menu; image authoring, which has no asset story; touch as a target, and its accessory bar. Undo is per leaf and per list, never one stack for the document: a list keeps the changes to its rows as steps of its own (ArrayField), and a card removal is the one card op with a step back, offered on the toast.
+Per-control render slots, which would hand reconciliation to consumer code; a pointer door onto the insert menu; image authoring, which has no asset story; touch as a target, and its accessory bar. Undo is per leaf and per list, never one stack for the document: a list keeps the changes to its rows as steps of its own (ArrayField), a card removal is the one card op with a step back, offered on the toast, and that toast holds the one step a field's taken proposal or a host's write leaves (§Review).
 
 ## The codec
 
