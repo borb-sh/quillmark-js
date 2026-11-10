@@ -109,6 +109,7 @@ describe('the drawn report', () => {
 		expect(r.drawn.at(-1)).toEqual({
 			order: ['first'],
 			accepted: [],
+			open: ['first'],
 			outdated: [],
 			undrawn: [
 				{ id: 'nowhere', reason: 'anchor' },

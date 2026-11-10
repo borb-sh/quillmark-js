@@ -101,6 +101,9 @@ export interface ReviewDrawn {
 	order: readonly string[];
 	/** The proposals accepted and still listed, which the editor draws as the changes they made. */
 	accepted: readonly string[];
+	/** The drawn items still waiting for an answer, in document order: the rest of `order`. A
+	 *  review is answered when it is empty. */
+	open: readonly string[];
 	/** Drawn proposals the reader's own writing meets: words both changed, a block one names
 	 *  gone or no longer what its writer read, or a field no longer holding its `before`. */
 	outdated: readonly string[];

@@ -113,8 +113,8 @@
 		return (await inner?.revealReview(id, opts)) ?? false;
 	}
 	/** Answer items as their buttons would, in document order (`'all'`: every item drawn),
-	 *  moving neither the focus nor the caret; `'reopen'` takes back accepted proposals. Returns
-	 *  the ids answered. */
+	 *  moving neither the focus nor the caret and raising no toast; `'reopen'` takes back
+	 *  accepted proposals. Returns the ids answered. */
 	export function answerReview(
 		ids: readonly string[] | 'all',
 		action: 'accept' | 'dismiss' | 'reopen'
