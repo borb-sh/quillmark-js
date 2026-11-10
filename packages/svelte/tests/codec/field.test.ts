@@ -381,6 +381,36 @@ describe('the mark chords', () => {
 		expect(marksOf(doc)).toEqual(['code']);
 		field.destroy();
 	});
+
+	it('commits every mark set over one range, in the order the store keeps', () => {
+		const doc = example();
+		const lost: string[] = [];
+		const field = createField({
+			doc,
+			quill: quill(),
+			addr: { field: 'colophon' },
+			container: mount(),
+			inline: true,
+			onError: (e) => lost.push(e.code)
+		});
+		const view = viewOf(field);
+		view.dispatch(view.state.tr.insertText('word', 1));
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 5)));
+		const { strong, em, underline, strike, code } = view.state.schema.marks;
+		// The schema's own order, which is not the store's for a pair like these first two.
+		const set = [strong, em, underline, strike, code];
+		for (const type of set) view.dispatch(view.state.tr.addMark(1, 5, type.create()));
+
+		expect(lost).toEqual([]);
+		expect(marksOf(doc)).toHaveLength(set.length);
+		const projected = pmToContent(view.state.doc);
+		expect(projected.marks).toEqual(normalize(projected).marks);
+		// A later edit to the field still lands.
+		view.dispatch(view.state.tr.insertText('!', 5));
+		expect((doc.getStored('colophon') as { text: string }).text).toBe('word!');
+		expect(lost).toEqual([]);
+		field.destroy();
+	});
 });
 
 describe('createField over an ABSENT declared richtext field', () => {

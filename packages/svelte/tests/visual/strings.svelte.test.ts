@@ -68,6 +68,25 @@ describe('strings on the mounted surface', () => {
 		expect(titles).toContain(DEFAULT_VISUAL_STRINGS.cardMoveUp);
 	});
 
+	it('names each card control for the card it acts on, the action alone its tooltip', () => {
+		const { target } = open({});
+		const S = DEFAULT_VISUAL_STRINGS;
+		const card = [...target.querySelectorAll('.qm-card')].find((c) =>
+			c.querySelector('.qm-card-controls')
+		)!;
+		const title = card.querySelector<HTMLInputElement>('.qm-card-title')!;
+		const name = title.value || title.placeholder;
+		const controls = [...card.querySelectorAll('.qm-card-controls button')];
+		expect(controls.map((b) => b.getAttribute('aria-label'))).toEqual(
+			[S.cardMoveUp, S.cardMoveDown, S.cardDelete].map((a) => S.cardAction(a, name))
+		);
+		expect(controls.map((b) => b.getAttribute('title'))).toEqual([
+			S.cardMoveUp,
+			S.cardMoveDown,
+			S.cardDelete
+		]);
+	});
+
 	it('re-renders when the wording changes under a live mount', () => {
 		const { target, props } = open({ strings: { addCard: 'FIRST' } });
 		expect(target.querySelector('.qm-add-btn')?.getAttribute('aria-label')).toBe('FIRST');

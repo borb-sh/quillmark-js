@@ -107,3 +107,22 @@ export function across(anchor: RangeAnchor, boxes: readonly Element[]): RangeAnc
 		}
 	};
 }
+
+/**
+ * A virtual anchor over the first line box of the element `find` returns when asked: a mark a
+ * view redraws under every edit, so no element outlives the surface hung off it. `context` is
+ * the view's own element, which does. Total as {@link rangeAnchor} is: with nothing to measure
+ * it returns the last rect that measured.
+ */
+export function markAnchor(context: Element, find: () => Element | undefined): RangeAnchor {
+	let last: DOMRect | undefined;
+	return {
+		contextElement: context,
+		getBoundingClientRect: () => {
+			const el = find();
+			const rect = el?.getClientRects()[0] ?? el?.getBoundingClientRect();
+			if (rect) last = rect;
+			return last ?? new DOMRect();
+		}
+	};
+}

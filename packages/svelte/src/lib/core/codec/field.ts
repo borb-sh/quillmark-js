@@ -57,6 +57,14 @@ import { bodyKeymap, holdsTab } from './keymap.js';
 import { DEFAULT_LEAVE_STRINGS, leavePlugin, type LeaveStrings } from './leave.js';
 import { FIELD_KEYS, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
+import {
+	DEFAULT_REVIEW_STRINGS,
+	reviewLayer,
+	type ReviewAction,
+	type ReviewStrings,
+	type ReviewVia,
+	type TextReview
+} from './review.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { dragMovePlugin } from './drag-move.js';
@@ -154,6 +162,20 @@ export interface CreateFieldOpts {
 	/** An edit leaving the leaf empty removes the field: an optional cell (`t?`), whose
 	 * unanswered `none` is what the empty leaf draws and an empty answer would hide. */
 	emptyUnsets?: boolean;
+	/** The review layer's wording, read per decoration pass (`review.ts`). */
+	reviewStrings?: () => ReviewStrings;
+	/** The review item whose card is up, and the reader's Escape lowering it. */
+	reviewShown?: () => string | undefined;
+	onReviewDismiss?(): void;
+	/** A reader answered the review item `id`: a proposal's button or its chord, or the chord
+	 *  that takes a change back. A proposal taken is written by then. */
+	onReview?(id: string, action: ReviewAction): void;
+	/** The review item under the pointer or holding the caret, `undefined` once it has left.
+	 *  The caret's report holds off while the reader types inside the item. */
+	onReviewPoint?(id: string | undefined, via: ReviewVia): void;
+	/** The ids of the review items the leaf draws, on each change of the set: an item whose
+	 *  anchor the leaf does not hold draws nothing. */
+	onReviewDrawn?(ids: readonly string[]): void;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new caret offset after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -202,6 +224,16 @@ export interface FieldController {
 	insertAnchor(id: string, pos: number, end?: number): void;
 	/** Remove the identity anchor `id` (the inverse of {@link insertAnchor}); a no-op if absent. */
 	removeAnchor(id: string): void;
+	/**
+	 * Draw `items` over the leaf, the one named `lit` a step stronger (`review.ts`): each by an
+	 * anchor the leaf holds, in the leaf's own flow, with nothing written to the document. A
+	 * `text` leaf holds no anchors and draws none.
+	 */
+	setReview(items: readonly TextReview[], lit?: string): void;
+	/** The elements the review item `id` draws, in document order; `[]` for one not drawn. */
+	reviewElements(id: string): HTMLElement[];
+	/** Put the caret in the review item `id` and focus the leaf; false for one not drawn. */
+	enterReview(id: string): boolean;
 	/** Ids of the anchors touching content range `[from, to]`: a selection's anchor state. */
 	anchorsInRange(from: number, to: number): string[];
 	/**
@@ -232,6 +264,7 @@ export interface LeafViews {
 }
 
 const anchorKey = new PluginKey<AnchorState>('quill-anchors');
+const NO_ANCHORS: AnchorPos[] = [];
 
 /**
  * An anchor mutation carried on a transaction's `anchorKey` meta, folded into the plugin's set so
@@ -502,6 +535,36 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// which view holds the caret.
 	const nested = new Set<EditorView>();
 
+	// The review layer's live cells: the items and the lit one move by assignment and a re-render.
+	let reviewItems: readonly TextReview[] = [];
+	let reviewLit: string | undefined;
+	const parsed = new Map<string, PMNode | undefined>();
+	const review = plaintext
+		? undefined
+		: reviewLayer({
+				items: () => reviewItems,
+				lit: () => reviewLit,
+				strings: () => opts.reviewStrings?.() ?? DEFAULT_REVIEW_STRINGS,
+				anchors: (state) => anchorKey.getState(state)?.anchors ?? NO_ANCHORS,
+				parse: (markdown) => {
+					if (!parsed.has(markdown)) {
+						let node: PMNode | undefined;
+						try {
+							node = decode(core().importMarkdown(markdown).content, schema);
+						} catch {
+							node = undefined;
+						}
+						parsed.set(markdown, node);
+					}
+					return parsed.get(markdown);
+				},
+				shown: () => opts.reviewShown?.(),
+				dismiss: () => opts.onReviewDismiss?.(),
+				act: (id, action) => opts.onReview?.(id, action),
+				point: (id, via) => opts.onReviewPoint?.(id, via),
+				drew: (ids) => opts.onReviewDrawn?.(ids)
+			});
+
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
 
@@ -610,7 +673,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
 				cap: opts.cap,
-				afterHistory: [anchorPlugin(seededAnchors)]
+				afterHistory: [anchorPlugin(seededAnchors), ...(review ? [review.plugin] : [])]
 			})
 		});
 		return { state: built, index: seedIndex };
@@ -883,6 +946,21 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			if (plaintext) return;
 			if (!heldAnchors().some((a) => a.id === id)) return; // absent: nothing to commit
 			view.dispatch(view.state.tr.setMeta(anchorKey, { op: 'remove', id } as AnchorEdit));
+		},
+		setReview(items: readonly TextReview[], lit?: string): void {
+			if (!review || (items === reviewItems && lit === reviewLit)) return;
+			reviewItems = items;
+			reviewLit = lit;
+			for (const markdown of parsed.keys())
+				if (!items.some((item) => item.state === 'proposed' && item.after === markdown))
+					parsed.delete(markdown);
+			review.refresh(view);
+		},
+		reviewElements(id: string): HTMLElement[] {
+			return review?.elements(view, id) ?? [];
+		},
+		enterReview(id: string): boolean {
+			return review?.enter(view, id) ?? false;
 		},
 		anchorsInRange(from: number, to: number): string[] {
 			return heldAnchors()

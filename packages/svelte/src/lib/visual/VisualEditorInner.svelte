@@ -29,6 +29,7 @@
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
 	import {
 		addrForFieldPath,
+		nearestAddrForFieldPath,
 		cardPath,
 		nestedAddrForFieldPath,
 		fieldPathForAddr,
@@ -53,8 +54,10 @@
 	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
+	import { createReview, setReview } from './review.svelte.js';
+	import type { FieldProposal } from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
-	import type { FieldController, LeafViews } from '../core/codec/index.js';
+	import { markAnchor, type FieldController, type LeafViews } from '../core/codec/index.js';
 	import {
 		IdSeq,
 		controlKind,
@@ -93,6 +96,7 @@
 	import Card from './Card.svelte';
 	import TipsCard from './TipsCard.svelte';
 	import FormatPopover from './FormatPopover.svelte';
+	import ReviewPopover, { type ReviewTarget } from './ReviewPopover.svelte';
 	// The add trigger and the kind menu draw shared recipes; a component carrying a
 	// shared class without also pulling its rule ships unstyled (controls.css).
 	import './controls.css';
@@ -111,6 +115,9 @@
 		fontLabels,
 		strings,
 		formatDiagnostic,
+		review,
+		onReview,
+		onReviewFocus,
 		class: className,
 		style
 	}: VisualEditorProps = $props();
@@ -278,6 +285,76 @@
 		e.stopPropagation();
 		undo.take();
 	}
+	// ── Review (`review.svelte.ts`): the host's list, published to the tree ─────
+	// A field item's path resolves here, against the live card keys, as a diagnostic's does:
+	// the nearest field holding it.
+	const reviewed = (path: DocPath): FieldKey | undefined => {
+		const addr = nearestAddrForFieldPath(path);
+		return addr?.field != null ? resolveCardKey(addr, cardIds) : undefined;
+	};
+	const reviewing = createReview({
+		items: () => review,
+		keyFor: (path) => {
+			const key = reviewed(path);
+			return key && fieldKeyToString(key);
+		},
+		answer(item, action) {
+			if (action === 'accept' && item.state === 'proposed' && 'field' in item && !takeField(item))
+				return false;
+			onReview?.({ id: item.id, action });
+			return true;
+		}
+	});
+	/**
+	 * Take a field's proposal: its value down the lane the field's own control commits by, so
+	 * the writer checks it and `onChange` reports it, with the step back offered as a host's
+	 * step is. A text leaf re-reads what was written. False where the writer refused the value,
+	 * which the field then says as it says any refused commit.
+	 */
+	function takeField(item: FieldProposal): boolean {
+		const key = reviewed(item.field);
+		if (!key?.field || typeof key.card === 'number') return false;
+		const isMain = key.card === undefined;
+		const id = key.card ?? model.main.id;
+		const name = key.field;
+		const leaf = fieldKeyToString(key);
+		const before = doc.getStored(makeAddr(id, isMain, name));
+		const write = (value: unknown): boolean => {
+			commitScalar(id, isMain, name, value);
+			if (commitErrors.has(leaf)) return false;
+			leaves.prose(leaf)?.applyExternal();
+			return true;
+		};
+		if (!write(item.after)) return false;
+		undo.offer(merged.reviewAccepted, () => void write(before), true);
+		return true;
+	}
+	setReview(reviewing);
+	span.onEnd(reviewing.dispose);
+	// The lit item, to a host lighting its own list: each change, and not the nothing a mount
+	// starts from.
+	let reported: string | undefined;
+	$effect(() => {
+		const id = reviewing.lit;
+		if (id === reported) return;
+		reported = id;
+		onReviewFocus?.(id);
+	});
+	/** Where item `id` is drawn, for the card that hangs off it. */
+	function reviewTarget(id: string): ReviewTarget | undefined {
+		const key = reviewing.keyOf(id);
+		if (key === undefined) return undefined;
+		const prose = leaves.prose(key);
+		const mark = prose?.reviewElements(id)[0];
+		if (prose && mark)
+			return {
+				anchor: markAnchor(prose.el, () => prose.reviewElements(id)[0]),
+				removed: mark.classList.contains('qm-review-gone')
+			};
+		const control = leaves.control(key);
+		return control && { anchor: control.el, removed: false };
+	}
+
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
 	// cannot do, since which group is open is the card's state (Card §revealLeaf).
 	type CardHandle = {
@@ -368,6 +445,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
+		undo.settle();
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
 
@@ -435,6 +513,7 @@
 				}
 			}
 			commitErrors.delete(keyStr);
+			undo.settle();
 			fieldCommitted(id, isMain, name, value);
 			report('field', id, makeAddr(id, isMain, name));
 		} catch (e) {
@@ -1038,6 +1117,52 @@
 		rederive();
 	}
 
+	// ── Review ──────────────────────────────────────────────────────────────────
+
+	/**
+	 * Bring the review item `id` to the reader: open the panel holding it, scroll it to the
+	 * middle of the view, light it, and raise its card where it has one. The focus stays
+	 * where it is, the reader having asked to look, unless `focus` asks for it: the caret
+	 * then goes into the item, or the focus to its field, so the chords answer it. False for
+	 * an item the editor does not draw.
+	 */
+	export async function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
+		if (!span.alive) return false;
+		const key = reviewing.keyOf(id);
+		if (key === undefined) return false;
+		mainCard?.revealLeaf(key);
+		for (const card of cardRefs) card?.revealLeaf(key);
+		if (!(await span.resumes(tick()))) return false;
+		reviewing.reveal(id);
+		if (opts.focus && !leaves.prose(key)?.enterReview(id)) leaves.control(key)?.focus();
+		// The lit item is drawn again, so its element is read once it has been.
+		if (!(await span.resumes(tick()))) return false;
+		const at =
+			leaves.prose(key)?.reviewElements(id)[0] ??
+			[...(rootEl?.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].find(
+				(el) => el.getAttribute('data-qm-review') === id
+			) ??
+			leaves.control(key)?.el;
+		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		at?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+		return true;
+	}
+
+	/**
+	 * Offer `undo` as the one step back from a write the host just made: `notice` on the
+	 * toast a removal's undo takes, with its button, and ⌘Z/Ctrl+Z anywhere in the editor
+	 * until the next edit lands. Runs at most once. Returns the withdrawal, for a host whose
+	 * step has gone stale some other way.
+	 */
+	export function offerUndo(notice: string, restore: () => void): () => void {
+		if (!span.alive) return () => {};
+		undo.offer(notice, restore, true);
+		const offered = undo.current;
+		return () => {
+			if (undo.holds(offered)) undo.withdraw();
+		};
+	}
+
 	function holds(cardId: CardId): boolean {
 		if (cardIndexOf(cardId) >= 0) return true;
 		missed(`no card ${cardId} in this session`);
@@ -1200,6 +1325,7 @@
 </div>
 
 <FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
+<ReviewPopover review={reviewing} targetFor={reviewTarget} />
 
 <!-- The add affordance is gated on the schema declaring `card_kinds`, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to
