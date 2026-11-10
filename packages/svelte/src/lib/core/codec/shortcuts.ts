@@ -58,6 +58,12 @@ export const TABLE_KEYS = {
 	eraseAlt: 'Delete'
 } as const;
 
+/** An item of review under the caret (`review.ts`), ahead of every other binding of its keys. */
+export const REVIEW_KEYS = {
+	accept: 'Mod-Enter',
+	reject: 'Mod-.'
+} as const;
+
 /** The mark toggles, each bound only where the schema declares its mark. */
 export function markKeymap(schema: Schema): Record<string, Command> {
 	const map: Record<string, Command> = {};
@@ -69,8 +75,9 @@ export function markKeymap(schema: Schema): Record<string, Command> {
 	return map;
 }
 
-/** Where a shortcut answers: any prose field, a multi-block body, a list item, a table cell. */
-export type ShortcutScope = 'field' | 'body' | 'list' | 'table';
+/** Where a shortcut answers: any prose field, a multi-block body, a list item, a table cell, an
+ *  item of review. */
+export type ShortcutScope = 'field' | 'body' | 'list' | 'table' | 'review';
 
 /** One shortcut as a host lists it. `keys` are the alternatives in `prosemirror-keymap`
  *  notation (`Mod-Shift-7`, `Alt-ArrowUp`): `Mod` is ⌘ on Apple platforms and Ctrl
@@ -108,6 +115,8 @@ export interface ShortcutStrings {
 	shortcutMoveLine: string;
 	shortcutAlignColumn: string;
 	shortcutDeleteCells: string;
+	shortcutReviewAccept: string;
+	shortcutReviewReject: string;
 }
 
 export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
@@ -135,7 +144,9 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutSelectRow: 'Select the row, then the table',
 	shortcutMoveLine: 'Move a selected row or column',
 	shortcutAlignColumn: 'Align a selected column',
-	shortcutDeleteCells: 'Delete the selected cells, rows or columns'
+	shortcutDeleteCells: 'Delete the selected cells, rows or columns',
+	shortcutReviewAccept: 'Accept the proposed change',
+	shortcutReviewReject: 'Dismiss the proposed change, or undo the change made'
 };
 
 const F = FIELD_KEYS;
@@ -176,7 +187,9 @@ const SHORTCUTS: readonly {
 		keys: [T.moveUp, T.moveDown, T.moveLeft, T.moveRight]
 	},
 	{ scope: 'table', label: 'shortcutAlignColumn', keys: [T.alignLeft, T.alignRight] },
-	{ scope: 'table', label: 'shortcutDeleteCells', keys: [T.erase, T.eraseAlt] }
+	{ scope: 'table', label: 'shortcutDeleteCells', keys: [T.erase, T.eraseAlt] },
+	{ scope: 'review', label: 'shortcutReviewAccept', keys: [REVIEW_KEYS.accept] },
+	{ scope: 'review', label: 'shortcutReviewReject', keys: [REVIEW_KEYS.reject] }
 ];
 
 /**

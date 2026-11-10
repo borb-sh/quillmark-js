@@ -275,6 +275,13 @@ function remintIslands(
 	return changed ? Fragment.fromArray(out) : null;
 }
 
+/** `fragment` as it lands in `doc` from outside it: an island whose id the document holds, or
+ *  that carries none, takes a fresh one. */
+export function arriving(doc: PMNode, fragment: Fragment): Fragment {
+	const { held, mint } = islandState(doc);
+	return remintIslands(fragment, held, mint) ?? fragment;
+}
+
 /**
  * The paste's island pass: an id the field already holds is re-minted on the way in, and an island
  * arriving with none (a table read off foreign markup, `table-paste.ts`) takes its first.
