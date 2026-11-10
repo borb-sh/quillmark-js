@@ -26,7 +26,6 @@ import {
 	projectDocument,
 	writeFrom,
 	type Change,
-	type Held,
 	type WriteFromOpts
 } from './fork.js';
 import {
@@ -111,17 +110,14 @@ export interface WriteLogOpts extends ReadLogOpts {
 	key?: string;
 	/** Make the edit on the Document as it stood at `base`; return its card operations, if any. */
 	edit(doc: Document): CardOp | CardOp[] | void;
-	/** `writeFrom`'s: where an edit meets a change made since, and what of it to hold back. A
-	 *  held part is written with the rest and answered in `held`, for a client of the session to
-	 *  write with `writeHeld` on request. */
+	/** `writeFrom`'s: where an edit meets a change made since. */
 	scope?: WriteFromOpts['scope'];
-	hold?: WriteFromOpts['hold'];
 }
 
 export type LogWrite =
-	/** Appended. `revision` holds the edit, to read from next; `held` the parts `hold` held back. */
-	| { status: 'written'; revision: Revision; changes: Change[]; held: Held[] }
-	/** Not appended: changes since `base` touch what the edit does, and `hold` held none of them. */
+	/** Appended. `revision` holds the edit, to read from next. */
+	| { status: 'written'; revision: Revision; changes: Change[] }
+	/** Not appended: changes since `base` touch what the edit does. */
 	| { status: 'conflict'; conflicts: Change[] }
 	/** Not appended: `base` names a session that has ended or a state the log no longer holds,
 	 *  or the log kept moving. Read again. */
@@ -162,8 +158,7 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 					quill,
 					doc: room.template,
 					edit: opts.edit,
-					...(opts.scope ? { scope: opts.scope } : {}),
-					...(opts.hold ? { hold: opts.hold } : {})
+					...(opts.scope ? { scope: opts.scope } : {})
 				});
 				if (written.conflicts.length) return { status: 'conflict', conflicts: written.conflicts };
 				if (!opened) {
@@ -186,8 +181,7 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 				return {
 					status: 'written',
 					revision: { epoch: opened.epoch, count: read.count + 1, check: checkOf(snapshot) },
-					changes: written.changes,
-					held: written.held
+					changes: written.changes
 				};
 			} finally {
 				read.ydoc.destroy();

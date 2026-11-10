@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**Holding the removal of a line someone edited no longer throws.** `writeFrom` with `hold: 'hunk'` holds such a line with an empty `after`, where it threw reading the held run of no lines.
+**Held writes are removed.** `writeFrom` and `writeLog` no longer take `hold`, and `Written` and `writeLog`'s answer no longer carry `held`; `writeHeld`, `heldState` and the `Held`, `HeldText`, `HeldValue`, `HeldCard`, `HeldPosition`, `HeldState` and `HeldOpts` types are gone. A write from a revision is written whole, and `conflicts` lists where it meets a change made since, as with `hold: 'none'`. A host that lets a reader take part of an answer draws it as proposals in the editor (`@quillmark/svelte`'s review layer) instead.
 
 ## v0.3.0 - 2026-11-06
 
