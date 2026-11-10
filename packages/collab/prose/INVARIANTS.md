@@ -21,7 +21,6 @@ Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to 
 - **I7** Updates from two sessions never meet: every log entry belongs to one epoch, and a client applies only entries of the epoch it joined.
 - **I8** Seeding a Document and projecting it back is lossless for everything that has a Y form.
 - **I9** A write from a revision is made on the Y state at that revision and merged as a concurrent edit, never applied to the live Document, so what anyone wrote since stays.
-- **I10** A write is taken back by a write from the state it left (`revert`), which restores there what the write changed and merges as I9 does, so what someone typed in its lines since is held like any other meeting. Rejected: undoing the write's Y operations (`Y.UndoManager`), which reads no Document, so it can neither hold a line nor answer what it changed, and lives in one client's memory where a `Written` is a value a host keeps.
 
 ## The Y form
 
@@ -59,9 +58,9 @@ Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to 
 - `push` reads every card, so its cost grows with the document; debounce it for large documents.
 - A whole-value field is written whole: two people editing different rows of an array of records keep one row's edit.
 - A write applied over a conflict merges two rewrites into neither. Hold the part and write it with `writeHeld`.
-- A held part belongs to the session it was made in, and so does a `Written` kept for `revert`. A host drops both when the session ends.
+- A held part belongs to the session it was made in. A host drops it when the session ends.
 - The host owns `session.doc` and frees it after `leave`.
 
 ## Testing
 
-A seeded fuzz runs several peers over the reference quill through random concurrent edits and random delivery, some from an earlier revision and some of those taken back, and asserts convergence to one Document and I6; a write taken back at once must leave the Document it was made on. The editor half is checked in the playground under `?collab=`.
+A seeded fuzz runs several peers over the reference quill through random concurrent edits and random delivery, some from an earlier revision, and asserts convergence to one Document and I6. The editor half is checked in the playground under `?collab=`.

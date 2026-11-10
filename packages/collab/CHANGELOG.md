@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**`revert` takes a write back.** `revert(written, { history, quill, doc })` answers an update that returns everything a write changed, text, values, card titles, and the cards it added, removed, moved or retyped, to what it was written from, and leaves what anyone else wrote where it is. It is a write from the state the write left, so it merges and holds as `writeFrom` does: by default (`hold: 'hunk'`) a line someone changed since where the write changed it is held for `writeHeld`, and one the write added that someone typed in is held with an empty `after`. Reverting a revert writes the write again. `Written` carries `base`, the snapshot it was written from, which `revert` reads.
+**Holding the removal of a line someone edited no longer throws.** `writeFrom` with `hold: 'hunk'` holds such a line with an empty `after`, where it threw reading the held run of no lines.
 
 ## v0.3.0 - 2026-11-06
 

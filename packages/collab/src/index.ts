@@ -15,7 +15,6 @@ export {
 	heldState,
 	changesSince,
 	projectDocument,
-	revert,
 	Unwritable
 } from './fork.js';
 export type {
@@ -28,7 +27,6 @@ export type {
 	HeldState,
 	HeldText,
 	HeldValue,
-	RevertOpts,
 	WriteFromOpts,
 	Written
 } from './fork.js';

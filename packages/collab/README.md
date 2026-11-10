@@ -68,18 +68,6 @@ if (heldState(part, at).state !== 'gone') session.apply(writeHeld(part, at).upda
 
 Edits are compared word by word: a change lands unless someone changed the same words since (`scope: 'line'` compares whole lines). With `hold: 'hunk'`, each line that meets such a change is held back and the rest of the edit is written; `held` lists each held part with its text as the edit read it, as it stood when held, and as the edit wrote it. `heldState` says whether a held part is still `open`, `edited` since, `matched` by what someone typed, or `gone`, and `writeHeld` writes it over whatever its lines hold now, leaving every other line as it is. A whole-value field is held whole, and so is a card one side removed, moved or retyped while the other changed it. A held part is plain JSON a host can keep or send, valid for the session it was made in. With `hold: 'none'`, the default, nothing is held and `conflicts` lists what changed since `base` where the edit changed too. Run `writeFrom` and `session.apply` in one task. An edit that inserts, removes or moves cards returns those `CardOp`s; a `reviseDocument` edit returns `cardOps(receipt.from, count)`, `count` the cards before it. An edit runs a second time when part of it is held, and must make the same change each time it runs. A server with no editor open goes through the log: `readLog({ log, quill, since })` returns the Document, its `Revision` (`{ epoch, count, check }`, short enough to hand a model, and to be handed back as it was read) and what changed since an earlier one, and `writeLog({ log, quill, base, author, key, edit, hold })` appends the edit and saves, answering what it held, or answers `conflict`, `stale` or `duplicate`. `saveVersion({ log, quill, label })` keeps the Document as it stands under a label, past every session; `readVersion` reads it back, and `restoreVersion({ log, quill, label, author })` writes the room back to it as one edit.
 
-`revert` takes a write back, for as long as its session lasts:
-
-```ts
-const written = writeFrom({ history: session.ydoc, base, quill, doc: session.doc, edit });
-session.apply(written.update, 'ai:run-1');
-// later, when the person undoes it:
-const undone = revert(written, at);
-session.apply(undone.update, 'ai:run-1');
-```
-
-The update returns everything the write changed, text, values, card titles, and the cards it added, removed, moved or retyped, to what the write was made from, and leaves what anyone else wrote where it is. It is itself a write, made from the state the write left, so it merges and holds as `writeFrom` does: with `hold: 'hunk'`, its default, a line someone has changed since where the write changed it stays as it reads and comes back in `held`, for `writeHeld` to write the earlier text over, and a line the write added that someone has typed in is held with an empty `after`. `revert` reads the write's `update` and `base`, so a host keeps those while it offers the undo, and applies the write before it reverts it. Reverting what `revert` returned writes the write again.
-
 ## Without a session
 
 `bindDocument({ doc, quill, ydoc, leader, onRemote })` binds a Document to any `Y.Doc` and leaves the transport to the host, once `await init()` from this package has instantiated the core it reads. `leader` is whether this binding writes back a repair that inserts: `true` for a binding alone on its `Y.Doc`, and for exactly one of several. `seedDocument(doc, quill)` is the update a Y state starts from, the same bytes on every client that seeds the same Document.

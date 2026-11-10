@@ -3,11 +3,10 @@
 // after each, exchange Y updates at random times and in random order, and must end holding one
 // Document. The mix leans on where the content model fights a CRDT: items inserted into one list
 // (container runs), tables edited and typed around (slots), and cards moved and edited at once.
-// Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are,
-// and some of those are taken back (`revert`).
+// Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are.
 import { describe, expect, it } from 'vitest';
 import type { Addr, Change, Content, Document, Quill } from '@quillmark/wasm';
-import { heldState, revert, writeFrom, writeHeld, type CardOp } from '../src/index.js';
+import { heldState, writeFrom, writeHeld, type CardOp } from '../src/index.js';
 import * as Y from 'yjs';
 import { project } from '../src/project.js';
 import { contentRoot, contentTypes, readField } from '../src/shape.js';
@@ -16,7 +15,6 @@ import { core, deliver, peers, quill, settle, snapshot, canonical, type Peer } f
 
 const SEEDS = 120;
 const STEPS = 40;
-const BACK = 30;
 
 /** A seeded PRNG (mulberry32), so a failing seed replays. */
 function rng(seed: number) {
@@ -311,16 +309,16 @@ function edit(r: Rng, q: Quill, p: Peer): boolean {
 
 /** One random edit made from a revision `p` held earlier, applied to `p`; whether it landed. Half
  *  hold back what meets an edit made since, and write some of what they held at once. The edit
- *  runs on its own seed, so a second run of it, when part is held, makes the same change. With
- *  `back`, or one time in four, the write is then taken back. */
-function staleEdit(r: Rng, q: Quill, p: Peer, base: Uint8Array, back = false): boolean {
+ *  runs on its own seed, so a second run of it, when part is held, makes the same change. */
+function staleEdit(r: Rng, q: Quill, p: Peer, base: Uint8Array): boolean {
 	let landed = false;
 	const seed = r.int(2 ** 31);
 	const hold = r.next() < 0.5 ? 'hunk' : 'none';
-	const at = { history: p.ydoc, quill: q, doc: p.doc };
-	const written = writeFrom({
-		...at,
+	const { update, held } = writeFrom({
+		history: p.ydoc,
 		base,
+		quill: q,
+		doc: p.doc,
 		hold,
 		edit(doc) {
 			let op: CardOp | undefined;
@@ -329,13 +327,16 @@ function staleEdit(r: Rng, q: Quill, p: Peer, base: Uint8Array, back = false): b
 			return op;
 		}
 	});
-	Y.applyUpdate(p.ydoc, written.update, 'writer');
-	for (const part of written.held) {
-		if (r.next() < 0.5 || heldState(part, at).state === 'gone') continue;
-		Y.applyUpdate(p.ydoc, writeHeld(part, at).update, 'writer');
+	Y.applyUpdate(p.ydoc, update, 'writer');
+	for (const part of held) {
+		if (
+			r.next() < 0.5 ||
+			heldState(part, { history: p.ydoc, quill: q, doc: p.doc }).state === 'gone'
+		)
+			continue;
+		const written = writeHeld(part, { history: p.ydoc, quill: q, doc: p.doc });
+		Y.applyUpdate(p.ydoc, written.update, 'writer');
 	}
-	if (back || r.next() < 0.25)
-		Y.applyUpdate(p.ydoc, revert(written, { ...at, hold }).update, 'writer');
 	return landed;
 }
 
@@ -353,7 +354,7 @@ function run(seed: number, q: Quill): { all: Peer[]; edits: number; errors: stri
 			try {
 				edits += staleEdit(r, q, p, bases.get(p)!) ? 1 : 0;
 			} catch (e) {
-				errors.push(`seed ${seed}: a write from a revision threw ${String(e)}`);
+				errors.push(`seed ${seed}: writeFrom threw ${String(e)}`);
 			}
 		} else if (roll < 0.7) edits += edit(r, q, p) ? 1 : 0;
 		else deliver(p, (n) => r.int(n), 1 + r.int(4));
@@ -391,32 +392,6 @@ describe('three peers, random concurrent edits', () => {
 			}
 		}
 		console.log(`fuzz: ${SEEDS} seeds, ${edits} edits landed`);
-		expect(failures.slice(0, 10)).toEqual([]);
-	});
-});
-
-describe('a write taken back at once', () => {
-	it(`leaves the document it was made on, over ${BACK} seeds`, () => {
-		const q = quill();
-		const failures: string[] = [];
-		let writes = 0;
-		for (let seed = 1; seed <= BACK; seed++) {
-			const r = rng(seed);
-			const [p, other] = peers(2, () => q.exampleDocument()!, q);
-			for (let step = 0; step < 8; step++) {
-				edit(r, q, p);
-				const before = snapshot(p.doc);
-				try {
-					writes += staleEdit(r, q, p, Y.encodeSnapshot(Y.snapshot(p.ydoc)), true) ? 1 : 0;
-				} catch (e) {
-					failures.push(`seed ${seed}: step ${step} threw ${String(e)}`);
-				}
-				if (snapshot(p.doc) !== before) failures.push(`seed ${seed}: step ${step} differs`);
-			}
-			settle([p, other]);
-			if (snapshot(other.doc) !== snapshot(p.doc)) failures.push(`seed ${seed}: documents differ`);
-		}
-		console.log(`fuzz: ${writes} writes taken back`);
 		expect(failures.slice(0, 10)).toEqual([]);
 	});
 });

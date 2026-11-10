@@ -157,6 +157,15 @@ describe('held parts', () => {
 		expect(heldState(held, { history: a.ydoc, quill: q, doc: a.doc }).state).toBe('open');
 	});
 
+	it('holds the removal of a line someone edited, with nothing after', () => {
+		const [a, b] = session(LINES);
+		const base = revision(a);
+		retype(b, 'at the end of the week', 'on Thursday');
+		const written = write(a, base, [LINES[0], LINES[2]], { hold: 'hunk' });
+		expect(written.held).toHaveLength(1);
+		expect(written.held[0]).toMatchObject({ type: 'text', before: LINES[1], after: '' });
+	});
+
 	it('holds the whole field when asked to hold by field', () => {
 		const [a, b] = session(LINES);
 		const base = revision(a);
