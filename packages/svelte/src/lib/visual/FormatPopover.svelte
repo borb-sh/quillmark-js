@@ -389,7 +389,7 @@
 	// prompt, not a second meaning for the button. The five value-less marks keep
 	// the toggle.
 	function toggle(name: string): void {
-		const view = keyed ? actedOn() : activeLeafView();
+		const view = actedOn();
 		if (!view) return;
 		const type: MarkType | undefined = view.state.schema.marks[name];
 		if (!type) return;
@@ -412,7 +412,7 @@
 	}
 
 	function toggleLines(ordered: boolean): void {
-		const view = keyed ? actedOn() : activeLeafView();
+		const view = actedOn();
 		if (!view) return;
 		toggleList(ordered)(view.state, view.dispatch);
 		settle(view);
