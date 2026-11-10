@@ -290,7 +290,77 @@ describe('a proposal', () => {
 			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'One paragraph, first.' },
 			{ id: 'r2', state: 'proposed', anchor: '~p2', after: 'One paragraph, second.' }
 		]);
-		expect(leaf.reports.at(-1)).toEqual({ ids: ['r1'], undrawn: [{ id: 'r2', reason: 'taken' }] });
+		expect(leaf.reports.at(-1)).toEqual({
+			ids: ['r1'],
+			outdated: [],
+			undrawn: [{ id: 'r2', reason: 'taken' }]
+		});
+	});
+
+	it('gives a paragraph one proposal that rewrites it and one that adds after it', () => {
+		const leaf = leafOver('Opening line.\n\nClosing line.');
+		leaf.anchor('~p1', 'Opening');
+		leaf.anchor('~p2', 'line', true);
+		leaf.anchor('~p3', 'line', true);
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Opening sentence.' },
+			{ id: 'r2', state: 'proposed', anchor: '~p2', after: 'Added first.' },
+			{ id: 'r3', state: 'proposed', anchor: '~p3', after: 'Added second.' }
+		]);
+		expect(leaf.reports.at(-1)).toEqual({
+			ids: ['r1', 'r2'],
+			outdated: [],
+			undrawn: [{ id: 'r3', reason: 'taken' }]
+		});
+	});
+
+	it('draws the words a proposal keeps and formats anew, beside the words it rewrites', () => {
+		const leaf = leafOver(
+			'Approve the plan in full and direct the maintenance officer to submit monthly reports.'
+		);
+		leaf.anchor('~p1', 'plan');
+		leaf.field.setReview([
+			{
+				id: 'r1',
+				state: 'proposed',
+				anchor: '~p1',
+				after:
+					'Approve the plan in full. Direct the maintenance officer to submit **monthly** reports.'
+			}
+		]);
+		expect(texts(leaf.el, 'del.qm-review-del')).toContain('monthly');
+		expect(leaf.el.querySelector('ins.qm-review-ins strong')?.textContent).toBe('monthly');
+		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		expect(core.exportMarkdown(leaf.doc.main.body)).toBe(
+			core.exportMarkdown(
+				md(
+					'Approve the plan in full. Direct the maintenance officer to submit **monthly** reports.'
+				)
+			)
+		);
+	});
+
+	it('takes away the formatting of a word it keeps, beside the words it rewrites', () => {
+		const leaf = leafOver('Submit the **signed** report by Friday.');
+		leaf.anchor('~p1', 'report');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Submit the signed report by Monday.' }
+		]);
+		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['signed', 'Friday']);
+		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		expect(core.exportMarkdown(leaf.doc.main.body)).toBe(
+			core.exportMarkdown(md('Submit the signed report by Monday.'))
+		);
+	});
+
+	it('draws nothing for a proposal that would write nothing, and says so', () => {
+		const leaf = leafOver('The quick brown fox.');
+		leaf.anchor('~p1', 'quick');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick brown fox.' }
+		]);
+		expect(leaf.el.querySelector('.qm-review-chip, .qm-review-held')).toBeNull();
+		expect(leaf.reports.at(-1)?.undrawn).toEqual([{ id: 'r1', reason: 'applied' }]);
 	});
 });
 
@@ -337,8 +407,31 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 
 	it('draws nothing where the reader wrote what it proposes', () => {
 		const leaf = typed('red', 'brown', 0, 'brown'.length);
-		expect(leaf.el.querySelector('del, ins')).toBeNull();
-		expect(leaf.drawn.at(-1)).toEqual(['r1']);
+		expect(leaf.el.querySelector('del, ins, .qm-review-chip')).toBeNull();
+		expect(leaf.reports.at(-1)?.undrawn).toEqual([{ id: 'r1', reason: 'applied' }]);
+	});
+
+	it('gives the whole paragraph to the whole proposal where the reader rewrote past its words', () => {
+		const leaf = leafOver('Keep this. Second is proposed.');
+		leaf.anchor('~p1', 'Keep');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Keep this. Second, rewritten.' }
+		]);
+		const view = viewOf(leaf.field);
+		const at = 1 + leaf.doc.main.body.text.indexOf('Second');
+		view.dispatch(
+			view.state.tr.insertText('My own sentence.', at, at + 'Second is proposed.'.length)
+		);
+		// The anchor's own range parts the struck run where it ends.
+		expect(marks(leaf).map((run) => run.join(''))).toEqual([
+			'Keep this. My own sentence.',
+			'Keep this. Second, rewritten.'
+		]);
+		expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		const chip = leaf.el.querySelector('.qm-review-chip')!;
+		expect(chip.classList.contains('qm-review-outdated')).toBe(true);
+		expect(chip.textContent).toContain(DEFAULT_REVIEW_STRINGS.reviewOutdated);
+		expect(taken(leaf)).toBe('Keep this. Second, rewritten.');
 	});
 
 	it('reads the paragraph anew under a proposal that arrives with another text', () => {
@@ -437,6 +530,20 @@ describe('answering', () => {
 		expect($head.parent.textBetween(0, $head.parentOffset)).toBe('The quick red');
 	});
 
+	it('a pressed Accept keeps the caret after what landed through the host lifting its anchor', () => {
+		const leaf = leafOver('- first item\n- second item\n\nAfter.');
+		leaf.anchor('~p1', 'second');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: '- second item\n- third item' }
+		]);
+		const view = viewOf(leaf.field);
+		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		leaf.doc.apply({}, { steps: [{ anchor: { id: '~p1', remove: true } }] });
+		leaf.field.applyExternal();
+		const { $head } = view.state.selection;
+		expect($head.parent.textBetween(0, $head.parentOffset)).toBe('third item');
+	});
+
 	it('a pressed Accept leaves the caret the reader holds where it is', () => {
 		const leaf = proposal();
 		caretIn(leaf, 'second');
@@ -491,6 +598,32 @@ describe('answering', () => {
 		leaf.shown = 'elsewhere';
 		press(view, 'Escape');
 		expect(leaf.lowered).toBe(1);
+	});
+
+	it('answers the item the caret was put into, of two that share a paragraph', () => {
+		const leaf = leafOver('Opening line.\n\nSecond is proposed.');
+		leaf.anchor('~a', 'Second');
+		leaf.anchor('~b', 'proposed', true);
+		leaf.field.setReview([
+			{ id: 'A', state: 'proposed', anchor: '~a', after: 'Second, rewritten.' },
+			{ id: 'B', state: 'proposed', anchor: '~b', after: 'Added after.' }
+		]);
+		caretIn(leaf, 'Second');
+		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.reject), mod);
+		expect(leaf.acts).toEqual([['A', 'dismiss']]);
+
+		const entered = leafOver('Opening line.\n\nSecond is proposed.');
+		entered.anchor('~a', 'Second');
+		entered.anchor('~b', 'proposed', true);
+		entered.field.setReview([
+			{ id: 'A', state: 'proposed', anchor: '~a', after: 'Second, rewritten.' },
+			{ id: 'B', state: 'proposed', anchor: '~b', after: 'Added after.' }
+		]);
+		expect(entered.field.enterReview('B')).toBe(true);
+		press(viewOf(entered.field), keyOf(REVIEW_KEYS.accept), mod);
+		expect(entered.acts).toEqual([['B', 'accept']]);
+		expect(entered.doc.main.body.text).toBe('Opening line.\nSecond is proposed.\nAdded after.');
+		expect(texts(entered.el, 'ins.qm-review-ins')).toEqual([', rewritten']);
 	});
 
 	it('takes the caret into an item by its id', () => {

@@ -22,7 +22,7 @@ import type { ReviewAction } from '../core/codec/index.js';
  *   point anchor it marks where text was only removed. A `proposed` item reads every paragraph the
  *   anchor touches as rewritten to `after`, Markdown, drawn as a word-level edit of those
  *   paragraphs; `''` proposes their removal, and a point anchor proposes new paragraphs after the
- *   one holding it. A paragraph takes one proposal.
+ *   one holding it. A paragraph takes one proposal that rewrites it and one that adds after it.
  * - `field`: the path of a field, for a value with no text to anchor in. A `changed` item marks
  *   the field's control, `before` the value it held; a `proposed` item sets `after` under the
  *   control, the value the field's writer would take, an absent one proposing the field cleared.

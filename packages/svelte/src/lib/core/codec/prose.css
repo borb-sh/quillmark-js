@@ -955,3 +955,24 @@ li.ProseMirror-selectednode::after {
 		gap: var(--_qm-space-2);
 	}
 }
+/* A proposal its paragraph's reader has rewritten since says so before its answers, in the
+   label's ink, since it now gives the whole paragraph to the whole proposal. */
+.qm-review-outdated-label {
+	align-self: center;
+	color: var(--_qm-ink-label);
+}
+/* Forced colours drop the tint, which is all that tells a proposed word from the document's
+   and Accept from a word beside it. A line under the proposed words, an outline round an
+   added block and the system's button stroke round each answer stand in. */
+@media (forced-colors: active) {
+	.ProseMirror .qm-review-ins {
+		text-decoration: underline;
+	}
+	.ProseMirror .qm-review-add {
+		outline: var(--_qm-border-width) solid CanvasText;
+	}
+	.qm-review-act.qm-review-accept,
+	.qm-review-act.qm-review-dismiss {
+		border: var(--_qm-border-width) solid ButtonText;
+	}
+}
