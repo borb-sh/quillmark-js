@@ -224,9 +224,9 @@ describe('an array of objects', () => {
 		flushSync();
 		expect(summaries(arr).map((s) => s.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
 
-		// A row reads as its number whatever it holds, the same words open or collapsed,
-		// and the words it draws are inside the name it is spoken by.
-		const titles = rows.map((r) => r.textContent?.trim());
+		// A row's title is its number whatever it holds, the same words open or collapsed,
+		// and the title it draws is inside the name it is spoken by.
+		const titles = rows.map((r) => r.querySelector('.qm-element-title')?.textContent?.trim());
 		expect(titles).toEqual([S.elementItem(1), S.elementItem(2)]);
 		rows.forEach((r, k) => {
 			expect(r.getAttribute('aria-label')).toBe(S.elementUntitled('Revisions', k + 1));

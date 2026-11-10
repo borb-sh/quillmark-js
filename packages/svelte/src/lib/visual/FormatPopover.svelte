@@ -5,7 +5,8 @@
  the whole of what this surface knows about the editor. The active leaf is a
  field's or a by-value one (an array's element, a subform's cell), reached through
  its views. A non-empty selection in the active leaf
- raises it over that leaf's selection rect; each button dispatches a PM `toggleMark`
+ raises it over that leaf's selection rect, or in a table cell under the cell's row,
+ which it would otherwise cover; each button dispatches a PM `toggleMark`
  command straight at the leaf's `EditorView`, whose own `dispatchTransaction` commits
  the result as it commits a keystroke: a field's lowers it to `markOps` through
  `apply` (field.ts), a by-value leaf's hands the re-encoded value to its parent
@@ -84,6 +85,7 @@
 		toggleList,
 		type RangeAnchor
 	} from '../core/codec/index.js';
+	import { across } from '../core/codec/anchor.js';
 	import type { ActiveProse } from './leaves.js';
 	import { clearLink, hrefInSelection, normalizeHref, setLink } from './links.js';
 	import { familyInSelection, setFamily } from './fonts.js';
@@ -158,6 +160,9 @@
 
 	/** The selection the surface hangs off, live rather than measured (`codec/anchor.ts`): floating-ui re-reads it through every scroll and reflow, so `sync` mints one only when the range moves. A new object each time it does, so bits-ui's `watch( => opts.customAnchor.current, …)` sees the change and repositions (a mutated-in-place object would not). */
 	let anchor = $state<RangeAnchor | undefined>(undefined);
+	/** Below a table cell's row, where above it the surface covers the row above and
+	 *  takes the presses and drops meant for it. */
+	let side = $state<'top' | 'bottom'>('top');
 
 	/** The view the caret is actually in: the leaf's own, or the nested cell view of a
 	 * table island (`codec/table-view.ts`). The six marks are the inline schema's
@@ -208,7 +213,10 @@
 		family = familyInSelection(view.state);
 		surfaceView = view;
 		const { from, to } = view.state.selection;
-		anchor = rangeAnchor(view, from, to);
+		const cell = view.dom.closest('.qm-table-cell');
+		const row = cell?.closest('tr');
+		anchor = row ? across(rangeAnchor(view, from, to), [row, cell!]) : rangeAnchor(view, from, to);
+		side = row ? 'bottom' : 'top';
 		open = true;
 	}
 
@@ -405,7 +413,7 @@
 		<Popover.Content
 			customAnchor={anchor ?? null}
 			collisionBoundary={portalTarget ?? []}
-			side="top"
+			{side}
 			align="center"
 			trapFocus={false}
 			sideOffset={spacePx(portalTarget, 2)}

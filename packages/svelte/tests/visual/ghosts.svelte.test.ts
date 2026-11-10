@@ -477,6 +477,20 @@ describe('a default that prints', () => {
 		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
 	});
 
+	it('puts back a segment typed into a stored blank as the focus leaves', () => {
+		const target = open({}, answering('dated: ""'));
+		const month = segment(target, 'month');
+		month.focus();
+		flushSync();
+		press(month, '1');
+		expect(rungs(target)).toEqual(['hint', undefined, 'hint']);
+
+		month.blur();
+		flushSync();
+		expect(q.reader(doc).get('dated')).toBe('');
+		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
+	});
+
 	it('writes the blank for a seated default emptied whole, and the blank stays', () => {
 		const target = open();
 		for (const [part, presses] of [
@@ -660,6 +674,27 @@ describe('an optional cell', () => {
 		flushSync();
 		expect(toggle.getAttribute('aria-checked')).toBe('true');
 		expect(flag.querySelector('.qm-toggle-wrap')!.hasAttribute('data-unset')).toBe(false);
+	});
+
+	it('unsets an answered `boolean?` on Delete or Backspace, and takes neither key while unset', () => {
+		const target = open();
+		const flag = field(target, 'Flag');
+		const toggle = flag.querySelector<HTMLElement>('.qm-toggle')!;
+		const key = (name: string) => {
+			const e = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true });
+			toggle.dispatchEvent(e);
+			flushSync();
+			return e.defaultPrevented;
+		};
+		expect(key('Delete')).toBe(false);
+		for (const name of ['Delete', 'Backspace']) {
+			toggle.click();
+			flushSync();
+			expect(q.reader(doc).get('flag')).toBe(true);
+			expect(key(name)).toBe(true);
+			expect(q.reader(doc).get('flag')).toBeUndefined();
+			expect(toggle.getAttribute('aria-checked')).toBe('mixed');
+		}
 	});
 
 	it('words its ghost as the consumer does', () => {

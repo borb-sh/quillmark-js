@@ -4,6 +4,52 @@
 
 ## Unreleased
 
+**Review draws in the editor.** `<VisualEditor review={items}>` takes a list of what someone other than the reader changed and what they propose, and draws each item in the editor's own flow, by an anchor in a rich text field or a body or by a field's path. A change is a line under its words, a wedge where words were only removed, or a line along the foot of a field's control, and the pointer or the caret resting on it raises a card with what it replaced and **Undo**. A proposal reads its paragraphs as rewritten to its Markdown, the words that would go struck and the words that would come tinted, with blocks it adds set in flow and **Accept** and **Dismiss** at its end; a field's proposal stands under its control the same way. What the reader writes in a paragraph under a proposal is kept, unstruck. Accepting is the editor's own edit: what lands is what was drawn, `onChange` reports it and undo takes it back. `onReview` reports each answer, `onReviewFocus` the item under attention, and ⌘/Ctrl+Enter and ⌘/Ctrl+. (`REVIEW_KEYS`) answer from the keyboard. `revealReview(id)` brings an item to the reader, opening the group that holds it, and with `{ focus: true }` puts the caret in it; a closed group's header marks that it holds one. The words are `strings` keys and the hue is the new `--qm-review` dial.
+
+**A host's write can be undone with ⌘Z.** `offerUndo(notice, undo)` offers one step back from a write the host made for the reader, on the toast a removal's undo takes and on ⌘Z/Ctrl+Z anywhere in the editor, a text field included, until the reader's next edit.
+
+**A drop anywhere in a table cell lands in that cell.** Text dropped on a cell's padding, or on the edge of its text where no line is, lands in the cell at the nearest place in its text, where the first landed as a new paragraph above the table and the second was taken and dropped.
+
+**Enter in a list of numbers moves on.** Enter in a number row that holds a number commits it and takes the focus to the next row with its number selected, or from the last row to a standing row for the next number, where the caret stayed and the next digits ran onto the number just entered.
+
+**The format bar over a table cell stands below the cell's row.** A selection in a table cell raises the format bar under the row it is in, where it stood above the selection and covered the row above, header cells included, until it closed.
+
+**Dragging a whole word out of a line leaves one space.** A text drag that moves whole words from one field to another closes the gap they leave to a single space, or none at a line's start or end and before closing punctuation, where the two spaces around the words stayed.
+
+**Undo takes back a change to a list's rows.** ⌘/Ctrl+Z anywhere in an array takes back its latest insert, remove, split, join, paste over several rows or move, the focus and caret returning to where they were, and ⌘/Ctrl+Shift+Z or Ctrl+Y puts it forward again, where each did nothing. A step is taken while the rows stand as it left them, so an edit typed in a row since undoes first, and a nested list answers for its own rows. A split's or a paste's own row keeps no step of its own for it.
+
+**Typing in a table cell undoes as a run.** A run of keystrokes in one cell of a table island is one undo step, as typing in a paragraph is, where each keystroke was a step of its own; a keystroke in another cell, or any other change to the table, opens the next.
+
+**A date left half typed shows what it stores.** Digits typed into a date or `datetime` storing nothing, short of a whole value, are put back as the focus leaves, where they stayed on screen with nothing written; a `datetime` given its date and no time is one.
+
+**Typing in a by-value cell costs its card, not the document.** A run of commits to one field, which is typing in an array element, a subform cell or a table cell, rebuilds only the card it is in past its first commit, and the whole-document derive, `quill.validate` with it, lands 300 ms after the run's last commit. A validation diagnostic therefore follows a pause in the typing; a refused commit still draws at once. A host that writes the document itself calls `refresh()` as before.
+
+**An array of numbers, enums, booleans or dates draws its type's control per element.** Each row is the number input, listbox, switch or date control its `items` type maps to, where it was a text input that offered an enum no members and wrote a number as text. `+ Add` adds the blank for an enum or a date and `false` for a boolean. A number has no empty answer, so `+ Add` opens a standing row after the last element that writes nothing until it holds a number, and emptying a number row removes its element, offered back on the undo toast. The remove of a scalar row is a tab stop, Enter and Backspace being its control's.
+
+**A table's grip drag follows a scroll.** A row or column held by its grip picks its drop again when anything scrolls under the pointer, where the drop rule stayed at the place measured when the drag began, and held near an edge it scrolls toward the lines out of view, the page for rows and the table's own scroller for columns, as a record list's handle does.
+
+**A matrix's added item is offered back when removed, and its add box keeps what was typed.** The remove of an added item offers it on the undo toast, columns and all, as an array row's does. Words typed in the add box are added when the focus leaves it, the focus staying where it went, where a click elsewhere discarded them; Escape still clears the box unadded.
+
+**Alt+↑/↓ moves a table's row and a line of a list.** The chord that moves a record's row moves a row of a `layout: table` array and an element of a list of lines or scalars, from any cell of the row or from its remove, the focus riding with the row; neither draws a handle. A control that takes the chord itself, a listbox or a date segment, keeps it.
+
+**Delete or Backspace returns an answered `boolean?` to unset.** With the focus on an optional switch that holds an answer, either key removes it and the switch draws its third state again; no control is drawn for it, and a press still only answers.
+
+**A collapsed record shows what it holds.** A closed row of an array of objects draws the words of its first one-line text cell after `Item N`, at the label ink, so closed rows are told apart without opening them. The row's title and its accessible name are unchanged.
+
+**A record row released outside its list stays where it was.** A handle drag whose pointer is more than a row's height past either end of the list draws no drop rule and moves nothing on release, where it landed the row at the nearest end however far away the release was.
+
+**A table line released outside its table stays where it was.** A grip drag whose pointer is more than a line's extent past either end of the table draws no drop rule and moves nothing on release, where it landed on the nearest line however far out; and over the lifted line itself, where a release moves nothing, no rule draws either.
+
+**Text dragged from one field to another moves.** A drag from one prose leaf into another, a table cell among them, deletes the dragged text from the leaf it left once the other has taken the drop, where it was left in both. Holding the copy modifier (Option on Apple platforms, Ctrl elsewhere) copies, as it does inside one field. Undo in either leaf takes the whole move back and redo puts it forward again, the two leaves keeping separate histories.
+
+**A text drag between a table cell and its own field undoes as one step.** A word dragged out of a table cell into the prose around its table, or into the cell from that prose, is two edits to one field; one ⌘/Ctrl+Z takes both back, where the first left the word in both places and it took a second to finish.
+
+**A `datetime` field edits its time.** The date control draws hour and minute segments after the date's for a `datetime` and writes `YYYY-MM-DDThh:mm`, keeping the seconds of a stored value that carries them. It wrote `YYYY-MM-DD`, which the writer refuses for the type, and hid a stored time.
+
+**Several lines pasted or dropped into a line split it where they land.** In a list of lines, the text after the caret or the drop point goes on with the last line, as a textarea's split leaves it, where it stayed behind the first; the caret ends between the two.
+
+**Enter splits a line of a list, and Backspace and Delete join two.** In a list of lines, `text` or `richtext`, Enter short of a line's end moves the rest of the line, marks and all, to a new row below with the caret at its start, where it opened an empty row and left the rest behind; at the end Enter still opens an empty row. Backspace at a line's start joins it onto the line above, and Delete at a line's end joins the next one onto it, the caret between the two, where both did nothing. A join that would pass the items' `max:` does nothing.
+
 ## v0.33.0 - 2026-11-09
 
 **An applied prose commit leaves new block ids to the store.** A commit that lands as a change sends each block the store does not hold as a placeholder, and each block node then takes the id the store holds, outside history. The id a node carries for a new block before its commit is provisional, so a host reads block ids from the store.

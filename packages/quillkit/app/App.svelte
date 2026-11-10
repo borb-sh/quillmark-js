@@ -34,6 +34,7 @@
 	import { engineOverSuite, facesFor, fontLabels } from '../client/engine';
 	import { collect, diagnosticsOf } from '../client/notes';
 	import { openQuiver } from '../client/quiver';
+	import { beginPrint } from '../client/print';
 	import { save } from '../client/save';
 	import Choose from './Choose.svelte';
 	import Drawer from './Drawer.svelte';
@@ -69,6 +70,7 @@
 	const CANT_OPEN = "This document can't open right now.";
 	const GONE = 'This document was made with a form this app no longer has.';
 	const FIX_FIELDS = 'Some answers need fixing before the page can update.';
+	const CANT_PRINT = 'This browser blocked printing. Download the PDF and print that.';
 
 	/** The document on screen and what it was opened on. */
 	interface Open {
@@ -111,7 +113,7 @@
 	/** A page that would not paint, until the next edit. */
 	let painted = $state.raw(true);
 	let notes = $state.raw<Diagnostic[]>([]);
-	/** Why the last download did not happen. */
+	/** Why the last download or print did not happen. */
 	let refusal = $state.raw<string | undefined>();
 	let downloading = $state.raw(false);
 
@@ -358,27 +360,50 @@
 
 	// ── The file ────────────────────────────────────────────────────────────────
 	/**
-	 * The document as the PDF the page shows. A keystroke not yet applied is applied first
-	 * and an open still in flight is waited on, so the file is the document in hand; a
-	 * document that does not render is refused rather than written from the last good page.
+	 * The document as the PDF the page shows, which both the download and the print hand
+	 * out. A keystroke not yet applied is applied first and an open still in flight is
+	 * waited on, so the file is the document in hand; a document that does not render is
+	 * refused rather than written from the last good page.
 	 */
+	async function pdfOf(at: Open): Promise<Uint8Array | undefined> {
+		if (settle !== undefined) await recompileNow();
+		await opening;
+		if (open !== at) return undefined;
+		if (!session || thrown.length) {
+			refusal = thrown.some((d) => d.path) ? FIX_FIELDS : CANT_RENDER;
+			return undefined;
+		}
+		const [artifact] = session.render({ format: 'pdf' }).artifacts;
+		if (!artifact) throw new Error('no PDF');
+		refusal = undefined;
+		return artifact.bytes;
+	}
+
 	async function download(): Promise<void> {
 		const at = open;
 		if (!at || downloading) return;
 		downloading = true;
 		try {
-			if (settle !== undefined) await recompileNow();
-			await opening;
-			if (open !== at) return;
-			if (!session || thrown.length) {
-				refusal = thrown.some((d) => d.path) ? FIX_FIELDS : CANT_RENDER;
-				return;
-			}
-			const [artifact] = session.render({ format: 'pdf' }).artifacts;
-			if (!artifact) throw new Error('no PDF');
-			refusal = undefined;
-			save(artifact.bytes, fileName(recordOf(at).title, 'pdf'), artifact.mimeType);
+			const pdf = await pdfOf(at);
+			if (pdf) save(pdf, fileName(recordOf(at).title, 'pdf'), 'application/pdf');
 		} catch {
+			refusal = CANT_RENDER;
+		} finally {
+			downloading = false;
+		}
+	}
+
+	async function print(): Promise<void> {
+		const at = open;
+		if (!at || downloading) return;
+		downloading = true;
+		const printing = beginPrint();
+		try {
+			const pdf = await pdfOf(at);
+			if (!pdf) printing.cancel();
+			else if (!printing.print(pdf)) refusal = CANT_PRINT;
+		} catch {
+			printing.cancel();
 			refusal = CANT_RENDER;
 		} finally {
 			downloading = false;
@@ -499,6 +524,13 @@
 			>
 		{/if}
 		{#if open}
+			<button
+				class="qm-control"
+				type="button"
+				data-testid="print"
+				disabled={downloading}
+				onclick={print}>Print</button
+			>
 			<button
 				class="qm-app-primary"
 				type="button"

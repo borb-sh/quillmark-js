@@ -221,7 +221,7 @@ main:
           entries:
             - label: Terms
               page: 20
-      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed row reads `Item` and its number at either rung, whatever its cells hold. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
+      description: "The two-deep shape: an `array` of `object` whose rows hold an `array` of `object`. A collapsed row reads `Item` and its number at either rung, with its first one-line text cell's words after it. A row holding a list is not a line a spreadsheet holds, so `ui.layout: table` is a load error here and it draws as the record list. `label` and `note` are content cells, so an entry regions at `main.appendices[0].entries[1].label` wherever the plate's loop prints it, the two-rung address a landing walks."
 
     columns:
       type: integer
@@ -246,6 +246,22 @@ main:
         group: layout
         compact: true
       description: Stamp DRAFT across the page. Also bound to a checkbox widget, so a boolean reaches the region table.
+
+    tab_stops:
+      type: array
+      items:
+        type: number
+      default: []
+      ui:
+        group: layout
+      description: "Where the body's tab stops fall, in points. An array of numbers, so each row is a number input: a number has no empty answer, so the add chip opens a standing row that commits once it holds one."
+
+    duplex:
+      type: boolean?
+      ui:
+        group: layout
+        compact: true
+      description: "Print on both sides. An optional boolean, so the switch has a third answer, unset, which Delete takes it back to."
 
     accent:
       type: enum
@@ -350,6 +366,37 @@ main:
         compact: true
       description: When the document was last revised. Blank to omit.
 
+    audiences:
+      type: array
+      items:
+        type: enum
+        values:
+          - staff
+          - partners
+          - press
+      default: []
+      ui:
+        group: meta
+      description: Who it is written for. An array of enums, so each row is a listbox and a new row starts blank.
+
+    proofs_passed:
+      type: array
+      items:
+        type: boolean
+      default: []
+      ui:
+        group: meta
+      description: One switch per proof round, on where the round passed. An array of booleans, so a new row starts off.
+
+    review_dates:
+      type: array
+      items:
+        type: date
+      default: []
+      ui:
+        group: meta
+      description: When it was reviewed. An array of dates, so each row is the date control and a new row starts blank.
+
     tracking_id:
       type: text
       default: SPEC-0001
@@ -410,7 +457,7 @@ main:
             | --- | --- | --- |
             | Inner | 18pt | 24pt |
             | Outer | 18pt | 20pt |
-      description: "The revision log. An array of objects: each element collapses to a summary row reading `Item` and its number, and opens onto a subform. The content cells region — `main.revisions[0].detail` is the fixture's one-rung nested-row address — and the scalar cells beside them reach the preview through the array's own region."
+      description: "The revision log. An array of objects: each element collapses to a summary row reading `Item` and its number, then its first one-line text cell's words, and opens onto a subform. The content cells region — `main.revisions[0].detail` is the fixture's one-rung nested-row address — and the scalar cells beside them reach the preview through the array's own region."
 
     checks:
       type: matrix

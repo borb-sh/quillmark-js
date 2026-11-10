@@ -4,8 +4,9 @@
  `writer.set(field, wholeArray)` (arrays are not op-addressed). Element control
  by `items.type`: `richtext` / `text` → a prose element
  ({@link ProseValue}), `object` → a summary row that opens onto a subform, or a
- table's row where the array asks for one and the cells are short, everything else →
- a text input. The add chip sits in the label header row (space-between with the field
+ table's row where the array asks for one and the cells are short, a number, an enum, a
+ boolean or a date → that type's own control, everything else → a text input. The add
+ chip sits in the label header row (space-between with the field
  label); {@link Field} skips its own label for array controls and hands this component
  the label track with it. An array declaring `max:` disables the chip at the cap and
  draws the count beside it: a disabled button takes no focus, so a `title` reaches
@@ -13,6 +14,9 @@
 
  An `object` element collapses: the row is its own summary — a box titled `Item` and
  its 1-based number, whatever the record holds — and opens onto {@link ObjectField}.
+ Collapsed, the summary draws the words of the record's first one-line text cell after
+ the title, at the label ink: what tells one closed row from the next, and no part of
+ the row's name.
  Open, the summary keeps its words, its chevron and its remove where they stood, and
  lets its box go: a line at the tap rung over the subform, so the one thing a press
  on it moves is the chevron. Each row opens and closes on its own: a
@@ -38,18 +42,26 @@
  every other field's control does. On an object element that box is the summary rather
  than the open row: a destructive control belongs to the line it sits on, not to
  everything that line has unfolded. A table's row carries the remove alone, in its last
- track and pinned to the end edge of the box the table scrolls in: every cell of the
- row is on the line, so a mis-order is a retype as it is in a list of strings, and the
- one gesture the row keeps never needs a scroll to reach.
+ track and pinned to the end edge of the box the table scrolls in, so the one control
+ the row draws never needs a scroll to reach. A table's row and a line carry no handle:
+ their reorder is the key's alone.
 
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
- caret there, a paste of several lines into a prose row opens a row per line,
- Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
- anywhere in an `object` row of the list moves it, the nearest row answering and never
- the record around a nested one, and is the twin of the handle's drag. A move is one splice of the ids
+ caret there, and short of a prose line's end splits the line there, as a bulleted list
+ does; a paste of several lines into a prose row opens a row per line; Backspace at a
+ prose line's start joins it onto the line above and Delete at its end joins the next
+ onto it, each one commit; Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
+ anywhere in a row of the list moves it, the nearest row answering and never
+ the record around a nested one, and on an `object` row is the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
+
+ A change to the rows (an insert, a remove, a split, a join, a paste over rows, a move)
+ is a step of the list's own, since no leaf's history holds it: ⌘/Ctrl+Z anywhere in the
+ list takes the latest back and ⌘/Ctrl+Shift+Z puts it forward, the nearest list
+ answering, while the rows stand as that step left them. An edit in a row since is the
+ row's to undo first. A removal offered on the toast is the same step.
 
  An empty list of lines (any element but an `object`) draws a standing row to type
  into, so a list's first line takes no press of the add chip first. The row is not an
@@ -58,6 +70,15 @@
  stays where it was, absent or `[]`, and Enter and Backspace have nothing to act on.
  Its first non-empty edit or paste commits it as the list's first element, keeping its
  id, so the caret stays in the leaf it is typing into.
+
+ A scalar element's row is its type's control, and the row's keys are that control's:
+ Enter and Backspace are a line's, so the remove is a tab stop here. A new row holds
+ what the type holds empty: the blank for an enum or a date, `false` for a boolean. A
+ number has no empty answer, so the add chip opens a standing row after the last
+ element, which commits once it holds a number and which its remove dismisses, and a
+ number row emptied is a row removed, offered back on the toast. Enter in a number row
+ holding a number moves on, as on a line: to the next row with its number selected, or
+ from the last to the standing row.
 
  An unset array whose `default:` holds elements draws them as its rows, at the default
  rung (`data-default` on the rows' box), since they are what prints. The rows are the
@@ -83,9 +104,11 @@
 		IdSeq,
 		baseType,
 		controlKind,
+		firstShortText,
 		declaredContent,
 		fieldTitle,
 		literalText,
+		renderedBoolean,
 		schemaAt,
 		textCap,
 		type ArrayLayout
@@ -97,6 +120,10 @@
 	import { rowDrag } from './rowdrag.svelte.js';
 	import Icon from './icons/Icon.svelte';
 	import TextField from './TextField.svelte';
+	import NumberField from './NumberField.svelte';
+	import EnumField from './EnumField.svelte';
+	import BooleanField from './BooleanField.svelte';
+	import DateField from './DateField.svelte';
 	import ObjectField from './ObjectField.svelte';
 	import ProseValue from './ProseValue.svelte';
 	import FieldLabel from './FieldLabel.svelte';
@@ -202,12 +229,24 @@
 	// The standing row's id, taken at its first commit and replaced: the row it
 	// becomes keeps the id, so its leaf never remounts under the keystroke.
 	let standingId = $state(seq.next());
+	// A boolean row is never empty, so a list of them has no row that is not one yet.
 	const standing = $derived(
-		!table && control !== 'object' && arr.length === 0 && (max == null || max > 0)
+		!table &&
+			control !== 'object' &&
+			control !== 'boolean' &&
+			arr.length === 0 &&
+			(max == null || max > 0)
 	);
 	/** Whether the standing row is drawn: a gesture lands on it, which holds no element yet. */
 	const onStanding = $derived(standing && ids.length === 0);
-	const rowIds = $derived(onStanding ? [standingId] : ids);
+	/** The add chip's standing row after a list of numbers (see the header). */
+	let adding = $state(false);
+	const pending = $derived(adding && control === 'number' && ids.length > 0 && !atCap);
+	const rowIds = $derived(onStanding ? [standingId] : pending ? [...ids, standingId] : ids);
+	/** Whether the element's keys are its control's own, the row wiring none. */
+	const scalar = $derived(
+		control === 'number' || control === 'enum' || control === 'boolean' || control === 'date'
+	);
 	// Length reconcile (defend against an out-of-band length change);
 	// order is maintained by the mutators, not here.
 	$effect(() => {
@@ -235,8 +274,26 @@
 	// it says so once per element per render. Thirteen lines on one memo's first paint,
 	// in the console a consumer is reading to find its own defects. Same shape
 	// {@link Card} keeps its header/panel refs in.
-	const els: Record<string, { focus: () => void; setCaret?: (pos: number) => void } | undefined> =
-		$state({});
+	const els: Record<
+		string,
+		| {
+				focus: () => void;
+				setCaret?: (pos: number) => void;
+				caret?: () => number | undefined;
+				current?: () => Content | undefined;
+				appended?: (tail: Content) => { content: Content; caret: number } | undefined;
+		  }
+		| undefined
+	> = $state({});
+	/** Focus row `id`'s control: through its handle where it exports one, else the first
+	 *  control the row's markup holds, its remove aside. */
+	function focusRow(id: string): void {
+		const el = els[id];
+		if (el) return el.focus();
+		[...(rowEls[id]?.querySelectorAll<HTMLElement>('input, button') ?? [])]
+			.find((n) => !n.classList.contains('qm-remove'))
+			?.focus();
+	}
 	// The rows' own boxes, on the same key and dropped on the same paths: what an
 	// element landing blooms in ({@link focusPath}), and what an object row's
 	// summary is found through. A row is a box whatever its element type, so the two
@@ -285,6 +342,9 @@
 		if (open.has(id)) open.delete(id);
 		else open.add(id);
 	}
+	/** What a collapsed row shows of its record: the cell a card's title reads. */
+	const preview = (k: number): string | undefined =>
+		firstShortText(items?.properties, (arr[k] ?? {}) as Record<string, unknown>);
 	const rowName = (k: number): string | undefined =>
 		label != null ? `${label} ${k + 1}` : undefined;
 	/** A row control's name: its action, and the row, where the row has a name. */
@@ -308,35 +368,45 @@
 	function emptyElement(): unknown {
 		if (control === 'prose') return emptyContent();
 		if (control === 'object') return {};
+		if (control === 'boolean') return false;
 		return '';
 	}
 
-	/** The standing row becomes the list's first element, keeping its id. */
+	/** The standing row becomes an element, the list's first or its last, keeping its id. */
 	function claimStanding(): void {
-		ids = [standingId];
+		ids = [...ids, standingId];
 		standingId = seq.next();
+		adding = false;
 	}
 	/** An empty list's landing: the standing row where one is drawn, else the add chip. */
 	function focusEmpty(): void {
-		(onStanding ? els[standingId] : addEl)?.focus();
+		if (onStanding) focusRow(standingId);
+		else addEl?.focus();
 	}
 	/** Splice `value` in at `at` under a fresh id and commit it. Every reshape withdraws
 	 *  the editor's standing undo offer: a restore reinserts at the index its removal left,
 	 *  which a reshape moves (`undo.svelte.ts`). */
 	function insertAt(at: number, value: unknown): string {
+		const before = snapshot();
 		undo.withdraw();
 		const id = seq.next();
 		ids = [...ids.slice(0, at), id, ...ids.slice(at)];
 		const next = arr.slice();
 		next.splice(at, 0, value);
 		onCommit(next);
+		record(before, next, { id });
 		return id;
 	}
 
 	function commitElement(k: number, next: unknown): void {
-		if (onStanding) {
+		if (onStanding || (pending && k === ids.length)) {
 			if (next === undefined || cellBlank(next)) return;
 			claimStanding();
+		} else if (next === undefined && control === 'number') {
+			// The focus follows only where the row still held it: a change on leaving is
+			// a focus already on its way elsewhere.
+			const held = !!rowEls[ids[k]]?.contains(document.activeElement);
+			return remove(k, undefined, false, true, held);
 		}
 		const copy = arr.slice();
 		// A cleared element control commits `undefined` (the unset rung), but an
@@ -357,10 +427,11 @@
 		if (control === 'object' && !table) open.add(id);
 		void focusAfterFlush(id, column);
 	}
-	/** Element `k` as `row` and `below` as new elements after it, one commit: a paste of
-	 *  several lines into a row, each line past the first a row as Enter would open it.
-	 *  The caret ends where the paste does, at the end of the last. */
-	function spill(k: number, row: Content, below: Content[]): void {
+	/** Element `k` as `row` and `below` as new elements after it, one commit: a paste or
+	 *  a drop of several lines into a row, each line past the first a row as Enter would
+	 *  open it. The caret ends where the lines do, at `caret` in the last. */
+	function spill(k: number, row: Content, below: Content[], caret: number): void {
+		const before = onStanding ? undefined : snapshot();
 		if (onStanding) claimStanding();
 		undo.withdraw();
 		const at = k + 1;
@@ -370,13 +441,48 @@
 		next[k] = row;
 		next.splice(at, 0, ...below);
 		onCommit(next);
+		if (before) record(before, next, { id: fresh.at(-1)!, caret });
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
-			els[fresh.at(-1)!]?.setCaret?.(Number.MAX_SAFE_INTEGER);
+			els[fresh.at(-1)!]?.setCaret?.(caret);
 		})();
 	}
+	/** Element `upper + 1` joined onto the end of element `upper`, one commit, the caret
+	 *  landing between the two: Backspace at a prose line's start, Delete at its end.
+	 *  Whether it joined: not past either end of the list, nor where a leaf is held or
+	 *  the joined line would pass the cap. */
+	function join(upper: number): boolean {
+		if (upper < 0 || upper + 1 >= ids.length) return false;
+		const tail = els[ids[upper + 1]]?.current?.();
+		const joined = tail && els[ids[upper]]?.appended?.(tail);
+		if (!joined) return false;
+		const before = snapshot();
+		undo.withdraw();
+		const [kept, gone] = [ids[upper], ids[upper + 1]];
+		ids = ids.filter((_, i) => i !== upper + 1);
+		drop(gone);
+		const next = arr.slice();
+		next.splice(upper, 2, joined.content);
+		onCommit(next);
+		record(before, next, { id: kept, caret: joined.caret });
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			els[kept]?.setCaret?.(joined.caret);
+		})();
+		return true;
+	}
+	/** Enter in a number row once it holds a number moves on, as Enter on a line does:
+	 *  to the row below with its number selected, or after the last to the standing row. */
+	function numberEntered(k: number): void {
+		if (k >= ids.length - 1) return add();
+		focusRow(ids[k + 1]);
+		rowEls[ids[k + 1]]?.querySelector('input')?.select();
+	}
 	function add(): void {
-		insertAfter(ids.length - 1);
+		if (control !== 'number') return insertAfter(ids.length - 1);
+		if (atCap) return;
+		adding = true;
+		void focusAfterFlush(standingId);
 	}
 	/** Remove element `k`. Focus lands on the element before it, or on the one that
 	 *  slid into its place; on the add affordance once the list is empty, which is then
@@ -387,25 +493,43 @@
 	 *  pinned and so keeps the clip where the pointer left it, where the first cell
 	 *  would scroll the box back to its start on every press. A removal the user asked for
 	 *  by name, the remove's press or its key, is offered back on the editor's toast
-	 *  (`undo.svelte.ts`); Backspace on an empty element takes nothing worth offering. */
-	function remove(k: number, column?: string, fromRemove = false, offer = false): void {
+	 *  (`undo.svelte.ts`); Backspace on an empty element takes nothing worth offering.
+	 *  `land` off leaves the focus where it is. The standing row after a list of numbers
+	 *  is no element: its remove dismisses it and writes nothing. */
+	function remove(
+		k: number,
+		column?: string,
+		fromRemove = false,
+		offer = false,
+		land = true
+	): void {
+		if (k >= ids.length) {
+			adding = false;
+			addEl?.focus();
+			return;
+		}
+		const before = snapshot();
 		const dropped = ids[k];
 		const value = arr[k];
 		const name = rowName(k) ?? t.strings.elementItem(k + 1);
 		const next = ids.filter((_, i) => i !== k);
 		ids = next;
 		drop(dropped);
-		onCommit(arr.filter((_, i) => i !== k));
-		if (offer) undo.offer(t.strings.undoRemoved(name), () => restore(k, value));
+		const values = arr.filter((_, i) => i !== k);
+		onCommit(values);
+		const step = record(before, values, next.length ? { id: next[Math.max(k - 1, 0)] } : undefined);
+		if (offer) undo.offer(t.strings.undoRemoved(name), () => restore(k, value, step));
 		else undo.withdraw();
+		if (!land) return;
 		void focusAfterFlush(next[Math.max(k - 1, 0)], column, fromRemove).then(() => {
 			if (offer) undo.hand(document.activeElement);
 		});
 	}
 	/** A removal's undo: `value` back at `k`, under a fresh id, focused where a landing on
 	 *  it would focus. A no-op once this field is gone, the row with it. */
-	function restore(k: number, value: unknown): void {
+	function restore(k: number, value: unknown, step: Reshape): void {
 		if (!span.alive) return;
+		if (done.at(-1) === step && takeStep(false)) return;
 		void focusAfterFlush(insertAt(Math.min(k, ids.length), value));
 	}
 	/** A collapsed record's remove key, on its summary: the remove is out of the tab order,
@@ -423,6 +547,7 @@
 	 */
 	function move(k: number, to: number): void {
 		if (to === k || to < 0 || to >= ids.length) return;
+		const before = snapshot();
 		const pressed = document.activeElement;
 		undo.withdraw();
 		arm.arm();
@@ -434,12 +559,91 @@
 		const [v] = next.splice(k, 1);
 		next.splice(to, 0, v);
 		onCommit(next);
+		record(before, next, before.focus?.id === id ? before.focus : { id });
 		void (async () => {
 			if (!(await span.resumes(tick()))) return;
 			if (pressed instanceof HTMLElement && pressed.isConnected && rowEls[id]?.contains(pressed))
 				pressed.focus();
 		})();
 	}
+	// ── The list's own undo ──────────────────────────────────────────────────────
+	// A change to the rows (an insert, a remove, a split, a join, a spill, a move) lives
+	// in no leaf's history, so the list keeps its steps itself. A step is taken back only
+	// while the rows stand as the step left them: an edit in a row since is the row's to
+	// undo first, and once its own undo brings the rows back, the step is next.
+	type Focus = { id: string; caret?: number };
+	type Rows = { ids: string[]; values: unknown[]; focus?: Focus };
+	type Reshape = { before: Rows; after: Rows };
+	/** How many steps the list keeps each way. */
+	const DEPTH = 100;
+	let done: Reshape[] = [];
+	let undone: Reshape[] = [];
+	/** Where the focus is in the list: the row holding it, and a prose row's caret. */
+	function focusNow(): Focus | undefined {
+		const at = document.activeElement;
+		const id = ids.find((i) => rowEls[i]?.contains(at));
+		return id === undefined ? undefined : { id, caret: els[id]?.caret?.() };
+	}
+	function snapshot(): Rows {
+		return { ids: ids.slice(), values: arr, focus: focusNow() };
+	}
+	/** Record the step from `before` to the rows just committed. Its `after` takes the
+	 *  rows as the store hands them back once the commit lands, which is what a later
+	 *  read compares against. */
+	function record(before: Rows, values: unknown[], focus?: Focus): Reshape {
+		const step: Reshape = { before, after: { ids: ids.slice(), values, focus } };
+		done = [...done.slice(1 - DEPTH), step];
+		undone = [];
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			step.after = { ...step.after, values: arr };
+		})();
+		return step;
+	}
+	const same = (a: unknown[], b: unknown[]): boolean =>
+		a === b || JSON.stringify(a) === JSON.stringify(b);
+	/** Take the latest step back (`redo` false) or forward again, where the rows still
+	 *  stand where it would start from. Whether it did. */
+	function takeStep(redo: boolean): boolean {
+		const stack = redo ? undone : done;
+		const step = stack.at(-1);
+		if (!step) return false;
+		const [from, to] = redo ? [step.before, step.after] : [step.after, step.before];
+		if (!same(arr, from.values)) return false;
+		if (redo) {
+			undone = undone.slice(0, -1);
+			done = [...done, step];
+		} else {
+			done = done.slice(0, -1);
+			undone = [...undone, step];
+		}
+		undo.withdraw();
+		for (const id of ids) if (!to.ids.includes(id)) drop(id);
+		ids = to.ids.slice();
+		onCommit(to.values);
+		const focus = to.focus && ids.includes(to.focus.id) ? to.focus : undefined;
+		void (async () => {
+			if (!(await span.resumes(tick()))) return;
+			const caret = focus?.caret;
+			const row = focus && els[focus.id];
+			if (caret !== undefined && row?.setCaret) row.setCaret(caret);
+			else void focusAfterFlush(focus?.id);
+		})();
+		return true;
+	}
+	/** ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Ctrl+Y) anywhere in the list, ahead of the
+	 *  control's own: the nearest list answers, never the one around a nested list. */
+	function onUndoChord(e: KeyboardEvent): void {
+		if (e.defaultPrevented || e.isComposing || e.altKey || !(e.metaKey || e.ctrlKey)) return;
+		const key = e.key.toLowerCase();
+		const redo = (key === 'z' && e.shiftKey) || (key === 'y' && !e.shiftKey && e.ctrlKey);
+		if (!redo && (key !== 'z' || e.shiftKey)) return;
+		if (!(e.target instanceof Element) || e.target.closest('.qm-array') !== e.currentTarget) return;
+		if (drag.held() || !takeStep(redo)) return;
+		e.preventDefault();
+		e.stopPropagation();
+	}
+
 	/** Take the caret: the first element, or the add affordance when the list is empty;
 	 * which is then the only thing there is to land on, and the next thing the user
 	 * wants anyway. Reached by a label click and by the editor's landing verbs, which
@@ -448,7 +652,7 @@
 		if (ids.length === 0) return focusEmpty();
 		if (table) return void cellEls[ids[0]]?.focus();
 		if (control === 'object') return focusObjectRow(ids[0]);
-		els[ids[0]]?.focus();
+		focusRow(ids[0]);
 	}
 	/** An object row's landing: inside the subform when that row is the open one, on
 	 *  the row's own summary otherwise — a collapsed row's control is its summary. */
@@ -507,12 +711,8 @@
 			})();
 		}
 		const el = els[id];
-		if (!el) {
-			focus();
-			return undefined;
-		}
-		if (pos != null && el.setCaret) el.setCaret(pos);
-		else el.focus();
+		if (pos != null && el?.setCaret) el.setCaret(pos);
+		else focusRow(id);
 		return rowEls[id];
 	}
 	/** Focus element `id` after the flush, never in the same tick: a mutation commits
@@ -543,7 +743,7 @@
 			return;
 		}
 		if (control === 'object') return focusObjectRow(id);
-		els[id]?.focus();
+		focusRow(id);
 	}
 	/** Whether a cell's committed value is at its blank: unset, the empty string, or a
 	 *  `Content` with no characters. A boolean or a number is never blank. */
@@ -608,13 +808,14 @@
 			remove(k, column);
 		}
 	}
-	/** The reorder's keyboard twin, on the row so it answers from the summary and from
-	 *  any cell an open row holds: Alt+↑/↓, the table island's own binding. The nearest
-	 *  row answers, or none does: a press inside a nested row is that row's whether it
-	 *  holds a reorder or not, so a key in a table's cell or a list of strings' input
-	 *  moves nothing, and never the record around it. A held drag owns the row until its
-	 *  release. */
+	/** The reorder's key, on the row so it answers from the summary, from any cell the
+	 *  row holds and from its remove: Alt+↑/↓, the table island's own binding. The nearest
+	 *  row answers, so a key in a nested list's row moves that row and never the record
+	 *  around it. A control that takes the chord keeps it: a listbox opens on it and a
+	 *  date segment steps, and their rows move from the remove. The standing row is no
+	 *  element and moves nowhere. A held drag owns the row until its release. */
 	function onRowKey(e: KeyboardEvent, k: number): void {
+		if (k >= ids.length) return;
 		if (!e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || e.isComposing || drag.held()) return;
 		// A cell that took the key — a select opening, a date segment stepping, a prose
 		// leaf joining — owns it.
@@ -631,7 +832,18 @@
 	const drag = rowDrag({
 		count: () => ids.length,
 		box: (i) => rowEls[ids[i]]?.getBoundingClientRect(),
-		move
+		move: (k, to) => {
+			const id = ids[k];
+			move(k, to);
+			// The row's summary takes the focus, so the keys that move it or take the move
+			// back act on the row the pointer just moved.
+			void (async () => {
+				if (!(await span.resumes(tick()))) return;
+				const summary = rowEls[id]?.querySelector<HTMLElement>('.qm-element-summary');
+				if (summary && !rowEls[id]?.contains(document.activeElement))
+					summary.focus({ preventScroll: true });
+			})();
+		}
 	});
 	onDestroy(drag.release);
 
@@ -660,6 +872,7 @@
 <div
 	class={['qm-array', { empty: ids.length === 0 }]}
 	role="group"
+	onkeydowncapture={onUndoChord}
 	aria-labelledby={label != null ? labelId : undefined}
 	aria-describedby={description ? descriptionId : undefined}
 >
@@ -722,10 +935,12 @@
 					<span class="qm-array-table-head-end"></span>
 				</div>
 				{#each ids as id, k (id)}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="qm-array-row qm-array-table-row qm-wash"
 						data-qm-index={k}
 						bind:this={rowEls[id]}
+						onkeydown={(e) => onRowKey(e, k)}
 					>
 						<ObjectField
 							bare
@@ -785,6 +1000,9 @@
 							     same rung as a panel header's, so the surface has one disclosure. -->
 							<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
 							<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
+							{#if !open.has(id) && preview(k)}
+								<span class="qm-element-preview">{preview(k)}</span>
+							{/if}
 						</button>
 						<div class="qm-row-actions">
 							{@render removeButton(k)}
@@ -816,10 +1034,12 @@
 			bind:this={rowsEl}
 		>
 			{#each rowIds as id, k (id)}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
 					class={['qm-array-row qm-wash', { standing: id === standingId }]}
 					data-qm-index={k}
 					bind:this={rowEls[id]}
+					onkeydown={(e) => onRowKey(e, k)}
 				>
 					{#if control === 'prose'}
 						<ProseValue
@@ -832,9 +1052,41 @@
 							onChange={(rt) => commitElement(k, rt)}
 							lines={{
 								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
-								onLines: (rt, below) => spill(k, rt, below)
+								onLines: (rt, below, caret) => spill(k, rt, below, caret),
+								onJoin: (dir) => join(dir < 0 ? k - 1 : k)
 							}}
 							onKey={(e) => onElementKey(e, k)}
+						/>
+					{:else if control === 'number'}
+						<NumberField
+							value={arr[k] as number | undefined}
+							integer={items != null && baseType(items) === 'integer'}
+							label={rowName(k)}
+							onCommit={(v) => commitElement(k, v)}
+							onEnter={() => numberEntered(k)}
+						/>
+					{:else if control === 'enum'}
+						<!-- The blank is an element's empty answer, drawn as an unanswered one. -->
+						<EnumField
+							value={(arr[k] as string | undefined) || undefined}
+							values={items?.values ?? []}
+							blankTitle={items?.ui?.blank_title}
+							label={rowName(k)}
+							onCommit={(v) => commitElement(k, v)}
+						/>
+					{:else if control === 'boolean'}
+						<BooleanField
+							value={renderedBoolean(arr[k])}
+							label={rowName(k)}
+							onCommit={(v) => commitElement(k, v)}
+						/>
+					{:else if control === 'date'}
+						<DateField
+							bind:this={els[id]}
+							value={(arr[k] as string | undefined) || undefined}
+							datetime={items != null && baseType(items) === 'datetime'}
+							label={rowName(k)}
+							onCommit={(v) => commitElement(k, v)}
 						/>
 					{:else}
 						<TextField
@@ -845,9 +1097,9 @@
 							onKey={(e) => onElementKey(e, k)}
 						/>
 					{/if}
-					{#if id !== standingId}
+					{#if id !== standingId || pending}
 						<div class="qm-row-actions">
-							{@render removeButton(k)}
+							{@render removeButton(k, scalar)}
 						</div>
 					{/if}
 					<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
@@ -861,13 +1113,15 @@
 <!-- The remove, one button wherever a row ends: a scalar row's slab, a record row's
      slab after its reorder pair, a table row's last track. Out of the tab order where the
      row has a key that removes it: Backspace on an emptied line, ⌘/Ctrl+Backspace on a
-     record's summary. A table's filled row has none, so its remove stays a stop. -->
+     record's summary. A table's filled row has none, nor has a scalar element's, so its
+     remove stays a stop. -->
 {#snippet removeButton(k: number, stop = false)}
 	<button
 		type="button"
 		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
 		title={t.strings.arrayRemove}
 		aria-label={rowAction(t.strings.arrayRemove, k)}
+		aria-keyshortcuts={control === 'object' && !table ? undefined : 'Alt+ArrowUp Alt+ArrowDown'}
 		tabindex={stop ? undefined : -1}
 		onclick={() => remove(k, undefined, true, true)}><Icon name="minus" /></button
 	>
@@ -876,7 +1130,8 @@
 <!-- An `object` row's drag handle, a table grip's twin hung off the row's start edge.
      Pointer-only and out of the accessibility tree: a press on it does nothing, so a
      button there would be one a screen reader activates to no effect. Its twin is
-     Alt+↑/↓ from anywhere in the row, which the summary announces. -->
+     Alt+↑/↓ from anywhere in the row, which the summary announces, as a table's or a
+     line's remove does for its own row. -->
 {#snippet handle(k: number)}
 	<span
 		class="qm-row-handle"
@@ -976,7 +1231,9 @@
 	 component's. The longhand beats the family's `padding` shorthand without a
 	 specificity fight: `controls.css` ranks the family at zero inside `:where()`. */
 	.qm-array-row > :global(.qm-input),
-	.qm-array-row > :global(.qm-control-box) {
+	.qm-array-row > :global(.qm-control-box),
+	.qm-array-row > :global(.qm-select-wrap > .qm-control-box),
+	.qm-array-row > :global(.qm-date-wrap .qm-control-box) {
 		padding-inline-end: var(--_qm-tap-min);
 	}
 	.qm-element-summary {
@@ -1168,6 +1425,20 @@
 		white-space: nowrap;
 		color: var(--_qm-ink);
 		font-variant-numeric: tabular-nums;
+	}
+	/* What the closed record holds, after its name and a rung under it: the label ink,
+	 on the line's remainder, and the first to give way where the line runs short. */
+	.qm-element-preview {
+		flex: 1 1 0;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		text-align: start;
+		color: var(--_qm-ink-label);
+	}
+	.qm-element-summary:has(.qm-element-preview) > .qm-element-title {
+		flex-shrink: 0;
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
 	 Every row of it is open, so it stands where an open row's subform stands: a rung

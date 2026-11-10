@@ -925,6 +925,24 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
+	it('a run of keystrokes in one cell is one undo step, and a keystroke in another cell opens one', () => {
+		const { field } = tableLeaf(LETTERED);
+		const type = (view: EditorView, text: string) => {
+			view.focus();
+			for (const ch of text) view.dispatch(view.state.tr.insertText(ch));
+		};
+		type(cellViews(field)[0], 'alpha');
+		expect(undoDepth(outerView(field).state)).toBe(1);
+		type(cellViews(field)[1], 'beta');
+		expect(undoDepth(outerView(field).state)).toBe(2);
+		press(cellViews(field)[1], 'z', { ctrlKey: true });
+		expect(leafProps(field).header[1].text).toBe(LETTERED.header[1].text);
+		expect(leafProps(field).header[0].text).toContain('alpha');
+		press(cellViews(field)[0], 'z', { ctrlKey: true });
+		expect(leafProps(field)).toEqual(LETTERED);
+		field.destroy();
+	});
+
 	it('an undo in the middle of a cell puts the caret where the edit was', () => {
 		const { field } = tableLeaf(withCell(LETTERED, 0, 0, cell('hello')));
 		const view = cellViews(field)[0];
@@ -1652,6 +1670,105 @@ describe('a grip drag moves its line', () => {
 		field.destroy();
 	});
 
+	it('re-picks the drop as the lines scroll under a held drag', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const grip = grips(field, 'row')[1];
+		const at = (type: string, [x, y]: [number, number]) =>
+			grip.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					clientX: x,
+					clientY: y
+				})
+			);
+		at('pointerdown', [35, 55]);
+		at('pointermove', [35, 60]);
+
+		// A scroll by any hand carries the next row up under a pointer that has not moved.
+		const rise = HOSTS[4].top - HOSTS[2].top;
+		layout(
+			field,
+			HOSTS.map((h) => ({ ...h, top: h.top - rise, bottom: h.bottom - rise }))
+		);
+		field.el.dispatchEvent(new Event('scroll'));
+		at('pointerup', [35, 60]);
+		expect(grid(leafProps(field))).toEqual([
+			['h1', 'h2'],
+			['b1', 'b2'],
+			['a1', 'a2']
+		]);
+		field.destroy();
+	});
+
+	it('a release more than a line past the table moves nothing, and no rule draws out there', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const grip = grips(field, 'row')[1];
+		const at = (type: string, [x, y]: [number, number]) =>
+			grip.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					clientX: x,
+					clientY: y
+				})
+			);
+		const last = HOSTS[4];
+		const reach = last.bottom - last.top;
+		at('pointerdown', [35, 55]);
+		at('pointermove', [35, 80]);
+		expect(field.el.querySelector('.qm-table-drop')).not.toBeNull();
+		at('pointermove', [35, last.bottom + reach + 1]);
+		expect(field.el.querySelector('.qm-table-drop')).toBeNull();
+		at('pointerup', [35, last.bottom + reach + 1]);
+		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
+		field.destroy();
+	});
+
+	it('a release within a line past the table lands on the end line', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const last = HOSTS[4];
+		dragGrip(grips(field, 'row')[1], [
+			[35, 55],
+			[35, 80],
+			[35, last.bottom + last.bottom - last.top]
+		]);
+		expect(grid(leafProps(field))).toEqual([
+			['h1', 'h2'],
+			['b1', 'b2'],
+			['a1', 'a2']
+		]);
+		field.destroy();
+	});
+
+	it('draws no rule while the pointer is back over the lifted line', () => {
+		const { field } = tableLeaf(LETTERED);
+		layout(field);
+		const grip = grips(field, 'row')[1];
+		const at = (type: string, [x, y]: [number, number]) =>
+			grip.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					clientX: x,
+					clientY: y
+				})
+			);
+		at('pointerdown', [35, 55]);
+		at('pointermove', [35, 80]);
+		expect(field.el.querySelector('.qm-table-drop')).not.toBeNull();
+		at('pointermove', [35, 55]);
+		expect(field.el.querySelector('.qm-table-drop')).toBeNull();
+		at('pointerup', [35, 55]);
+		field.destroy();
+	});
+
 	it('a body row dragged onto the header becomes the header', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
@@ -1821,6 +1938,87 @@ function type(view: EditorView, text: string): boolean {
 	const { from, to } = view.state.selection;
 	return !!view.someProp('handleTextInput', (f) => f(view, from, to, text, () => view.state.tr));
 }
+
+/** jsdom has no `DragEvent`: the drop a table dispatches again over a cell's text is
+ *  this one, carrying what the browser's carried. */
+globalThis.DragEvent ??= class extends MouseEvent {
+	readonly dataTransfer: DataTransfer | null;
+	constructor(type: string, init: DragEventInit = {}) {
+		super(type, init);
+		this.dataTransfer = init.dataTransfer ?? null;
+	}
+} as typeof DragEvent;
+
+/** A text drop at a viewport point, on the element under it. */
+function dropAt(target: Element, x: number, y: number, text: string): Event {
+	const dataTransfer = {
+		types: ['text/plain'],
+		files: [],
+		getData: (type: string) => (type === 'text/plain' ? text : '')
+	} as unknown as DataTransfer;
+	const event = new DragEvent('drop', {
+		bubbles: true,
+		cancelable: true,
+		clientX: x,
+		clientY: y,
+		dataTransfer
+	});
+	target.dispatchEvent(event);
+	return event;
+}
+
+describe('a drop anywhere in a cell lands in that cell', () => {
+	// Cell 2 (`a1`) is the host box `HOSTS[2]`, and its line is inset in it by the
+	// editor's own padding. The cell's view resolves a point on the line to the line's end
+	// and any other to the place before it, between blocks, as a browser's does.
+	const LINE: Box = { left: 36, top: 47, right: 94, bottom: 63 };
+	function withLine(field: FieldController): EditorView {
+		layout(field);
+		const view = cellViews(field)[2];
+		(view.dom.firstElementChild as HTMLElement).getBoundingClientRect = () => domRect(LINE);
+		view.posAtCoords = ({ left, top }) => ({
+			pos: left > LINE.left && left < LINE.right && top > LINE.top && top < LINE.bottom ? 3 : 0,
+			inside: -1
+		});
+		return view;
+	}
+
+	it("from the cell's padding, not the field beside the table", () => {
+		const { field } = tableLeaf(LETTERED);
+		const view = withLine(field);
+		const blocks = outerView(field).state.doc.childCount;
+		const event = dropAt(cellBox(field, 2), 31, 55, 'x');
+		expect(event.defaultPrevented).toBe(true);
+		expect(view.state.doc.textContent).toBe('a1x');
+		expect(outerView(field).state.doc.childCount).toBe(blocks);
+		expect(leafProps(field).rows[0][0].text).toBe('a1x');
+		field.destroy();
+	});
+
+	it("from the editor's padding, where the drop resolves between blocks", () => {
+		const { field } = tableLeaf(LETTERED);
+		const view = withLine(field);
+		dropAt(view.dom, 31, 55, 'x');
+		expect(view.state.doc.textContent).toBe('a1x');
+		field.destroy();
+	});
+
+	it('leaves a file to the editor root', () => {
+		const { field } = tableLeaf(LETTERED);
+		withLine(field);
+		outerView(field).posAtCoords = () => null;
+		const event = new DragEvent('drop', {
+			bubbles: true,
+			cancelable: true,
+			clientX: 31,
+			clientY: 55
+		});
+		Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'] } });
+		cellBox(field, 2).dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+		field.destroy();
+	});
+});
 
 describe('a pointer press on the island resolves to a caret', () => {
 	it('inside the frame it lands in the NEAREST cell, by geometry', () => {

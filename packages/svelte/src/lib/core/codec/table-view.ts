@@ -26,12 +26,15 @@ import { decode } from './decode.js';
 import { FIELD_KEYS, markKeymap, TABLE_KEYS as T } from './shortcuts.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
+import { dragMovePlugin } from './drag-move.js';
+import { TYPING } from './undo.js';
 import { tableOfNode } from './table.js';
 import type { IslandNodeAttrs } from './islands.js';
 import { tableElement, tableText } from './table-copy.js';
 import { breakKeymap } from './breaks.js';
 import { cellSchema } from './schema.js';
 import { revealProps } from './reveal.js';
+import { followDrag } from '../dragfollow.js';
 import {
 	ALIGNS,
 	canMerge,
@@ -232,11 +235,12 @@ function chromeButton(className: string, label: string, run: () => void): HTMLBu
 
 /** A cell's plugin stack: marks, the markdown shorthands and a pasted URL's link, and
  *  nothing that belongs to the field (history, anchors, the ghost). */
-function cellPlugins(keys: Record<string, Command>) {
+function cellPlugins(keys: Record<string, Command>, outer: () => EditorView) {
 	return [
 		inputRulesPlugin(cellSchema),
 		undoRuleKeymap(),
 		linkPastePlugin(cellSchema.marks.link),
+		dragMovePlugin(outer),
 		keymap(keys),
 		keymap(baseKeymap)
 	];
@@ -252,6 +256,9 @@ const CONTROLS = '.qm-table-grip, .qm-table-add, .qm-table-align, .qm-table-resi
 /** What the nested views and the band answer for themselves, which is what `stopEvent`
  *  keeps from PM. */
 const OWNED = `.qm-table-cell-host, ${CONTROLS}`;
+
+/** The drops a table dispatched again over a cell's text, which it lets through. */
+const redropped = new WeakSet<Event>();
 
 /** How far a press travels before it is a drag rather than a click. */
 const DEAD_ZONE = 3;
@@ -349,12 +356,14 @@ const spanCells = (a: { r: number; c: number }, b: { r: number; c: number }): Ce
  * A drag in flight: the line lifted, where the press started, and whether it has passed the dead
  * zone.
  *
- * `lines` is read once at engage: nothing reflows during the drag, and a rect per pointermove
- * would force ~150 layouts an event at 20x8.
+ * `lines` is read at engage and again when something scrolls (`core/dragfollow.ts`): nothing
+ * reflows during the drag, and a rect per pointermove would force ~150 layouts an event at 20x8.
  */
 interface Drag {
 	line: Line;
 	origin: Point;
+	/** The pointer along the drag's axis, as last reported. */
+	at: number;
 	engaged: boolean;
 	/** Escape called the drag off: the release that follows moves nothing and selects nothing. */
 	cancelled: boolean;
@@ -367,6 +376,8 @@ interface Drag {
 	/** Each line's extent along the drag's axis, by index, plus the frame's origin. */
 	lines: { index: number; start: number; end: number; cross: number; span: number }[];
 	origin0: { left: number; top: number };
+	/** Stops following the scrolls under an engaged drag. */
+	unfollow?: () => void;
 }
 
 /**
@@ -453,6 +464,9 @@ class TableIslandView implements NodeView {
 	private resize: Resize | undefined;
 	/** A drag's trailing `click`, which would otherwise re-select the moved line. */
 	private suppressClick = false;
+	/** The seat the last cell edit was typed in, so the next keystroke there joins its undo
+	 *  step; any other write clears it. */
+	private typedIn: string | undefined;
 	/** The grips of the row and column under the pointer, drawn up. */
 	private near: HTMLButtonElement[] = [];
 
@@ -469,6 +483,7 @@ class TableIslandView implements NodeView {
 		this.dom.addEventListener('mouseover', this.onHover);
 		this.dom.addEventListener('mouseleave', this.onLeave);
 		this.dom.addEventListener('copy', this.onCopy, true);
+		this.dom.addEventListener('drop', this.onDrop, true);
 		this.render();
 	}
 
@@ -496,7 +511,7 @@ class TableIslandView implements NodeView {
 			const head = mounted.view.state.selection.head;
 			const fresh = EditorState.create({
 				doc: decode(cellContent(stored), cellSchema),
-				plugins: cellPlugins(this.cellKeys(mounted.r, mounted.c))
+				plugins: cellPlugins(this.cellKeys(mounted.r, mounted.c), () => this.outer)
 			});
 			mounted.view.updateState(fresh);
 			mounted.shown = stored;
@@ -533,6 +548,7 @@ class TableIslandView implements NodeView {
 		this.dom.removeEventListener('mouseover', this.onHover);
 		this.dom.removeEventListener('mouseleave', this.onLeave);
 		this.dom.removeEventListener('copy', this.onCopy, true);
+		this.dom.removeEventListener('drop', this.onDrop, true);
 		this.endDrag();
 		this.endSweep();
 		this.endResize();
@@ -580,8 +596,10 @@ class TableIslandView implements NodeView {
 		event.preventDefault();
 		event.stopPropagation();
 		const grid = this.dom.querySelector('.qm-table');
-		if (grid && within(grid.getBoundingClientRect(), point)) this.focusNearestCell(point);
-		else this.caretBeside(point);
+		if (grid && within(grid.getBoundingClientRect(), point)) {
+			const nearest = this.nearestCell(point);
+			if (nearest) this.focusCell(nearest.r, nearest.c);
+		} else this.caretBeside(point);
 	};
 
 	/**
@@ -621,11 +639,68 @@ class TableIslandView implements NodeView {
 	};
 
 	/**
-	 * The cell a press inside the frame belongs to: the nearest by rect. Row cells share a vertical
+	 * A drop anywhere in a cell's box lands in that cell, at the text nearest the pointer, as a
+	 * press there does. The cell's padding is the table's, and the editor's own padding resolves
+	 * to a place between blocks no text fits, so left alone the first drop lands in the field
+	 * beside the table and the second nowhere. The drop is dispatched again over the cell's text, so the cell's view runs
+	 * its whole drop, a move's delete in the leaf it came from included. Captured, ahead of both
+	 * views.
+	 */
+	private readonly onDrop = (event: DragEvent): void => {
+		if (redropped.has(event) || !this.rendered) return;
+		// A file is the editor root's to refuse.
+		if (event.dataTransfer?.types.includes('Files')) return;
+		const target = event.target as Element | null;
+		if (target?.closest?.(CONTROLS)) return;
+		const point = { x: event.clientX, y: event.clientY };
+		const box = target?.closest?.('.qm-table-cell');
+		const grid = this.dom.querySelector('.qm-table');
+		const cell = box
+			? this.cells.find((m) => m.box === box)
+			: grid && within(grid.getBoundingClientRect(), point)
+				? this.nearestCell(point)
+				: undefined;
+		if (!cell) return;
+		const { view } = cell;
+		if (target && view.dom.contains(target)) {
+			const over = view.posAtCoords({ left: point.x, top: point.y });
+			if (over && view.state.doc.resolve(over.pos).parent.inlineContent) return;
+		}
+		let line: Element | undefined;
+		let nearest = Infinity;
+		for (const block of view.dom.children) {
+			const at = distance(block.getBoundingClientRect(), point);
+			if (at < nearest) [line, nearest] = [block, at];
+		}
+		if (!line) return;
+		const rect = line.getBoundingClientRect();
+		const x = Math.min(Math.max(point.x, rect.left + 1), rect.right - 1);
+		const y = Math.min(Math.max(point.y, rect.top + 1), rect.bottom - 1);
+		event.preventDefault();
+		event.stopPropagation();
+		const again = new DragEvent('drop', {
+			bubbles: true,
+			cancelable: true,
+			clientX: x,
+			clientY: y,
+			screenX: event.screenX + x - point.x,
+			screenY: event.screenY + y - point.y,
+			dataTransfer: event.dataTransfer,
+			altKey: event.altKey,
+			ctrlKey: event.ctrlKey,
+			metaKey: event.metaKey,
+			shiftKey: event.shiftKey
+		});
+		redropped.add(again);
+		line.dispatchEvent(again);
+	};
+
+	/**
+	 * The cell a point inside the frame belongs to: the nearest by rect. Row cells share a vertical
 	 * extent and column cells a horizontal one, so the nearest cell is the nearest row crossed with
 	 * the nearest column: R+C rects rather than R×C (27 layouts a press at 20x8, not 160).
 	 */
-	private focusNearestCell(point: Point): void {
+	private nearestCell(point: Point): MountedCell | undefined {
 		let row: number | undefined;
 		let column: number | undefined;
 		let nearestRow = Infinity;
@@ -648,7 +723,8 @@ class TableIslandView implements NodeView {
 				}
 			}
 		}
-		if (row !== undefined && column !== undefined) this.focusCell(row, column);
+		if (row === undefined || column === undefined) return undefined;
+		return this.cells.find((m) => covers(m, row, column));
 	}
 
 	/**
@@ -1034,6 +1110,7 @@ class TableIslandView implements NodeView {
 		this.drag = {
 			line,
 			origin: { x: event.clientX, y: event.clientY },
+			at: line.axis === 'row' ? event.clientY : event.clientX,
 			engaged: false,
 			cancelled: false,
 			drop: line.index,
@@ -1056,18 +1133,42 @@ class TableIslandView implements NodeView {
 		if (!drag || drag.cancelled) return;
 		const travel = Math.hypot(event.clientX - drag.origin.x, event.clientY - drag.origin.y);
 		if (!drag.engaged && travel < DEAD_ZONE) return;
+		drag.at = drag.line.axis === 'row' ? event.clientY : event.clientX;
 		if (!drag.engaged) this.engage(drag);
-		drag.drop = this.dropIndex(drag, drag.line.axis === 'row' ? event.clientY : event.clientX);
+		drag.drop = this.dropIndex(drag, drag.at);
 		this.paintDrop(drag);
 	};
 
-	/** The drag becomes one: lift the line, and measure the table once. */
+	/** The drag becomes one: lift the line, measure the table, and follow what scrolls under it. */
 	private engage(drag: Drag): void {
 		drag.engaged = true;
 		addEventListener('keydown', this.onDragKey, true);
 		this.dom.classList.add('qm-table-dragging');
 		drag.grip.classList.add('qm-table-lifted');
 		for (const cell of this.boxesOf(drag.line)) cell.classList.add('qm-table-lifted');
+		this.measure(drag);
+		drag.unfollow = followDrag({
+			grip: drag.grip,
+			axis: drag.line.axis === 'row' ? 'y' : 'x',
+			at: () => drag.at,
+			extent: () =>
+				drag.lines.length
+					? { start: drag.lines[0].start, end: drag.lines[drag.lines.length - 1].end }
+					: undefined,
+			moved: () => {
+				if (this.drag !== drag || drag.cancelled) return;
+				this.measure(drag);
+				drag.drop = this.dropIndex(drag, drag.at);
+				drag.painted = -1;
+				this.paintDrop(drag);
+			},
+			lost: () => this.drag === drag && this.endDrag()
+		});
+	}
+
+	/** Each line's extent where it stands now. */
+	private measure(drag: Drag): void {
+		drag.lines = [];
 		const frame = this.frame;
 		if (!frame) return;
 		const box = frame.getBoundingClientRect();
@@ -1128,6 +1229,7 @@ class TableIslandView implements NodeView {
 	};
 
 	private unlift(): void {
+		this.drag?.unfollow?.();
 		removeEventListener('keydown', this.onDragKey, true);
 		this.dropMark?.remove();
 		this.dropMark = undefined;
@@ -1139,8 +1241,8 @@ class TableIslandView implements NodeView {
 	private endDrag(): void {
 		const drag = this.drag;
 		if (!drag) return;
-		this.drag = undefined;
 		this.unlift();
+		this.drag = undefined;
 		drag.grip.removeEventListener('pointermove', this.onGripMove);
 		drag.grip.removeEventListener('pointerup', this.onGripUp);
 		drag.grip.removeEventListener('pointercancel', this.onGripUp);
@@ -1149,19 +1251,23 @@ class TableIslandView implements NodeView {
 	}
 
 	/**
-	 * Which line the pointer is over along the drag's axis: the nearest by the extents measured at
-	 * engage. One dimension suffices: the cross-axis term is identical across the candidates.
+	 * Which line the pointer is over along the drag's axis: the nearest by the extents last
+	 * measured, within that line's own extent past either end of the table, and the drag's own
+	 * line, so no move, further out than that. One dimension suffices: the cross-axis term is
+	 * identical across the candidates.
 	 */
 	private dropIndex(drag: Drag, at: number): number {
 		let best = drag.line.index;
 		let nearest = Infinity;
+		let reach = 0;
 		for (const line of drag.lines) {
 			const gap = at < line.start ? line.start - at : at > line.end ? at - line.end : 0;
 			if (gap >= nearest) continue;
 			nearest = gap;
 			best = line.index;
+			reach = line.end - line.start;
 		}
-		return best;
+		return nearest > reach ? drag.line.index : best;
 	}
 
 	private boxesOf(line: Line): HTMLElement[] {
@@ -1171,10 +1277,16 @@ class TableIslandView implements NodeView {
 
 	/**
 	 * The drop indicator: one rule on the boundary the line would land against, redrawn only when
-	 * the boundary changes.
+	 * the boundary changes, and none while the release would leave the line where it stands.
 	 */
 	private paintDrop(drag: Drag): void {
 		if (drag.drop === drag.painted) return;
+		if (drag.drop === drag.line.index) {
+			drag.painted = drag.drop;
+			this.dropMark?.remove();
+			this.dropMark = undefined;
+			return;
+		}
 		const line = drag.lines.find((l) => l.index === drag.drop);
 		const frame = this.frame;
 		if (!line || !frame) return;
@@ -1609,7 +1721,7 @@ class TableIslandView implements NodeView {
 		const view: EditorView = new EditorView(host, {
 			state: EditorState.create({
 				doc: decode(cellContent(seed), cellSchema),
-				plugins: cellPlugins(this.cellKeys(r, c))
+				plugins: cellPlugins(this.cellKeys(r, c), () => this.outer)
 			}),
 			attributes: { 'aria-label': name, class: 'qm-table-cell-editor' },
 			// A cell is one of the leaf's lines, so a reveal keeps the leaf's clearance, not PM's
@@ -1627,7 +1739,7 @@ class TableIslandView implements NodeView {
 				const now = this.props();
 				const cell = cellFromDoc(next.doc, cellAt(now, r, c));
 				mounted.shown = cell;
-				this.write(withCell(now, r, c, cell), undefined, from);
+				this.write(withCell(now, r, c, cell), undefined, from, `${r}:${c}`);
 			},
 			handleDOMEvents: {
 				focus: () => {
@@ -1668,12 +1780,13 @@ class TableIslandView implements NodeView {
 	/**
 	 * Commit a new rectangle onto the node. `setNodeMarkup` is an ordinary PM transaction, so the
 	 * field lowers it through the island channel: one commit, one undo step, which is why every op
-	 * writes a whole table.
+	 * writes a whole table. A run of keystrokes in one cell (`typedIn` its seat) is one step.
 	 */
 	private write(
 		next: TableGrid,
 		focus?: { r: number; c: number },
-		from = this.focusedSeat()
+		from = this.focusedSeat(),
+		typedIn?: string
 	): void {
 		const pos = this.getPos();
 		if (pos == null) return;
@@ -1681,12 +1794,13 @@ class TableIslandView implements NodeView {
 		if (!node || node.type !== this.node.type) return;
 		const left = valueKey(node);
 		if (left && from) departures.set(left, from);
-		this.outer.dispatch(
-			this.outer.state.tr.setNodeMarkup(pos, undefined, {
-				...node.attrs,
-				...islandOf(next)
-			})
-		);
+		const tr = this.outer.state.tr.setNodeMarkup(pos, undefined, {
+			...node.attrs,
+			...islandOf(next)
+		});
+		if (typedIn !== undefined && typedIn === this.typedIn) tr.setMeta(TYPING, true);
+		this.typedIn = typedIn;
+		this.outer.dispatch(tr);
 		if (focus) this.focusCell(focus.r, focus.c);
 	}
 

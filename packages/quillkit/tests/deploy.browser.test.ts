@@ -222,6 +222,7 @@ const APP_SURVEY = `(async () => {
 		editorMounted: pane !== null && hooked !== null,
 		previewMounted: preview !== null,
 		download: document.querySelector('.qm-app-primary') !== null,
+		print: document.querySelector('[data-testid="print"]') !== null,
 		viewport: window.innerWidth,
 		scrollWidth: document.documentElement.scrollWidth,
 		shellWidth: width(shell),
@@ -255,6 +256,7 @@ interface AppSurvey {
 	editorMounted: boolean;
 	previewMounted: boolean;
 	download: boolean;
+	print: boolean;
 	viewport: number;
 	scrollWidth: number;
 	shellWidth: number | null;
@@ -396,6 +398,7 @@ describe('the built app, served under a subpath', () => {
 			expect(page.editorMounted, where).toBe(true);
 			expect(page.previewMounted, where).toBe(true);
 			expect(page.download, where).toBe(true);
+			expect(page.print, where).toBe(true);
 		}
 	});
 

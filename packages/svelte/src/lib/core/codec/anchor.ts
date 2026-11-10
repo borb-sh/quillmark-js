@@ -86,3 +86,43 @@ export function rangeAnchor(view: EditorView, from: number, to: number): RangeAn
 		}
 	};
 }
+
+/**
+ * `anchor`'s horizontal extent over the vertical extent of `boxes`: a surface hung off it
+ * clears every one, as a surface over a selection in a table cell clears the cell's row.
+ */
+export function across(anchor: RangeAnchor, boxes: readonly Element[]): RangeAnchor {
+	return {
+		contextElement: anchor.contextElement,
+		getBoundingClientRect: () => {
+			const { left, width } = anchor.getBoundingClientRect();
+			let top = Infinity;
+			let bottom = -Infinity;
+			for (const box of boxes) {
+				const rect = box.getBoundingClientRect();
+				top = Math.min(top, rect.top);
+				bottom = Math.max(bottom, rect.bottom);
+			}
+			return new DOMRect(left, top, width, bottom - top);
+		}
+	};
+}
+
+/**
+ * A virtual anchor over the first line box of the element `find` returns when asked: a mark a
+ * view redraws under every edit, so no element outlives the surface hung off it. `context` is
+ * the view's own element, which does. Total as {@link rangeAnchor} is: with nothing to measure
+ * it returns the last rect that measured.
+ */
+export function markAnchor(context: Element, find: () => Element | undefined): RangeAnchor {
+	let last: DOMRect | undefined;
+	return {
+		contextElement: context,
+		getBoundingClientRect: () => {
+			const el = find();
+			const rect = el?.getClientRects()[0] ?? el?.getBoundingClientRect();
+			if (rect) last = rect;
+			return last ?? new DOMRect();
+		}
+	};
+}

@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { DocumentReader, type Quill, type Document } from '@quillmark/wasm';
 import { core, quill, example, literal } from '../helpers/fixtures.js';
-import { field, mountEditor, paste, press, unmountAll } from '../helpers/surface.svelte.js';
+import { field, mountEditor, paste, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -106,17 +106,97 @@ describe('an array of `text`', () => {
 		expect(read(q, doc, 'errata')).toEqual(seeded);
 	});
 
-	it('inserts a sibling on Enter', () => {
+	it('moves a line on Alt+↑/↓, its leaf and the caret with it', async () => {
 		const q = quill();
 		const doc = example();
 		const { target } = mountEditor(q, doc);
+		const seeded = literal(doc.getStored('errata')) as string[];
+		const first = rows(target)[0];
+		first.focus();
+		press(first, 'ArrowDown', { altKey: true, cancelable: true });
+		await settle();
+		expect(read(q, doc, 'errata')).toEqual([seeded[1], seeded[0], ...seeded.slice(2)]);
+		expect(rows(target)[1]).toBe(first);
+		expect(document.activeElement).toBe(first);
+		// The first line has nowhere to go up.
+		press(rows(target)[0], 'ArrowUp', { altKey: true, cancelable: true });
+		expect(read(q, doc, 'errata')).toEqual([seeded[1], seeded[0], ...seeded.slice(2)]);
+	});
+
+	it('inserts a sibling on Enter at the end of a line', async () => {
+		const q = quill();
+		const doc = example();
+		const { target, editor } = mountEditor(q, doc);
 
 		const seeded = literal(doc.getStored('errata')) as string[];
+		await editor.setCaret({
+			field: 'main.errata[0]',
+			pos: seeded[0].length,
+			granularity: 'cluster'
+		});
+		await tick();
 		press(rows(target)[0], 'Enter');
 		expect(rows(target)).toHaveLength(seeded.length + 1);
 		// The new row is the first one's sibling, not the list's tail.
 		expect(rows(target)[1].textContent).toBe('');
 		expect(literal(doc.getStored('errata'))).toEqual([seeded[0], '', ...seeded.slice(1)]);
+	});
+
+	it('splits a line on Enter short of its end, the caret at the start of the new row', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('errata', ['abcdef', 'ghi']);
+		const { target, editor } = mountEditor(q, doc);
+
+		await editor.setCaret({ field: 'main.errata[0]', pos: 3, granularity: 'cluster' });
+		await tick();
+		press(rows(target)[0], 'Enter', { cancelable: true });
+		await settle();
+		expect(literal(doc.getStored('errata'))).toEqual(['abc', 'def', 'ghi']);
+		expect(rows(target).map((r) => r.textContent)).toEqual(['abc', 'def', 'ghi']);
+		expect(document.activeElement).toBe(rows(target)[1]);
+		const sel = window.getSelection();
+		expect(sel?.anchorNode?.textContent).toBe('def');
+		expect(sel?.anchorOffset).toBe(0);
+	});
+
+	it('joins a line onto the one above on Backspace at its start', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('errata', ['abc', 'def', 'ghi']);
+		const { target, editor } = mountEditor(q, doc);
+
+		await editor.setCaret({ field: 'main.errata[1]', pos: 0, granularity: 'cluster' });
+		await tick();
+		press(rows(target)[1], 'Backspace', { cancelable: true });
+		await settle();
+		expect(literal(doc.getStored('errata'))).toEqual(['abcdef', 'ghi']);
+		expect(rows(target).map((r) => r.textContent)).toEqual(['abcdef', 'ghi']);
+		expect(document.activeElement).toBe(rows(target)[0]);
+		const sel = window.getSelection();
+		expect(sel?.anchorNode?.textContent).toBe('abcdef');
+		expect(sel?.anchorOffset).toBe(3);
+		// The first line has nothing above it to join.
+		await editor.setCaret({ field: 'main.errata[0]', pos: 0, granularity: 'cluster' });
+		await tick();
+		press(rows(target)[0], 'Backspace', { cancelable: true });
+		await settle();
+		expect(literal(doc.getStored('errata'))).toEqual(['abcdef', 'ghi']);
+	});
+
+	it('joins the next line onto this one on Delete at its end', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('errata', ['abc', 'def']);
+		const { target, editor } = mountEditor(q, doc);
+
+		await editor.setCaret({ field: 'main.errata[0]', pos: 3, granularity: 'cluster' });
+		await tick();
+		press(rows(target)[0], 'Delete', { cancelable: true });
+		await settle();
+		expect(literal(doc.getStored('errata'))).toEqual(['abcdef']);
+		expect(document.activeElement).toBe(rows(target)[0]);
+		expect(window.getSelection()?.anchorOffset).toBe(3);
 	});
 
 	it('takes a paste of several lines as a row per line', () => {
@@ -136,6 +216,24 @@ describe('an array of `text`', () => {
 		flushSync();
 		expect(literal(doc.getStored('errata'))).toEqual(['one', 'two', 'three']);
 		expect(rows(target).map((r) => r.textContent)).toEqual(['one', 'two', 'three']);
+	});
+
+	it('splits the row at the caret, its rest following the last line pasted', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('errata', ['abcdef']);
+		const { target, editor } = mountEditor(q, doc);
+
+		await editor.setCaret({ field: 'main.errata[0]', pos: 3, granularity: 'cluster' });
+		await tick();
+		paste(rows(target)[0], 'one\ntwo');
+		await new Promise((r) => setTimeout(r, 0));
+		expect(literal(doc.getStored('errata'))).toEqual(['abcone', 'twodef']);
+		expect(rows(target).map((r) => r.textContent)).toEqual(['abcone', 'twodef']);
+		expect(document.activeElement?.getAttribute('aria-label')).toBe('Errata 2');
+		const sel = window.getSelection();
+		expect(sel?.anchorNode?.textContent).toBe('twodef');
+		expect(sel?.anchorOffset).toBe(3);
 	});
 
 	// The landing is the row's, not the field's: a `text` element rides the same
@@ -185,6 +283,26 @@ Body.
 			"Raynor's Raiders Field Report, 2504, Zerg Hive Cluster Activity on Char"
 		]);
 		expect(text.some((t) => t?.includes('*'))).toBe(false);
+	});
+
+	it('keeps the marks on both halves of a split, and a join mends them', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('keywords', [core.importMarkdown('*Schema* shapes').content]);
+		const { target, editor } = mountEditor(q, doc);
+		const keywords = () => leaves(target, 'Keywords');
+
+		await editor.setCaret({ field: 'main.keywords[0]', pos: 3, granularity: 'cluster' });
+		await tick();
+		press(keywords()[0], 'Enter', { cancelable: true });
+		await settle();
+		expect((doc.getStored('keywords') as unknown[]).length).toBe(2);
+		expect(keywords().map((el) => el.querySelector('em')?.textContent)).toEqual(['Sch', 'ema']);
+
+		press(keywords()[1], 'Backspace', { cancelable: true });
+		await settle();
+		expect((doc.getStored('keywords') as unknown[]).length).toBe(1);
+		expect(keywords()[0].innerHTML).toBe('<p><em>Schema</em> shapes</p>');
 	});
 });
 
