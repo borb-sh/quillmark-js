@@ -80,7 +80,7 @@ describe('a changed field', () => {
 		await rested();
 		card()!.querySelector<HTMLButtonElement>('.qm-review-undo')!.click();
 		flushSync();
-		expect(r.events).toEqual([{ id: 'r1', action: 'undo' }]);
+		expect(r.events).toEqual([{ id: 'r1', action: 'revert' }]);
 		expect(r.doc.toMarkdown()).toBe(before);
 		expect(r.changes).toEqual([]);
 		expect(r.target.querySelector('[data-qm-review]')).toBeNull();
@@ -88,8 +88,8 @@ describe('a changed field', () => {
 
 	it('answers the reject chord from inside the field', () => {
 		const r = review(changed);
-		press(leaf(openField(r.target, main, 'subtitle')), keyOf(REVIEW_KEYS.reject), mod);
-		expect(r.events).toEqual([{ id: 'r1', action: 'undo' }]);
+		press(leaf(openField(r.target, main, 'subtitle')), keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toEqual([{ id: 'r1', action: 'revert' }]);
 	});
 });
 
@@ -244,8 +244,8 @@ describe('an item in the body', () => {
 			.querySelector('.qm-review-changed')!
 			.closest<HTMLElement>('.ProseMirror')!;
 		expect(document.activeElement).toBe(body);
-		press(body, keyOf(REVIEW_KEYS.reject), mod);
-		expect(r.events).toEqual([{ id: 'r1', action: 'undo' }]);
+		press(body, keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toEqual([{ id: 'r1', action: 'revert' }]);
 	});
 
 	it('is drawn no more once answered, while the list still holds it', () => {

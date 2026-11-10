@@ -1,0 +1,155 @@
+// @vitest-environment jsdom
+// Undoing review answers: ⌘Z from anywhere in the editor takes back the answers since the
+// reader's last edit, newest first, each item reopened with what was written for it.
+import { describe, it, expect, afterEach } from 'vitest';
+import { flushSync } from 'svelte';
+import type { Document } from '@quillmark/wasm';
+import type { ReviewEvent, ReviewItem } from '$lib/visual';
+import { quill, example } from '../helpers/fixtures.js';
+import {
+	leaf,
+	mountEditor,
+	openField,
+	press,
+	settle,
+	typeLeaf,
+	unmountAll,
+	type EditorRef,
+	type Mounted
+} from '../helpers/surface.svelte.js';
+
+afterEach(unmountAll);
+
+const main = quill().schema.main;
+const mod = { ctrlKey: true };
+
+interface Journaled extends Mounted<EditorRef> {
+	doc: Document;
+	events: ReviewEvent[];
+}
+
+function journaled(items: (doc: Document) => ReviewItem[]): Journaled {
+	const doc = example();
+	const events: ReviewEvent[] = [];
+	const mounted = mountEditor(quill(), doc, {
+		review: items(doc),
+		onReview: (e) => events.push(e)
+	});
+	return { ...mounted, doc, events };
+}
+
+/** Lay anchor `id` over the second word of a rich text field's text, or of the body's. */
+function anchor(doc: Document, field: string | undefined, id: string): void {
+	const text = field ? (doc.getStored(field) as { text: string }).text : doc.main.body.text;
+	const word = text.split(' ')[1];
+	const at = text.indexOf(word);
+	doc.apply(field ? { field } : {}, {
+		steps: [{ anchor: { id, start: at, end: at + word.length } }]
+	});
+}
+
+const abstractText = (doc: Document): string =>
+	(doc.getStored('abstract') as { text: string }).text;
+
+/** The Accept on item `id`, wherever it is drawn. */
+function accept(target: HTMLElement, id: string): void {
+	[...target.querySelectorAll<HTMLButtonElement>('.qm-review-accept')]
+		.find((el) => el.closest('[data-qm-review]')?.getAttribute('data-qm-review') === id)!
+		.click();
+	flushSync();
+}
+
+const mixed = (doc: Document): ReviewItem[] => {
+	anchor(doc, undefined, '~a');
+	anchor(doc, 'abstract', '~b');
+	return [
+		{ id: 'A', state: 'proposed', anchor: '~a', after: 'The body, proposed.' },
+		{ id: 'F', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
+		{ id: 'B', state: 'proposed', anchor: '~b', after: 'The abstract, proposed.' }
+	];
+};
+
+describe('the answer journal', () => {
+	it('takes back two field proposals one ⌘Z each, and reopens both', async () => {
+		const r = journaled((doc) => [
+			{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
+			{ id: 'sub', state: 'proposed', field: doc.pathFor('subtitle'), after: 'A new subtitle' }
+		]);
+		const before = r.doc.getStored('subtitle');
+		openField(r.target, main, 'columns');
+		accept(r.target, 'cols');
+		accept(r.target, 'sub');
+		expect(r.doc.getStored('columns')).toBe(2);
+		const root = r.target.querySelector<HTMLElement>('.qm-editor')!;
+		press(root, 'z', mod);
+		press(root, 'z', mod);
+		await settle();
+		expect(r.doc.getStored('subtitle')).toEqual(before);
+		expect(r.doc.getStored('columns')).toBeUndefined();
+		expect(r.events.slice(2)).toEqual([
+			{ id: 'sub', action: 'reopen' },
+			{ id: 'cols', action: 'reopen' }
+		]);
+		expect(r.target.querySelectorAll('.qm-review-proposal')).toHaveLength(2);
+	});
+
+	it('takes back answers across leaves and fields newest first, from inside the first leaf', async () => {
+		const r = journaled(mixed);
+		const body = r.doc.main.body.text;
+		const abstract = abstractText(r.doc);
+		openField(r.target, main, 'columns');
+		openField(r.target, main, 'abstract');
+		accept(r.target, 'A');
+		accept(r.target, 'F');
+		accept(r.target, 'B');
+		const bodyLeaf = [...r.target.querySelectorAll<HTMLElement>('.ProseMirror')].find((el) =>
+			el.textContent?.includes('The body, proposed.')
+		)!;
+		bodyLeaf.focus();
+		press(bodyLeaf, 'z', mod);
+		expect(r.events.at(-1)).toEqual({ id: 'B', action: 'reopen' });
+		expect(abstractText(r.doc)).toBe(abstract);
+		press(bodyLeaf, 'z', mod);
+		expect(r.events.at(-1)).toEqual({ id: 'F', action: 'reopen' });
+		expect(r.doc.getStored('columns')).toBeUndefined();
+		press(bodyLeaf, 'z', mod);
+		expect(r.events.at(-1)).toEqual({ id: 'A', action: 'reopen' });
+		expect(r.doc.main.body.text).toBe(body);
+		await settle();
+	});
+
+	it('is emptied by the reader’s next edit, whose own undo is then the key’s', async () => {
+		const r = journaled(mixed);
+		openField(r.target, main, 'abstract');
+		accept(r.target, 'A');
+		const accepted = r.doc.main.body.text;
+		const abstract = openField(r.target, main, 'abstract');
+		const before = abstractText(r.doc);
+		typeLeaf(abstract, 'Typed over.');
+		expect(abstractText(r.doc)).toBe('Typed over.');
+		press(leaf(abstract), 'z', mod);
+		await settle();
+		expect(abstractText(r.doc)).toBe(before);
+		expect(r.doc.main.body.text).toBe(accepted);
+		expect(r.events.filter((e) => e.action === 'reopen')).toEqual([]);
+	});
+
+	it('takes back a whole batch with one ⌘Z', async () => {
+		const r = journaled(mixed);
+		const body = r.doc.main.body.text;
+		await settle();
+		expect([...r.editor.answerReview('all', 'accept')].sort()).toEqual(['A', 'B', 'F']);
+		flushSync();
+		expect(r.target.querySelector('.qm-toast')).not.toBeNull();
+		press(r.target.querySelector<HTMLElement>('.qm-editor')!, 'z', mod);
+		await settle();
+		expect(
+			r.events
+				.filter((e) => e.action === 'reopen')
+				.map((e) => e.id)
+				.sort()
+		).toEqual(['A', 'B', 'F']);
+		expect(r.doc.main.body.text).toBe(body);
+		expect(r.doc.getStored('columns')).toBeUndefined();
+	});
+});

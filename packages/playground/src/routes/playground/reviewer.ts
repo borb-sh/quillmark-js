@@ -1,8 +1,9 @@
 // `?review`: another writer's hand over the opened document, through the verbs a host's own
 // reviewer has. It writes a few changes and lays a few proposals where the document holds the
 // text for them, and answers the reader as a host does: an accepted or dismissed item leaves the
-// list, a change taken back is written back, and a dismissal or a change taken back is offered
-// one step back on the editor's undo.
+// list with its anchor left in place, a reopened one comes back to it, and a change taken back is
+// written back with one step back offered on the editor's undo. The anchors are transient, so
+// they stand until the page goes and cost the stored value nothing.
 import type { Addr, Content, Document, Quill } from '@quillmark/wasm';
 import type { ReviewEvent, ReviewItem } from '@quillmark/svelte/visual';
 
@@ -28,7 +29,7 @@ interface Held {
 export interface Reviewer {
 	/** The list the editor draws. */
 	items(): ReviewItem[];
-	/** Make the write an answer asks for, and drop the item. */
+	/** Make the write an answer asks for, and drop the item or put it back. */
 	answer(event: ReviewEvent, editor: ReviewEditor): void;
 }
 
@@ -144,20 +145,31 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 			item: { id: `review-${serial++}`, state: 'proposed', field: doc.pathFor('columns'), after: 2 }
 		});
 
+	/** The items answered, by id, with where each stood on the list, for a reopen. */
+	const answered = new Map<string, { entry: Held; at: number }>();
+
 	return {
 		items: () => held.map((h) => h.item),
 		answer({ id, action }, editor) {
+			if (action === 'reopen') {
+				const back = answered.get(id);
+				if (!back) return;
+				answered.delete(id);
+				held.splice(Math.min(back.at, held.length), 0, back.entry);
+				changed();
+				return;
+			}
 			const at = held.findIndex((h) => h.item.id === id);
 			if (at < 0) return;
 			const [entry] = held.splice(at, 1);
-			const { item, addr } = entry;
+			const { addr } = entry;
 			/** The editor re-reads what this side wrote, and the page the list. */
 			const land = (): void => {
 				if (addr) editor.applyExternal(doc.pathFor(addr));
 				else editor.refresh();
 				changed();
 			};
-			if (action === 'undo') {
+			if (action === 'revert') {
 				const written: Content | undefined = addr && doc.read(addr);
 				entry.revert?.();
 				editor.offerUndo('Change reverted', () => {
@@ -166,18 +178,13 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 					held.splice(at, 0, entry);
 					land();
 				});
-			} else {
-				// The editor wrote what an accept takes; either way the anchor has done its work.
-				const laid = addr && 'anchor' in item ? anchorOf(doc, addr, item.anchor) : undefined;
-				if (addr && laid) doc.apply(addr, { steps: [{ anchor: { id: laid.id, remove: true } }] });
-				if (action === 'dismiss')
-					editor.offerUndo('Proposal dismissed', () => {
-						if (addr && laid) doc.apply(addr, { steps: [{ anchor: laid }] });
-						held.splice(at, 0, entry);
-						land();
-					});
+				land();
+				return;
 			}
-			land();
+			// The editor wrote what an accept takes, and its ⌘Z reopens either answer, so the
+			// anchor stays where the item can be placed again.
+			answered.set(id, { entry, at });
+			changed();
 		}
 	};
 }

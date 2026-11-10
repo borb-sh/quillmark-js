@@ -21,8 +21,8 @@ function store(refuse = false) {
 		items: () => items,
 		keyFor: (path) => path,
 		exact: () => true,
-		answer(item, action) {
-			answers.push([item.id, action]);
+		answer(id, _item, action) {
+			answers.push([id, action]);
 			return !refuse;
 		}
 	});
@@ -123,8 +123,8 @@ describe('a reveal', () => {
 describe('an answer', () => {
 	it('takes the item off what is drawn until a list arrives without it', () => {
 		const { review, answers, list } = store();
-		review.act('change', 'undo');
-		expect(answers).toEqual([['change', 'undo']]);
+		review.act('change', 'revert');
+		expect(answers).toEqual([['change', 'revert']]);
 		expect(review.text.map((item) => item.id)).toEqual(['proposal']);
 
 		list([...ITEMS]);
@@ -137,7 +137,7 @@ describe('an answer', () => {
 
 	it('leaves the item standing where it could not be made', () => {
 		const { review } = store(true);
-		review.act('other', 'undo');
+		review.act('other', 'revert');
 		expect(review.at('main.title').changed?.id).toBe('other');
 	});
 });

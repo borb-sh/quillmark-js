@@ -125,8 +125,10 @@ export interface VisualEditorProps {
 	review?: readonly ReviewItem[];
 	/**
 	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-.` with the caret or the
-	 * focus in it, or a host's `answerReview`. The host makes the write the answer asks for,
-	 * tells the editor (`applyExternal`, `refresh`), and drops the item from `review`.
+	 * focus in it, or a host's `answerReview`; or undid an answer with ⌘Z, `reopen`. The host
+	 * makes the write a `revert` asks for and tells the editor (`applyExternal`, `refresh`),
+	 * takes an answered item off `review` with its anchor left in place, and puts a reopened
+	 * one back.
 	 */
 	onReview?: (event: ReviewEvent) => void;
 	/**

@@ -15,7 +15,7 @@
 // Taking a proposal is the leaf's own edit, made from the plan the drawing was made from, so the
 // words that land are the words that were drawn. It goes down the lane a keystroke takes: one
 // transaction, one undo step, one commit.
-import { closeHistory } from 'prosemirror-history';
+import { closeHistory, isHistoryTransaction, undo } from 'prosemirror-history';
 import { DOMSerializer, Fragment, Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
 import { keydownHandler } from 'prosemirror-keymap';
 import {
@@ -52,8 +52,9 @@ export type TextReview =
 	| { id: string; state: 'proposed'; anchor: string; after: string };
 
 /** What a reader did with an item: took a proposal, which the leaf has written by the time it
- *  says so, turned one down, or asked for a change back. */
-export type ReviewAction = 'accept' | 'dismiss' | 'undo';
+ *  says so, turned one down, asked for a change back, or undid an answer, so the item is open
+ *  again with whatever was written for it taken back. */
+export type ReviewAction = 'accept' | 'dismiss' | 'revert' | 'reopen';
 
 /** What brought an item under attention: the pointer over it, or the caret in it. */
 export type ReviewVia = 'pointer' | 'caret';
@@ -97,6 +98,8 @@ export interface ReviewChannel {
 	dismiss(): void;
 	/** A reader's answer, `chord` where a key gave it. */
 	act(id: string, action: ReviewAction, chord?: boolean): void;
+	/** The leaf is writing a taken proposal, and is done. */
+	writing?(on: boolean): void;
 	/** The item the pointer or the caret is in, `undefined` once it has left. */
 	point(id: string | undefined, via: ReviewVia): void;
 	/** What the leaf draws and what it holds and does not draw, on each change of either. */
@@ -128,6 +131,8 @@ interface ReviewState {
 	edits: number;
 	answered: ReadonlyMap<string, Answer>;
 	entered: string | undefined;
+	/** The accepts an undo or a redo took back or gave again, for the plugin view to report. */
+	replayed: readonly { id: string; to: 'accept' | undefined }[];
 }
 
 /** What a transaction tells the review state: an answer given or taken back, the ids of
@@ -180,10 +185,15 @@ function answering(state: ReviewState, id: string, to: Answer | undefined): Revi
 }
 
 function applyReview(tr: Transaction, state: ReviewState): ReviewState {
-	let next = state;
+	let next = state.replayed.length ? { ...state, replayed: [] } : state;
 	if (tr.docChanged && !tr.getMeta(remoteKey)) next = { ...next, edits: next.edits + 1 };
-	for (const step of tr.steps)
-		if (step instanceof ReviewAnswer) next = answering(next, step.id, step.to);
+	const history = isHistoryTransaction(tr);
+	for (const step of tr.steps) {
+		if (!(step instanceof ReviewAnswer)) continue;
+		next = answering(next, step.id, step.to);
+		// Reported whether or not the answer is still held: the host's list may have dropped it.
+		if (history) next = { ...next, replayed: [...next.replayed, { id: step.id, to: step.to }] };
+	}
 	const meta = tr.getMeta(reviewKey) as ReviewMeta | undefined;
 	if (meta?.answer) next = answering(next, meta.answer.id, meta.answer.to);
 	for (const id of meta?.prune ?? []) next = answering(next, id, undefined);
@@ -523,7 +533,7 @@ function chip(
 			'dismiss',
 			strings.reviewDismiss,
 			strings.reviewDismissTitle,
-			REVIEW_KEYS.reject
+			REVIEW_KEYS.dismiss
 		)
 	);
 	// The space a run of answers stands off its line by, which a wrapped run leaves behind.
@@ -841,6 +851,10 @@ export interface ReviewLayer {
 	/** Answer item `id` as its button would, moving neither the caret nor the focus. False
 	 *  where the leaf does not draw it or cannot write it. */
 	answer(id: string, action: ReviewAction): boolean;
+	/** Open a dismissal of item `id` again, and say so. False for one not dismissed here. */
+	reopen(view: EditorView, id: string): boolean;
+	/** Undo the leaf's newest history step: an accept's, which reopens its item. */
+	undo(view: EditorView): boolean;
 }
 
 /**
@@ -879,7 +893,12 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				const end = tr.mapping.map(Math.max(...plan.map((piece) => piece.to)), 1);
 				tr.setSelection(Selection.near(tr.doc.resolve(Math.min(end, tr.doc.content.size)), -1));
 			}
-			view.dispatch(tr.step(new ReviewAnswer(id, 'accept')));
+			channel.writing?.(true);
+			try {
+				view.dispatch(tr.step(new ReviewAnswer(id, 'accept')));
+			} finally {
+				channel.writing?.(false);
+			}
 			if (away) view.focus();
 		} else {
 			view.dispatch(
@@ -951,7 +970,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	};
 
 	const answer =
-		(action: 'accept' | 'reject') =>
+		(action: 'accept' | 'dismiss') =>
 		(state: EditorState): boolean => {
 			const span = spanAt(
 				drawn(state).spans,
@@ -960,7 +979,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				action === 'accept'
 			);
 			if (!span) return false;
-			act(span.id, span.proposed ? (action === 'accept' ? 'accept' : 'dismiss') : 'undo', {
+			act(span.id, span.proposed ? action : 'revert', {
 				chord: true
 			});
 			return true;
@@ -976,14 +995,14 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	const plugin = new Plugin<ReviewState>({
 		key: reviewKey,
 		state: {
-			init: () => ({ edits: 0, answered: new Map(), entered: undefined }),
+			init: () => ({ edits: 0, answered: new Map(), entered: undefined, replayed: [] }),
 			apply: applyReview
 		},
 		props: {
 			decorations: (state) => drawn(state).set,
 			handleKeyDown: keydownHandler({
 				[REVIEW_KEYS.accept]: answer('accept'),
-				[REVIEW_KEYS.reject]: answer('reject'),
+				[REVIEW_KEYS.dismiss]: answer('dismiss'),
 				Escape: lower
 			}),
 			handleDOMEvents: {
@@ -1013,6 +1032,9 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			report(view.state);
 			return {
 				update(view, prev) {
+					const review = reviewKey.getState(view.state);
+					if (review && review !== reviewKey.getState(prev))
+						for (const { id, to } of review.replayed) channel.act(id, to ?? 'reopen');
 					report(view.state);
 					follow(view, reviewKey.getState(prev)?.edits !== reviewKey.getState(view.state)?.edits);
 				},
@@ -1046,6 +1068,17 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			);
 		},
 		answer: (id, action) => act(id, action, { quiet: true }),
+		reopen(view, id) {
+			if (reviewKey.getState(view.state)?.answered.get(id) !== 'dismiss') return false;
+			view.dispatch(
+				view.state.tr
+					.setMeta(reviewKey, { answer: { id, to: undefined } } satisfies ReviewMeta)
+					.setMeta('addToHistory', false)
+			);
+			channel.act(id, 'reopen');
+			return true;
+		},
+		undo: (view) => undo(view.state, view.dispatch),
 		enter(view, id) {
 			const span = drawn(view.state).spans.find((s) => s.id === id);
 			if (!span) return false;

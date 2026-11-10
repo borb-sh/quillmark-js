@@ -175,6 +175,8 @@ export interface CreateFieldOpts {
 	 *  that takes a change back, `chord` where a key gave it. A proposal taken is written by
 	 *  then. */
 	onReview?(id: string, action: ReviewAction, chord?: boolean): void;
+	/** The leaf is writing a taken proposal, and is done: the commit between is the answer's. */
+	onReviewWriting?(on: boolean): void;
 	/** The review item under the pointer or holding the caret, `undefined` once it has left.
 	 *  The caret's report holds off while the reader types inside the item. */
 	onReviewPoint?(id: string | undefined, via: ReviewVia): void;
@@ -243,6 +245,11 @@ export interface FieldController {
 	/** Answer the review item `id` as its button would, moving neither the caret nor the
 	 *  focus; false for one not drawn, or a proposal that can no longer be written. */
 	answerReview(id: string, action: ReviewAction): boolean;
+	/** Open the review item `id` this leaf dismissed again, reported as `reopen`; false for
+	 *  one it did not dismiss. */
+	reopenReview(id: string): boolean;
+	/** Undo the leaf's newest step, a taken proposal's, reported as `reopen`. */
+	undoReview(): boolean;
 	/** Ids of the anchors touching content range `[from, to]`: a selection's anchor state. */
 	anchorsInRange(from: number, to: number): string[];
 	/**
@@ -570,6 +577,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				shown: () => opts.reviewShown?.(),
 				dismiss: () => opts.onReviewDismiss?.(),
 				act: (id, action, chord) => opts.onReview?.(id, action, chord),
+				writing: (on) => opts.onReviewWriting?.(on),
 				point: (id, via) => opts.onReviewPoint?.(id, via),
 				drew: (report) => opts.onReviewDrawn?.(report)
 			});
@@ -986,6 +994,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		},
 		answerReview(id: string, action: ReviewAction): boolean {
 			return review?.answer(id, action) ?? false;
+		},
+		reopenReview(id: string): boolean {
+			return review?.reopen(view, id) ?? false;
+		},
+		undoReview(): boolean {
+			return review?.undo(view) ?? false;
 		},
 		enterReview(id: string): boolean {
 			return review?.enter(view, id) ?? false;

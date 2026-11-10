@@ -72,6 +72,9 @@ export interface VisualStrings
 	reviewChange: string;
 	/** The toast over a field's proposal taken, beside its way back. */
 	reviewAccepted: string;
+	/** The toast over a host's batch of proposals taken, and over one turned down. */
+	reviewAcceptedAll: string;
+	reviewDismissedAll: string;
 	/** Before what a change replaced: `Was  the old words`. */
 	reviewWas: string;
 	/** The whole of the card over text that replaced nothing. */
@@ -320,6 +323,8 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	reviewUndoTitle: `Undo (${chord('.')})`,
 	reviewChange: 'Change',
 	reviewAccepted: 'Change accepted',
+	reviewAcceptedAll: 'Changes accepted',
+	reviewDismissedAll: 'Proposals dismissed',
 	reviewWas: 'Was',
 	reviewAdded: 'Added',
 	reviewRemoved: 'Removed',

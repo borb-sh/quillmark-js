@@ -158,7 +158,7 @@ Hand it a different `doc` and the editor **re-keys itself**: every leaf remounts
 	{quill}
 	review={items}
 	onReview={({ id, action }) => {
-		/* 'accept' | 'dismiss' | 'undo'; take the item off the list */
+		/* 'accept' | 'dismiss' | 'revert': take the item off the list; 'reopen': put it back */
 	}}
 	onReviewFocus={(id) => {
 		/* the item under the reader's attention, or undefined */
@@ -197,13 +197,14 @@ items = [...items, { id: 'r1', state: 'changed', anchor: '~r1', before: 'disjoin
 
 Who writes an answer follows who holds the words:
 
-| `action`  | What the reader did      | Who writes                                                                                                                                         |
-| --------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accept`  | Took a proposal.         | The editor, before the event: the proposal as it was drawn, as an edit of the reader's. `onChange` reports it and the reader's undo takes it back. |
-| `dismiss` | Turned a proposal down.  | No one.                                                                                                                                            |
-| `undo`    | Asked for a change back. | The host, which alone knows the inverse of what it wrote, followed by `applyExternal` or `refresh`.                                                |
+| `action`  | What the reader did             | Who writes                                                                                                     |
+| --------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `accept`  | Took a proposal.                | The editor, before the event: the proposal as it was drawn, as an edit of the reader's. `onChange` reports it. |
+| `dismiss` | Turned a proposal down.         | No one.                                                                                                        |
+| `revert`  | Asked for a change back.        | The host, which alone knows the inverse of what it wrote, followed by `applyExternal` or `refresh`.            |
+| `reopen`  | Undid an accept or a dismissal. | The editor, before the event: what an accept wrote is taken back. The item is open again.                      |
 
-An answered item is drawn no more from the moment of the answer. The host takes it off the list and lifts its anchor (`{ anchor: { id, remove: true } }`). In a shared session the inverse of a write is `revert` from `@quillmark/collab`, which holds back what someone has typed in the write's lines since. A field's proposal the schema refuses stays, unanswered, and the field says why as it does for any refused value.
+An answered item is drawn no more from the moment of the answer. ⌘Z/Ctrl+Z from anywhere in the editor takes back the answers given since the reader's last edit, newest first, one answer or one `answerReview` call at a time, and each comes back as `reopen`; past that edit a taken proposal is still undone in its own text field, with its `reopen`, and a field's value and a dismissal are final. A field's accept and a batch stand on the toast with their way back. So the host's side of a round is: on `accept` and `dismiss`, take the item off the list and leave its anchor where it is; on `reopen`, put the item back; when the round ends, a new answer arriving or the document closing, lift the anchors (`{ anchor: { id, remove: true } }`). A `~` anchor never reaches the stored value, so one left standing costs nothing, and a host that ignores `reopen` keeps the text the undo brought back. In a shared session the inverse of a write is `revert` from `@quillmark/collab`, which holds back what someone has typed in the write's lines since. A field's proposal the schema refuses stays, unanswered, and the field says why as it does for any refused value.
 
 `onReviewDrawn` reports what the editor draws of the list, on each change once the leaves have drawn: `order`, the open items drawn in document order; `outdated`, the proposals the reader has written past; and `undrawn`, every listed item it does not draw, each with why: `anchor` (no mounted leaf holds it), `field` (the path names no field the editor holds, or a proposal names a place inside one), `parse` (`after` is not Markdown the leaf reads), `taken` (an earlier item has the paragraph or the field) or `applied` (the text already reads as proposed). A host's count and its next and previous read `order`, so they agree with the page.
 

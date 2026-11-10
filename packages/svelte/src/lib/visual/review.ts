@@ -42,7 +42,9 @@ export type ReviewItem =
  *
  * - `accept`: a proposal taken. The editor has written it by now, as an edit of the reader's.
  * - `dismiss`: a proposal turned down. Nothing is written.
- * - `undo`: a change to take back. Nothing is written here: the write is the host's.
+ * - `revert`: a change to take back. Nothing is written here: the write is the host's.
+ * - `reopen`: an accept or a dismissal undone. The editor has taken back what an accept wrote,
+ *   and the item is open again.
  */
 export interface ReviewEvent {
 	id: string;

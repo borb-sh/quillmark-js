@@ -336,10 +336,10 @@
 			reviewing.act(proposed.id, 'accept', true);
 			return true;
 		},
-		[REVIEW_KEYS.reject]: () => {
+		[REVIEW_KEYS.dismiss]: () => {
 			const item = proposed ?? changed;
 			if (!item) return false;
-			reviewing.act(item.id, proposed ? 'dismiss' : 'undo', true);
+			reviewing.act(item.id, proposed ? 'dismiss' : 'revert', true);
 			return true;
 		}
 	});

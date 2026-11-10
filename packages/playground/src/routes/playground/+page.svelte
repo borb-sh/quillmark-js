@@ -68,7 +68,8 @@
     seed ─► doc.apply (text + anchor) ─► review = items ─► onReviewDrawn ─► the bar's count
     bar ─► stepReview / answerReview('all', …) ─► onReview per item
     accept ─► the editor's own edit ─► onChange ─► onReview ─► the item leaves the list
-    undo ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
+    revert ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
+    ⌘Z after an answer ─► onReview reopen ─► the item back on the list
                                            └► editor.offerUndo (the step back from it)
 -->
 <script lang="ts">

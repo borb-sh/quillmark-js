@@ -200,7 +200,7 @@ describe('stepping', () => {
 		await settle();
 		const order = chorded.drawn.at(-1)!.order;
 		expect(await chorded.editor.stepReview(1)).toBe(order[0]);
-		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.reject), mod);
+		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.dismiss), mod);
 		await settle();
 		await settle();
 		expect(chorded.events).toEqual([{ id: order[0], action: 'dismiss' }]);
@@ -226,7 +226,7 @@ describe('stepping', () => {
 		const order = r.drawn.at(-1)!.order;
 		await r.editor.stepReview(1);
 		const before = r.lit.length;
-		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.reject), mod);
+		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.dismiss), mod);
 		await settle();
 		await settle();
 		expect(r.lit.slice(before)).not.toContain(order[1]);
