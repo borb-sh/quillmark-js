@@ -20,9 +20,11 @@
 import { getContext, setContext } from 'svelte';
 import type { Diagnostic } from '@quillmark/wasm';
 import {
+	DEFAULT_REVIEW_STRINGS,
 	DEFAULT_SHORTCUT_STRINGS,
 	DEFAULT_SLASH_STRINGS,
 	DEFAULT_TABLE_STRINGS,
+	type ReviewStrings,
 	type ShortcutStrings,
 	type SlashStrings,
 	type TableChromeStrings
@@ -30,14 +32,15 @@ import {
 import type { BodyPlaceholder } from './structure.js';
 
 /**
- * The island, the insert menu and the shortcut list's keys come from the codec, which owns
- * all three models (a NodeView inside the leaf, the trigger the leaf's keymap drives, and
- * the keymaps' own tables). Extending
+ * The island, the insert menu, the shortcut list and the review layer's keys come from the
+ * codec, which owns all four models (a NodeView inside the leaf, the trigger the leaf's keymap
+ * drives, the keymaps' own tables, and the decorations a leaf draws its review with). Extending
  * rather than restating them is what keeps one English list: a consumer overrides an
  * island handle's name beside the card controls' and the codec still has a default
  * for a leaf mounted directly.
  */
-export interface VisualStrings extends TableChromeStrings, SlashStrings, ShortcutStrings {
+export interface VisualStrings
+	extends TableChromeStrings, SlashStrings, ShortcutStrings, ReviewStrings {
 	// ── Card controls (accessible names: the buttons are glyphs) ───────────────
 	cardMoveUp: string;
 	cardMoveDown: string;
@@ -48,6 +51,30 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings, Shortcu
 	/** A closed panel's header, spoken after its name (`Layout, has an issue`) when a field
 	 *  inside holds a diagnostic: the leading separator is part of the wording. */
 	groupFlagged: string;
+
+	/** The same header where a field inside holds an item of review. */
+	groupReviewed: string;
+
+	// ── Review (the card over a change, the row under a field) ───────────────
+	/** The card's button, and the row's: takes the change back. */
+	reviewUndo: string;
+	/** Its tooltip, which names the chord. */
+	reviewUndoTitle: string;
+	/** The card's accessible name. */
+	reviewChange: string;
+	/** The toast over a field's proposal taken, beside its way back. */
+	reviewAccepted: string;
+	/** Before what a change replaced: `Was  the old words`. */
+	reviewWas: string;
+	/** The whole of the card over text that replaced nothing. */
+	reviewAdded: string;
+	/** Before the text a change took out, or the whole of the card where the host kept none. */
+	reviewRemoved: string;
+	/** A value that was, or would be, nothing: `Was  Empty`. */
+	reviewEmpty: string;
+	/** A switch's two values, as a card and a row word them. */
+	reviewOn: string;
+	reviewOff: string;
 
 	// ── Structural undo (the toast a removal raises) ─────────────────────────
 	/** The toast's notice, named for what went: `Authors 2 removed`. */
@@ -253,6 +280,20 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardDelete: 'Delete card',
 	cardTitle: 'Card title',
 	groupFlagged: ', has an issue',
+	groupReviewed: ', has changes to review',
+	...DEFAULT_REVIEW_STRINGS,
+	reviewAcceptTitle: `Accept (${chord('↵')})`,
+	reviewDismissTitle: `Dismiss (${chord('.')})`,
+	reviewUndo: 'Undo',
+	reviewUndoTitle: `Undo (${chord('.')})`,
+	reviewChange: 'Change',
+	reviewAccepted: 'Change accepted',
+	reviewWas: 'Was',
+	reviewAdded: 'Added',
+	reviewRemoved: 'Removed',
+	reviewEmpty: 'Empty',
+	reviewOn: 'On',
+	reviewOff: 'Off',
 	undoRemoved: (what) => `${what} removed`,
 	undoAction: 'Undo',
 	addCard: 'Add Card',
