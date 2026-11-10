@@ -62,18 +62,17 @@
   open, for the branches a quill on disk reaches none of (README
   §Routes).
 
-  `?review` stands another writer over the opened document (`reviewer.ts`): changes it wrote
-  and proposals it holds, handed to the editor as `review`, and its answers to `onReview`.
+  `?review` stands another writer's answer over the opened document (`reviewer.ts`): the list
+  `proposalsBetween` makes of it, set once as `review` and cleared once, on Keep.
 
-    seed ─► doc.apply (text + anchor) ─► review = items ─► onReviewDrawn ─► the bar's count
-    bar ─► stepReview / answerReview('all', …) ─► onReview per item
-    accept ─► the editor's own edit ─► onChange ─► onReview ─► the item stays, drawn as its change
-    Keep ─► the accepted items leave the list ─► their marks go
+    seed ─► answer on a copy ─► proposalsBetween(quill, doc, copy) ─► review = items
+    onReviewDrawn ─► the bar's count, from `open` and `accepted`
+    bar ─► stepReview / answerReview('all', …) ─► onReview per item, the list untouched
+    Keep ─► review = [] ─► the accepted items' marks go
     Undo all / a change's Undo ─► answerReview('all', 'reopen') ─► onReview reopen
-    Auto-accept ─► onReviewDrawn ─► answerReview('all', 'accept'), no proposal painted
-    revert ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
-    ⌘Z after an answer ─► onReview reopen ─► the item back on the list
-                                           └► editor.offerUndo (the step back from it)
+    Auto-accept ─► the first onReviewDrawn listing the items ─► answerReview(the drawn ids
+                   neither outdated nor undrawn, 'accept'), no proposal painted
+    reopen under Auto-accept ─► answerReview([id], 'dismiss'), so Undo is one press
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -102,7 +101,7 @@
 	import { Preview } from '@quillmark/svelte/preview';
 	import { LABELS as fontLabels, loadSuite } from '@quillmark/fonts';
 	import { DEFAULT_FIXTURE, fixtureNames, loadFixtureTree } from '../fixture';
-	import { seedReview, type Reviewer } from './reviewer';
+	import { seedReview } from './reviewer';
 
 	type Status = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready' };
 	type VisualEditorComponent = typeof import('@quillmark/svelte/visual').VisualEditor;
@@ -142,20 +141,20 @@
 					action: 'accept' | 'dismiss' | 'reopen'
 				): string[];
 				stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
-				offerUndo(notice: string, undo: () => void): () => void;
 		  }
 		| undefined = $state();
 
-	// The reviewer under `?review`, the list it hands the editor, and the item the editor says is
-	// under the reader's attention.
-	let reviewer: Reviewer | undefined;
+	// The list `?review` hands the editor, and the item the editor says is under the reader's
+	// attention.
 	let reviewItems = $state<ReviewItem[] | undefined>();
 	let reviewFocus = $state('none');
 	// What the editor draws of the list: the bar counts and walks this, not the list itself, so
 	// its count and the page agree.
 	let reviewDrawn = $state<ReviewDrawn | undefined>();
-	// Whether the reviewer's proposals are accepted as they arrive.
+	// Whether the reviewer's proposals are accepted as they arrive, and the ids set and not yet
+	// reported, which the first report listing them accepts.
 	let autoAccept = $state(false);
+	let arriving: Set<string> | undefined;
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -335,10 +334,12 @@
 		lastChangeSource = 'remote';
 		scheduleRecompile();
 	}
-	// The reader's answer to a review item. The editor has already written an accepted
-	// proposal, through `onChange`; the reviewer makes the write a change taken back asks for.
-	function handleReview(event: ReviewEvent): void {
-		if (editorRef) reviewer?.answer(event, editorRef, autoAccept);
+	// The reader's answer to a review item. The editor has made any write it asks for and
+	// draws the item as answered, so the list stays as it was set. Under auto-accept a proposal
+	// the reader takes back is turned down, so its Undo is the one press.
+	function handleReview({ id, action }: ReviewEvent): void {
+		if (autoAccept && action === 'reopen')
+			void tick().then(() => editorRef?.answerReview([id], 'dismiss'));
 	}
 	// The review bar, built from the public verbs alone: the reference a host copies.
 	function stepReview(dir: 1 | -1): void {
@@ -349,11 +350,22 @@
 		editorRef?.answerReview('all', action);
 	}
 	function keepAll(): void {
-		reviewer?.keep(reviewDrawn?.accepted ?? []);
+		reviewItems = [];
 	}
-	// What arrives is accepted once the editor says it has drawn it, ahead of the next paint.
-	function arrive(): void {
-		if (autoAccept) editorRef?.answerReview('all', 'accept');
+	// What arrives is accepted once the editor first says it has drawn it, ahead of the next
+	// paint: the drawn ids neither outdated nor undrawn, so a proposal the reader's own writing
+	// meets stays open.
+	function arrive(drawn: ReviewDrawn | undefined, set: boolean): void {
+		if (!drawn || !autoAccept) return;
+		if (set) {
+			const listed = (id: string) => arriving?.has(id);
+			if (!drawn.order.some(listed) && !drawn.undrawn.some(({ id }) => listed(id))) return;
+			arriving = undefined;
+		}
+		const outdated = new Set(drawn.outdated);
+		const undrawn = new Set(drawn.undrawn.map(({ id }) => id));
+		const ids = drawn.order.filter((id) => !outdated.has(id) && !undrawn.has(id));
+		if (ids.length) editorRef?.answerReview(ids, 'accept');
 	}
 	function handleError(err: EditorError): void {
 		lastError = `${err.code}: ${err.message}`;
@@ -441,8 +453,8 @@
 		engineHandle = undefined;
 		live = undefined;
 		room = 'none';
-		reviewer = undefined;
 		reviewItems = undefined;
+		arriving = undefined;
 		reviewDrawn = undefined;
 		reviewFocus = 'none';
 		fonts = [];
@@ -542,14 +554,10 @@
 				live = joined;
 				room = `${roomName} · ${joined.epoch}`;
 			} else if (params.has('review')) {
-				// Seeded before the editor mounts, so the anchors are in the value each leaf opens on.
 				// A room's document is every tab's, and the items are this page's alone.
-				const seeded = seedReview(doc, quill, () => {
-					reviewItems = seeded.items();
-					scheduleRecompile();
-				});
-				reviewer = seeded;
-				reviewItems = seeded.items();
+				const { items } = seedReview(doc, quill);
+				reviewItems = items;
+				arriving = new Set(items.map((item) => item.id));
 				autoAccept = params.has('auto');
 			}
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
@@ -696,8 +704,8 @@
 				<span class="stat"
 					><span class="qm-label">review</span>
 					<span class="qm-readout" data-testid="review-focus"
-						>{reviewFocus} · {(reviewDrawn?.order.length ?? 0) -
-							(reviewDrawn?.accepted.length ?? 0)} open · {reviewDrawn?.accepted.length ?? 0} accepted</span
+						>{reviewFocus} · {reviewDrawn?.open.length ?? 0} open · {reviewDrawn?.accepted.length ??
+							0} accepted</span
 					></span
 				>
 				{#if reviewDrawn?.undrawn.length}
@@ -792,7 +800,7 @@
 							class="qm-control"
 							type="button"
 							data-testid="review-keep"
-							disabled={!reviewDrawn?.accepted.length}
+							disabled={!reviewItems.length || !!reviewDrawn?.open.length}
 							onmousedown={(e) => e.preventDefault()}
 							onclick={keepAll}>Keep</button
 						>
@@ -809,7 +817,7 @@
 								type="checkbox"
 								data-testid="review-auto"
 								bind:checked={autoAccept}
-								onchange={arrive}
+								onchange={() => arrive(reviewDrawn, false)}
 							/>
 							Auto-accept
 						</label>
@@ -877,7 +885,7 @@
 						}}
 						onReviewDrawn={(drawn) => {
 							reviewDrawn = drawn;
-							arrive();
+							if (arriving) arrive(drawn, true);
 						}}
 						{fonts}
 						{fontLabels}

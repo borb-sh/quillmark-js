@@ -160,13 +160,13 @@ describe('the answer journal', () => {
 		expect(r.target.querySelector('.ProseMirror [data-qm-review="A"]')).not.toBeNull();
 	});
 
-	it('takes back a whole batch with one ⌘Z', async () => {
+	it('takes back a whole batch with one ⌘Z, the host’s batch raising no toast', async () => {
 		const r = journaled(mixed);
 		const body = r.doc.main.body.text;
 		await settle();
 		expect([...r.editor.answerReview('all', 'accept')].sort()).toEqual(['A', 'B', 'F']);
 		flushSync();
-		expect(r.target.querySelector('.qm-toast')).not.toBeNull();
+		expect(r.target.querySelector('.qm-toast')).toBeNull();
 		press(r.target.querySelector<HTMLElement>('.qm-editor')!, 'z', mod);
 		await settle();
 		expect(

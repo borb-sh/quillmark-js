@@ -598,6 +598,7 @@
 		return {
 			order,
 			accepted: order.filter((id) => reviewing.accepted.has(id)),
+			open: order.filter((id) => !reviewing.accepted.has(id)),
 			outdated: order.filter((id) => outdated.has(id) && !reviewing.accepted.has(id)),
 			undrawn: reviewing.items.flatMap((item) => {
 				const reason = why.get(item.id);
@@ -610,6 +611,7 @@
 	const NO_REPORT = JSON.stringify({
 		order: [],
 		accepted: [],
+		open: [],
 		outdated: [],
 		undrawn: []
 	} satisfies ReviewDrawn);
@@ -1477,8 +1479,9 @@
 	export function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
 		return reveal(id, opts.focus ?? false, false);
 	}
-	/** {@link revealReview}; a step leaves an item already wholly in view where it is, so a walk
-	 *  down neighbouring items does not jump the page under each. */
+	/** {@link revealReview}; a step scrolls an item only as far as its scroller must to show it,
+	 *  so a walk down neighbouring items does not jump the page under each, and an item in a
+	 *  pane that scrolls on its own is shown by that pane. */
 	async function reveal(id: string, focus: boolean, stepping: boolean): Promise<boolean> {
 		if (!span.alive) return false;
 		const key = reviewing.keyOf(id);
@@ -1496,10 +1499,11 @@
 				(el) => el.getAttribute('data-qm-review') === id
 			) ??
 			leaves.control(key)?.el;
-		const box = at?.getBoundingClientRect();
-		if (stepping && box && box.top >= 0 && box.bottom <= window.innerHeight) return true;
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-		at?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+		at?.scrollIntoView({
+			behavior: reduce ? 'auto' : 'smooth',
+			block: stepping ? 'nearest' : 'center'
+		});
 		return true;
 	}
 
@@ -1509,7 +1513,8 @@
 	 * already accepted, and an item that cannot be answered (a proposal that no longer writes, a
 	 * value the field's writer refuses) stands. `'reopen'` takes back each accepted proposal
 	 * named, as its card's Undo does. `onReview` hears each answer, and neither the focus nor the
-	 * caret moves. Returns the ids answered.
+	 * caret moves. The batch raises no toast, the host's to word if it wants one, and ⌘Z takes
+	 * it back whole. Returns the ids answered.
 	 */
 	export function answerReview(
 		ids: readonly string[] | 'all',
@@ -1544,7 +1549,6 @@
 		}
 		if (entry.ids.length) {
 			if (!journalOffer || !undo.holds(journalOffer)) journal = [];
-			entry.notice = action === 'accept' ? merged.reviewAcceptedAll : merged.reviewDismissedAll;
 			journal.push(entry);
 			offerJournal();
 		}
