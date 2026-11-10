@@ -523,6 +523,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	/** Whether the leaf holds a default nobody has written: the `data-default` mark. */
 	const unwritten = (): boolean => !!fallback && doc.getStored(addr) == null;
 	let defaulted = unwritten();
+	/** The document the leaf last held as its unwritten default, which an undo can return to. */
+	let unwrittenDoc: PMNode | undefined;
 
 	// `known` is the codec's view of what the leaf holds: kept in sync after every
 	// own-edit so `reconcile` can tell an external change from the field's own.
@@ -589,6 +591,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const seeded = buildState(reconciler.last);
 	const state = seeded.state;
 	index = seeded.index;
+	if (defaulted) unwrittenDoc = state.doc;
 
 	// The clearance PM's reveal keeps around the caret, in this leaf's own line box: PM's 5px
 	// default leaves the next typed line past the fold. Measured off the mounted box and dropped
@@ -639,7 +642,13 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				// (d) the change signal, only for what actually landed.
 				const anchors = plaintext ? [] : readAnchors();
 				const newRt = scan ? scanContent(scan, anchors) : pmToContent(next.doc, anchors);
-				if (commitEdit(oldRt, newRt)) opts.onChange?.(addr);
+				// An undo back to the default the leaf held unwritten takes the write back too.
+				const unwrite = !!unwrittenDoc && isHistoryTransaction(tr) && next.doc.eq(unwrittenDoc);
+				if (unwrite ? commitUnset() : commitEdit(oldRt, newRt)) opts.onChange?.(addr);
+				if (unwrite) {
+					defaulted = unwritten();
+					view.setProps({});
+				}
 			}
 			// The caret, for structural and selection-only changes, reported after the commit.
 			opts.onCaretMove?.(addr, pmToOffset(index, next.selection.head));
@@ -686,6 +695,35 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			})
 		});
 		return { state: built, index: seedIndex };
+	}
+
+	/** Re-read the leaf from the document: the reconciler's own edit, a landed remote replace, or
+	 *  a rebuild. */
+	function reread(delta: Delta | undefined): void {
+		const current = shown();
+		const flipped = holds(current) !== held;
+		const wasDefaulted = defaulted;
+		defaulted = unwritten();
+		if (!flipped && !reconciler.shouldRehydrate(current)) {
+			// Own edit / no change; a default written as itself changes the mark alone.
+			if (defaulted !== wasDefaulted) view.setProps({});
+			return;
+		}
+		if (!flipped && !held && landRemote(current, delta)) {
+			reconciler.commit(current);
+			if (defaulted !== wasDefaulted) view.setProps({});
+			return;
+		}
+		if (flipped) held = !held;
+		const caret = pmToOffset(index, view.state.selection.head);
+		const fresh = buildState(current);
+		index = fresh.index;
+		// Best-effort caret continuity across an external change: keep the offset. Set
+		// rather than dispatched, so a leaf the caret is not in reports no caret move.
+		const sel = Selection.near(fresh.state.doc.resolve(offsetToPM(index, caret)));
+		view.updateState(fresh.state.apply(fresh.state.tr.setSelection(sel)));
+		reconciler.commit(current);
+		if (flipped) opts.onHold?.(held);
 	}
 
 	// (b)+(c): lower the edit to a change and commit, or `replace` a field not yet at content rest.
@@ -898,30 +936,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			view.dispatch(view.state.tr.setSelection(sel).scrollIntoView());
 		},
 		applyExternal(delta?: Delta): void {
-			const current = shown();
-			const flipped = holds(current) !== held;
-			const wasDefaulted = defaulted;
-			defaulted = unwritten();
-			if (!flipped && !reconciler.shouldRehydrate(current)) {
-				// Own edit / no change; a default written as itself changes the mark alone.
-				if (defaulted !== wasDefaulted) view.setProps({});
-				return;
-			}
-			if (!flipped && !held && landRemote(current, delta)) {
-				reconciler.commit(current);
-				if (defaulted !== wasDefaulted) view.setProps({});
-				return;
-			}
-			if (flipped) held = !held;
-			const caret = pmToOffset(index, view.state.selection.head);
-			const fresh = buildState(current);
-			index = fresh.index;
-			// Best-effort caret continuity across an external change: keep the offset. Set
-			// rather than dispatched, so a leaf the caret is not in reports no caret move.
-			const sel = Selection.near(fresh.state.doc.resolve(offsetToPM(index, caret)));
-			view.updateState(fresh.state.apply(fresh.state.tr.setSelection(sel)));
-			reconciler.commit(current);
-			if (flipped) opts.onHold?.(held);
+			reread(delta);
+			unwrittenDoc = defaulted ? view.state.doc : undefined;
 		},
 		setPlaceholder(text: string | undefined): void {
 			if (text === placeholderText) return;
