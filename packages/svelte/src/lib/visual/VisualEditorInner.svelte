@@ -55,6 +55,7 @@
 	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo, type UndoOffer } from './undo.svelte.js';
+	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview } from './review.svelte.js';
 	import type { FieldProposal, ReviewDrawn } from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
@@ -879,7 +880,7 @@
 			shown?.titleOverride ||
 			shown?.titlePlaceholder ||
 			kindTitle(quill.schema.card_kinds?.[card.kind], card.kind);
-		const gone: Removed = { id, card, above: cardIds[i - 1], below: cardIds[i + 1], at: i };
+		const gone = removed.remove(id, card, cardIds, i);
 		doc.removeCard(i);
 		arm.arm();
 		cardIds = cardIds.filter((_, k) => k !== i);
@@ -887,41 +888,22 @@
 		// No addr: the removed card has none left and every survivor's shifted. The
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
 		bump('structure', id, undefined, { op: 'remove', at: i });
-		removed.push(gone);
 		undo.offer(merged.undoRemoved(name), () => restoreCard(gone), {
 			keptAs: merged.undoRestore(name)
 		});
 		if (held) void focusAfterRemove(i);
 	}
-	/** A removed card and the place it left, named by the cards either side of it: an index
-	 *  names whatever stands there after the next insert, move or removal, and a session key
-	 *  names one card for the surface's life. */
-	type Removed = {
-		readonly id: CardId;
-		readonly card: ReturnType<typeof doc.card>;
-		above: CardId | undefined;
-		below: CardId | undefined;
-		readonly at: number;
-	};
-	/** The removals not yet restored, each the step `undo` keeps for it. */
-	const removed: Removed[] = [];
-	/** Where a removed card goes back: under the card it stood below, else over the one it
-	 *  stood above, else the index it left, held to the stack's length. */
-	function placeOf(gone: Removed): number {
-		const above = gone.above === undefined ? -1 : cardIndexOf(gone.above);
-		if (above >= 0) return above + 1;
-		const below = gone.below === undefined ? -1 : cardIndexOf(gone.below);
-		return below >= 0 ? below : Math.min(gone.at, cardIds.length);
-	}
+	/** The removals not yet restored, each the step `undo` keeps for it (`removed.ts`). */
+	const removed = removedCards<ReturnType<typeof doc.card>>();
 	/** The removal's undo: the card back beside the neighbours it left, under a fresh session
 	 *  key (ids are never reused), with the focus on its title. A removal that named the
 	 *  gone card as its neighbour names the restored one. The document mints a card's `$id`
 	 *  from the ids it holds, so a card added since may hold the one this card left with,
 	 *  and the card then goes back without it and is minted another. */
-	function restoreCard(gone: Removed): void {
+	function restoreCard(gone: RemovedCard<ReturnType<typeof doc.card>>): void {
 		if (!span.alive) return;
 		const { card } = gone;
-		const i = placeOf(gone);
+		const i = removed.place(gone, cardIds);
 		try {
 			const taken = card.id !== undefined && cardIds.some((_, k) => doc.card(k).id === card.id);
 			const back = { ...card };
@@ -937,11 +919,7 @@
 			return;
 		}
 		const id = seq.next();
-		removed.splice(removed.indexOf(gone), 1);
-		for (const other of removed) {
-			if (other.above === gone.id) other.above = id;
-			if (other.below === gone.id) other.below = id;
-		}
+		removed.restored(gone, id);
 		arm.arm();
 		cardIds = [...cardIds.slice(0, i), id, ...cardIds.slice(i)];
 		bump('structure', id, i, { op: 'insert', at: i });
