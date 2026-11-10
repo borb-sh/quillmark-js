@@ -306,4 +306,23 @@ describe('a host’s step', () => {
 		expect(undone).toBe(0);
 		expect(r.doc.getStored('columns')).toBeUndefined();
 	});
+	it('leaves a removed card the key’s once an answer given over it is taken back', () => {
+		const r = review((doc) => [
+			{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
+		]);
+		const before = r.doc.toMarkdown();
+		r.target.querySelector<HTMLButtonElement>('.qm-card-delete')!.click();
+		flushSync();
+		const without = r.doc.toMarkdown();
+		openField(r.target, main, 'columns')
+			.querySelector<HTMLButtonElement>('.qm-review-accept')!
+			.click();
+		flushSync();
+		press(document.body, 'z', mod);
+		flushSync();
+		expect(r.doc.toMarkdown()).toBe(without);
+		press(document.body, 'z', mod);
+		flushSync();
+		expect(r.doc.toMarkdown()).toBe(before);
+	});
 });

@@ -23,7 +23,9 @@
 // for the reader, an assistant's answer, lands outside every leaf's history, so nothing the
 // reader can press takes it back. ⌘Z anywhere in the editor is its, a text leaf's own
 // included. Its restore is good against the document it was offered over and no other, so
-// the next edit drops it, toast and all.
+// the next edit drops it, toast and all. A review answer's step is a host's step made by no
+// edit, so it holds a card's step it was offered over: taking the answer back leaves the
+// card's the last thing that happened again.
 //
 // The key listens on the document, not on the surface: a removal by the pointer takes the
 // pressed button with it and leaves the focus on the page's body, which no keydown on the
@@ -57,6 +59,9 @@ export interface Hold {
 	readonly keptAs?: string;
 	/** Held for the key alone, with no toast: a standing step whose way back is the key. */
 	readonly quiet?: boolean;
+	/** A review answer's step, standing: an answer is no edit, so it holds the card's step it
+	 *  was offered over, which is the key's again once the answer is taken back. */
+	readonly answer?: boolean;
 }
 
 export interface StructuralUndo {
@@ -97,6 +102,13 @@ export interface StructuralUndo {
 
 const EDITABLE = 'input, textarea, select, [contenteditable="true"]';
 
+/** A step held past its toast, and an answer's, the card's step it was offered over. */
+interface Held {
+	readonly offer: UndoOffer;
+	readonly standing: boolean;
+	readonly under?: Held;
+}
+
 /** The editor whose offer is the page's latest: the body belongs to no surface, so of two
  *  editors with an offer standing, the key at the body is the one that offered last's. */
 let latest: object | undefined;
@@ -105,7 +117,7 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 	let current = $state.raw<UndoOffer | undefined>();
 	let kept = $state.raw<readonly KeptStep[]>([]);
 	/** The held step no edit has landed since: the key's, on its toast or past it. */
-	let last: { readonly offer: UndoOffer; readonly standing: boolean } | undefined;
+	let last: Held | undefined;
 	let handed: Element | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let paused = false;
@@ -141,11 +153,12 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		get kept() {
 			return kept.at(-1);
 		},
-		offer(notice, restore, { standing = false, keptAs, quiet = false } = {}) {
+		offer(notice, restore, { standing = false, keptAs, quiet = false, answer = false } = {}) {
+			const under = answer ? (last?.standing ? last.under : last) : undefined;
 			clear();
 			const offer = { notice, restore };
 			if (keptAs !== undefined) kept = [...kept, { label: keptAs, restore }];
-			if (standing || keptAs !== undefined) last = { offer, standing };
+			if (standing || keptAs !== undefined) last = { offer, standing, under };
 			latest = self;
 			if (quiet) return offer;
 			current = offer;
@@ -188,7 +201,9 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			const offer = live();
 			if (!offer) return false;
 			const step = stepOf(offer);
+			const under = last?.standing && last.offer === offer ? last.under : undefined;
 			clear();
+			last = under && stepOf(under.offer) ? under : undefined;
 			if (step) run(step);
 			else offer.restore();
 			return true;

@@ -501,6 +501,24 @@ describe('answering', () => {
 		expect(turned.doc.main.body.text).toContain('brown fox');
 	});
 
+	it('the accept chord takes a proposal over the task item it is in', () => {
+		const leaf = leafOver('- [ ] the quick brown fox');
+		leaf.anchor('~p1', 'brown');
+		leaf.field.setReview([
+			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'the quick red fox' }
+		]);
+		const view = viewOf(leaf.field);
+		let at = -1;
+		view.state.doc.descendants((node, pos) => {
+			if (at < 0 && node.isText) at = pos + node.text!.indexOf('quick') + 1;
+		});
+		view.focus();
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
+		press(view, keyOf(REVIEW_KEYS.accept), mod);
+		expect(leaf.acts).toEqual([['r1', 'accept']]);
+		expect(leaf.doc.toMarkdown()).toContain('- [ ] the quick red fox');
+	});
+
 	it('an answered item is drawn again only under a list that holds it anew', () => {
 		const leaf = proposal();
 		const items: TextReview[] = [{ id: 'r2', state: 'changed', anchor: '~c1' }];
