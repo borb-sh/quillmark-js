@@ -131,7 +131,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **Editing chrome is per leaf; structural chrome is Svelte in the shell.**
 
-- **The formatting popover answers a selection, never a pointer**, and asks the view it would act on, so it withholds itself over a `text` leaf. Font families come from the host's library, not the quill's.
+- **The formatting popover answers a selection, never a pointer**, and asks the view it would act on, so it withholds itself over a `text` leaf. It takes the focus only by its own key, and then holds it until Escape hands it back to the selection. Font families come from the host's library, not the quill's.
 - **An input rule declines only where its result is unrepresentable or belongs to another gesture**, never on how a quill would render it, since what a quill typesets is not knowable here. Backspace right after a rule takes it back.
 - **An input rule runs the command its slash pick runs**, so a construct's two doors are one implementation and cannot drift apart.
 - **Each body key is one chain of links, innermost surface first**, so the nearest surface answers. A key edits its own block; an item's number is its position and no keystroke writes one; Tab is structural in a body and free for navigation in a one-line field; Escape gives the focus up; no gesture nests past the store's depth bound.

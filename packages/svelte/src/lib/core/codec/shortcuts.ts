@@ -9,8 +9,8 @@ import { toggleMark } from 'prosemirror-commands';
 import type { Schema } from 'prosemirror-model';
 import type { Command } from 'prosemirror-state';
 
-/** Every prose leaf, a table cell included: history and the marks. `link` binds in the
- *  formatting popover, which is the surface that prompts for the URL. */
+/** Every prose leaf, a table cell included: history and the marks. `link` and `formatBar`
+ *  bind in the formatting popover, the surface one prompts from and the other enters. */
 export const FIELD_KEYS = {
 	undo: 'Mod-z',
 	redo: 'Mod-Shift-z',
@@ -20,7 +20,8 @@ export const FIELD_KEYS = {
 	underline: 'Mod-u',
 	strike: 'Mod-Shift-x',
 	code: 'Mod-e',
-	link: 'Mod-k'
+	link: 'Mod-k',
+	formatBar: 'Alt-F10'
 } as const;
 
 /** A multi-block body, outside any surface nested in it. */
@@ -90,6 +91,7 @@ export interface ShortcutStrings {
 	shortcutStrikethrough: string;
 	shortcutCode: string;
 	shortcutLink: string;
+	shortcutFormatBar: string;
 	shortcutLineBreak: string;
 	shortcutLeave: string;
 	shortcutNumberedList: string;
@@ -117,6 +119,7 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutStrikethrough: 'Strikethrough',
 	shortcutCode: 'Code',
 	shortcutLink: 'Link',
+	shortcutFormatBar: 'Move to the format bar over a selection',
 	shortcutLineBreak: 'Line break within a paragraph',
 	shortcutLeave: 'Leave the editor',
 	shortcutNumberedList: 'Numbered list',
@@ -153,6 +156,7 @@ const SHORTCUTS: readonly {
 	{ scope: 'field', label: 'shortcutStrikethrough', keys: [F.strike] },
 	{ scope: 'field', label: 'shortcutCode', keys: [F.code] },
 	{ scope: 'field', label: 'shortcutLink', keys: [F.link] },
+	{ scope: 'field', label: 'shortcutFormatBar', keys: [F.formatBar] },
 	{ scope: 'body', label: 'shortcutLineBreak', keys: [BODY_KEYS.lineBreak] },
 	{ scope: 'body', label: 'shortcutLeave', keys: [BODY_KEYS.leave] },
 	{ scope: 'list', label: 'shortcutNumberedList', keys: [L.numbered] },
