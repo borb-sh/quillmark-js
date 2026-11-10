@@ -162,6 +162,10 @@ The client a quiver's readers reach: someone with a form to fill in, who has nev
 
 **The file is the document in hand.** A press flushes a settling keystroke, waits on an open in flight, and writes from the session the page is painted from. A document that does not render is refused rather than written from the last good page.
 
+### Print
+
+**A print is the download's file, handed to the print dialog**, so what prints is the PDF a reader would download, never the canvas the page paints. Where the browser prints a PDF from a hidden frame it does; where it cannot (no inline PDF viewer, as on a phone, or Safari, whose frame prints blank) the PDF opens in a tab whose viewer prints it. That tab is opened on the press, before the render's await, since a tab opened after it is a blocked popup.
+
 ### Retired pins
 
 **A document reopens on the ref it was made on**, so a quiver that moves a quill to a new version does not move a reader's half-filled form under them. A pin the pack still holds opens on it with an update offered; a pin the pack no longer holds stands as its record, downloadable as markdown.
