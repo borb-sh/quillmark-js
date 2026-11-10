@@ -282,7 +282,12 @@ function emitText(acc: Acc, s: string, pmStart: number, marks: readonly Mark[]):
 		acc.rawMarks.push({ start: at, end: acc.text.length, ...contentDescriptorFromPM(mark) });
 }
 
-/** Merge adjacent/overlapping same-descriptor marks into maximal ranges. */
+/**
+ * Merge adjacent/overlapping same-descriptor marks into maximal ranges, in the store's
+ * canonical order: by range, then by descriptor. A write takes a `Content` in that order
+ * alone, and PM hands a character's marks in its schema's, so two marks over one range
+ * leave here ordered by what they are rather than by which the schema ranks first.
+ */
 function mergeMarks(raw: ContentMark[]): ContentMark[] {
 	const groups = new Map<
 		string,
@@ -295,20 +300,27 @@ function mergeMarks(raw: ContentMark[]): ContentMark[] {
 		if (!g) groups.set(key, (g = { descriptor: descriptor as ContentMarkKind, intervals: [] }));
 		g.intervals.push({ start, end });
 	}
-	const out: ContentMark[] = [];
-	for (const g of groups.values()) {
+	const out: { key: string; mark: ContentMark }[] = [];
+	for (const [key, g] of groups) {
 		const sorted = [...g.intervals].sort((a, b) => a.start - b.start);
 		let cur: { start: number; end: number } | null = null;
 		for (const iv of sorted) {
 			if (cur && iv.start <= cur.end) cur.end = Math.max(cur.end, iv.end);
 			else {
-				if (cur) out.push({ ...cur, ...g.descriptor } as ContentMark);
+				if (cur) out.push({ key, mark: { ...cur, ...g.descriptor } as ContentMark });
 				cur = { ...iv };
 			}
 		}
-		if (cur) out.push({ ...cur, ...g.descriptor } as ContentMark);
+		if (cur) out.push({ key, mark: { ...cur, ...g.descriptor } as ContentMark });
 	}
-	return out.sort((a, b) => a.start - b.start || a.end - b.end);
+	return out
+		.sort(
+			(a, b) =>
+				a.mark.start - b.mark.start ||
+				a.mark.end - b.mark.end ||
+				(a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+		)
+		.map((o) => o.mark);
 }
 
 // ── Lowering ────────────────────────────────────────────────────────────────

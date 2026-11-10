@@ -62,6 +62,15 @@
  trick): without it, the browser's default mousedown action focuses the
  button before `click` fires, blurring the editor and collapsing the
  selection the command is supposed to act on.
+
+ The keyboard's way in. Alt-F10 over a selection raises the surface at once and puts
+ the focus on its first control, which is the only route to the font picker a keyboard
+ has and one more to the buttons its chords already reach. Worked from there, the
+ surface keeps the focus: Tab and Shift-Tab walk its controls and wrap, the arrows step
+ between buttons, an action leaves the focus where it is so a second can follow, and
+ Escape hands the focus back to the selection with the surface still up. Entered by a
+ press instead, the surface is a pointer's and every action returns the focus to the
+ text, as before.
 -->
 <script lang="ts">
 	import { onDestroy } from 'svelte';
@@ -142,6 +151,9 @@
 	let surfaceView: EditorView | undefined;
 	/** A pointer is down outside this surface: the selection is still being made. */
 	let pressed = false;
+	/** The surface is being worked from the keyboard: entered by its key, until the focus
+	 *  goes back to the text or anywhere else. */
+	let keyed = false;
 	let linkPromptOpen = $state(false);
 	/** Whether the selection carried a link when the prompt was raised. */
 	let linkPresent = $state(false);
@@ -282,8 +294,79 @@
 	// focus: bits-ui flips `open` itself) must not leave a stale prompt for the
 	// next open.
 	$effect(() => {
-		if (!open) linkPromptOpen = false;
+		if (!open) {
+			linkPromptOpen = false;
+			keyed = false;
+			entering = false;
+		}
 	});
+
+	/** The surface's controls, in the order it draws them. */
+	const stops = (): HTMLElement[] => [
+		...(contentEl?.querySelectorAll<HTMLElement>('button, select, input') ?? [])
+	];
+	/** The view an action from the surface lands on: the one it rose over, a cell view
+	 *  without the focus being no longer the leaf's `focusedView`. */
+	const actedOn = (): EditorView | undefined =>
+		surfaceView && !surfaceView.isDestroyed ? surfaceView : activeLeafView();
+	/** After an action: back to the text, unless the surface is being worked from the
+	 *  keyboard, where the next action is one more key away. */
+	function settle(view: EditorView): void {
+		if (!keyed) view.focus();
+		sync();
+	}
+
+	/** The format bar's key: raise the surface over the selection without the wait a
+	 *  keyboard selection otherwise gets, and enter it. */
+	function enterBar(view: EditorView): boolean {
+		if (!view.hasFocus()) return false;
+		sync();
+		if (!open) return false;
+		keyed = true;
+		entering = true;
+		return true;
+	}
+	/** The key was pressed and the focus is owed to the surface's first control, which
+	 *  a surface raised by that same press has yet to mount. */
+	let entering = $state(false);
+	$effect(() => {
+		if (!entering || !contentEl) return;
+		entering = false;
+		stops()[0]?.focus();
+	});
+	/** Out of the surface by its own key: the focus to the selection, the surface up. */
+	function leaveBar(): void {
+		keyed = false;
+		const view = actedOn();
+		if (!view) return;
+		view.focus();
+		sync();
+	}
+	function onBarKeyDown(e: KeyboardEvent): void {
+		if (!keyed) return;
+		const all = stops();
+		const at = all.indexOf(e.target as HTMLElement);
+		if (at < 0) return;
+		const onButton = e.target instanceof HTMLButtonElement;
+		const step =
+			e.key === 'Tab'
+				? e.shiftKey
+					? -1
+					: 1
+				: onButton && e.key === 'ArrowRight'
+					? 1
+					: onButton && e.key === 'ArrowLeft'
+						? -1
+						: 0;
+		if (!step || e.ctrlKey || e.metaKey || e.altKey) return;
+		e.preventDefault();
+		all[(at + step + all.length) % all.length].focus();
+	}
+	/** The focus going anywhere but another of the surface's controls ends the keyboard's
+	 *  hold on it. */
+	function onBarFocusOut(e: FocusEvent): void {
+		if (!contentEl?.contains(e.relatedTarget as Node | null)) keyed = false;
+	}
 
 	// The prompt takes its own focus. Nothing else moves it: open-auto-focus is
 	// prevented (focus discipline above), and the prompt replaces the buttons on a
@@ -306,7 +389,7 @@
 	// prompt, not a second meaning for the button. The five value-less marks keep
 	// the toggle.
 	function toggle(name: string): void {
-		const view = activeLeafView();
+		const view = keyed ? actedOn() : activeLeafView();
 		if (!view) return;
 		const type: MarkType | undefined = view.state.schema.marks[name];
 		if (!type) return;
@@ -318,30 +401,28 @@
 			return;
 		}
 		toggleMark(type)(view.state, view.dispatch);
-		view.focus();
-		sync();
+		settle(view);
 	}
 
 	function pickFamily(name: string): void {
-		const view = surfaceView && !surfaceView.isDestroyed ? surfaceView : activeLeafView();
+		const view = actedOn();
 		if (!view) return;
 		setFamily(name)(view.state, view.dispatch);
-		view.focus();
-		sync();
+		settle(view);
 	}
 
 	function toggleLines(ordered: boolean): void {
-		const view = activeLeafView();
+		const view = keyed ? actedOn() : activeLeafView();
 		if (!view) return;
 		toggleList(ordered)(view.state, view.dispatch);
-		view.focus();
-		sync();
+		settle(view);
 	}
 
 	/** Every exit from the prompt: lower it, run `cmd` if there is one, and hand the
 	 *  leaf back its focus and the surface its buttons. */
 	function closePrompt(cmd?: Command): void {
 		linkPromptOpen = false;
+		keyed = false;
 		const view = promptView && !promptView.isDestroyed ? promptView : activeLeafView();
 		promptView = undefined;
 		if (view) {
@@ -372,14 +453,15 @@
 		return true;
 	}
 
-	const linkKey = keydownHandler({
-		[FIELD_KEYS.link]: (_state, _dispatch, view) => !!view && raiseLink(view)
+	const surfaceKeys = keydownHandler({
+		[FIELD_KEYS.link]: (_state, _dispatch, view) => !!view && raiseLink(view),
+		[FIELD_KEYS.formatBar]: (_state, _dispatch, view) => !!view && enterBar(view)
 	});
 
 	function onKeyDown(e: KeyboardEvent): void {
 		if (e.defaultPrevented) return;
 		const view = activeLeafView();
-		if (view && linkKey(view, e)) e.preventDefault();
+		if (view && surfaceKeys(view, e)) e.preventDefault();
 	}
 
 	function removeLink(): void {
@@ -419,6 +501,13 @@
 			sideOffset={spacePx(portalTarget, 2)}
 			onOpenAutoFocus={(e: Event) => e.preventDefault()}
 			onCloseAutoFocus={(e: Event) => e.preventDefault()}
+			onEscapeKeydown={(e: KeyboardEvent) => {
+				// Worked from the keyboard, Escape is the way back to the text, not a
+				// dismissal that would leave the focus on a control going away.
+				if (!keyed || linkPromptOpen) return;
+				e.preventDefault();
+				leaveBar();
+			}}
 		>
 			<!-- The `child` snippet, so the surface is the primitive's content node
 			 rather than a pill inside it: the dismissal is a CSS animation and the
@@ -438,6 +527,8 @@
 						class="qm-format-popover qm-popover-surface"
 						data-qm-root
 						inert={!raised}
+						onkeydown={onBarKeyDown}
+						onfocusout={onBarFocusOut}
 					>
 						{#if linkPromptOpen}
 							<form
@@ -477,10 +568,16 @@
 								>
 							</form>
 						{:else}
-							<!-- `role="group"`, not `toolbar`: these buttons carry no roving-tabindex /
-							     arrow-key navigation, so the ARIA toolbar contract would be a lie;
-							     a labelled group is the honest description. -->
-							<div class="qm-format-buttons" role="group" aria-label={t.strings.formatGroup}>
+							<!-- `role="group"`, not `toolbar`: every control here is a tab stop of its
+							     own and the picker keeps its arrows, so the ARIA toolbar contract of one
+							     stop and roving arrows would be a lie; a labelled group is the honest
+							     description. -->
+							<div
+								class="qm-format-buttons"
+								role="group"
+								aria-label={t.strings.formatGroup}
+								aria-keyshortcuts={FIELD_KEYS.formatBar.replaceAll('-', '+')}
+							>
 								{#each MARKS as m (m.name)}
 									<button
 										type="button"
