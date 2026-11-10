@@ -55,13 +55,22 @@ function review(items: (doc: Document) => ReviewItem[]): Reviewed {
 const stored = (doc: Document, name: string): unknown =>
 	(doc.getStored(name) as { text?: string } | undefined)?.text ?? doc.getStored(name);
 
-describe('a changed field', () => {
-	const changed = (doc: Document): ReviewItem[] => [
-		{ id: 'r1', state: 'changed', field: doc.pathFor('subtitle'), before: 'An older subtitle' }
+describe('an accepted field proposal', () => {
+	const proposed = (doc: Document): ReviewItem[] => [
+		{ id: 'r1', field: doc.pathFor('subtitle'), after: 'A newer subtitle' }
 	];
+	/** The editor over `proposed`, `r1` accepted. */
+	function accepted(): Reviewed & { before: string } {
+		const r = review(proposed);
+		const before = r.doc.toMarkdown();
+		expect(r.editor.answerReview(['r1'], 'accept')).toEqual(['r1']);
+		flushSync();
+		return { ...r, before };
+	}
 
 	it('marks the control, and raises its card with what the value was once the focus rests', async () => {
-		const r = review(changed);
+		const r = accepted();
+		const was = stored(example(), 'subtitle') as string;
 		const control = openField(r.target, main, 'subtitle').querySelector('.qm-field-control')!;
 		expect(control.getAttribute('data-qm-review')).toBe('r1');
 		leaf(control as HTMLElement).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
@@ -69,36 +78,36 @@ describe('a changed field', () => {
 		expect(r.lit.at(-1)).toBe('r1');
 		expect(card()).toBeNull();
 		await rested();
-		expect(card()?.textContent).toContain('An older subtitle');
+		expect(card()?.textContent).toContain(was);
 	});
 
-	it('asks the host for the change back, and writes nothing', async () => {
-		const r = review(changed);
-		const before = r.doc.toMarkdown();
+	it('is taken back by its card’s Undo, and opens again', async () => {
+		const r = accepted();
 		const control = openField(r.target, main, 'subtitle').querySelector('.qm-field-control')!;
 		leaf(control as HTMLElement).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
 		await rested();
 		card()!.querySelector<HTMLButtonElement>('.qm-review-undo')!.click();
 		flushSync();
-		expect(r.events).toEqual([{ id: 'r1', action: 'revert' }]);
-		expect(r.doc.toMarkdown()).toBe(before);
-		expect(r.changes).toEqual([]);
-		expect(r.target.querySelector('[data-qm-review]')).toBeNull();
+		expect(r.events).toEqual([
+			{ id: 'r1', action: 'accept' },
+			{ id: 'r1', action: 'reopen' }
+		]);
+		expect(r.doc.toMarkdown()).toBe(r.before);
+		expect(r.target.querySelector('.qm-review-proposal[data-qm-review="r1"]')).not.toBeNull();
 	});
 
-	it('answers the reject chord from inside the field', () => {
-		const r = review(changed);
+	it('answers the reject chord from inside the field by taking it back', () => {
+		const r = accepted();
 		press(leaf(openField(r.target, main, 'subtitle')), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(r.events).toEqual([{ id: 'r1', action: 'revert' }]);
+		expect(r.events.at(-1)).toEqual({ id: 'r1', action: 'reopen' });
+		expect(r.doc.toMarkdown()).toBe(r.before);
 	});
 });
 
 describe('a proposed field value', () => {
 	const proposed =
 		(after: unknown) =>
-		(doc: Document): ReviewItem[] => [
-			{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after }
-		];
+		(doc: Document): ReviewItem[] => [{ id: 'r1', field: doc.pathFor('columns'), after }];
 	const row = (r: Reviewed) =>
 		openField(r.target, main, 'columns').querySelector<HTMLElement>('.qm-review-proposal')!;
 
@@ -163,7 +172,7 @@ describe('a proposed field value', () => {
 		const r = review((doc) => [
 			{
 				id: 'r1',
-				state: 'proposed',
+
 				field: doc.pathFor('subtitle'),
 				after: `${stored(doc, 'subtitle')}, revised`
 			}
@@ -181,7 +190,7 @@ describe('a proposed field value', () => {
 
 describe('an item in a closed group', () => {
 	const items = (doc: Document): ReviewItem[] => [
-		{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
+		{ id: 'r1', field: doc.pathFor('columns'), after: 2 }
 	];
 	const marked = (r: Reviewed) =>
 		[...r.target.querySelectorAll('.qm-group-reviewed')].map((flag) =>
@@ -211,24 +220,23 @@ describe('an item in a closed group', () => {
 });
 
 describe('an item in the body', () => {
-	const anchored =
-		(state: 'changed' | 'proposed') =>
-		(doc: Document): ReviewItem[] => {
-			const word = doc.main.body.text.split(' ')[1];
-			const at = doc.main.body.text.indexOf(word);
-			doc.apply({}, { steps: [{ anchor: { id: '~a1', start: at, end: at + word.length } }] });
-			return state === 'changed'
-				? [{ id: 'r1', state, anchor: '~a1', before: 'was' }]
-				: [{ id: 'r1', state, anchor: '~a1', after: 'A proposed line.' }];
-		};
+	const first = (doc: Document): ReviewItem[] => [
+		{
+			id: 'r1',
 
-	it('is drawn in the leaf holding its anchor', () => {
-		const r = review(anchored('changed'));
-		expect(r.target.querySelector('.ProseMirror .qm-review-changed')).not.toBeNull();
+			field: 'main.body',
+			replace: [doc.blocks({})[0].id],
+			after: 'A proposed line.'
+		}
+	];
+
+	it('is drawn in the body’s leaf', () => {
+		const r = review(first);
+		expect(r.target.querySelector('.ProseMirror [data-qm-review="r1"]')).not.toBeNull();
 	});
 
 	it('is the leaf’s own edit when taken, and the event follows the change', () => {
-		const r = review(anchored('proposed'));
+		const r = review(first);
 		r.target.querySelector<HTMLButtonElement>('.ProseMirror .qm-review-accept')!.click();
 		flushSync();
 		expect(r.doc.main.body.text.startsWith('A proposed line.')).toBe(true);
@@ -237,19 +245,19 @@ describe('an item in the body', () => {
 	});
 
 	it('takes the caret when revealed with the focus, so its chords answer', async () => {
-		const r = review(anchored('changed'));
+		const r = review(first);
 		expect(await r.editor.revealReview('r1', { focus: true })).toBe(true);
 		flushSync();
 		const body = r.target
-			.querySelector('.qm-review-changed')!
+			.querySelector('[data-qm-review="r1"]')!
 			.closest<HTMLElement>('.ProseMirror')!;
 		expect(document.activeElement).toBe(body);
 		press(body, keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(r.events).toEqual([{ id: 'r1', action: 'revert' }]);
+		expect(r.events).toEqual([{ id: 'r1', action: 'dismiss' }]);
 	});
 
 	it('is drawn no more once answered, while the list still holds it', () => {
-		const r = review(anchored('proposed'));
+		const r = review(first);
 		r.target.querySelector<HTMLButtonElement>('.ProseMirror .qm-review-dismiss')!.click();
 		flushSync();
 		expect(r.target.querySelector('[data-qm-review]')).toBeNull();
@@ -258,58 +266,15 @@ describe('an item in the body', () => {
 		expect(r.target.querySelector('[data-qm-review]')).toBeNull();
 		r.props.review = [];
 		flushSync();
-		r.props.review = anchoredAgain();
+		r.props.review = first(r.doc);
 		flushSync();
 		expect(r.target.querySelector('[data-qm-review]')).not.toBeNull();
 	});
-	const anchoredAgain = (): ReviewItem[] => [
-		{ id: 'r1', state: 'proposed', anchor: '~a1', after: 'A proposed line.' }
-	];
 });
 
-describe('a host’s step', () => {
-	it('is offered on the toast, and taken by the key from inside a text leaf', () => {
-		const r = review(() => []);
-		let undone = 0;
-		r.editor.offerUndo('Three places edited', () => undone++);
-		flushSync();
-		expect(toast(r.target)?.textContent).toContain('Three places edited');
-		press(leaf(r.target), 'z', mod);
-		expect(undone).toBe(1);
-		expect(toast(r.target)).toBeNull();
-	});
-
-	it('is withdrawn by the function offering it returned', () => {
-		const r = review(() => []);
-		let undone = 0;
-		const withdraw = r.editor.offerUndo('Three places edited', () => undone++);
-		flushSync();
-		withdraw();
-		flushSync();
-		expect(toast(r.target)).toBeNull();
-		press(document.body, 'z', mod);
-		expect(undone).toBe(0);
-	});
-
-	it('gives way to the reader’s next edit', () => {
-		const r = review((doc) => [
-			{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
-		]);
-		let undone = 0;
-		r.editor.offerUndo('Three places edited', () => undone++);
-		flushSync();
-		openField(r.target, main, 'columns')
-			.querySelector<HTMLButtonElement>('.qm-review-accept')!
-			.click();
-		flushSync();
-		press(document.body, 'z', mod);
-		expect(undone).toBe(0);
-		expect(r.doc.getStored('columns')).toBeUndefined();
-	});
+describe('a removed card’s step', () => {
 	it('leaves a removed card the key’s once an answer given over it is taken back', () => {
-		const r = review((doc) => [
-			{ id: 'r1', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
-		]);
+		const r = review((doc) => [{ id: 'r1', field: doc.pathFor('columns'), after: 2 }]);
 		const before = r.doc.toMarkdown();
 		r.target.querySelector<HTMLButtonElement>('.qm-card-delete')!.click();
 		flushSync();

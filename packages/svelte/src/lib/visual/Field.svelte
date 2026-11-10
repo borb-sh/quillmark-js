@@ -332,8 +332,8 @@
 	/** The item the focus in the field attends to: the change, whose card it raises, else the
 	 *  proposal. */
 	const attended = $derived(changed ?? proposed);
-	/** The chords, with the focus anywhere in the field: a proposal's answers, else the change
-	 *  taken back. A prose leaf's own items answer first, in the leaf. */
+	/** The chords, with the focus anywhere in the field: a proposal's answers, else an accepted
+	 *  one taken back. A prose leaf's own items answer first, in the leaf. */
 	const reviewKeys = keydownHandler({
 		[REVIEW_KEYS.accept]: () => {
 			if (!proposed) return false;
@@ -343,7 +343,7 @@
 		[REVIEW_KEYS.dismiss]: () => {
 			const item = proposed ?? changed;
 			if (!item) return false;
-			reviewing.act(item.id, proposed ? 'dismiss' : 'revert', true);
+			reviewing.act(item.id, proposed ? 'dismiss' : 'reopen', true);
 			return true;
 		}
 	});

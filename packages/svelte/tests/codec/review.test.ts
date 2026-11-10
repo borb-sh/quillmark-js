@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
-// The review layer of a prose leaf: an item draws by the anchor it names, in the leaf's own
-// flow, and writes nothing while it stands; a proposal reads as an edit of its paragraph, and
-// taking it writes what was drawn; the two chords and the two buttons answer through one channel.
+// The review layer of a prose leaf: a proposal draws over the blocks it names, in the leaf's own
+// flow, and writes nothing while it stands; it reads as an edit of its paragraph, taking it writes
+// what was drawn, and what it wrote is marked while the list holds it; the two chords and the two
+// buttons answer through one channel.
 import { describe, it, expect, afterEach } from 'vitest';
 import { redo, undo } from 'prosemirror-history';
 import { TextSelection } from 'prosemirror-state';
 import { createField, REVIEW_KEYS, DEFAULT_REVIEW_STRINGS } from '$lib/core/codec';
 import type {
+	BlockPlace,
 	FieldController,
 	ReviewAction,
 	ReviewReport,
@@ -30,8 +32,6 @@ interface Leaf {
 	/** The item whose card is up, and how often the leaf lowered it. */
 	shown?: string;
 	lowered: number;
-	/** Lay an anchor over the first `text` in the body, or a point at its start. */
-	anchor(id: string, text: string, point?: boolean): void;
 }
 
 const open: FieldController[] = [];
@@ -73,14 +73,36 @@ function leafOver(markdown: string): Leaf {
 		points,
 		drawn,
 		reports,
-		lowered: 0,
-		anchor(id, text, point = false) {
-			const at = doc.main.body.text.indexOf(text);
-			if (at < 0) throw new Error(`no ${text} in the body`);
-			field.insertAnchor(id, at, point ? at : at + text.length);
-		}
+		lowered: 0
 	};
 	return leaf;
+}
+
+/** The offset of the first `text` in the body. */
+function offsetOf(leaf: Leaf, text: string): number {
+	const at = leaf.doc.main.body.text.indexOf(text);
+	if (at < 0) throw new Error(`no ${text} in the body`);
+	return at;
+}
+
+/** The body's blocks from the one holding the first `from` to the one holding the first `to`. */
+function over(leaf: Leaf, from: string, to = from): { replace: string[] } {
+	const start = offsetOf(leaf, from);
+	const end = offsetOf(leaf, to) + to.length;
+	const replace = leaf.doc
+		.blocks({})
+		.filter((b) => b.start < end && b.end > start)
+		.map((b) => b.id);
+	return { replace };
+}
+
+/** Beside the block holding the first `text`: before it where `text` opens the body, else
+ *  after it. */
+function beside(leaf: Leaf, text: string): { insert: BlockPlace } {
+	const at = offsetOf(leaf, text);
+	const blocks = leaf.doc.blocks({});
+	const block = blocks.find((b) => b.start <= at && at <= b.end)!;
+	return { insert: at === 0 ? { before: block.id } : { after: block.id } };
 }
 
 /** Put the caret a character into the first `text` of the body, in a focused leaf. */
@@ -109,83 +131,25 @@ const shownText = (el: HTMLElement): string =>
 const texts = (el: HTMLElement, selector: string): string[] =>
 	[...el.querySelectorAll(selector)].map((node) => node.textContent ?? '');
 
-describe('a change', () => {
-	it('marks the text its anchor covers, and nothing in the document', () => {
-		const leaf = leafOver('The plan was approved on Monday.');
-		leaf.anchor('~c1', 'approved');
-		const before = leaf.doc.toMarkdown();
-		leaf.field.setReview([{ id: 'r1', state: 'changed', anchor: '~c1' }]);
-		expect(texts(leaf.el, '.qm-review-changed')).toEqual(['approved']);
-		expect(leaf.field.reviewElements('r1').map((el) => el.textContent)).toEqual(['approved']);
-		expect(leaf.doc.toMarkdown()).toBe(before);
-	});
-
-	it('stands a wedge where its point anchor says text was removed', () => {
-		const leaf = leafOver('The plan was approved.');
-		leaf.anchor('~c1', 'approved', true);
-		leaf.field.setReview([{ id: 'r1', state: 'changed', anchor: '~c1' }]);
-		const wedge = leaf.el.querySelector('.qm-review-gone')!;
-		expect(wedge.getAttribute('aria-label')).toBe(DEFAULT_REVIEW_STRINGS.reviewGone);
-		expect(wedge.nextSibling?.textContent).toBe('approved.');
-		expect(leaf.el.querySelector('.ProseMirror')!.textContent).toBe(leaf.doc.main.body.text);
-	});
-
-	it('rides the edits made around it', () => {
-		const leaf = leafOver('The plan was approved.');
-		leaf.anchor('~c1', 'approved');
-		leaf.field.setReview([{ id: 'r1', state: 'changed', anchor: '~c1' }]);
-		const view = viewOf(leaf.field);
-		view.dispatch(view.state.tr.insertText('Yesterday ', 1));
-		expect(texts(leaf.el, '.qm-review-changed')).toEqual(['approved']);
-	});
-
-	it('draws nothing for an anchor the leaf does not hold, and says which it drew', () => {
-		const leaf = leafOver('The plan was approved.');
-		leaf.anchor('~c1', 'plan');
-		leaf.field.setReview([
-			{ id: 'r1', state: 'changed', anchor: '~c1' },
-			{ id: 'r2', state: 'changed', anchor: '~elsewhere' }
-		]);
-		expect(leaf.drawn.at(-1)).toEqual(['r1']);
-		expect(leaf.field.reviewElements('r2')).toEqual([]);
-		leaf.field.setReview([]);
-		expect(leaf.drawn.at(-1)).toEqual([]);
-		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
-	});
-
-	it('is drawn a step stronger while it is the lit one', () => {
-		const leaf = leafOver('The plan was approved.');
-		leaf.anchor('~c1', 'plan');
-		const items: TextReview[] = [{ id: 'r1', state: 'changed', anchor: '~c1' }];
-		leaf.field.setReview(items, 'r1');
-		expect(leaf.el.querySelector('.qm-review-changed.qm-review-lit')).not.toBeNull();
-		leaf.field.setReview(items);
-		expect(leaf.el.querySelector('.qm-review-lit')).toBeNull();
-	});
-});
-
 describe('a proposal', () => {
 	it('reads its paragraph as rewritten: the words that go struck, the words that come added', () => {
 		const leaf = leafOver('The quick brown fox jumps over the lazy dog.');
-		leaf.anchor('~p1', 'brown');
 		const after = 'The quick red fox leaps over the lazy dog.';
 		const before = leaf.doc.toMarkdown();
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after }]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'brown'), after }]);
 		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['brown', 'jumps']);
 		expect(texts(leaf.el, 'ins.qm-review-ins')).toEqual(['red', 'leaps']);
 		expect(proposedText(leaf.el)).toBe(after);
 		expect(leaf.doc.toMarkdown()).toBe(before);
 	});
 
-	it('covers the whole of every paragraph its anchor touches', () => {
+	it('covers the whole of every paragraph it names', () => {
 		const leaf = leafOver('First paragraph here.\n\nSecond paragraph here.\n\nThird stays.');
-		const { text } = leaf.doc.main.body;
-		leaf.field.insertAnchor('~p1', text.indexOf('here'), text.indexOf('Second') + 3);
 		leaf.field.setReview([
 			{
 				id: 'r1',
-				state: 'proposed',
-				anchor: '~p1',
+
+				...over(leaf, 'here', 'Second'),
 				after: 'First paragraph rewritten.\n\nSecond paragraph rewritten.'
 			}
 		]);
@@ -197,12 +161,11 @@ describe('a proposal', () => {
 
 	it('keeps the formatting the proposal carries on the words it adds', () => {
 		const leaf = leafOver('Submit the report by Friday.');
-		leaf.anchor('~p1', 'report');
 		leaf.field.setReview([
 			{
 				id: 'r1',
-				state: 'proposed',
-				anchor: '~p1',
+
+				...over(leaf, 'report'),
 				after: 'Submit the **signed** report by Friday.'
 			}
 		]);
@@ -211,9 +174,13 @@ describe('a proposal', () => {
 
 	it('strikes the stretch whose formatting alone would change', () => {
 		const leaf = leafOver('Submit the report by Friday.');
-		leaf.anchor('~p1', 'report');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Submit the **report** by Friday.' }
+			{
+				id: 'r1',
+
+				...over(leaf, 'report'),
+				after: 'Submit the **report** by Friday.'
+			}
 		]);
 		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['report']);
 		expect(leaf.el.querySelector('ins.qm-review-ins strong')?.textContent).toBe('report');
@@ -221,9 +188,13 @@ describe('a proposal', () => {
 
 	it('sets the paragraphs it adds in flow under the one it rewrites', () => {
 		const leaf = leafOver('Opening line.\n\nClosing line.');
-		leaf.anchor('~p1', 'Opening');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Opening line.\n\nA new middle.' }
+			{
+				id: 'r1',
+
+				...over(leaf, 'Opening'),
+				after: 'Opening line.\n\nA new middle.'
+			}
 		]);
 		const blocks = [...leaf.el.querySelector('.ProseMirror')!.children];
 		expect(blocks.map((b) => b.classList.contains('qm-review-add'))).toEqual([false, true, false]);
@@ -232,40 +203,35 @@ describe('a proposal', () => {
 
 	it('strikes a paragraph it would remove', () => {
 		const leaf = leafOver('Keep this.\n\nDrop this.');
-		leaf.anchor('~p1', 'Drop');
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: '' }]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'Drop'), after: '' }]);
 		expect(texts(leaf.el, 'del.qm-review-del').join('')).toBe('Drop this.');
 		expect(leaf.el.querySelector('.qm-review-out')?.textContent).toContain('Drop this.');
 	});
 
-	it('proposes new paragraphs after the one holding its point anchor', () => {
+	it('proposes new paragraphs after the one it names', () => {
 		const leaf = leafOver('Opening line.\n\nClosing line.');
-		leaf.anchor('~p1', 'line', true);
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Inserted.' }]);
+		leaf.field.setReview([{ id: 'r1', ...beside(leaf, 'line'), after: 'Inserted.' }]);
 		expect(proposedText(leaf.el)).toBe('Opening line.\nInserted.\nClosing line.');
 		expect(leaf.el.querySelector('del')).toBeNull();
 	});
 
-	it('proposes before the first paragraph where its point opens the leaf', () => {
+	it('proposes new paragraphs before the first', () => {
 		const leaf = leafOver('Opening line.');
-		leaf.anchor('~p1', 'Opening', true);
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'A preamble.' }]);
+		leaf.field.setReview([{ id: 'r1', ...beside(leaf, 'Opening'), after: 'A preamble.' }]);
 		expect(proposedText(leaf.el)).toBe('A preamble.\nOpening line.');
 	});
 
-	it('writes into the empty paragraph its point stands in', () => {
+	it('writes into the empty paragraph a leaf holds alone', () => {
 		const leaf = leafOver('');
-		leaf.field.insertAnchor('~p1', 0);
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'A first line.' }]);
+		leaf.field.setReview([{ id: 'r1', insert: 'end', after: 'A first line.' }]);
 		expect(leaf.el.querySelector('.ProseMirror')!.children).toHaveLength(1);
 		expect(texts(leaf.el, 'ins.qm-review-ins')).toEqual(['A first line.']);
 	});
 
 	it('adds an item to the list its paragraph is in, as an item of that list', () => {
 		const leaf = leafOver('- first item\n- second item');
-		leaf.anchor('~p1', 'second');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: '- second item\n- third item' }
+			{ id: 'r1', ...over(leaf, 'second'), after: '- second item\n- third item' }
 		]);
 		const list = leaf.el.querySelector('ul')!;
 		expect(leaf.el.querySelectorAll('ul')).toHaveLength(1);
@@ -276,19 +242,16 @@ describe('a proposal', () => {
 
 	it('replaces a paragraph it would turn into another kind of block, whole', () => {
 		const leaf = leafOver('A plain line.');
-		leaf.anchor('~p1', 'plain');
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: '# A heading' }]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'plain'), after: '# A heading' }]);
 		expect(texts(leaf.el, 'del.qm-review-del').join('')).toBe('A plain line.');
 		expect(leaf.el.querySelector('h1.qm-review-add')?.textContent).toContain('A heading');
 	});
 
 	it('gives a paragraph to the first proposal that names it', () => {
 		const leaf = leafOver('One paragraph only.');
-		leaf.anchor('~p1', 'One');
-		leaf.anchor('~p2', 'only');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'One paragraph, first.' },
-			{ id: 'r2', state: 'proposed', anchor: '~p2', after: 'One paragraph, second.' }
+			{ id: 'r1', ...over(leaf, 'One'), after: 'One paragraph, first.' },
+			{ id: 'r2', ...over(leaf, 'only'), after: 'One paragraph, second.' }
 		]);
 		expect(leaf.reports.at(-1)).toEqual({
 			ids: ['r1'],
@@ -300,13 +263,10 @@ describe('a proposal', () => {
 
 	it('gives a paragraph one proposal that rewrites it and one that adds after it', () => {
 		const leaf = leafOver('Opening line.\n\nClosing line.');
-		leaf.anchor('~p1', 'Opening');
-		leaf.anchor('~p2', 'line', true);
-		leaf.anchor('~p3', 'line', true);
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Opening sentence.' },
-			{ id: 'r2', state: 'proposed', anchor: '~p2', after: 'Added first.' },
-			{ id: 'r3', state: 'proposed', anchor: '~p3', after: 'Added second.' }
+			{ id: 'r1', ...over(leaf, 'Opening'), after: 'Opening sentence.' },
+			{ id: 'r2', ...beside(leaf, 'line'), after: 'Added first.' },
+			{ id: 'r3', ...beside(leaf, 'line'), after: 'Added second.' }
 		]);
 		expect(leaf.reports.at(-1)).toEqual({
 			ids: ['r1', 'r2'],
@@ -320,12 +280,11 @@ describe('a proposal', () => {
 		const leaf = leafOver(
 			'Approve the plan in full and direct the maintenance officer to submit monthly reports.'
 		);
-		leaf.anchor('~p1', 'plan');
 		leaf.field.setReview([
 			{
 				id: 'r1',
-				state: 'proposed',
-				anchor: '~p1',
+
+				...over(leaf, 'plan'),
 				after:
 					'Approve the plan in full. Direct the maintenance officer to submit **monthly** reports.'
 			}
@@ -344,9 +303,13 @@ describe('a proposal', () => {
 
 	it('takes away the formatting of a word it keeps, beside the words it rewrites', () => {
 		const leaf = leafOver('Submit the **signed** report by Friday.');
-		leaf.anchor('~p1', 'report');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Submit the signed report by Monday.' }
+			{
+				id: 'r1',
+
+				...over(leaf, 'report'),
+				after: 'Submit the signed report by Monday.'
+			}
 		]);
 		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['signed', 'Friday']);
 		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
@@ -357,10 +320,7 @@ describe('a proposal', () => {
 
 	it('draws nothing for a proposal that would write nothing, and says so', () => {
 		const leaf = leafOver('The quick brown fox.');
-		leaf.anchor('~p1', 'quick');
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick brown fox.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick brown fox.' }]);
 		expect(leaf.el.querySelector('.qm-review-chip, .qm-review-held')).toBeNull();
 		expect(leaf.reports.at(-1)?.undrawn).toEqual([{ id: 'r1', reason: 'applied' }]);
 	});
@@ -371,10 +331,7 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 	 *  of the first `at` in the body. */
 	function typed(text: string, at: string, from = 0, to = from): Leaf {
 		const leaf = leafOver('The quick brown fox.');
-		leaf.anchor('~p1', 'quick');
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red fox.' }]);
 		const view = viewOf(leaf.field);
 		const pos = 1 + leaf.doc.main.body.text.indexOf(at);
 		view.dispatch(view.state.tr.insertText(text, pos + from, pos + to));
@@ -416,9 +373,8 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 
 	it('gives the whole paragraph to the whole proposal where the reader rewrote past its words', () => {
 		const leaf = leafOver('Keep this. Second is proposed.');
-		leaf.anchor('~p1', 'Keep');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Keep this. Second, rewritten.' }
+			{ id: 'r1', ...over(leaf, 'Keep'), after: 'Keep this. Second, rewritten.' }
 		]);
 		const view = viewOf(leaf.field);
 		const at = 1 + leaf.doc.main.body.text.indexOf('Second');
@@ -439,13 +395,9 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 
 	it('reads the paragraph anew under a proposal that arrives with another text', () => {
 		const leaf = typed('Truly, ', 'The');
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red fox.' }]);
 		expect(marks(leaf)).toEqual([['brown'], ['red']]);
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The slow brown fox.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The slow brown fox.' }]);
 		expect(marks(leaf)).toEqual([['Truly, ', 'quick'], ['slow']]);
 	});
 });
@@ -473,9 +425,7 @@ describe('a proposal by blocks', () => {
 	it('rewrites the block it names, and no other', () => {
 		const leaf = leafOver('The quick brown fox.\n\nThe quick brown dog.');
 		const [, dog] = ids(leaf);
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', replace: [dog], after: 'The quick red dog.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', replace: [dog], after: 'The quick red dog.' }]);
 		expect(marks(leaf)).toEqual([['brown'], ['red']]);
 		expect(accept(leaf)).toBe('The quick brown fox.\nThe quick red dog.');
 	});
@@ -483,7 +433,7 @@ describe('a proposal by blocks', () => {
 	it('removes the blocks it names where it proposes nothing', () => {
 		const leaf = leafOver('Keep this.\n\nDrop this.\n\nAnd this.');
 		const [, drop, and] = ids(leaf);
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', replace: [drop, and], after: '' }]);
+		leaf.field.setReview([{ id: 'r1', replace: [drop, and], after: '' }]);
 		expect(accept(leaf)).toBe('Keep this.');
 	});
 
@@ -494,17 +444,15 @@ describe('a proposal by blocks', () => {
 		['at the end', () => 'end' as const, 'One.\nTwo.\nAdded.']
 	])('adds %s', (_where, insert, written) => {
 		const leaf = leafOver('One.\n\nTwo.');
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', insert: insert(ids(leaf)), after: 'Added.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', insert: insert(ids(leaf)), after: 'Added.' }]);
 		expect(accept(leaf)).toBe(written);
 	});
 
 	it('draws nothing where no block it names stands, and says why', () => {
 		const leaf = leafOver('One.');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', replace: ['gone'], after: 'Two.' },
-			{ id: 'r2', state: 'proposed', insert: { after: 'gone' }, after: 'Two.' }
+			{ id: 'r1', replace: ['gone'], after: 'Two.' },
+			{ id: 'r2', insert: { after: 'gone' }, after: 'Two.' }
 		]);
 		expect(leaf.el.querySelector('del, ins, .qm-review-chip, .qm-review-add')).toBeNull();
 		expect(leaf.reports.at(-1)?.undrawn).toEqual([
@@ -516,9 +464,7 @@ describe('a proposal by blocks', () => {
 	it('is outdated where a block it names is gone', () => {
 		const leaf = leafOver('One here.\n\nTwo here.');
 		const [one] = ids(leaf);
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', replace: [one, 'gone'], after: 'One there.\n\nTwo there.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', replace: [one, 'gone'], after: 'One there.\n\nTwo there.' }]);
 		expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
 	});
 
@@ -527,7 +473,7 @@ describe('a proposal by blocks', () => {
 		function arrive(live: string, before: string, after: string): Leaf {
 			const leaf = leafOver(live);
 			const [first] = ids(leaf);
-			leaf.field.setReview([{ id: 'r1', state: 'proposed', replace: [first], before, after }]);
+			leaf.field.setReview([{ id: 'r1', replace: [first], before, after }]);
 			return leaf;
 		}
 
@@ -569,7 +515,7 @@ describe('a proposal by blocks', () => {
 			leaf.field.setReview([
 				{
 					id: 'r1',
-					state: 'proposed',
+
 					replace: ids(leaf),
 					before: 'First here.\n\nSecond here.',
 					after: 'First and second here.'
@@ -608,14 +554,15 @@ describe('a proposal by blocks', () => {
 });
 
 describe('answering', () => {
+	/** `r1` open over the first paragraph, and `r2` taken over the second, drawn as its change. */
 	function proposal(): Leaf {
 		const leaf = leafOver('The quick brown fox.\n\nA second paragraph.');
-		leaf.anchor('~p1', 'brown');
-		leaf.anchor('~c1', 'second');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' },
-			{ id: 'r2', state: 'changed', anchor: '~c1' }
+			{ id: 'r1', ...over(leaf, 'brown'), after: 'The quick red fox.' },
+			{ id: 'r2', ...over(leaf, 'second'), after: 'A later paragraph.' }
 		]);
+		leaf.field.answerReview('r2', 'accept');
+		leaf.acts.length = 0;
 		return leaf;
 	}
 	it('a proposal carries its two buttons, named by the strings', () => {
@@ -641,7 +588,7 @@ describe('answering', () => {
 		const leaf = proposal();
 		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
 		expect(leaf.acts).toEqual([['r1', 'accept']]);
-		expect(leaf.doc.main.body.text).toBe('The quick red fox.\nA second paragraph.');
+		expect(leaf.doc.main.body.text).toBe('The quick red fox.\nA later paragraph.');
 		expect(leaf.el.querySelector('del, ins, .qm-review-chip')).toBeNull();
 	});
 
@@ -661,10 +608,7 @@ describe('answering', () => {
 
 	it('the accept chord takes a proposal over the task item it is in', () => {
 		const leaf = leafOver('- [ ] the quick brown fox');
-		leaf.anchor('~p1', 'brown');
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'the quick red fox' }
-		]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'brown'), after: 'the quick red fox' }]);
 		const view = viewOf(leaf.field);
 		let at = -1;
 		view.state.doc.descendants((node, pos) => {
@@ -677,25 +621,25 @@ describe('answering', () => {
 		expect(leaf.doc.toMarkdown()).toContain('- [ ] the quick red fox');
 	});
 
-	it('an answered item is drawn again only under a list that holds it anew', () => {
-		const leaf = proposal();
-		const items: TextReview[] = [{ id: 'r2', state: 'changed', anchor: '~c1' }];
+	it('a dismissed item is drawn again only under a list that holds it anew', () => {
+		const leaf = leafOver('The quick brown fox.');
+		const items: TextReview[] = [{ id: 'r1', ...over(leaf, 'brown'), after: 'The quick red fox.' }];
 		leaf.field.setReview(items);
-		caretIn(leaf, 'second');
+		caretIn(leaf, 'quick');
 		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.el.querySelector('.qm-review-changed')).toBeNull();
+		expect(leaf.el.querySelector('.qm-review-chip')).toBeNull();
 		leaf.field.setReview([]);
 		leaf.field.setReview([...items]);
-		expect(leaf.el.querySelector('.qm-review-changed')).not.toBeNull();
+		expect(leaf.el.querySelector('.qm-review-chip')).not.toBeNull();
 	});
 
-	it('the reject chord takes back the change the caret is in, and the accept chord passes', () => {
+	it('the reject chord takes back the accepted change the caret is in, and the accept chord passes', () => {
 		const leaf = proposal();
-		caretIn(leaf, 'second');
+		caretIn(leaf, 'later');
 		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.accept), mod);
 		expect(leaf.acts).toEqual([]);
 		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.acts).toEqual([['r2', 'revert']]);
+		expect(leaf.acts).toEqual([['r2', 'reopen']]);
 	});
 
 	it('a pressed Accept leaves the caret after what landed, in a focused leaf', () => {
@@ -708,15 +652,13 @@ describe('answering', () => {
 		expect($head.parent.textBetween(0, $head.parentOffset)).toBe('The quick red');
 	});
 
-	it('a pressed Accept keeps the caret after what landed through the host lifting its anchor', () => {
+	it('a pressed Accept keeps the caret after what landed through a refresh', () => {
 		const leaf = leafOver('- first item\n- second item\n\nAfter.');
-		leaf.anchor('~p1', 'second');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: '- second item\n- third item' }
+			{ id: 'r1', ...over(leaf, 'second'), after: '- second item\n- third item' }
 		]);
 		const view = viewOf(leaf.field);
 		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
-		leaf.doc.apply({}, { steps: [{ anchor: { id: '~p1', remove: true } }] });
 		leaf.field.applyExternal();
 		const { $head } = view.state.selection;
 		expect($head.parent.textBetween(0, $head.parentOffset)).toBe('third item');
@@ -724,41 +666,47 @@ describe('answering', () => {
 
 	it('a pressed Accept leaves the caret the reader holds where it is', () => {
 		const leaf = proposal();
-		caretIn(leaf, 'second');
+		caretIn(leaf, 'later');
 		const view = viewOf(leaf.field);
 		const before = view.state.selection.$head.parentOffset;
 		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
 		const { $head } = view.state.selection;
-		expect($head.parent.textContent).toBe('A second paragraph.');
+		expect($head.parent.textContent).toBe('A later paragraph.');
 		expect($head.parentOffset).toBe(before);
 	});
 
 	it('answers a proposal that only adds from anywhere in the paragraph it adds after', () => {
 		const leaf = leafOver('Opening line.\n\nClosing line.');
-		leaf.anchor('~p1', 'line', true);
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'Inserted.' }]);
+		leaf.field.setReview([{ id: 'r1', ...beside(leaf, 'line'), after: 'Inserted.' }]);
 		caretIn(leaf, 'Opening');
 		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
 		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.accept), mod);
 		expect(leaf.doc.main.body.text).toBe('Opening line.\nInserted.\nClosing line.');
 	});
 
-	it('gives the caret to the change inside a paragraph a proposal covers', () => {
+	it('gives the caret to the accepted change inside a paragraph a proposal covers', () => {
 		const within = (): Leaf => {
 			const leaf = leafOver('The quick brown fox.');
-			leaf.anchor('~p1', 'brown');
-			leaf.anchor('~c1', 'fox');
+			const change: TextReview = {
+				id: 'r2',
+
+				...over(leaf, 'fox'),
+				after: 'The quick brown cat.'
+			};
+			leaf.field.setReview([change]);
+			leaf.field.answerReview('r2', 'accept');
+			leaf.acts.length = 0;
 			leaf.field.setReview([
-				{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' },
-				{ id: 'r2', state: 'changed', anchor: '~c1' }
+				{ id: 'r1', ...over(leaf, 'brown'), after: 'The quick red cat.' },
+				change
 			]);
-			caretIn(leaf, 'fox');
+			caretIn(leaf, 'cat');
 			return leaf;
 		};
 		const back = within();
 		expect(back.points.at(-1)).toEqual(['r2', 'caret']);
 		press(viewOf(back.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(back.acts).toEqual([['r2', 'revert']]);
+		expect(back.acts).toEqual([['r2', 'reopen']]);
 
 		const taken = within();
 		press(viewOf(taken.field), keyOf(REVIEW_KEYS.accept), mod);
@@ -767,7 +715,7 @@ describe('answering', () => {
 
 	it('Escape lowers the card of an item the leaf draws, and is the leaf’s own key otherwise', () => {
 		const leaf = proposal();
-		caretIn(leaf, 'second');
+		caretIn(leaf, 'later');
 		const view = viewOf(leaf.field);
 		leaf.shown = 'r2';
 		press(view, 'Escape');
@@ -780,22 +728,18 @@ describe('answering', () => {
 
 	it('answers the item the caret was put into, of two that share a paragraph', () => {
 		const leaf = leafOver('Opening line.\n\nSecond is proposed.');
-		leaf.anchor('~a', 'Second');
-		leaf.anchor('~b', 'proposed', true);
 		leaf.field.setReview([
-			{ id: 'A', state: 'proposed', anchor: '~a', after: 'Second, rewritten.' },
-			{ id: 'B', state: 'proposed', anchor: '~b', after: 'Added after.' }
+			{ id: 'A', ...over(leaf, 'Second'), after: 'Second, rewritten.' },
+			{ id: 'B', ...beside(leaf, 'proposed'), after: 'Added after.' }
 		]);
 		caretIn(leaf, 'Second');
 		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.dismiss), mod);
 		expect(leaf.acts).toEqual([['A', 'dismiss']]);
 
 		const entered = leafOver('Opening line.\n\nSecond is proposed.');
-		entered.anchor('~a', 'Second');
-		entered.anchor('~b', 'proposed', true);
 		entered.field.setReview([
-			{ id: 'A', state: 'proposed', anchor: '~a', after: 'Second, rewritten.' },
-			{ id: 'B', state: 'proposed', anchor: '~b', after: 'Added after.' }
+			{ id: 'A', ...over(entered, 'Second'), after: 'Second, rewritten.' },
+			{ id: 'B', ...beside(entered, 'proposed'), after: 'Added after.' }
 		]);
 		expect(entered.field.enterReview('B')).toBe(true);
 		press(viewOf(entered.field), keyOf(REVIEW_KEYS.accept), mod);
@@ -811,7 +755,7 @@ describe('answering', () => {
 		expect(view.hasFocus()).toBe(true);
 		expect(leaf.points.at(-1)).toEqual(['r2', 'caret']);
 		press(view, keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.acts).toEqual([['r2', 'revert']]);
+		expect(leaf.acts).toEqual([['r2', 'reopen']]);
 		expect(leaf.field.enterReview('nowhere')).toBe(false);
 	});
 
@@ -824,7 +768,7 @@ describe('answering', () => {
 
 	it('reports the item the caret arrives in, and holds off while the reader types in it', () => {
 		const leaf = proposal();
-		caretIn(leaf, 'second');
+		caretIn(leaf, 'later');
 		expect(leaf.points.at(-1)).toEqual(['r2', 'caret']);
 		const view = viewOf(leaf.field);
 		view.dispatch(view.state.tr.insertText('x'));
@@ -833,7 +777,7 @@ describe('answering', () => {
 		view.dispatch(view.state.tr.insertText('y'));
 		expect(leaf.points).toHaveLength(said);
 		caretIn(leaf, 'paragraph');
-		caretIn(leaf, 'second');
+		caretIn(leaf, 'later');
 		expect(leaf.points.at(-1)).toEqual(['r2', 'caret']);
 	});
 
@@ -848,13 +792,12 @@ describe('answering', () => {
 });
 
 describe('taking a proposal', () => {
-	/** Lay `after` over the paragraphs from `from` to `to`, or at a point before `from`, and take it. */
+	/** Propose `after` over the paragraphs from `from` to `to`, or beside the one holding `from`,
+	 *  and take it. */
 	function take(markdown: string, after: string, from: string, to?: string | true): Leaf {
 		const leaf = leafOver(markdown);
-		const { text } = leaf.doc.main.body;
-		if (to === true) leaf.anchor('~p1', from, true);
-		else leaf.field.insertAnchor('~p1', text.indexOf(from), text.indexOf(to ?? from) + 1);
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after }]);
+		const at = to === true ? beside(leaf, from) : over(leaf, from, to ?? from);
+		leaf.field.setReview([{ id: 'r1', ...at, after }]);
 		const drawn = proposedText(leaf.el);
 		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
 		expect(leaf.acts).toEqual([['r1', 'accept']]);
@@ -979,10 +922,7 @@ describe('taking a proposal', () => {
 
 	it('is opened again after a dismissal, and says so', () => {
 		const leaf = leafOver('The quick brown fox.');
-		leaf.anchor('~p1', 'quick');
-		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' }
-		]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red fox.' }]);
 		leaf.el.querySelector<HTMLElement>('.qm-review-dismiss')!.click();
 		expect(leaf.el.querySelector('.qm-review-chip')).toBeNull();
 		leaf.field.reopenReview('r1');
@@ -995,11 +935,10 @@ describe('taking a proposal', () => {
 
 	it('is opened again after a dismissal the host took off its list', () => {
 		const leaf = leafOver('The quick brown fox.');
-		leaf.anchor('~p1', 'quick');
 		const item = {
 			id: 'r1',
-			state: 'proposed',
-			anchor: '~p1',
+
+			...over(leaf, 'quick'),
 			after: 'The quick red fox.'
 		} as const;
 		leaf.field.setReview([item]);
@@ -1026,14 +965,20 @@ describe('taking a proposal', () => {
 
 	it('keeps the marks the reader’s paragraph holds outside the words it rewrites', () => {
 		const leaf = leafOver('The quick brown fox.');
-		leaf.anchor('~p1', 'brown');
-		leaf.anchor('~c1', 'fox');
+		const change: TextReview = {
+			id: 'r2',
+
+			...over(leaf, 'fox'),
+			after: 'The quick brown cat.'
+		};
+		leaf.field.setReview([change]);
+		leaf.field.answerReview('r2', 'accept');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' },
-			{ id: 'r2', state: 'changed', anchor: '~c1' }
+			{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red cat.' },
+			change
 		]);
 		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
-		expect(texts(leaf.el, '.qm-review-changed')).toEqual(['red', 'fox']);
+		expect(texts(leaf.el, '.qm-review-changed')).toEqual(['red', 'cat']);
 	});
 });
 
@@ -1041,11 +986,9 @@ describe('a taken proposal the host still lists', () => {
 	/** Two paragraphs, each with a proposal over its second word, both taken. */
 	function both(): Leaf {
 		const leaf = leafOver('The quick brown fox.\n\nA slow grey cat.');
-		leaf.anchor('~p1', 'quick');
-		leaf.anchor('~p2', 'slow');
 		leaf.field.setReview([
-			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'The quick red fox.' },
-			{ id: 'r2', state: 'proposed', anchor: '~p2', after: 'A slow **black** cat.' }
+			{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red fox.' },
+			{ id: 'r2', ...over(leaf, 'slow'), after: 'A slow **black** cat.' }
 		]);
 		leaf.field.answerReview('r1', 'accept');
 		leaf.field.answerReview('r2', 'accept');
@@ -1135,12 +1078,7 @@ describe('a taken proposal the host still lists', () => {
 
 	it('stands a wedge where it took a paragraph out, and puts the paragraph back', () => {
 		const leaf = leafOver('Keep this.\n\nDrop this.');
-		leaf.field.insertAnchor(
-			'~p1',
-			leaf.doc.main.body.text.indexOf('Drop'),
-			leaf.doc.main.body.text.length
-		);
-		leaf.field.setReview([{ id: 'r1', state: 'proposed', anchor: '~p1', after: '' }]);
+		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'Drop'), after: '' }]);
 		leaf.field.answerReview('r1', 'accept');
 		expect(leaf.doc.main.body.text).toBe('Keep this.');
 		expect(leaf.el.querySelectorAll('.qm-review-gone')).toHaveLength(1);
@@ -1166,23 +1104,5 @@ describe('a taken proposal the host still lists', () => {
 		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['grey']);
 		redo(view.state, view.dispatch);
 		expect(texts(leaf.el, '.qm-review-changed')).toEqual(['red', 'black']);
-	});
-});
-
-describe('a text leaf', () => {
-	it('holds no anchors, so draws no review', () => {
-		const doc = example();
-		const el = mount();
-		const field = createField({
-			doc,
-			quill: quill(),
-			addr: { field: 'title' },
-			container: el,
-			plaintext: true,
-			inline: true
-		});
-		open.push(field);
-		field.setReview([{ id: 'r1', state: 'changed', anchor: '~c1' }]);
-		expect(field.reviewElements('r1')).toEqual([]);
 	});
 });

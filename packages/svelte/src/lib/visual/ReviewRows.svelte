@@ -8,7 +8,7 @@
 <script lang="ts">
 	import type { PathStep } from '@quillmark/wasm';
 	import ReviewProposal from './ReviewProposal.svelte';
-	import { valueIn, type DeepReview } from './review.js';
+	import { isChange, valueIn, type DeepReview } from './review.js';
 	import { review } from './review.svelte.js';
 	import { wording } from './strings.js';
 	import { humanize } from './structure.js';
@@ -36,7 +36,7 @@
 </script>
 
 {#each entries ?? [] as { steps, item } (item.id)}
-	{#if item.state === 'proposed'}
+	{#if !isChange(item)}
 		<ReviewProposal
 			{item}
 			value={valueIn(value, steps)}

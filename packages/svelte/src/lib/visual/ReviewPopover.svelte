@@ -124,7 +124,7 @@
 							class="qm-chip qm-review-undo qm-focus-ring"
 							title={t.strings.reviewUndoTitle}
 							onmousedown={(e) => e.preventDefault()}
-							onclick={() => shown && review.act(shown.item.id, 'revert')}
+							onclick={() => shown && review.act(shown.item.id, 'reopen')}
 							>{t.strings.reviewUndo}</button
 						>
 					</div>

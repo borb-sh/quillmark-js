@@ -115,21 +115,19 @@ export interface VisualEditorProps {
 	 */
 	formatDiagnostic?: FormatDiagnostic;
 	/**
-	 * What someone other than the reader changed, and what one proposes, for the editor to
-	 * draw where each item sits ({@link ReviewItem}): a line under changed words and a card
-	 * with what they replaced, a proposal as a word-level edit of its own paragraph with
-	 * Accept and Dismiss at its end, a field's change on its control and a proposed value
-	 * under it. Declarative: the editor draws the list it is handed and writes nothing for
-	 * it, so an item leaves the page when the host takes it off the list.
+	 * What someone other than the reader proposes, for the editor to draw where each item sits
+	 * ({@link ReviewItem}): a proposal as a word-level edit of its own blocks with Accept and
+	 * Dismiss at its end, a field's proposed value under its control, and one accepted as the
+	 * change it made with a card holding what it replaced. Declarative: the host sets the list
+	 * once and clears it once, and the editor draws every answer while the list holds the
+	 * item.
 	 */
 	review?: readonly ReviewItem[];
 	/**
 	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-.` with the caret or the
 	 * focus in it, or a host's `answerReview`; or undid an answer, with ⌘Z or an accepted
-	 * change's Undo, `reopen`. The host makes the write a `revert` asks for and tells the editor
-	 * (`applyExternal`, `refresh`), takes a dismissed item off `review` with its anchor left in
-	 * place, leaves an accepted one on for as long as its change should stay marked, and puts a
-	 * reopened one back.
+	 * change's Undo, `reopen`. The editor has made every write an answer asks for and draws it,
+	 * so the host leaves `review` as it set it.
 	 */
 	onReview?: (event: ReviewEvent) => void;
 	/**

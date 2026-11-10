@@ -40,21 +40,16 @@ function kept(items: (doc: Document) => ReviewItem[], listed = true): Kept {
 	return { ...mounted, doc, events, drawn };
 }
 
-/** Lay anchor `id` over the second word of the body. */
-function anchor(doc: Document, id: string): void {
-	const text = doc.main.body.text;
-	const word = text.split(' ')[1];
-	const at = text.indexOf(word);
-	doc.apply({}, { steps: [{ anchor: { id, start: at, end: at + word.length } }] });
+/** The first block of a rich text field, or of the body, as the place a proposal replaces. */
+function first(doc: Document, field?: string): { field: string; replace: string[] } {
+	const addr = field ? { field } : {};
+	return { field: doc.pathFor(addr), replace: [doc.blocks(addr)[0].id] };
 }
 
-const pair = (doc: Document): ReviewItem[] => {
-	anchor(doc, '~a');
-	return [
-		{ id: 'A', state: 'proposed', anchor: '~a', after: 'The body, proposed.' },
-		{ id: 'F', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
-	];
-};
+const pair = (doc: Document): ReviewItem[] => [
+	{ id: 'A', ...first(doc), after: 'The body, proposed.' },
+	{ id: 'F', field: doc.pathFor('columns'), after: 2 }
+];
 
 describe('an accepted proposal still listed', () => {
 	it('draws as the change it made, in text and in a field, and is reported as accepted', async () => {

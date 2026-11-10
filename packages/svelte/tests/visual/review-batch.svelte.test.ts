@@ -43,16 +43,15 @@ function batch(items: (doc: Document) => ReviewItem[], advance?: boolean): Batch
 	return { ...mounted, doc, events, drawn, lit };
 }
 
-/** Lay anchor `id` over the `n`th word of a rich text field's text, or of the body's. */
-function anchor(doc: Document, field: string | undefined, id: string, n: number): void {
-	const text = field
-		? (doc.getStored(field) as { text: string }).text
-		: (doc.main.body.text as string);
-	const word = text.split(' ')[n];
-	const at = text.indexOf(word);
-	doc.apply(field ? { field } : {}, {
-		steps: [{ anchor: { id, start: at, end: at + word.length } }]
-	});
+/** The `n`th block of a rich text field, or of the body: its path and its id. */
+function block(doc: Document, field?: string, n = 0): { field: string; id: string } {
+	const addr = field ? { field } : {};
+	return { field: doc.pathFor(addr), id: doc.blocks(addr)[n].id };
+}
+/** A proposal rewriting the `n`th block of a rich text field, or of the body, to `after`. */
+function over(doc: Document, id: string, after: string, field?: string, n = 0): ReviewItem {
+	const at = block(doc, field, n);
+	return { id, field: at.field, replace: [at.id], after };
 }
 
 /** The ids by where their first element stands in the page. */
@@ -66,15 +65,11 @@ function pageOrder(target: HTMLElement, ids: readonly string[]): string[] {
 	);
 }
 
-const spread = (doc: Document): ReviewItem[] => {
-	anchor(doc, undefined, '~b', 1);
-	anchor(doc, 'abstract', '~a', 1);
-	return [
-		{ id: 'body', state: 'proposed', anchor: '~b', after: 'A body line, proposed.' },
-		{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
-		{ id: 'abs', state: 'proposed', anchor: '~a', after: 'An abstract, proposed.' }
-	];
-};
+const spread = (doc: Document): ReviewItem[] => [
+	over(doc, 'body', 'A body line, proposed.'),
+	{ id: 'cols', field: doc.pathFor('columns'), after: 2 },
+	over(doc, 'abs', 'An abstract, proposed.', 'abstract')
+];
 
 describe('the drawn report', () => {
 	it('names the open items in the order the page shows them, across leaves and fields', async () => {
@@ -88,21 +83,25 @@ describe('the drawn report', () => {
 
 	it('says why each item it does not draw is not drawn', async () => {
 		const r = batch((doc) => {
-			anchor(doc, undefined, '~b', 1);
-			const body = doc.main.body.text as string;
-			const first = body.split('\n')[0];
+			const first = doc.blocks({})[0].markdown;
 			return [
-				{ id: 'nowhere', state: 'proposed', anchor: '~gone', after: 'Anything.' },
+				{
+					id: 'nowhere',
+
+					field: doc.pathFor({}),
+					replace: ['gone'],
+					after: 'Anything.'
+				},
 				{
 					id: 'inside',
-					state: 'proposed',
+
 					field: `${doc.pathFor('contact')}.no_such_cell`,
 					after: 'a@b.c'
 				},
-				{ id: 'unknown', state: 'proposed', field: 'main.no_such_field', after: 1 },
-				{ id: 'first', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
-				{ id: 'second', state: 'proposed', field: doc.pathFor('columns'), after: 3 },
-				{ id: 'same', state: 'proposed', anchor: '~b', after: first }
+				{ id: 'unknown', field: 'main.no_such_field', after: 1 },
+				{ id: 'first', field: doc.pathFor('columns'), after: 2 },
+				{ id: 'second', field: doc.pathFor('columns'), after: 3 },
+				over(doc, 'same', first)
 			];
 		});
 		await settle();
@@ -112,7 +111,7 @@ describe('the drawn report', () => {
 			open: ['first'],
 			outdated: [],
 			undrawn: [
-				{ id: 'nowhere', reason: 'anchor' },
+				{ id: 'nowhere', reason: 'block' },
 				{ id: 'inside', reason: 'field' },
 				{ id: 'unknown', reason: 'field' },
 				{ id: 'second', reason: 'taken' },
@@ -129,7 +128,7 @@ describe('a proposal by blocks', () => {
 		return [
 			{
 				id: 'body',
-				state: 'proposed',
+
 				field: doc.pathFor({}),
 				replace: [first.id],
 				before: first.markdown,
@@ -137,13 +136,13 @@ describe('a proposal by blocks', () => {
 			},
 			{
 				id: 'abs',
-				state: 'proposed',
+
 				field: doc.pathFor('abstract'),
 				insert: 'end',
 				after: 'Appended.'
 			},
-			{ id: 'lost', state: 'proposed', field: doc.pathFor({}), replace: ['nope'], after: 'X.' },
-			{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), before: 5, after: 2 }
+			{ id: 'lost', field: doc.pathFor({}), replace: ['nope'], after: 'X.' },
+			{ id: 'cols', field: doc.pathFor('columns'), before: 5, after: 2 }
 		];
 	};
 
@@ -170,18 +169,11 @@ describe('a proposal by blocks', () => {
 
 describe('answering by the host', () => {
 	it('answers every item drawn, one event each, and leaves the focus where it was', async () => {
-		const r = batch((doc) => {
-			anchor(doc, undefined, '~b1', 1);
-			const body = doc.main.body.text as string;
-			const second = body.split('\n')[1].split(' ')[1];
-			const at = body.indexOf(second, body.indexOf('\n'));
-			doc.apply({}, { steps: [{ anchor: { id: '~b2', start: at, end: at + second.length } }] });
-			return [
-				{ id: 'p1', state: 'proposed', anchor: '~b1', after: 'The first, proposed.' },
-				{ id: 'p2', state: 'proposed', anchor: '~b2', after: 'The second, proposed.' },
-				{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), after: 2 }
-			];
-		});
+		const r = batch((doc) => [
+			over(doc, 'p1', 'The first, proposed.'),
+			over(doc, 'p2', 'The second, proposed.', undefined, 1),
+			{ id: 'cols', field: doc.pathFor('columns'), after: 2 }
+		]);
 		await settle();
 		const outside = document.createElement('button');
 		document.body.append(outside);
@@ -197,16 +189,15 @@ describe('answering by the host', () => {
 		outside.remove();
 	});
 
-	it('passes over a change when it dismisses them all, as it does when it accepts', async () => {
-		const r = batch((doc) => {
-			anchor(doc, undefined, '~c', 1);
-			anchor(doc, undefined, '~p', 3);
-			return [
-				{ id: 'c1', state: 'changed', anchor: '~c', before: 'was' },
-				{ id: 'p1', state: 'proposed', anchor: '~p', after: 'A proposed line.' }
-			];
-		});
+	it('passes over an accepted proposal when it dismisses them all', async () => {
+		const r = batch((doc) => [
+			over(doc, 'c1', 'An accepted line.'),
+			over(doc, 'p1', 'A proposed line.', undefined, 3)
+		]);
 		await settle();
+		expect(r.editor.answerReview(['c1'], 'accept')).toEqual(['c1']);
+		await settle();
+		r.events.length = 0;
 		const body = r.doc.main.body.text;
 		expect(r.editor.answerReview('all', 'dismiss')).toEqual(['p1']);
 		flushSync();
@@ -230,12 +221,16 @@ describe('stepping', () => {
 
 	it('steps to a proposal that adds after a paragraph another proposal rewrites, and answers it', async () => {
 		const r = batch((doc) => {
-			anchor(doc, undefined, '~a', 1);
-			const at = (doc.main.body.text as string).indexOf(' ');
-			doc.apply({}, { steps: [{ anchor: { id: '~p', start: at, end: at } }] });
+			const first = block(doc);
 			return [
-				{ id: 'A', state: 'proposed', anchor: '~a', after: 'A rewrite.' },
-				{ id: 'B', state: 'proposed', anchor: '~p', after: 'Added after.' }
+				over(doc, 'A', 'A rewrite.'),
+				{
+					id: 'B',
+
+					field: first.field,
+					insert: { after: first.id },
+					after: 'Added after.'
+				}
 			];
 		});
 		await settle();

@@ -1,14 +1,14 @@
-// Review, drawn in the leaf's own flow: what a writer other than the reader changed here, and what
-// one proposes to change. An item names an anchor the leaf holds, so its place is the document's
-// and rides every edit; nothing is measured from outside the view.
+// Review, drawn in the leaf's own flow: what a writer other than the reader proposes to change
+// here, and what of it the reader took. An item names blocks by the ids the leaf's nodes carry, so
+// its place is the document's and rides every edit; nothing is measured from outside the view.
 //
-// A change is a mark over the text that was written, or a wedge where text was only taken out. A
-// proposal is the paragraph it would rewrite, read as an edit of itself: the words that would go
+// A proposal is the paragraph it would rewrite, read as an edit of itself: the words that would go
 // struck, the words that would come tinted in their place, and what it adds beyond the paragraph
 // set in flow under it. None of it enters the document while it is proposed: the struck words are
-// the leaf's own text under a decoration, and every added word is a widget.
+// the leaf's own text under a decoration, and every added word is a widget. A proposal taken is a
+// mark over the text it wrote, or a wedge where it only took text out.
 //
-// A proposal is an edit of the paragraph as it stood when the proposal arrived. What the reader
+// A proposal is an edit of the paragraph as its writer read it, or as it stood when it arrived. What the reader
 // writes in the paragraph since is theirs: the proposal's stretches ride past it, and only the
 // words it would rewrite are struck, as the reader has them now.
 //
@@ -41,16 +41,13 @@ import { wordDiff, type DiffHunk } from './review-diff.js';
 import { REVIEW_KEYS } from './shortcuts.js';
 
 /**
- * One item of review over a prose leaf, by the anchor or the blocks that place it.
+ * One proposal over a prose leaf, by the blocks that place it.
  *
- * `changed` marks the anchor's range as written by someone else; a point anchor marks where text
- * was only removed. `proposed` reads the paragraphs it covers as rewritten to `after`, Markdown,
- * where `''` proposes their removal. It covers the blocks `replace` names by id, or the paragraphs
- * its anchor touches. Its blocks pair with the paragraphs in order, each drawn as an edit of the one
+ * It reads the blocks `replace` names by id as rewritten to `after`, Markdown, where `''`
+ * proposes their removal. Its blocks pair with the paragraphs in order, each drawn as an edit of the one
  * it pairs with while the two are one kind of block; past the first that is not, the paragraphs
  * left are struck whole and the blocks left are added after the outermost block holding the last
- * paragraph, or as the next items of its list. One that names where it adds, by `insert` or a
- * point anchor, proposes new blocks the same way after the block it names, or before the leaf's
+ * paragraph, or as the next items of its list. One that names where it adds, by `insert`, proposes new blocks the same way after the block it names, or before the leaf's
  * first; in a leaf that holds one empty paragraph it proposes that paragraph's text. A paragraph
  * takes one proposal that rewrites it and one that adds after it, and a later item of either kind
  * naming it draws nothing.
@@ -60,20 +57,16 @@ import { REVIEW_KEYS } from './shortcuts.js';
  * an edit of the blocks as they stood when the leaf first drew it.
  */
 export type TextReview =
-	| { id: string; state: 'changed'; anchor: string }
-	| { id: string; state: 'proposed'; anchor: string; after: string }
-	| { id: string; state: 'proposed'; replace: readonly string[]; before?: string; after: string }
-	| { id: string; state: 'proposed'; insert: BlockPlace; after: string };
+	| { id: string; replace: readonly string[]; before?: string; after: string }
+	| { id: string; insert: BlockPlace; after: string };
 
 /** Where a proposal adds blocks: after or before the block with the id, or at the leaf's end. */
 export type BlockPlace = { after: string } | { before: string } | 'end';
 
-type TextProposal = Extract<TextReview, { state: 'proposed' }>;
-
-/** What a reader did with an item: took a proposal, which the leaf has written by the time it
- *  says so, turned one down, asked for a change back, or undid an answer, so the item is open
- *  again with whatever was written for it taken back. */
-export type ReviewAction = 'accept' | 'dismiss' | 'revert' | 'reopen';
+/** What a reader did with a proposal: took it, which the leaf has written by the time it says
+ *  so, turned it down, or undid an answer, so the item is open again with whatever was written
+ *  for it taken back. */
+export type ReviewAction = 'accept' | 'dismiss' | 'reopen';
 
 /** What brought an item under attention: the pointer over it, or the caret in it. */
 export type ReviewVia = 'pointer' | 'caret';
@@ -139,8 +132,8 @@ export interface ReviewReport {
 	/** The drawn proposals the reader's own writing meets: words both changed, or a block one
 	 *  names gone or no longer the block it read. */
 	outdated: readonly string[];
-	/** The items the leaf holds and does not draw, each with why: by its anchor, or by the
-	 *  blocks it names, which only the leaf holding its field is handed. */
+	/** The items the leaf holds and does not draw, each with why: by the blocks it names,
+	 *  which only the leaf holding its field is handed. */
 	undrawn: readonly { id: string; reason: LeafUndrawn }[];
 	/** The drawn proposals taken here and still listed, drawn as changes, each with the text
 	 *  that stood where it wrote. */
@@ -189,6 +182,9 @@ interface ReviewState {
 	entered: string | undefined;
 	/** The accepts an undo or a redo took back or gave again, for the plugin view to report. */
 	replayed: readonly { id: string; to: 'accept' | undefined }[];
+	/** The id the store gave each block it took again under a new one, by the id it had: a
+	 *  block an undo puts back is the block a proposal named. */
+	renamed: ReadonlyMap<string, string>;
 }
 
 /** What a transaction tells the review state: an answer given or taken back, the ids of
@@ -197,9 +193,24 @@ interface ReviewMeta {
 	answer?: { id: string; to: Answer | undefined };
 	prune?: readonly string[];
 	entered?: string;
+	renamed?: readonly (readonly [string, string])[];
 }
 
 const reviewKey = new PluginKey<ReviewState>('quill-review');
+
+/** Tell the review layer the store took blocks under new ids, each `[was, now]`. */
+export function renameBlocks(
+	tr: Transaction,
+	renamed: readonly (readonly [string, string])[]
+): void {
+	if (renamed.length) tr.setMeta(reviewKey, { renamed } satisfies ReviewMeta);
+}
+
+/** The id the block once named `id` stands under now. */
+function nowOf(renamed: ReadonlyMap<string, string>, id: string): string {
+	for (let hops = 0; hops < renamed.size && renamed.has(id); hops++) id = renamed.get(id)!;
+	return id;
+}
 
 /**
  * Taking a proposal, as a step of the transaction that writes it. It changes no content, and it
@@ -294,6 +305,7 @@ function applyReview(tr: Transaction, state: ReviewState): ReviewState {
 	const meta = tr.getMeta(reviewKey) as ReviewMeta | undefined;
 	if (meta?.answer) next = answering(next, meta.answer.id, meta.answer.to);
 	for (const id of meta?.prune ?? []) next = answering(next, id, undefined);
+	if (meta?.renamed) next = { ...next, renamed: new Map([...next.renamed, ...meta.renamed]) };
 	if (meta?.entered !== undefined) next = { ...next, entered: meta.entered };
 	else if (next.entered !== undefined && (tr.docChanged || tr.selectionSet))
 		next = { ...next, entered: undefined };
@@ -736,11 +748,8 @@ function lastLine(el: HTMLElement): HTMLElement | undefined {
 }
 
 /** The blocks a proposal covered when it arrived, by its id, with the `after` it then held and
- *  the anchor or the blocks that placed it. */
-type Bases = Map<
-	string,
-	{ after: string; place: { anchor: string } | { blocks: string[] }; blocks: readonly PMNode[] }
->;
+ *  the ids of the blocks that placed it. */
+type Bases = Map<string, { after: string; place: readonly string[]; blocks: readonly PMNode[] }>;
 
 /** The id of the stored block a leaf decodes from: a block island's own, any other's `id`. */
 function blockOf(node: PMNode): string {
@@ -748,8 +757,8 @@ function blockOf(node: PMNode): string {
 }
 
 /** Where a proposal stands among the leaves: the ones it rewrites, the one it adds after, and
- *  whether it adds ahead of them all. `missing` where a block it names is gone. `undefined`
- *  for an anchor the leaf does not hold, `'gone'` where no block it names stands. */
+ *  whether it adds ahead of them all. `missing` where a block it names is gone, `'gone'` where
+ *  no block it names stands. */
 interface Place {
 	cover: number[];
 	beside: number;
@@ -758,62 +767,34 @@ interface Place {
 }
 
 function placeOf(
-	item: TextProposal,
+	item: TextReview,
 	leaves: readonly Leaf[],
-	anchors: ReadonlyMap<string, AnchorPos>
-): Place | 'gone' | undefined {
-	const index = (id: string): number => leaves.findIndex((leaf) => blockOf(leaf.node) === id);
-	// A leaf of one empty paragraph is filled by what is added to it.
-	const empty = (i: number): boolean =>
-		leaves.length === 1 && leaves[i].node.isTextblock && !leaves[i].node.content.size;
+	now: (id: string) => string
+): Place | 'gone' {
+	const index = (id: string): number => leaves.findIndex((leaf) => blockOf(leaf.node) === now(id));
 	if ('replace' in item) {
-		const named = new Set(item.replace);
+		const named = new Set(item.replace.map(now));
 		const cover = leaves.flatMap((leaf, i) => (named.has(blockOf(leaf.node)) ? [i] : []));
 		if (!cover.length) return 'gone';
 		const found = new Set(cover.map((i) => blockOf(leaves[i].node)));
 		return { cover, beside: -1, ahead: false, missing: found.size < named.size };
 	}
-	if ('insert' in item) {
-		const at = item.insert;
-		let beside = leaves.length - 1;
-		let ahead = false;
-		if (at !== 'end') {
-			const i = index('after' in at ? at.after : at.before);
-			if (i < 0) return 'gone';
-			if ('after' in at) beside = i;
-			else if (i === 0) [beside, ahead] = [0, true];
-			else beside = i - 1;
-		}
-		if (beside < 0) return 'gone';
-		if (empty(beside)) return { cover: [beside], beside, ahead: false, missing: false };
-		return { cover: [], beside, ahead, missing: false };
+	const at = item.insert;
+	let beside = leaves.length - 1;
+	let ahead = false;
+	if (at !== 'end') {
+		const i = index('after' in at ? at.after : at.before);
+		if (i < 0) return 'gone';
+		if ('after' in at) beside = i;
+		else if (i === 0) [beside, ahead] = [0, true];
+		else beside = i - 1;
 	}
-	const anchor = anchors.get(item.anchor);
-	if (!anchor) return undefined;
-	const point = anchor.start === anchor.end;
-	const cover: number[] = [];
-	let beside = -1;
-	leaves.forEach((leaf, i) => {
-		const [lo, hi] = reach(leaf);
-		if (point) {
-			if (beside < 0 && lo <= anchor.start && anchor.start <= hi) beside = i;
-		} else if (
-			(lo < anchor.end && hi > anchor.start) ||
-			(lo === hi && anchor.start <= lo && lo <= anchor.end)
-		)
-			cover.push(i);
-	});
-	if (!point) return cover.length ? { cover, beside, ahead: false, missing: false } : undefined;
-	if (beside < 0) return undefined;
+	if (beside < 0) return 'gone';
+	// A leaf of one empty paragraph is filled by what is added to it.
 	const leaf = leaves[beside];
-	if (leaf.node.isTextblock && !leaf.node.content.size)
+	if (leaves.length === 1 && leaf.node.isTextblock && !leaf.node.content.size)
 		return { cover: [beside], beside, ahead: false, missing: false };
-	return {
-		cover,
-		beside,
-		ahead: beside === 0 && anchor.start === reach(leaf)[0],
-		missing: false
-	};
+	return { cover: [], beside, ahead, missing: false };
 }
 
 /** The blocks a proposal's writer read, by the id each was read under; `undefined` where
@@ -836,18 +817,17 @@ function readOf(
 }
 
 function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases): Drawn {
-	const { answered, written } = reviewKey.getState(state)!;
+	const { answered, written, renamed } = reviewKey.getState(state)!;
+	const now = (id: string): string => nowOf(renamed, id);
 	const listed = channel.items();
-	const anchors = new Map(channel.anchors(state).map((a) => [a.id, a]));
-	// A base outlives its item's answer and its leaving the list while its anchor stands, so a
-	// proposal brought back by an undo draws against the paragraph it first drew over.
+	// A base outlives its item's answer and its leaving the list while a block it covered
+	// stands, so a proposal brought back by an undo draws against the paragraph it first drew over.
 	if (bases.size) {
 		const ids = new Set(listed.map((item) => item.id));
 		let blocks: Set<string> | undefined;
-		const stands = (place: { anchor: string } | { blocks: string[] }): boolean => {
-			if ('anchor' in place) return anchors.has(place.anchor);
+		const stands = (place: readonly string[]): boolean => {
 			blocks ??= new Set(leavesOf(state.doc).map((leaf) => blockOf(leaf.node)));
-			return place.blocks.some((id) => blocks!.has(id));
+			return place.some((id) => blocks!.has(id));
 		};
 		for (const [id, base] of bases) if (!ids.has(id) && !stands(base.place)) bases.delete(id);
 	}
@@ -875,7 +855,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 	const taken = new Set<number>();
 	const adding = new Set<number>();
 
-	/** A change's mark over `[from, to)`, or its wedge where text was only taken out. */
+	/** A taken proposal's mark over `[from, to)`, or its wedge where text was only taken out. */
 	const changed = (id: string, from: number, to: number): void => {
 		if (to > from) {
 			lights(id, (on) =>
@@ -934,17 +914,8 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		}
 		const name = { 'data-qm-review': item.id };
 
-		if (item.state === 'changed') {
-			const anchor = anchors.get(item.anchor);
-			if (!anchor) continue;
-			changed(item.id, anchor.start, anchor.end);
-			spans.push({ id: item.id, proposed: false, from: anchor.start, to: anchor.end });
-			continue;
-		}
-
 		leaves ??= leavesOf(doc);
-		const at = placeOf(item, leaves, anchors);
-		if (!at) continue;
+		const at = placeOf(item, leaves, now);
 		if (at === 'gone') {
 			undrawn.push({ id: item.id, reason: 'block' });
 			continue;
@@ -978,7 +949,8 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		let base: readonly PMNode[];
 		if ('replace' in item && item.before !== undefined) {
 			const read = readOf(item.replace, item.before, channel);
-			const was = covered.map((leaf) => read?.get(blockOf(leaf.node)));
+			const named = new Map(item.replace.map((id) => [now(id), id]));
+			const was = covered.map((leaf) => read?.get(named.get(blockOf(leaf.node)) ?? ''));
 			stale ||= was.some((node) => !node);
 			base = was.map((node, k) => node ?? covered[k].node);
 		} else {
@@ -989,10 +961,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 					: covered.map((leaf) => leaf.node);
 			bases.set(item.id, {
 				after: item.after,
-				place:
-					'anchor' in item
-						? { anchor: item.anchor }
-						: { blocks: covered.map((l) => blockOf(l.node)) },
+				place: covered.map((l) => blockOf(l.node)),
 				blocks: base
 			});
 		}
@@ -1342,9 +1311,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				action === 'accept'
 			);
 			if (!span) return false;
-			act(span.id, span.proposed ? action : 'revert', {
-				chord: true
-			});
+			act(span.id, span.proposed ? action : 'reopen', { chord: true });
 			return true;
 		};
 	/** Escape lowers the card over the item the caret is in, before it is anything else's. */
@@ -1363,7 +1330,8 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				answered: new Map(),
 				written: new Map(),
 				entered: undefined,
-				replayed: []
+				replayed: [],
+				renamed: new Map()
 			}),
 			apply: applyReview
 		},

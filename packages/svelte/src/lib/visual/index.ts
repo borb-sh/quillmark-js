@@ -36,7 +36,7 @@ export type { BodyPlaceholder, BodyPlaceholderContext } from './structure.js';
 export { editorShortcuts } from '../core/codec/index.js';
 export type { EditorShortcut, ShortcutScope } from '../core/codec/index.js';
 
-// Review: what a host hands the editor to draw of another writer's changes and proposals, and
+// Review: what a host hands the editor to draw of another writer's proposals, and
 // what the editor says back. The chords that answer an item are in `editorShortcuts`.
 export type {
 	BlockProposal,

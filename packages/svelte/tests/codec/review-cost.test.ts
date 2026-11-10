@@ -39,16 +39,13 @@ function batch(prefix: string, count: number, proposed = count) {
 	doc.replace({}, md(texts.join('\n\n')));
 	const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
 	open.push(field);
-	const items: TextReview[] = texts.slice(0, proposed).map((text, n) => {
-		const at = doc.main.body.text.indexOf(text);
-		field.insertAnchor(`~${prefix}${n}`, at, at + 4);
-		return {
-			id: `${prefix}${n}`,
-			state: 'proposed',
-			anchor: `~${prefix}${n}`,
-			after: text.replace(`p${n}w3`, 'proposed')
-		};
-	});
+	const blocks = doc.blocks({});
+	const items: TextReview[] = texts.slice(0, proposed).map((text, n) => ({
+		id: `${prefix}${n}`,
+
+		replace: [blocks[n].id],
+		after: text.replace(`p${n}w3`, 'proposed')
+	}));
 	field.setReview(items);
 	const view = viewOf(field);
 	/** Type a letter at the start of paragraph `n`. */

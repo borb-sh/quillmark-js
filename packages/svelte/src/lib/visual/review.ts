@@ -1,21 +1,18 @@
 // Review, as a host hands it to the editor: a plain list of what someone other than the reader
-// changed and what one proposes, drawn in the editor's own flow. Data in, events out: the editor
-// holds no opinion on where an item came from, and the host lays the anchors and takes an
-// answered item off the list.
+// proposes, drawn in the editor's own flow. Data in, events out: the editor holds no opinion on
+// where an item came from, and the host sets the list once and clears it once.
 //
-// Who writes follows who holds the words. A proposal carries what it would write, so taking it
-// is the editor's own edit, down the lane a reader's edit takes: what lands is what was drawn,
-// `onChange` reports it, and the reader's undo takes it back. A change carries at most what it
-// replaced as words to show, so taking one back is the host's write, which alone knows the
-// inverse of what it wrote.
+// A proposal carries what it would write, so taking it is the editor's own edit, down the lane a
+// reader's edit takes: what lands is what was drawn, `onChange` reports it, and the reader's undo
+// takes it back.
 import type { PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
 import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/index.js';
 
 /**
- * One item of review. `id` is the host's, unique in the list, and is what every event names.
+ * One proposal. `id` is the host's, unique in the list, and is what every event names.
  *
- * An item names its place one of three ways:
+ * An item names its place one of two ways:
  *
  * - `field` with `replace` or `insert`: blocks of a rich text field or a body, by the ids the
  *   document gives them. A `proposed` item with `replace` reads the blocks named as rewritten to
@@ -24,16 +21,9 @@ import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/inde
  *   theirs: kept unstruck, and kept by Accept. One with `insert` proposes new blocks after or
  *   before a block, or at the field's end. A paragraph takes one proposal that rewrites it and one
  *   that adds after it.
- * - `anchor`: the id of an anchor in a rich text field or a body, which the host lays with the
- *   document's own `apply` (a transient one, id prefixed `~`, never reaches the stored value). A
- *   `changed` item marks the anchor's range as written, `before` the text it replaced; over a
- *   point anchor it marks where text was only removed. A `proposed` item reads every paragraph the
- *   anchor touches as rewritten to `after`, and over a point anchor proposes new paragraphs after
- *   the one holding it.
- * - `field` alone: the path of a field, for a value with no text to anchor in. A `changed` item
- *   marks the field's control, `before` the value it held; a `proposed` item sets `after` under
- *   the control, the value the field's writer would take, an absent one proposing the field
- *   cleared, and `before` the value its writer read. A path to a place inside a record or a
+ * - `field` alone: the path of a field. It sets `after` under the control, the value the
+ *   field's writer would take, an absent one proposing the field cleared, and `before` the value
+ *   its writer read. A path to a place inside a record or a
  *   list names that place: a cell, or a member by its index, which `after` absent takes out
  *   and an index past the last appends.
  *
@@ -41,30 +31,24 @@ import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/inde
  * and an accepted proposal the list still holds is drawn as the change it made, with the card
  * that takes it back, until the list lets it go.
  */
-export type ReviewItem =
-	| { id: string; state: 'changed'; anchor: string; before?: string }
-	| { id: string; state: 'proposed'; anchor: string; after: string }
-	| FieldChange
-	| FieldProposal
-	| BlockProposal;
+export type ReviewItem = FieldProposal | BlockProposal;
 
 /** A proposal over blocks of a rich text field, by their ids. */
 export type BlockProposal =
 	| {
 			id: string;
-			state: 'proposed';
 			field: DocPath;
 			replace: readonly string[];
 			before?: string;
 			after: string;
 	  }
-	| { id: string; state: 'proposed'; field: DocPath; insert: BlockPlace; after: string };
+	| { id: string; field: DocPath; insert: BlockPlace; after: string };
 
 /** Whether an item names blocks of a rich text field, which its prose leaf draws. */
 export const byBlocks = (item: object): item is BlockProposal =>
 	'replace' in item || 'insert' in item;
 
-/** Whether an item is a field's own, drawn on its control. */
+/** Whether an item is a field's own, drawn on its control: a proposal, or one accepted there. */
 export const onField = (item: object): item is FieldChange | FieldProposal =>
 	'field' in item && !byBlocks(item);
 
@@ -73,7 +57,6 @@ export const onField = (item: object): item is FieldChange | FieldProposal =>
  *
  * - `accept`: a proposal taken. The editor has written it by now, as an edit of the reader's.
  * - `dismiss`: a proposal turned down. Nothing is written.
- * - `revert`: a change to take back. Nothing is written here: the write is the host's.
  * - `reopen`: an accept or a dismissal undone. The editor has taken back what an accept wrote,
  *   and the item is open again.
  */
@@ -85,7 +68,6 @@ export interface ReviewEvent {
 /**
  * Why a listed item draws nothing:
  *
- * - `anchor`: no mounted leaf holds its anchor.
  * - `block`: no block it names stands in its field, or no leaf of the field is mounted.
  * - `field`: its path names no field the editor holds, or a place inside one its schema does
  *   not declare.
@@ -93,11 +75,11 @@ export interface ReviewEvent {
  * - `taken`: an earlier item has its paragraph, or its field.
  * - `applied`: the text already reads as proposed, so it would write nothing.
  */
-export type ReviewUndrawn = 'anchor' | 'block' | 'field' | 'parse' | 'taken' | 'applied';
+export type ReviewUndrawn = 'block' | 'field' | 'parse' | 'taken' | 'applied';
 
 /** What the editor draws of the host's list. */
 export interface ReviewDrawn {
-	/** The items the editor draws, in document order: the open ones and the accepted ones. */
+	/** The proposals the editor draws, in document order: the open ones and the accepted ones. */
 	order: readonly string[];
 	/** The proposals accepted and still listed, which the editor draws as the changes they made. */
 	accepted: readonly string[];
@@ -111,12 +93,15 @@ export interface ReviewDrawn {
 	undrawn: readonly { id: string; reason: ReviewUndrawn }[];
 }
 
-/** A `changed` item over a field's control. */
+/** A field proposal accepted, as the change it made over its control, `before` the value it
+ *  replaced. The editor's own, tagged as it takes the accept; a host lists proposals alone. */
 export type FieldChange = { id: string; state: 'changed'; field: DocPath; before?: unknown };
-/** A `proposed` item under a field's control. */
+/** Whether an item is an accepted proposal the editor holds, rather than one the host lists. */
+export const isChange = <T extends object>(item: T): item is Extract<T, { state: 'changed' }> =>
+	'state' in item && item.state === 'changed';
+/** A proposal under a field's control. */
 export type FieldProposal = {
 	id: string;
-	state: 'proposed';
 	field: DocPath;
 	before?: unknown;
 	after?: unknown;
@@ -245,7 +230,7 @@ export function locate(
 	item: FieldProposal | FieldChange,
 	claimed: Set<string>
 ): { steps: readonly PathStep[]; found: boolean } {
-	const read = item.state === 'proposed' && 'before' in item;
+	const read = !isChange(item) && 'before' in item;
 	const before = read ? item.before : undefined;
 	const at = steps.at(-1);
 	const head = steps.slice(0, -1);

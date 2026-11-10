@@ -129,11 +129,6 @@
 	): Promise<string | undefined> {
 		return (await inner?.stepReview(dir, opts)) ?? undefined;
 	}
-	/** Offer `undo` as the one step back from a write the host just made: on the toast, and
-	 *  on ⌘Z/Ctrl+Z anywhere in the editor until the next edit. Returns the withdrawal. */
-	export function offerUndo(notice: string, undo: () => void): () => void {
-		return inner?.offerUndo(notice, undo) ?? (() => {});
-	}
 </script>
 
 {#key props.doc}

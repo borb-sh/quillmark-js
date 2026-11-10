@@ -107,7 +107,7 @@ export function proposalsBetween(
 			if (next?.markdown === b.markdown) continue;
 			items.push({
 				id: mint(),
-				state: 'proposed',
+
 				field,
 				replace: [b.id],
 				before: b.markdown,
@@ -121,7 +121,7 @@ export function proposalsBetween(
 			if (!run.length) return;
 			items.push({
 				id: mint(),
-				state: 'proposed',
+
 				field,
 				insert: lead ? { after: lead } : next ? { before: next } : 'end',
 				after: run.map((b) => b.markdown).join('\n\n')
@@ -150,7 +150,7 @@ export function proposalsBetween(
 		const whole = (): void =>
 			void items.push({
 				id: mint(),
-				state: 'proposed',
+
 				field: pathAt(steps),
 				...(was !== undefined && { before: was }),
 				...(now !== undefined && { after: now })
@@ -172,14 +172,14 @@ export function proposalsBetween(
 			for (let k = paired; k < removed; k++)
 				items.push({
 					id: mint(),
-					state: 'proposed',
+
 					field: pathAt([...steps, from + k]),
 					before: was[from + k]
 				});
 			for (let k = paired; k < added; k++)
 				items.push({
 					id: mint(),
-					state: 'proposed',
+
 					field: pathAt([...steps, appended++]),
 					after: now[to + k]
 				});
