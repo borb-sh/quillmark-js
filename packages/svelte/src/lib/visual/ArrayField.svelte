@@ -600,8 +600,14 @@
 		})();
 		return step;
 	}
+	/** A row as a step compares it. A record's blank cells read as absent: a cell typed in
+	 *  and undone back to empty commits its empty answer where the step's row had no key. */
+	const compared = (row: unknown): unknown =>
+		control === 'object' && row !== null && typeof row === 'object'
+			? Object.fromEntries(Object.entries(row).filter(([, cell]) => !cellBlank(cell)))
+			: row;
 	const same = (a: unknown[], b: unknown[]): boolean =>
-		a === b || JSON.stringify(a) === JSON.stringify(b);
+		a === b || JSON.stringify(a.map(compared)) === JSON.stringify(b.map(compared));
 	/** Take the latest step back (`redo` false) or forward again, where the rows still
 	 *  stand where it would start from. Whether it did. */
 	function takeStep(redo: boolean): boolean {

@@ -140,6 +140,30 @@ describe('a list’s undo', () => {
 		expect(stored()).toEqual(['abcdef']);
 	});
 
+	it('takes a table row added back once its cell is undone to empty', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('contributors', [{ name: 'Ada' }]);
+		const { target, editor } = mountEditor(q, doc);
+		const stored = () => literal(doc.getStored('contributors')) as unknown[];
+		const cell = (row: number) =>
+			target.querySelector<HTMLElement>(`.ProseMirror[aria-label="Contributors ${row} Name"]`)!;
+		await editor.setCaret({ field: 'main.contributors[0].name', pos: 3, granularity: 'cluster' });
+		await tick();
+		press(cell(1), 'Enter', { cancelable: true });
+		await settle();
+		const added = stored();
+		paste(cell(2), 'X');
+		await settle();
+
+		undo(cell(2));
+		await settle();
+		expect(stored()).toHaveLength(added.length);
+		undo(cell(2));
+		await settle();
+		expect(stored()).toHaveLength(added.length - 1);
+	});
+
 	it('hands a row moved by its handle the focus, where undo takes the move back', async () => {
 		const q = quill();
 		const doc = example();
