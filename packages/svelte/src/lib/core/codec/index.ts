@@ -49,6 +49,7 @@ export type { LeaveStrings } from './leave.js';
 // wording and its `ReviewItem` narrows to the leaf's own.
 export { DEFAULT_REVIEW_STRINGS } from './review.js';
 export type {
+	BlockPlace,
 	LeafUndrawn,
 	ReviewAction,
 	ReviewReport,

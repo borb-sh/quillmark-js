@@ -38,7 +38,14 @@ export type { EditorShortcut, ShortcutScope } from '../core/codec/index.js';
 
 // Review: what a host hands the editor to draw of another writer's changes and proposals, and
 // what the editor says back. The chords that answer an item are in `editorShortcuts`.
-export type { ReviewDrawn, ReviewEvent, ReviewItem, ReviewUndrawn } from './review.js';
+export type {
+	BlockProposal,
+	ReviewDrawn,
+	ReviewEvent,
+	ReviewItem,
+	ReviewUndrawn
+} from './review.js';
+export type { BlockPlace } from '../core/codec/index.js';
 export type { ReviewAction } from '../core/codec/index.js';
 export { REVIEW_KEYS } from '../core/codec/index.js';
 

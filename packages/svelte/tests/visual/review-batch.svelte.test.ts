@@ -122,6 +122,51 @@ describe('the drawn report', () => {
 	});
 });
 
+describe('a proposal by blocks', () => {
+	const blocks = (doc: Document): ReviewItem[] => {
+		const [first] = doc.blocks({});
+		return [
+			{
+				id: 'body',
+				state: 'proposed',
+				field: doc.pathFor({}),
+				replace: [first.id],
+				before: first.markdown,
+				after: `${first.markdown} More.`
+			},
+			{
+				id: 'abs',
+				state: 'proposed',
+				field: doc.pathFor('abstract'),
+				insert: 'end',
+				after: 'Appended.'
+			},
+			{ id: 'lost', state: 'proposed', field: doc.pathFor({}), replace: ['nope'], after: 'X.' },
+			{ id: 'cols', state: 'proposed', field: doc.pathFor('columns'), before: 5, after: 2 }
+		];
+	};
+
+	it('is drawn in the leaf of the field it names, and said outdated where its value moved', async () => {
+		const r = batch(blocks);
+		await settle();
+		const { order, outdated, undrawn } = r.drawn.at(-1)!;
+		expect([...order].sort()).toEqual(['abs', 'body', 'cols']);
+		expect(order).toEqual(pageOrder(r.target, order));
+		expect(outdated).toEqual(['cols']);
+		expect(undrawn).toEqual([{ id: 'lost', reason: 'block' }]);
+	});
+
+	it('is taken by the host as the leaf’s own edit', async () => {
+		const r = batch(blocks);
+		await settle();
+		expect([...r.editor.answerReview(['body', 'abs'], 'accept')].sort()).toEqual(['abs', 'body']);
+		const [first] = r.doc.blocks({});
+		expect(first.markdown.endsWith(' More.')).toBe(true);
+		expect((r.doc.getStored('abstract') as { text: string }).text.endsWith('Appended.')).toBe(true);
+		expect(r.events.map((e) => e.action)).toEqual(['accept', 'accept']);
+	});
+});
+
 describe('answering by the host', () => {
 	it('answers every item drawn, one event each, and leaves the focus where it was', async () => {
 		const r = batch((doc) => {

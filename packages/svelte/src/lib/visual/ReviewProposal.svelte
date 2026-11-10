@@ -58,6 +58,9 @@
 		{/if}
 	</span>
 	<span class="qm-review-answers">
+		{#if reviewing.fieldOutdated.has(item.id)}
+			<span class="qm-review-outdated-label">{t.strings.reviewOutdated}</span>
+		{/if}
 		<button
 			type="button"
 			class="qm-review-act qm-review-accept qm-focus-ring"

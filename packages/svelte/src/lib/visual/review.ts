@@ -9,34 +9,61 @@
 // replaced as words to show, so taking one back is the host's write, which alone knows the
 // inverse of what it wrote.
 import type { DocPath } from '../core/address.js';
-import { wordDiff, type ReviewAction } from '../core/codec/index.js';
+import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/index.js';
 
 /**
  * One item of review. `id` is the host's, unique in the list, and is what every event names.
  *
- * An item names its place one of two ways:
+ * An item names its place one of three ways:
  *
+ * - `field` with `replace` or `insert`: blocks of a rich text field or a body, by the ids the
+ *   document gives them. A `proposed` item with `replace` reads the blocks named as rewritten to
+ *   `after`, Markdown, drawn as a word-level edit of them; `''` proposes their removal. `before`
+ *   is those blocks as the proposal's writer read them, so what the reader wrote in them since is
+ *   theirs: kept unstruck, and kept by Accept. One with `insert` proposes new blocks after or
+ *   before a block, or at the field's end. A paragraph takes one proposal that rewrites it and one
+ *   that adds after it.
  * - `anchor`: the id of an anchor in a rich text field or a body, which the host lays with the
  *   document's own `apply` (a transient one, id prefixed `~`, never reaches the stored value). A
  *   `changed` item marks the anchor's range as written, `before` the text it replaced; over a
  *   point anchor it marks where text was only removed. A `proposed` item reads every paragraph the
- *   anchor touches as rewritten to `after`, Markdown, drawn as a word-level edit of those
- *   paragraphs; `''` proposes their removal, and a point anchor proposes new paragraphs after the
- *   one holding it. A paragraph takes one proposal that rewrites it and one that adds after it.
- * - `field`: the path of a field, for a value with no text to anchor in. A `changed` item marks
- *   the field's control, `before` the value it held; a `proposed` item sets `after` under the
- *   control, the value the field's writer would take, an absent one proposing the field cleared.
- *   A path into a container names its field.
+ *   anchor touches as rewritten to `after`, and over a point anchor proposes new paragraphs after
+ *   the one holding it.
+ * - `field` alone: the path of a field, for a value with no text to anchor in. A `changed` item
+ *   marks the field's control, `before` the value it held; a `proposed` item sets `after` under
+ *   the control, the value the field's writer would take, an absent one proposing the field
+ *   cleared, and `before` the value its writer read. A path into a container names its field.
  *
- * An item whose anchor or field the editor does not hold draws nothing. A dismissed item is drawn
- * no more, and an accepted proposal the list still holds is drawn as the change it made, with the
- * card that takes it back, until the list lets it go.
+ * An item whose place the editor does not hold draws nothing. A dismissed item is drawn no more,
+ * and an accepted proposal the list still holds is drawn as the change it made, with the card
+ * that takes it back, until the list lets it go.
  */
 export type ReviewItem =
 	| { id: string; state: 'changed'; anchor: string; before?: string }
 	| { id: string; state: 'proposed'; anchor: string; after: string }
-	| { id: string; state: 'changed'; field: DocPath; before?: unknown }
-	| { id: string; state: 'proposed'; field: DocPath; after?: unknown };
+	| FieldChange
+	| FieldProposal
+	| BlockProposal;
+
+/** A proposal over blocks of a rich text field, by their ids. */
+export type BlockProposal =
+	| {
+			id: string;
+			state: 'proposed';
+			field: DocPath;
+			replace: readonly string[];
+			before?: string;
+			after: string;
+	  }
+	| { id: string; state: 'proposed'; field: DocPath; insert: BlockPlace; after: string };
+
+/** Whether an item names blocks of a rich text field, which its prose leaf draws. */
+export const byBlocks = (item: object): item is BlockProposal =>
+	'replace' in item || 'insert' in item;
+
+/** Whether an item is a field's own, drawn on its control. */
+export const onField = (item: object): item is FieldChange | FieldProposal =>
+	'field' in item && !byBlocks(item);
 
 /**
  * A reader's answer to an item.
@@ -56,12 +83,13 @@ export interface ReviewEvent {
  * Why a listed item draws nothing:
  *
  * - `anchor`: no mounted leaf holds its anchor.
+ * - `block`: no block it names stands in its field, or no leaf of the field is mounted.
  * - `field`: its path names no field the editor holds, or a proposal names a place inside one.
  * - `parse`: its `after` is not Markdown the leaf holding it reads.
  * - `taken`: an earlier item has its paragraph, or its field.
  * - `applied`: the text already reads as proposed, so it would write nothing.
  */
-export type ReviewUndrawn = 'anchor' | 'field' | 'parse' | 'taken' | 'applied';
+export type ReviewUndrawn = 'anchor' | 'block' | 'field' | 'parse' | 'taken' | 'applied';
 
 /** What the editor draws of the host's list. */
 export interface ReviewDrawn {
@@ -69,16 +97,34 @@ export interface ReviewDrawn {
 	order: readonly string[];
 	/** The proposals accepted and still listed, which the editor draws as the changes they made. */
 	accepted: readonly string[];
-	/** Drawn proposals whose paragraph the reader has rewritten past their words since. */
+	/** Drawn proposals the reader's own writing meets: words both changed, a block one names
+	 *  gone or no longer what its writer read, or a field no longer holding its `before`. */
 	outdated: readonly string[];
 	/** Listed items the editor does not draw, each with why. */
 	undrawn: readonly { id: string; reason: ReviewUndrawn }[];
 }
 
 /** A `changed` item over a field's control. */
-export type FieldChange = Extract<ReviewItem, { state: 'changed'; field: DocPath }>;
+export type FieldChange = { id: string; state: 'changed'; field: DocPath; before?: unknown };
 /** A `proposed` item under a field's control. */
-export type FieldProposal = Extract<ReviewItem, { state: 'proposed'; field: DocPath }>;
+export type FieldProposal = {
+	id: string;
+	state: 'proposed';
+	field: DocPath;
+	before?: unknown;
+	after?: unknown;
+};
+
+/** Whether two values are one, whatever order their keys stand in; absent is `null`. */
+export function sameValue(a: unknown, b: unknown): boolean {
+	const canonical = (value: unknown): string =>
+		JSON.stringify(value ?? null, (_, v: unknown) =>
+			v && typeof v === 'object' && !Array.isArray(v)
+				? Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)))
+				: v
+		);
+	return canonical(a) === canonical(b);
+}
 
 /** A reviewed value as the words a reader is shown for it: a string as written, a rich text
  *  value by its text, a list by its members, a subform by its named cells. `''` for nothing. */

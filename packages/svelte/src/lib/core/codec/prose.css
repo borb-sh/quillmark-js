@@ -955,8 +955,8 @@ li.ProseMirror-selectednode::after {
 		gap: var(--_qm-space-2);
 	}
 }
-/* A proposal its paragraph's reader has rewritten since says so before its answers, in the
-   label's ink, since it now gives the whole paragraph to the whole proposal. */
+/* A proposal the reader's own writing meets says so before its answers, in the label's ink:
+   taking it writes over what the reader wrote. */
 .qm-review-outdated-label {
 	align-self: center;
 	color: var(--_qm-ink-label);
