@@ -112,11 +112,12 @@
 	export async function revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean> {
 		return (await inner?.revealReview(id, opts)) ?? false;
 	}
-	/** Answer open items as their buttons would, in document order (`'all'`: every item
-	 *  drawn), moving neither the focus nor the caret. Returns the ids answered. */
+	/** Answer items as their buttons would, in document order (`'all'`: every item drawn),
+	 *  moving neither the focus nor the caret; `'reopen'` takes back accepted proposals. Returns
+	 *  the ids answered. */
 	export function answerReview(
 		ids: readonly string[] | 'all',
-		action: 'accept' | 'dismiss'
+		action: 'accept' | 'dismiss' | 'reopen'
 	): string[] {
 		return inner?.answerReview(ids, action) ?? [];
 	}
