@@ -58,8 +58,9 @@ export const TABLE_KEYS = {
 	eraseAlt: 'Delete'
 } as const;
 
-/** An item of review under the caret (`review.ts`), ahead of every other binding of its keys;
- *  `next` and `previous` step through the items from anywhere in the editor. */
+/** An item of review under the caret (`review.ts`), ahead of every other binding of its keys,
+ *  so `accept` takes a proposal over a task item's `LIST_KEYS.task`; `next` and `previous` step
+ *  through the items from anywhere in the editor. */
 export const REVIEW_KEYS = {
 	accept: 'Mod-Enter',
 	dismiss: 'Mod-.',
@@ -140,7 +141,7 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutBulletedList: 'Bulleted list',
 	shortcutIndent: 'Nest under the item above',
 	shortcutOutdent: 'Move back up a level',
-	shortcutTask: 'Check or uncheck a task',
+	shortcutTask: 'Check or uncheck a task, outside a proposal',
 	shortcutMoveItem: 'Move the item up or down',
 	shortcutNextCell: 'Next cell, adding a row past the last',
 	shortcutPreviousCell: 'Previous cell',

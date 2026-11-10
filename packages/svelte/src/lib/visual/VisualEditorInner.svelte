@@ -55,6 +55,7 @@
 	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo, type UndoOffer } from './undo.svelte.js';
+	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview } from './review.svelte.js';
 	import type { FieldChange, FieldProposal, ReviewDrawn } from './review.js';
@@ -289,9 +290,7 @@
 	 *  On the document, since a removal under the pointer leaves the focus on the body, and
 	 *  captured, so a leaf the removal handed the focus to hears the key after the offer. */
 	function onUndoKey(e: KeyboardEvent): void {
-		if (e.defaultPrevented || e.isComposing || e.shiftKey || e.altKey) return;
-		if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
-		if (!undo.accepts(e.target, rootEl)) return;
+		if (undoChord(e) !== 'undo' || !undo.accepts(e.target, rootEl)) return;
 		e.preventDefault();
 		e.stopPropagation();
 		undo.take();
@@ -310,14 +309,19 @@
 		{ change: FieldChange; leaf: string; back: () => void; holds: () => boolean }
 	>();
 	const takenChanges = $derived(new Map([...taken].map(([id, t]) => [id, t.change])));
+	/** Take a field's answer back: the value it replaced written back, if any, and the item
+	 *  reopened. */
+	const giveBack = (id: string, leaf: string, back?: () => void): void => {
+		back?.();
+		reviewing.heard(id, 'reopen', leaf);
+	};
 	const reviewing = createReview({
 		items: () => review,
 		taken: () => takenChanges,
 		putBack(id) {
 			const field = taken.get(id);
 			if (field) {
-				field.back();
-				reviewing.heard(id, 'reopen', field.leaf);
+				giveBack(id, field.leaf, field.back);
 				return true;
 			}
 			const key = reviewing.keyOf(id);
@@ -355,7 +359,6 @@
 			const field = item && 'field' in item ? reviewed(item.field) : undefined;
 			const leaf = key ?? (field && fieldKeyToString(field));
 			if (leaf === undefined) return true;
-			const reopen = (): void => reviewing.heard(id, 'reopen', leaf);
 			const prose = key !== undefined && !field;
 			record(
 				id,
@@ -363,10 +366,7 @@
 					? action === 'accept'
 						? () => void leaves.prose(leaf)?.undoReview()
 						: () => void leaves.prose(leaf)?.reopenReview(id)
-					: () => {
-							back?.();
-							reopen();
-						},
+					: () => giveBack(id, leaf, back),
 				back && merged.reviewAccepted
 			);
 			return true;
@@ -401,7 +401,11 @@
 		const top = journal.at(-1);
 		journalOffer =
 			top &&
-			undo.offer(top.notice ?? '', unanswer, { standing: true, quiet: top.notice === undefined });
+			undo.offer(top.notice ?? '', unanswer, {
+				standing: true,
+				quiet: top.notice === undefined,
+				answer: true
+			});
 	}
 	function unanswer(): void {
 		const top = journal.pop();
@@ -1485,8 +1489,7 @@
 	 */
 	export function offerUndo(notice: string, restore: () => void): () => void {
 		if (!span.alive) return () => {};
-		undo.offer(notice, restore, { standing: true });
-		const offered = undo.current;
+		const offered = undo.offer(notice, restore, { standing: true });
 		return () => {
 			if (undo.holds(offered)) undo.withdraw();
 		};
