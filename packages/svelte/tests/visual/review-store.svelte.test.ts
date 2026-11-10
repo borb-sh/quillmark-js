@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // The review state's one answer to three sources of attention, and when a change's card is up.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { createReview, HOVER_MS, LEAVE_MS, REVEAL_MS } from '$lib/visual/review.svelte';
