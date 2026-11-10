@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.35.0 - 2026-11-10
+
 **Accept leaves plain text.** An accepted proposal is drawn no more: the underline under what it wrote, the wedge where it removed words, the mark along a field's control and the card with **Undo** are gone, and so is `'reopen'` as an `answerReview` action and the ⌘/Ctrl+. chord on an accepted change. ⌘Z still takes back the answers given since the reader's last edit, newest first, each reported as `reopen`. A host that offers to take a whole answer back keeps its own snapshot of the document from before it. `onReviewDrawn` drops `order` and `accepted`: `open` is the drawn items in document order. `VisualStrings` drops `reviewUndo`, `reviewUndoTitle`, `reviewChange`, `reviewWas`, `reviewAdded` and `reviewRemoved`, and `ReviewStrings` drops `reviewGone`.
 
 **A review item stays on its card while cards are written.** An item names its card by index as the cards stood when the list was set, and the editor carries it through every card added, removed or moved since, by `applyCardOps` or by the reader: it draws on the card it named, and Accept writes there. A host accepting a card the answer added writes it at once, with the review open. An item whose card is gone is reported `undrawn` as `field`.
