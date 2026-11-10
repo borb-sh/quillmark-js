@@ -61,6 +61,7 @@ import {
 	DEFAULT_REVIEW_STRINGS,
 	reviewLayer,
 	type ReviewAction,
+	type ReviewReport,
 	type ReviewStrings,
 	type ReviewVia,
 	type TextReview
@@ -176,9 +177,10 @@ export interface CreateFieldOpts {
 	/** The review item under the pointer or holding the caret, `undefined` once it has left.
 	 *  The caret's report holds off while the reader types inside the item. */
 	onReviewPoint?(id: string | undefined, via: ReviewVia): void;
-	/** The ids of the review items the leaf draws, on each change of the set: an item whose
-	 *  anchor the leaf does not hold draws nothing. */
-	onReviewDrawn?(ids: readonly string[]): void;
+	/** What the leaf draws of the review items, on each change: the ids drawn, and the items
+	 *  whose anchor the leaf holds that it does not draw, each with why. An item whose anchor
+	 *  the leaf does not hold is in neither. */
+	onReviewDrawn?(report: ReviewReport): void;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new caret offset after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -567,7 +569,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				dismiss: () => opts.onReviewDismiss?.(),
 				act: (id, action) => opts.onReview?.(id, action),
 				point: (id, via) => opts.onReviewPoint?.(id, via),
-				drew: (ids) => opts.onReviewDrawn?.(ids)
+				drew: (report) => opts.onReviewDrawn?.(report)
 			});
 
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).

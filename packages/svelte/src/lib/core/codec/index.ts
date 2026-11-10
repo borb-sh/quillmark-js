@@ -48,7 +48,14 @@ export type { LeaveStrings } from './leave.js';
 // The review layer a leaf draws over its anchors: the visual tier's `strings` set extends its
 // wording and its `ReviewItem` narrows to the leaf's own.
 export { DEFAULT_REVIEW_STRINGS } from './review.js';
-export type { ReviewAction, ReviewStrings, ReviewVia, TextReview } from './review.js';
+export type {
+	LeafUndrawn,
+	ReviewAction,
+	ReviewReport,
+	ReviewStrings,
+	ReviewVia,
+	TextReview
+} from './review.js';
 export { wordDiff } from './review-diff.js';
 export type { DiffHunk } from './review-diff.js';
 

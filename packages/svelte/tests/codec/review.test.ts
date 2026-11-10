@@ -3,10 +3,16 @@
 // flow, and writes nothing while it stands; a proposal reads as an edit of its paragraph, and
 // taking it writes what was drawn; the two chords and the two buttons answer through one channel.
 import { describe, it, expect, afterEach } from 'vitest';
-import { undo } from 'prosemirror-history';
+import { redo, undo } from 'prosemirror-history';
 import { TextSelection } from 'prosemirror-state';
 import { createField, REVIEW_KEYS, DEFAULT_REVIEW_STRINGS } from '$lib/core/codec';
-import type { FieldController, ReviewAction, ReviewVia, TextReview } from '$lib/core/codec';
+import type {
+	FieldController,
+	ReviewAction,
+	ReviewReport,
+	ReviewVia,
+	TextReview
+} from '$lib/core/codec';
 import type { Document } from '@quillmark/wasm';
 import { core, example, md, mount, press, quill, viewOf } from './_util.js';
 
@@ -20,6 +26,7 @@ interface Leaf {
 	acts: [string, ReviewAction][];
 	points: [string | undefined, ReviewVia][];
 	drawn: string[][];
+	reports: ReviewReport[];
 	/** The item whose card is up, and how often the leaf lowered it. */
 	shown?: string;
 	lowered: number;
@@ -39,6 +46,7 @@ function leafOver(markdown: string): Leaf {
 	const acts: Leaf['acts'] = [];
 	const points: Leaf['points'] = [];
 	const drawn: string[][] = [];
+	const reports: ReviewReport[] = [];
 	const field = createField({
 		doc,
 		quill: quill(),
@@ -46,7 +54,10 @@ function leafOver(markdown: string): Leaf {
 		container: el,
 		onReview: (id, action) => acts.push([id, action]),
 		onReviewPoint: (id, via) => points.push([id, via]),
-		onReviewDrawn: (ids) => drawn.push([...ids]),
+		onReviewDrawn: (report) => {
+			drawn.push([...report.ids]);
+			reports.push(report);
+		},
 		reviewShown: () => leaf.shown,
 		onReviewDismiss: () => {
 			leaf.shown = undefined;
@@ -61,6 +72,7 @@ function leafOver(markdown: string): Leaf {
 		acts,
 		points,
 		drawn,
+		reports,
 		lowered: 0,
 		anchor(id, text, point = false) {
 			const at = doc.main.body.text.indexOf(text);
@@ -278,7 +290,7 @@ describe('a proposal', () => {
 			{ id: 'r1', state: 'proposed', anchor: '~p1', after: 'One paragraph, first.' },
 			{ id: 'r2', state: 'proposed', anchor: '~p2', after: 'One paragraph, second.' }
 		]);
-		expect(leaf.drawn.at(-1)).toEqual(['r1']);
+		expect(leaf.reports.at(-1)).toEqual({ ids: ['r1'], undrawn: [{ id: 'r2', reason: 'taken' }] });
 	});
 });
 
@@ -627,6 +639,27 @@ describe('taking a proposal', () => {
 		const view = viewOf(leaf.field);
 		undo(view.state, view.dispatch);
 		expect(leaf.doc.main.body.text).toBe('The quick brown fox.\nClosing.');
+	});
+
+	it('is drawn again by the undo that takes it back, and no more by the redo', () => {
+		const leaf = take('The quick brown fox.', 'The quick red fox.', 'quick');
+		const view = viewOf(leaf.field);
+		undo(view.state, view.dispatch);
+		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['brown']);
+		expect(leaf.drawn.at(-1)).toEqual(['r1']);
+		redo(view.state, view.dispatch);
+		expect(leaf.doc.main.body.text).toBe('The quick red fox.');
+		expect(leaf.el.querySelector('del, ins, .qm-review-chip')).toBeNull();
+	});
+
+	it('comes back with the words typed into its step, under one undo', () => {
+		const leaf = take('The quick brown fox.', 'The quick red fox.', 'quick');
+		const view = viewOf(leaf.field);
+		view.dispatch(view.state.tr.insertText('dish', 1 + 'The quick red'.length));
+		expect(leaf.doc.main.body.text).toBe('The quick reddish fox.');
+		undo(view.state, view.dispatch);
+		expect(leaf.doc.main.body.text).toBe('The quick brown fox.');
+		expect(texts(leaf.el, 'ins.qm-review-ins')).toEqual(['red']);
 	});
 
 	it('keeps the marks the reader’s paragraph holds outside the words it rewrites', () => {
