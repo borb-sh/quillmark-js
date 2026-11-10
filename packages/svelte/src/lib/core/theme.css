@@ -276,9 +276,9 @@
 	   `visual/controls.css`, since a rung each control reassembles is a scale
 	   only up to the point where it is assembled. One width: focus is the only
 	   state that draws a ring anywhere, so there is no held-back tier under it.
-	   Sub-pixel, because at two it reads as a second border on a card whose every
-	   other stroke is a hairline. */
-	--_qm-ring-width: 1.5px;
+	   Two whole pixels, WCAG 2.4.13's floor: a sub-pixel width rounds down to one
+	   device pixel at 1x density, where the ring is then a hairline beside hairlines. */
+	--_qm-ring-width: 2px;
 	/* Every ring the surface draws, focus and selection alike, which is why the name
 	   carries neither. Assembled here because the parts spelled out at a use site pass
 	   every axis — each reads a rung — while drawing a ring nothing else agrees with. */
@@ -413,11 +413,14 @@
 	   `--qm-font-size` anchors the chrome rung and `label` stands one 1.125 step under
 	   it. The ratio and the weight are fixed conventions, not dials: no consumer tunes
 	   a typographic ratio, and a dial nobody turns is a name every reader still holds.
-	   Two chrome rungs: nothing the chrome names ranks above the value it names, a card
-	   title being body at the mid weight, and a second step below `label` lands near
-	   11px, under a size anything here wants to be read at. */
+	   Two chrome rungs under the body and one over it. A second step below `label` lands
+	   near 11px, under a size anything here wants to be read at. `title` is the card's
+	   name alone, two steps up: a card holds sections whose headers stand at the body,
+	   and one step is the paper's, which reads as a change of register rather than of
+	   rank, so a card and the section inside it read as siblings at it. */
 	--_qm-text-body: var(--qm-font-size, 0.875rem);
 	--_qm-text-label: calc(var(--_qm-text-body) / 1.125);
+	--_qm-text-title: calc(var(--_qm-text-body) * 1.125 * 1.125);
 	/* Paper: the document body answers to the preview's paper where every other
 	   surface here answers to the control beside it, so a rung shared with the chrome
 	   makes a consumer asking for larger prose take larger inputs with it. 16/15 where
@@ -488,6 +491,16 @@
 	font-family: var(--_qm-font);
 	color: var(--_qm-ink);
 	line-height: var(--_qm-leading-body);
+}
+
+/* More contrast steps the two rungs that identify a control rather than a list of
+   selectors: the well's edge to 3:1 against the card at both poles (WCAG 1.4.11),
+   which half the ink over the well clears, and the ring a pixel wider. */
+@media (prefers-contrast: more) {
+	:where([data-qm-root]) {
+		--_qm-well-edge: color-mix(in oklab, var(--_qm-fg) 50%, transparent);
+		--_qm-ring-width: 3px;
+	}
 }
 
 /* Reduced motion collapses the scale, never a list of selectors.

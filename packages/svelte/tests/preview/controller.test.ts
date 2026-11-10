@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { createPreview } from '$lib/preview/controller';
+import { DEFAULT_PREVIEW_STRINGS } from '$lib/preview/strings';
 import type { LiveSession, FieldRegion } from '@quillmark/wasm';
 import { change, mockSession, stubPaintGlobals } from '../helpers/session.js';
 
@@ -131,5 +132,41 @@ describe('the page slot names its index', () => {
 		preview.refresh(change(2));
 		expect(numbers()).toEqual(['0', '1']);
 		preview.destroy();
+	});
+});
+
+describe('what a screen reader hears of the pane', () => {
+	const S = DEFAULT_PREVIEW_STRINGS;
+	const labels = () =>
+		[...container.querySelectorAll<HTMLElement>('.qm-page-slot')].map((el) => [
+			el.getAttribute('role'),
+			el.getAttribute('aria-label')
+		]);
+
+	it('names the pane a region and each page by its place, across a count change', () => {
+		const preview = createPreview(mockSession(2), { container });
+		expect(container.getAttribute('role')).toBe('region');
+		expect(container.getAttribute('aria-label')).toBe(S.previewLabel);
+		expect(labels()).toEqual([
+			['img', S.pageLabel(1, 2)],
+			['img', S.pageLabel(2, 2)]
+		]);
+
+		preview.refresh(change(3));
+		expect(labels().map(([, label]) => label)).toEqual([1, 2, 3].map((n) => S.pageLabel(n, 3)));
+
+		preview.destroy();
+		expect(container.hasAttribute('role')).toBe(false);
+		expect(container.hasAttribute('aria-label')).toBe(false);
+	});
+
+	it("keeps the host's own role and name", () => {
+		container.setAttribute('role', 'figure');
+		container.setAttribute('aria-labelledby', 'heading');
+		const preview = createPreview(mockSession(1), { container });
+		expect(container.getAttribute('role')).toBe('figure');
+		expect(container.hasAttribute('aria-label')).toBe(false);
+		preview.destroy();
+		expect(container.getAttribute('role')).toBe('figure');
 	});
 });
