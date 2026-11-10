@@ -2,15 +2,15 @@
  A proposed value, under the control whose value it would replace: the value as words, and the
  two answers. In flow, as a diagnostic is, so the proposal stands with its field and takes no
  surface of its own. It is drawn as a prose proposal is, what would go struck and what would
- come tinted: two lines of words by the words they differ in, any other pair of values whole.
+ come tinted: two lines of words by the words they differ in, two lists by their members, two
+ records by their keys, any other pair of values whole.
 
  The buttons are in the tab order, a form control having no caret for a chord to follow; the
  chords answer too while the focus is in the field (`Field.svelte`).
 -->
 <script lang="ts">
-	import { wordDiff } from '../core/codec/index.js';
 	import { wording } from './strings.js';
-	import { reviewText, type FieldProposal } from './review.js';
+	import { reviewRuns, reviewText, type FieldProposal } from './review.js';
 	import { review } from './review.svelte.js';
 
 	interface Props {
@@ -34,28 +34,7 @@
 
 	const words = $derived({ on: t.strings.reviewOn, off: t.strings.reviewOff });
 	const after = $derived(reviewText(item.after, words));
-	/** The proposal as runs: kept, struck, added. Two lines of words differ by their words; any
-	 *  other pair differs whole, the value that would go and the one that would come. */
-	const runs = $derived.by((): { text: string; kind?: 'del' | 'ins' }[] => {
-		const prose = (v: unknown): v is string | { text: string } =>
-			typeof v === 'string' || (typeof v === 'object' && v !== null && 'text' in v);
-		const before = reviewText(value, words);
-		if (!prose(value) || !prose(item.after) || !before || !after)
-			return [
-				...(before ? [{ text: before, kind: 'del' as const }] : []),
-				...(after ? [{ text: after, kind: 'ins' as const }] : [])
-			];
-		const out: { text: string; kind?: 'del' | 'ins' }[] = [];
-		let at = 0;
-		for (const hunk of wordDiff(before, after)) {
-			if (hunk.at > at) out.push({ text: before.slice(at, hunk.at) });
-			if (hunk.end > hunk.at) out.push({ text: before.slice(hunk.at, hunk.end), kind: 'del' });
-			if (hunk.insert) out.push({ text: hunk.insert, kind: 'ins' });
-			at = hunk.end;
-		}
-		if (at < before.length) out.push({ text: before.slice(at) });
-		return out;
-	});
+	const runs = $derived(reviewRuns(value, item.after, words));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
