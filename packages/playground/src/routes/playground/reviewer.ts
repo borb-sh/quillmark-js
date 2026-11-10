@@ -145,6 +145,26 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 			redo
 		});
 	}
+	const keywords = doc.getStored('keywords');
+	if (Array.isArray(keywords) && keywords.length > 1)
+		held.push({
+			item: {
+				id: `review-${serial++}`,
+				state: 'proposed',
+				field: doc.pathFor('keywords'),
+				after: [...keywords.slice(0, -1), 'Review', ...keywords.slice(-1)]
+			}
+		});
+	const contributors = doc.getStored('contributors');
+	if (Array.isArray(contributors) && contributors.length > 1)
+		held.push({
+			item: {
+				id: `review-${serial++}`,
+				state: 'proposed',
+				field: doc.pathFor('contributors'),
+				after: [contributors[0], { ...contributors[1], role: 'editor' }]
+			}
+		});
 	if ('columns' in (quill.schema.main.fields ?? {}))
 		held.push({
 			item: { id: `review-${serial++}`, state: 'proposed', field: doc.pathFor('columns'), after: 2 }
