@@ -8,6 +8,8 @@ Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to 
 
 **Every merge is this package's.** Quillmark core is single-writer and refuses a write whose base has moved (`edit::stale_base`), so concurrent writers merge here, in Y, and the Document takes the merged value through `replace`. Rejected: a merge in core, which would need a history core does not keep.
 
+**A write from a revision is written whole, or reported where it meets a change.** `writeFrom` holds nothing back: what it writes, it writes in one update, and where that meets a change made since it lists the change in `conflicts` for the host to answer. Rejected: holding back each part that meets a change for the host to write on request, a second rebase beside the editor's own, which carries an assistant's proposal through the reader's typing and has the reader answer it a paragraph at a time (svelte/INVARIANTS §"A proposal is an edit of the paragraph as its writer read it").
+
 **The package knows nothing of the editor.** The host wires `onRemote` to the editor's host verbs (svelte/INVARIANTS §"A host that changes the document says so").
 
 ## Invariants
@@ -57,8 +59,7 @@ Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to 
 - A change of quill reference is not a field edit. The host ends the session and every client rejoins.
 - `push` reads every card, so its cost grows with the document; debounce it for large documents.
 - A whole-value field is written whole: two people editing different rows of an array of records keep one row's edit.
-- A write applied over a conflict merges two rewrites into neither. Hold the part and write it with `writeHeld`.
-- A held part belongs to the session it was made in. A host drops it when the session ends.
+- A write applied over a conflict merges two rewrites into neither. Apply a write from a revision only when its `conflicts` is empty.
 - The host owns `session.doc` and frees it after `leave`.
 
 ## Testing

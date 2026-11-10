@@ -9,27 +9,8 @@ export type {
 	DocumentBinding,
 	RemoteChange
 } from './document.js';
-export {
-	writeFrom,
-	writeHeld,
-	heldState,
-	changesSince,
-	projectDocument,
-	Unwritable
-} from './fork.js';
-export type {
-	Change,
-	ForkOpts,
-	Held,
-	HeldCard,
-	HeldOpts,
-	HeldPosition,
-	HeldState,
-	HeldText,
-	HeldValue,
-	WriteFromOpts,
-	Written
-} from './fork.js';
+export { writeFrom, changesSince, projectDocument, Unwritable } from './fork.js';
+export type { Change, ForkOpts, WriteFromOpts, Written } from './fork.js';
 export { joinSession, QuillMismatch } from './session.js';
 export type {
 	Appended,
