@@ -67,7 +67,10 @@
 
     seed ─► doc.apply (text + anchor) ─► review = items ─► onReviewDrawn ─► the bar's count
     bar ─► stepReview / answerReview('all', …) ─► onReview per item
-    accept ─► the editor's own edit ─► onChange ─► onReview ─► the item leaves the list
+    accept ─► the editor's own edit ─► onChange ─► onReview ─► the item stays, drawn as its change
+    Keep ─► the accepted items leave the list ─► their marks go
+    Undo all / a change's Undo ─► answerReview('all', 'reopen') ─► onReview reopen
+    Auto-accept ─► onReviewDrawn ─► answerReview('all', 'accept'), no proposal painted
     revert ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
     ⌘Z after an answer ─► onReview reopen ─► the item back on the list
                                            └► editor.offerUndo (the step back from it)
@@ -134,7 +137,10 @@
 				refresh(): void;
 				applyCardOps(ops: readonly CardOp[]): void;
 				revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
-				answerReview(ids: readonly string[] | 'all', action: 'accept' | 'dismiss'): string[];
+				answerReview(
+					ids: readonly string[] | 'all',
+					action: 'accept' | 'dismiss' | 'reopen'
+				): string[];
 				stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
 				offerUndo(notice: string, undo: () => void): () => void;
 		  }
@@ -148,6 +154,8 @@
 	// What the editor draws of the list: the bar counts and walks this, not the list itself, so
 	// its count and the page agree.
 	let reviewDrawn = $state<ReviewDrawn | undefined>();
+	// Whether the reviewer's proposals are accepted as they arrive.
+	let autoAccept = $state(false);
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -330,15 +338,22 @@
 	// The reader's answer to a review item. The editor has already written an accepted
 	// proposal, through `onChange`; the reviewer makes the write a change taken back asks for.
 	function handleReview(event: ReviewEvent): void {
-		if (editorRef) reviewer?.answer(event, editorRef);
+		if (editorRef) reviewer?.answer(event, editorRef, autoAccept);
 	}
 	// The review bar, built from the public verbs alone: the reference a host copies.
 	function stepReview(dir: 1 | -1): void {
 		void editorRef?.stepReview(dir);
 	}
 	// Its batch buttons keep the focus where it was, so ⌘Z in the editor takes a batch back.
-	function answerAll(action: 'accept' | 'dismiss'): void {
+	function answerAll(action: 'accept' | 'dismiss' | 'reopen'): void {
 		editorRef?.answerReview('all', action);
+	}
+	function keepAll(): void {
+		reviewer?.keep(reviewDrawn?.accepted ?? []);
+	}
+	// What arrives is accepted once the editor says it has drawn it, ahead of the next paint.
+	function arrive(): void {
+		if (autoAccept) editorRef?.answerReview('all', 'accept');
 	}
 	function handleError(err: EditorError): void {
 		lastError = `${err.code}: ${err.message}`;
@@ -535,6 +550,7 @@
 				});
 				reviewer = seeded;
 				reviewItems = seeded.items();
+				autoAccept = params.has('auto');
 			}
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
 			// suite and the render build; the engine and the session follow behind it.
@@ -680,7 +696,8 @@
 				<span class="stat"
 					><span class="qm-label">review</span>
 					<span class="qm-readout" data-testid="review-focus"
-						>{reviewFocus} · {reviewDrawn?.order.length ?? 0} open</span
+						>{reviewFocus} · {(reviewDrawn?.order.length ?? 0) -
+							(reviewDrawn?.accepted.length ?? 0)} open · {reviewDrawn?.accepted.length ?? 0} accepted</span
 					></span
 				>
 				{#if reviewDrawn?.undrawn.length}
@@ -771,6 +788,31 @@
 							onmousedown={(e) => e.preventDefault()}
 							onclick={() => answerAll('dismiss')}>Dismiss all</button
 						>
+						<button
+							class="qm-control"
+							type="button"
+							data-testid="review-keep"
+							disabled={!reviewDrawn?.accepted.length}
+							onmousedown={(e) => e.preventDefault()}
+							onclick={keepAll}>Keep</button
+						>
+						<button
+							class="qm-control"
+							type="button"
+							data-testid="review-undo-all"
+							disabled={!reviewDrawn?.accepted.length}
+							onmousedown={(e) => e.preventDefault()}
+							onclick={() => answerAll('reopen')}>Undo all</button
+						>
+						<label class="qm-control review-auto">
+							<input
+								type="checkbox"
+								data-testid="review-auto"
+								bind:checked={autoAccept}
+								onchange={arrive}
+							/>
+							Auto-accept
+						</label>
 					</span>
 				{/if}
 				<button
@@ -835,6 +877,7 @@
 						}}
 						onReviewDrawn={(drawn) => {
 							reviewDrawn = drawn;
+							arrive();
 						}}
 						{fonts}
 						{fontLabels}
@@ -932,6 +975,11 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--qmh-space-2);
+	}
+	.review-auto {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--qmh-space);
 	}
 
 	/* The one pair on the strip whose value is a control rather than a readout, so the

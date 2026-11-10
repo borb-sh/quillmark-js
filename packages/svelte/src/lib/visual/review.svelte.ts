@@ -8,7 +8,7 @@
 // so neither raises one on its way across a paragraph, and it waits a beat on the pointer's
 // leaving so the pointer can travel into it.
 //
-// An answered item is drawn no more, from the answer and not from the host's next list: the
+// A dismissed item is drawn no more, from the answer and not from the host's next list: the
 // reader's press shows at once however long the host takes to hand over a list without it.
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
@@ -29,9 +29,14 @@ export interface ShownReview {
 	via: ReviewVia | 'reveal';
 }
 
+/** A `changed` item over a prose leaf. */
+type TextChange = Extract<ReviewItem, { state: 'changed'; anchor: string }>;
+
 export interface Review {
 	/** The host's list, less what was answered here. */
 	readonly items: readonly ReviewItem[];
+	/** The proposals accepted and still listed, each as the change it made. */
+	readonly accepted: ReadonlyMap<string, FieldChange | TextChange>;
 	/** The items a prose leaf draws, one identity until the list changes. */
 	readonly text: readonly TextReview[];
 	/** Each mounted prose leaf's report of what it draws, by leaf key. */
@@ -79,27 +84,51 @@ export interface ReviewSource {
 	/** An answer a chord gave, once it is made. */
 	chorded?(id: string): void;
 	writing?(on: boolean): void;
+	/** The field proposals accepted here, each as the change it made. */
+	taken?(): ReadonlyMap<string, FieldChange>;
+	/** Take back what accepting `id` wrote, so it is open again. */
+	putBack?(id: string): boolean;
 }
 
 export function createReview(source: ReviewSource): Review & { dispose(): void } {
 	/** The ids answered, each until a list arrives without it. */
 	const answered = new Set<string>();
+	/** The field proposals accepted here, drawn while the field still holds what was written. */
+	const took = new Set<string>();
 	let answers = $state(0);
 	const items = $derived.by(() => {
 		const listed = source.items() ?? [];
 		if (!answers) return listed;
 		const ids = new Set(listed.map((item) => item.id));
 		for (const id of answered) if (!ids.has(id)) answered.delete(id);
-		return answered.size ? listed.filter((item) => !answered.has(item.id)) : listed;
+		for (const id of took) if (!ids.has(id)) took.delete(id);
+		const taken = source.taken?.();
+		const gone = (id: string): boolean => answered.has(id) || (took.has(id) && !taken?.has(id));
+		return answered.size || took.size ? listed.filter((item) => !gone(item.id)) : listed;
 	});
-	const byId = $derived(new Map(items.map((item) => [item.id, item])));
+	const drawn = new SvelteMap<string, ReviewReport>();
+	/** Each accepted proposal still listed, as the change the card and the field draw. */
+	const accepted = $derived.by(() => {
+		const out = new Map<string, FieldChange | TextChange>();
+		const listed = new Map((source.items() ?? []).map((item) => [item.id, item]));
+		for (const [id, change] of source.taken?.() ?? []) if (listed.has(id)) out.set(id, change);
+		for (const report of drawn.values())
+			for (const { id, before } of report.accepted ?? []) {
+				const item = listed.get(id);
+				if (item && 'anchor' in item)
+					out.set(id, { id, state: 'changed', anchor: item.anchor, before });
+			}
+		return out;
+	});
+	const byId = $derived(new Map(items.map((item) => [item.id, accepted.get(item.id) ?? item])));
 	const text: readonly TextReview[] = $derived(
 		items.filter((item): item is Extract<ReviewItem, { anchor: string }> => 'anchor' in item)
 	);
 	const placed = $derived.by(() => {
 		const out = new Map<string, { changed?: FieldChange; proposed?: FieldProposal }>();
 		const undrawn: { id: string; reason: ReviewUndrawn }[] = [];
-		for (const item of items) {
+		for (const listed of items) {
+			const item = accepted.get(listed.id) ?? listed;
 			if (!('field' in item)) continue;
 			const key = source.keyFor(item.field);
 			// A proposal for a place inside a field would be written over the whole field.
@@ -119,7 +148,6 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return { fields: out, undrawn };
 	});
 	const fields = $derived(placed.fields);
-	const drawn = new SvelteMap<string, ReviewReport>();
 
 	let pointer = $state<string | undefined>();
 	let caret = $state<string | undefined>();
@@ -147,10 +175,14 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 	);
 
 	const answering = (id: string, action: ReviewAction, chord?: boolean): void => {
-		if (action === 'reopen') answered.delete(id);
-		else {
+		if (action === 'reopen') {
+			answered.delete(id);
+			took.delete(id);
+		} else {
 			if (card?.id === id) card = undefined;
-			answered.add(id);
+			// An accepted proposal stays, drawn as its change, while the list holds it.
+			if (action !== 'accept') answered.add(id);
+			else if (byId.get(id) && 'field' in byId.get(id)!) took.add(id);
 		}
 		answers++;
 		if (chord) source.chorded?.(id);
@@ -159,6 +191,9 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 	const self: Review & { dispose(): void } = {
 		get items() {
 			return items;
+		},
+		get accepted() {
+			return accepted;
 		},
 		get text() {
 			return text;
@@ -226,6 +261,8 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			else clearTimeout(timer);
 		},
 		act(id, action, chord) {
+			if (accepted.has(id) && (action === 'revert' || action === 'reopen'))
+				return source.putBack?.(id) ?? false;
 			const item = byId.get(id);
 			if (!item || !source.answer(id, item, action)) return false;
 			answering(id, action, chord);
@@ -281,6 +318,7 @@ const NO_ITEMS: readonly TextReview[] = [];
 /** What a component rendered outside the editor gets: nothing to draw. */
 const NO_REVIEW: Review = {
 	items: [],
+	accepted: new Map(),
 	text: NO_ITEMS,
 	reports: new Map(),
 	fieldUndrawn: [],

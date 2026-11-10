@@ -1,8 +1,10 @@
 // `?review`: another writer's hand over the opened document, through the verbs a host's own
 // reviewer has. It writes a few changes and lays a few proposals where the document holds the
-// text for them, and answers the reader as a host does: an accepted or dismissed item leaves the
-// list with its anchor left in place, a reopened one comes back to it, and a change taken back is
-// written back with one step back offered on the editor's undo. The anchors are transient, so
+// text for them, and answers the reader as a host does: an accepted item stays on the list, so the
+// editor marks the change it made, until the reader keeps it; a dismissed one leaves the list with
+// its anchor left in place; a reopened one comes back to it, or under auto-accept leaves it, so
+// Undo is the one press; and a change taken back is written back with one step back offered on the
+// editor's undo. The anchors are transient, so
 // they stand until the page goes and cost the stored value nothing.
 import type { Addr, Content, Document, Quill } from '@quillmark/wasm';
 import type { ReviewEvent, ReviewItem } from '@quillmark/svelte/visual';
@@ -29,8 +31,11 @@ interface Held {
 export interface Reviewer {
 	/** The list the editor draws. */
 	items(): ReviewItem[];
-	/** Make the write an answer asks for, and drop the item or put it back. */
-	answer(event: ReviewEvent, editor: ReviewEditor): void;
+	/** Make the write an answer asks for, and drop the item or put it back. Under `auto` a
+	 *  reopened proposal leaves the list rather than standing open. */
+	answer(event: ReviewEvent, editor: ReviewEditor, auto?: boolean): void;
+	/** Keep the accepted changes `ids`: off the list, so unmarked. */
+	keep(ids: readonly string[]): void;
 }
 
 /** The anchor `id` as the value at `addr` holds it now. */
@@ -150,8 +155,23 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 
 	return {
 		items: () => held.map((h) => h.item),
-		answer({ id, action }, editor) {
+		keep(ids) {
+			const kept = new Set(ids);
+			for (let i = held.length - 1; i >= 0; i--) if (kept.has(held[i].item.id)) held.splice(i, 1);
+			changed();
+		},
+		answer({ id, action }, editor, auto = false) {
+			// An accepted proposal stays listed, drawn as its change, until it is kept.
+			if (action === 'accept') return;
 			if (action === 'reopen') {
+				const listed = held.findIndex((h) => h.item.id === id);
+				if (listed >= 0) {
+					if (auto) {
+						held.splice(listed, 1);
+						changed();
+					}
+					return;
+				}
 				const back = answered.get(id);
 				if (!back) return;
 				answered.delete(id);
@@ -181,8 +201,7 @@ export function seedReview(doc: Document, quill: Quill, changed: () => void): Re
 				land();
 				return;
 			}
-			// The editor wrote what an accept takes, and its ⌘Z reopens either answer, so the
-			// anchor stays where the item can be placed again.
+			// A dismissal's ⌘Z reopens it, so the anchor stays where the item can be placed again.
 			answered.set(id, { entry, at });
 			changed();
 		}

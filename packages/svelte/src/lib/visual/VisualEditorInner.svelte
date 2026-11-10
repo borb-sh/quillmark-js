@@ -57,7 +57,7 @@
 	import { createStructuralUndo, setStructuralUndo, type UndoOffer } from './undo.svelte.js';
 	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview } from './review.svelte.js';
-	import type { FieldProposal, ReviewDrawn } from './review.js';
+	import type { FieldChange, FieldProposal, ReviewDrawn } from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import {
 		markAnchor,
@@ -303,8 +303,26 @@
 		const addr = nearestAddrForFieldPath(path);
 		return addr && declaredField(addr) ? resolveCardKey(addr, cardIds) : undefined;
 	};
+	/** The field proposals accepted here: the change each made, the leaf it is at, the write
+	 *  back, and whether the value is still the one written. */
+	const taken = new SvelteMap<
+		string,
+		{ change: FieldChange; leaf: string; back: () => void; holds: () => boolean }
+	>();
+	const takenChanges = $derived(new Map([...taken].map(([id, t]) => [id, t.change])));
 	const reviewing = createReview({
 		items: () => review,
+		taken: () => takenChanges,
+		putBack(id) {
+			const field = taken.get(id);
+			if (field) {
+				field.back();
+				reviewing.heard(id, 'reopen', field.leaf);
+				return true;
+			}
+			const key = reviewing.keyOf(id);
+			return key !== undefined && !!leaves.prose(key)?.answerReview(id, 'reopen');
+		},
 		keyFor: (path) => {
 			const key = reviewed(path);
 			return key && fieldKeyToString(key);
@@ -322,9 +340,15 @@
 		},
 		answer(id, item, action, key) {
 			let back: (() => void) | undefined;
+			if (action === 'reopen') taken.delete(id);
 			if (action === 'accept' && item?.state === 'proposed' && 'field' in item) {
-				back = takeField(item);
-				if (!back) return false;
+				const took = takeField(item);
+				if (!took) return false;
+				back = took.back;
+				taken.set(id, {
+					...took,
+					change: { id, state: 'changed', field: item.field, before: took.before }
+				});
 			}
 			onReview?.({ id, action });
 			if (action !== 'accept' && action !== 'dismiss') return true;
@@ -367,6 +391,8 @@
 	let writing = 0;
 	function settled(): void {
 		if (writing) return;
+		// A field set to another value since it was accepted no longer shows that change.
+		for (const [id, field] of taken) if (!field.holds()) taken.delete(id);
 		journal = [];
 		journalOffer = undefined;
 		undo.settle();
@@ -404,17 +430,21 @@
 	/**
 	 * Take a field's proposal: its value down the lane the field's own control commits by, so
 	 * the writer checks it and `onChange` reports it. A text leaf re-reads what was written.
-	 * Returns the write back to the value it replaced, or `undefined` where the writer refused
-	 * the value, which the field then says as it says any refused commit.
+	 * Returns the value it replaced, the write back to it, and whether the field still holds
+	 * what was written, or `undefined` where the writer refused the value, which the field then
+	 * says as it says any refused commit.
 	 */
-	function takeField(item: FieldProposal): (() => void) | undefined {
+	function takeField(
+		item: FieldProposal
+	): { leaf: string; before: unknown; back: () => void; holds: () => boolean } | undefined {
 		const key = reviewed(item.field);
 		if (!key?.field || typeof key.card === 'number') return undefined;
 		const isMain = key.card === undefined;
 		const id = key.card ?? model.main.id;
 		const name = key.field;
 		const leaf = fieldKeyToString(key);
-		const before = doc.getStored(makeAddr(id, isMain, name));
+		const addr = makeAddr(id, isMain, name);
+		const before = doc.getStored(addr);
 		const write = (value: unknown): boolean => {
 			commitScalar(id, isMain, name, value);
 			if (commitErrors.has(leaf)) return false;
@@ -423,7 +453,14 @@
 		};
 		writing++;
 		try {
-			return write(item.after) ? () => void write(before) : undefined;
+			if (!write(item.after)) return undefined;
+			const written = JSON.stringify(doc.getStored(addr));
+			return {
+				leaf,
+				before,
+				back: () => void write(before),
+				holds: () => JSON.stringify(doc.getStored(addr)) === written
+			};
 		} finally {
 			writing--;
 		}
@@ -475,8 +512,10 @@
 		for (const { id, reason } of reviewing.fieldUndrawn) why.set(id, reason);
 		for (const item of reviewing.items)
 			if ('anchor' in item && !reported.has(item.id)) why.set(item.id, 'anchor');
+		const order = reviewOrder();
 		return {
-			order: reviewOrder(),
+			order,
+			accepted: order.filter((id) => reviewing.accepted.has(id)),
 			outdated,
 			undrawn: reviewing.items.flatMap((item) => {
 				const reason = why.get(item.id);
@@ -486,11 +525,17 @@
 	}
 	// The report, to a host counting its own list: each change, read once the leaves the change
 	// mounted have drawn, so a list just handed over is not reported as anchored nowhere.
-	const NO_REPORT = JSON.stringify({ order: [], outdated: [], undrawn: [] } satisfies ReviewDrawn);
+	const NO_REPORT = JSON.stringify({
+		order: [],
+		accepted: [],
+		outdated: [],
+		undrawn: []
+	} satisfies ReviewDrawn);
 	let drewReport = NO_REPORT;
 	let drewOrder: readonly string[] = [];
 	$effect(() => {
 		void reviewing.items;
+		void reviewing.accepted;
 		void reviewing.fieldUndrawn;
 		for (const report of reviewing.reports.values()) void report;
 		let live = true;
@@ -1373,26 +1418,33 @@
 	}
 
 	/**
-	 * Answer open items as their buttons would, in document order: `'all'` is every item drawn.
-	 * Both pass over a change, which has neither button, and an item that cannot be answered (a
-	 * proposal that no longer writes, a value the field's writer refuses) stands. `onReview`
-	 * hears each answer, and neither the focus nor the caret moves. Returns the ids answered.
+	 * Answer items as their buttons would, in document order: `'all'` is every item drawn. An
+	 * accept or a dismissal passes over a change, which has neither button, and over a proposal
+	 * already accepted, and an item that cannot be answered (a proposal that no longer writes, a
+	 * value the field's writer refuses) stands. `'reopen'` takes back each accepted proposal
+	 * named, as its card's Undo does. `onReview` hears each answer, and neither the focus nor the
+	 * caret moves. Returns the ids answered.
 	 */
 	export function answerReview(
 		ids: readonly string[] | 'all',
-		action: 'accept' | 'dismiss'
+		action: 'accept' | 'dismiss' | 'reopen'
 	): string[] {
 		if (!span.alive) return [];
 		const order = reviewOrder();
 		const asked = ids === 'all' ? order : order.filter((id) => ids.includes(id));
 		const out: string[] = [];
+		if (action === 'reopen') {
+			for (const id of asked)
+				if (reviewing.accepted.has(id) && reviewing.act(id, 'reopen')) out.push(id);
+			return out;
+		}
 		const entry: Answered = { ids: [], inverses: [] };
 		batching = entry;
 		writing++;
 		try {
 			for (const id of asked) {
 				const item = reviewing.items.find((it) => it.id === id);
-				if (!item || item.state === 'changed') continue;
+				if (!item || item.state === 'changed' || reviewing.accepted.has(id)) continue;
 				const key = reviewing.keyOf(id);
 				// Each one is planned against the document the one before it left.
 				const answered =

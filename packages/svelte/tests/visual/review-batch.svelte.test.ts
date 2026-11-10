@@ -108,6 +108,7 @@ describe('the drawn report', () => {
 		await settle();
 		expect(r.drawn.at(-1)).toEqual({
 			order: ['first'],
+			accepted: [],
 			outdated: [],
 			undrawn: [
 				{ id: 'nowhere', reason: 'anchor' },
