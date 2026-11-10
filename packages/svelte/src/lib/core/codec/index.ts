@@ -13,7 +13,7 @@ import './prose.css';
 
 // What a floating surface anchors to. The visual tier's own surfaces mint one over a
 // selection (`visual/FormatPopover.svelte`), so it is reached off-barrel.
-export { rangeAnchor } from './anchor.js';
+export { markAnchor, rangeAnchor } from './anchor.js';
 export type { RangeAnchor } from './anchor.js';
 
 // The prose leaf.
@@ -40,10 +40,17 @@ export type { TableChromeStrings } from './table-view.js';
 export { DEFAULT_SLASH_STRINGS } from './slash.js';
 export type { SlashState, SlashStrings } from './slash.js';
 
+// The review layer a leaf draws over its anchors: the visual tier's `strings` set extends its
+// wording and its `ReviewItem` narrows to the leaf's own.
+export { DEFAULT_REVIEW_STRINGS } from './review.js';
+export type { ReviewAction, ReviewStrings, ReviewVia, TextReview } from './review.js';
+export { wordDiff } from './review-diff.js';
+export type { DiffHunk } from './review-diff.js';
+
 // The rich editor's shortcuts as a host lists them, read off the tables the keymaps bind from;
 // the visual tier's `strings` set extends their wording, and the formatting popover binds its
 // link chord from `FIELD_KEYS`.
-export { DEFAULT_SHORTCUT_STRINGS, FIELD_KEYS, editorShortcuts } from './shortcuts.js';
+export { DEFAULT_SHORTCUT_STRINGS, FIELD_KEYS, REVIEW_KEYS, editorShortcuts } from './shortcuts.js';
 export type { EditorShortcut, ShortcutScope, ShortcutStrings } from './shortcuts.js';
 
 // Schemas (the decode/encode target; the VisualEditor mounts them). `hasMarks` is
