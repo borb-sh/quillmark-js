@@ -414,6 +414,11 @@
 		justify-content: space-between;
 		gap: var(--_qm-space-2);
 	}
+	/* Under a label that carries its description in flow, the count keeps the label's
+	 line rather than centring on the two. */
+	.qm-matrix-header:has(> :global(.qm-field-label-row.briefed)) {
+		align-items: baseline;
+	}
 	/* The count reads at the label rung: a fact about the field, never a value. */
 	.qm-matrix-count {
 		font-size: var(--_qm-text-label);

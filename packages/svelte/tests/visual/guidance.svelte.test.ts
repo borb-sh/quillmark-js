@@ -3,9 +3,13 @@
 // control raises the description that control carries: the keyboard's one way in, so a
 // field costs one Tab stop. Which glyph answers is the control's own `aria-describedby`,
 // so a table cell reaches its column's description through the header.
+//
+// And where a description is drawn. A short one stands under its label, the line itself
+// describing the control, and a longer one behind the glyph; either draws its markdown
+// as marks, and describes the control by its words alone.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
-import { quill, example } from '../helpers/fixtures.js';
+import { quill, example, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	field,
 	leaf,
@@ -35,11 +39,12 @@ const describedText = (control: Element): string[] =>
 		.split(/\s+/)
 		.map((id) => document.getElementById(id)?.textContent ?? '');
 
-/** The `contact` subform's `name` cell, its group opened. */
-function contactName(target: HTMLElement): { input: HTMLElement; hint: HTMLElement } {
+/** The `contact` subform's `note` cell, whose description stands behind a glyph, its
+ *  group opened. */
+function contactNote(target: HTMLElement): { input: HTMLElement; hint: HTMLElement } {
 	const contact = openField(target, quill().schema.main, 'contact');
 	const label = [...contact.querySelectorAll<HTMLLabelElement>('.qm-object .qm-field-label')].find(
-		(l) => l.querySelector('span')?.textContent === 'Name'
+		(l) => l.querySelector('span')?.textContent === 'Note'
 	)!;
 	return {
 		input: leaf(label.closest<HTMLElement>('.qm-object-prop')!),
@@ -57,7 +62,7 @@ describe('the guidance key', () => {
 
 	it('raises the focused control’s own description, and lowers it again', () => {
 		const { target } = mountEditor(quill(), example());
-		const { input, hint } = contactName(target);
+		const { input, hint } = contactNote(target);
 		input.focus();
 
 		press(input, '/', { ctrlKey: true });
@@ -69,7 +74,7 @@ describe('the guidance key', () => {
 
 	it('lowers on Escape in the control and on focus leaving it', () => {
 		const { target } = mountEditor(quill(), example());
-		const { input } = contactName(target);
+		const { input } = contactNote(target);
 		input.focus();
 
 		press(input, '/', { ctrlKey: true });
@@ -95,5 +100,65 @@ describe('the guidance key', () => {
 		press(cell, '/', { ctrlKey: true });
 		const column = table.querySelector('.qm-array-table-col')!;
 		expect(raised(target)).toEqual([hintOf(column)]);
+	});
+});
+
+const DESCRIBED_YAML = `quill:
+  name: described
+  version: 1.0.0
+  backend: typst
+  description: A short description and a long one.
+typst:
+  plate_file: plate.typ
+main:
+  fields:
+    short:
+      type: text
+      description: Set as \`code\`, *briefly*.
+    long:
+      type: text
+      description: A description that runs well past what one line under a label holds, set as \`code\` and pointing at [a page](https://example.com) for the rest of it.
+`;
+
+describe('a description', () => {
+	function open(): HTMLElement {
+		const q = quillFromYaml(DESCRIBED_YAML);
+		return mountEditor(q, q.seedDocument()).target;
+	}
+	const brief = (scope: Element) => scope.querySelector<HTMLElement>('.qm-field-brief');
+
+	it('stands under its label where it is short, its markdown drawn', () => {
+		const target = open();
+		const short = field(target, 'Short');
+		expect(short.querySelector('.qm-field-hint')).toBeNull();
+		expect(brief(short)!.querySelector('code')).not.toBeNull();
+		expect(brief(short)!.textContent).not.toMatch(/[`*]/);
+		expect(describedText(leaf(short))).toEqual([brief(short)!.textContent]);
+	});
+
+	it('raises nothing for a description already on screen', () => {
+		const target = open();
+		const input = leaf(field(target, 'Short'));
+		input.focus();
+		press(input, '/', { ctrlKey: true });
+		expect(raised(target)).toEqual([]);
+	});
+
+	it('keeps a long one behind its glyph, described by its words alone', () => {
+		const target = open();
+		const long = field(target, 'Long');
+		expect(brief(long)).toBeNull();
+		const [words] = describedText(leaf(long));
+		expect(words).not.toMatch(/[`\]]/);
+
+		const input = leaf(long);
+		input.focus();
+		press(input, '/', { ctrlKey: true });
+		expect(raised(target)).toEqual([hintOf(long)]);
+		const surface = document.querySelector<HTMLElement>('.qm-hint-popover')!;
+		expect(surface.textContent).toBe(words);
+		expect(surface.querySelector('code')).not.toBeNull();
+		// A link is drawn as its words: the surface is not one to land in.
+		expect(surface.querySelector('a')).toBeNull();
 	});
 });

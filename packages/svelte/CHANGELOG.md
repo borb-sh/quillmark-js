@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A short description stands under its label, and a description's markdown is drawn.** A field description of up to 72 characters is set in flow under the field's label, where it sat behind an info marker that showed only on the field's hover or focus; a longer one keeps the marker and its popover, as does a table column's. A description's inline markdown draws as marks in both places, a link as its words, where backticks and asterisks printed literally, and the text that describes the control to assistive tech is the words alone.
+
 **A drop anywhere in a table cell lands in that cell.** Text dropped on a cell's padding, or on the edge of its text where no line is, lands in the cell at the nearest place in its text, where the first landed as a new paragraph above the table and the second was taken and dropped.
 
 **Enter in a list of numbers moves on.** Enter in a number row that holds a number commits it and takes the focus to the next row with its number selected, or from the last row to a standing row for the next number, where the caret stayed and the next digits ran onto the number just entered.

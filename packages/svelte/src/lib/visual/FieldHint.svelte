@@ -9,11 +9,11 @@
  on touch, which leaves guidance the reference quill puts on nearly every field
  reachable on a tablet only through a screen reader.
 
- Floating rather than inline under the label: the reference quill's descriptions run
- to a median of ~110 characters and past 250 at the tail: permanently in flow that
- is several wrapped lines under every field, which is the density the card is built
- to avoid. Measured, not assumed; a quill whose descriptions are all one short line
- would be better served inline.
+ Floating, for a description past a line or so (`isBrief`): the reference quill's
+ descriptions run to a median of ~110 characters and past 250 at the tail, and
+ permanently in flow that is several wrapped lines under every field, which is the
+ density the card is built to avoid. A short one stands under its label instead
+ ({@link FieldLabel}) and raises no marker.
 
  The popover is chrome, not the announcement. Its content is `aria-hidden`: the
  description reaches assistive tech through the always-present parked node
@@ -32,6 +32,7 @@
 	import { Popover } from 'bits-ui';
 	import Icon from './icons/Icon.svelte';
 	import { spacePx } from '../core/rungs.js';
+	import { renderGuidance } from './guidance.js';
 	import './controls.css';
 
 	interface Props {
@@ -77,7 +78,7 @@
 		probe.className = 'qm-hint-popover';
 		probe.style.cssText =
 			'position:absolute;width:max-content;visibility:hidden;pointer-events:none';
-		probe.textContent = description;
+		probe.replaceChildren(renderGuidance(description));
 		host.appendChild(probe);
 		const range = document.createRange();
 		range.selectNodeContents(probe);
@@ -105,6 +106,11 @@
 	/** What a keyboard raise was asked from: the described control, holding focus while
 	 * the trigger never does, so its leaving and its Escape are what lower the surface. */
 	let from = $state<HTMLElement | undefined>(undefined);
+
+	/** The description is DOM, not text (`renderGuidance`), so it is written in. */
+	function paint(surface: HTMLElement): void {
+		surface.replaceChildren(renderGuidance(description));
+	}
 
 	function raise(origin?: HTMLElement): void {
 		from = origin;
@@ -228,9 +234,8 @@
 						data-qm-root
 						aria-hidden="true"
 						inert={!raised}
-					>
-						{description}
-					</div>
+						{@attach paint}
+					></div>
 				</div>
 			{/snippet}
 		</Popover.Content>
@@ -303,5 +308,15 @@
 		font-size: var(--_qm-text-label);
 		line-height: var(--_qm-leading-body);
 		color: var(--_qm-ink-label);
+	}
+	/* The rendered description is the codec's `toDOM` output, one paragraph. `code` takes
+	 the face a leaf gives it (`core/codec/prose.css`) and no chip, the surface being
+	 translucent already. */
+	:global(.qm-hint-popover p) {
+		margin: 0;
+	}
+	:global(.qm-hint-popover code) {
+		font-family: var(--_qm-font-mono);
+		font-size: inherit;
 	}
 </style>
