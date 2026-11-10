@@ -5,7 +5,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { REVIEW_KEYS } from '$lib/core/codec';
-import { HOVER_MS } from '$lib/visual/review.svelte';
 import type { ReviewEvent, ReviewItem } from '$lib/visual';
 import { quill, example } from '../helpers/fixtures.js';
 import {
@@ -23,15 +22,9 @@ import {
 afterEach(unmountAll);
 
 const main = quill().schema.main;
-const card = (): HTMLElement | null => document.querySelector<HTMLElement>('.qm-review-card');
 const toast = (target: HTMLElement) => target.querySelector<HTMLElement>('.qm-toast');
 const keyOf = (chord: string): string => chord.slice(chord.lastIndexOf('-') + 1);
 const mod = { ctrlKey: true };
-/** The beat the focus rests in a changed field before its card rises. */
-const rested = async (): Promise<void> => {
-	await new Promise((done) => setTimeout(done, HOVER_MS));
-	flushSync();
-};
 
 interface Reviewed extends Mounted<EditorRef> {
 	doc: Document;
@@ -56,51 +49,18 @@ const stored = (doc: Document, name: string): unknown =>
 	(doc.getStored(name) as { text?: string } | undefined)?.text ?? doc.getStored(name);
 
 describe('an accepted field proposal', () => {
-	const proposed = (doc: Document): ReviewItem[] => [
-		{ id: 'r1', field: doc.pathFor('subtitle'), after: 'A newer subtitle' }
-	];
-	/** The editor over `proposed`, `r1` accepted. */
-	function accepted(): Reviewed & { before: string } {
-		const r = review(proposed);
+	it('leaves the control as any value it holds, with no answer left on it', () => {
+		const r = review((doc) => [
+			{ id: 'r1', field: doc.pathFor('subtitle'), after: 'A newer subtitle' }
+		]);
 		const before = r.doc.toMarkdown();
 		expect(r.editor.answerReview(['r1'], 'accept')).toEqual(['r1']);
 		flushSync();
-		return { ...r, before };
-	}
-
-	it('marks the control, and raises its card with what the value was once the focus rests', async () => {
-		const r = accepted();
-		const was = stored(example(), 'subtitle') as string;
-		const control = openField(r.target, main, 'subtitle').querySelector('.qm-field-control')!;
-		expect(control.getAttribute('data-qm-review')).toBe('r1');
-		leaf(control as HTMLElement).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-		flushSync();
-		expect(r.lit.at(-1)).toBe('r1');
-		expect(card()).toBeNull();
-		await rested();
-		expect(card()?.textContent).toContain(was);
-	});
-
-	it('is taken back by its card’s Undo, and opens again', async () => {
-		const r = accepted();
-		const control = openField(r.target, main, 'subtitle').querySelector('.qm-field-control')!;
-		leaf(control as HTMLElement).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-		await rested();
-		card()!.querySelector<HTMLButtonElement>('.qm-review-undo')!.click();
-		flushSync();
-		expect(r.events).toEqual([
-			{ id: 'r1', action: 'accept' },
-			{ id: 'r1', action: 'reopen' }
-		]);
-		expect(r.doc.toMarkdown()).toBe(r.before);
-		expect(r.target.querySelector('.qm-review-proposal[data-qm-review="r1"]')).not.toBeNull();
-	});
-
-	it('answers the reject chord from inside the field by taking it back', () => {
-		const r = accepted();
-		press(leaf(openField(r.target, main, 'subtitle')), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(r.events.at(-1)).toEqual({ id: 'r1', action: 'reopen' });
-		expect(r.doc.toMarkdown()).toBe(r.before);
+		const field = openField(r.target, main, 'subtitle');
+		expect(field.querySelector('[data-qm-review]')).toBeNull();
+		press(leaf(field), keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
+		expect(r.doc.toMarkdown()).not.toBe(before);
 	});
 });
 

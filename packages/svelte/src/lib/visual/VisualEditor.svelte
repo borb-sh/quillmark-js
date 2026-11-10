@@ -107,17 +107,16 @@
 		inner?.applyCardOps(ops);
 	}
 	/** Bring the review item `id` to the reader: its panel opened, scrolled to the middle of
-	 *  the view, lit, its card raised. The focus stays put unless `focus` sends the caret into
+	 *  the view, lit. The focus stays put unless `focus` sends the caret into
 	 *  the item, where its chords answer. False for an item not drawn. */
 	export async function revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean> {
 		return (await inner?.revealReview(id, opts)) ?? false;
 	}
 	/** Answer items as their buttons would, in document order (`'all'`: every item drawn),
-	 *  moving neither the focus nor the caret and raising no toast; `'reopen'` takes back
-	 *  accepted proposals. Returns the ids answered. */
+	 *  moving neither the focus nor the caret and raising no toast. Returns the ids answered. */
 	export function answerReview(
 		ids: readonly string[] | 'all',
-		action: 'accept' | 'dismiss' | 'reopen'
+		action: 'accept' | 'dismiss'
 	): string[] {
 		return inner?.answerReview(ids, action) ?? [];
 	}

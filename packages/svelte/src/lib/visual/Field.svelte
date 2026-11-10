@@ -318,22 +318,16 @@
 	 * rather than counted twice.
 	 */
 	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
-	// A change rests as a line on the control's edge and a proposal as a row under it. The
-	// pointer over the control and the focus in it are the field's two ways of being attended
-	// to, as the pointer and the caret are a mark's.
+	// A proposal rests as a row under the control. The focus in the control attends to it, as
+	// the caret in a leaf's words attends to theirs.
 	const reviewing = review();
 	const reviewed = $derived(reviewing.at(leafKey));
-	const changed = $derived(reviewed.changed);
 	const proposed = $derived(reviewed.proposed);
 	/** The items naming a place inside this field: a record's and a list's own controls draw
 	 *  them where they are, any other's under this one. */
 	const nestedReview = $derived(reviewed.nested);
-	const lit = $derived(changed !== undefined && reviewing.lit === changed.id);
-	/** The item the focus in the field attends to: the change, whose card it raises, else the
-	 *  proposal. */
-	const attended = $derived(changed ?? proposed);
-	/** The chords, with the focus anywhere in the field: a proposal's answers, else an accepted
-	 *  one taken back. A prose leaf's own items answer first, in the leaf. */
+	/** The chords, with the focus anywhere in the field: the proposal's answers. A prose leaf's
+	 *  own items answer first, in the leaf. */
 	const reviewKeys = keydownHandler({
 		[REVIEW_KEYS.accept]: () => {
 			if (!proposed) return false;
@@ -341,14 +335,13 @@
 			return true;
 		},
 		[REVIEW_KEYS.dismiss]: () => {
-			const item = proposed ?? changed;
-			if (!item) return false;
-			reviewing.act(item.id, proposed ? 'dismiss' : 'reopen', true);
+			if (!proposed) return false;
+			reviewing.act(proposed.id, 'dismiss', true);
 			return true;
 		}
 	});
 	function onReviewKey(e: KeyboardEvent): void {
-		if (e.defaultPrevented || (!changed && !proposed)) return;
+		if (e.defaultPrevented || !proposed) return;
 		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
 		if (reviewKeys({} as never, e)) e.preventDefault();
 	}
@@ -385,17 +378,13 @@
 	 level and measures the same. -->
 	<div class="qm-field-stack">
 		<div
-			class={['qm-field-control qm-wash', { 'qm-review-set': changed, 'qm-review-lit': lit }]}
-			data-qm-review={changed?.id}
+			class="qm-field-control qm-wash"
 			{@attach registerControl}
 			onfocusin={(e) => {
 				reportFocus?.(e);
-				if (attended) reviewing.point(attended.id, 'caret', leafKey);
+				if (proposed) reviewing.point(proposed.id, 'caret', leafKey);
 			}}
-			onfocusout={() => attended && reviewing.point(undefined, 'caret', leafKey)}
-			oninput={() => changed && reviewing.point(undefined, 'caret')}
-			onpointerenter={() => changed && reviewing.point(changed.id, 'pointer')}
-			onpointerleave={() => changed && reviewing.point(undefined, 'pointer')}
+			onfocusout={() => proposed && reviewing.point(undefined, 'caret', leafKey)}
 		>
 			{#if field.control === 'prose'}
 				<ProseField
@@ -613,22 +602,5 @@
 	   a subform it bounds a group, where there is no single box for it to disagree with. */
 	.qm-field-control {
 		border-radius: var(--_qm-radius-inner);
-	}
-	/* A value someone else set is underlined as a changed word is: the same stroke along the
-	   control's foot, and under attention the tint a lit word takes. A plane over the
-	   control, as the wash is, so it reads the same over a well, a switch and a subform, and
-	   lifted over the control's own positioned box. */
-	.qm-field-control.qm-review-set::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		box-shadow: inset 0 calc(-1 * var(--_qm-vertical-width)) 0 var(--_qm-review-line);
-		z-index: 1;
-		pointer-events: none;
-		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
-	}
-	.qm-field-control.qm-review-set.qm-review-lit::before {
-		background: var(--_qm-review-tint);
 	}
 </style>

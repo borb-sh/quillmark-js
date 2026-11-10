@@ -30,6 +30,7 @@
 	import { isQuillmarkError, MAIN_CARD_ADDR } from '@quillmark/wasm';
 	import {
 		addrForFieldPath,
+		cardMoved,
 		nearestAddrForFieldPath,
 		cardPath,
 		nestedAddrForFieldPath,
@@ -60,24 +61,14 @@
 	import { createReview, setReview } from './review.svelte.js';
 	import {
 		byBlocks,
-		isChange,
 		onField,
-		sameValue,
 		valueIn,
 		valueWith,
-		valueWithInserted,
-		besideOf,
-		type FieldChange,
 		type FieldProposal,
 		type ReviewDrawn
 	} from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
-	import {
-		markAnchor,
-		REVIEW_KEYS,
-		type FieldController,
-		type LeafViews
-	} from '../core/codec/index.js';
+	import { REVIEW_KEYS, type FieldController, type LeafViews } from '../core/codec/index.js';
 	import {
 		IdSeq,
 		controlKind,
@@ -116,7 +107,6 @@
 	import Card from './Card.svelte';
 	import TipsCard from './TipsCard.svelte';
 	import FormatPopover from './FormatPopover.svelte';
-	import ReviewPopover, { type ReviewTarget } from './ReviewPopover.svelte';
 	// The add trigger and the kind menu draw shared recipes; a component carrying a
 	// shared class without also pulling its rule ships unstyled (controls.css).
 	import './controls.css';
@@ -174,6 +164,19 @@
 	// Session ids, one per composable card, reordered in lockstep with structure ops.
 	// svelte-ignore state_referenced_locally
 	let cardIds = $state<string[]>(seq.take(doc.cardCount));
+	/** The card keys as they stood when the host set its review list: an item names its card by
+	 *  index into these, so it stays on that card through every card op since. */
+	let listed: { list: VisualEditorProps['review']; cards: readonly string[] } | undefined;
+	function cardsListed(): readonly string[] {
+		const held = listed;
+		if (held && held.list === review) return held.cards;
+		listed = { list: review, cards: cardIds };
+		return cardIds;
+	}
+	function setCards(next: string[]): void {
+		cardsListed();
+		cardIds = next;
+	}
 
 	// Local commit-error diagnostics (INVARIANTS §Diagnostics, producer #2),
 	// id-keyed rather than positional so an error stays pinned to its field across a
@@ -314,31 +317,23 @@
 		const addr = nearestAddrForFieldPath(path);
 		return addr && declaredField(addr) ? resolveCardKey(addr, cardIds) : undefined;
 	};
-	/** The field proposals accepted here: the change each made, the leaf it is at, the write
-	 *  back, and whether the value is still the one written. */
-	const taken = new SvelteMap<
-		string,
-		{ change: FieldChange; leaf: string; back: () => void; holds: () => boolean }
-	>();
-	const takenChanges = $derived(new Map([...taken].map(([id, t]) => [id, t.change])));
 	/** Take a field's answer back: the value it replaced written back, if any, and the item
 	 *  reopened. */
 	const giveBack = (id: string, leaf: string, back?: () => void): void => {
 		back?.();
 		reviewing.heard(id, 'reopen', leaf);
 	};
+	/** The host's list with each card it names by index moved to where that card stands now. */
+	const reviewItems = $derived.by(() => {
+		const was = cardsListed();
+		if (!review?.length || was === cardIds) return review;
+		return review.map((item) => {
+			const field = cardMoved(item.field, was, cardIds);
+			return field === item.field ? item : { ...item, field };
+		});
+	});
 	const reviewing = createReview({
-		items: () => review,
-		taken: () => takenChanges,
-		putBack(id) {
-			const field = taken.get(id);
-			if (field) {
-				giveBack(id, field.leaf, field.back);
-				return true;
-			}
-			const key = reviewing.keyOf(id);
-			return key !== undefined && !!leaves.prose(key)?.answerReview(id, 'reopen');
-		},
+		items: () => reviewItems,
 		keyFor: (path) => {
 			const key = reviewed(path);
 			return key && fieldKeyToString(key);
@@ -378,15 +373,9 @@
 		},
 		answer(id, item, action, key) {
 			let back: (() => void) | undefined;
-			if (action === 'reopen') taken.delete(id);
-			if (action === 'accept' && item && !isChange(item) && onField(item)) {
-				const took = takeField(item);
-				if (!took) return false;
-				back = took.back;
-				taken.set(id, {
-					...took,
-					change: { id, state: 'changed', field: item.field, before: took.before }
-				});
+			if (action === 'accept' && item && onField(item)) {
+				back = takeField(item);
+				if (!back) return false;
 			}
 			onReview?.({ id, action });
 			if (action !== 'accept' && action !== 'dismiss') return true;
@@ -424,8 +413,6 @@
 	let writing = 0;
 	function settled(): void {
 		if (writing) return;
-		// A field set to another value since it was accepted no longer shows that change.
-		for (const [id, field] of taken) if (!field.holds()) taken.delete(id);
 		journal = [];
 		journalOffer = undefined;
 		undo.settle();
@@ -466,14 +453,13 @@
 
 	/**
 	 * Take a field's proposal: its value down the lane the field's own control commits by, so
-	 * the writer checks it and `onChange` reports it. A text leaf re-reads what was written.
-	 * Returns the value it replaced, the write back to it, and whether the field still holds
-	 * what was written, or `undefined` where the writer refused the value, which the field then
-	 * says as it says any refused commit.
+	 * the writer checks it and `onChange` reports it. A text leaf re-reads what was written. A
+	 * place inside the field is written as the whole value with that place alone changed, down
+	 * the lane an edit of the place takes. Returns the write back to the value it replaced,
+	 * which the journal runs before any older answer's, or `undefined` where the writer refused
+	 * the value, which the field then says as it says any refused commit.
 	 */
-	function takeField(
-		item: FieldProposal
-	): { leaf: string; before: unknown; back: () => void; holds: () => boolean } | undefined {
+	function takeField(item: FieldProposal): (() => void) | undefined {
 		const key = reviewed(item.field);
 		if (!key?.field || typeof key.card === 'number') return undefined;
 		const isMain = key.card === undefined;
@@ -489,16 +475,15 @@
 		};
 		writing++;
 		try {
-			if (!addrForFieldPath(item.field)) return takeInside(item, leaf, write);
 			const before = doc.getStored(addr);
-			if (!write(item.after)) return undefined;
-			const written = JSON.stringify(doc.getStored(addr));
-			return {
-				leaf,
-				before,
-				back: () => void write(before),
-				holds: () => JSON.stringify(doc.getStored(addr)) === written
-			};
+			let after = item.after;
+			if (!addrForFieldPath(item.field)) {
+				const steps = reviewing.at(leaf).nested?.find((e) => e.item.id === item.id)?.steps;
+				if (!steps) return undefined;
+				after = valueWith(current(), steps, item.after);
+			}
+			if (!write(after)) return undefined;
+			return () => void write(before);
 		} finally {
 			writing--;
 		}
@@ -508,40 +493,6 @@
 			const at = isMain ? 0 : cardIndexOf(id);
 			if (at < 0) return undefined;
 			return fieldValues((isMain ? doc.main : doc.card(at)).payloadItems)[name];
-		}
-		/**
-		 * A proposal for a place inside the field: the whole value written with that place
-		 * changed, down the lane an edit of the place takes, and taken back by writing that
-		 * place alone back, so another place accepted since keeps its change.
-		 */
-		function takeInside(
-			item: FieldProposal,
-			leaf: string,
-			write: (value: unknown) => boolean
-		): { leaf: string; before: unknown; back: () => void; holds: () => boolean } | undefined {
-			const steps = reviewing.at(leaf).nested?.find((e) => e.item.id === item.id)?.steps;
-			if (!steps) return undefined;
-			const value = current();
-			const last = steps.at(-1);
-			const list = typeof last === 'number' ? valueIn(value, steps.slice(0, -1)) : undefined;
-			const length = Array.isArray(list) ? list.length : 0;
-			const adds = typeof last === 'number' && last >= length && item.after !== undefined;
-			const removes = typeof last === 'number' && !adds && item.after === undefined;
-			const landed = adds ? [...steps.slice(0, -1), length] : steps;
-			const before = valueIn(value, steps);
-			const beside = removes ? besideOf(value, steps) : {};
-			if (!write(valueWith(value, steps, item.after))) return undefined;
-			return {
-				leaf,
-				before,
-				back: () =>
-					void write(
-						removes
-							? valueWithInserted(current(), steps, before, beside)
-							: valueWith(current(), landed, adds ? undefined : before)
-					),
-				holds: () => removes || sameValue(valueIn(current(), landed), item.after)
-			};
 		}
 	}
 	setReview(reviewing);
@@ -593,12 +544,10 @@
 			if (!reported.has(item.id) && !why.has(item.id)) {
 				if (byBlocks(item)) why.set(item.id, 'block');
 			}
-		const order = reviewOrder();
+		const open = reviewOrder();
 		return {
-			order,
-			accepted: order.filter((id) => reviewing.accepted.has(id)),
-			open: order.filter((id) => !reviewing.accepted.has(id)),
-			outdated: order.filter((id) => outdated.has(id) && !reviewing.accepted.has(id)),
+			open,
+			outdated: open.filter((id) => outdated.has(id)),
 			undrawn: reviewing.items.flatMap((item) => {
 				const reason = why.get(item.id);
 				return reason ? [{ id: item.id, reason }] : [];
@@ -607,18 +556,11 @@
 	}
 	// The report, to a host counting its own list: each change, read once the leaves the change
 	// mounted have drawn, so a list just handed over is not reported as anchored nowhere.
-	const NO_REPORT = JSON.stringify({
-		order: [],
-		accepted: [],
-		open: [],
-		outdated: [],
-		undrawn: []
-	} satisfies ReviewDrawn);
+	const NO_REPORT = JSON.stringify({ open: [], outdated: [], undrawn: [] } satisfies ReviewDrawn);
 	let drewReport = NO_REPORT;
 	let drewOrder: readonly string[] = [];
 	$effect(() => {
 		void reviewing.items;
-		void reviewing.accepted;
 		void reviewing.fieldUndrawn;
 		for (const id of reviewing.fieldOutdated) void id;
 		for (const report of reviewing.reports.values()) void report;
@@ -626,7 +568,7 @@
 		void tick().then(() => {
 			if (!live || !span.alive) return;
 			const report = reviewReport();
-			drewOrder = report.order;
+			drewOrder = report.open;
 			const joined = JSON.stringify(report);
 			if (joined === drewReport) return;
 			drewReport = joined;
@@ -675,24 +617,6 @@
 		e.preventDefault();
 		e.stopPropagation();
 	}
-	/** Where item `id` is drawn, for the card that hangs off it. */
-	function reviewTarget(id: string): ReviewTarget | undefined {
-		const key = reviewing.keyOf(id);
-		if (key === undefined) return undefined;
-		const prose = leaves.prose(key);
-		const mark = prose?.reviewElements(id)[0];
-		if (prose && mark)
-			return {
-				anchor: markAnchor(prose.el, () => prose.reviewElements(id)[0]),
-				removed: mark.classList.contains('qm-review-gone')
-			};
-		const control = leaves.control(key);
-		const own = [...(control?.el.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].find(
-			(el) => el.getAttribute('data-qm-review') === id
-		);
-		return control && { anchor: own ?? control.el, removed: false };
-	}
-
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
 	// cannot do, since which group is open is the card's state (Card §revealLeaf).
 	type CardHandle = {
@@ -919,7 +843,7 @@
 			undo.withdraw();
 			const id = seq.next();
 			arm.arm();
-			cardIds = [...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)];
+			setCards([...cardIds.slice(0, atIndex), id, ...cardIds.slice(atIndex)]);
 			bump('structure', id, atIndex, { op: 'insert', at: atIndex });
 			// Centred: the new card is the subject, and the neighbours it landed between
 			// are what say where it went.
@@ -985,7 +909,7 @@
 		const w = cardIds.slice();
 		const [x] = w.splice(from, 1);
 		w.splice(to, 0, x);
-		cardIds = w;
+		setCards(w);
 		bump('structure', id, to, { op: 'move', from, to });
 		if (held) void keepFocus(focused);
 		// `nearest`: the card was already in view and only needs to stay there, so one
@@ -1015,7 +939,7 @@
 		const gone = removed.remove(id, card, cardIds, i);
 		doc.removeCard(i);
 		arm.arm();
-		cardIds = cardIds.filter((_, k) => k !== i);
+		setCards(cardIds.filter((_, k) => k !== i));
 		forget(id);
 		// No addr: the removed card has none left and every survivor's shifted. The
 		// stack changed, not a leaf, and the id is the only handle the removal leaves.
@@ -1053,7 +977,7 @@
 		const id = seq.next();
 		removed.restored(gone, id);
 		arm.arm();
-		cardIds = [...cardIds.slice(0, i), id, ...cardIds.slice(i)];
+		setCards([...cardIds.slice(0, i), id, ...cardIds.slice(i)]);
 		bump('structure', id, i, { op: 'insert', at: i });
 		void (async () => {
 			if (!(await scrollCardIntoView(id, 'nearest'))) return;
@@ -1462,7 +1386,7 @@
 			else if (op.op === 'remove') forget(ids.splice(op.at, 1)[0]);
 			else ids.splice(op.to, 0, ...ids.splice(op.from, 1));
 		}
-		cardIds = ids;
+		setCards(ids);
 		rederive();
 	}
 
@@ -1470,10 +1394,9 @@
 
 	/**
 	 * Bring the review item `id` to the reader: open the panel holding it, scroll it to the
-	 * middle of the view, light it, and raise its card where it has one. The focus stays
-	 * where it is, the reader having asked to look, unless `focus` asks for it: the caret
-	 * then goes into the item, or the focus to its field, so the chords answer it. False for
-	 * an item the editor does not draw.
+	 * middle of the view, and light it. The focus stays where it is, the reader having asked
+	 * to look, unless `focus` asks for it: the caret then goes into the item, or the focus to
+	 * its field, so the chords answer it. False for an item the editor does not draw.
 	 */
 	export function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
 		return reveal(id, opts.focus ?? false, false);
@@ -1508,33 +1431,26 @@
 
 	/**
 	 * Answer items as their buttons would, in document order: `'all'` is every item drawn. An
-	 * accept or a dismissal passes over a change, which has neither button, and over a proposal
-	 * already accepted, and an item that cannot be answered (a proposal that no longer writes, a
-	 * value the field's writer refuses) stands. `'reopen'` takes back each accepted proposal
-	 * named, as its card's Undo does. `onReview` hears each answer, and neither the focus nor the
-	 * caret moves. The batch raises no toast, the host's to word if it wants one, and ⌘Z takes
-	 * it back whole. Returns the ids answered.
+	 * item that cannot be answered (a proposal that no longer writes, a value the field's writer
+	 * refuses) stands. `onReview` hears each answer, and neither the focus nor the caret moves.
+	 * The batch raises no toast, the host's to word if it wants one, and ⌘Z takes it back whole.
+	 * Returns the ids answered.
 	 */
 	export function answerReview(
 		ids: readonly string[] | 'all',
-		action: 'accept' | 'dismiss' | 'reopen'
+		action: 'accept' | 'dismiss'
 	): string[] {
 		if (!span.alive) return [];
 		const order = reviewOrder();
 		const asked = ids === 'all' ? order : order.filter((id) => ids.includes(id));
 		const out: string[] = [];
-		if (action === 'reopen') {
-			for (const id of asked)
-				if (reviewing.accepted.has(id) && reviewing.act(id, 'reopen')) out.push(id);
-			return out;
-		}
 		const entry: Answered = { ids: [], inverses: [] };
 		batching = entry;
 		writing++;
 		try {
 			for (const id of asked) {
 				const item = reviewing.items.find((it) => it.id === id);
-				if (!item || reviewing.accepted.has(id)) continue;
+				if (!item) continue;
 				const key = reviewing.keyOf(id);
 				// Each one is planned against the document the one before it left.
 				const answered = !onField(item)
@@ -1739,7 +1655,6 @@
 </div>
 
 <FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
-<ReviewPopover review={reviewing} targetFor={reviewTarget} />
 
 <!-- The add affordance is gated on the schema declaring `card_kinds`, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to

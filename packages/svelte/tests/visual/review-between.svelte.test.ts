@@ -52,7 +52,7 @@ describe('an answer’s review list', () => {
 		const report = drawn.at(-1)!;
 		expect(report.undrawn).toEqual([]);
 		expect(report.outdated).toEqual([]);
-		expect([...report.order].sort()).toEqual(items.map((item) => item.id).sort());
+		expect([...report.open].sort()).toEqual(items.map((item) => item.id).sort());
 
 		expect(editor.answerReview('all', 'accept').length).toBe(items.length);
 		await settle();
@@ -85,19 +85,18 @@ describe('the host’s list', () => {
 		editor.answerReview([first], 'accept');
 		editor.answerReview([second], 'dismiss');
 		await settle();
-		expect(drawn.at(-1)).toMatchObject({ accepted: [first] });
-		expect(drawn.at(-1)?.order).not.toContain(second);
-		expect(drawn.at(-1)?.open).toEqual(drawn.at(-1)?.order.filter((id) => id !== first));
+		expect(drawn.at(-1)?.open).toHaveLength(items.length - 2);
+		expect(drawn.at(-1)?.open).not.toContain(first);
+		expect(drawn.at(-1)?.open).not.toContain(second);
 		expect(target.querySelector('.qm-toast-notice')?.textContent ?? '').toBe('');
 
 		press(target.querySelector<HTMLElement>('.qm-editor')!, 'z', { ctrlKey: true });
-		editor.answerReview([first], 'reopen');
+		press(target.querySelector<HTMLElement>('.qm-editor')!, 'z', { ctrlKey: true });
 		await settle();
 		expect(events.slice(-2)).toEqual([
 			{ id: second, action: 'reopen' },
 			{ id: first, action: 'reopen' }
 		]);
-		expect(drawn.at(-1)?.accepted).toEqual([]);
 		expect(drawn.at(-1)?.open).toHaveLength(items.length);
 
 		const kept = items.find(
@@ -106,7 +105,7 @@ describe('the host’s list', () => {
 		editor.answerReview([kept], 'accept');
 		props.review = [];
 		await settle();
-		expect(drawn.at(-1)).toMatchObject({ order: [], accepted: [], open: [] });
+		expect(drawn.at(-1)).toMatchObject({ open: [] });
 		expect(target.querySelector('[data-qm-review]')).toBeNull();
 		expect(
 			sameValue(fieldValues(doc.main.payloadItems).signature_block, ['A. LOVELACE', 'Countess'])

@@ -2,13 +2,10 @@
 // under attention.
 //
 // Attention has three sources and one answer. The pointer over an item, the caret in one and a
-// host's reveal each name an item; the lit one is the card's where a card is up, else the
-// revealed, the caret's, the pointer's, in that order. A card is the before-and-undo surface of an
-// accepted proposal: it rises at once for a reveal, and after a beat for the pointer and the caret,
-// so neither raises one on its way across a paragraph, and it waits a beat on the pointer's
-// leaving so the pointer can travel into it.
+// host's reveal each name an item; the lit one is the revealed, else the caret's, else the
+// pointer's.
 //
-// A dismissed item is drawn no more, from the answer and not from the host's next list: the
+// An answered item is drawn no more, from the answer and not from the host's next list: the
 // reader's press shows at once however long the host takes to hand over a list without it.
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
@@ -18,37 +15,20 @@ import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/
 import {
 	byBlocks,
 	locate,
-	isChange,
 	onField,
 	sameValue,
 	type DeepReview,
-	type FieldChange,
 	type FieldProposal,
 	type ReviewItem,
 	type ReviewUndrawn
 } from './review.js';
 
-/** How long the pointer or the caret rests on a change before its card rises, in ms. */
-export const HOVER_MS = 350;
-/** How long a card outlasts the pointer's leaving, in ms: the trip from the mark into the card. */
-export const LEAVE_MS = 200;
-/** How long a revealed item with no card stays lit, in ms. */
+/** How long a revealed item stays lit, in ms. */
 export const REVEAL_MS = 2400;
-
-/** The card on show: the accepted proposal it is up for, as its change, and what raised it. */
-export interface ShownReview {
-	item: FieldChange | TextChange;
-	via: ReviewVia | 'reveal';
-}
-
-/** A proposal taken in a prose leaf, as the change it made, `before` the text it replaced. */
-export type TextChange = { id: string; state: 'changed'; before?: string };
 
 export interface Review {
 	/** The host's list, less what was answered here. */
 	readonly items: readonly ReviewItem[];
-	/** The proposals accepted and still listed, each as the change it made. */
-	readonly accepted: ReadonlyMap<string, FieldChange | TextChange>;
 	/** The items the prose leaf at `key` draws, those placed by blocks of its own field. One
 	 *  identity until the list changes. */
 	textAt(key: string): readonly TextReview[];
@@ -60,14 +40,9 @@ export interface Review {
 	readonly fieldOutdated: ReadonlySet<string>;
 	/** The item under attention. */
 	readonly lit: string | undefined;
-	readonly shown: ShownReview | undefined;
 	/** The items over the field at leaf `key`: its own, and those naming a place inside it,
 	 *  each with the steps to the value it names as the field holds it now. */
-	at(key: string): {
-		changed?: FieldChange;
-		proposed?: FieldProposal;
-		nested?: readonly DeepReview[];
-	};
+	at(key: string): { proposed?: FieldProposal; nested?: readonly DeepReview[] };
 	/** Whether anything draws at leaf `key`: a field's own item, or a text item in its leaf. */
 	marks(key: string): boolean;
 	/** The leaf drawing item `id`, where one does. */
@@ -84,10 +59,6 @@ export interface Review {
 	heard(id: string, action: ReviewAction, key: string, chord?: boolean): void;
 	/** A leaf is writing an answer, and is done: its edit is the answer's, not the reader's. */
 	writing(on: boolean): void;
-	/** Hold the card up while the pointer or the focus is in it, and let it go again. */
-	hold(): void;
-	release(): void;
-	dismiss(): void;
 	reveal(id: string): void;
 }
 
@@ -108,51 +79,25 @@ export interface ReviewSource {
 	/** A reader's answer, to make and to pass on: `item` where the list holds it, `key` the
 	 *  leaf that gave it where one did. `false` where it could not be made, and the item
 	 *  stands. */
-	answer(
-		id: string,
-		item: ReviewItem | FieldChange | TextChange | undefined,
-		action: ReviewAction,
-		key?: string
-	): boolean;
+	answer(id: string, item: ReviewItem | undefined, action: ReviewAction, key?: string): boolean;
 	/** An answer a chord gave, once it is made. */
 	chorded?(id: string): void;
 	writing?(on: boolean): void;
-	/** The field proposals accepted here, each as the change it made. */
-	taken?(): ReadonlyMap<string, FieldChange>;
-	/** Take back what accepting `id` wrote, so it is open again. */
-	putBack?(id: string): boolean;
 }
 
 export function createReview(source: ReviewSource): Review & { dispose(): void } {
 	/** The ids answered, each until a list arrives without it. */
 	const answered = new Set<string>();
-	/** The field proposals accepted here, drawn while the field still holds what was written. */
-	const took = new Set<string>();
 	let answers = $state(0);
 	const items = $derived.by(() => {
 		const listed = source.items() ?? [];
 		if (!answers) return listed;
 		const ids = new Set(listed.map((item) => item.id));
 		for (const id of answered) if (!ids.has(id)) answered.delete(id);
-		for (const id of took) if (!ids.has(id)) took.delete(id);
-		const taken = source.taken?.();
-		const gone = (id: string): boolean => answered.has(id) || (took.has(id) && !taken?.has(id));
-		return answered.size || took.size ? listed.filter((item) => !gone(item.id)) : listed;
+		return answered.size ? listed.filter((item) => !answered.has(item.id)) : listed;
 	});
 	const drawn = new SvelteMap<string, ReviewReport>();
-	/** Each accepted proposal still listed, as the change the card and the field draw. */
-	const accepted = $derived.by(() => {
-		const out = new Map<string, FieldChange | TextChange>();
-		const listed = new Map((source.items() ?? []).map((item) => [item.id, item]));
-		for (const [id, change] of source.taken?.() ?? []) if (listed.has(id)) out.set(id, change);
-		for (const report of drawn.values())
-			for (const { id, before } of report.accepted ?? []) {
-				const item = listed.get(id);
-				if (item && byBlocks(item)) out.set(id, { id, state: 'changed', before });
-			}
-		return out;
-	});
-	const byId = $derived(new Map(items.map((item) => [item.id, accepted.get(item.id) ?? item])));
+	const byId = $derived(new Map(items.map((item) => [item.id, item])));
 	/** The items each prose leaf draws, by leaf key. */
 	const text = $derived.by(() => {
 		const own = new Map<string, TextReview[]>();
@@ -167,21 +112,17 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return own;
 	});
 	const placed = $derived.by(() => {
-		const out = new Map<
-			string,
-			{ changed?: FieldChange; proposed?: FieldProposal; nested?: DeepReview[] }
-		>();
+		const out = new Map<string, { proposed?: FieldProposal; nested?: DeepReview[] }>();
 		const undrawn: { id: string; reason: ReviewUndrawn }[] = [];
 		/** The nested proposals whose `before` the field no longer holds. */
 		const moved = new Set<string>();
 		const claims = new Map<string, Set<string>>();
-		for (const listed of items) {
-			if (byBlocks(listed)) {
-				if (source.leafFor(listed.field) === undefined)
-					undrawn.push({ id: listed.id, reason: 'field' });
+		for (const item of items) {
+			if (byBlocks(item)) {
+				if (source.leafFor(item.field) === undefined)
+					undrawn.push({ id: item.id, reason: 'field' });
 				continue;
 			}
-			const item = accepted.get(listed.id) ?? listed;
 			if (!onField(item)) continue;
 			if (!source.exact(item.field)) {
 				const deep = source.nested(item.field);
@@ -193,14 +134,11 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				claims.set(deep.key, claimed);
 				const held = out.get(deep.key) ?? {};
 				const { steps, found } = locate(deep.value, deep.steps, item, claimed);
-				const same = (held.nested ?? []).some(
-					(e) => isChange(e.item) === isChange(item) && sameValue(e.steps, steps)
-				);
-				if (same) {
+				if ((held.nested ?? []).some((e) => sameValue(e.steps, steps))) {
 					undrawn.push({ id: item.id, reason: 'taken' });
 					continue;
 				}
-				if (!found && !isChange(item)) moved.add(item.id);
+				if (!found) moved.add(item.id);
 				held.nested = [...(held.nested ?? []), { steps, item }];
 				out.set(deep.key, held);
 				continue;
@@ -211,12 +149,11 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				continue;
 			}
 			const held = out.get(key) ?? {};
-			if ((isChange(item) ? held.changed : held.proposed) !== undefined) {
+			if (held.proposed !== undefined) {
 				undrawn.push({ id: item.id, reason: 'taken' });
 				continue;
 			}
-			if (isChange(item)) held.changed = item;
-			else held.proposed = item;
+			held.proposed = item;
 			out.set(key, held);
 		}
 		return { fields: out, undrawn, moved };
@@ -239,37 +176,12 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 	let caret = $state<string | undefined>();
 	let caretFrom: string | undefined;
 	let revealed = $state<string | undefined>();
-	let card = $state<{ id: string; via: ReviewVia | 'reveal' } | undefined>();
-	let held = false;
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	/** The caret's rest on a change, its own so the pointer's passing does not restart it. */
-	let rest: ReturnType<typeof setTimeout> | undefined;
 	let fade: ReturnType<typeof setTimeout> | undefined;
-	const wait = (ms: number, then: () => void): void => {
-		clearTimeout(timer);
-		timer = setTimeout(then, ms);
-	};
-	const changed = (id: string | undefined): id is string =>
-		id !== undefined && !!byId.get(id) && isChange(byId.get(id)!);
-
-	const shown = $derived.by((): ShownReview | undefined => {
-		const item = card && byId.get(card.id);
-		return item && isChange(item) && card ? { item, via: card.via } : undefined;
-	});
-	const lit = $derived(
-		[shown?.item.id, revealed, caret, pointer].find((id) => id !== undefined && byId.has(id))
-	);
+	const lit = $derived([revealed, caret, pointer].find((id) => id !== undefined && byId.has(id)));
 
 	const answering = (id: string, action: ReviewAction, chord?: boolean): void => {
-		if (action === 'reopen') {
-			answered.delete(id);
-			took.delete(id);
-		} else {
-			if (card?.id === id) card = undefined;
-			// An accepted proposal stays, drawn as its change, while the list holds it.
-			if (action !== 'accept') answered.add(id);
-			else if (byId.get(id) && onField(byId.get(id)!)) took.add(id);
-		}
+		if (action === 'reopen') answered.delete(id);
+		else answered.add(id);
 		answers++;
 		if (chord) source.chorded?.(id);
 	};
@@ -277,9 +189,6 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 	const self: Review & { dispose(): void } = {
 		get items() {
 			return items;
-		},
-		get accepted() {
-			return accepted;
 		},
 		textAt: (key) => text.get(key) ?? NO_ITEMS,
 		get reports() {
@@ -293,9 +202,6 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		},
 		get lit() {
 			return lit;
-		},
-		get shown() {
-			return shown;
 		},
 		at: (key) => fields.get(key) ?? {},
 		marks: (key) => fields.has(key) || !!drawn.get(key)?.ids.length,
@@ -315,44 +221,16 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			else drawn.delete(key);
 		},
 		point(id, via, from) {
-			if (via === 'caret') {
-				if (id === undefined && from !== undefined && caretFrom !== from) return;
-				caretFrom = from;
-				caret = id;
-				clearTimeout(rest);
-				if (changed(id)) {
-					// A card already up for the item is the caret's from here: it stays while
-					// the caret does. The caret's card takes the pointer's place.
-					const raise = (): void => {
-						clearTimeout(timer);
-						card = { id, via };
-					};
-					if (card?.id === id) raise();
-					else
-						rest = setTimeout(() => {
-							if (caret === id) raise();
-						}, HOVER_MS);
-				} else if (card?.via === 'caret' || (id !== undefined && card)) card = undefined;
-				if (id !== undefined) revealed = undefined;
+			if (via === 'pointer') {
+				pointer = id;
 				return;
 			}
-			pointer = id;
-			if (changed(id)) {
-				if (card?.id === id) return clearTimeout(timer);
-				if (card && card.via !== 'pointer') return;
-				if (card) card = { id, via };
-				else
-					wait(HOVER_MS, () => {
-						if (pointer === id && (!card || card.via === 'pointer')) card = { id, via };
-					});
-			} else if (card?.via === 'pointer' && !held)
-				wait(LEAVE_MS, () => {
-					if (card?.via === 'pointer' && card.id !== pointer && !held) card = undefined;
-				});
-			else clearTimeout(timer);
+			if (id === undefined && from !== undefined && caretFrom !== from) return;
+			caretFrom = from;
+			caret = id;
+			if (id !== undefined) revealed = undefined;
 		},
 		act(id, action, chord) {
-			if (accepted.has(id) && action === 'reopen') return source.putBack?.(id) ?? false;
 			const item = byId.get(id);
 			if (!item || !source.answer(id, item, action)) return false;
 			answering(id, action, chord);
@@ -362,35 +240,14 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		heard(id, action, key, chord) {
 			if (source.answer(id, byId.get(id), action, key)) answering(id, action, chord);
 		},
-		hold() {
-			held = true;
-			clearTimeout(timer);
-		},
-		release() {
-			held = false;
-			if (card?.via === 'pointer' && card.id !== pointer)
-				wait(LEAVE_MS, () => {
-					if (!held && card?.via === 'pointer' && card.id !== pointer) card = undefined;
-				});
-		},
-		dismiss() {
-			clearTimeout(timer);
-			clearTimeout(rest);
-			card = undefined;
-		},
 		reveal(id) {
-			clearTimeout(timer);
-			clearTimeout(rest);
 			clearTimeout(fade);
-			card = changed(id) ? { id, via: 'reveal' } : undefined;
 			revealed = id;
 			fade = setTimeout(() => {
 				if (revealed === id) revealed = undefined;
 			}, REVEAL_MS);
 		},
 		dispose() {
-			clearTimeout(timer);
-			clearTimeout(rest);
 			clearTimeout(fade);
 		}
 	};
@@ -408,13 +265,11 @@ const NO_ITEMS: readonly TextReview[] = [];
 /** What a component rendered outside the editor gets: nothing to draw. */
 const NO_REVIEW: Review = {
 	items: [],
-	accepted: new Map(),
 	textAt: () => NO_ITEMS,
 	reports: new Map(),
 	fieldUndrawn: [],
 	fieldOutdated: new Set(),
 	lit: undefined,
-	shown: undefined,
 	at: () => ({}),
 	marks: () => false,
 	keyOf: () => undefined,
@@ -423,9 +278,6 @@ const NO_REVIEW: Review = {
 	act: () => false,
 	heard() {},
 	writing() {},
-	hold() {},
-	release() {},
-	dismiss() {},
 	reveal() {}
 };
 

@@ -788,52 +788,7 @@ li.ProseMirror-selectednode::after {
 
 /* ── Review (`review.ts`) ────────────────────────────────────────────────────
    Drawn in the leaf's own flow and at the leaf's own type, so a reviewed paragraph still
-   reads as the paragraph. One hue throughout (`--_qm-review`), and three strengths of it.
-
-   A change someone else made is a line under the words that were written: quieter than a
-   link's, which is the ink's, and absent from the page the document prints. The tint
-   arrives with attention. */
-.ProseMirror .qm-review-changed {
-	text-decoration: underline;
-	text-decoration-color: var(--_qm-review-line);
-	text-decoration-thickness: var(--_qm-vertical-width);
-	text-underline-offset: 0.2em;
-	border-radius: var(--_qm-radius-inner);
-	transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
-}
-.ProseMirror .qm-review-changed.qm-review-lit {
-	background: var(--_qm-review-tint);
-}
-/* Where text was only taken out there are no words to underline, so a wedge stands at the
-   join, under the baseline the way a proofreader's caret does. It takes no width: the
-   line reads as the document has it. What the pointer and a finger find is the join's
-   whole line, a letter to either side, since the wedge alone is too small to hit. */
-.ProseMirror .qm-review-gone {
-	position: relative;
-	display: inline-block;
-	width: 0;
-	height: 1em;
-	vertical-align: text-bottom;
-}
-.ProseMirror .qm-review-gone::before {
-	content: '';
-	position: absolute;
-	inset: -0.15em -0.45em -0.4em;
-}
-.ProseMirror .qm-review-gone::after {
-	content: '';
-	position: absolute;
-	left: -0.35em;
-	bottom: -0.3em;
-	width: 0.7em;
-	height: 0.45em;
-	background: var(--_qm-review-line);
-	clip-path: polygon(50% 0, 100% 100%, 0 100%);
-	transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
-}
-.ProseMirror .qm-review-gone.qm-review-lit::after {
-	background: var(--_qm-review);
-}
+   reads as the paragraph. One hue throughout (`--_qm-review`). */
 
 /* A proposal is its paragraph read as an edit of itself. The words that would go step back
    to the label ink under a line; the words that would come stand at the ink on the tint,

@@ -75,7 +75,7 @@ describe('the drawn report', () => {
 	it('names the open items in the order the page shows them, across leaves and fields', async () => {
 		const r = batch(spread);
 		await settle();
-		const { order, undrawn } = r.drawn.at(-1)!;
+		const { open: order, undrawn } = r.drawn.at(-1)!;
 		expect([...order].sort()).toEqual(['abs', 'body', 'cols']);
 		expect(order).toEqual(pageOrder(r.target, order));
 		expect(undrawn).toEqual([]);
@@ -106,8 +106,6 @@ describe('the drawn report', () => {
 		});
 		await settle();
 		expect(r.drawn.at(-1)).toEqual({
-			order: ['first'],
-			accepted: [],
 			open: ['first'],
 			outdated: [],
 			undrawn: [
@@ -149,7 +147,7 @@ describe('a proposal by blocks', () => {
 	it('is drawn in the leaf of the field it names, and said outdated where its value moved', async () => {
 		const r = batch(blocks);
 		await settle();
-		const { order, outdated, undrawn } = r.drawn.at(-1)!;
+		const { open: order, outdated, undrawn } = r.drawn.at(-1)!;
 		expect([...order].sort()).toEqual(['abs', 'body', 'cols']);
 		expect(order).toEqual(pageOrder(r.target, order));
 		expect(outdated).toEqual(['cols']);
@@ -189,7 +187,7 @@ describe('answering by the host', () => {
 		outside.remove();
 	});
 
-	it('passes over an accepted proposal when it dismisses them all', async () => {
+	it('passes over an accepted proposal when it dismisses them all, leaving it plain text', async () => {
 		const r = batch((doc) => [
 			over(doc, 'c1', 'An accepted line.'),
 			over(doc, 'p1', 'A proposed line.', undefined, 3)
@@ -203,7 +201,8 @@ describe('answering by the host', () => {
 		flushSync();
 		expect(r.events).toEqual([{ id: 'p1', action: 'dismiss' }]);
 		expect(r.doc.main.body.text).toBe(body);
-		expect(r.target.querySelector('[data-qm-review="c1"]')).not.toBeNull();
+		expect(body).toContain('An accepted line.');
+		expect(r.target.querySelector('[data-qm-review="c1"]')).toBeNull();
 	});
 });
 
@@ -211,7 +210,7 @@ describe('stepping', () => {
 	it('walks the drawn items in page order and round from the end', async () => {
 		const r = batch(spread);
 		await settle();
-		const { order } = r.drawn.at(-1)!;
+		const { open: order } = r.drawn.at(-1)!;
 		const walked: (string | undefined)[] = [];
 		for (let i = 0; i <= order.length; i++)
 			walked.push(await r.editor.stepReview(1, { focus: false }));
@@ -243,7 +242,7 @@ describe('stepping', () => {
 	it('goes to the next and the previous item from the chords, from anywhere in the editor', async () => {
 		const r = batch(spread);
 		await settle();
-		const { order } = r.drawn.at(-1)!;
+		const { open: order } = r.drawn.at(-1)!;
 		const root = r.target.querySelector<HTMLElement>('.qm-editor')!;
 		const chord = async (dir: 'next' | 'previous') => {
 			press(root, keyOf(REVIEW_KEYS[dir]), { ...mod, altKey: true });
@@ -259,7 +258,7 @@ describe('stepping', () => {
 	it('goes on to the next item after an answer by chord, and stays after one by pointer', async () => {
 		const chorded = batch(spread);
 		await settle();
-		const order = chorded.drawn.at(-1)!.order;
+		const order = chorded.drawn.at(-1)!.open;
 		expect(await chorded.editor.stepReview(1)).toBe(order[0]);
 		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.dismiss), mod);
 		await settle();
@@ -270,7 +269,7 @@ describe('stepping', () => {
 
 		const pressed = batch(spread);
 		await settle();
-		const first = pressed.drawn.at(-1)!.order[0];
+		const first = pressed.drawn.at(-1)!.open[0];
 		const dismiss = [
 			...pressed.target.querySelectorAll<HTMLButtonElement>('.qm-review-dismiss')
 		].find((el) => el.closest('[data-qm-review]')?.getAttribute('data-qm-review') === first)!;
@@ -284,7 +283,7 @@ describe('stepping', () => {
 	it('stays on the answered item’s place when the host turns advancing off', async () => {
 		const r = batch(spread, false);
 		await settle();
-		const order = r.drawn.at(-1)!.order;
+		const order = r.drawn.at(-1)!.open;
 		await r.editor.stepReview(1);
 		const before = r.lit.length;
 		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.dismiss), mod);

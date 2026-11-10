@@ -117,23 +117,24 @@ export interface VisualEditorProps {
 	/**
 	 * What someone other than the reader proposes, for the editor to draw where each item sits
 	 * ({@link ReviewItem}): a proposal as a word-level edit of its own blocks with Accept and
-	 * Dismiss at its end, a field's proposed value under its control, and one accepted as the
-	 * change it made with a card holding what it replaced. Declarative: the host sets the list
-	 * once and clears it once, and the editor draws every answer while the list holds the
-	 * item.
+	 * Dismiss at its end, and a field's proposed value under its control. Declarative: the host
+	 * sets the list once and clears it once, and the editor draws every answer while the list
+	 * holds the item: an answered item is drawn no more, and an accepted one is plain text. A
+	 * card an item names by index is read against the cards as they stood when the list was
+	 * set, so the item stays on its card through `applyCardOps` and the reader's own card
+	 * edits; an item whose card is gone draws nothing.
 	 */
 	review?: readonly ReviewItem[];
 	/**
 	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-.` with the caret or the
-	 * focus in it, or a host's `answerReview`; or undid an answer, with ⌘Z or an accepted
-	 * change's Undo, `reopen`. The editor has made every write an answer asks for and draws it,
+	 * focus in it, or a host's `answerReview`; or undid an answer with ⌘Z, `reopen`. The editor has made every write an answer asks for and draws it,
 	 * so the host leaves `review` as it set it.
 	 */
 	onReview?: (event: ReviewEvent) => void;
 	/**
-	 * What the editor draws of `review`, on each change once the leaves have drawn: the items
-	 * in document order, the accepted proposals among them drawn as changes, the proposals the
-	 * reader has written past since, and every listed item it does not draw with why. What a
+	 * What the editor draws of `review`, on each change once the leaves have drawn: the open
+	 * items in document order, the proposals the reader has written past since, and every
+	 * listed item it does not draw with why. What a
 	 * host counts and steps its own list by.
 	 */
 	onReviewDrawn?: (drawn: ReviewDrawn) => void;

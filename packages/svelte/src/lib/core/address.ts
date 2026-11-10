@@ -141,6 +141,21 @@ export interface NestedAddr {
 }
 
 /**
+ * `path` with the card it names moved: its index read into `was`, the card keys as they stood,
+ * and written as that key's index in `now`. A card no longer in `now` is named past the last, so
+ * the path resolves to nothing. `path` itself where it names no card, or a card past `was`.
+ */
+export function cardMoved(path: DocPath, was: readonly string[], now: readonly string[]): DocPath {
+	const segs = segsOf(path);
+	const head = segs?.[0];
+	if (!segs || head?.seg !== 'card' || head.index >= was.length) return path;
+	const at = now.indexOf(was[head.index]);
+	const index = at < 0 ? now.length : at;
+	if (index === head.index) return path;
+	return core().formatDocPath([{ ...head, index }, ...segs.slice(1)]);
+}
+
+/**
  * `parseDocPath`, with a malformed path as `undefined` rather than a throw. The gate is read
  * outside the try: an uninitialized core is not a malformed path.
  */
