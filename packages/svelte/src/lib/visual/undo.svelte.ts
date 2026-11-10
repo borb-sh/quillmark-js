@@ -19,13 +19,12 @@
 // surface draws the newest kept step as a standing control. Past the next edit the control
 // is the way back, so the key never brings back a card the user has since worked past.
 //
-// A host's step rides the same toast and the same key (`offerUndo`): a write the host made
-// for the reader, an assistant's answer, lands outside every leaf's history, so nothing the
-// reader can press takes it back. ⌘Z anywhere in the editor is its, a text leaf's own
-// included. Its restore is good against the document it was offered over and no other, so
-// the next edit drops it, toast and all. A review answer's step is a host's step made by no
-// edit, so it holds a card's step it was offered over: taking the answer back leaves the
-// card's the last thing that happened again.
+// A standing step rides the same toast and the same key: the review answers since the
+// reader's last edit, which land outside every leaf's history. ⌘Z anywhere in the editor is
+// its, a text leaf's own included. Its restore is good against the document it was offered
+// over and no other, so the next edit drops it, toast and all. It is made by no edit, so it
+// holds a card's step it was offered over: taking the answer back leaves the card's the last
+// thing that happened again.
 //
 // The key listens on the document, not on the surface: a removal by the pointer takes the
 // pressed button with it and leaves the focus on the page's body, which no keydown on the
@@ -53,7 +52,7 @@ export interface KeptStep {
 
 /** How a step is held past its toast. */
 export interface Hold {
-	/** A host's step: the key is its in a text control too, and the next edit drops it. */
+	/** A standing step: the key is its in a text control too, and the next edit drops it. */
 	readonly standing?: boolean;
 	/** A card's step: kept under this label, whatever lands after. */
 	readonly keptAs?: string;
@@ -73,8 +72,8 @@ export interface StructuralUndo {
 	 *  a `hold`, the key stays the step's past its toast, until {@link settle}. Returns the
 	 *  offer, for {@link holds}. */
 	offer(notice: string, restore: () => void, hold?: Hold): UndoOffer;
-	/** An edit landed: a held step is no longer the last thing that happened. A host's goes,
-	 *  and a kept one answers to its control alone once its offer has. */
+	/** An edit landed: a held step is no longer the last thing that happened. A standing one
+	 *  goes, and a kept one answers to its control alone once its offer has. */
 	settle(): void;
 	/** Name the control the removal handed the focus to. ⌘Z there is the offer's until the
 	 *  control takes an edit or the focus leaves it: the key that removed is the key that
@@ -84,7 +83,7 @@ export interface StructuralUndo {
 	 *  edit has landed since, and the target is the page's body, where a removal under the
 	 *  pointer leaves the focus, when this editor offered last on the page; the handed
 	 *  control; or a control under `root` that keeps no history of its own. A text control
-	 *  that is not the handed one keeps its key from a removal and gives it to a host's step. */
+	 *  that is not the handed one keeps its key from a removal and gives it to a standing step. */
 	accepts(target: EventTarget | null, root: Element | undefined): boolean;
 	/** Hold the lapse while the toast is under the pointer or the focus, and let it run again. */
 	pause(): void;

@@ -3,8 +3,8 @@
 //
 // Attention has three sources and one answer. The pointer over an item, the caret in one and a
 // host's reveal each name an item; the lit one is the card's where a card is up, else the
-// revealed, the caret's, the pointer's, in that order. A card is the before-and-undo surface of a
-// `changed` item: it rises at once for a reveal, and after a beat for the pointer and the caret,
+// revealed, the caret's, the pointer's, in that order. A card is the before-and-undo surface of an
+// accepted proposal: it rises at once for a reveal, and after a beat for the pointer and the caret,
 // so neither raises one on its way across a paragraph, and it waits a beat on the pointer's
 // leaving so the pointer can travel into it.
 //
@@ -34,23 +34,22 @@ export const LEAVE_MS = 200;
 /** How long a revealed item with no card stays lit, in ms. */
 export const REVEAL_MS = 2400;
 
-/** The card on show: the `changed` item it is up for, and what raised it. */
+/** The card on show: the accepted proposal it is up for, as its change, and what raised it. */
 export interface ShownReview {
 	item: FieldChange | TextChange;
 	via: ReviewVia | 'reveal';
 }
 
-/** A change over a prose leaf: a `changed` item by its anchor, or a proposal taken there,
- *  `before` the text it replaced. */
-export type TextChange = { id: string; state: 'changed'; anchor?: string; before?: string };
+/** A proposal taken in a prose leaf, as the change it made, `before` the text it replaced. */
+export type TextChange = { id: string; state: 'changed'; before?: string };
 
 export interface Review {
 	/** The host's list, less what was answered here. */
 	readonly items: readonly ReviewItem[];
 	/** The proposals accepted and still listed, each as the change it made. */
 	readonly accepted: ReadonlyMap<string, FieldChange | TextChange>;
-	/** The items the prose leaf at `key` draws: those placed by an anchor, which any leaf may
-	 *  hold, and those placed by blocks of its own field. One identity until the list changes. */
+	/** The items the prose leaf at `key` draws, those placed by blocks of its own field. One
+	 *  identity until the list changes. */
 	textAt(key: string): readonly TextReview[];
 	/** Each mounted prose leaf's report of what it draws, by leaf key. */
 	readonly reports: ReadonlyMap<string, ReviewReport>;
@@ -110,7 +109,7 @@ export interface ReviewSource {
 	 *  stands. */
 	answer(
 		id: string,
-		item: ReviewItem | TextChange | undefined,
+		item: ReviewItem | FieldChange | TextChange | undefined,
 		action: ReviewAction,
 		key?: string
 	): boolean;
@@ -148,30 +147,23 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		for (const report of drawn.values())
 			for (const { id, before } of report.accepted ?? []) {
 				const item = listed.get(id);
-				if (item && 'anchor' in item)
-					out.set(id, { id, state: 'changed', anchor: item.anchor, before });
-				else if (item && byBlocks(item)) out.set(id, { id, state: 'changed', before });
+				if (item && byBlocks(item)) out.set(id, { id, state: 'changed', before });
 			}
 		return out;
 	});
 	const byId = $derived(new Map(items.map((item) => [item.id, accepted.get(item.id) ?? item])));
-	/** The items each prose leaf draws, by leaf key, and those every leaf is handed. */
+	/** The items each prose leaf draws, by leaf key. */
 	const text = $derived.by(() => {
-		const anchored: TextReview[] = [];
 		const own = new Map<string, TextReview[]>();
 		for (const item of items) {
-			if ('anchor' in item) {
-				anchored.push(item);
-				for (const list of own.values()) list.push(item);
-			} else if (byBlocks(item)) {
-				const key = source.leafFor(item.field);
-				if (key === undefined) continue;
-				let list = own.get(key);
-				if (!list) own.set(key, (list = [...anchored]));
-				list.push(item);
-			}
+			if (!byBlocks(item)) continue;
+			const key = source.leafFor(item.field);
+			if (key === undefined) continue;
+			let list = own.get(key);
+			if (!list) own.set(key, (list = []));
+			list.push(item);
 		}
-		return { anchored, own };
+		return own;
 	});
 	const placed = $derived.by(() => {
 		const out = new Map<
@@ -288,7 +280,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		get accepted() {
 			return accepted;
 		},
-		textAt: (key) => text.own.get(key) ?? text.anchored,
+		textAt: (key) => text.get(key) ?? NO_ITEMS,
 		get reports() {
 			return drawn;
 		},
@@ -309,7 +301,10 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		keyOf(id) {
 			const item = byId.get(id);
 			if (!item) return undefined;
-			if (byBlocks(item)) return source.leafFor(item.field);
+			if (byBlocks(item)) {
+				const key = source.leafFor(item.field);
+				return key !== undefined && drawn.get(key)?.ids.includes(id) ? key : undefined;
+			}
 			if ('field' in item) return source.keyFor(item.field);
 			for (const [key, report] of drawn) if (report.ids.includes(id)) return key;
 			return undefined;
@@ -356,8 +351,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			else clearTimeout(timer);
 		},
 		act(id, action, chord) {
-			if (accepted.has(id) && (action === 'revert' || action === 'reopen'))
-				return source.putBack?.(id) ?? false;
+			if (accepted.has(id) && action === 'reopen') return source.putBack?.(id) ?? false;
 			const item = byId.get(id);
 			if (!item || !source.answer(id, item, action)) return false;
 			answering(id, action, chord);

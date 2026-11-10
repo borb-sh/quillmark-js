@@ -408,8 +408,7 @@
 
 	// ── The answer journal: the review answers since the reader's last edit, each undone by
 	// ⌘Z from anywhere in the editor, newest first, its item reopened with it. An edit that is
-	// not an answer empties it, as it drops a host's step: an inverse is good against the
-	// document it was recorded over. An answer's own writes, and an inverse's, go down the
+	// not an answer empties it: an inverse is good against the document it was recorded over. An answer's own writes, and an inverse's, go down the
 	// lanes an edit does, so they are flagged while they are made.
 	interface Answered {
 		ids: string[];
@@ -591,8 +590,7 @@
 		for (const { id, reason } of reviewing.fieldUndrawn) why.set(id, reason);
 		for (const item of reviewing.items)
 			if (!reported.has(item.id) && !why.has(item.id)) {
-				if ('anchor' in item) why.set(item.id, 'anchor');
-				else if (byBlocks(item)) why.set(item.id, 'block');
+				if (byBlocks(item)) why.set(item.id, 'block');
 			}
 		const order = reviewOrder();
 		return {
@@ -1535,7 +1533,7 @@
 		try {
 			for (const id of asked) {
 				const item = reviewing.items.find((it) => it.id === id);
-				if (!item || item.state === 'changed' || reviewing.accepted.has(id)) continue;
+				if (!item || reviewing.accepted.has(id)) continue;
 				const key = reviewing.keyOf(id);
 				// Each one is planned against the document the one before it left.
 				const answered = !onField(item)
@@ -1564,20 +1562,6 @@
 		opts: { focus?: boolean } = {}
 	): Promise<string | undefined> {
 		return step(dir, opts.focus ?? true);
-	}
-
-	/**
-	 * Offer `undo` as the one step back from a write the host just made: `notice` on the
-	 * toast a removal's undo takes, with its button, and ⌘Z/Ctrl+Z anywhere in the editor
-	 * until the next edit lands. Runs at most once. Returns the withdrawal, for a host whose
-	 * step has gone stale some other way.
-	 */
-	export function offerUndo(notice: string, restore: () => void): () => void {
-		if (!span.alive) return () => {};
-		const offered = undo.offer(notice, restore, { standing: true });
-		return () => {
-			if (undo.holds(offered)) undo.withdraw();
-		};
 	}
 
 	function holds(cardId: CardId): boolean {

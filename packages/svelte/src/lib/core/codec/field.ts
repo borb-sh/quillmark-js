@@ -59,6 +59,7 @@ import { FIELD_KEYS, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
 import {
 	DEFAULT_REVIEW_STRINGS,
+	renameBlocks,
 	reviewLayer,
 	type ReviewAction,
 	type ReviewReport,
@@ -838,9 +839,14 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		});
 		if (nodes.length !== stored.length) return;
 		const tr = view.state.tr;
+		const renamed: [string, string][] = [];
 		nodes.forEach((n, i) => {
-			if (n.id !== stored[i]) tr.setNodeAttribute(n.pos, n.key, stored[i]);
+			if (n.id === stored[i]) return;
+			tr.setNodeAttribute(n.pos, n.key, stored[i]);
+			// A split's copy of an id the first half keeps is no rename.
+			if (typeof n.id === 'string' && !stored.includes(n.id)) renamed.push([n.id, stored[i]]);
 		});
+		renameBlocks(tr, renamed);
 		if (tr.docChanged) view.updateState(view.state.apply(tr.setMeta('addToHistory', false)));
 	}
 

@@ -207,53 +207,6 @@ describe('structural undo', () => {
 		expect(doc.toMarkdown()).toBe(before);
 	});
 
-	it("takes a host's step before a kept card's, and leaves the card to its control", () => {
-		const doc = example();
-		const before = doc.toMarkdown();
-		const { target, editor } = mountEditor(quill(), doc);
-
-		deleteButton(slots(target)[0]).click();
-		flushSync();
-		const without = doc.toMarkdown();
-		let undone = 0;
-		editor.offerUndo('Three places edited', () => undone++);
-		flushSync();
-		expect(toast(target)?.textContent).toContain('Three places edited');
-
-		press(document.body, 'z', { metaKey: true });
-		flushSync();
-		expect(undone).toBe(1);
-		press(document.body, 'z', { metaKey: true });
-		flushSync();
-		expect(doc.toMarkdown()).toBe(without);
-
-		restoreButton(target)!.click();
-		flushSync();
-		expect(doc.toMarkdown()).toBe(before);
-	});
-
-	it("drops a host's step when a card is restored by its control", () => {
-		vi.useFakeTimers();
-		const doc = example();
-		const before = doc.toMarkdown();
-		const { target, editor } = mountEditor(quill(), doc);
-
-		deleteButton(slots(target)[0]).click();
-		flushSync();
-		let undone = 0;
-		editor.offerUndo('Three places edited', () => undone++);
-		flushSync();
-		lapse();
-		restoreButton(target)!.click();
-		flushSync();
-		expect(doc.toMarkdown()).toBe(before);
-
-		press(document.body, 'z', { metaKey: true });
-		flushSync();
-		expect(undone).toBe(0);
-		expect(doc.toMarkdown()).toBe(before);
-	});
-
 	it("keeps a card's toast through another card operation, and withdraws a row's", () => {
 		const { target, editor } = mountEditor(quill(), example());
 		deleteButton(slots(target)[0]).click();

@@ -8,10 +8,12 @@ import type { ReviewItem } from '$lib/visual';
 beforeEach(() => void vi.useFakeTimers());
 afterEach(() => void vi.useRealTimers());
 
+// `change` and `other` are accepted, in the body's leaf and on the title's control, and drawn
+// as the changes they made; `proposal` is open.
 const ITEMS: ReviewItem[] = [
-	{ id: 'change', state: 'changed', anchor: '~a', before: 'was' },
-	{ id: 'other', state: 'changed', field: 'main.title', before: 'Old' },
-	{ id: 'proposal', state: 'proposed', anchor: '~b', after: 'New.' }
+	{ id: 'change', state: 'proposed', field: 'main.body', replace: ['b0'], after: 'Now.' },
+	{ id: 'other', state: 'proposed', field: 'main.title', before: 'Old', after: 'New' },
+	{ id: 'proposal', state: 'proposed', field: 'main.body', insert: 'end', after: 'New.' }
 ];
 
 function store(refuse = false) {
@@ -24,10 +26,17 @@ function store(refuse = false) {
 		leafFor: (path) => path,
 		valueAt: () => undefined,
 		nested: () => undefined,
+		taken: () => new Map([['other', { id: 'other', state: 'changed', field: 'main.title' }]]),
 		answer(id, _item, action) {
 			answers.push([id, action]);
 			return !refuse;
 		}
+	});
+	review.drew('main.body', {
+		ids: ['change', 'proposal'],
+		outdated: [],
+		undrawn: [],
+		accepted: [{ id: 'change', before: 'was' }]
 	});
 	return { review, answers, list: (next: ReviewItem[]) => (items = next) };
 }
@@ -124,7 +133,7 @@ describe('a reveal', () => {
 });
 
 describe('the leaves', () => {
-	it('each draw the anchored items and those by blocks of their own field', () => {
+	it('each draw the items by blocks of their own field', () => {
 		const { review, list } = store();
 		list([
 			...ITEMS,
@@ -136,34 +145,32 @@ describe('the leaves', () => {
 			'proposal',
 			'mine'
 		]);
-		expect(review.textAt('main.abstract').map((item) => item.id)).toEqual([
-			'change',
-			'proposal',
-			'theirs'
-		]);
-		expect(review.textAt('main.title').map((item) => item.id)).toEqual(['change', 'proposal']);
+		expect(review.textAt('main.abstract').map((item) => item.id)).toEqual(['theirs']);
+		expect(review.textAt('main.title')).toEqual([]);
 		expect(review.at('main.body')).toEqual({});
 	});
 });
 
 describe('an answer', () => {
-	it('takes the item off what is drawn until a list arrives without it', () => {
+	it('takes a dismissed item off what is drawn until a list arrives without it', () => {
 		const { review, answers, list } = store();
-		review.act('change', 'revert');
-		expect(answers).toEqual([['change', 'revert']]);
-		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['proposal']);
+		review.act('proposal', 'dismiss');
+		expect(answers).toEqual([['proposal', 'dismiss']]);
+		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['change']);
 
 		list([...ITEMS]);
-		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['proposal']);
-		list(ITEMS.slice(1));
-		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['proposal']);
+		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['change']);
+		list(ITEMS.slice(0, 2));
+		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['change']);
 		list(ITEMS);
-		expect(review.textAt('main:$body').map((item) => item.id)).toEqual(['change', 'proposal']);
+		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['change', 'proposal']);
 	});
 
 	it('leaves the item standing where it could not be made', () => {
 		const { review } = store(true);
-		review.act('other', 'revert');
+		review.act('proposal', 'dismiss');
+		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['change', 'proposal']);
+		expect(review.act('other', 'reopen')).toBe(false);
 		expect(review.at('main.title').changed?.id).toBe('other');
 	});
 });

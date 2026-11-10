@@ -28,8 +28,8 @@ interface Journaled extends Mounted<EditorRef> {
 	events: ReviewEvent[];
 }
 
-/** An editor over `items`; a `host` that lists as the README says takes an answered item off
- *  the list and puts a reopened one back. */
+/** An editor over `items`; a `host` edits its list per answer, an answered item off it and a
+ *  reopened one back on, which the editor bears though the set-once contract does not ask it. */
 function journaled(items: (doc: Document) => ReviewItem[], host = false): Journaled {
 	const doc = example();
 	const events: ReviewEvent[] = [];
@@ -49,14 +49,10 @@ function journaled(items: (doc: Document) => ReviewItem[], host = false): Journa
 	return { ...mounted, doc, events };
 }
 
-/** Lay anchor `id` over the second word of a rich text field's text, or of the body's. */
-function anchor(doc: Document, field: string | undefined, id: string): void {
-	const text = field ? (doc.getStored(field) as { text: string }).text : doc.main.body.text;
-	const word = text.split(' ')[1];
-	const at = text.indexOf(word);
-	doc.apply(field ? { field } : {}, {
-		steps: [{ anchor: { id, start: at, end: at + word.length } }]
-	});
+/** The first block of a rich text field, or of the body, as the place a proposal replaces. */
+function first(doc: Document, field?: string): { field: string; replace: string[] } {
+	const addr = field ? { field } : {};
+	return { field: doc.pathFor(addr), replace: [doc.blocks(addr)[0].id] };
 }
 
 const abstractText = (doc: Document): string =>
@@ -70,15 +66,11 @@ function accept(target: HTMLElement, id: string): void {
 	flushSync();
 }
 
-const mixed = (doc: Document): ReviewItem[] => {
-	anchor(doc, undefined, '~a');
-	anchor(doc, 'abstract', '~b');
-	return [
-		{ id: 'A', state: 'proposed', anchor: '~a', after: 'The body, proposed.' },
-		{ id: 'F', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
-		{ id: 'B', state: 'proposed', anchor: '~b', after: 'The abstract, proposed.' }
-	];
-};
+const mixed = (doc: Document): ReviewItem[] => [
+	{ id: 'A', state: 'proposed', ...first(doc), after: 'The body, proposed.' },
+	{ id: 'F', state: 'proposed', field: doc.pathFor('columns'), after: 2 },
+	{ id: 'B', state: 'proposed', ...first(doc, 'abstract'), after: 'The abstract, proposed.' }
+];
 
 describe('the answer journal', () => {
 	it('takes back two field proposals one ⌘Z each, and reopens both', async () => {
