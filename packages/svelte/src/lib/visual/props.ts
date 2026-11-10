@@ -8,6 +8,7 @@ import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
 import type { FormatDiagnostic, VisualStringsInput } from './strings.js';
+import type { ReviewEvent, ReviewItem } from './review.js';
 
 export interface VisualEditorProps {
 	doc: Document;
@@ -113,6 +114,26 @@ export interface VisualEditorProps {
 	 * render lanes need: their parameters exist only inside that English string.
 	 */
 	formatDiagnostic?: FormatDiagnostic;
+	/**
+	 * What someone other than the reader changed, and what one proposes, for the editor to
+	 * draw where each item sits ({@link ReviewItem}): a line under changed words and a card
+	 * with what they replaced, a proposal as a word-level edit of its own paragraph with
+	 * Accept and Dismiss at its end, a field's change on its control and a proposed value
+	 * under it. Declarative: the editor draws the list it is handed and writes nothing for
+	 * it, so an item leaves the page when the host takes it off the list.
+	 */
+	review?: readonly ReviewItem[];
+	/**
+	 * A reader answered an item: a button on it, or `Mod-Enter` / `Mod-.` with the caret or
+	 * the focus in it. The host makes the write the answer asks for, tells the editor
+	 * (`applyExternal`, `refresh`), and drops the item from `review`.
+	 */
+	onReview?: (event: ReviewEvent) => void;
+	/**
+	 * The item under attention, `undefined` once nothing is: the pointer over one, the caret
+	 * in one, or one a `revealReview` named. What a host lights its own list by.
+	 */
+	onReviewFocus?: (id: string | undefined) => void;
 	/** Appended to the root's own class: the surface is a mounted element the
 	 * consumer positions, so it needs a handle for layout it owns. */
 	class?: string;

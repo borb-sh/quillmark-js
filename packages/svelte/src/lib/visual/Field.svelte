@@ -57,6 +57,10 @@
 	import MatrixField from './MatrixField.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
 	import FieldLabel from './FieldLabel.svelte';
+	import ReviewProposal from './ReviewProposal.svelte';
+	import { review } from './review.svelte.js';
+	import { REVIEW_KEYS } from '../core/codec/index.js';
+	import { keydownHandler } from 'prosemirror-keymap';
 
 	interface Props {
 		field: FieldModel;
@@ -142,6 +146,26 @@
 	// resolves to digits, and the control has to know it follows the render date.
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
+	// Where the field stands against its default, for the label row's end (`FieldLabel`):
+	// unset with the default printing, or written over one that would. A container's
+	// source is its cells' composed, so only a control holding one value says either.
+	const scalar = $derived(!isContainer(field.control));
+	// A prose leaf commits past the derive (`VisualEditorInner` `proseChanged`), so its
+	// row stands as the last derive left it. The leaf's commit says whether the field is
+	// written since, and holds until the next derive hands a row that answers.
+	let since = $state.raw<{ row: ResolvedField | undefined; written: boolean }>();
+	const written = $derived(
+		since && since.row === provenance ? since.written : provenance?.source === 'authored'
+	);
+	const defaulted = $derived(
+		scalar && !written && provenance?.source === 'default' && printed !== undefined
+	);
+	const resettable = $derived(scalar && written && declared !== undefined);
+	const defaultId = $derived(`${domIds.control}-default`);
+	function proseCommitted(at: Addr): void {
+		since = { row: provenance, written: doc.getStored(at) != null };
+		onChange?.(at);
+	}
 	const none = $derived(optional && value == null ? t.strings.optionalGhost : undefined);
 	// A variant resolves as one rung whose value is the whole container, so the
 	// discriminant's ghost is that container's own discriminant cell.
@@ -165,14 +189,19 @@
 	// The parked description node renders only when the schema carries one, so the
 	// reference must vanish with it: `aria-describedby` pointing at nothing describes
 	// nothing, and silently.
-	const describedBy = $derived(field.description ? domIds.description : undefined);
+	const description = $derived(field.description ? domIds.description : undefined);
+	// The default tag describes the control while it stands. A prose leaf takes the tag's
+	// id apart and adds it itself, on the mark it keeps of its own default (`createField`).
+	const describedBy = $derived(
+		defaulted ? [description, defaultId].filter(Boolean).join(' ') : description
+	);
 	// A capped prose leaf reports its count, and the count describes it too: a keystroke
 	// the cap refuses changes nothing else a reader can perceive.
 	let chars = $state<number>();
 	const cap = $derived(field.control === 'prose' ? textCap(field.schema) : undefined);
 	const countId = $derived(`${domIds.control}-count`);
 	const proseDescribedBy = $derived(
-		cap ? [describedBy, countId].filter(Boolean).join(' ') : describedBy
+		cap ? [description, countId].filter(Boolean).join(' ') : description
 	);
 	// Two controls own their label row, the add chip and the held count sharing it.
 	const ownsLabel = $derived(field.control === 'array' || field.control === 'matrix');
@@ -232,6 +261,13 @@
 	// Only where `for` cannot reach; the labelable four are the browser's own, and a
 	// second handler over them would be a focus the label already placed.
 	const onActivate = $derived(labelable ? undefined : focusControl);
+	/** Back to the default: the field unset, and the focus on its control, the button
+	 *  that held it leaving with the written value. */
+	function reset(): void {
+		since = undefined;
+		onCommitScalar(undefined);
+		focusControl();
+	}
 
 	/**
 	 * This field's landing handle. The wrapper is the bloom host rather than the
@@ -280,6 +316,39 @@
 	 * controller — the source that drives its caret signals too — and is excluded here
 	 * rather than counted twice.
 	 */
+	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
+	// A change rests as a line on the control's edge and a proposal as a row under it. The
+	// pointer over the control and the focus in it are the field's two ways of being attended
+	// to, as the pointer and the caret are a mark's.
+	const reviewing = review();
+	const reviewed = $derived(reviewing.at(leafKey));
+	const changed = $derived(reviewed.changed);
+	const proposed = $derived(reviewed.proposed);
+	const lit = $derived(changed !== undefined && reviewing.lit === changed.id);
+	/** The item the focus in the field attends to: the change, whose card it raises, else the
+	 *  proposal. */
+	const attended = $derived(changed ?? proposed);
+	/** The chords, with the focus anywhere in the field: a proposal's answers, else the change
+	 *  taken back. A prose leaf's own items answer first, in the leaf. */
+	const reviewKeys = keydownHandler({
+		[REVIEW_KEYS.accept]: () => {
+			if (!proposed) return false;
+			reviewing.act(proposed.id, 'accept');
+			return true;
+		},
+		[REVIEW_KEYS.reject]: () => {
+			const item = proposed ?? changed;
+			if (!item) return false;
+			reviewing.act(item.id, proposed ? 'dismiss' : 'undo');
+			return true;
+		}
+	});
+	function onReviewKey(e: KeyboardEvent): void {
+		if (e.defaultPrevented || (!changed && !proposed)) return;
+		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
+		if (reviewKeys({} as never, e)) e.preventDefault();
+	}
+
 	const reportFocus = $derived(
 		field.control === 'prose'
 			? undefined
@@ -288,7 +357,9 @@
 	);
 </script>
 
-<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- The keydown is a control's, bubbled: the field answers the review chords for it. -->
+<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail} onkeydown={onReviewKey}>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
@@ -299,6 +370,9 @@
 			description={field.description}
 			count={cap && chars != null ? t.strings.textCount(chars, cap.max) : undefined}
 			{countId}
+			{defaulted}
+			{defaultId}
+			onReset={resettable ? reset : undefined}
 		/>
 	{/if}
 	<!-- The control and what hangs under it, in one grid cell: the diagnostics stack
@@ -306,7 +380,19 @@
 	 rule below holds why). One markup for both spans; a field owning its row nests a
 	 level and measures the same. -->
 	<div class="qm-field-stack">
-		<div class="qm-field-control qm-wash" {@attach registerControl} onfocusin={reportFocus}>
+		<div
+			class={['qm-field-control qm-wash', { 'qm-review-set': changed, 'qm-review-lit': lit }]}
+			data-qm-review={changed?.id}
+			{@attach registerControl}
+			onfocusin={(e) => {
+				reportFocus?.(e);
+				if (attended) reviewing.point(attended.id, 'caret');
+			}}
+			onfocusout={() => attended && reviewing.point(undefined, 'caret')}
+			oninput={() => changed && reviewing.point(undefined, 'caret')}
+			onpointerenter={() => changed && reviewing.point(changed.id, 'pointer')}
+			onpointerleave={() => changed && reviewing.point(undefined, 'pointer')}
+		>
 			{#if field.control === 'prose'}
 				<ProseField
 					{quill}
@@ -320,11 +406,12 @@
 					emptyUnsets={optional}
 					labelledBy={domIds.label}
 					describedBy={proseDescribedBy}
+					defaultNoteId={defaultId}
 					cap={cap && { ...cap, onCount: (n) => (chars = n) }}
 					{leafKey}
 					{onFocus}
 					{onCaretMove}
-					{onChange}
+					onChange={proseCommitted}
 					{onError}
 					{leaves}
 					{diagnostics}
@@ -445,6 +532,9 @@
 			{/if}
 		</div>
 
+		{#if proposed}
+			<ReviewProposal item={proposed} {value} refocus={focusControl} />
+		{/if}
 		{#if !isContainer(field.control)}
 			<DiagnosticList {diagnostics} />
 		{/if}
@@ -464,6 +554,10 @@
 		gap: var(--_qm-space);
 		grid-column: 1 / -1;
 		min-width: 0;
+	}
+	/* The way back to the default arrives with the field's hover or focus (`FieldLabel`). */
+	.qm-field:is(:hover, :focus-within) > :global(.qm-field-label-row > .qm-field-reset) {
+		opacity: 1;
 	}
 	/* A row-sharing field subgrids onto the section's row tracks instead of sizing its
 	 own: two tracks, the label and the control's stack, taken from the parent, so
@@ -510,5 +604,22 @@
 	   a subform it bounds a group, where there is no single box for it to disagree with. */
 	.qm-field-control {
 		border-radius: var(--_qm-radius-inner);
+	}
+	/* A value someone else set is underlined as a changed word is: the same stroke along the
+	   control's foot, and under attention the tint a lit word takes. A plane over the
+	   control, as the wash is, so it reads the same over a well, a switch and a subform, and
+	   lifted over the control's own positioned box. */
+	.qm-field-control.qm-review-set::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		box-shadow: inset 0 calc(-1 * var(--_qm-vertical-width)) 0 var(--_qm-review-line);
+		z-index: 1;
+		pointer-events: none;
+		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-field-control.qm-review-set.qm-review-lit::before {
+		background: var(--_qm-review-tint);
 	}
 </style>

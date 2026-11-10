@@ -7,13 +7,19 @@ export interface PreviewStrings {
 	noPages: string;
 	/** The zoom pill's action, after the percentage it shows. */
 	resetZoom: string;
+	/** The pane's accessible name, where the container carries none of its own. */
+	previewLabel: string;
+	/** A page's text alternative, 1-based: the canvas is pixels to a screen reader. */
+	pageLabel: (page: number, count: number) => string;
 }
 
 /** The package's English. */
 export const DEFAULT_PREVIEW_STRINGS: PreviewStrings = {
 	renderFailed: 'Preview failed to render.',
 	noPages: 'No pages to preview.',
-	resetZoom: 'reset zoom'
+	resetZoom: 'reset zoom',
+	previewLabel: 'Document preview',
+	pageLabel: (page, count) => `Page ${page} of ${count}`
 };
 
 /** A consumer's wording: any subset, the rest the package's. */

@@ -106,6 +106,17 @@
 	export function applyCardOps(ops: readonly CardOp[]): void {
 		inner?.applyCardOps(ops);
 	}
+	/** Bring the review item `id` to the reader: its panel opened, scrolled to the middle of
+	 *  the view, lit, its card raised. The focus stays put unless `focus` sends the caret into
+	 *  the item, where its chords answer. False for an item not drawn. */
+	export async function revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean> {
+		return (await inner?.revealReview(id, opts)) ?? false;
+	}
+	/** Offer `undo` as the one step back from a write the host just made: on the toast, and
+	 *  on ⌘Z/Ctrl+Z anywhere in the editor until the next edit. Returns the withdrawal. */
+	export function offerUndo(notice: string, undo: () => void): () => void {
+		return inner?.offerUndo(notice, undo) ?? (() => {});
+	}
 </script>
 
 {#key props.doc}

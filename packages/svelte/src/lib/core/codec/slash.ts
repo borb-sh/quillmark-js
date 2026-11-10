@@ -48,6 +48,9 @@ export interface SlashStrings {
 	slashHint: string;
 	/** A command's row name, by its token: `numbered-list` → `Numbered list`. */
 	slashName: (command: string) => string;
+	/** What the menu announces as its highlight moves, the caret never leaving the text:
+	 *  the row's name and its 1-based place, `Table, 6 of 6`. */
+	slashPosition: (name: string, index: number, count: number) => string;
 }
 
 const SLASH_NAMES: Record<string, string> = {
@@ -65,7 +68,8 @@ export const DEFAULT_SLASH_STRINGS: SlashStrings = {
 	slashLabel: 'Insert',
 	slashHint: 'Type / to insert',
 	slashName: (command) =>
-		SLASH_NAMES[command] ?? command.charAt(0).toUpperCase() + command.slice(1).replace(/-/g, ' ')
+		SLASH_NAMES[command] ?? command.charAt(0).toUpperCase() + command.slice(1).replace(/-/g, ' '),
+	slashPosition: (name, index, count) => `${name}, ${index} of ${count}`
 };
 
 /**

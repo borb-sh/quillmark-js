@@ -576,7 +576,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 		const card = cardOf(c);
 		const title = map.get(TITLE);
 		if ((typeof title === 'string' ? title : undefined) !== titleOf(card.ext)) {
-			storeTitle(cardAddr(c), typeof title === 'string' ? title : undefined);
+			storeTitle(doc, cardAddr(c), typeof title === 'string' ? title : undefined);
 			moved = true;
 		}
 		const schema = schemaOf(c, card.kind);
@@ -665,17 +665,6 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 			held.add(root);
 			report(e);
 		}
-	}
-
-	function storeTitle(addr: CardAddr, title: string | undefined): void {
-		const ext = doc.getExt(addr) ?? {};
-		const editor = { ...((ext.editor as Record<string, unknown> | undefined) ?? {}) };
-		if (title === undefined) delete editor.title;
-		else editor.title = title;
-		const { editor: _, ...rest } = ext;
-		const next = Object.keys(editor).length ? { ...rest, editor } : rest;
-		if (Object.keys(next).length) doc.storeExt(addr, next);
-		else if (doc.getExt(addr)) doc.removeExt(addr);
 	}
 
 	// ── Wiring ───────────────────────────────────────────────────────────────
@@ -800,9 +789,21 @@ function fieldItems(items: PayloadItem[]): { key: string; value: unknown }[] {
 	return items.filter((i): i is Extract<PayloadItem, { type: 'field' }> => i.type === 'field');
 }
 
-function titleOf(ext: Record<string, unknown> | undefined): string | undefined {
+export function titleOf(ext: Record<string, unknown> | undefined): string | undefined {
 	const t = (ext?.editor as { title?: unknown } | undefined)?.title;
 	return typeof t === 'string' ? t : undefined;
+}
+
+/** Give the card at `addr` the title, the one part of its `$ext` a session carries. */
+export function storeTitle(doc: Document, addr: CardAddr, title: string | undefined): void {
+	const ext = doc.getExt(addr) ?? {};
+	const editor = { ...((ext.editor as Record<string, unknown> | undefined) ?? {}) };
+	if (title === undefined) delete editor.title;
+	else editor.title = title;
+	const { editor: _, ...rest } = ext;
+	const next = Object.keys(editor).length ? { ...rest, editor } : rest;
+	if (Object.keys(next).length) doc.storeExt(addr, next);
+	else if (doc.getExt(addr)) doc.removeExt(addr);
 }
 
 const sameAddr = (a: Addr, b: Addr): boolean => a.card === b.card && a.field === b.field;

@@ -14,6 +14,12 @@
  flow under the label, the row's second line, and is itself the node that describes the
  control. A longer one is an info marker raising a themed popover ({@link FieldHint}).
 
+ The row's end says where the field stands against its `default:` (INVARIANTS §"The
+ commitment ladder"). While the default is what prints, a tag says so in words, and the
+ control is described by it. Once the field is written over a default, the same place
+ holds the way back: one button for every control, arriving with the field's hover or
+ focus as the guidance marker does, and named for its field.
+
  The description describes, it does not name. Behind a marker it is parked in an
  always-present visually-hidden node here and the control carries `aria-describedby`: name then
  role then description, which is the announcement the markup visually implies. In
@@ -28,6 +34,9 @@
 <script lang="ts">
 	import FieldHint from './FieldHint.svelte';
 	import { guidanceText, isBrief, renderGuidance } from './guidance.js';
+	import { wording } from './strings.js';
+
+	const t = wording();
 
 	interface Props {
 		label: string;
@@ -49,6 +58,12 @@
 		count?: string;
 		/** The count's own id, for the control's `aria-describedby`. */
 		countId?: string;
+		/** The field is unset and its `default:` is what prints. */
+		defaulted?: boolean;
+		/** The default tag's own id, for the control's `aria-describedby`. */
+		defaultId?: string;
+		/** Unset the field, where it is written over a `default:` that prints. */
+		onReset?: () => void;
 	}
 	let {
 		label,
@@ -59,9 +74,13 @@
 		description,
 		brief = true,
 		count,
-		countId
+		countId,
+		defaulted = false,
+		defaultId,
+		onReset
 	}: Props = $props();
 
+	const resetId = $props.id();
 	const inFlow = $derived(brief && description != null && isBrief(description));
 	/** The description is DOM, not text (`renderGuidance`), so it is written in. */
 	function paint(line: HTMLElement): void {
@@ -95,6 +114,18 @@
 		 enough to keep both out. -->
 		<FieldHint {description} {label} describedBy={descriptionId} />
 		<span class="qm-visually-hidden" id={descriptionId}>{guidanceText(description)}</span>
+	{/if}
+	{#if defaulted}
+		<span class="qm-field-default" id={defaultId}>{t.strings.fieldDefault}</span>
+	{:else if onReset}
+		<!-- Named by its own word and then the field's: `Reset Font size`. -->
+		<button
+			type="button"
+			class="qm-field-reset qm-tap-floor qm-focus-ring"
+			id={resetId}
+			aria-labelledby={id ? `${resetId} ${id}` : undefined}
+			onclick={onReset}>{t.strings.fieldReset}</button
+		>
 	{/if}
 	{#if count != null}
 		<span class="qm-field-count" id={countId}>{count}</span>
@@ -150,6 +181,47 @@
 		font-size: var(--_qm-text-label);
 		color: var(--_qm-ink-label);
 		font-variant-numeric: tabular-nums;
+	}
+	/* The row's end, the count's side, and ahead of a count where both stand. Words at the
+	   label rung and a step under the label's weight, which names the field where this
+	   only qualifies it. */
+	.qm-field-default,
+	.qm-field-reset {
+		flex: none;
+		margin-inline-start: auto;
+		font-size: var(--_qm-text-label);
+		line-height: var(--_qm-leading-tight);
+		color: var(--_qm-ink-label);
+	}
+	:is(.qm-field-default, .qm-field-reset) + .qm-field-count {
+		margin-inline-start: 0;
+	}
+	/* Unboxed, as a link in a line is: the row is a line of text, and a chip's floor
+	   would stand taller than it (`.qm-tap-floor` carries the target). At rest it is
+	   absent, as the guidance marker is and for its reason: a card written over its
+	   defaults would otherwise stand the word beside every label. The field that owns
+	   the row brings it up (`Field.svelte`). */
+	.qm-field-reset {
+		padding: 0;
+		border: 0;
+		border-radius: var(--_qm-radius-inner);
+		background: none;
+		font-family: inherit;
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-field-reset:focus-visible {
+		opacity: 1;
+	}
+	.qm-field-reset:hover {
+		color: var(--_qm-ink);
+		text-decoration: underline;
+	}
+	@media (hover: none) {
+		.qm-field-reset {
+			opacity: 1;
+		}
 	}
 	/* A label that lands focus says so. Only when it has somewhere to land: an
 	   `ObjectField` property's label names a subform, not one control. */
