@@ -877,6 +877,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		const next = decode(rt, schema);
 		const tr = before.tr.setMeta('addToHistory', false).setMeta(remoteKey, true);
 		const start = before.doc.content.findDiffStart(next.content);
+		let span: [number, number] | undefined;
 		try {
 			if (start != null) {
 				let { a: endA, b: endB } = before.doc.content.findDiffEnd(next.content)!;
@@ -886,15 +887,24 @@ export function createField(opts: CreateFieldOpts): FieldController {
 					endB += overlap;
 				}
 				tr.replace(start, endA, next.slice(start, endB));
+				span = [start, endA];
 			}
 			if (!tr.doc.eq(next)) return false;
 			const after = buildLineIndex(tr.doc);
-			if (delta && before.selection instanceof TextSelection) {
-				const at = (pm: number) => offsetToPM(after, mapThroughDelta(delta, pmToOffset(index, pm)));
+			const { selection } = before;
+			// With no delta to map through, a caret inside the replaced span keeps its offset, as a
+			// rebuild keeps it: mapped, it would leave the span, and a span can be wider than what
+			// changed where a block's container ids differ from the store's.
+			const replaced = !!span && span[0] <= selection.from && selection.to <= span[1];
+			if (selection instanceof TextSelection && (delta || replaced)) {
+				const at = (pm: number) => {
+					const offset = pmToOffset(index, pm);
+					return offsetToPM(after, delta ? mapThroughDelta(delta, offset) : offset);
+				};
 				tr.setSelection(
 					TextSelection.between(
-						tr.doc.resolve(at(before.selection.anchor)),
-						tr.doc.resolve(at(before.selection.head))
+						tr.doc.resolve(at(selection.anchor)),
+						tr.doc.resolve(at(selection.head))
 					)
 				);
 			}
