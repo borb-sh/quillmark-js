@@ -54,7 +54,7 @@
 	import type { VisualEditorProps } from './props.js';
 	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
-	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
+	import { createStructuralUndo, setStructuralUndo, type UndoOffer } from './undo.svelte.js';
 	import { createReview, setReview } from './review.svelte.js';
 	import type { FieldProposal, ReviewDrawn } from './review.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
@@ -190,7 +190,7 @@
 	function report(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
-		undo.settle();
+		settled();
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
 	}
 	function rederive(): void {
@@ -316,22 +316,99 @@
 				if (span.alive) void step(1, true, index < 0 ? undefined : { id, index });
 			});
 		},
-		answer(item, action) {
-			if (action === 'accept' && item.state === 'proposed' && 'field' in item && !takeField(item))
-				return false;
-			onReview?.({ id: item.id, action });
+		writing(on) {
+			writing += on ? 1 : -1;
+		},
+		answer(id, item, action, key) {
+			let back: (() => void) | undefined;
+			if (action === 'accept' && item?.state === 'proposed' && 'field' in item) {
+				back = takeField(item);
+				if (!back) return false;
+			}
+			onReview?.({ id, action });
+			if (action !== 'accept' && action !== 'dismiss') return true;
+			const field = item && 'field' in item ? reviewed(item.field) : undefined;
+			const leaf = key ?? (field && fieldKeyToString(field));
+			if (leaf === undefined) return true;
+			const reopen = (): void => reviewing.heard(id, 'reopen', leaf);
+			const prose = key !== undefined && !field;
+			record(
+				id,
+				prose
+					? action === 'accept'
+						? () => void leaves.prose(leaf)?.undoReview()
+						: () => void leaves.prose(leaf)?.reopenReview(id)
+					: () => {
+							back?.();
+							reopen();
+						},
+				back && merged.reviewAccepted
+			);
 			return true;
 		}
 	});
+
+	// ── The answer journal: the review answers since the reader's last edit, each undone by
+	// ⌘Z from anywhere in the editor, newest first, its item reopened with it. An edit that is
+	// not an answer empties it, as it drops a host's step: an inverse is good against the
+	// document it was recorded over. An answer's own writes, and an inverse's, go down the
+	// lanes an edit does, so they are flagged while they are made.
+	interface Answered {
+		ids: string[];
+		inverses: (() => void)[];
+		/** The toast it stands on; none where the key alone takes it back. */
+		notice?: string;
+	}
+	let journal: Answered[] = [];
+	/** The entry a batch of answers records into. */
+	let batching: Answered | undefined;
+	let journalOffer: UndoOffer | undefined;
+	let writing = 0;
+	function settled(): void {
+		if (writing) return;
+		journal = [];
+		journalOffer = undefined;
+		undo.settle();
+	}
+	function offerJournal(): void {
+		const top = journal.at(-1);
+		journalOffer =
+			top &&
+			undo.offer(top.notice ?? '', unanswer, { standing: true, quiet: top.notice === undefined });
+	}
+	function unanswer(): void {
+		const top = journal.pop();
+		if (!top) return;
+		writing++;
+		try {
+			for (const inverse of [...top.inverses].reverse()) inverse();
+		} finally {
+			writing--;
+		}
+		offerJournal();
+	}
+	function record(id: string, inverse: () => void, notice?: string): void {
+		if (batching) {
+			batching.ids.push(id);
+			batching.inverses.push(inverse);
+			return;
+		}
+		// Another step took the key since: the answers before it are no longer the last thing
+		// that happened.
+		if (!journalOffer || !undo.holds(journalOffer)) journal = [];
+		journal.push({ ids: [id], inverses: [inverse], notice });
+		offerJournal();
+	}
+
 	/**
 	 * Take a field's proposal: its value down the lane the field's own control commits by, so
-	 * the writer checks it and `onChange` reports it, with the step back offered as a host's
-	 * step is. A text leaf re-reads what was written. False where the writer refused the value,
-	 * which the field then says as it says any refused commit.
+	 * the writer checks it and `onChange` reports it. A text leaf re-reads what was written.
+	 * Returns the write back to the value it replaced, or `undefined` where the writer refused
+	 * the value, which the field then says as it says any refused commit.
 	 */
-	function takeField(item: FieldProposal): boolean {
+	function takeField(item: FieldProposal): (() => void) | undefined {
 		const key = reviewed(item.field);
-		if (!key?.field || typeof key.card === 'number') return false;
+		if (!key?.field || typeof key.card === 'number') return undefined;
 		const isMain = key.card === undefined;
 		const id = key.card ?? model.main.id;
 		const name = key.field;
@@ -343,9 +420,12 @@
 			leaves.prose(leaf)?.applyExternal();
 			return true;
 		};
-		if (!write(item.after)) return false;
-		undo.offer(merged.reviewAccepted, () => void write(before), { standing: true });
-		return true;
+		writing++;
+		try {
+			return write(item.after) ? () => void write(before) : undefined;
+		} finally {
+			writing--;
+		}
 	}
 	setReview(reviewing);
 	span.onEnd(reviewing.dispose);
@@ -570,7 +650,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
-		undo.settle();
+		settled();
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
 
@@ -1316,7 +1396,7 @@
 
 	/**
 	 * Answer open items as their buttons would, in document order: `'all'` is every item drawn.
-	 * An accept passes over a change, which has none, and an item that cannot be answered (a
+	 * Both pass over a change, which has neither button, and an item that cannot be answered (a
 	 * proposal that no longer writes, a value the field's writer refuses) stands. `onReview`
 	 * hears each answer, and neither the focus nor the caret moves. Returns the ids answered.
 	 */
@@ -1328,16 +1408,30 @@
 		const order = reviewOrder();
 		const asked = ids === 'all' ? order : order.filter((id) => ids.includes(id));
 		const out: string[] = [];
-		for (const id of asked) {
-			const item = reviewing.items.find((it) => it.id === id);
-			if (!item || (action === 'accept' && item.state === 'changed')) continue;
-			const key = reviewing.keyOf(id);
-			// Each one is planned against the document the one before it left.
-			const answered =
-				'anchor' in item
-					? key !== undefined && !!leaves.prose(key)?.answerReview(id, action)
-					: reviewing.act(id, action);
-			if (answered) out.push(id);
+		const entry: Answered = { ids: [], inverses: [] };
+		batching = entry;
+		writing++;
+		try {
+			for (const id of asked) {
+				const item = reviewing.items.find((it) => it.id === id);
+				if (!item || item.state === 'changed') continue;
+				const key = reviewing.keyOf(id);
+				// Each one is planned against the document the one before it left.
+				const answered =
+					'anchor' in item
+						? key !== undefined && !!leaves.prose(key)?.answerReview(id, action)
+						: reviewing.act(id, action);
+				if (answered) out.push(id);
+			}
+		} finally {
+			writing--;
+			batching = undefined;
+		}
+		if (entry.ids.length) {
+			if (!journalOffer || !undo.holds(journalOffer)) journal = [];
+			entry.notice = action === 'accept' ? merged.reviewAcceptedAll : merged.reviewDismissedAll;
+			journal.push(entry);
+			offerJournal();
 		}
 		return out;
 	}

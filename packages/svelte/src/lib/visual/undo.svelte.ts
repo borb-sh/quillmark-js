@@ -55,6 +55,8 @@ export interface Hold {
 	readonly standing?: boolean;
 	/** A card's step: kept under this label, whatever lands after. */
 	readonly keptAs?: string;
+	/** Held for the key alone, with no toast: a standing step whose way back is the key. */
+	readonly quiet?: boolean;
 }
 
 export interface StructuralUndo {
@@ -63,8 +65,9 @@ export interface StructuralUndo {
 	/** The newest kept step, if any. */
 	readonly kept: KeptStep | undefined;
 	/** Offer `restore` as the undo of the step just made, replacing any standing offer. With
-	 *  a `hold`, the key stays the step's past its toast, until {@link settle}. */
-	offer(notice: string, restore: () => void, hold?: Hold): void;
+	 *  a `hold`, the key stays the step's past its toast, until {@link settle}. Returns the
+	 *  offer, for {@link holds}. */
+	offer(notice: string, restore: () => void, hold?: Hold): UndoOffer;
 	/** An edit landed: a held step is no longer the last thing that happened. A host's goes,
 	 *  and a kept one answers to its control alone once its offer has. */
 	settle(): void;
@@ -99,7 +102,7 @@ const EDITABLE = 'input, textarea, select, [contenteditable="true"]';
 let latest: object | undefined;
 
 export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
-	let current = $state<UndoOffer | undefined>();
+	let current = $state.raw<UndoOffer | undefined>();
 	let kept = $state.raw<readonly KeptStep[]>([]);
 	/** The held step no edit has landed since: the key's, on its toast or past it. */
 	let last: { readonly offer: UndoOffer; readonly standing: boolean } | undefined;
@@ -138,13 +141,16 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		get kept() {
 			return kept.at(-1);
 		},
-		offer(notice, restore, { standing = false, keptAs } = {}) {
+		offer(notice, restore, { standing = false, keptAs, quiet = false } = {}) {
 			clear();
-			current = { notice, restore };
+			const offer = { notice, restore };
 			if (keptAs !== undefined) kept = [...kept, { label: keptAs, restore }];
-			if (standing || keptAs !== undefined) last = { offer: current, standing };
+			if (standing || keptAs !== undefined) last = { offer, standing };
 			latest = self;
+			if (quiet) return offer;
+			current = offer;
 			lapse();
+			return offer;
 		},
 		settle() {
 			if (last?.standing) clear();
@@ -215,7 +221,7 @@ export function setStructuralUndo(undo: StructuralUndo): void {
 const NO_UNDO: StructuralUndo = {
 	current: undefined,
 	kept: undefined,
-	offer() {},
+	offer: (notice, restore) => ({ notice, restore }),
 	settle() {},
 	hand() {},
 	accepts: () => false,

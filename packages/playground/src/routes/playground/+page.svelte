@@ -68,7 +68,8 @@
     seed ─► doc.apply (text + anchor) ─► review = items ─► onReviewDrawn ─► the bar's count
     bar ─► stepReview / answerReview('all', …) ─► onReview per item
     accept ─► the editor's own edit ─► onChange ─► onReview ─► the item leaves the list
-    undo ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
+    revert ─► onReview ─► the reviewer's write ─► editor.applyExternal(path) / refresh
+    ⌘Z after an answer ─► onReview reopen ─► the item back on the list
                                            └► editor.offerUndo (the step back from it)
 -->
 <script lang="ts">
@@ -335,6 +336,7 @@
 	function stepReview(dir: 1 | -1): void {
 		void editorRef?.stepReview(dir);
 	}
+	// Its batch buttons keep the focus where it was, so ⌘Z in the editor takes a batch back.
 	function answerAll(action: 'accept' | 'dismiss'): void {
 		editorRef?.answerReview('all', action);
 	}
@@ -758,6 +760,7 @@
 							type="button"
 							data-testid="review-accept-all"
 							disabled={none}
+							onmousedown={(e) => e.preventDefault()}
 							onclick={() => answerAll('accept')}>Accept all</button
 						>
 						<button
@@ -765,6 +768,7 @@
 							type="button"
 							data-testid="review-dismiss-all"
 							disabled={none}
+							onmousedown={(e) => e.preventDefault()}
 							onclick={() => answerAll('dismiss')}>Dismiss all</button
 						>
 					</span>

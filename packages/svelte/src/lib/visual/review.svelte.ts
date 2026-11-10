@@ -54,6 +54,11 @@ export interface Review {
 	point(id: string | undefined, via: ReviewVia, from?: string): void;
 	/** A reader's answer, `chord` where a key gave it. False where it could not be made. */
 	act(id: string, action: ReviewAction, chord?: boolean): boolean;
+	/** An answer leaf `key` has already given, the item listed or not: a reopen and a redo's
+	 *  accept arrive for items the host may have taken off or not yet put back. */
+	heard(id: string, action: ReviewAction, key: string, chord?: boolean): void;
+	/** A leaf is writing an answer, and is done: its edit is the answer's, not the reader's. */
+	writing(on: boolean): void;
 	/** Hold the card up while the pointer or the focus is in it, and let it go again. */
 	hold(): void;
 	release(): void;
@@ -67,11 +72,13 @@ export interface ReviewSource {
 	keyFor(path: DocPath): string | undefined;
 	/** Whether a path names a field itself, and not a place inside one. */
 	exact(path: DocPath): boolean;
-	/** A reader's answer, to make and to pass on. `false` where it could not be made, and the
-	 *  item stands. */
-	answer(item: ReviewItem, action: ReviewAction): boolean;
+	/** A reader's answer, to make and to pass on: `item` where the list holds it, `key` the
+	 *  leaf that gave it where one did. `false` where it could not be made, and the item
+	 *  stands. */
+	answer(id: string, item: ReviewItem | undefined, action: ReviewAction, key?: string): boolean;
 	/** An answer a chord gave, once it is made. */
 	chorded?(id: string): void;
+	writing?(on: boolean): void;
 }
 
 export function createReview(source: ReviewSource): Review & { dispose(): void } {
@@ -147,6 +154,16 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		[shown?.item.id, revealed, caret, pointer].find((id) => id !== undefined && byId.has(id))
 	);
 
+	const answering = (id: string, action: ReviewAction, chord?: boolean): void => {
+		if (action === 'reopen') answered.delete(id);
+		else {
+			if (card?.id === id) card = undefined;
+			answered.add(id);
+		}
+		answers++;
+		if (chord) source.chorded?.(id);
+	};
+
 	const self: Review & { dispose(): void } = {
 		get items() {
 			return items;
@@ -172,8 +189,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			const item = byId.get(id);
 			if (!item) return undefined;
 			if ('field' in item) return source.keyFor(item.field);
-			for (const [key, report] of drawn)
-				if (report.ids.includes(id) || report.undrawn.some((u) => u.id === id)) return key;
+			for (const [key, report] of drawn) if (report.ids.includes(id)) return key;
 			return undefined;
 		},
 		drew(key, report) {
@@ -219,12 +235,13 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		},
 		act(id, action, chord) {
 			const item = byId.get(id);
-			if (!item || !source.answer(item, action)) return false;
-			if (card?.id === id) card = undefined;
-			answered.add(id);
-			answers++;
-			if (chord) source.chorded?.(id);
+			if (!item || !source.answer(id, item, action)) return false;
+			answering(id, action, chord);
 			return true;
+		},
+		writing: (on) => source.writing?.(on),
+		heard(id, action, key, chord) {
+			if (source.answer(id, byId.get(id), action, key)) answering(id, action, chord);
 		},
 		hold() {
 			held = true;
@@ -283,6 +300,8 @@ const NO_REVIEW: Review = {
 	drew() {},
 	point() {},
 	act: () => false,
+	heard() {},
+	writing() {},
 	hold() {},
 	release() {},
 	dismiss() {},
