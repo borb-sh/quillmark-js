@@ -36,7 +36,7 @@ export interface RowDrag {
 export function rowDrag(rows: DragRows): RowDrag {
 	type Held = { k: number; origin: number; y: number; engaged: boolean; drop: number };
 	let drag = $state<Held | undefined>();
-	let grip: Element | undefined;
+	let grip: HTMLElement | undefined;
 	let unfollow: (() => void) | undefined;
 
 	/** The row the pointer is over, or the nearest one within its own height past either
@@ -89,7 +89,7 @@ export function rowDrag(rows: DragRows): RowDrag {
 			e.preventDefault();
 			release();
 			grip = e.currentTarget as HTMLElement;
-			(grip as HTMLElement).setPointerCapture?.(e.pointerId);
+			grip.setPointerCapture?.(e.pointerId);
 			drag = { k, origin: e.clientY, y: e.clientY, engaged: false, drop: k };
 		},
 		move(e) {

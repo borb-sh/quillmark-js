@@ -406,7 +406,7 @@
 			// The focus follows only where the row still held it: a change on leaving is
 			// a focus already on its way elsewhere.
 			const held = !!rowEls[ids[k]]?.contains(document.activeElement);
-			return remove(k, undefined, false, true, held);
+			return remove(k, { offer: true, land: held });
 		}
 		const copy = arr.slice();
 		// A cleared element control commits `undefined` (the unset rung), but an
@@ -498,10 +498,12 @@
 	 *  is no element: its remove dismisses it and writes nothing. */
 	function remove(
 		k: number,
-		column?: string,
-		fromRemove = false,
-		offer = false,
-		land = true
+		{
+			column,
+			fromRemove = false,
+			offer = false,
+			land = true
+		}: { column?: string; fromRemove?: boolean; offer?: boolean; land?: boolean } = {}
 	): void {
 		if (k >= ids.length) {
 			adding = false;
@@ -537,7 +539,7 @@
 	function onSummaryKey(e: KeyboardEvent, k: number): void {
 		if (e.key !== 'Backspace' || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
 		e.preventDefault();
-		remove(k, undefined, false, true);
+		remove(k, { offer: true });
 	}
 	/**
 	 * Move element `k` to slot `to`: one splice of the ids and of the values together, so
@@ -811,7 +813,7 @@
 			// the emptiness test reads the state before this keystroke applies; so the
 			// press that empties an element never also removes it.
 			e.preventDefault();
-			remove(k, column);
+			remove(k, { column });
 		}
 	}
 	/** The reorder's key, on the row so it answers from the summary, from any cell the
@@ -1133,7 +1135,7 @@
 		aria-label={rowAction(t.strings.arrayRemove, k)}
 		aria-keyshortcuts={control === 'object' && !table ? undefined : 'Alt+ArrowUp Alt+ArrowDown'}
 		tabindex={stop ? undefined : -1}
-		onclick={() => remove(k, undefined, true, true)}><Icon name="x" /></button
+		onclick={() => remove(k, { fromRemove: true, offer: true })}><Icon name="x" /></button
 	>
 {/snippet}
 

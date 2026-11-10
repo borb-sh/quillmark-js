@@ -67,7 +67,7 @@
 	}
 </script>
 
-<span class="qm-slash-live" aria-live="polite">{announced}</span>
+<span class="qm-visually-hidden" aria-live="polite">{announced}</span>
 
 <Popover.Root bind:open>
 	<Popover.Portal to={portalTarget}>
@@ -134,15 +134,6 @@
 </Popover.Root>
 
 <style>
-	/* The parked description's recipe (`FieldLabel`): heard and not drawn. */
-	.qm-slash-live {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
-	}
 	/* The surface, its inset, its item pad and the rung a highlight fills with are all
 	   `.qm-menu-surface` / `.qm-menu-item` (controls.css): the same recipe the enum
 	   listbox and the card stack's kind menu draw, because all three are lists picked

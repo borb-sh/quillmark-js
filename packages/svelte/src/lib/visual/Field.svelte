@@ -535,7 +535,7 @@
 		{#if proposed}
 			<ReviewProposal item={proposed} {value} refocus={focusControl} />
 		{/if}
-		{#if !isContainer(field.control)}
+		{#if scalar}
 			<DiagnosticList {diagnostics} />
 		{/if}
 	</div>

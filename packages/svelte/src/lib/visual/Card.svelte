@@ -765,16 +765,6 @@
 		position: absolute;
 		inset: 0;
 	}
-	/* The parked description: `FieldLabel`'s recipe, for the one description a
-	 header rather than a label parks. */
-	.qm-visually-hidden {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
-	}
 	.qm-group-header :global(.qm-group-chevron) {
 		flex-shrink: 0;
 		display: block;
