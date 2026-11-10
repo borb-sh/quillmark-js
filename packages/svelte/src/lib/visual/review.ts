@@ -178,18 +178,55 @@ export function valueWith(value: unknown, steps: readonly PathStep[], to: unknow
 	return record;
 }
 
-/** `value` with a member put back at `steps`, the ones from it on moving down one. */
+/** The members that stood either side of the one `steps` reach in `value`, which put it back. */
+export interface Beside {
+	before?: { member: unknown };
+	after?: { member: unknown };
+}
+
+/** The members either side of the one `steps` reach in `value`. */
+export function besideOf(value: unknown, steps: readonly PathStep[]): Beside {
+	const at = steps.at(-1);
+	const list = valueIn(value, steps.slice(0, -1));
+	if (typeof at !== 'number' || !Array.isArray(list)) return {};
+	return {
+		...(at > 0 && at - 1 < list.length && { before: { member: list[at - 1] } }),
+		...(at + 1 < list.length && { after: { member: list[at + 1] } })
+	};
+}
+
+/**
+ * `value` with a member put back at `steps`, the ones from it on moving down one: after the
+ * member that stood before it, else before the one that stood after it, the nearest of each to
+ * the index, so members put back in any order land where they stood; at the index where
+ * neither stands.
+ */
 export function valueWithInserted(
 	value: unknown,
 	steps: readonly PathStep[],
-	member: unknown
+	member: unknown,
+	beside: Beside = {}
 ): unknown {
 	const head = steps.slice(0, -1);
 	const at = steps.at(-1);
 	const list = valueIn(value, head);
 	if (typeof at !== 'number' || !Array.isArray(list)) return valueWith(value, steps, member);
+	const nearest = (near: { member: unknown } | undefined, to: number): number | undefined => {
+		if (!near) return undefined;
+		let found: number | undefined;
+		list.forEach((m: unknown, i) => {
+			if (
+				sameValue(m, near.member) &&
+				(found === undefined || Math.abs(i - to) < Math.abs(found - to))
+			)
+				found = i;
+		});
+		return found;
+	};
+	const after = nearest(beside.before, at - 1);
+	const before = after === undefined ? nearest(beside.after, at) : undefined;
 	const next = [...list];
-	next.splice(Math.min(at, next.length), 0, member);
+	next.splice(after !== undefined ? after + 1 : (before ?? Math.min(at, next.length)), 0, member);
 	return valueWith(value, head, next);
 }
 

@@ -171,6 +171,27 @@ describe('a list’s member', () => {
 		expect(r.drawn.at(-1)?.outdated).toEqual([]);
 	});
 
+	it('is put back where it stood, whichever of two removals is taken back first', async () => {
+		const five = ['A', 'B', 'C', 'D', 'E'];
+		const r = nested(
+			(doc) => {
+				const path = doc.pathFor('signature_block');
+				return [
+					{ id: 'b', state: 'proposed', field: `${path}[1]`, before: 'B' },
+					{ id: 'd', state: 'proposed', field: `${path}[3]`, before: 'D' }
+				];
+			},
+			(doc) => void quill().writer(doc).set('signature_block', five)
+		);
+		await settle();
+		press(r, 'b', 'accept');
+		press(r, 'd', 'accept');
+		expect(texts(r.doc.getStored('signature_block'))).toEqual(['A', 'C', 'E']);
+		expect(r.editor.answerReview(['b'], 'reopen')).toEqual(['b']);
+		expect(r.editor.answerReview(['d'], 'reopen')).toEqual(['d']);
+		expect(texts(r.doc.getStored('signature_block'))).toEqual(five);
+	});
+
 	it('is outdated where no member holds what it read', async () => {
 		const r = nested(
 			(doc) => [

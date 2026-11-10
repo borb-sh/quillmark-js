@@ -1,6 +1,7 @@
 // Where a nested proposal lands in a field's value, and the value it writes there.
 import { describe, it, expect } from 'vitest';
 import {
+	besideOf,
 	locate,
 	valueIn,
 	valueWith,
@@ -28,6 +29,14 @@ describe('a value at a place', () => {
 			who: { name: 'Ada' }
 		});
 		expect(value).toEqual({ rows: ['a', 'b'], who: { name: 'Ada' } });
+	});
+
+	it('puts a member back beside the one that stood before it, else the one after', () => {
+		const was = ['a', 'b', 'c', 'd'];
+		expect(besideOf(was, [0])).toEqual({ after: { member: 'b' } });
+		expect(valueWithInserted(['c', 'd'], [2], 'b', besideOf(was, [1]))).toEqual(['b', 'c', 'd']);
+		expect(valueWithInserted(['b', 'c'], [0], 'a', besideOf(was, [0]))).toEqual(['a', 'b', 'c']);
+		expect(valueWithInserted(['x'], [1], 'b', besideOf(was, [1]))).toEqual(['x', 'b']);
 	});
 });
 

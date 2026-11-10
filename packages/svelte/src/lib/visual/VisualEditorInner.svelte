@@ -65,6 +65,7 @@
 		valueIn,
 		valueWith,
 		valueWithInserted,
+		besideOf,
 		type FieldChange,
 		type FieldProposal,
 		type ReviewDrawn
@@ -528,6 +529,7 @@
 			const removes = typeof last === 'number' && !adds && item.after === undefined;
 			const landed = adds ? [...steps.slice(0, -1), length] : steps;
 			const before = valueIn(value, steps);
+			const beside = removes ? besideOf(value, steps) : {};
 			if (!write(valueWith(value, steps, item.after))) return undefined;
 			return {
 				leaf,
@@ -535,7 +537,7 @@
 				back: () =>
 					void write(
 						removes
-							? valueWithInserted(current(), steps, before)
+							? valueWithInserted(current(), steps, before, beside)
 							: valueWith(current(), landed, adds ? undefined : before)
 					),
 				holds: () => removes || sameValue(valueIn(current(), landed), item.after)
