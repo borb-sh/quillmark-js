@@ -93,16 +93,8 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return answered.size ? listed.filter((item) => !answered.has(item.id)) : listed;
 	});
 	const byId = $derived(new Map(items.map((item) => [item.id, item])));
-	const text = $derived(
-		items.flatMap((item): TextReview[] =>
-			'anchor' in item
-				? [
-						item.state === 'proposed'
-							? { id: item.id, state: 'proposed', anchor: item.anchor, after: item.after }
-							: { id: item.id, state: 'changed', anchor: item.anchor }
-					]
-				: []
-		)
+	const text: readonly TextReview[] = $derived(
+		items.filter((item): item is Extract<ReviewItem, { anchor: string }> => 'anchor' in item)
 	);
 	const placed = $derived.by(() => {
 		const out = new Map<string, { changed?: FieldChange; proposed?: FieldProposal }>();

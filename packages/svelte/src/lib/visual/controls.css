@@ -441,6 +441,20 @@
 	}
 }
 
+/* Heard and not drawn: a parked description, a status a screen reader follows. In the
+ accessibility tree, out of the layout, and never a focus stop. Clipped rather than
+ `display: none` / `hidden`, which take a node out of the tree entirely and would make
+ an `aria-describedby` dangle. Out of flow, so the classic recipe's `margin: -1px` has
+ nothing left to counteract: and it would mint a literal off every rung. */
+:where(.qm-visually-hidden) {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
 /* Forced colours drop every fill and shadow, which is every edge a field and a chip
  draw here, and keep opacity, which would leave a resting control a ghost against a
  system palette. The system's own strokes stand in for both. */

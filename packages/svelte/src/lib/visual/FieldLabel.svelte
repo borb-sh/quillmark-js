@@ -35,6 +35,7 @@
 	import FieldHint from './FieldHint.svelte';
 	import { guidanceText, isBrief, renderGuidance } from './guidance.js';
 	import { wording } from './strings.js';
+	import './controls.css';
 
 	const t = wording();
 
@@ -227,18 +228,5 @@
 	   `ObjectField` property's label names a subform, not one control. */
 	.qm-field-label.targeted {
 		cursor: pointer;
-	}
-	/* The parked description: in the accessibility tree, out of the layout, and never
-	 a focus stop. Clipped rather than `display: none` / `hidden`, which take a node
-	 out of the tree entirely and would make the `aria-describedby` dangle. Out of
-	 flow, so the classic recipe's `margin: -1px` has nothing left to counteract:
-	 and it would mint a literal off every rung. */
-	.qm-visually-hidden {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
 	}
 </style>
