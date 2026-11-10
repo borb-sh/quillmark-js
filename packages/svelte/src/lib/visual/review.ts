@@ -9,7 +9,7 @@
 // replaced as words to show, so taking one back is the host's write, which alone knows the
 // inverse of what it wrote.
 import type { DocPath } from '../core/address.js';
-import type { ReviewAction } from '../core/codec/index.js';
+import { wordDiff, type ReviewAction } from '../core/codec/index.js';
 
 /**
  * One item of review. `id` is the host's, unique in the list, and is what every event names.
@@ -99,4 +99,126 @@ export function reviewText(value: unknown, words: { on: string; off: string }): 
 		.filter(([, v]) => v)
 		.map(([key, v]) => `${key}: ${v}`)
 		.join('; ');
+}
+
+/** A stretch of a proposal as a reader is shown it: kept, struck, or tinted. */
+export interface ReviewRun {
+	text: string;
+	kind?: 'del' | 'ins';
+}
+
+type Words = { on: string; off: string };
+
+const prose = (v: unknown): v is string | { text: string } =>
+	typeof v === 'string' || (typeof v === 'object' && v !== null && 'text' in v);
+const record = (v: unknown): v is Record<string, unknown> =>
+	typeof v === 'object' && v !== null && !Array.isArray(v) && !prose(v);
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+function whole(before: string, after: string): ReviewRun[] {
+	return [
+		...(before ? [{ text: before, kind: 'del' as const }] : []),
+		...(after ? [{ text: after, kind: 'ins' as const }] : [])
+	];
+}
+
+function joined(parts: ReviewRun[][], by: string): ReviewRun[] {
+	return parts.filter((p) => p.length).flatMap((p, i) => (i ? [{ text: by }, ...p] : p));
+}
+
+/** The keys of two records that differ, each as `key: ` with what goes struck and what comes
+ *  tinted. */
+function recordRuns(
+	before: Record<string, unknown>,
+	after: Record<string, unknown>,
+	words: Words
+): ReviewRun[] {
+	const keys = [...new Set([...Object.keys(after), ...Object.keys(before)])];
+	return joined(
+		keys
+			.filter((key) => !same(before[key], after[key]))
+			.map((key) => {
+				const runs = whole(reviewText(before[key], words), reviewText(after[key], words));
+				return runs.length ? [{ text: `${key}: ` }, ...runs] : [];
+			}),
+		'; '
+	);
+}
+
+/** Two lists by their members, in order: a member both hold is kept, one only `before` holds is
+ *  struck, one only `after` holds is tinted. In a list of records a kept record is left out, and a
+ *  record struck where one is tinted reads as the keys the two differ in. */
+function listRuns(
+	before: readonly unknown[],
+	after: readonly unknown[],
+	words: Words
+): ReviewRun[] {
+	const n = before.length;
+	const m = after.length;
+	const common = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+	for (let i = n - 1; i >= 0; i--)
+		for (let j = m - 1; j >= 0; j--)
+			common[i][j] = same(before[i], after[j])
+				? common[i + 1][j + 1] + 1
+				: Math.max(common[i + 1][j], common[i][j + 1]);
+	const records = [...before, ...after].some(record);
+	/** A record edited in place, named by its first value where that stays, so a reader can tell
+	 *  which of the list it is with the records kept left out. */
+	const edited = (was: Record<string, unknown>, now: Record<string, unknown>): ReviewRun[] => {
+		const first = Object.keys(now)[0];
+		const name =
+			first !== undefined && same(was[first], now[first]) && reviewText(now[first], words);
+		const runs = recordRuns(was, now, words);
+		return name ? [{ text: `${name} (` }, ...runs, { text: ')' }] : runs;
+	};
+	const parts: ReviewRun[][] = [];
+	let gone: unknown[] = [];
+	let come: unknown[] = [];
+	const flush = (): void => {
+		const pairs = records ? Math.min(gone.length, come.length) : 0;
+		for (let k = 0; k < pairs; k++)
+			parts.push(
+				record(gone[k]) && record(come[k])
+					? edited(gone[k] as Record<string, unknown>, come[k] as Record<string, unknown>)
+					: whole(reviewText(gone[k], words), reviewText(come[k], words))
+			);
+		for (const v of gone.slice(pairs)) parts.push(whole(reviewText(v, words), ''));
+		for (const v of come.slice(pairs)) parts.push(whole('', reviewText(v, words)));
+		gone = [];
+		come = [];
+	};
+	let i = 0;
+	let j = 0;
+	while (i < n || j < m) {
+		if (i < n && j < m && same(before[i], after[j])) {
+			flush();
+			if (!records) parts.push([{ text: reviewText(before[i], words) }]);
+			i++;
+			j++;
+		} else if (j < m && (i === n || common[i][j + 1] >= common[i + 1][j])) come.push(after[j++]);
+		else gone.push(before[i++]);
+	}
+	flush();
+	return joined(parts, ', ');
+}
+
+/** A proposal as runs, what it keeps, strikes and tints. Two lines of words differ by their words,
+ *  two lists by their members, two records by their keys; any other pair differs whole. */
+export function reviewRuns(before: unknown, after: unknown, words: Words): ReviewRun[] {
+	if (Array.isArray(before) && Array.isArray(after) && before.length && after.length)
+		return listRuns(before, after, words);
+	if (record(before) && record(after)) return recordRuns(before, after, words);
+	const was = reviewText(before, words);
+	const now = reviewText(after, words);
+	if (!prose(before) || !prose(after) || !was || !now) return whole(was, now);
+	const out: ReviewRun[] = [];
+	let at = 0;
+	for (const hunk of wordDiff(was, now)) {
+		if (hunk.at > at) out.push({ text: was.slice(at, hunk.at) });
+		if (hunk.end > hunk.at) out.push({ text: was.slice(hunk.at, hunk.end), kind: 'del' });
+		if (hunk.insert) out.push({ text: hunk.insert, kind: 'ins' });
+		at = hunk.end;
+	}
+	if (at < was.length) out.push({ text: was.slice(at) });
+	return out;
 }
