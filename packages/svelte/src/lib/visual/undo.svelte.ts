@@ -1,25 +1,33 @@
-// The structural undo: one step back for a removal, offered on a toast.
+// The structural undo: the step back for a removal, offered on a toast.
 //
 // A leaf's text has its own history (`core/codec/field.ts`), so a keystroke is undone where
 // it was typed. A removal has no leaf left to hold one: the card or the row it took is gone
 // from the tree, and with it every history that could have restored it. So the surface keeps
-// the step itself, one deep, and offers it where the removal happened.
+// the step itself and offers it where the removal happened.
 //
-// One deep, and only the latest: a second removal replaces the first offer, and any other
-// structural edit withdraws it, because the restore reinserts at the index the removal left
-// and an edit between the two moves what that index names. The offer lapses on its own after
-// a while, so an Undo pressed long after the removal is not a surprise; the while holds as
-// long as the toast is under the pointer or the focus.
+// An offer is the latest step's, and one deep: a second replaces the first, and the toast
+// lapses on its own after a while, the while holding as long as the toast is under the
+// pointer or the focus. A row's step goes with its offer, its list's own history being what
+// holds it after: the restore reinserts at the index the removal left, so any other
+// structural edit withdraws it.
 //
-// A host's step rides the same toast and the same key (`offerUndo`): a write the host made for
-// the reader, an assistant's answer, lands outside every leaf's history, so nothing the reader
-// can press takes it back. It stands past its toast: it is the last thing that happened to the
-// document until the reader does something else, so ⌘Z anywhere in the editor is its, a text
-// leaf's own included, until the next edit lands.
+// Two steps are held past their toast, each the last thing that happened to the document
+// until the next edit lands, and ⌘Z is theirs until then.
 //
-// The key listens on the document while an offer stands, not on the surface: a removal by
-// the pointer takes the pressed button with it and leaves the focus on the page's body,
-// which no keydown on the surface hears.
+// A card's step is kept for the session, because nothing else holds a card: its restore
+// names the neighbours it left rather than an index, so no later edit unseats it, and the
+// surface draws the newest kept step as a standing control. Past the next edit the control
+// is the way back, so the key never brings back a card the user has since worked past.
+//
+// A host's step rides the same toast and the same key (`offerUndo`): a write the host made
+// for the reader, an assistant's answer, lands outside every leaf's history, so nothing the
+// reader can press takes it back. ⌘Z anywhere in the editor is its, a text leaf's own
+// included. Its restore is good against the document it was offered over and no other, so
+// the next edit drops it, toast and all.
+//
+// The key listens on the document, not on the surface: a removal by the pointer takes the
+// pressed button with it and leaves the focus on the page's body, which no keydown on the
+// surface hears.
 import { getContext, setContext } from 'svelte';
 
 /** How long an offer stands, in ms. Long enough to read the toast and reach its button;
@@ -33,32 +41,54 @@ export interface UndoOffer {
 	readonly restore: () => void;
 }
 
+/** A removal whose step is kept for the session. */
+export interface KeptStep {
+	/** What the standing control says, already worded: `Restore Findings`. */
+	readonly label: string;
+	/** Put back what the removal took. Runs at most once. */
+	readonly restore: () => void;
+}
+
+/** How a step is held past its toast. */
+export interface Hold {
+	/** A host's step: the key is its in a text control too, and the next edit drops it. */
+	readonly standing?: boolean;
+	/** A card's step: kept under this label, whatever lands after. */
+	readonly keptAs?: string;
+}
+
 export interface StructuralUndo {
 	/** The offer on show, if any. */
 	readonly current: UndoOffer | undefined;
-	/** Offer `restore` as the undo of the removal just made, replacing any standing offer.
-	 *  `standing` is a host's step: the key stays its past the toast, and in a text control,
-	 *  until {@link settle}. */
-	offer(notice: string, restore: () => void, standing?: boolean): void;
-	/** An edit landed: a host's step is no longer the last thing that happened. */
+	/** The newest kept step, if any. */
+	readonly kept: KeptStep | undefined;
+	/** Offer `restore` as the undo of the step just made, replacing any standing offer. With
+	 *  a `hold`, the key stays the step's past its toast, until {@link settle}. */
+	offer(notice: string, restore: () => void, hold?: Hold): void;
+	/** An edit landed: a held step is no longer the last thing that happened. A host's goes,
+	 *  and a kept one answers to its control alone once its offer has. */
 	settle(): void;
 	/** Name the control the removal handed the focus to. ⌘Z there is the offer's until the
 	 *  control takes an edit or the focus leaves it: the key that removed is the key that
 	 *  asks for it back, and the control has nothing of its own to undo yet. */
 	hand(el: Element | null): void;
-	/** Whether ⌘Z pressed at `target` is the offer's: the page's body, where a removal under
-	 *  the pointer leaves the focus, when this offer is the page's latest; the handed control; or a control under `root` that keeps
-	 *  no history of its own. A text control that is not the handed one keeps its key from a
-	 *  removal's offer and gives it to a host's step. */
+	/** Whether ⌘Z pressed at `target` is this undo's: there is an offer, or a held step no
+	 *  edit has landed since, and the target is the page's body, where a removal under the
+	 *  pointer leaves the focus, when this editor offered last on the page; the handed
+	 *  control; or a control under `root` that keeps no history of its own. A text control
+	 *  that is not the handed one keeps its key from a removal and gives it to a host's step. */
 	accepts(target: EventTarget | null, root: Element | undefined): boolean;
 	/** Hold the lapse while the toast is under the pointer or the focus, and let it run again. */
 	pause(): void;
 	resume(): void;
-	/** Whether `offer` is the one standing, on its toast or past it. */
+	/** Whether `offer` is the one the key would take, on its toast or held past it. */
 	holds(offer: UndoOffer | undefined): boolean;
-	/** Run the standing offer and clear it. False when there was none to run. */
+	/** Run the standing offer, or with none the held step, and clear it. False when there
+	 *  was nothing to run. */
 	take(): boolean;
-	/** Drop the standing offer without running it. */
+	/** Run the newest kept step, whatever offer stands. False when none is kept. */
+	takeKept(): boolean;
+	/** Drop the standing offer or the held step without running it, unless it is kept. */
 	withdraw(): void;
 }
 
@@ -70,8 +100,9 @@ let latest: object | undefined;
 
 export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 	let current = $state<UndoOffer | undefined>();
-	/** A host's step, held past its toast. */
-	let kept: UndoOffer | undefined;
+	let kept = $state.raw<readonly KeptStep[]>([]);
+	/** The held step no edit has landed since: the key's, on its toast or past it. */
+	let last: { readonly offer: UndoOffer; readonly standing: boolean } | undefined;
 	let handed: Element | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let paused = false;
@@ -79,32 +110,45 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		if (timer !== undefined) clearTimeout(timer);
 		timer = undefined;
 	};
-	const lapse = (): void => {
-		timer = setTimeout(() => (kept ? lower() : clear()), OFFER_MS);
-	};
 	const lower = (): void => {
 		stop();
 		paused = false;
 		handed = undefined;
 		current = undefined;
 	};
+	const lapse = (): void => {
+		timer = setTimeout(lower, OFFER_MS);
+	};
 	const clear = (): void => {
 		lower();
-		kept = undefined;
+		last = undefined;
+	};
+	/** The step the key would take. */
+	const live = (): UndoOffer | undefined => current ?? last?.offer;
+	const stepOf = (offer: UndoOffer | undefined): KeptStep | undefined =>
+		offer && kept.find((step) => step.restore === offer.restore);
+	const run = (step: KeptStep): void => {
+		kept = kept.filter((k) => k !== step);
+		step.restore();
 	};
 	const self: StructuralUndo & { dispose(): void } = {
 		get current() {
 			return current;
 		},
-		offer(notice, restore, standing = false) {
+		get kept() {
+			return kept.at(-1);
+		},
+		offer(notice, restore, { standing = false, keptAs } = {}) {
 			clear();
 			current = { notice, restore };
-			if (standing) kept = current;
+			if (keptAs !== undefined) kept = [...kept, { label: keptAs, restore }];
+			if (standing || keptAs !== undefined) last = { offer: current, standing };
 			latest = self;
 			lapse();
 		},
 		settle() {
-			if (kept) clear();
+			if (last?.standing) clear();
+			else last = undefined;
 		},
 		hand(el) {
 			if (!current || !el) return;
@@ -118,10 +162,10 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			el.addEventListener('focusout', release);
 		},
 		accepts(target, root) {
-			if (!(current ?? kept) || !(target instanceof Element)) return false;
+			if (!live() || !(target instanceof Element)) return false;
 			if (target === document.body) return latest === self;
 			if (target === handed) return true;
-			return !!root?.contains(target) && (!!kept || !target.closest(EDITABLE));
+			return !!root?.contains(target) && (!!last?.standing || !target.closest(EDITABLE));
 		},
 		pause() {
 			if (!current || paused) return;
@@ -133,16 +177,30 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			paused = false;
 			lapse();
 		},
-		holds: (offer) => !!offer && (current ?? kept) === offer,
+		holds: (offer) => !!offer && live() === offer,
 		take() {
-			const offer = current ?? kept;
-			clear();
+			const offer = live();
 			if (!offer) return false;
-			offer.restore();
+			const step = stepOf(offer);
+			clear();
+			if (step) run(step);
+			else offer.restore();
 			return true;
 		},
-		withdraw: clear,
-		dispose: clear
+		takeKept() {
+			const step = kept.at(-1);
+			if (!step) return false;
+			if (stepOf(live()) === step) clear();
+			run(step);
+			return true;
+		},
+		withdraw() {
+			if (!stepOf(live())) clear();
+		},
+		dispose() {
+			clear();
+			kept = [];
+		}
 	};
 	return self;
 }
@@ -156,6 +214,7 @@ export function setStructuralUndo(undo: StructuralUndo): void {
 /** What a component rendered outside the editor gets: no offer, so it removes as it always did. */
 const NO_UNDO: StructuralUndo = {
 	current: undefined,
+	kept: undefined,
 	offer() {},
 	settle() {},
 	hand() {},
@@ -164,6 +223,7 @@ const NO_UNDO: StructuralUndo = {
 	resume() {},
 	holds: () => false,
 	take: () => false,
+	takeKept: () => false,
 	withdraw() {}
 };
 

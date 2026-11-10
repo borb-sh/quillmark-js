@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A removed card can be put back for as long as the editor is mounted.** A control at the foot of the cards names the card removed last and restores it, then the one before it, where the undo toast was the only way back and lapsed after six seconds. ⌘/Ctrl+Z off a text control restores it too until the next edit lands. A restored card returns beside the card it stood under, so a card added, moved or removed since no longer withdraws the offer; one whose `$id` a card added since now holds is minted another. `VisualStrings` gains `undoRestore`.
+
 **A short description stands under its label, and a description's markdown is drawn.** A field description of up to 72 characters is set in flow under the field's label, where it sat behind an info marker that showed only on the field's hover or focus; a longer one keeps the marker and its popover, as does a table column's. A description's inline markdown draws as marks in both places, a link as its words, where backticks and asterisks printed literally, and the text that describes the control to assistive tech is the words alone.
 
 **A field says that it shows its default, and offers the way back to it.** A card's text, number, enum, boolean or date field that is unset over a `default:` that prints carries a `Default` tag at the end of its label row, which also describes its control. Written over such a default, it carries a `Reset` button in the same place, shown on the field's hover or focus and named for the field, which unsets it and puts the focus on its control, where a text field emptied over its default had no way back to it. `VisualStrings` gains `fieldDefault` and `fieldReset`.

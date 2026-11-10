@@ -110,7 +110,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **A retype inserts the new card before removing the old**, so a refusal leaves the document as it was. The chrome offers no switch for a declared kind: a card's kind is fixed once it exists.
 
-**A delete is offered back once**, and any other card operation withdraws the offer, since the index it restores to has moved.
+**A removed card is kept for the session.** Nothing else holds a card once it is gone, so its step outlives the toast that offers it: a control at the stack's foot names the newest one, and ⌘Z reaches it with no toast up only until the next edit lands, so the key never brings back a card the user has worked past. The restore names the cards it stood between, not an index, so no later card operation unseats it. A row's removal is offered once and withdrawn by any other structural edit, its list's own history being what holds it after. A timer as the only way back to a card was rejected: a card can hold pages, and six seconds is shorter than noticing a mistake.
 
 **The `$ext.editor` namespace is the write unit, and one verb owns it.** `storeExt` replaces the whole `$ext` map, so every write goes through `patchEditorExt`, which merges and drops keys; that is what keeps a tips dismissal from wiping every card's title. An emptied namespace removes itself. The backend never sees the namespace.
 
@@ -186,7 +186,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **The card never takes the focus, and waits a beat for what raises it.** The caret that raised it stays where it was, and neither a pointer crossing a paragraph nor a caret arrowing through a changed word raises one; a host's reveal, being asked for, raises it at once. Escape lowers a card over the leaf's own item before it is any other binding's, so it costs the reader neither the caret nor the focus. One item is under attention at a time, the card's before a revealed one, the caret's before the pointer's.
 
-**A host's step back is one deep and stands until the next edit.** A write the host made for the reader lands outside every leaf's history, so `offerUndo` holds it where a removal's undo is held and gives it ⌘Z anywhere in the editor, a text leaf included, until an edit lands and it is no longer the last thing that happened.
+**A host's step back is one deep and stands until the next edit.** A write the host made for the reader lands outside every leaf's history, so `offerUndo` holds it where a removal's undo is held and gives it ⌘Z anywhere in the editor, a text leaf included, until an edit lands and it is no longer the last thing that happened. The edit drops it, toast and all, where a removed card's step is kept: its undo is good against the document it was offered over and no other.
 
 ### Declined
 
