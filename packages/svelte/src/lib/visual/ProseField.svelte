@@ -157,7 +157,7 @@
 				onReviewDismiss: () => reviewing.dismiss(),
 				onReview: (id, action) => reviewing.act(id, action),
 				onReviewPoint: (id, via) => reviewing.point(id, via),
-				onReviewDrawn: (ids) => reviewing.drew(leafKey, ids),
+				onReviewDrawn: (report) => reviewing.drew(leafKey, report.ids),
 				onFocus,
 				onCaretMove,
 				onChange,

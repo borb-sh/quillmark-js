@@ -16,7 +16,7 @@
 // words that land are the words that were drawn. It goes down the lane a keystroke takes: one
 // transaction, one undo step, one commit.
 import { closeHistory } from 'prosemirror-history';
-import { DOMSerializer, Fragment, type Node as PMNode } from 'prosemirror-model';
+import { DOMSerializer, Fragment, type Node as PMNode, type Schema } from 'prosemirror-model';
 import { keydownHandler } from 'prosemirror-keymap';
 import {
 	Plugin,
@@ -25,6 +25,7 @@ import {
 	type EditorState,
 	type Transaction
 } from 'prosemirror-state';
+import { Step, StepResult } from 'prosemirror-transform';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { arriving, HARD_BREAK, ISLAND_SLOT } from './islands.js';
 import type { AnchorPos } from './marks.js';
@@ -93,12 +94,87 @@ export interface ReviewChannel {
 	act(id: string, action: ReviewAction): void;
 	/** The item the pointer or the caret is in, `undefined` once it has left. */
 	point(id: string | undefined, via: ReviewVia): void;
-	/** The ids the leaf draws, on each change of the set. */
-	drew(ids: readonly string[]): void;
+	/** What the leaf draws and what it holds and does not draw, on each change of either. */
+	drew(report: ReviewReport): void;
 }
 
-/** Counts the leaf's own edits, so the caret's report can tell typing from arriving. */
-const reviewKey = new PluginKey<number>('quill-review');
+/** Why a listed item whose anchor the leaf holds draws nothing: `after` is not Markdown the
+ *  leaf's schema holds, or an earlier item has the paragraph. */
+export type LeafUndrawn = 'parse' | 'taken';
+
+/** What a leaf draws of the items it was handed. */
+export interface ReviewReport {
+	/** The ids drawn, in the order the items were listed. */
+	ids: readonly string[];
+	/** The items whose anchor the leaf holds and which it does not draw, each with why. */
+	undrawn: readonly { id: string; reason: LeafUndrawn }[];
+}
+
+/** An answer the leaf holds: a proposal taken or turned down here, drawn no more. */
+type Answer = 'accept' | 'dismiss';
+
+/** The leaf's review state: the count of its own edits, so the caret's report can tell typing
+ *  from arriving, and the items answered here. */
+interface ReviewState {
+	edits: number;
+	answered: ReadonlyMap<string, Answer>;
+}
+
+/** What a transaction tells the review state: an answer given or taken back, or the ids of
+ *  answered items the host's list no longer holds. */
+type ReviewMeta = { answer: { id: string; to: Answer | undefined } } | { prune: readonly string[] };
+
+const reviewKey = new PluginKey<ReviewState>('quill-review');
+
+/**
+ * Taking a proposal, as a step of the transaction that writes it. It changes no content, and it
+ * is a step and not a transaction's meta so that the leaf's history carries the answer with the
+ * words: undoing the accept inverts it and the proposal draws again, and a redo, an undo event
+ * grown by typing, the depth cap and a rebase over a remote edit each move it with its words.
+ */
+class ReviewAnswer extends Step {
+	constructor(
+		readonly id: string,
+		readonly to: 'accept' | undefined
+	) {
+		super();
+	}
+	apply(doc: PMNode): StepResult {
+		return StepResult.ok(doc);
+	}
+	invert(): Step {
+		return new ReviewAnswer(this.id, this.to ? undefined : 'accept');
+	}
+	map(): Step {
+		return this;
+	}
+	toJSON() {
+		return { stepType: 'quillReviewAnswer', id: this.id, to: this.to ?? null };
+	}
+	static fromJSON(_schema: Schema, json: { id: string; to: 'accept' | null }): ReviewAnswer {
+		return new ReviewAnswer(json.id, json.to ?? undefined);
+	}
+}
+Step.jsonID('quillReviewAnswer', ReviewAnswer);
+
+function answering(state: ReviewState, id: string, to: Answer | undefined): ReviewState {
+	if (state.answered.get(id) === to) return state;
+	const answered = new Map(state.answered);
+	if (to) answered.set(id, to);
+	else answered.delete(id);
+	return { ...state, answered };
+}
+
+function applyReview(tr: Transaction, state: ReviewState): ReviewState {
+	let next = state;
+	if (tr.docChanged && !tr.getMeta(remoteKey)) next = { ...next, edits: next.edits + 1 };
+	for (const step of tr.steps)
+		if (step instanceof ReviewAnswer) next = answering(next, step.id, step.to);
+	const meta = tr.getMeta(reviewKey) as ReviewMeta | undefined;
+	if (meta && 'answer' in meta) next = answering(next, meta.answer.id, meta.answer.to);
+	else if (meta) for (const id of meta.prune) next = answering(next, id, undefined);
+	return next;
+}
 
 /** A block the document holds no blocks inside: a textblock, a rule, a block island. */
 interface Leaf {
@@ -196,6 +272,7 @@ interface Drawn {
 	spans: Span[];
 	/** Each drawn proposal's pieces, by its id. */
 	plans: Map<string, Piece[]>;
+	undrawn: { id: string; reason: LeafUndrawn }[];
 }
 
 /**
@@ -342,21 +419,25 @@ function lastLine(el: HTMLElement): HTMLElement | undefined {
 	}
 }
 
-/** The blocks a proposal covered when it arrived, by its id, with the `after` it then held. */
-type Bases = Map<string, { after: string; blocks: PMNode[] }>;
+/** The blocks a proposal covered when it arrived, by its id, with the `after` it then held and
+ *  the anchor it named. */
+type Bases = Map<string, { after: string; anchor: string; blocks: PMNode[] }>;
 
-function draw(
-	state: EditorState,
-	channel: ReviewChannel,
-	act: Act,
-	answered: ReadonlySet<string>,
-	bases: Bases
-): Drawn {
-	const items = channel.items().filter((item) => !answered.has(item.id));
-	const plans = new Map<string, Piece[]>();
-	if (!items.length) return { set: DecorationSet.empty, spans: [], plans };
-	const { doc } = state;
+function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases): Drawn {
+	const { answered } = reviewKey.getState(state)!;
+	const listed = channel.items();
 	const anchors = new Map(channel.anchors(state).map((a) => [a.id, a]));
+	// A base outlives its item's answer and its leaving the list while its anchor stands, so a
+	// proposal brought back by an undo draws against the paragraph it first drew over.
+	if (bases.size) {
+		const ids = new Set(listed.map((item) => item.id));
+		for (const [id, base] of bases) if (!ids.has(id) && !anchors.has(base.anchor)) bases.delete(id);
+	}
+	const items = answered.size ? listed.filter((item) => !answered.has(item.id)) : listed;
+	const plans = new Map<string, Piece[]>();
+	const undrawn: Drawn['undrawn'] = [];
+	if (!items.length) return { set: DecorationSet.empty, spans: [], plans, undrawn };
+	const { doc } = state;
 	const lit = channel.lit();
 	const strings = channel.strings();
 	const serializer = DOMSerializer.fromSchema(state.schema);
@@ -422,10 +503,16 @@ function draw(
 			else ahead = beside === 0 && anchor.start === reach(leaf)[0];
 		}
 		if (!point && !cover.length) continue;
-		if (cover.some((i) => taken.has(i))) continue;
+		if (cover.some((i) => taken.has(i))) {
+			undrawn.push({ id: item.id, reason: 'taken' });
+			continue;
+		}
 
 		const proposed = item.after.trim() ? channel.parse(item.after) : undefined;
-		if (item.after.trim() && !proposed) continue;
+		if (item.after.trim() && !proposed) {
+			undrawn.push({ id: item.id, reason: 'parse' });
+			continue;
+		}
 		const next = proposed ? leavesOf(proposed) : [];
 		const covered = cover.map((i) => leaves![i]);
 		let paired = 0;
@@ -445,7 +532,7 @@ function draw(
 			seen?.after === item.after && seen.blocks.length === covered.length
 				? seen.blocks
 				: covered.map((leaf) => leaf.node);
-		bases.set(item.id, { after: item.after, blocks: base });
+		bases.set(item.id, { after: item.after, anchor: item.anchor, blocks: base });
 
 		covered.forEach((leaf, k) => {
 			const [lo, hi] = reach(leaf);
@@ -569,7 +656,7 @@ function draw(
 			to: reach(last)[1]
 		});
 	}
-	return { set: DecorationSet.create(doc, decos), spans, plans };
+	return { set: DecorationSet.create(doc, decos), spans, plans, undrawn };
 }
 
 /** Whether a block's last leaf is a textblock, so its last line can carry a run. */
@@ -612,6 +699,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	let memo:
 		| {
 				doc: PMNode;
+				review: ReviewState;
 				anchors: readonly AnchorPos[];
 				items: readonly TextReview[];
 				lit: string | undefined;
@@ -619,11 +707,9 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				drawn: Drawn;
 		  }
 		| undefined;
-	let drewIds = '';
+	const NOTHING = JSON.stringify({ ids: [], undrawn: [] } satisfies ReviewReport);
+	let reported = NOTHING;
 	let host: EditorView | undefined;
-	/** The items answered here, drawn no more: an answer shows at once, whenever the list that
-	 *  held the item is next handed over. */
-	const answered = new Set<string>();
 	const bases: Bases = new Map();
 	/** Answer an item. Taking a proposal writes it first, and one that can no longer be written
 	 *  stays as it is. A proposal taken by a press while the focus is elsewhere leaves the caret
@@ -640,45 +726,45 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				const end = tr.mapping.map(Math.max(...plan.map((piece) => piece.to)), 1);
 				tr.setSelection(Selection.near(tr.doc.resolve(Math.min(end, tr.doc.content.size)), -1));
 			}
-			answered.add(id);
-			memo = undefined;
-			view.dispatch(tr);
+			view.dispatch(tr.step(new ReviewAnswer(id, 'accept')));
 			if (away) view.focus();
 		} else {
-			answered.add(id);
-			memo = undefined;
-			view.setProps({});
+			view.dispatch(
+				view.state.tr
+					.setMeta(reviewKey, { answer: { id, to: 'dismiss' } } satisfies ReviewMeta)
+					.setMeta('addToHistory', false)
+			);
 		}
 		channel.act(id, action);
 	};
 	const drawn = (state: EditorState): Drawn => {
+		const review = reviewKey.getState(state)!;
 		const anchors = channel.anchors(state);
 		const items = channel.items();
-		if (memo?.items !== items) {
-			const listed = new Set(items.map((item) => item.id));
-			for (const id of answered) if (!listed.has(id)) answered.delete(id);
-			for (const id of bases.keys()) if (!listed.has(id)) bases.delete(id);
-		}
 		const lit = channel.lit();
 		const strings = channel.strings();
 		if (
 			memo &&
 			memo.doc === state.doc &&
+			memo.review === review &&
 			memo.anchors === anchors &&
 			memo.items === items &&
 			memo.lit === lit &&
 			memo.strings === strings
 		)
 			return memo.drawn;
-		const next = draw(state, channel, act, answered, bases);
-		memo = { doc: state.doc, anchors, items, lit, strings, drawn: next };
-		const ids = next.spans.map((s) => s.id);
-		const joined = ids.join('\u0000');
-		if (joined !== drewIds) {
-			drewIds = joined;
-			channel.drew(ids);
-		}
+		const next = draw(state, channel, act, bases);
+		memo = { doc: state.doc, review, anchors, items, lit, strings, drawn: next };
 		return next;
+	};
+	/** Tell the channel what the leaf draws, where that moved. */
+	const report = (state: EditorState): void => {
+		const { spans, undrawn } = drawn(state);
+		const next: ReviewReport = { ids: spans.map((s) => s.id), undrawn };
+		const joined = JSON.stringify(next);
+		if (joined === reported) return;
+		reported = joined;
+		channel.drew(next);
 	};
 
 	let hovered: string | undefined;
@@ -725,11 +811,11 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		return true;
 	};
 
-	const plugin = new Plugin<number>({
+	const plugin = new Plugin<ReviewState>({
 		key: reviewKey,
 		state: {
-			init: () => 0,
-			apply: (tr, edits) => (tr.docChanged && !tr.getMeta(remoteKey) ? edits + 1 : edits)
+			init: () => ({ edits: 0, answered: new Map() }),
+			apply: applyReview
 		},
 		props: {
 			decorations: (state) => drawn(state).set,
@@ -762,14 +848,16 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		},
 		view: (view) => {
 			host = view;
+			report(view.state);
 			return {
 				update(view, prev) {
-					follow(view, reviewKey.getState(prev) !== reviewKey.getState(view.state));
+					report(view.state);
+					follow(view, reviewKey.getState(prev)?.edits !== reviewKey.getState(view.state)?.edits);
 				},
 				destroy() {
 					if (hovered !== undefined) channel.point(undefined, 'pointer');
 					if (caret !== undefined) channel.point(undefined, 'caret');
-					if (drewIds) channel.drew([]);
+					if (reported !== NOTHING) channel.drew({ ids: [], undrawn: [] });
 					host = undefined;
 				}
 			};
@@ -779,7 +867,16 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	return {
 		plugin,
 		refresh(view) {
-			view.setProps({});
+			// An answer is held until a list arrives without its item.
+			const answered = reviewKey.getState(view.state)?.answered;
+			const listed = new Set(channel.items().map((item) => item.id));
+			const prune = [...(answered?.keys() ?? [])].filter((id) => !listed.has(id));
+			if (!prune.length) return view.setProps({});
+			view.dispatch(
+				view.state.tr
+					.setMeta(reviewKey, { prune } satisfies ReviewMeta)
+					.setMeta('addToHistory', false)
+			);
 		},
 		elements(view, id) {
 			return [...view.dom.querySelectorAll<HTMLElement>('[data-qm-review]')].filter(
