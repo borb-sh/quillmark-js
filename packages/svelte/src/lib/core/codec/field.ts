@@ -53,7 +53,8 @@ import { anchorsFromContent, type AnchorPos } from './marks.js';
 import { contentEqual, createReconciler, type Reconciler } from './reconcile.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
-import { bodyKeymap } from './keymap.js';
+import { bodyKeymap, holdsTab } from './keymap.js';
+import { DEFAULT_LEAVE_STRINGS, leavePlugin, type LeaveStrings } from './leave.js';
 import { FIELD_KEYS, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
@@ -121,6 +122,8 @@ export interface CreateFieldOpts {
 	onSlash?(state: SlashState | undefined): void;
 	/** The slash surface's wording, read per decoration pass; read only beside {@link onSlash}. */
 	slashStrings?: () => SlashStrings;
+	/** The way out's wording, read as it is drawn (`leave.ts`). Absent leaves the package's English. */
+	leaveStrings?: () => LeaveStrings;
 	/**
 	 * Accessible name → `aria-label` on the `contenteditable`, for a leaf nothing else names (an
 	 * array element, the card body). A leaf with a field label takes `labelledBy` instead: `for`
@@ -600,6 +603,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				inline,
 				slash,
 				slashHint: () => (opts.slashStrings?.() ?? DEFAULT_SLASH_STRINGS).slashHint,
+				leaveStrings: opts.leaveStrings,
 				noInputRules: opts.noInputRules,
 				// Always installed, so a leaf that mounts without a ghost can still be
 				// given one later; the plugin draws nothing while the text is empty.
@@ -936,6 +940,8 @@ export function proseLeafPlugins(
 		slash?: (state: SlashState | undefined) => void;
 		/** The empty line's hint, read live; drawn only beside `slash`. */
 		slashHint?: () => string | undefined;
+		/** The way out's wording, read live (`leave.ts`); the package's English without it. */
+		leaveStrings?: () => LeaveStrings;
 		noInputRules?: boolean;
 		/** Read live: the ghost can move after mount and a re-hydration rebuilds this stack. */
 		placeholder?: () => string | undefined;
@@ -955,6 +961,8 @@ export function proseLeafPlugins(
 		linebreakPlugin(schema)
 	];
 	if (opts.slash) list.push(slashPlugin(opts.slash, opts.slashHint));
+	if (!opts.inline && holdsTab(schema))
+		list.push(leavePlugin(opts.leaveStrings ?? (() => DEFAULT_LEAVE_STRINGS)));
 	if (!opts.noInputRules) list.push(inputRulesPlugin(schema), undoRuleKeymap());
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
 	list.push(keymap(baseKeymap));

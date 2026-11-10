@@ -180,12 +180,13 @@
 }
 :where(.qm-icon-btn:hover:not(:disabled)),
 :where(.qm-add-affordance:hover:not(:disabled)),
-:where(.qm-chip:hover:not(:disabled)) {
+:where(.qm-chip:hover:not(:disabled, [aria-disabled='true'])) {
 	background: var(--_qm-surface-hover);
 }
 :where(.qm-icon-btn:disabled),
 :where(.qm-add-affordance:disabled),
-:where(.qm-chip:disabled) {
+:where(.qm-chip:disabled),
+:where(.qm-chip[aria-disabled='true']) {
 	opacity: var(--_qm-opacity-idle);
 	cursor: default;
 }

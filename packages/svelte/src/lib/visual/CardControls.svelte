@@ -2,6 +2,9 @@
   Card controls, composable cards only.
   Right-aligned in the header: a move-up/move-down chevron pair (each disabled at its
   edge), then delete, the row revealed while the pointer or the caret is in the card.
+  A move button at its edge is inert by `aria-disabled` and out of the tab order, not
+  `disabled`: a move that reaches the edge under the focus then keeps the focus on the
+  button pressed, where a disabled one drops it to the page.
   Reorder is buttons, not drag. All three are chips (controls.css): fill arrives
   on hover, and delete rests at the label ink beside them. The card scopes
   that reveal, so its condition lives in the parent's CSS; the row keeps the narrower
@@ -32,15 +35,17 @@
 			type="button"
 			class="qm-chip qm-focus-ring"
 			title={t.strings.cardMoveUp}
-			disabled={isFirst}
-			onclick={onMoveUp}><Icon name="chevron-up" /></button
+			aria-disabled={isFirst || undefined}
+			tabindex={isFirst ? -1 : undefined}
+			onclick={() => isFirst || onMoveUp()}><Icon name="chevron-up" /></button
 		>
 		<button
 			type="button"
 			class="qm-chip qm-focus-ring"
 			title={t.strings.cardMoveDown}
-			disabled={isLast}
-			onclick={onMoveDown}><Icon name="chevron-down" /></button
+			aria-disabled={isLast || undefined}
+			tabindex={isLast ? -1 : undefined}
+			onclick={() => isLast || onMoveDown()}><Icon name="chevron-down" /></button
 		>
 	</div>
 	<button

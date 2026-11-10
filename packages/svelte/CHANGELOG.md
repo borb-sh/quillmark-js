@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**Escape, then Tab or Shift-Tab, leaves a body in either direction.** Escape in a body keeps the focus and the caret where they are and hands the next Tab or Shift-Tab to the browser, from a list item too, where it blurred the body: the focus was then drawn nowhere and Shift-Tab landed back in the body. Any other key, a press or an edit gives Tab back to the body. A Tab the body holds to no effect shows `Esc, then Tab, to move on` in the leaf's corner, and Escape shows `Tab to move on`, both in a status region. `VisualStrings` gains `leaveTaught` and `leaveArmed`, and `shortcutLeave` reads `Let Tab leave the editor`.
+
+**A card moved by its button keeps the focus on that button.** A move from the keyboard leaves the focus on the button pressed, at the stack's edge too, where it fell to the page whenever the move re-inserted the card or disabled the button. A move button at its edge is inert by `aria-disabled` and out of the tab order.
+
 **A drop anywhere in a table cell lands in that cell.** Text dropped on a cell's padding, or on the edge of its text where no line is, lands in the cell at the nearest place in its text, where the first landed as a new paragraph above the table and the second was taken and dropped.
 
 **Enter in a list of numbers moves on.** Enter in a number row that holds a number commits it and takes the focus to the next row with its number selected, or from the last row to a standing row for the next number, where the caret stayed and the next digits ran onto the number just entered.

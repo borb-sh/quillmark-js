@@ -40,6 +40,11 @@ export type { TableChromeStrings } from './table-view.js';
 export { DEFAULT_SLASH_STRINGS } from './slash.js';
 export type { SlashState, SlashStrings } from './slash.js';
 
+// The body's way out by the keyboard: the codec owns the keys and the hint's element,
+// the visual tier's `strings` set its wording.
+export { DEFAULT_LEAVE_STRINGS } from './leave.js';
+export type { LeaveStrings } from './leave.js';
+
 // The rich editor's shortcuts as a host lists them, read off the tables the keymaps bind from;
 // the visual tier's `strings` set extends their wording, and the formatting popover binds its
 // link chord from `FIELD_KEYS`.
