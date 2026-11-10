@@ -10,6 +10,7 @@ import { quill, example } from '../helpers/fixtures.js';
 import {
 	mountEditor,
 	openField,
+	press as key,
 	settle,
 	unmountAll,
 	type EditorRef,
@@ -53,6 +54,11 @@ const texts = (value: unknown): unknown =>
 				: v
 		)
 	);
+/** ⌘Z from the editor's root, which takes back the newest answer. */
+const undoKey = (r: Nested): void => {
+	key(r.target.querySelector<HTMLElement>('.qm-editor')!, 'z', { ctrlKey: true });
+	flushSync();
+};
 const press = (r: Nested, id: string, action: 'accept' | 'dismiss'): void => {
 	const row = r.target.querySelector(`.qm-review-proposal[data-qm-review="${id}"]`)!;
 	row.querySelector<HTMLButtonElement>(`.qm-review-${action}`)!.click();
@@ -93,19 +99,18 @@ describe('a record’s cell', () => {
 		expect(r.drawn.at(-1)?.undrawn).toEqual([]);
 	});
 
-	it('is taken alone, and taken back alone', async () => {
+	it('is taken alone, and ⌘Z takes the newest back alone', async () => {
 		const r = nested(contact, seed);
 		await settle();
 		press(r, 'name', 'accept');
 		press(r, 'email', 'accept');
 		expect(texts(r.doc.getStored('contact'))).toEqual({ name: 'Grace', email: 'g@example.org' });
-		expect(r.editor.answerReview(['name'], 'reopen')).toEqual(['name']);
-		flushSync();
-		expect(texts(r.doc.getStored('contact'))).toEqual({ name: 'Ada', email: 'g@example.org' });
+		undoKey(r);
+		expect(texts(r.doc.getStored('contact'))).toEqual({ name: 'Grace', email: 'a@example.org' });
 		expect(r.events.map((e) => [e.id, e.action])).toEqual([
 			['name', 'accept'],
 			['email', 'accept'],
-			['name', 'reopen']
+			['email', 'reopen']
 		]);
 	});
 
@@ -171,7 +176,7 @@ describe('a list’s member', () => {
 		expect(r.drawn.at(-1)?.outdated).toEqual([]);
 	});
 
-	it('is put back where it stood, whichever of two removals is taken back first', async () => {
+	it('is put back where it stood by ⌘Z, the newest removal first', async () => {
 		const five = ['A', 'B', 'C', 'D', 'E'];
 		const r = nested(
 			(doc) => {
@@ -187,8 +192,9 @@ describe('a list’s member', () => {
 		press(r, 'b', 'accept');
 		press(r, 'd', 'accept');
 		expect(texts(r.doc.getStored('signature_block'))).toEqual(['A', 'C', 'E']);
-		expect(r.editor.answerReview(['b'], 'reopen')).toEqual(['b']);
-		expect(r.editor.answerReview(['d'], 'reopen')).toEqual(['d']);
+		undoKey(r);
+		expect(texts(r.doc.getStored('signature_block'))).toEqual(['A', 'C', 'D', 'E']);
+		undoKey(r);
 		expect(texts(r.doc.getStored('signature_block'))).toEqual(five);
 	});
 

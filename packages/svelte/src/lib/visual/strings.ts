@@ -63,24 +63,12 @@ export interface VisualStrings
 	/** The same header where a field inside holds an item of review. */
 	groupReviewed: string;
 
-	// ── Review (the card over a change, the row under a field) ───────────────
-	/** The card's button, and the row's: takes the change back. */
-	reviewUndo: string;
-	/** Its tooltip, which names the chord. */
-	reviewUndoTitle: string;
-	/** The card's accessible name. */
-	reviewChange: string;
+	// ── Review (the row under a field) ───────────────────────────────────────
 	/** The toast over a field's proposal taken, beside its way back. */
 	reviewAccepted: string;
-	/** Before what a change replaced: `Was  the old words`. */
-	reviewWas: string;
-	/** The whole of the card over text that replaced nothing. */
-	reviewAdded: string;
-	/** Before the text a change took out, or the whole of the card where the host kept none. */
-	reviewRemoved: string;
-	/** A value that was, or would be, nothing: `Was  Empty`. */
+	/** A value that was, or would be, nothing. */
 	reviewEmpty: string;
-	/** A switch's two values, as a card and a row word them. */
+	/** A switch's two values, as a row words them. */
 	reviewOn: string;
 	reviewOff: string;
 
@@ -316,13 +304,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	...DEFAULT_REVIEW_STRINGS,
 	reviewAcceptTitle: `Accept (${chord('↵')})`,
 	reviewDismissTitle: `Dismiss (${chord('.')})`,
-	reviewUndo: 'Undo',
-	reviewUndoTitle: `Undo (${chord('.')})`,
-	reviewChange: 'Change',
 	reviewAccepted: 'Change accepted',
-	reviewWas: 'Was',
-	reviewAdded: 'Added',
-	reviewRemoved: 'Removed',
 	reviewEmpty: 'Empty',
 	reviewOn: 'On',
 	reviewOff: 'Off',

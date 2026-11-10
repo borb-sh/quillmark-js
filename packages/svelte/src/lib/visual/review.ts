@@ -27,9 +27,8 @@ import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/inde
  *   list names that place: a cell, or a member by its index, which `after` absent takes out
  *   and an index past the last appends.
  *
- * An item whose place the editor does not hold draws nothing. A dismissed item is drawn no more,
- * and an accepted proposal the list still holds is drawn as the change it made, with the card
- * that takes it back, until the list lets it go.
+ * An item whose place the editor does not hold draws nothing. An answered item is drawn no
+ * more: a dismissed one wrote nothing, and an accepted one is plain text in the document.
  */
 export type ReviewItem = FieldProposal | BlockProposal;
 
@@ -48,17 +47,16 @@ export type BlockProposal =
 export const byBlocks = (item: object): item is BlockProposal =>
 	'replace' in item || 'insert' in item;
 
-/** Whether an item is a field's own, drawn on its control: a proposal, or one accepted there. */
-export const onField = (item: object): item is FieldChange | FieldProposal =>
-	'field' in item && !byBlocks(item);
+/** Whether an item is a field's own, drawn under its control. */
+export const onField = (item: object): item is FieldProposal => 'field' in item && !byBlocks(item);
 
 /**
  * A reader's answer to an item.
  *
  * - `accept`: a proposal taken. The editor has written it by now, as an edit of the reader's.
  * - `dismiss`: a proposal turned down. Nothing is written.
- * - `reopen`: an accept or a dismissal undone. The editor has taken back what an accept wrote,
- *   and the item is open again.
+ * - `reopen`: an accept or a dismissal undone by ⌘Z. The editor has taken back what an accept
+ *   wrote, and the item is open again.
  */
 export interface ReviewEvent {
 	id: string;
@@ -79,12 +77,8 @@ export type ReviewUndrawn = 'block' | 'field' | 'parse' | 'taken' | 'applied';
 
 /** What the editor draws of the host's list. */
 export interface ReviewDrawn {
-	/** The proposals the editor draws, in document order: the open ones and the accepted ones. */
-	order: readonly string[];
-	/** The proposals accepted and still listed, which the editor draws as the changes they made. */
-	accepted: readonly string[];
-	/** The drawn items still waiting for an answer, in document order: the rest of `order`. A
-	 *  review is answered when it is empty. */
+	/** The proposals the editor draws, in document order, each waiting for an answer. A review
+	 *  is answered when it is empty. */
 	open: readonly string[];
 	/** Drawn proposals the reader's own writing meets: words both changed, a block one names
 	 *  gone or no longer what its writer read, or a field no longer holding its `before`. */
@@ -93,12 +87,6 @@ export interface ReviewDrawn {
 	undrawn: readonly { id: string; reason: ReviewUndrawn }[];
 }
 
-/** A field proposal accepted, as the change it made over its control, `before` the value it
- *  replaced. The editor's own, tagged as it takes the accept; a host lists proposals alone. */
-export type FieldChange = { id: string; state: 'changed'; field: DocPath; before?: unknown };
-/** Whether an item is an accepted proposal the editor holds, rather than one the host lists. */
-export const isChange = <T extends object>(item: T): item is Extract<T, { state: 'changed' }> =>
-	'state' in item && item.state === 'changed';
 /** A proposal under a field's control. */
 export type FieldProposal = {
 	id: string;
@@ -111,7 +99,7 @@ export type FieldProposal = {
  *  value it names, a member of a list by its index, a cell of a record by its key. */
 export interface DeepReview {
 	steps: readonly PathStep[];
-	item: FieldProposal | FieldChange;
+	item: FieldProposal;
 }
 
 /** One rung of a nested item's walk: the items naming this rung's own value, and the rest by
@@ -166,58 +154,6 @@ export function valueWith(value: unknown, steps: readonly PathStep[], to: unknow
 	return record;
 }
 
-/** The members that stood either side of the one `steps` reach in `value`, which put it back. */
-export interface Beside {
-	before?: { member: unknown };
-	after?: { member: unknown };
-}
-
-/** The members either side of the one `steps` reach in `value`. */
-export function besideOf(value: unknown, steps: readonly PathStep[]): Beside {
-	const at = steps.at(-1);
-	const list = valueIn(value, steps.slice(0, -1));
-	if (typeof at !== 'number' || !Array.isArray(list)) return {};
-	return {
-		...(at > 0 && at - 1 < list.length && { before: { member: list[at - 1] } }),
-		...(at + 1 < list.length && { after: { member: list[at + 1] } })
-	};
-}
-
-/**
- * `value` with a member put back at `steps`, the ones from it on moving down one: after the
- * member that stood before it, else before the one that stood after it, the nearest of each to
- * the index, so members put back in any order land where they stood; at the index where
- * neither stands.
- */
-export function valueWithInserted(
-	value: unknown,
-	steps: readonly PathStep[],
-	member: unknown,
-	beside: Beside = {}
-): unknown {
-	const head = steps.slice(0, -1);
-	const at = steps.at(-1);
-	const list = valueIn(value, head);
-	if (typeof at !== 'number' || !Array.isArray(list)) return valueWith(value, steps, member);
-	const nearest = (near: { member: unknown } | undefined, to: number): number | undefined => {
-		if (!near) return undefined;
-		let found: number | undefined;
-		list.forEach((m: unknown, i) => {
-			if (
-				sameValue(m, near.member) &&
-				(found === undefined || Math.abs(i - to) < Math.abs(found - to))
-			)
-				found = i;
-		});
-		return found;
-	};
-	const after = nearest(beside.before, at - 1);
-	const before = after === undefined ? nearest(beside.after, at) : undefined;
-	const next = [...list];
-	next.splice(after !== undefined ? after + 1 : (before ?? Math.min(at, next.length)), 0, member);
-	return valueWith(value, head, next);
-}
-
 /**
  * Where a field proposal's steps land in `value` as it stands. A list's member is found by its
  * index where it holds `before`, else as the nearest member holding `before` that `claimed`
@@ -227,10 +163,10 @@ export function valueWithInserted(
 export function locate(
 	value: unknown,
 	steps: readonly PathStep[],
-	item: FieldProposal | FieldChange,
+	item: FieldProposal,
 	claimed: Set<string>
 ): { steps: readonly PathStep[]; found: boolean } {
-	const read = !isChange(item) && 'before' in item;
+	const read = 'before' in item;
 	const before = read ? item.before : undefined;
 	const at = steps.at(-1);
 	const head = steps.slice(0, -1);

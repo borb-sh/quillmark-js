@@ -1,12 +1,12 @@
 // Review, drawn in the leaf's own flow: what a writer other than the reader proposes to change
-// here, and what of it the reader took. An item names blocks by the ids the leaf's nodes carry, so
-// its place is the document's and rides every edit; nothing is measured from outside the view.
+// here. An item names blocks by the ids the leaf's nodes carry, so its place is the document's and
+// rides every edit; nothing is measured from outside the view.
 //
 // A proposal is the paragraph it would rewrite, read as an edit of itself: the words that would go
 // struck, the words that would come tinted in their place, and what it adds beyond the paragraph
 // set in flow under it. None of it enters the document while it is proposed: the struck words are
-// the leaf's own text under a decoration, and every added word is a widget. A proposal taken is a
-// mark over the text it wrote, or a wedge where it only took text out.
+// the leaf's own text under a decoration, and every added word is a widget. A proposal taken is
+// plain text, the leaf's like any other.
 //
 // A proposal is an edit of the paragraph as its writer read it, or as it stood when it arrived. What the reader
 // writes in the paragraph since is theirs: the proposal's stretches ride past it, and only the
@@ -16,14 +16,7 @@
 // words that land are the words that were drawn. It goes down the lane a keystroke takes: one
 // transaction, one undo step, one commit.
 import { closeHistory, isHistoryTransaction, undo } from 'prosemirror-history';
-import {
-	DOMSerializer,
-	Fragment,
-	Mark,
-	Slice,
-	type Node as PMNode,
-	type Schema
-} from 'prosemirror-model';
+import { DOMSerializer, Fragment, Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
 import { keydownHandler } from 'prosemirror-keymap';
 import {
 	Plugin,
@@ -32,10 +25,9 @@ import {
 	type EditorState,
 	type Transaction
 } from 'prosemirror-state';
-import { Step, StepResult, type Mappable } from 'prosemirror-transform';
+import { Step, StepResult } from 'prosemirror-transform';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { arriving, HARD_BREAK, ISLAND_SLOT } from './islands.js';
-import type { AnchorPos } from './marks.js';
 import { remoteKey } from './remote.js';
 import { wordDiff, type DiffHunk } from './review-diff.js';
 import { REVIEW_KEYS } from './shortcuts.js';
@@ -65,7 +57,7 @@ export type BlockPlace = { after: string } | { before: string } | 'end';
 
 /** What a reader did with a proposal: took it, which the leaf has written by the time it says
  *  so, turned it down, or undid an answer, so the item is open again with whatever was written
- *  for it taken back. */
+ *  for it taken back by the leaf's own undo. */
 export type ReviewAction = 'accept' | 'dismiss' | 'reopen';
 
 /** What brought an item under attention: the pointer over it, or the caret in it. */
@@ -80,8 +72,6 @@ export interface ReviewStrings {
 	reviewDismissTitle: string;
 	/** The accessible name of a proposal's two buttons as a group. */
 	reviewProposal: string;
-	/** The accessible name of the wedge standing where text was removed. */
-	reviewGone: string;
 	/** The label before the buttons of a proposal whose paragraph the reader rewrote since. */
 	reviewOutdated: string;
 }
@@ -92,7 +82,6 @@ export const DEFAULT_REVIEW_STRINGS: ReviewStrings = {
 	reviewAcceptTitle: 'Accept',
 	reviewDismissTitle: 'Dismiss',
 	reviewProposal: 'Proposed change',
-	reviewGone: 'Text removed here',
 	reviewOutdated: 'Edited since'
 };
 
@@ -102,14 +91,8 @@ export interface ReviewChannel {
 	/** The item under attention, drawn a step stronger. */
 	lit(): string | undefined;
 	strings(): ReviewStrings;
-	anchors(state: EditorState): readonly AnchorPos[];
-	/** Lay `anchors` again in the transaction that puts their text back. */
-	restore?(tr: Transaction, anchors: readonly AnchorPos[]): void;
 	/** `after` as a document under the leaf's schema; `undefined` where it does not parse. */
 	parse(markdown: string): PMNode | undefined;
-	/** The item whose card is up, and the way to lower it. */
-	shown(): string | undefined;
-	dismiss(): void;
 	/** A reader's answer, `chord` where a key gave it. */
 	act(id: string, action: ReviewAction, chord?: boolean): void;
 	/** The leaf is writing a taken proposal, and is done. */
@@ -135,41 +118,10 @@ export interface ReviewReport {
 	/** The items the leaf holds and does not draw, each with why: by the blocks it names,
 	 *  which only the leaf holding its field is handed. */
 	undrawn: readonly { id: string; reason: LeafUndrawn }[];
-	/** The drawn proposals taken here and still listed, drawn as changes, each with the text
-	 *  that stood where it wrote. */
-	accepted: readonly { id: string; before: string }[];
 }
 
 /** An answer the leaf holds: a proposal taken or turned down here, drawn no more. */
 type Answer = 'accept' | 'dismiss';
-
-/** One stretch a taken proposal wrote: `[from, to)` of the leaf, and what stood there before. A
- *  stretch the proposal only took out is a point. */
-interface Written {
-	from: number;
-	to: number;
-	before: Slice;
-	/** The anchors the write swallowed, by their offsets into `before`. */
-	anchors?: readonly AnchorPos[];
-}
-
-/** Each stretch through `mapping`. Words typed at a stretch's edge stay outside it, and one inside
- *  it grows it; `fresh` stretches were just written, so they reach over what the mapping wrote.
- *  `undefined` where nothing the proposal wrote or took out is left. */
-function mapWritten(
-	written: readonly Written[],
-	mapping: Mappable,
-	fresh = false
-): Written[] | undefined {
-	const out: Written[] = [];
-	for (const w of written) {
-		const a = mapping.mapResult(w.from, fresh ? -1 : 1);
-		const b = mapping.mapResult(w.to, fresh ? 1 : -1);
-		if (w.from === w.to ? a.deleted : b.pos <= a.pos) continue;
-		out.push({ ...w, from: a.pos, to: Math.max(a.pos, b.pos) });
-	}
-	return out.length ? out : undefined;
-}
 
 /** The leaf's review state: the count of its own edits, so the caret's report can tell typing
  *  from arriving, the items answered here, and the item the caret was put into by its id, which
@@ -177,8 +129,6 @@ function mapWritten(
 interface ReviewState {
 	edits: number;
 	answered: ReadonlyMap<string, Answer>;
-	/** What each proposal taken here wrote, while any of it stands. */
-	written: ReadonlyMap<string, readonly Written[]>;
 	entered: string | undefined;
 	/** The accepts an undo or a redo took back or gave again, for the plugin view to report. */
 	replayed: readonly { id: string; to: 'accept' | undefined }[];
@@ -219,13 +169,9 @@ function nowOf(renamed: ReadonlyMap<string, string>, id: string): string {
  * grown by typing, the depth cap and a rebase over a remote edit each move it with its words.
  */
 class ReviewAnswer extends Step {
-	/** `written` stands in the document as it is after the steps that write it: an accept's
-	 *  stretches, and on an undo of an accept the stretches it puts back, which an undo of that
-	 *  undo writes over again. */
 	constructor(
 		readonly id: string,
-		readonly to: 'accept' | undefined,
-		readonly written: readonly Written[] = []
+		readonly to: 'accept' | undefined
 	) {
 		super();
 	}
@@ -233,72 +179,35 @@ class ReviewAnswer extends Step {
 		return StepResult.ok(doc);
 	}
 	invert(): Step {
-		return new ReviewAnswer(this.id, this.to ? undefined : 'accept', this.written);
+		return new ReviewAnswer(this.id, this.to ? undefined : 'accept');
 	}
-	map(mapping: Mappable): Step {
-		return new ReviewAnswer(this.id, this.to, mapWritten(this.written, mapping) ?? []);
+	map(): Step {
+		return this;
 	}
 	toJSON() {
-		return {
-			stepType: 'quillReviewAnswer',
-			id: this.id,
-			to: this.to ?? null,
-			written: this.written.map((w) => ({ ...w, before: w.before.toJSON() }))
-		};
+		return { stepType: 'quillReviewAnswer', id: this.id, to: this.to ?? null };
 	}
-	static fromJSON(
-		schema: Schema,
-		json: {
-			id: string;
-			to: 'accept' | null;
-			written?: { from: number; to: number; before: unknown; anchors?: AnchorPos[] }[];
-		}
-	): ReviewAnswer {
-		return new ReviewAnswer(
-			json.id,
-			json.to ?? undefined,
-			(json.written ?? []).map((w) => ({ ...w, before: Slice.fromJSON(schema, w.before as never) }))
-		);
+	static fromJSON(_schema: Schema, json: { id: string; to: 'accept' | null }): ReviewAnswer {
+		return new ReviewAnswer(json.id, json.to ?? undefined);
 	}
 }
 Step.jsonID('quillReviewAnswer', ReviewAnswer);
 
-function answering(
-	state: ReviewState,
-	id: string,
-	to: Answer | undefined,
-	written?: readonly Written[]
-): ReviewState {
-	let next = state;
-	if (state.written.has(id) || written) {
-		const all = new Map(state.written);
-		if (written) all.set(id, written);
-		else all.delete(id);
-		next = { ...next, written: all };
-	}
-	if (state.answered.get(id) === to) return next;
+function answering(state: ReviewState, id: string, to: Answer | undefined): ReviewState {
+	if (state.answered.get(id) === to) return state;
 	const answered = new Map(state.answered);
 	if (to) answered.set(id, to);
 	else answered.delete(id);
-	return { ...next, answered };
+	return { ...state, answered };
 }
 
 function applyReview(tr: Transaction, state: ReviewState): ReviewState {
 	let next = state.replayed.length ? { ...state, replayed: [] } : state;
 	if (tr.docChanged && !tr.getMeta(remoteKey)) next = { ...next, edits: next.edits + 1 };
-	if (tr.docChanged && next.written.size) {
-		const all = new Map<string, readonly Written[]>();
-		for (const [id, written] of next.written) {
-			const moved = mapWritten(written, tr.mapping);
-			if (moved) all.set(id, moved);
-		}
-		next = { ...next, written: all };
-	}
 	const history = isHistoryTransaction(tr);
-	tr.steps.forEach((step, i) => {
+	tr.steps.forEach((step) => {
 		if (!(step instanceof ReviewAnswer)) return;
-		const written = step.to && mapWritten(step.written, tr.mapping.slice(i + 1), true);
-		next = answering(next, step.id, step.to, written || undefined);
+		next = answering(next, step.id, step.to);
 		// Reported whether or not the answer is still held: the host's list may have dropped it.
 		if (history) next = { ...next, replayed: [...next.replayed, { id: step.id, to: step.to }] };
 	});
@@ -385,11 +294,10 @@ function tail(doc: PMNode, from: number): PMNode[] {
 	return out;
 }
 
-/** One drawn item: where the caret counts as in it, whether it is a proposal, and whether it
- *  is one that only adds after its paragraph. */
+/** One drawn proposal: where the caret counts as in it, and whether it only adds after its
+ *  paragraph. */
 interface Span {
 	id: string;
-	proposed: boolean;
 	adds?: boolean;
 	from: number;
 	to: number;
@@ -418,21 +326,12 @@ interface Drawn {
 	plans: Map<string, Piece[]>;
 	outdated: string[];
 	undrawn: { id: string; reason: LeafUndrawn }[];
-	accepted: { id: string; before: string }[];
 }
 
-/**
- * The edit that takes a proposal: its pieces, last first, so each still stands where it was
- * read, and the stretches it wrote. `undefined` where the pieces no longer make a document the
- * schema holds.
- */
-function taking(
-	state: EditorState,
-	plan: readonly Piece[],
-	anchors: readonly AnchorPos[]
-): { tr: Transaction; written: Written[] } | undefined {
+/** The edit that takes a proposal: its pieces, last first, so each still stands where it was
+ *  read. `undefined` where the pieces no longer make a document the schema holds. */
+function taking(state: EditorState, plan: readonly Piece[]): Transaction | undefined {
 	const tr = state.tr;
-	const made: { from: number; to: number; before: Slice; step: number }[] = [];
 	try {
 		for (const piece of [...plan].sort((a, b) => b.from - a.from)) {
 			let { from, to } = piece;
@@ -444,52 +343,17 @@ function taking(
 				}
 				// A leaf holds a block at the least: its last one is emptied where it stands.
 				if (from === 0 && to === tr.doc.content.size) {
-					made.push({ from, to, before: tr.doc.slice(from, to), step: tr.steps.length });
 					tr.replaceWith(from, to, tr.doc.type.createAndFill()!.content);
 					continue;
 				}
 			}
-			made.push({ from, to, before: tr.doc.slice(from, to), step: tr.steps.length });
 			tr.replaceWith(from, to, arriving(tr.doc, piece.content));
 		}
 		tr.doc.check();
 	} catch {
 		return undefined;
 	}
-	if (!tr.docChanged) return undefined;
-	const written = made.map(({ from, to, before, step }) => {
-		const after = tr.mapping.slice(step);
-		const swallowed = anchors
-			.filter((a) => a.end > a.start && from <= a.start && a.end <= to)
-			.map((a) => ({ id: a.id, start: a.start - from, end: a.end - from }));
-		return { from: after.map(from, -1), to: after.map(to, 1), before, anchors: swallowed };
-	});
-	return { tr: closeHistory(tr), written };
-}
-
-/** The reader's edit that takes back what proposal `id` wrote, wherever the stretches have
- *  moved to and whatever was typed inside them, so the proposal is open again. */
-function putBack(
-	state: EditorState,
-	id: string,
-	written: readonly Written[],
-	channel: ReviewChannel
-): Transaction {
-	const tr = state.tr;
-	const made: { w: Written; step: number }[] = [];
-	for (const w of [...written].sort((a, b) => b.from - a.from)) {
-		made.push({ w, step: tr.steps.length });
-		tr.replace(w.from, w.to, w.before);
-	}
-	const back = made.map(({ w, step }) => {
-		const after = tr.mapping.slice(step);
-		return { ...w, from: after.map(w.from, -1), to: after.map(w.to, 1) };
-	});
-	const anchors = back.flatMap((w) =>
-		(w.anchors ?? []).map((a) => ({ id: a.id, start: w.from + a.start, end: w.from + a.end }))
-	);
-	if (anchors.length) channel.restore?.(tr, anchors);
-	return closeHistory(tr.step(new ReviewAnswer(id, undefined, back)));
+	return tr.docChanged ? closeHistory(tr) : undefined;
 }
 
 /** A hunk between two paired textblocks. `format` marks one whose words stay and whose
@@ -661,11 +525,7 @@ const rewritten = (() => {
 
 /** An answer to an item: from a button, from a chord, or `quiet` from a host's call, which moves
  *  neither the caret nor the focus. False where it could not be given, and the item stands. */
-type Act = (
-	id: string,
-	action: ReviewAction,
-	how?: { chord?: boolean; quiet?: boolean }
-) => boolean;
+type Act = (id: string, action: Answer, how?: { chord?: boolean; quiet?: boolean }) => boolean;
 
 /** A chord as `aria-keyshortcuts` spells it, `Mod` as either platform's. */
 const ariaKeys = (chord: string): string =>
@@ -817,7 +677,7 @@ function readOf(
 }
 
 function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases): Drawn {
-	const { answered, written, renamed } = reviewKey.getState(state)!;
+	const { answered, renamed } = reviewKey.getState(state)!;
 	const now = (id: string): string => nowOf(renamed, id);
 	const listed = channel.items();
 	// A base outlives its item's answer and its leaving the list while a block it covered
@@ -831,16 +691,13 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		};
 		for (const [id, base] of bases) if (!ids.has(id) && !stands(base.place)) bases.delete(id);
 	}
-	const items = answered.size
-		? listed.filter((item) => !answered.has(item.id) || written.has(item.id))
-		: listed;
+	const items = answered.size ? listed.filter((item) => !answered.has(item.id)) : listed;
 	const plans = new Map<string, Piece[]>();
 	const undrawn: Drawn['undrawn'] = [];
 	const outdated: string[] = [];
-	const accepted: Drawn['accepted'] = [];
 	const decos: Drawn['decos'] = [];
 	const lighting = new Set<string>();
-	if (!items.length) return { decos, lighting, spans: [], plans, outdated, undrawn, accepted };
+	if (!items.length) return { decos, lighting, spans: [], plans, outdated, undrawn };
 	const { doc } = state;
 	const strings = channel.strings();
 	const serializer = DOMSerializer.fromSchema(state.schema);
@@ -855,63 +712,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 	const taken = new Set<number>();
 	const adding = new Set<number>();
 
-	/** A taken proposal's mark over `[from, to)`, or its wedge where text was only taken out. */
-	const changed = (id: string, from: number, to: number): void => {
-		if (to > from) {
-			lights(id, (on) =>
-				Decoration.inline(from, to, {
-					class: on ? 'qm-review-changed qm-review-lit' : 'qm-review-changed',
-					'data-qm-review': id
-				})
-			);
-			return;
-		}
-		lights(id, (on) =>
-			Decoration.widget(
-				from,
-				() => {
-					const el = document.createElement('span');
-					el.className = on ? 'qm-review-gone qm-review-lit' : 'qm-review-gone';
-					el.contentEditable = 'false';
-					el.setAttribute('data-qm-review', id);
-					el.setAttribute('role', 'img');
-					el.setAttribute('aria-label', strings.reviewGone);
-					return el;
-				},
-				{ side: -1, key: `gone:${id}:${on}` }
-			)
-		);
-	};
-
 	for (const item of items) {
-		// A proposal taken here is drawn as the change it made, while the host lists it.
-		const wrote = written.get(item.id);
-		if (wrote) {
-			for (const w of wrote) {
-				// A wedge stands in a line: one where whole blocks went stands at the end of the
-				// line before, or the start of the one after.
-				const $at = doc.resolve(w.from);
-				if (w.to > w.from || $at.parent.inlineContent) changed(item.id, w.from, w.to);
-				else {
-					const at = Selection.findFrom($at, -1, true) ?? Selection.findFrom($at, 1, true);
-					if (at) changed(item.id, at.from, at.from);
-				}
-			}
-			spans.push({
-				id: item.id,
-				proposed: false,
-				from: Math.min(...wrote.map((w) => w.from)),
-				to: Math.max(...wrote.map((w) => w.to))
-			});
-			accepted.push({
-				id: item.id,
-				before: wrote
-					.map((w) => w.before.content.textBetween(0, w.before.content.size, '\n'))
-					.filter(Boolean)
-					.join('\n')
-			});
-			continue;
-		}
 		const name = { 'data-qm-review': item.id };
 
 		leaves ??= leavesOf(doc);
@@ -1100,13 +901,12 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		// What a proposal only adds to has the caret anywhere in the block it adds from.
 		spans.push({
 			id: item.id,
-			proposed: true,
 			adds: !covered.length,
 			from: reach(covered[0] ?? last)[0],
 			to: reach(last)[1]
 		});
 	}
-	return { decos, lighting, spans, plans, outdated, undrawn, accepted };
+	return { decos, lighting, spans, plans, outdated, undrawn };
 }
 
 /** Whether a block's last leaf is a textblock, so its last line can carry a run. */
@@ -1117,18 +917,16 @@ function endsInLine(node: PMNode): boolean {
 }
 
 /** The item the caret is in: the one it was put into by its id while it holds the caret, else
- *  the one that holds it closest, so a change inside a paragraph a proposal covers is the change
- *  while the caret is in its words, and of a proposal that rewrites a paragraph and one that adds
- *  after it, the one that rewrites. `proposed` asks for a proposal alone. */
+ *  the one that holds it closest, so of a proposal that rewrites a paragraph and one that adds
+ *  after it, the one that rewrites. */
 function spanAt(
 	spans: readonly Span[],
 	pos: number,
-	entered: string | undefined,
-	proposed = false
+	entered: string | undefined
 ): Span | undefined {
 	let best: Span | undefined;
 	for (const s of spans) {
-		if (s.from > pos || pos > s.to || (proposed && !s.proposed)) continue;
+		if (s.from > pos || pos > s.to) continue;
 		if (s.id === entered) return s;
 		const size = s.to - s.from;
 		const held = best && best.to - best.from;
@@ -1149,7 +947,7 @@ export interface ReviewLayer {
 	enter(view: EditorView, id: string): boolean;
 	/** Answer item `id` as its button would, moving neither the caret nor the focus. False
 	 *  where the leaf does not draw it or cannot write it. */
-	answer(id: string, action: ReviewAction): boolean;
+	answer(id: string, action: 'accept' | 'dismiss'): boolean;
 	/** Open a dismissal of item `id` again and say so, the dismissal still held here or
 	 *  already pruned by the host taking the item off its list. */
 	reopen(view: EditorView, id: string): void;
@@ -1158,8 +956,8 @@ export interface ReviewLayer {
 }
 
 /**
- * The leaf's review layer. The decorations are a function of the document, the anchors and the
- * channel's items, kept until one of them moves. The caret's report holds off while the reader
+ * The leaf's review layer. The decorations are a function of the document and the channel's
+ * items, kept until one of them moves. The caret's report holds off while the reader
  * types inside an item: an item is news on arriving in it, and noise under every keystroke.
  */
 export function reviewLayer(channel: ReviewChannel): ReviewLayer {
@@ -1167,7 +965,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		| {
 				doc: PMNode;
 				review: ReviewState;
-				anchors: readonly AnchorPos[];
 				items: readonly TextReview[];
 				strings: ReviewStrings;
 				drawn: Drawn;
@@ -1175,12 +972,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		| undefined;
 	/** The decorations of what is drawn, with the lit item they were made for. */
 	let shown: { drawn: Drawn; lit: string | undefined; set: DecorationSet } | undefined;
-	const NOTHING = JSON.stringify({
-		ids: [],
-		outdated: [],
-		undrawn: [],
-		accepted: []
-	} satisfies ReviewReport);
+	const NOTHING = JSON.stringify({ ids: [], outdated: [], undrawn: [] } satisfies ReviewReport);
 	let reported = NOTHING;
 	let host: EditorView | undefined;
 	const bases: Bases = new Map();
@@ -1190,18 +982,10 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	const act: Act = (id, action, how = {}) => {
 		const view = host;
 		if (!view || !drawn(view.state).spans.some((span) => span.id === id)) return false;
-		const wrote = reviewKey.getState(view.state)!.written.get(id);
-		if (wrote) {
-			if (action === 'accept' || action === 'dismiss') return false;
-			view.dispatch(putBack(view.state, id, wrote, channel));
-			channel.act(id, 'reopen', how.chord);
-			return true;
-		}
 		if (action === 'accept') {
 			const plan = drawn(view.state).plans.get(id);
-			const took = plan && taking(view.state, plan, channel.anchors(view.state));
-			if (!took || !plan) return false;
-			const { tr } = took;
+			const tr = plan && taking(view.state, plan);
+			if (!tr || !plan) return false;
 			const away = !how.quiet && !view.hasFocus();
 			if (away) {
 				const end = tr.mapping.map(Math.max(...plan.map((piece) => piece.to)), 1);
@@ -1209,7 +993,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			}
 			channel.writing?.(true);
 			try {
-				view.dispatch(tr.step(new ReviewAnswer(id, 'accept', took.written)));
+				view.dispatch(tr.step(new ReviewAnswer(id, 'accept')));
 			} finally {
 				channel.writing?.(false);
 			}
@@ -1226,20 +1010,18 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	};
 	const drawn = (state: EditorState): Drawn => {
 		const review = reviewKey.getState(state)!;
-		const anchors = channel.anchors(state);
 		const items = channel.items();
 		const strings = channel.strings();
 		if (
 			memo &&
 			memo.doc === state.doc &&
 			memo.review === review &&
-			memo.anchors === anchors &&
 			memo.items === items &&
 			memo.strings === strings
 		)
 			return memo.drawn;
 		const next = draw(state, channel, act, bases);
-		memo = { doc: state.doc, review, anchors, items, strings, drawn: next };
+		memo = { doc: state.doc, review, items, strings, drawn: next };
 		return next;
 	};
 	/** Whether the lit item moving to `lit` changes how anything here reads. */
@@ -1264,8 +1046,8 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	};
 	/** Tell the channel what the leaf draws, where that moved. */
 	const report = (state: EditorState): void => {
-		const { spans, outdated, undrawn, accepted } = drawn(state);
-		const next: ReviewReport = { ids: spans.map((s) => s.id), outdated, undrawn, accepted };
+		const { spans, outdated, undrawn } = drawn(state);
+		const next: ReviewReport = { ids: spans.map((s) => s.id), outdated, undrawn };
 		const joined = JSON.stringify(next);
 		if (joined === reported) return;
 		reported = joined;
@@ -1302,25 +1084,17 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	};
 
 	const answer =
-		(action: 'accept' | 'dismiss') =>
+		(action: Answer) =>
 		(state: EditorState): boolean => {
 			const span = spanAt(
 				drawn(state).spans,
 				state.selection.head,
-				reviewKey.getState(state)?.entered,
-				action === 'accept'
+				reviewKey.getState(state)?.entered
 			);
 			if (!span) return false;
-			act(span.id, span.proposed ? action : 'reopen', { chord: true });
+			act(span.id, action, { chord: true });
 			return true;
 		};
-	/** Escape lowers the card over the item the caret is in, before it is anything else's. */
-	const lower = (state: EditorState): boolean => {
-		const id = channel.shown();
-		if (id === undefined || !drawn(state).spans.some((span) => span.id === id)) return false;
-		channel.dismiss();
-		return true;
-	};
 
 	const plugin = new Plugin<ReviewState>({
 		key: reviewKey,
@@ -1328,7 +1102,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			init: () => ({
 				edits: 0,
 				answered: new Map(),
-				written: new Map(),
 				entered: undefined,
 				replayed: [],
 				renamed: new Map()
@@ -1339,8 +1112,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			decorations,
 			handleKeyDown: keydownHandler({
 				[REVIEW_KEYS.accept]: answer('accept'),
-				[REVIEW_KEYS.dismiss]: answer('dismiss'),
-				Escape: lower
+				[REVIEW_KEYS.dismiss]: answer('dismiss')
 			}),
 			handleDOMEvents: {
 				mouseover: (_view, e) => {
@@ -1378,8 +1150,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				destroy() {
 					if (hovered !== undefined) channel.point(undefined, 'pointer');
 					if (caret !== undefined) channel.point(undefined, 'caret');
-					if (reported !== NOTHING)
-						channel.drew({ ids: [], outdated: [], undrawn: [], accepted: [] });
+					if (reported !== NOTHING) channel.drew({ ids: [], outdated: [], undrawn: [] });
 					host = undefined;
 				}
 			};

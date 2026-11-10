@@ -66,13 +66,13 @@
   `proposalsBetween` makes of it, set once as `review` and cleared once, on Keep.
 
     seed ─► answer on a copy ─► proposalsBetween(quill, doc, copy) ─► review = items
-    onReviewDrawn ─► the bar's count, from `open` and `accepted`
+    onReviewDrawn ─► the bar's count, from `open`
     bar ─► stepReview / answerReview('all', …) ─► onReview per item, the list untouched
-    Keep ─► review = [] ─► the accepted items' marks go
-    Undo all / a change's Undo ─► answerReview('all', 'reopen') ─► onReview reopen
+    Keep ─► review = []
+    ⌘Z ─► the newest answers taken back ─► onReview reopen
     Auto-accept ─► the first onReviewDrawn listing the items ─► answerReview(the drawn ids
                    neither outdated nor undrawn, 'accept'), no proposal painted
-    reopen under Auto-accept ─► answerReview([id], 'dismiss'), so Undo is one press
+    reopen under Auto-accept ─► answerReview([id], 'dismiss'), so ⌘Z is one press
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -136,10 +136,7 @@
 				refresh(): void;
 				applyCardOps(ops: readonly CardOp[]): void;
 				revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
-				answerReview(
-					ids: readonly string[] | 'all',
-					action: 'accept' | 'dismiss' | 'reopen'
-				): string[];
+				answerReview(ids: readonly string[] | 'all', action: 'accept' | 'dismiss'): string[];
 				stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
 		  }
 		| undefined = $state();
@@ -336,7 +333,7 @@
 	}
 	// The reader's answer to a review item. The editor has made any write it asks for and
 	// draws the item as answered, so the list stays as it was set. Under auto-accept a proposal
-	// the reader takes back is turned down, so its Undo is the one press.
+	// the reader takes back with ⌘Z is turned down, so the one press takes it back.
 	function handleReview({ id, action }: ReviewEvent): void {
 		if (autoAccept && action === 'reopen')
 			void tick().then(() => editorRef?.answerReview([id], 'dismiss'));
@@ -346,7 +343,7 @@
 		void editorRef?.stepReview(dir);
 	}
 	// Its batch buttons keep the focus where it was, so ⌘Z in the editor takes a batch back.
-	function answerAll(action: 'accept' | 'dismiss' | 'reopen'): void {
+	function answerAll(action: 'accept' | 'dismiss'): void {
 		editorRef?.answerReview('all', action);
 	}
 	function keepAll(): void {
@@ -359,12 +356,12 @@
 		if (!drawn || !autoAccept) return;
 		if (set) {
 			const listed = (id: string) => arriving?.has(id);
-			if (!drawn.order.some(listed) && !drawn.undrawn.some(({ id }) => listed(id))) return;
+			if (!drawn.open.some(listed) && !drawn.undrawn.some(({ id }) => listed(id))) return;
 			arriving = undefined;
 		}
 		const outdated = new Set(drawn.outdated);
 		const undrawn = new Set(drawn.undrawn.map(({ id }) => id));
-		const ids = drawn.order.filter((id) => !outdated.has(id) && !undrawn.has(id));
+		const ids = drawn.open.filter((id) => !outdated.has(id) && !undrawn.has(id));
 		if (ids.length) editorRef?.answerReview(ids, 'accept');
 	}
 	function handleError(err: EditorError): void {
@@ -704,8 +701,7 @@
 				<span class="stat"
 					><span class="qm-label">review</span>
 					<span class="qm-readout" data-testid="review-focus"
-						>{reviewFocus} · {reviewDrawn?.open.length ?? 0} open · {reviewDrawn?.accepted.length ??
-							0} accepted</span
+						>{reviewFocus} · {reviewDrawn?.open.length ?? 0} open</span
 					></span
 				>
 				{#if reviewDrawn?.undrawn.length}
@@ -764,7 +760,7 @@
 					>
 				{/if}
 				{#if reviewItems}
-					{@const none = opening || !reviewDrawn?.order.length}
+					{@const none = opening || !reviewDrawn?.open.length}
 					<span class="review-bar" role="group" aria-label="Review">
 						<button
 							class="qm-control"
@@ -803,14 +799,6 @@
 							disabled={!reviewItems.length || !!reviewDrawn?.open.length}
 							onmousedown={(e) => e.preventDefault()}
 							onclick={keepAll}>Keep</button
-						>
-						<button
-							class="qm-control"
-							type="button"
-							data-testid="review-undo-all"
-							disabled={!reviewDrawn?.accepted.length}
-							onmousedown={(e) => e.preventDefault()}
-							onclick={() => answerAll('reopen')}>Undo all</button
 						>
 						<label class="qm-control review-auto">
 							<input

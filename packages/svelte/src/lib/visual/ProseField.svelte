@@ -153,8 +153,6 @@
 					slash = next;
 				},
 				reviewStrings: () => t.strings,
-				reviewShown: () => reviewing.shown?.item.id,
-				onReviewDismiss: () => reviewing.dismiss(),
 				onReview: (id, action, chord) => reviewing.heard(id, action, leafKey, chord),
 				onReviewPoint: (id, via) => reviewing.point(id, via, leafKey),
 				onReviewWriting: (on) => reviewing.writing(on),
