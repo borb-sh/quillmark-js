@@ -113,6 +113,8 @@
 		textCap,
 		type ArrayLayout
 	} from './structure.js';
+	import { splitReview, type DeepReview } from './review.js';
+	import ReviewRows from './ReviewRows.svelte';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import { propertyDomIds } from './domid.js';
 	import type { LandingBox } from './leaves.js';
@@ -180,6 +182,10 @@
 		 * naming a row draws under that row — under its head while it is collapsed, under
 		 * the cell once it is open — and one naming no row draws at the list's foot. */
 		diagnostics?: readonly DeepDiagnostic[];
+		/** The review items naming a place inside this list, each with its steps still to
+		 *  walk from it: a member's under its row, a record's cell handed to the open row
+		 *  that draws it, and a member past the last at the list's foot (`ReviewRows`). */
+		review?: readonly DeepReview[];
 	}
 	let {
 		value,
@@ -194,7 +200,8 @@
 		idBase,
 		contentAt,
 		onCommit,
-		diagnostics
+		diagnostics,
+		review
 	}: Props = $props();
 
 	// The element control is the item schema's own, with no departure: a content-typed
@@ -227,6 +234,23 @@
 	const foot = $derived(
 		unrouted(routed, (step) => typeof step === 'number' && step >= 0 && step < arr.length)
 	);
+	const reviewed = $derived(splitReview(review));
+	/** A row's review items: the member's own, and those inside it. */
+	const rowReview = (k: number): DeepReview[] =>
+		k < arr.length ? (reviewed.below.get(k) ?? []) : [];
+	const ownReview = (k: number): DeepReview[] => rowReview(k).filter((e) => !e.steps.length);
+	const innerReview = (k: number): DeepReview[] => rowReview(k).filter((e) => e.steps.length);
+	/** What has no row to draw under: a member past the last, and a place no row holds. A
+	 *  table's rows are cells alone, so a member's own item is drawn here too, by its number. */
+	const reviewFoot = $derived([
+		...reviewed.here,
+		...[...reviewed.below].flatMap(([step, list]) => {
+			const held = typeof step === 'number' && step >= 0 && step < arr.length;
+			return list
+				.filter((e) => !held || (table && !e.steps.length))
+				.map((e) => ({ steps: [step, ...e.steps], item: e.item }));
+		})
+	]);
 
 	// Parallel stable ids, one per element, kept in lockstep with the data below.
 	// Seeded eagerly so a non-empty array renders its rows on the first pass:
@@ -945,6 +969,7 @@
 							onCommit={(obj) => commitElement(k, obj)}
 							onCellKey={(e, column) => onElementKey(e, k, column)}
 							diagnostics={routed.below.get(k)}
+							review={innerReview(k)}
 						/>
 						{@render removeButton(k, true)}
 					</div>
@@ -1010,11 +1035,14 @@
 							contentAt={(path) => readAt([k, ...path])}
 							onCommit={(obj) => commitElement(k, obj)}
 							diagnostics={routed.below.get(k)}
+							review={innerReview(k)}
 						/>
+						<ReviewRows entries={ownReview(k)} value={arr[k]} member />
 					{:else}
 						<!-- A collapsed row draws no cell, so what its cells would have said is said
 						     under the head, where the row can be seen: the message names the leaf. -->
 						<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
+						<ReviewRows entries={rowReview(k)} value={arr[k]} member />
 					{/if}
 				</div>
 			{/each}
@@ -1098,11 +1126,13 @@
 						</div>
 					{/if}
 					<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
+					<ReviewRows entries={rowReview(k)} value={arr[k]} member />
 				</div>
 			{/each}
 		</div>
 	{/if}
 	<DiagnosticList diagnostics={foot} />
+	<ReviewRows entries={reviewFoot} value={arr} member />
 </div>
 
 <!-- The remove, one button wherever a row ends: a scalar row's slab, a record row's

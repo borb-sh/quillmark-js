@@ -23,6 +23,7 @@ function store(refuse = false) {
 		exact: () => true,
 		leafFor: (path) => path,
 		valueAt: () => undefined,
+		nested: () => undefined,
 		answer(id, _item, action) {
 			answers.push([id, action]);
 			return !refuse;

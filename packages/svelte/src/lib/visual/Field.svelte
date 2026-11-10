@@ -58,6 +58,7 @@
 	import DiagnosticList from './DiagnosticList.svelte';
 	import FieldLabel from './FieldLabel.svelte';
 	import ReviewProposal from './ReviewProposal.svelte';
+	import ReviewRows from './ReviewRows.svelte';
 	import { review } from './review.svelte.js';
 	import { REVIEW_KEYS } from '../core/codec/index.js';
 	import { keydownHandler } from 'prosemirror-keymap';
@@ -324,6 +325,9 @@
 	const reviewed = $derived(reviewing.at(leafKey));
 	const changed = $derived(reviewed.changed);
 	const proposed = $derived(reviewed.proposed);
+	/** The items naming a place inside this field: a record's and a list's own controls draw
+	 *  them where they are, any other's under this one. */
+	const nestedReview = $derived(reviewed.nested);
 	const lit = $derived(changed !== undefined && reviewing.lit === changed.id);
 	/** The item the focus in the field attends to: the change, whose card it raises, else the
 	 *  proposal. */
@@ -490,6 +494,7 @@
 					{contentAt}
 					onCommit={onCommitScalar}
 					diagnostics={deep}
+					review={nestedReview}
 				/>
 			{:else if field.control === 'object'}
 				<ObjectField
@@ -505,6 +510,7 @@
 					{contentAt}
 					onCommit={onCommitScalar}
 					diagnostics={deep}
+					review={nestedReview}
 				/>
 			{:else if field.control === 'matrix'}
 				<MatrixField
@@ -532,6 +538,9 @@
 			{/if}
 		</div>
 
+		{#if field.control !== 'object' && field.control !== 'array'}
+			<ReviewRows entries={nestedReview} {value} />
+		{/if}
 		{#if proposed}
 			<ReviewProposal item={proposed} {value} refocus={focusControl} />
 		{/if}

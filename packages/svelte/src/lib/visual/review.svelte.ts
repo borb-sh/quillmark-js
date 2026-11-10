@@ -12,12 +12,15 @@
 // reader's press shows at once however long the host takes to hand over a list without it.
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
+import type { PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
 import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
 import {
 	byBlocks,
+	locate,
 	onField,
 	sameValue,
+	type DeepReview,
 	type FieldChange,
 	type FieldProposal,
 	type ReviewItem,
@@ -58,8 +61,13 @@ export interface Review {
 	/** The item under attention. */
 	readonly lit: string | undefined;
 	readonly shown: ShownReview | undefined;
-	/** The items over the field at leaf `key`. */
-	at(key: string): { changed?: FieldChange; proposed?: FieldProposal };
+	/** The items over the field at leaf `key`: its own, and those naming a place inside it,
+	 *  each with the steps to the value it names as the field holds it now. */
+	at(key: string): {
+		changed?: FieldChange;
+		proposed?: FieldProposal;
+		nested?: readonly DeepReview[];
+	};
 	/** Whether anything draws at leaf `key`: a field's own item, or a text item in its leaf. */
 	marks(key: string): boolean;
 	/** The leaf drawing item `id`, where one does. */
@@ -89,6 +97,9 @@ export interface ReviewSource {
 	keyFor(path: DocPath): string | undefined;
 	/** Whether a path names a field itself, and not a place inside one. */
 	exact(path: DocPath): boolean;
+	/** A path naming a place inside a field: the field's leaf key, the steps from it, and the
+	 *  value it holds. `undefined` for a place its schema does not declare. */
+	nested(path: DocPath): { key: string; steps: readonly PathStep[]; value: unknown } | undefined;
 	/** The value the field at `path` holds, as its control is handed it. */
 	valueAt(path: DocPath): unknown;
 	/** The key of the prose leaf a rich text field's or a body's path names, `undefined` for
@@ -163,8 +174,14 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return { anchored, own };
 	});
 	const placed = $derived.by(() => {
-		const out = new Map<string, { changed?: FieldChange; proposed?: FieldProposal }>();
+		const out = new Map<
+			string,
+			{ changed?: FieldChange; proposed?: FieldProposal; nested?: DeepReview[] }
+		>();
 		const undrawn: { id: string; reason: ReviewUndrawn }[] = [];
+		/** The nested proposals whose `before` the field no longer holds. */
+		const moved = new Set<string>();
+		const claims = new Map<string, Set<string>>();
 		for (const listed of items) {
 			if (byBlocks(listed)) {
 				if (source.leafFor(listed.field) === undefined)
@@ -172,10 +189,31 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				continue;
 			}
 			const item = accepted.get(listed.id) ?? listed;
-			if (!('field' in item)) continue;
+			if (!onField(item)) continue;
+			if (!source.exact(item.field)) {
+				const deep = source.nested(item.field);
+				if (!deep) {
+					undrawn.push({ id: item.id, reason: 'field' });
+					continue;
+				}
+				const claimed = claims.get(deep.key) ?? new Set<string>();
+				claims.set(deep.key, claimed);
+				const held = out.get(deep.key) ?? {};
+				const { steps, found } = locate(deep.value, deep.steps, item, claimed);
+				const same = (held.nested ?? []).some(
+					(e) => e.item.state === item.state && sameValue(e.steps, steps)
+				);
+				if (same) {
+					undrawn.push({ id: item.id, reason: 'taken' });
+					continue;
+				}
+				if (!found && item.state === 'proposed') moved.add(item.id);
+				held.nested = [...(held.nested ?? []), { steps, item }];
+				out.set(deep.key, held);
+				continue;
+			}
 			const key = source.keyFor(item.field);
-			// A proposal for a place inside a field would be written over the whole field.
-			if (key === undefined || (item.state === 'proposed' && !source.exact(item.field))) {
+			if (key === undefined) {
 				undrawn.push({ id: item.id, reason: 'field' });
 				continue;
 			}
@@ -188,12 +226,12 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			else held.proposed = item;
 			out.set(key, held);
 		}
-		return { fields: out, undrawn };
+		return { fields: out, undrawn, moved };
 	});
 	const fields = $derived(placed.fields);
 	// A proposal made from a value the field no longer holds would write over the reader's.
 	const outdated = $derived.by(() => {
-		const out = new Set<string>();
+		const out = new Set<string>(placed.moved);
 		for (const { proposed } of fields.values())
 			if (
 				proposed &&

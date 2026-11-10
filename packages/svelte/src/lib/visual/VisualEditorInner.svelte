@@ -61,6 +61,10 @@
 	import {
 		byBlocks,
 		onField,
+		sameValue,
+		valueIn,
+		valueWith,
+		valueWithInserted,
 		type FieldChange,
 		type FieldProposal,
 		type ReviewDrawn
@@ -338,6 +342,14 @@
 			return key && fieldKeyToString(key);
 		},
 		exact: (path) => addrForFieldPath(path) != null,
+		nested(path) {
+			const target = leafTargetFor(path);
+			const field = reviewed(path);
+			if (!target?.steps || !field?.field) return undefined;
+			const card =
+				field.card === undefined ? model.main : model.cards[cardIndexOf(field.card as CardId)];
+			return { key: target.key, steps: target.steps, value: card?.values[field.field] };
+		},
 		valueAt(path) {
 			const key = reviewed(path);
 			if (!key?.field) return undefined;
@@ -468,7 +480,6 @@
 		const name = key.field;
 		const leaf = fieldKeyToString(key);
 		const addr = makeAddr(id, isMain, name);
-		const before = doc.getStored(addr);
 		const write = (value: unknown): boolean => {
 			commitScalar(id, isMain, name, value);
 			if (commitErrors.has(leaf)) return false;
@@ -477,6 +488,8 @@
 		};
 		writing++;
 		try {
+			if (!addrForFieldPath(item.field)) return takeInside(item, leaf, write);
+			const before = doc.getStored(addr);
 			if (!write(item.after)) return undefined;
 			const written = JSON.stringify(doc.getStored(addr));
 			return {
@@ -487,6 +500,46 @@
 			};
 		} finally {
 			writing--;
+		}
+
+		/** The field's value as its control is handed it, read anew. */
+		function current(): unknown {
+			const at = isMain ? 0 : cardIndexOf(id);
+			if (at < 0) return undefined;
+			return fieldValues((isMain ? doc.main : doc.card(at)).payloadItems)[name];
+		}
+		/**
+		 * A proposal for a place inside the field: the whole value written with that place
+		 * changed, down the lane an edit of the place takes, and taken back by writing that
+		 * place alone back, so another place accepted since keeps its change.
+		 */
+		function takeInside(
+			item: FieldProposal,
+			leaf: string,
+			write: (value: unknown) => boolean
+		): { leaf: string; before: unknown; back: () => void; holds: () => boolean } | undefined {
+			const steps = reviewing.at(leaf).nested?.find((e) => e.item.id === item.id)?.steps;
+			if (!steps) return undefined;
+			const value = current();
+			const last = steps.at(-1);
+			const list = typeof last === 'number' ? valueIn(value, steps.slice(0, -1)) : undefined;
+			const length = Array.isArray(list) ? list.length : 0;
+			const adds = typeof last === 'number' && last >= length && item.after !== undefined;
+			const removes = typeof last === 'number' && !adds && item.after === undefined;
+			const landed = adds ? [...steps.slice(0, -1), length] : steps;
+			const before = valueIn(value, steps);
+			if (!write(valueWith(value, steps, item.after))) return undefined;
+			return {
+				leaf,
+				before,
+				back: () =>
+					void write(
+						removes
+							? valueWithInserted(current(), steps, before)
+							: valueWith(current(), landed, adds ? undefined : before)
+					),
+				holds: () => removes || sameValue(valueIn(current(), landed), item.after)
+			};
 		}
 	}
 	setReview(reviewing);
@@ -631,7 +684,10 @@
 				removed: mark.classList.contains('qm-review-gone')
 			};
 		const control = leaves.control(key);
-		return control && { anchor: control.el, removed: false };
+		const own = [...(control?.el.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].find(
+			(el) => el.getAttribute('data-qm-review') === id
+		);
+		return control && { anchor: own ?? control.el, removed: false };
 	}
 
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller

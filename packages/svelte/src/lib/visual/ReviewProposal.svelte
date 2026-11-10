@@ -19,8 +19,12 @@
 		value: unknown;
 		/** Take the focus back to the control: an answer given from the row unmounts it. */
 		refocus?: () => void;
+		/** Where the value is, for one drawn under a control that is not its own. */
+		label?: string;
+		/** It takes a list's member out, so nothing comes in its place. */
+		removes?: boolean;
 	}
-	let { item, value, refocus }: Props = $props();
+	let { item, value, refocus, label, removes = false }: Props = $props();
 
 	let row = $state<HTMLElement>();
 	function answer(action: 'accept' | 'dismiss'): void {
@@ -48,12 +52,13 @@
 	onpointerleave={() => reviewing.point(undefined, 'pointer')}
 >
 	<span class="qm-review-value">
+		{#if label}<span class="qm-review-where">{label}: </span>{/if}
 		{#each runs as run, i (i)}
 			{#if run.kind === 'del'}<del class="qm-review-del">{run.text}</del
 				>{:else if run.kind === 'ins'}<ins class="qm-review-ins">{run.text}</ins
 				>{:else}{run.text}{/if}
 		{/each}
-		{#if !after}
+		{#if !after && !removes}
 			<span class="qm-review-none">{t.strings.reviewEmpty}</span>
 		{/if}
 	</span>
@@ -120,6 +125,9 @@
 		box-shadow:
 			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-lit),
 			var(--_qm-space-half) 0 0 var(--_qm-review-lit);
+	}
+	.qm-review-where {
+		color: var(--_qm-ink-label);
 	}
 	.qm-review-none {
 		color: var(--_qm-ink-label);

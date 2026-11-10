@@ -8,6 +8,7 @@
 // `onChange` reports it, and the reader's undo takes it back. A change carries at most what it
 // replaced as words to show, so taking one back is the host's write, which alone knows the
 // inverse of what it wrote.
+import type { PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
 import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/index.js';
 
@@ -32,7 +33,9 @@ import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/inde
  * - `field` alone: the path of a field, for a value with no text to anchor in. A `changed` item
  *   marks the field's control, `before` the value it held; a `proposed` item sets `after` under
  *   the control, the value the field's writer would take, an absent one proposing the field
- *   cleared, and `before` the value its writer read. A path into a container names its field.
+ *   cleared, and `before` the value its writer read. A path to a place inside a record or a
+ *   list names that place: a cell, or a member by its index, which `after` absent takes out
+ *   and an index past the last appends.
  *
  * An item whose place the editor does not hold draws nothing. A dismissed item is drawn no more,
  * and an accepted proposal the list still holds is drawn as the change it made, with the card
@@ -84,7 +87,8 @@ export interface ReviewEvent {
  *
  * - `anchor`: no mounted leaf holds its anchor.
  * - `block`: no block it names stands in its field, or no leaf of the field is mounted.
- * - `field`: its path names no field the editor holds, or a proposal names a place inside one.
+ * - `field`: its path names no field the editor holds, or a place inside one its schema does
+ *   not declare.
  * - `parse`: its `after` is not Markdown the leaf holding it reads.
  * - `taken`: an earlier item has its paragraph, or its field.
  * - `applied`: the text already reads as proposed, so it would write nothing.
@@ -115,14 +119,124 @@ export type FieldProposal = {
 	after?: unknown;
 };
 
-/** Whether two values are one, whatever order their keys stand in; absent is `null`. */
+/** A field item routed past its field: the steps from the rung it is handed to down to the
+ *  value it names, a member of a list by its index, a cell of a record by its key. */
+export interface DeepReview {
+	steps: readonly PathStep[];
+	item: FieldProposal | FieldChange;
+}
+
+/** One rung of a nested item's walk: the items naming this rung's own value, and the rest by
+ *  the step they take next, that step consumed. */
+export function splitReview(list: readonly DeepReview[] | undefined): {
+	here: DeepReview[];
+	below: Map<PathStep, DeepReview[]>;
+} {
+	const here: DeepReview[] = [];
+	const below = new Map<PathStep, DeepReview[]>();
+	for (const entry of list ?? []) {
+		if (!entry.steps.length) {
+			here.push(entry);
+			continue;
+		}
+		const [step, ...steps] = entry.steps;
+		const bucket = below.get(step) ?? [];
+		bucket.push({ steps, item: entry.item });
+		below.set(step, bucket);
+	}
+	return { here, below };
+}
+
+/** The value `steps` reach in `value`, `undefined` where they reach nothing. */
+export function valueIn(value: unknown, steps: readonly PathStep[]): unknown {
+	let at = value;
+	for (const step of steps) {
+		if (at == null || typeof at !== 'object') return undefined;
+		at = (at as Record<PathStep, unknown>)[step];
+	}
+	return at;
+}
+
+/** `value` with what `steps` reach set to `to`: a list's member past its end appended, and one
+ *  set to nothing taken out; a record's cell set to nothing left out. Copies on the way down. */
+export function valueWith(value: unknown, steps: readonly PathStep[], to: unknown): unknown {
+	if (!steps.length) return to;
+	const [step, ...rest] = steps;
+	if (typeof step === 'number') {
+		const list = Array.isArray(value) ? [...value] : [];
+		const at = Math.min(step, list.length);
+		const next = valueWith(list[at], rest, to);
+		if (!rest.length && to === undefined) list.splice(at, 1);
+		else if (step >= list.length) list.push(next);
+		else list[at] = next;
+		return list;
+	}
+	const record = value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : {};
+	const next = valueWith((record as Record<string, unknown>)[step], rest, to);
+	if (next === undefined) delete (record as Record<string, unknown>)[step];
+	else (record as Record<string, unknown>)[step] = next;
+	return record;
+}
+
+/** `value` with a member put back at `steps`, the ones from it on moving down one. */
+export function valueWithInserted(
+	value: unknown,
+	steps: readonly PathStep[],
+	member: unknown
+): unknown {
+	const head = steps.slice(0, -1);
+	const at = steps.at(-1);
+	const list = valueIn(value, head);
+	if (typeof at !== 'number' || !Array.isArray(list)) return valueWith(value, steps, member);
+	const next = [...list];
+	next.splice(Math.min(at, next.length), 0, member);
+	return valueWith(value, head, next);
+}
+
+/**
+ * Where a field proposal's steps land in `value` as it stands. A list's member is found by its
+ * index where it holds `before`, else as the nearest member holding `before` that `claimed`
+ * does not already hold, so one member taken out does not move another's proposal onto the
+ * wrong row. `found` is false where the proposal has a `before` nothing holds.
+ */
+export function locate(
+	value: unknown,
+	steps: readonly PathStep[],
+	item: FieldProposal | FieldChange,
+	claimed: Set<string>
+): { steps: readonly PathStep[]; found: boolean } {
+	const read = item.state === 'proposed' && 'before' in item;
+	const before = read ? item.before : undefined;
+	const at = steps.at(-1);
+	const head = steps.slice(0, -1);
+	const list = valueIn(value, head);
+	const claim = (out: readonly PathStep[]) => {
+		claimed.add(JSON.stringify(out));
+		return out;
+	};
+	if (!read || before === undefined || typeof at !== 'number' || !Array.isArray(list)) {
+		const found = !read || sameValue(valueIn(value, steps), before);
+		return { steps: claim(steps), found };
+	}
+	const free = (i: number): boolean =>
+		sameValue(list[i], before) && !claimed.has(JSON.stringify([...head, i]));
+	if (free(at)) return { steps: claim(steps), found: true };
+	for (let d = 1; d < list.length; d++)
+		for (const i of [at - d, at + d])
+			if (i >= 0 && i < list.length && free(i)) return { steps: claim([...head, i]), found: true };
+	return { steps, found: false };
+}
+
+/** Whether two values are one, whatever order their keys stand in; absent is `null`, and a
+ *  plain text value rests as its words, as a writer takes it either way. */
 export function sameValue(a: unknown, b: unknown): boolean {
 	const canonical = (value: unknown): string =>
-		JSON.stringify(value ?? null, (_, v: unknown) =>
-			v && typeof v === 'object' && !Array.isArray(v)
-				? Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)))
-				: v
-		);
+		JSON.stringify(value ?? null, (_, v: unknown) => {
+			if (!v || typeof v !== 'object' || Array.isArray(v)) return v;
+			const { text, codec } = v as { text?: unknown; codec?: unknown };
+			if (codec === 'plain' && typeof text === 'string') return text;
+			return Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)));
+		});
 	return canonical(a) === canonical(b);
 }
 
