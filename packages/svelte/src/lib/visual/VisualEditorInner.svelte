@@ -110,6 +110,7 @@
 		fonts,
 		fontLabels,
 		strings,
+		locale,
 		formatDiagnostic,
 		class: className,
 		style
@@ -125,6 +126,9 @@
 		},
 		get formatDiagnostic() {
 			return formatDiagnostic;
+		},
+		get locale() {
+			return locale;
 		}
 	});
 

@@ -108,6 +108,12 @@ export interface VisualEditorProps {
 	 */
 	strings?: VisualStringsInput;
 	/**
+	 * The BCP 47 tag a date control orders and words its segments by: day before month,
+	 * a 24-hour clock, the letters an empty segment shows. Unset, the browser's. The
+	 * stored value is `YYYY-MM-DD` whatever this says.
+	 */
+	locale?: string;
+	/**
 	 * A boundary `Diagnostic` → the text shown under its field. Returning
 	 * `undefined` takes the diagnostic's own message, which is the arm the parse and
 	 * render lanes need: their parameters exist only inside that English string.

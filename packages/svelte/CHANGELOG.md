@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A date control follows a locale.** `VisualEditor` takes `locale`, a BCP 47 tag, and a date or `datetime` control orders its segments, draws its separators and clock, and words its empty segments by it, where every reader saw `mm / dd / yyyy` and AM/PM. Unset, it is the browser's, so a control reads day first in a browser set to a locale that writes dates so; a host that wants the earlier order passes `locale="en-US"`. The tag is pinned to the Gregorian calendar and Latin digits, the ones a stored `YYYY-MM-DD` is written in, and the stored value does not change. A `datetime` default's AM or PM is worded by the locale too.
+
 **A drop anywhere in a table cell lands in that cell.** Text dropped on a cell's padding, or on the edge of its text where no line is, lands in the cell at the nearest place in its text, where the first landed as a new paragraph above the table and the second was taken and dropped.
 
 **Enter in a list of numbers moves on.** Enter in a number row that holds a number commits it and takes the focus to the next row with its number selected, or from the last row to a standing row for the next number, where the caret stayed and the next digits ran onto the number just entered.

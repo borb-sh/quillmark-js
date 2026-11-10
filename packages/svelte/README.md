@@ -164,6 +164,8 @@ The package ships English and a seam to replace it. `strings` is keyed and **par
 />
 ```
 
+`locale` is the BCP 47 tag a date control orders and words its segments by, and defaults to the browser's; a product that sets `strings` for a language sets it to match. The stored date is `YYYY-MM-DD` under any locale.
+
 `formatDiagnostic` gets the whole `Diagnostic` and returns `undefined` to take its own message. Validation and edit diagnostics re-word from `code`, `path` and `args`; parse errors and render warnings carry their detail inside English text and stand as they are ([INVARIANTS.md](prose/INVARIANTS.md#diagnostics)).
 
 ### Fonts

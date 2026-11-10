@@ -18,6 +18,10 @@
  calendar) rather than `DatePicker`: the segments are the entry affordance, and a
  calendar is a second surface this field does not need.
 
+ The segments' order, their separators, the clock and the letters an empty segment
+ shows are the locale's: the host's `locale`, else the browser's, pinned to the calendar
+ and digits the stored string is written in (`dateLocale`).
+
  A `datetime` is the same control with the time's segments after the date's, to the
  minute. It stores `YYYY-MM-DDThh:mm`, and `:ss` after it where the stored value
  carried seconds, which no segment shows and an edit keeps. `today` is no value of its
@@ -74,10 +78,19 @@
 		type DateValue
 	} from '@internationalized/date';
 	import Icon from './icons/Icon.svelte';
-	import { wording } from './strings.js';
+	import { dateLocale, wording } from './strings.js';
 	import './controls.css';
 
 	const t = wording();
+	const locale = $derived(dateLocale(t.locale));
+	/** The locale's own words for the two halves of a twelve-hour day. */
+	const dayPeriods = $derived.by(() => {
+		const format = new Intl.DateTimeFormat(locale, { hour: 'numeric', hour12: true });
+		const at = (hour: number): string =>
+			format.formatToParts(new Date(2000, 0, 1, hour)).find((p) => p.type === 'dayPeriod')?.value ??
+			'';
+		return { am: at(6), pm: at(18) };
+	});
 	const TODAY = 'today';
 	/** Read at each use: a session left open past midnight renders the new day. */
 	const renderDate = (): DateValue => today(getLocalTimeZone());
@@ -266,7 +279,7 @@
 				return clock ? { text: pad(clock.minute), ghosted: 'default' } : { text, ghosted: 'hint' };
 			case 'dayPeriod':
 				return clock
-					? { text: clock.hour < 12 ? 'AM' : 'PM', ghosted: 'default' }
+					? { text: clock.hour < 12 ? dayPeriods.am : dayPeriods.pm, ghosted: 'default' }
 					: { text, ghosted: 'hint' };
 			default:
 				return { text, ghosted: 'hint' };
@@ -285,6 +298,7 @@
 		<BitsDateField.Root
 			value={parsed}
 			{placeholder}
+			{locale}
 			granularity={datetime ? 'minute' : 'day'}
 			onValueChange={(d) => {
 				// A cleared or half-typed field yields undefined, held until the focus

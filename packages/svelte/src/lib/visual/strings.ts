@@ -339,6 +339,9 @@ const KEY = Symbol('qm.wording');
 export interface Wording {
 	readonly strings: VisualStrings;
 	readonly formatDiagnostic: FormatDiagnostic | undefined;
+	/** The host's locale tag, for the one control whose own parts are worded by a locale
+	 *  rather than by a string here ({@link dateLocale}). */
+	readonly locale?: string;
 }
 
 export function setWording(channel: Wording): void {
@@ -383,4 +386,26 @@ function builtIn(d: Diagnostic, strings: VisualStrings): string | undefined {
 		default:
 			return undefined;
 	}
+}
+
+/**
+ * The locale a date's segments are ordered and worded by: the host's, else the browser's.
+ * Pinned to the Gregorian calendar and Latin digits, which are what a stored `YYYY-MM-DD`
+ * is written in, so a locale whose own calendar or digits differ still shows the date the
+ * document holds. A tag `Intl` cannot read falls to the next, and the last is `en`.
+ */
+export function dateLocale(tag: string | undefined): string {
+	const browser = typeof navigator === 'undefined' ? undefined : navigator.language;
+	for (const candidate of [tag, browser]) {
+		if (!candidate) continue;
+		try {
+			return new Intl.Locale(candidate, {
+				calendar: 'gregory',
+				numberingSystem: 'latn'
+			}).toString();
+		} catch {
+			// The next candidate.
+		}
+	}
+	return 'en';
 }
