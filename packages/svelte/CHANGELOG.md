@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**Escape, then Tab or Shift-Tab, leaves a body in either direction.** Escape in a body keeps the focus and the caret where they are and hands the next Tab or Shift-Tab to the browser, from a list item too, where it blurred the body: the focus was then drawn nowhere and Shift-Tab landed back in the body. Any other key, a press or an edit gives Tab back to the body. A Tab the body holds to no effect shows `Esc, then Tab, to move on` in the leaf's corner, and Escape shows `Tab to move on`, both in a status region. `VisualStrings` gains `leaveTaught` and `leaveArmed`, and `shortcutLeave` reads `Let Tab leave the editor`.
+
+**A card moved by its button keeps the focus on that button.** A move from the keyboard leaves the focus on the button pressed, at the stack's edge too, where it fell to the page whenever the move re-inserted the card or disabled the button. A move button at its edge is inert by `aria-disabled` and out of the tab order.
+
 **The focus ring is two pixels, and more contrast steps the field edge.** The ring every control draws on focus is 2px wide, where its 1.5px rounded down to one device pixel on a 1× display. Under `prefers-contrast: more` a field's edge stands at 3:1 against the card and the ring at 3px.
 
 **A switch draws in forced colours.** Under Windows High Contrast and other forced palettes a switch draws its track in the system's button stroke and its thumb in the system's text or highlight colour, where it drew nothing.

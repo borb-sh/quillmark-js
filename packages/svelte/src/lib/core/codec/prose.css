@@ -320,6 +320,32 @@ li.ProseMirror-selectednode::after {
 	}
 }
 
+/* The way out's hint (`leave.ts`): a status region beside the editable, in the corner of
+   the box the leaf stands in, over the text's last line rather than under it, so its
+   coming and going moves nothing. Empty at rest and still in the tree, which is what
+   lets a reader hear the words arrive. */
+:where(:has(> .qm-leave-hint)) {
+	position: relative;
+}
+.qm-leave-hint {
+	position: absolute;
+	inset-block-end: var(--_qm-space);
+	inset-inline-end: var(--_qm-space);
+	padding: var(--_qm-space-half) var(--_qm-space-2);
+	border-radius: var(--_qm-radius-pill);
+	background: var(--_qm-surface-raised);
+	box-shadow: var(--_qm-lift);
+	font-size: var(--_qm-text-label);
+	font-style: normal;
+	line-height: 1;
+	white-space: nowrap;
+	color: var(--_qm-ink-label);
+	pointer-events: none;
+}
+.qm-leave-hint:empty {
+	opacity: 0;
+}
+
 /* ── The table island ────────────────────────────────────────────────────────
 
    The one construct in this file with chrome in it. The rest of the stylesheet

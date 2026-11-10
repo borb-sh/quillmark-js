@@ -130,7 +130,7 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutLink: 'Link',
 	shortcutFormatBar: 'Move to the format bar over a selection',
 	shortcutLineBreak: 'Line break within a paragraph',
-	shortcutLeave: 'Leave the editor',
+	shortcutLeave: 'Let Tab leave the editor',
 	shortcutNumberedList: 'Numbered list',
 	shortcutBulletedList: 'Bulleted list',
 	shortcutIndent: 'Nest under the item above',

@@ -262,6 +262,7 @@
 						: proseLeafPlugins(schema, {
 								inline,
 								placeholder: () => drawn.placeholder,
+								leaveStrings: () => t.strings,
 								cap
 							})
 				});

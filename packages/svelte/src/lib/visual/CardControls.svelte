@@ -1,7 +1,10 @@
 <!--
   Card controls, composable cards only.
-  Right-aligned in the header: a move-up/move-down arrow pair (each disabled at its
-  edge), then delete, each named for the card it acts on, the row revealed while the pointer or the caret is in the card.
+  Right-aligned in the header: a move-up/move-down arrow pair (each inert at its edge),
+  then delete, each named for the card it acts on, the row revealed while the pointer or
+  the caret is in the card. A move button at its edge is inert by `aria-disabled` and out
+  of the tab order, not `disabled`: a move that reaches the edge under the focus then keeps
+  the focus on the button pressed, where a disabled one drops it to the page.
   Reorder is buttons, not drag. All three are chips (controls.css): fill arrives
   on hover, and delete rests at the label ink beside them. The card scopes
   that reveal, so its condition lives in the parent's CSS; the row keeps the narrower
@@ -35,16 +38,18 @@
 			class="qm-chip qm-focus-ring"
 			title={t.strings.cardMoveUp}
 			aria-label={t.strings.cardAction(t.strings.cardMoveUp, name)}
-			disabled={isFirst}
-			onclick={onMoveUp}><Icon name="arrow-up" /></button
+			aria-disabled={isFirst || undefined}
+			tabindex={isFirst ? -1 : undefined}
+			onclick={() => isFirst || onMoveUp()}><Icon name="arrow-up" /></button
 		>
 		<button
 			type="button"
 			class="qm-chip qm-focus-ring"
 			title={t.strings.cardMoveDown}
 			aria-label={t.strings.cardAction(t.strings.cardMoveDown, name)}
-			disabled={isLast}
-			onclick={onMoveDown}><Icon name="arrow-down" /></button
+			aria-disabled={isLast || undefined}
+			tabindex={isLast ? -1 : undefined}
+			onclick={() => isLast || onMoveDown()}><Icon name="arrow-down" /></button
 		>
 	</div>
 	<button

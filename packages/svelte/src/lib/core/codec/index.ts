@@ -40,6 +40,11 @@ export type { TableChromeStrings } from './table-view.js';
 export { DEFAULT_SLASH_STRINGS } from './slash.js';
 export type { SlashState, SlashStrings } from './slash.js';
 
+// The body's way out by the keyboard: the codec owns the keys and the hint's element,
+// the visual tier's `strings` set its wording.
+export { DEFAULT_LEAVE_STRINGS } from './leave.js';
+export type { LeaveStrings } from './leave.js';
+
 // The review layer a leaf draws over its anchors: the visual tier's `strings` set extends its
 // wording and its `ReviewItem` narrows to the leaf's own.
 export { DEFAULT_REVIEW_STRINGS } from './review.js';

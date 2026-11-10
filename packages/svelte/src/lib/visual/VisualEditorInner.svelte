@@ -640,6 +640,8 @@
 		if (from < 0) return;
 		const to = from + dir;
 		if (to < 0 || to >= doc.cardCount) return;
+		const focused = document.activeElement;
+		const held = focused instanceof HTMLElement && slotEls[from]?.contains(focused);
 		arm.arm();
 		doc.moveCard(from, to);
 		undo.withdraw();
@@ -648,9 +650,17 @@
 		w.splice(to, 0, x);
 		cardIds = w;
 		bump('structure', id, to, { op: 'move', from, to });
+		if (held) void keepFocus(focused);
 		// `nearest`: the card was already in view and only needs to stay there, so one
 		// that never left the viewport moves it not at all.
 		void scrollCardIntoView(id, 'nearest');
+	}
+	/** Give the focus back to the control a move was made from. The reconcile reorders by
+	 *  re-inserting slots, and a re-inserted node loses the focus to the page's body with no
+	 *  blur to say so; which of two swapped slots it re-inserts is its own choice. */
+	async function keepFocus(el: HTMLElement): Promise<void> {
+		if (!(await span.resumes(tick()))) return;
+		if (el.isConnected && document.activeElement !== el) el.focus({ preventScroll: true });
 	}
 	function removeCardById(id: string): void {
 		const i = cardIndexOf(id);

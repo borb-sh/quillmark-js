@@ -4,12 +4,16 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
-import { createField } from '$lib/core/codec';
+import { DEFAULT_LEAVE_STRINGS, createField } from '$lib/core/codec';
 import type { FieldController, LeafViews, SlashState } from '$lib/core/codec';
 import { filterItems } from '$lib/core/codec/slash.js';
 import type { Document, TableProps } from '@quillmark/wasm';
 import { mount, press, quill, md } from './_util.js';
 import { levelsOf } from './_util.js';
+
+/** Whether the body's exit link took an Escape: the leaf's hint names the key it waits for. */
+const leaving = (view: EditorView): boolean =>
+	view.dom.nextElementSibling?.textContent === DEFAULT_LEAVE_STRINGS.leaveArmed;
 
 // jsdom has no layout, and ProseMirror measures: the caret it scrolls into view
 // after a structural key, and the trigger the menu anchors on. One stub for both,
@@ -381,8 +385,7 @@ describe('the query filters, and a miss draws nothing', () => {
 		}
 		view.focus();
 		press(view, 'Escape');
-		expect(view.hasFocus()).toBe(false);
-		view.focus();
+		expect(leaving(view)).toBe(true);
 		press(view, 'Enter');
 		// Enter split the paragraph rather than inserting: no offer, no pick.
 		expect(field.getContent().islands ?? []).toHaveLength(0);
@@ -640,11 +643,11 @@ describe('the menu does not disturb the body it sits in', () => {
 		field.destroy();
 	});
 
-	it('Escape with no menu open gives the focus up', () => {
+	it("Escape with no menu open is the body's way out", () => {
 		const { field, view } = leaf('para');
 		view.focus();
 		press(view, 'Escape');
-		expect(view.hasFocus()).toBe(false);
+		expect(leaving(view)).toBe(true);
 		expect(field.getContent().blocks).toHaveLength(1);
 		field.destroy();
 	});

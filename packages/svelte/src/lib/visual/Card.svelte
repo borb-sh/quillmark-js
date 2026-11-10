@@ -205,7 +205,9 @@
 	 *  recovery shell, which has no title to focus. */
 	export function focusHeader(): void {
 		handed = true;
-		el?.querySelector<HTMLElement>('.qm-card-header :is(input, button:not(:disabled))')?.focus();
+		el?.querySelector<HTMLElement>(
+			".qm-card-header :is(input, button:not(:disabled, [aria-disabled='true']))"
+		)?.focus();
 		handed = false;
 	}
 </script>

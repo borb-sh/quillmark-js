@@ -143,6 +143,7 @@
 				cap,
 				tableStrings: () => t.strings,
 				slashStrings: () => t.strings,
+				leaveStrings: () => t.strings,
 				onSlash: (next) => {
 					slash = next;
 				},
