@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.34.0 - 2026-11-10
+
 **`proposalsBetween` makes a review list from an assistant's answer.** `proposalsBetween(quill, base, answer)` compares the document as the assistant read it with the copy it edited and returns `{ items, cards }`: block proposals with `before` for the body and block rich text fields, a proposal per record cell and list member that changed elsewhere, and the cards added and taken out as rows for the host. Card pairs and block pairs go by id, so no host writes its own diff or lays an anchor.
 
 **A host sets the review list once and clears it once.** The editor draws every answer while the list holds the item, so a host no longer takes answered items off its list or puts reopened ones back; the README states the contract. `onReviewDrawn` gains `open`, the drawn items still waiting for an answer. `answerReview` raises no toast, where a batch raised `Changes accepted` or `Proposals dismissed` for a press the reader never made under auto-accept; ⌘Z still takes it back whole. `VisualStrings` drops `reviewAcceptedAll` and `reviewDismissedAll`.
