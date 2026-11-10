@@ -11,7 +11,16 @@ import { flushSync } from 'svelte';
 import type { Document, Quill, ResolvedField } from '@quillmark/wasm';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quillFromYaml } from '../helpers/fixtures.js';
-import { field, leaf, mountEditor, type, typeLeaf, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	field,
+	leaf,
+	mountEditor,
+	press,
+	settle,
+	type,
+	typeLeaf,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -163,5 +172,27 @@ describe('a field written over its default', () => {
 			DEFAULT_VISUAL_STRINGS.fieldDefault
 		]);
 		expect(reset(kept)).toBeNull();
+	});
+
+	it('is unset again by the undo that takes its edit back', async () => {
+		const target = open();
+		const kept = field(target, 'Kept');
+		typeLeaf(kept, 'Changed');
+		expect(row('kept').source).toBe('authored');
+
+		press(leaf(kept), 'z', { ctrlKey: true, cancelable: true });
+		await settle();
+		expect(row('kept').source).toBe('default');
+		expect(tag(kept)?.textContent).toBe(DEFAULT_VISUAL_STRINGS.fieldDefault);
+		expect(reset(kept)).toBeNull();
+	});
+
+	it('stays written where its undo comes back to the default it had written', async () => {
+		const target = open(answering('kept: Kept'));
+		const kept = field(target, 'Kept');
+		typeLeaf(kept, 'Changed');
+		press(leaf(kept), 'z', { ctrlKey: true, cancelable: true });
+		await settle();
+		expect(row('kept').source).toBe('authored');
 	});
 });
