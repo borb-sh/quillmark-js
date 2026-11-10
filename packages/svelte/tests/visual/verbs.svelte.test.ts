@@ -164,6 +164,24 @@ describe('a reorder through the card control', () => {
 		expect(leafKeys(after[1])).toContain(`${captured.cardId}:$body`);
 	});
 
+	it('keeps the focus on a move button that reaches its edge, inert and out of the tab order', () => {
+		const q = quill();
+		const { target, changes } = mountEditor(q, twoSections(q));
+		const moveUp = slots(target)[1].querySelector<HTMLButtonElement>('.qm-card-reorder button')!;
+		moveUp.focus();
+		moveUp.click();
+		flushSync();
+		expect(slots(target)[0].contains(moveUp)).toBe(true);
+		expect(document.activeElement).toBe(moveUp);
+		expect(moveUp.getAttribute('aria-disabled')).toBe('true');
+		expect(moveUp.tabIndex).toBe(-1);
+
+		const moves = changes.length;
+		moveUp.click();
+		flushSync();
+		expect(changes).toHaveLength(moves);
+	});
+
 	it('carries a refused commit with the card, not with the index', () => {
 		const q = quill();
 		// `credits` carries the fixture's card-side `integer` (`rights.year`), whose input

@@ -11,6 +11,12 @@
 // a while, so an Undo pressed long after the removal is not a surprise; the while holds as
 // long as the toast is under the pointer or the focus.
 //
+// A host's step rides the same toast and the same key (`offerUndo`): a write the host made for
+// the reader, an assistant's answer, lands outside every leaf's history, so nothing the reader
+// can press takes it back. It stands past its toast: it is the last thing that happened to the
+// document until the reader does something else, so ⌘Z anywhere in the editor is its, a text
+// leaf's own included, until the next edit lands.
+//
 // The key listens on the document while an offer stands, not on the surface: a removal by
 // the pointer takes the pressed button with it and leaves the focus on the page's body,
 // which no keydown on the surface hears.
@@ -30,19 +36,26 @@ export interface UndoOffer {
 export interface StructuralUndo {
 	/** The offer on show, if any. */
 	readonly current: UndoOffer | undefined;
-	/** Offer `restore` as the undo of the removal just made, replacing any standing offer. */
-	offer(notice: string, restore: () => void): void;
+	/** Offer `restore` as the undo of the removal just made, replacing any standing offer.
+	 *  `standing` is a host's step: the key stays its past the toast, and in a text control,
+	 *  until {@link settle}. */
+	offer(notice: string, restore: () => void, standing?: boolean): void;
+	/** An edit landed: a host's step is no longer the last thing that happened. */
+	settle(): void;
 	/** Name the control the removal handed the focus to. ⌘Z there is the offer's until the
 	 *  control takes an edit or the focus leaves it: the key that removed is the key that
 	 *  asks for it back, and the control has nothing of its own to undo yet. */
 	hand(el: Element | null): void;
 	/** Whether ⌘Z pressed at `target` is the offer's: the page's body, where a removal under
 	 *  the pointer leaves the focus, when this offer is the page's latest; the handed control; or a control under `root` that keeps
-	 *  no history of its own. A text control that is not the handed one keeps its key. */
+	 *  no history of its own. A text control that is not the handed one keeps its key from a
+	 *  removal's offer and gives it to a host's step. */
 	accepts(target: EventTarget | null, root: Element | undefined): boolean;
 	/** Hold the lapse while the toast is under the pointer or the focus, and let it run again. */
 	pause(): void;
 	resume(): void;
+	/** Whether `offer` is the one standing, on its toast or past it. */
+	holds(offer: UndoOffer | undefined): boolean;
 	/** Run the standing offer and clear it. False when there was none to run. */
 	take(): boolean;
 	/** Drop the standing offer without running it. */
@@ -57,6 +70,8 @@ let latest: object | undefined;
 
 export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 	let current = $state<UndoOffer | undefined>();
+	/** A host's step, held past its toast. */
+	let kept: UndoOffer | undefined;
 	let handed: Element | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let paused = false;
@@ -65,23 +80,31 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 		timer = undefined;
 	};
 	const lapse = (): void => {
-		timer = setTimeout(clear, OFFER_MS);
+		timer = setTimeout(() => (kept ? lower() : clear()), OFFER_MS);
 	};
-	const clear = (): void => {
+	const lower = (): void => {
 		stop();
 		paused = false;
 		handed = undefined;
 		current = undefined;
 	};
+	const clear = (): void => {
+		lower();
+		kept = undefined;
+	};
 	const self: StructuralUndo & { dispose(): void } = {
 		get current() {
 			return current;
 		},
-		offer(notice, restore) {
+		offer(notice, restore, standing = false) {
 			clear();
 			current = { notice, restore };
+			if (standing) kept = current;
 			latest = self;
 			lapse();
+		},
+		settle() {
+			if (kept) clear();
 		},
 		hand(el) {
 			if (!current || !el) return;
@@ -95,10 +118,10 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			el.addEventListener('focusout', release);
 		},
 		accepts(target, root) {
-			if (!current || !(target instanceof Element)) return false;
+			if (!(current ?? kept) || !(target instanceof Element)) return false;
 			if (target === document.body) return latest === self;
 			if (target === handed) return true;
-			return !!root?.contains(target) && !target.closest(EDITABLE);
+			return !!root?.contains(target) && (!!kept || !target.closest(EDITABLE));
 		},
 		pause() {
 			if (!current || paused) return;
@@ -110,8 +133,9 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			paused = false;
 			lapse();
 		},
+		holds: (offer) => !!offer && (current ?? kept) === offer,
 		take() {
-			const offer = current;
+			const offer = current ?? kept;
 			clear();
 			if (!offer) return false;
 			offer.restore();
@@ -133,10 +157,12 @@ export function setStructuralUndo(undo: StructuralUndo): void {
 const NO_UNDO: StructuralUndo = {
 	current: undefined,
 	offer() {},
+	settle() {},
 	hand() {},
 	accepts: () => false,
 	pause() {},
 	resume() {},
+	holds: () => false,
 	take: () => false,
 	withdraw() {}
 };

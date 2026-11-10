@@ -20,9 +20,13 @@
 import { getContext, setContext } from 'svelte';
 import type { Diagnostic } from '@quillmark/wasm';
 import {
+	DEFAULT_LEAVE_STRINGS,
+	DEFAULT_REVIEW_STRINGS,
 	DEFAULT_SHORTCUT_STRINGS,
 	DEFAULT_SLASH_STRINGS,
 	DEFAULT_TABLE_STRINGS,
+	type LeaveStrings,
+	type ReviewStrings,
 	type ShortcutStrings,
 	type SlashStrings,
 	type TableChromeStrings
@@ -30,24 +34,55 @@ import {
 import type { BodyPlaceholder } from './structure.js';
 
 /**
- * The island, the insert menu and the shortcut list's keys come from the codec, which owns
- * all three models (a NodeView inside the leaf, the trigger the leaf's keymap drives, and
- * the keymaps' own tables). Extending
+ * The island, the insert menu, the shortcut list and the review layer's keys come from the
+ * codec, which owns all four models (a NodeView inside the leaf, the trigger the leaf's keymap
+ * drives, the keymaps' own tables, and the decorations a leaf draws its review with). Extending
  * rather than restating them is what keeps one English list: a consumer overrides an
  * island handle's name beside the card controls' and the codec still has a default
  * for a leaf mounted directly.
  */
-export interface VisualStrings extends TableChromeStrings, SlashStrings, ShortcutStrings {
+export interface VisualStrings
+	extends TableChromeStrings, SlashStrings, ShortcutStrings, LeaveStrings, ReviewStrings {
 	// ── Card controls (accessible names: the buttons are glyphs) ───────────────
 	cardMoveUp: string;
 	cardMoveDown: string;
 	cardDelete: string;
 	/** The card-title input's accessible name. */
 	cardTitle: string;
+	/**
+	 * A card control's accessible name, the action and the card it acts on, by the title
+	 * the header shows: `Delete card, Findings`. The action alone stays the tooltip.
+	 * Parametric, so word order stays the translator's.
+	 */
+	cardAction: (action: string, card: string) => string;
 
 	/** A closed panel's header, spoken after its name (`Layout, has an issue`) when a field
 	 *  inside holds a diagnostic: the leading separator is part of the wording. */
 	groupFlagged: string;
+
+	/** The same header where a field inside holds an item of review. */
+	groupReviewed: string;
+
+	// ── Review (the card over a change, the row under a field) ───────────────
+	/** The card's button, and the row's: takes the change back. */
+	reviewUndo: string;
+	/** Its tooltip, which names the chord. */
+	reviewUndoTitle: string;
+	/** The card's accessible name. */
+	reviewChange: string;
+	/** The toast over a field's proposal taken, beside its way back. */
+	reviewAccepted: string;
+	/** Before what a change replaced: `Was  the old words`. */
+	reviewWas: string;
+	/** The whole of the card over text that replaced nothing. */
+	reviewAdded: string;
+	/** Before the text a change took out, or the whole of the card where the host kept none. */
+	reviewRemoved: string;
+	/** A value that was, or would be, nothing: `Was  Empty`. */
+	reviewEmpty: string;
+	/** A switch's two values, as a card and a row word them. */
+	reviewOn: string;
+	reviewOff: string;
 
 	// ── Structural undo (the toast a removal raises) ─────────────────────────
 	/** The toast's notice, named for what went: `Authors 2 removed`. */
@@ -65,8 +100,12 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings, Shortcu
 	// ── Array control ─────────────────────────────────────────────────────────
 	arrayAdd: string;
 	arrayRemove: string;
-	/** The drag handle on an `object` row: its tooltip. */
+	/** The drag handle on an `object` row: its tooltip, which names the keys that move
+	 *  the row too. */
 	arrayDrag: string;
+	/** What a list's standing row ghosts, the row that is not an element yet: the words
+	 *  say what typing there does. */
+	arrayStanding: string;
 	/**
 	 * A row control's accessible name, the action and the row it acts on: `Remove
 	 * Authors 2`. The action alone stays the tooltip. Parametric, so word order stays
@@ -121,7 +160,7 @@ export interface VisualStrings extends TableChromeStrings, SlashStrings, Shortcu
 	enumClear: string;
 
 	// ── Matrix control ────────────────────────────────────────────────────────
-	/** The count in the matrix's label row: how many of its items are held. */
+	/** The count in the matrix's label row: how many of its items are ticked. */
 	matrixHeld: (held: number, total: number) => string;
 	/** An open matrix's add box at rest, naming the list it adds to: `Add to Staff…`. The box
 	 *  draws its own `+`. `list` is empty for a matrix mounted with no label. */
@@ -250,22 +289,48 @@ export function chord(
 	return `Ctrl+${shift ? 'Shift+' : ''}${bare}`;
 }
 
+/** An `Alt` chord as the writer's platform prints it: `⌥↑` on Apple's, `Alt+↑` elsewhere,
+ *  on the test {@link chord} reads. */
+export function alt(
+	key: string,
+	platform = typeof navigator === 'undefined' ? '' : navigator.platform
+): string {
+	return /Mac|iP(hone|[oa]d)/.test(platform) ? `⌥${key}` : `Alt+${key}`;
+}
+
 /** The package's English. Every key, so the merge below is total. */
 export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	...DEFAULT_TABLE_STRINGS,
 	...DEFAULT_SLASH_STRINGS,
 	...DEFAULT_SHORTCUT_STRINGS,
+	...DEFAULT_LEAVE_STRINGS,
 	cardMoveUp: 'Move up',
 	cardMoveDown: 'Move down',
 	cardDelete: 'Delete card',
 	cardTitle: 'Card title',
+	cardAction: (action, card) => `${action}, ${card}`,
 	groupFlagged: ', has an issue',
+	groupReviewed: ', has changes to review',
+	...DEFAULT_REVIEW_STRINGS,
+	reviewAcceptTitle: `Accept (${chord('↵')})`,
+	reviewDismissTitle: `Dismiss (${chord('.')})`,
+	reviewUndo: 'Undo',
+	reviewUndoTitle: `Undo (${chord('.')})`,
+	reviewChange: 'Change',
+	reviewAccepted: 'Change accepted',
+	reviewWas: 'Was',
+	reviewAdded: 'Added',
+	reviewRemoved: 'Removed',
+	reviewEmpty: 'Empty',
+	reviewOn: 'On',
+	reviewOff: 'Off',
 	undoRemoved: (what) => `${what} removed`,
 	undoAction: 'Undo',
-	addCard: 'Add Card',
+	addCard: 'Add card',
 	arrayAdd: '+ Add',
 	arrayRemove: 'Remove',
-	arrayDrag: 'Drag to move',
+	arrayDrag: `Drag to move (${alt('↑/↓')})`,
+	arrayStanding: 'Add an item…',
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
 	textCount: (count, max) => `${count} / ${max}`,
@@ -281,22 +346,22 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 					: `Needs a ${expected} value.`,
 	diagFormatViolation: (format) =>
 		format === 'date'
-			? 'Not a real date. Type it as YYYY-MM-DD, or press Today.'
+			? 'Not a real date. Check the day and month, or press Today.'
 			: format === 'datetime'
-				? 'Not a real date and time. Type it as YYYY-MM-DDTHH:MM.'
+				? 'Not a real date and time. Check the day, month and time.'
 				: `Doesn't match the ${format} format.`,
 	fieldDefault: 'Default',
 	fieldReset: 'Reset',
 	enumUnsetTag: 'Default',
 	enumReset: 'Reset to default',
 	enumClear: 'Clear',
-	matrixHeld: (held, total) => `${held} of ${total} held`,
+	matrixHeld: (held, total) => `${held} of ${total} selected`,
 	matrixAdd: (list) => (list ? `Add to ${list}…` : 'Add…'),
 	matrixItemTitle: (list, index) => `${list ? `${list} item` : 'Item'} ${index}`,
 	matrixRemove: (title) => `Remove ${title}`,
 	dateToday: 'Today',
 	optionalGhost: 'None',
-	proseHeld: 'Holds more than this field can edit here.',
+	proseHeld: "This field has formatting it can't edit here. It is kept as it is.",
 	formatGroup: 'Formatting',
 	formatBold: `Bold (${chord('B')})`,
 	formatEmphasis: `Italic (${chord('I')})`,

@@ -40,6 +40,8 @@ export interface EditorRef {
 	applyExternal(field: string, delta?: Delta): void;
 	refresh(): void;
 	applyCardOps(ops: readonly CardOp[]): void;
+	revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
+	offerUndo(notice: string, undo: () => void): () => void;
 }
 
 /** `VisualEditorInner` also holds the active prose leaf. */

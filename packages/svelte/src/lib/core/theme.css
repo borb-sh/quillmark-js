@@ -88,7 +88,7 @@
 	/* Neutral: the surface spends no hue on a state it can draw in grey. The pair
 	   clears WCAG 2.4.11's 3:1 against the card at both poles, at 4.8:1 and 5.8:1. */
 	--_qm-accent: var(--qm-accent, light-dark(#71717a, #a1a1aa));
-	/* The one hue the surface spends, and it spends it on a state. Each pole is
+	/* One of the two hues the surface spends, each on a state. Each pole is
 	   its own figure rather than one ink shown twice: a hue calibrated against
 	   white reads as a stain on a dark card. Both clear WCAG 1.4.3's 4.5:1 against
 	   the card, which is the bar the label rung asks for and the one the glyphs
@@ -97,6 +97,12 @@
 	   figures are the host scale's (`preset/scale.css`), so a page's status line
 	   and a card's diagnostic carry one colour meaning error. */
 	--_qm-danger: var(--qm-danger, light-dark(#9e1518, #f9786c));
+	/* Review: what someone other than the reader wrote here, and what one proposes. The
+	   other hue, and a state's again: drawn in the accent's grey, a proposed word reads as a
+	   code span and a changed field's line as its border, before either reads as someone
+	   else's writing. A figure per pole, as danger's are. Nothing is set in this hue: it runs
+	   under words and along them, and the words over it stay the ink. */
+	--_qm-review: var(--qm-review, light-dark(#4f46e5, #a5b4fc));
 	--_qm-font: var(--qm-font, ui-sans-serif, system-ui, sans-serif);
 	--_qm-font-mono: var(--qm-font-mono, ui-monospace, monospace);
 
@@ -209,6 +215,16 @@
 	   ratio `default` steps the ink. What is drawn over it in the card's colour, the
 	   thumb and the check, holds 3:1 at both poles, at 3.3:1 and 4.2:1. */
 	--_qm-accent-default: color-mix(in oklab, var(--_qm-accent), var(--_qm-bg) 20%);
+	/* The review hue, three ways. `tint` is held under the words a proposal would add and
+	   over a field someone else set, at the strength the accent's own tint is held under
+	   body text plus what a state resting on a well has to clear. `lit` is that tint under
+	   attention: the pointer over the item, the caret in it, a host revealing it. `line` is
+	   the stroke: the line under changed words, the line through the words a proposal
+	   would take, and a changed field's edge, held back so it sits under a link's
+	   underline rather than beside it. */
+	--_qm-review-tint: color-mix(in oklab, var(--_qm-review) 20%, transparent);
+	--_qm-review-lit: color-mix(in oklab, var(--_qm-review) 34%, transparent);
+	--_qm-review-line: color-mix(in oklab, var(--_qm-review) 60%, transparent);
 	/* The danger hue held: what a destructive control fills with where the family's
 	   neutral hover rung would read as one more button. Mixed at the accent tint's
 	   strength, so a held tint is a held tint whichever hue it carries. */
@@ -276,9 +292,9 @@
 	   `visual/controls.css`, since a rung each control reassembles is a scale
 	   only up to the point where it is assembled. One width: focus is the only
 	   state that draws a ring anywhere, so there is no held-back tier under it.
-	   Sub-pixel, because at two it reads as a second border on a card whose every
-	   other stroke is a hairline. */
-	--_qm-ring-width: 1.5px;
+	   Two whole pixels, WCAG 2.4.13's floor: a sub-pixel width rounds down to one
+	   device pixel at 1x density, where the ring is then a hairline beside hairlines. */
+	--_qm-ring-width: 2px;
 	/* Every ring the surface draws, focus and selection alike, which is why the name
 	   carries neither. Assembled here because the parts spelled out at a use site pass
 	   every axis — each reads a rung — while drawing a ring nothing else agrees with. */
@@ -413,11 +429,14 @@
 	   `--qm-font-size` anchors the chrome rung and `label` stands one 1.125 step under
 	   it. The ratio and the weight are fixed conventions, not dials: no consumer tunes
 	   a typographic ratio, and a dial nobody turns is a name every reader still holds.
-	   Two chrome rungs: nothing the chrome names ranks above the value it names, a card
-	   title being body at the mid weight, and a second step below `label` lands near
-	   11px, under a size anything here wants to be read at. */
+	   Two chrome rungs under the body and one over it. A second step below `label` lands
+	   near 11px, under a size anything here wants to be read at. `title` is the card's
+	   name alone, two steps up: a card holds sections whose headers stand at the body,
+	   and one step is the paper's, which reads as a change of register rather than of
+	   rank, so a card and the section inside it read as siblings at it. */
 	--_qm-text-body: var(--qm-font-size, 0.875rem);
 	--_qm-text-label: calc(var(--_qm-text-body) / 1.125);
+	--_qm-text-title: calc(var(--_qm-text-body) * 1.125 * 1.125);
 	/* Paper: the document body answers to the preview's paper where every other
 	   surface here answers to the control beside it, so a rung shared with the chrome
 	   makes a consumer asking for larger prose take larger inputs with it. 16/15 where
@@ -488,6 +507,16 @@
 	font-family: var(--_qm-font);
 	color: var(--_qm-ink);
 	line-height: var(--_qm-leading-body);
+}
+
+/* More contrast steps the two rungs that identify a control rather than a list of
+   selectors: the well's edge to 3:1 against the card at both poles (WCAG 1.4.11),
+   which half the ink over the well clears, and the ring a pixel wider. */
+@media (prefers-contrast: more) {
+	:where([data-qm-root]) {
+		--_qm-well-edge: color-mix(in oklab, var(--_qm-fg) 50%, transparent);
+		--_qm-ring-width: 3px;
+	}
 }
 
 /* Reduced motion collapses the scale, never a list of selectors.

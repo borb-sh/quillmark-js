@@ -132,10 +132,10 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **Editing chrome is per leaf; structural chrome is Svelte in the shell.**
 
-- **The formatting popover answers a selection, never a pointer**, and asks the view it would act on, so it withholds itself over a `text` leaf. Font families come from the host's library, not the quill's.
+- **The formatting popover answers a selection, never a pointer**, and asks the view it would act on, so it withholds itself over a `text` leaf. It takes the focus only by its own key, and then holds it until Escape hands it back to the selection. Font families come from the host's library, not the quill's.
 - **An input rule declines only where its result is unrepresentable or belongs to another gesture**, never on how a quill would render it, since what a quill typesets is not knowable here. Backspace right after a rule takes it back.
 - **An input rule runs the command its slash pick runs**, so a construct's two doors are one implementation and cannot drift apart.
-- **Each body key is one chain of links, innermost surface first**, so the nearest surface answers. A key edits its own block; an item's number is its position and no keystroke writes one; Tab is structural in a body and free for navigation in a one-line field; Escape gives the focus up; no gesture nests past the store's depth bound.
+- **Each body key is one chain of links, innermost surface first**, so the nearest surface answers. A key edits its own block; an item's number is its position and no keystroke writes one; Tab is structural in a body and free for navigation in a one-line field; Escape hands the next Tab or Shift-Tab to the browser, the focus staying in the leaf until that key moves it, and a Tab the body held names that way out beside the leaf; no gesture nests past the store's depth bound. Escape blurring the leaf was rejected: the focus is then drawn nowhere, and Shift-Tab from a blurred body lands back in the body.
 - **A floating surface tracks a live element, never a rect measured once**, so it follows scroll and reflow, and portals into the nearest `[data-qm-root]` so the consumer's dials reach it.
 
 ### Diagnostics
@@ -168,9 +168,29 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **A nested address is a target through its field.** The boundary names elements and cells `Addr` cannot reach, so a landing checks each step against the schema and hands the walk to the field's control, each rung resolving its own step at the point of use.
 
+### Review
+
+**Review is the host's list, drawn in the editor's own flow.** An item is plain data naming an anchor a leaf holds or a field's path, and it draws where that is: a decoration in the leaf, a mark on the control. Nothing is measured from outside a view, so an item rides every edit and reflow, and nothing of it enters the document, the commit, a leaf's history or a collaborator's copy while it stands. Rejected: an overlay laid over the editor, which re-measures on every change and parts from the text it describes; a host render slot, which hands reconciliation to consumer code; and suggestion marks in the content, which every reader of the content would have to know to skip.
+
+**A proposal is drawn and taken from one plan.** The leaf pairs the proposal's blocks with the paragraphs its anchor touches and derives the pieces once: the stretches to replace, the blocks to lift, the blocks to add. The decorations are those pieces drawn, and taking the proposal is those pieces as one transaction, so what lands is what was read. Rejected: the host writing an accepted proposal with the store's block verbs, which place Markdown by rules of their own, so the drawn proposal and the written one part inside a list.
+
+**Who writes follows who holds the words.** A proposal carries what it would write, so taking it is the editor's edit, down the lane a reader's takes: a leaf's transaction, in its history; a field's value, through the typed writer, with the step back offered on the toast. A press that takes one while the focus is elsewhere leaves the caret after what landed, in a focused leaf, so the reader's next ⌘Z is that edit's and not a miss. A change carries at most the words it replaced, to show, so taking one back is the host's write, which alone has the inverse of what it wrote. Turning a proposal down writes nothing.
+
+**A proposal is an edit of the paragraph as it stood when it arrived.** The leaf keeps the blocks a proposal covered when it first drew it, and carries each stretch the proposal rewrites through what was written since: words typed beside a stretch stay outside it, and a word rewritten under one is struck as it now reads. So what the reader writes in the paragraph is neither struck while the proposal stands nor lost when it is taken. The base is the mounted leaf's, by item id, and is read anew when the item arrives with another `after`. Rejected: diffing the paragraph as it stands against `after`, which strikes every word the reader adds and removes it on Accept.
+
+**A paragraph takes one proposal, whole.** The diff inside it is drawn by the word and answered by the paragraph: a sentence taken a word at a time is one nobody proposed and nobody read. The first item naming a paragraph has it.
+
+**An answered item is drawn no more, from the answer.** The leaf and the surface each drop it at the press, until a list arrives without it, so the reader's answer shows at once however long the host takes to hand over the next list.
+
+**A change is the lighter mark and a proposal the stronger, in one hue.** A change is already the document's, so it is a line under its words, or along the foot of its control, and its card comes only to attention; a proposal is not, so its words are struck and tinted where they stand, with its two answers. `--qm-review` is a hue of its own at each pole, beside danger the second the surface spends: in the accent's grey a proposed word reads as a code span and a changed field's line as its border, before either reads as someone else's writing. Nothing is set in the hue; it runs under words and along them.
+
+**The card never takes the focus, and waits a beat for what raises it.** The caret that raised it stays where it was, and neither a pointer crossing a paragraph nor a caret arrowing through a changed word raises one; a host's reveal, being asked for, raises it at once. Escape lowers a card over the leaf's own item before it is any other binding's, so it costs the reader neither the caret nor the focus. One item is under attention at a time, the card's before a revealed one, the caret's before the pointer's.
+
+**A host's step back is one deep and stands until the next edit.** A write the host made for the reader lands outside every leaf's history, so `offerUndo` holds it where a removal's undo is held and gives it ⌘Z anywhere in the editor, a text leaf included, until an edit lands and it is no longer the last thing that happened.
+
 ### Declined
 
-Per-control render slots, which would hand reconciliation to consumer code; a pointer door onto the insert menu; image authoring, which has no asset story; touch as a target, and its accessory bar. Undo is per leaf and per list, never one stack for the document: a list keeps the changes to its rows as steps of its own (ArrayField), and a card removal is the one card op with a step back, offered on the toast.
+Per-control render slots, which would hand reconciliation to consumer code; a pointer door onto the insert menu; image authoring, which has no asset story; touch as a target, and its accessory bar. Undo is per leaf and per list, never one stack for the document: a list keeps the changes to its rows as steps of its own (ArrayField), a card removal is the one card op with a step back, offered on the toast, and that toast holds the one step a field's taken proposal or a host's write leaves (§Review).
 
 ## The codec
 

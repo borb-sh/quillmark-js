@@ -15,6 +15,7 @@
 	import type { LeafRegistry } from './leaves.js';
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
+	import { review } from './review.svelte.js';
 	import './controls.css';
 	import type { Document, Quill, Addr, Content, Diagnostic } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
@@ -106,6 +107,10 @@
 	// locale swap reaches a mounted table without remounting the leaf and losing the caret.
 	const t = wording();
 
+	// The editor's review state: this leaf draws the items whose anchors it holds, and
+	// says which it drew.
+	const reviewing = review();
+
 	/** Pushed by the leaf's trigger plugin: the menu is the leaf's surface rather than
 	 * the shell's (INVARIANTS §Chrome). A constrained leaf never receives one, the
 	 * trigger mounting on the block schema alone. */
@@ -143,9 +148,16 @@
 				cap,
 				tableStrings: () => t.strings,
 				slashStrings: () => t.strings,
+				leaveStrings: () => t.strings,
 				onSlash: (next) => {
 					slash = next;
 				},
+				reviewStrings: () => t.strings,
+				reviewShown: () => reviewing.shown?.item.id,
+				onReviewDismiss: () => reviewing.dismiss(),
+				onReview: (id, action) => reviewing.act(id, action),
+				onReviewPoint: (id, via) => reviewing.point(id, via),
+				onReviewDrawn: (ids) => reviewing.drew(leafKey, ids),
 				onFocus,
 				onCaretMove,
 				onChange,
@@ -175,6 +187,10 @@
 		controller?.setFallback(fallback);
 	});
 
+	$effect(() => {
+		controller?.setReview(reviewing.text, reviewing.lit);
+	});
+
 	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.
 	$effect(() => {
 		void diagnostics;
@@ -199,6 +215,7 @@
 	leaf={() => controller}
 	label={t.strings.slashLabel}
 	name={t.strings.slashName}
+	position={t.strings.slashPosition}
 />
 
 <style>
