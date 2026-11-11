@@ -119,7 +119,11 @@
 			<Icon name="chevron-down" class="qm-select-chevron" />
 		</Select.Trigger>
 		<Select.Portal to={portalTarget}>
-			<Select.Content collisionBoundary={portalTarget ?? []} sideOffset={spacePx(wrapEl)}>
+			<Select.Content
+				collisionBoundary={portalTarget ?? []}
+				strategy="absolute"
+				sideOffset={spacePx(wrapEl)}
+			>
 				<!-- The list portals out of the trigger's DOM but into the nearest
 				     `[data-qm-root]`, and carries the marker itself, like FormatPopover.
 				     That root is the boundary a flip is measured against too, being the box

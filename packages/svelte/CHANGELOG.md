@@ -14,6 +14,8 @@
 
 **No answer raises a toast.** A field's accept no longer stands on a toast; ⌘Z is the way back from every answer. `VisualStrings` no longer extends `ReviewStrings`, and `ReviewStrings` and `DEFAULT_REVIEW_STRINGS` are removed; `reviewAccepted`, `reviewAcceptTitle` and `reviewDismissTitle` give way to `reviewAccept`, `reviewDismiss`, `reviewProposal`, `reviewOutdated`, `reviewPosition`, `reviewNewCard` and `reviewRemoveCard`.
 
+**Floating surfaces scroll with the text.** The formatting popover, the slash menu, an enum's list, a field's guidance and the add-card menu are placed in the editor's own root, which is now positioned, so a pane that scrolls carries them with what they float over instead of re-placing them after each scroll, where they trailed their anchor while the pane moved. A host that positions something absolutely inside the editor's root now places it against that root.
+
 ## v0.35.1 - 2026-11-11
 
 **A field's guidance marker shows at rest.** The ⓘ beside a label with a description past 72 characters stands at the rung a live glyph control rests at, and comes up whole with its field's hover or focus, where it was hidden until then and a reader could not tell the field had guidance.

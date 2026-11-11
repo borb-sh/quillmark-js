@@ -495,6 +495,7 @@
 		<Popover.Content
 			customAnchor={anchor ?? null}
 			collisionBoundary={portalTarget ?? []}
+			strategy="absolute"
 			{side}
 			align="center"
 			trapFocus={false}
