@@ -126,7 +126,7 @@ export interface VisualEditorProps {
 	 */
 	review?: readonly ReviewItem[];
 	/**
-	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-.` with the caret or the
+	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-Backspace` with the caret or the
 	 * focus in it, or a host's `answerReview`; or undid an answer with ⌘Z, `reopen`. The editor has made every write an answer asks for and draws it,
 	 * so the host leaves `review` as it set it.
 	 */

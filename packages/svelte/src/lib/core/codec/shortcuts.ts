@@ -63,7 +63,7 @@ export const TABLE_KEYS = {
  *  through the items from anywhere in the editor. */
 export const REVIEW_KEYS = {
 	accept: 'Mod-Enter',
-	dismiss: 'Mod-.',
+	dismiss: 'Mod-Backspace',
 	next: 'Mod-Alt-ArrowDown',
 	previous: 'Mod-Alt-ArrowUp'
 } as const;
@@ -152,7 +152,7 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutAlignColumn: 'Align a selected column',
 	shortcutDeleteCells: 'Delete the selected cells, rows or columns',
 	shortcutReviewAccept: 'Accept the proposed change',
-	shortcutReviewDismiss: 'Dismiss the proposed change, or undo the change made',
+	shortcutReviewDismiss: 'Dismiss the proposed change',
 	shortcutReviewNext: 'Go to the next review item',
 	shortcutReviewPrevious: 'Go to the previous review item'
 };

@@ -303,7 +303,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	groupReviewed: ', has changes to review',
 	...DEFAULT_REVIEW_STRINGS,
 	reviewAcceptTitle: `Accept (${chord('↵')})`,
-	reviewDismissTitle: `Dismiss (${chord('.')})`,
+	reviewDismissTitle: `Dismiss (${chord('⌫')})`,
 	reviewAccepted: 'Change accepted',
 	reviewEmpty: 'Empty',
 	reviewOn: 'On',

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**⌘/Ctrl+Backspace dismisses a proposal.** `REVIEW_KEYS.dismiss` is `Mod-Backspace`, the key writers coming from AI editors reach for, in place of `Mod-.`. With the caret in a proposal, or the focus in a field holding one, it dismisses rather than deleting to the line's start; anywhere else it deletes as before. The Dismiss button's tooltip and `shortcutReviewDismiss` say so, and `shortcutReviewDismiss` no longer mentions undoing a change made, which the chord stopped doing in v0.35.0.
+
 ## v0.35.1 - 2026-11-11
 
 **A field's guidance marker shows at rest.** The ⓘ beside a label with a description past 72 characters stands at the rung a live glyph control rests at, and comes up whole with its field's hover or focus, where it was hidden until then and a reader could not tell the field had guidance.
