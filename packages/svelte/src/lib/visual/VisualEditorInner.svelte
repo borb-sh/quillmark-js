@@ -1696,6 +1696,7 @@
 					<DropdownMenu.Portal to={rootEl}>
 						<DropdownMenu.Content
 							collisionBoundary={rootEl ?? []}
+							strategy="absolute"
 							sideOffset={spacePx(rootEl)}
 							onCloseAutoFocus={(e) => {
 								if (picked) e.preventDefault();
@@ -1806,6 +1807,9 @@
 	   back to being one block clipped at its edges. That is the page form; a pane's
 	   frame is the host's, and it spends less (`.qm-pane` below). */
 	:global(:where(.qm-editor)) {
+		/* The frame every floating surface is placed in (INVARIANTS §Chrome), so a pane that
+		   scrolls carries them with the text. */
+		position: relative;
 		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;

@@ -136,7 +136,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 - **An input rule declines only where its result is unrepresentable or belongs to another gesture**, never on how a quill would render it, since what a quill typesets is not knowable here. Backspace right after a rule takes it back.
 - **An input rule runs the command its slash pick runs**, so a construct's two doors are one implementation and cannot drift apart.
 - **Each body key is one chain of links, innermost surface first**, so the nearest surface answers. A key edits its own block; an item's number is its position and no keystroke writes one; Tab is structural in a body and free for navigation in a one-line field; Escape hands the next Tab or Shift-Tab to the browser, the focus staying in the leaf until that key moves it, and a Tab the body held names that way out beside the leaf; no gesture nests past the store's depth bound. Escape blurring the leaf was rejected: the focus is then drawn nowhere, and Shift-Tab from a blurred body lands back in the body.
-- **A floating surface tracks a live element, never a rect measured once**, so it follows scroll and reflow, and portals into the nearest `[data-qm-root]` so the consumer's dials reach it.
+- **A floating surface stands in the editor's frame and tracks a live element, never a rect measured once.** It portals into the nearest `[data-qm-root]`, so the consumer's dials reach it, and is placed absolutely in that root, which is positioned, so a pane that scrolls carries the surface with its text and only a reflow asks for a new place. Rejected: fixed placement re-done on each scroll event, which a scroll the compositor runs ahead of leaves a frame behind its anchor for as long as the pane moves.
 
 ### Diagnostics
 
