@@ -22,12 +22,17 @@
 
 	const t = wording();
 
+	/** Where the steps lead, by name and number; a member past a list's last is a new one. */
 	const where = (steps: readonly PathStep[]): string | undefined =>
 		steps.length
 			? steps
-					.map((step) =>
-						typeof step === 'number' ? t.strings.elementItem(step + 1) : humanize(step)
-					)
+					.map((step, i) => {
+						if (typeof step !== 'number') return humanize(step);
+						const list = valueIn(value, steps.slice(0, i));
+						return Array.isArray(list) && step >= list.length
+							? t.strings.reviewNewItem
+							: t.strings.elementItem(step + 1);
+					})
 					.join(' · ')
 			: undefined;
 </script>

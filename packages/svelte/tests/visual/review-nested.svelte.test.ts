@@ -165,7 +165,7 @@ describe('a list’s member', () => {
 		expect(await said(r, ['change', 'drop', 'add'])).toEqual([
 			'A.ADA LOVELACE',
 			'Author',
-			'Item 4: Countess'
+			'New item: Countess'
 		]);
 	});
 

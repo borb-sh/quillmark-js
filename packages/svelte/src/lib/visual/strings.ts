@@ -76,6 +76,8 @@ export interface VisualStrings
 	reviewRemoveCard: string;
 	/** A value that was, or would be, nothing. */
 	reviewEmpty: string;
+	/** Where a proposal adds a list member past the last, on the answer card. */
+	reviewNewItem: string;
 	/** A switch's two values, as a row words them. */
 	reviewOn: string;
 	reviewOff: string;
@@ -317,6 +319,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	reviewNewCard: 'New card',
 	reviewRemoveCard: 'Proposed removal',
 	reviewEmpty: 'Empty',
+	reviewNewItem: 'New item',
 	reviewOn: 'On',
 	reviewOff: 'Off',
 	undoRemoved: (what) => `${what} removed`,
