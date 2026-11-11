@@ -6,9 +6,11 @@
  is the host's bar's.
 
  It sits under the change, right-aligned to the text column the change stands in, and flips
- above it where there is no room below. It never goes under the host's chrome at the pane's foot
- (`inset`), and over a change taller than the pane it stays pinned at the foot while any of the
- change shows. A change is several elements (struck runs, tinted widgets, added blocks, a row
+ above it where there is no room below, keeping clear of the host's chrome at the pane's foot
+ (`inset`). Over a change taller than the pane it stays pinned at the foot while any of the
+ change shows. A change out of the pane keeps its card where it would stand beside it, so the
+ card scrolls out with the text and the pane's edge clips it as it clips the text.
+ A change is several elements (struck runs, tinted widgets, added blocks, a row
  under a control, a card's mark), so the box is their union, read anew on each measure: a leaf
  redraws its decorations as it likes, and a box measured once parts from the text it stood on.
  What it watches is the card holding the change, not the editor: a mutation there, a scroll
@@ -45,7 +47,7 @@
 	let left = $state(0);
 	/** Pinned at the pane's foot, where every scroll moves it, so it follows without a glide. */
 	let pinned = $state(false);
-	/** The change shows in the pane, so the card has somewhere to stand. */
+	/** The change is drawn, so the card has somewhere to stand. */
 	let placed = $state(false);
 	/** Where the focus was when the keyboard entered the card, to hand it back. */
 	let from: HTMLElement | undefined;
@@ -76,6 +78,13 @@
 		return box;
 	}
 
+	/** Whether any of `at` shows in the pane, clear of the host's chrome at its foot. */
+	function inView(at: HTMLElement): boolean {
+		const r = at.getBoundingClientRect();
+		const view = band();
+		return r.bottom > view.top && r.top < view.bottom - inset;
+	}
+
 	function place(): void {
 		const els = parts();
 		const rects = els.map((e) => e.getBoundingClientRect()).filter((r) => r.width || r.height);
@@ -89,10 +98,7 @@
 		const floor = view.bottom - inset - gap;
 		const upper = Math.min(...rects.map((r) => r.top));
 		const lower = Math.max(...rects.map((r) => r.bottom));
-		if (lower < ceil || upper > floor) {
-			placed = false;
-			return;
-		}
+		const shows = lower >= ceil && upper <= floor;
 		const h = el.offsetHeight;
 		const w = el.offsetWidth;
 		const column = (els[0].closest('.qm-field, .qm-card, .qm-review-card-add') ?? root)!;
@@ -106,10 +112,14 @@
 				? below
 				: above >= ceil
 					? above
-					: Math.max(ceil, Math.min(floor - h, below));
+					: !shows
+						? upper > floor
+							? above
+							: below
+						: Math.max(ceil, Math.min(floor - h, below));
 		top = y - at.top + (root?.scrollTop ?? 0);
 		left = left - at.left + (root?.scrollLeft ?? 0);
-		pinned = !fits;
+		pinned = shows && !fits;
 		placed = true;
 	}
 
@@ -170,7 +180,7 @@
 	/** Put the focus on Accept, handing it back to where it was on Escape or an answer. False
 	 *  with no card on show. */
 	export async function enter(): Promise<boolean> {
-		if (!shown || !el) return false;
+		if (!shown || !el || !inView(el)) return false;
 		from = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
 		await tick();
 		el.querySelector<HTMLElement>('.qm-review-card-accept')?.focus({ preventScroll: true });
