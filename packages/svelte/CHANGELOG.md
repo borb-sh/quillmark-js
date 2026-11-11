@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A field's guidance marker shows at rest.** The ⓘ beside a label with a description past 72 characters stands at the rung a live glyph control rests at, and comes up whole with its field's hover or focus, where it was hidden until then and a reader could not tell the field had guidance.
+
+**A field proposal's new words are underlined in forced colours.** Under `forced-colors: active` the words a field proposal would write carry a line under them, as a body proposal's already do, since a high-contrast theme drops the tint that otherwise marks them.
+
 ## v0.35.0 - 2026-11-10
 
 **Accept leaves plain text.** An accepted proposal is drawn no more: the underline under what it wrote, the wedge where it removed words, the mark along a field's control and the card with **Undo** are gone, and so is `'reopen'` as an `answerReview` action and the ⌘/Ctrl+. chord on an accepted change. ⌘Z still takes back the answers given since the reader's last edit, newest first, each reported as `reopen`. A host that offers to take a whole answer back keeps its own snapshot of the document from before it. `onReviewDrawn` drops `order` and `accepted`: `open` is the drawn items in document order. `VisualStrings` drops `reviewUndo`, `reviewUndoTitle`, `reviewChange`, `reviewWas`, `reviewAdded` and `reviewRemoved`, and `ReviewStrings` drops `reviewGone`.

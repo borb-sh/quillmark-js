@@ -126,6 +126,13 @@
 			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-lit),
 			var(--_qm-space-half) 0 0 var(--_qm-review-lit);
 	}
+	/* Forced colours drop the tint, so the proposed words take the line prose's take
+	   (`codec/prose.css`). */
+	@media (forced-colors: active) {
+		.qm-review-ins {
+			text-decoration: underline;
+		}
+	}
 	.qm-review-where {
 		color: var(--_qm-ink-label);
 	}

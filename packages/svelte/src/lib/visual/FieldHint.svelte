@@ -257,13 +257,13 @@
 
 	 It takes no fill either: the surface itself opens on hover.
 
-	 At rest it is absent, a card describing every field otherwise standing a mark
-	 beside each label before anything is touched. It arrives with the
-	 scope that owns its row (the field, the property, the array or matrix, the table
-	 its column heads, the section a lone field is named by), each reached by child
-	 steps so a nested field's marker stays at rest under its container's hover, and
-	 while its surface is open. The keyboard's `Mod-/` and the parked description do not
-	 depend on the lift. */
+	 At rest it stands at the rung a live glyph control rests at, so a reader sees that
+	 guidance exists before touching anything, and it comes up whole with the scope
+	 that owns its row (the field, the property, the array or matrix, the table its
+	 column heads, the section a lone field is named by), each reached by child steps so
+	 a nested field's marker stays at rest under its container's hover, and while its
+	 surface is open. The keyboard's `Mod-/` and the parked description do not depend on
+	 the lift. */
 	.qm-field-hint {
 		/* The marker recedes to the label rung; the surface carries the text. */
 		color: var(--_qm-ink-label);
@@ -271,7 +271,7 @@
 		cursor: help;
 		padding: 0;
 		background: none;
-		opacity: 0;
+		opacity: var(--_qm-opacity-rest);
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	:global(:is(.qm-field, .qm-object-prop):is(:hover, :focus-within) > .qm-field-label-row)
@@ -285,13 +285,6 @@
 	.qm-field-hint:focus-visible,
 	.qm-field-hint[aria-expanded='true'] {
 		opacity: 1;
-	}
-	/* Without a hover there is no lift to wait for, and a tap is the glyph's only door, so
-	 it rests drawn at the rung a live glyph control rests at. */
-	@media (hover: none) {
-		.qm-field-hint {
-			opacity: var(--_qm-opacity-rest);
-		}
 	}
 	/* The lift, the translucency, the blur and the scale-in come from
 	 `.qm-popover-surface` (controls.css). This surface's own is a measure: guidance
