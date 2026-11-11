@@ -160,12 +160,13 @@ const structured = (c: Content): boolean =>
  * What Accept writes over `live`, the value as it reads now: `after` where there is no `before`,
  * or where the reader has changed nothing since; else each change from `before` to `after` carried
  * onto `live`, the reader's own changes kept. Where a change of the reader's meets one of the
- * proposal's, or the value holds more than lines of words, it is `after` whole and outdated.
+ * proposal's, or the value holds more than lines of words, it is `after` whole and outdated, unless
+ * the value already reads as `after`.
  */
 export function planValue(before: Content | undefined, live: Content, after: Content): ValuePlan {
 	if (!before) return { merged: after, outdated: false };
 	const ours = valueChanges(before, live);
-	if (!ours.length) return { merged: after, outdated: false };
+	if (!ours.length || !valueChanges(live, after).length) return { merged: after, outdated: false };
 	const theirs = valueChanges(before, after);
 	if ([before, live, after].some(structured) || theirs.some((p) => ours.some((r) => meet(p, r))))
 		return { merged: after, outdated: true };

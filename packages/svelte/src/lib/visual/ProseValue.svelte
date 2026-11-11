@@ -294,7 +294,7 @@
 										? [
 												valueDiffPlugin(
 													() => drawnProposal,
-													(id, outdated) => reviewing.planned(id, outdated)
+													(id, state) => reviewing.planned(id, state)
 												)
 											]
 										: []

@@ -57,7 +57,7 @@ export type {
 } from './review.js';
 export { wordDiff } from './review-diff.js';
 export { valueDiffPlugin } from './value-diff.js';
-export type { ValueProposal } from './value-diff.js';
+export type { ValueProposal, ValueState } from './value-diff.js';
 export { asContent, planValue, valueChanges } from './value-plan.js';
 export type { ValuePlan, ValueChange } from './value-plan.js';
 export type { DiffHunk } from './review-diff.js';

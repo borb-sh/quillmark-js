@@ -53,3 +53,12 @@ describe('a proposal of words', () => {
 		expect(merged.marks).toEqual([{ type: 'emph', start: 4, end: 7 }]);
 	});
 });
+
+describe('a proposal the reader has already written', () => {
+	it('is not outdated, and writes what the value already reads', () => {
+		expect(plan('The cat sat', 'The dog sat', 'The dog sat')).toEqual({
+			merged: asContent('The dog sat'),
+			outdated: false
+		});
+	});
+});

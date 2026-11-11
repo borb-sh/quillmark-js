@@ -160,7 +160,7 @@
 				onReviewPoint: (id, via) => reviewing.point(id, via),
 				onReviewWriting: (on) => reviewing.writing(on),
 				onReviewDrawn: (report) => reviewing.drew(leafKey, report),
-				onValuePlanned: (id, outdated) => reviewing.planned(id, outdated),
+				onValuePlanned: (id, state) => reviewing.planned(id, state),
 				onFocus,
 				onCaretMove,
 				onChange,

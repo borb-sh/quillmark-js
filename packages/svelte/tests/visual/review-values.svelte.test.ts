@@ -106,6 +106,19 @@ describe('a line of words under a proposal', () => {
 		expect(text(r.doc.getStored('subtitle'))).toBe('A revised document');
 	});
 
+	it('is drawn no more, and reported applied, once the reader has typed it', async () => {
+		const r = review(subtitle);
+		await settle();
+		await r.editor.focusField('main.subtitle');
+		const view = activeView(r.editor);
+		view.dispatch(view.state.tr.insertText('revised ', 3));
+		flushSync();
+		await settle();
+		expect(r.drawn.at(-1)?.open).toEqual([]);
+		expect(r.drawn.at(-1)?.outdated).toEqual([]);
+		expect(r.drawn.at(-1)?.undrawn).toEqual([{ id: 'sub', reason: 'applied' }]);
+	});
+
 	it('is left open by Accept all where it is outdated, the reader’s value kept', async () => {
 		const r = review((doc) => [
 			{ id: 'sub', field: doc.pathFor('subtitle'), before: 'Something else', after: 'New' },

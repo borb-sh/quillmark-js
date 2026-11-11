@@ -25,6 +25,10 @@ export interface ValueProposal {
 	lit: boolean;
 }
 
+/** How a proposal stands against what the leaf holds: drawn and open, drawn and met by the
+ *  reader's writing, or already read as proposed, so its Accept would write nothing. */
+export type ValueState = 'open' | 'outdated' | 'applied';
+
 export const valueDiffKey = new PluginKey<void>('qm-value-diff');
 
 /** `[from, to)` of `c` as a value of its own, one line. */
@@ -50,18 +54,19 @@ function inserted(schema: Schema, c: Content, from: number, to: number): Node {
 function draw(
 	state: EditorState,
 	p: ValueProposal,
-	planned?: (id: string, outdated: boolean) => void
+	planned?: (id: string, state: ValueState) => void
 ): DecorationSet {
 	const scan = scanDoc(state.doc);
 	const live = scanContent(scan);
 	const index = lineIndexOf(scan);
 	const at = (offset: number): number => offsetToPM(index, offset);
 	const { merged, outdated } = planValue(p.before, live, p.after);
-	if (p.before) planned?.(p.id, outdated);
+	const changes = valueChanges(live, merged);
+	planned?.(p.id, !changes.length ? 'applied' : outdated ? 'outdated' : 'open');
 	const decos: Decoration[] = [];
 	const name = { 'data-qm-review': p.id };
 	const lit = p.lit ? ' qm-review-lit' : '';
-	valueChanges(live, merged).forEach(({ at: from, end, from: start, to }, n) => {
+	changes.forEach(({ at: from, end, from: start, to }, n) => {
 		if (end > from)
 			decos.push(
 				Decoration.inline(at(from), at(end), {
@@ -95,11 +100,11 @@ function draw(
 
 /**
  * The plugin, reading the proposal live: a caller that moves it redraws with `setProps`.
- * `planned` hears, on each draw, whether the reader's writing meets the proposal.
+ * `planned` hears, on each draw, how the proposal stands against what the leaf holds.
  */
 export function valueDiffPlugin(
 	read: () => ValueProposal | undefined,
-	planned?: (id: string, outdated: boolean) => void
+	planned?: (id: string, state: ValueState) => void
 ): Plugin {
 	return new Plugin({
 		key: valueDiffKey,

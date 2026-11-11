@@ -13,7 +13,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
 import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
-import { asContent, planValue } from '../core/codec/index.js';
+import { asContent, planValue, type ValueState } from '../core/codec/index.js';
 import {
 	byBlocks,
 	byCard,
@@ -80,9 +80,9 @@ export interface Review {
 	 *  the proposed value accepts it, any other is written and dismisses it, both one answer.
 	 *  False where it could not be made, and the commit is the caller's. */
 	answerWith(id: string, value: unknown): boolean;
-	/** A leaf of words drawing proposal `id` over what it holds: whether the reader's writing
-	 *  meets it, `undefined` once it draws it no more. */
-	planned(id: string, outdated: boolean | undefined): void;
+	/** A leaf of words drawing proposal `id` over what it holds: how it stands against it,
+	 *  `undefined` once it draws it no more. One the leaf already reads as is `applied`. */
+	planned(id: string, state: ValueState | undefined): void;
 	/** What Accept of `item` writes at a place holding `value`: a proposal of words a leaf draws
 	 *  carried onto what the reader wrote since its writer read it, else its `after`. */
 	writes(item: FieldProposal, value: unknown): unknown;
@@ -247,8 +247,8 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return { fields: out, undrawn, moved };
 	});
 	const fields = $derived(placed.fields);
-	/** Each proposal of words a leaf draws, by id: whether the reader's writing meets it. */
-	const carried = new SvelteMap<string, boolean>();
+	/** Each proposal of words a leaf draws, by id: how it stands against what the leaf holds. */
+	const carried = new SvelteMap<string, ValueState>();
 	// A proposal made from a value the field no longer holds would write over the reader's. One a
 	// leaf of words carries is outdated only where the reader's writing meets it.
 	const outdated = $derived.by(() => {
@@ -260,10 +260,17 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				!sameValue(source.valueAt(proposed.field), proposed.before)
 			)
 				out.add(proposed.id);
-		for (const [id, meets] of carried)
-			if (meets) out.add(id);
+		for (const [id, state] of carried)
+			if (state === 'outdated') out.add(id);
 			else out.delete(id);
 		return out;
+	});
+
+	/** The field items no control draws, those a leaf already reads as proposed among them. */
+	const undrawnFields = $derived.by(() => {
+		const applied = [...carried].filter(([, state]) => state === 'applied');
+		if (!applied.length) return placed.undrawn;
+		return [...placed.undrawn, ...applied.map(([id]) => ({ id, reason: 'applied' as const }))];
 	});
 
 	let current = $state<string | undefined>();
@@ -292,7 +299,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			return drawn;
 		},
 		get fieldUndrawn() {
-			return placed.undrawn;
+			return undrawnFields;
 		},
 		get fieldOutdated() {
 			return outdated;
@@ -350,9 +357,9 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			answering(id, action);
 			return true;
 		},
-		planned(id, meets) {
-			if (meets === undefined) carried.delete(id);
-			else if (carried.get(id) !== meets) carried.set(id, meets);
+		planned(id, state) {
+			if (state === undefined) carried.delete(id);
+			else if (carried.get(id) !== state) carried.set(id, state);
 		},
 		writes(item, value) {
 			const text = carried.has(item.id) ? textProposal(item) : undefined;
