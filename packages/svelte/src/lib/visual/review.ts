@@ -5,9 +5,9 @@
 // A proposal carries what it would write, so taking it is the editor's own edit, down the lane a
 // reader's edit takes: what lands is what was drawn, `onChange` reports it, and the reader's undo
 // takes it back.
-import type { Card, PathStep } from '@quillmark/wasm';
+import type { Card, Content, PathStep } from '@quillmark/wasm';
 import type { DocPath, Landing } from '../core/address.js';
-import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/index.js';
+import { asContent, wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/index.js';
 
 /**
  * One proposal. `id` is the host's, unique in the list, and is what every event names.
@@ -387,27 +387,44 @@ export function reviewRuns(before: unknown, after: unknown, words: Words): Revie
 	return out;
 }
 
-/** A proposed value as the text a one-line leaf would hold, `undefined` where it is not text. */
-export function proposedText(after: unknown): string | undefined {
-	if (after == null) return '';
-	if (typeof after === 'string') return after;
-	if (typeof after === 'object' && 'text' in after)
-		return String((after as { text: unknown }).text);
-	return undefined;
+/** A proposal a leaf of words draws over its own value: what it would write, and the value its
+ *  writer read where it says, each as the leaf's content. */
+export interface TextProposal {
+	id: string;
+	after: Content;
+	before?: Content;
 }
 
-/** A proposal its control draws as words over its own value, a line of text's as a word diff and
- *  a number's as the struck and the proposed figures; `undefined` where it draws none. */
-export function wordedProposal(
+/** A proposal over a leaf of words, `undefined` where its values are not words. A cleared value
+ *  is drawn as what Accept leaves: `cleared`, the default that would print, else nothing. */
+export function textProposal(
 	item: FieldProposal | undefined,
-	control: 'text' | 'number' | undefined
+	cleared?: Content
+): TextProposal | undefined {
+	if (!item) return undefined;
+	const after = item.after === undefined && cleared ? cleared : asContent(item.after);
+	const before = 'before' in item ? asContent(item.before) : undefined;
+	if (!after || ('before' in item && !before)) return undefined;
+	return { id: item.id, after, ...(before && { before }) };
+}
+
+/** A number's proposal, drawn over its input as the struck and the proposed figures; `undefined`
+ *  for one that clears it, which the input shows as what Accept leaves. */
+export function numberProposal(
+	item: FieldProposal | undefined
 ): { id: string; after: string } | undefined {
-	if (!item || !control) return undefined;
-	const after =
-		control === 'number'
-			? item.after == null
-				? undefined
-				: String(item.after)
-			: proposedText(item.after);
-	return after === undefined ? undefined : { id: item.id, after };
+	return item && item.after != null ? { id: item.id, after: String(item.after) } : undefined;
+}
+
+/** What a control that shows one value shows while `item` stands: the value Accept would write,
+ *  nothing where it clears the control, which then draws its default or its empty face. */
+export function shownValue(item: FieldProposal | undefined, stored: unknown): unknown {
+	return item ? item.after : stored;
+}
+
+/** Whether a value a reader commits is the one a proposal would write: a blank and an unset value
+ *  are one, since a control cleared over a default commits `''`. */
+export function writesProposed(value: unknown, after: unknown): boolean {
+	const blank = (v: unknown): boolean => v == null || v === '';
+	return blank(value) ? blank(after) : sameValue(value, after);
 }

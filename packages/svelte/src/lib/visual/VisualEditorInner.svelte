@@ -396,9 +396,12 @@
 		writing(on) {
 			writing += on ? 1 : -1;
 		},
-		answer(id, item, action, key) {
+		answer(id, item, action, key, write) {
 			let back: (() => void) | undefined;
-			if (action === 'accept' && item && (onField(item) || byCard(item))) {
+			if (write && item && onField(item)) {
+				back = takeField(item, write);
+				if (!back) return false;
+			} else if (action === 'accept' && item && (onField(item) || byCard(item))) {
 				back = onField(item) ? takeField(item) : takeCard(item);
 				if (!back) return false;
 			}
@@ -473,13 +476,14 @@
 
 	/**
 	 * Take a field's proposal: its value down the lane the field's own control commits by, so
-	 * the writer checks it and `onChange` reports it. A text leaf re-reads what was written. A
-	 * place inside the field is written as the whole value with that place alone changed, down
-	 * the lane an edit of the place takes. Returns the write back to the value it replaced,
-	 * which the journal runs before any older answer's, or `undefined` where the writer refused
-	 * the value, which the field then says as it says any refused commit.
+	 * the writer checks it and `onChange` reports it, or `edit`, the value a reader's own commit
+	 * under it writes. A text leaf re-reads what was written. A place inside the field is written
+	 * as the whole value with that place alone changed, down the lane an edit of the place takes.
+	 * Returns the write back to the value it replaced, which the journal runs before any older
+	 * answer's, or `undefined` where the writer refused the value, which the field then says as it
+	 * says any refused commit.
 	 */
-	function takeField(item: FieldProposal): (() => void) | undefined {
+	function takeField(item: FieldProposal, edit?: { value: unknown }): (() => void) | undefined {
 		const key = reviewed(item.field);
 		if (!key?.field || typeof key.card === 'number') return undefined;
 		const isMain = key.card === undefined;
@@ -496,12 +500,14 @@
 		writing++;
 		try {
 			const before = doc.getStored(addr);
-			let after = item.after;
+			const to = (place: unknown): unknown => (edit ? edit.value : reviewing.writes(item, place));
+			let after: unknown;
 			if (!addrForFieldPath(item.field)) {
 				const steps = reviewing.at(leaf).nested?.find((e) => e.item.id === item.id)?.steps;
 				if (!steps) return undefined;
-				after = valueWith(current(), steps, item.after);
-			}
+				const value = current();
+				after = valueWith(value, steps, to(valueIn(value, steps)));
+			} else after = to(current());
 			if (!write(after)) return undefined;
 			return () => void write(before);
 		} finally {
@@ -1691,7 +1697,12 @@
 	): string[] {
 		if (!span.alive) return [];
 		const order = reviewOrder();
-		const asked = ids === 'all' ? order : order.filter((id) => ids.includes(id));
+		// Accepting every item leaves the outdated ones open: each would write over the reader.
+		const outdated = new Set(ids === 'all' && action === 'accept' ? reviewReport().outdated : []);
+		const asked =
+			ids === 'all'
+				? order.filter((id) => !outdated.has(id))
+				: order.filter((id) => ids.includes(id));
 		const out: string[] = [];
 		const entry: Answered = { ids: [], inverses: [] };
 		batching = entry;
@@ -1858,7 +1869,7 @@
 				const value = fieldValues((isMain ? doc.main : doc.card(at)).payloadItems)[key.field];
 				out.set(leaf, (held = { cardId, isMain, name: key.field, value, ids: [] }));
 			}
-			if (addrForFieldPath(item.field)) held.value = item.after;
+			if (addrForFieldPath(item.field)) held.value = reviewing.writes(item, held.value);
 			else {
 				const steps = leafTargetFor(item.field)?.steps;
 				if (!steps) continue;
@@ -1878,7 +1889,11 @@
 					}
 				}
 				if (!found) continue;
-				held.value = valueWith(held.value, found, item.after);
+				held.value = valueWith(
+					held.value,
+					found,
+					reviewing.writes(item, valueIn(held.value, found))
+				);
 			}
 			held.ids.push(id);
 		}

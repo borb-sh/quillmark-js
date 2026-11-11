@@ -16,6 +16,7 @@
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
 	import { review } from './review.svelte.js';
+	import type { TextProposal } from './review.js';
 	import './controls.css';
 	import type { Document, Quill, Addr, Content, Diagnostic } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
@@ -61,8 +62,8 @@
 		cap?: TextCap;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
-		/** A whole proposed value for a one-line leaf, drawn over its text as a word diff. */
-		proposed?: { id: string; after: string };
+		/** A whole proposed value for a leaf of lines, drawn over its text as a word diff. */
+		proposed?: TextProposal;
 		onFocus?: (addr: Addr) => void;
 		onCaretMove?: (addr: Addr, pos: number) => void;
 		/** A commit landed on this leaf: the prose change lane. */
@@ -159,6 +160,7 @@
 				onReviewPoint: (id, via) => reviewing.point(id, via),
 				onReviewWriting: (on) => reviewing.writing(on),
 				onReviewDrawn: (report) => reviewing.drew(leafKey, report),
+				onValuePlanned: (id, state) => reviewing.planned(id, state),
 				onFocus,
 				onCaretMove,
 				onChange,
@@ -193,6 +195,12 @@
 	});
 	$effect(() => {
 		controller?.setValueProposal(proposed && { ...proposed, lit: reviewing.lit === proposed.id });
+	});
+	$effect(() => {
+		const id = proposed?.id;
+		return () => {
+			if (id !== undefined) reviewing.planned(id, undefined);
+		};
 	});
 
 	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.

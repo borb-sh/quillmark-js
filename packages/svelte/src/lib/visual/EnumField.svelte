@@ -45,6 +45,9 @@
 		optionAllowed?: (value: string) => boolean;
 		/** How a refused option draws: greyed and unpickable, or left out of the list. */
 		enumDisallowed?: 'hide' | 'disable';
+		/** `value` is a proposal's, not the document's: the list marks it, and every pick
+		 *  commits, the proposed member's included, so a pick answers the proposal. */
+		proposing?: boolean;
 	}
 	let {
 		value,
@@ -57,13 +60,16 @@
 		describedBy,
 		onCommit,
 		optionAllowed,
-		enumDisallowed = 'disable'
+		enumDisallowed = 'disable',
+		proposing = false
 	}: Props = $props();
 
 	// The sentinel's option value: a namespaced marker that no schema-authored
 	// enum member would ever be (`values` are classification markings, seal ids, and
 	// the like), so it never collides with a real option.
 	const UNSET = '__qm_unset__';
+	/** What the primitive holds while a proposal stands: no option, so every pick changes it. */
+	const PROPOSED = '__qm_proposed__';
 
 	// Driven controlled (`value` + `onValueChange`, never `bind:`) so reconciliation
 	// stays the package's rather than the primitive's.
@@ -99,9 +105,9 @@
 	<Select.Root
 		type="single"
 		allowDeselect={false}
-		value={local}
+		value={proposing ? PROPOSED : local}
 		onValueChange={(v) => {
-			if (v == null) return;
+			if (v == null || v === PROPOSED) return;
 			local = v;
 			// Sentinel → unset (parent `removeField`, default renders); any real pick
 			// (incl. the default value) → a genuine write.

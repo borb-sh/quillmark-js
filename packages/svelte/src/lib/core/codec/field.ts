@@ -65,7 +65,7 @@ import {
 	type ReviewVia,
 	type TextReview
 } from './review.js';
-import { valueDiffPlugin, type ValueProposal } from './value-diff.js';
+import { valueDiffPlugin, type ValueProposal, type ValueState } from './value-diff.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { dragMovePlugin } from './drag-move.js';
@@ -178,6 +178,9 @@ export interface CreateFieldOpts {
 	 *  whose anchor the leaf holds that it does not draw, each with why. An item whose anchor
 	 *  the leaf does not hold is in neither. */
 	onReviewDrawn?(report: ReviewReport): void;
+	/** On each draw of a whole proposed value, how it stands against what the leaf holds
+	 *  (`value-diff.ts`). */
+	onValuePlanned?(id: string, state: ValueState): void;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new caret offset after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -595,7 +598,13 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			});
 
 	let valueProposal: ValueProposal | undefined;
-	const valueDiff = inline ? valueDiffPlugin(() => valueProposal) : undefined;
+	const valueDiff =
+		inline || plaintext
+			? valueDiffPlugin(
+					() => valueProposal,
+					(id, state) => opts.onValuePlanned?.(id, state)
+				)
+			: undefined;
 
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
@@ -1030,8 +1039,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			if (!valueDiff) return;
 			if (
 				p?.id === valueProposal?.id &&
-				p?.after === valueProposal?.after &&
-				p?.lit === valueProposal?.lit
+				p?.lit === valueProposal?.lit &&
+				JSON.stringify([p?.after, p?.before]) ===
+					JSON.stringify([valueProposal?.after, valueProposal?.before])
 			)
 				return;
 			valueProposal = p;

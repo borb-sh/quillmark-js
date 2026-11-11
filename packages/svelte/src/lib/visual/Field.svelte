@@ -60,7 +60,7 @@
 	import ReviewProposal from './ReviewProposal.svelte';
 	import ReviewRows from './ReviewRows.svelte';
 	import { review } from './review.svelte.js';
-	import { wordedProposal } from './review.js';
+	import { numberProposal, shownValue, textProposal } from './review.js';
 
 	interface Props {
 		field: FieldModel;
@@ -323,23 +323,26 @@
 	 * rather than counted twice.
 	 */
 	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
-	/** A whole proposed value drawn as words over the control's own: a one-line text leaf's
-	 *  as a word diff, a number's as the struck and the proposed figures. */
-	const worded = $derived(
-		wordedProposal(
-			proposed,
-			field.control === 'number'
-				? 'number'
-				: field.control === 'prose' && field.inline
-					? 'text'
-					: undefined
-		)
+	/** A whole proposed value drawn as words over the control's own: a leaf of lines' as a word
+	 *  diff, carried onto what the reader wrote since its writer read it, a number's as the struck
+	 *  and the proposed figures. */
+	const texted = $derived(
+		field.control === 'prose' && (field.inline || field.plaintext)
+			? textProposal(proposed, printed ? (ghost as Content) : undefined)
+			: undefined
 	);
-	/** What a control that cannot draw a proposal as words shows while one stands: the value it
-	 *  would hold, tinted (`ReviewProposal`). */
-	const display = $derived(
-		proposed && !worded && proposed.after !== undefined ? proposed.after : value
-	);
+	const numbered = $derived(field.control === 'number' ? numberProposal(proposed) : undefined);
+	const worded = $derived(texted ?? numbered);
+	/** What a control that cannot draw a proposal as words shows while one stands: the value
+	 *  Accept would write, tinted (`ReviewProposal`), or its default or empty face where Accept
+	 *  clears it. */
+	const display = $derived(proposed && !worded ? shownValue(proposed, value) : value);
+	/** A commit on a control that shows one value answers the proposal on it: the proposed value
+	 *  accepts it, any other dismisses it (INVARIANTS §Review). */
+	function answerOrCommit(v: unknown): void {
+		if (proposed && reviewing.answerWith(proposed.id, v)) return;
+		onCommitScalar(v);
+	}
 	/** The items naming a place inside this field: a record's and a list's own controls draw
 	 *  them where they are, any other's under this one. */
 	const nestedReview = $derived(reviewed.nested);
@@ -393,14 +396,14 @@
 					inline={field.inline}
 					plaintext={field.plaintext}
 					fallback={printed ? (ghost as Content) : undefined}
-					placeholder={none}
+					placeholder={proposed ? undefined : none}
 					emptyUnsets={optional}
 					labelledBy={domIds.label}
 					describedBy={proseDescribedBy}
 					defaultNoteId={defaultId}
 					cap={cap && { ...cap, onCount: (n) => (chars = n) }}
 					{leafKey}
-					proposed={worded}
+					proposed={texted}
 					{onFocus}
 					{onCaretMove}
 					onChange={proseCommitted}
@@ -417,14 +420,15 @@
 					{optional}
 					id={domIds.control}
 					{describedBy}
-					onCommit={onCommitScalar}
+					onCommit={answerOrCommit}
+					proposing={!!proposed}
 					{optionAllowed}
 					{enumDisallowed}
 				/>
 			{:else if field.control === 'variant'}
 				<VariantField
 					bind:this={variantEl}
-					value={value as Record<string, unknown> | undefined}
+					value={display as Record<string, unknown> | undefined}
 					schema={field.schema}
 					{ghostMember}
 					label={field.label}
@@ -436,11 +440,12 @@
 					{optionAllowed}
 					{enumDisallowed}
 					diagnostics={deep}
+					review={nestedReview}
 				/>
 			{:else if field.control === 'number'}
 				<NumberField
 					value={display as number | undefined}
-					proposed={worded}
+					proposed={numbered}
 					integer={baseType(field.schema) === 'integer'}
 					fallback={declared}
 					placeholder={none}
@@ -455,7 +460,7 @@
 					{optional}
 					id={domIds.control}
 					{describedBy}
-					onCommit={onCommitScalar}
+					onCommit={answerOrCommit}
 				/>
 			{:else if field.control === 'date'}
 				<DateField
@@ -465,7 +470,7 @@
 					datetime={baseType(field.schema) === 'datetime'}
 					labelledBy={domIds.label}
 					{describedBy}
-					onCommit={onCommitScalar}
+					onCommit={answerOrCommit}
 				/>
 			{:else if field.control === 'array'}
 				<ArrayField
@@ -514,6 +519,7 @@
 					{contentAt}
 					onCommit={onCommitScalar}
 					diagnostics={deep}
+					review={nestedReview}
 				/>
 			{:else}
 				<TextField
@@ -527,7 +533,7 @@
 			{/if}
 		</div>
 
-		{#if field.control !== 'object' && field.control !== 'array'}
+		{#if !isContainer(field.control)}
 			<ReviewRows entries={nestedReview} />
 		{/if}
 		{#if proposed && !worded}
