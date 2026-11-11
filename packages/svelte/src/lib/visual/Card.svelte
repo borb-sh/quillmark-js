@@ -58,6 +58,9 @@
 		/** Every field in this card registers its landing handle here, which is what the
 		 *  editor's `focusField`/`setCaret` resolve a `DocPath` to. */
 		leaves?: LeafRegistry;
+		/** Words the header carries beside its controls, as a review's tag on a card it would
+		 *  take out. */
+		tag?: string;
 	}
 	let {
 		card,
@@ -72,7 +75,8 @@
 		onCaretMove,
 		onChange,
 		onError,
-		leaves
+		leaves,
+		tag
 	}: Props = $props();
 
 	const reviewing = review();
@@ -246,6 +250,7 @@
 					</span>
 				</div>
 				<div class="qm-card-header-right">
+					{#if tag}<span class="qm-card-tag">{tag}</span>{/if}
 					<CardControls
 						{isFirst}
 						{isLast}
@@ -408,6 +413,7 @@
 	<header class="qm-card-header">
 		<span class="qm-card-title-static">{humanize(card.kind)}</span>
 		<div class="qm-card-header-right">
+			{#if tag}<span class="qm-card-tag">{tag}</span>{/if}
 			<CardControls
 				{isFirst}
 				{isLast}
@@ -493,6 +499,11 @@
 		 so the header sits that far off the card's edge and the rule. */
 		padding-inline: var(--_qm-column);
 		margin-block: calc(-1 * var(--_qm-space-3) / 2);
+	}
+	.qm-card-tag {
+		font-size: var(--_qm-text-label);
+		font-weight: var(--_qm-weight-mid);
+		color: var(--_qm-ink-label);
 	}
 	.qm-card-header-right {
 		display: flex;
