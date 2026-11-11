@@ -49,8 +49,9 @@ jobs:
 
       - name: Read the release from the branch name
         id: release
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          BRANCH="${{ github.event.pull_request.head.ref }}"
           if [[ ! "$BRANCH" =~ ^release/([a-z]+)-v(.+)$ ]]; then
             echo "::error::$BRANCH is not release/<package>-v<version>"
             exit 1
