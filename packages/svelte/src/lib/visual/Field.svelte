@@ -60,8 +60,6 @@
 	import ReviewProposal from './ReviewProposal.svelte';
 	import ReviewRows from './ReviewRows.svelte';
 	import { review } from './review.svelte.js';
-	import { REVIEW_KEYS } from '../core/codec/index.js';
-	import { keydownHandler } from 'prosemirror-keymap';
 
 	interface Props {
 		field: FieldModel;
@@ -318,33 +316,14 @@
 	 * rather than counted twice.
 	 */
 	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
-	// A proposal rests as a row under the control. The focus in the control attends to it, as
-	// the caret in a leaf's words attends to theirs.
+	// A proposal rests as a row under the control. The focus arriving in the control makes it
+	// current, as the caret arriving in a leaf's words makes theirs.
 	const reviewing = review();
 	const reviewed = $derived(reviewing.at(leafKey));
 	const proposed = $derived(reviewed.proposed);
 	/** The items naming a place inside this field: a record's and a list's own controls draw
 	 *  them where they are, any other's under this one. */
 	const nestedReview = $derived(reviewed.nested);
-	/** The chords, with the focus anywhere in the field: the proposal's answers. A prose leaf's
-	 *  own items answer first, in the leaf. */
-	const reviewKeys = keydownHandler({
-		[REVIEW_KEYS.accept]: () => {
-			if (!proposed) return false;
-			reviewing.act(proposed.id, 'accept', true);
-			return true;
-		},
-		[REVIEW_KEYS.dismiss]: () => {
-			if (!proposed) return false;
-			reviewing.act(proposed.id, 'dismiss', true);
-			return true;
-		}
-	});
-	function onReviewKey(e: KeyboardEvent): void {
-		if (e.defaultPrevented || !proposed) return;
-		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
-		if (reviewKeys({} as never, e)) e.preventDefault();
-	}
 
 	const reportFocus = $derived(
 		field.control === 'prose'
@@ -354,9 +333,7 @@
 	);
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<!-- The keydown is a control's, bubbled: the field answers the review chords for it. -->
-<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail} onkeydown={onReviewKey}>
+<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail}>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
@@ -382,9 +359,8 @@
 			{@attach registerControl}
 			onfocusin={(e) => {
 				reportFocus?.(e);
-				if (proposed) reviewing.point(proposed.id, 'caret', leafKey);
+				if (proposed) reviewing.point(proposed.id, 'caret');
 			}}
-			onfocusout={() => proposed && reviewing.point(undefined, 'caret', leafKey)}
 		>
 			{#if field.control === 'prose'}
 				<ProseField
@@ -531,7 +507,7 @@
 			<ReviewRows entries={nestedReview} {value} />
 		{/if}
 		{#if proposed}
-			<ReviewProposal item={proposed} {value} refocus={focusControl} />
+			<ReviewProposal item={proposed} {value} />
 		{/if}
 		{#if scalar}
 			<DiagnosticList {diagnostics} />

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // An answer as a review list, handed to an editor over the document its writer read: every item
-// drawn, none outdated, and the whole list accepted leaves the document as the answer. The host
-// sets the list once and clears it once, and between the two the editor answers it alone.
+// drawn, none outdated, and the whole list accepted leaves the document as the answer, its cards
+// included. The host sets the list once and clears it once, and between the two the editor answers
+// it alone.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import type { ReviewDrawn, ReviewEvent } from '$lib/visual';
@@ -15,7 +16,7 @@ afterEach(unmountAll);
 
 /** A writer's answer over `base`: words of the body and of a block rich text field rewritten
  *  and added, a one-line rich text field, a text cell, a list's member, a record's cell and a
- *  number changed. */
+ *  number changed, a card added and a card taken out. */
 function answered(base: Document): Document {
 	const answer = base.clone();
 	const write = quill().writer(answer);
@@ -34,6 +35,8 @@ function answered(base: Document): Document {
 	answer.applyBlocks({ field: 'abstract' }, [
 		{ op: 'insertAfter', id: answer.blocks({ field: 'abstract' })[0].id, markdown: 'More.' }
 	]);
+	write.addCard('note', {}, 'A note the writer adds.', 1);
+	answer.removeCard(3);
 	return answer;
 }
 
@@ -41,8 +44,7 @@ describe('an answer’s review list', () => {
 	it('is drawn whole over the document its writer read, and accepted it is the answer', async () => {
 		const doc = example();
 		const answer = answered(doc);
-		const { items, cards } = proposalsBetween(quill(), doc, answer);
-		expect(cards).toEqual([]);
+		const { items } = proposalsBetween(quill(), doc, answer);
 		const drawn: ReviewDrawn[] = [];
 		const { editor } = mountEditor(quill(), doc, {
 			review: items,
@@ -64,6 +66,9 @@ describe('an answer’s review list', () => {
 		const want = fieldValues(answer.main.payloadItems);
 		for (const name of ['title', 'subtitle', 'signature_block', 'contributors', 'columns'])
 			expect(sameValue(now[name], want[name]), name).toBe(true);
+		const cards = (d: Document) =>
+			Array.from({ length: d.cardCount }, (_, i) => ({ kind: d.card(i).kind, id: d.card(i).id }));
+		expect(cards(doc)).toEqual(cards(answer));
 	});
 });
 

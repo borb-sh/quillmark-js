@@ -58,12 +58,10 @@ import { DEFAULT_LEAVE_STRINGS, leavePlugin, type LeaveStrings } from './leave.j
 import { FIELD_KEYS, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
 import {
-	DEFAULT_REVIEW_STRINGS,
 	renameBlocks,
 	reviewLayer,
 	type ReviewAction,
 	type ReviewReport,
-	type ReviewStrings,
 	type ReviewVia,
 	type TextReview
 } from './review.js';
@@ -167,12 +165,9 @@ export interface CreateFieldOpts {
 	/** An edit leaving the leaf empty removes the field: an optional cell (`t?`), whose
 	 * unanswered `none` is what the empty leaf draws and an empty answer would hide. */
 	emptyUnsets?: boolean;
-	/** The review layer's wording, read per decoration pass (`review.ts`). */
-	reviewStrings?: () => ReviewStrings;
-	/** A reader answered the review item `id`: a proposal's button or its chord, or an undo
-	 *  that took the answer back, `chord` where a key gave it. A proposal taken is written by
-	 *  then. */
-	onReview?(id: string, action: ReviewAction, chord?: boolean): void;
+	/** The leaf answered the review item `id`, or an undo took the answer back. A proposal
+	 *  taken is written by then. */
+	onReview?(id: string, action: ReviewAction): void;
 	/** The leaf is writing a taken proposal, and is done: the commit between is the answer's. */
 	onReviewWriting?(on: boolean): void;
 	/** The review item under the pointer or holding the caret, `undefined` once it has left.
@@ -559,7 +554,6 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		: reviewLayer({
 				items: () => reviewItems,
 				lit: () => reviewLit,
-				strings: () => opts.reviewStrings?.() ?? DEFAULT_REVIEW_STRINGS,
 				parse: (markdown) => {
 					if (!parsed.has(markdown)) {
 						let node: PMNode | undefined;
@@ -572,7 +566,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 					}
 					return parsed.get(markdown);
 				},
-				act: (id, action, chord) => opts.onReview?.(id, action, chord),
+				act: (id, action) => opts.onReview?.(id, action),
 				writing: (on) => opts.onReviewWriting?.(on),
 				point: (id, via) => opts.onReviewPoint?.(id, via),
 				drew: (report) => opts.onReviewDrawn?.(report)

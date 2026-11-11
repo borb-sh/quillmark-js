@@ -70,9 +70,7 @@
     bar ─► stepReview / answerReview('all', …) ─► onReview per item, the list untouched
     Keep ─► review = []
     ⌘Z ─► the newest answers taken back ─► onReview reopen
-    Auto-accept ─► the first onReviewDrawn listing the items ─► answerReview(the drawn ids
-                   neither outdated nor undrawn, 'accept'), no proposal painted
-    reopen under Auto-accept ─► answerReview([id], 'dismiss'), so ⌘Z is one press
+    the answer card, the review keys ─► the editor's own, on the current item
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -94,7 +92,6 @@
 		CardOp,
 		EditorChange,
 		ReviewDrawn,
-		ReviewEvent,
 		ReviewItem
 	} from '@quillmark/svelte/visual';
 	import type { Delta, RemoteChange, Session } from '@quillmark/collab';
@@ -148,10 +145,6 @@
 	// What the editor draws of the list: the bar counts and walks this, not the list itself, so
 	// its count and the page agree.
 	let reviewDrawn = $state<ReviewDrawn | undefined>();
-	// Whether the reviewer's proposals are accepted as they arrive, and the ids set and not yet
-	// reported, which the first report listing them accepts.
-	let autoAccept = $state(false);
-	let arriving: Set<string> | undefined;
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -331,13 +324,6 @@
 		lastChangeSource = 'remote';
 		scheduleRecompile();
 	}
-	// The reader's answer to a review item. The editor has made any write it asks for and
-	// draws the item as answered, so the list stays as it was set. Under auto-accept a proposal
-	// the reader takes back with ⌘Z is turned down, so the one press takes it back.
-	function handleReview({ id, action }: ReviewEvent): void {
-		if (autoAccept && action === 'reopen')
-			void tick().then(() => editorRef?.answerReview([id], 'dismiss'));
-	}
 	// The review bar, built from the public verbs alone: the reference a host copies.
 	function stepReview(dir: 1 | -1): void {
 		void editorRef?.stepReview(dir);
@@ -348,21 +334,6 @@
 	}
 	function keepAll(): void {
 		reviewItems = [];
-	}
-	// What arrives is accepted once the editor first says it has drawn it, ahead of the next
-	// paint: the drawn ids neither outdated nor undrawn, so a proposal the reader's own writing
-	// meets stays open.
-	function arrive(drawn: ReviewDrawn | undefined, set: boolean): void {
-		if (!drawn || !autoAccept) return;
-		if (set) {
-			const listed = (id: string) => arriving?.has(id);
-			if (!drawn.open.some(listed) && !drawn.undrawn.some(({ id }) => listed(id))) return;
-			arriving = undefined;
-		}
-		const outdated = new Set(drawn.outdated);
-		const undrawn = new Set(drawn.undrawn.map(({ id }) => id));
-		const ids = drawn.open.filter((id) => !outdated.has(id) && !undrawn.has(id));
-		if (ids.length) editorRef?.answerReview(ids, 'accept');
 	}
 	function handleError(err: EditorError): void {
 		lastError = `${err.code}: ${err.message}`;
@@ -451,7 +422,6 @@
 		live = undefined;
 		room = 'none';
 		reviewItems = undefined;
-		arriving = undefined;
 		reviewDrawn = undefined;
 		reviewFocus = 'none';
 		fonts = [];
@@ -554,8 +524,6 @@
 				// A room's document is every tab's, and the items are this page's alone.
 				const { items } = seedReview(doc, quill);
 				reviewItems = items;
-				arriving = new Set(items.map((item) => item.id));
-				autoAccept = params.has('auto');
 			}
 			// The editor binds `doc` and `quill` alone, so it lands here, ahead of the font
 			// suite and the render build; the engine and the session follow behind it.
@@ -800,15 +768,6 @@
 							onmousedown={(e) => e.preventDefault()}
 							onclick={keepAll}>Keep</button
 						>
-						<label class="qm-control review-auto">
-							<input
-								type="checkbox"
-								data-testid="review-auto"
-								bind:checked={autoAccept}
-								onchange={() => arrive(reviewDrawn, false)}
-							/>
-							Auto-accept
-						</label>
 					</span>
 				{/if}
 				<button
@@ -867,13 +826,11 @@
 						onError={handleError}
 						diagnostics={externalDiagnostics}
 						review={reviewItems}
-						onReview={handleReview}
 						onReviewFocus={(id) => {
 							reviewFocus = id ?? 'none';
 						}}
 						onReviewDrawn={(drawn) => {
 							reviewDrawn = drawn;
-							if (arriving) arrive(drawn, true);
 						}}
 						{fonts}
 						{fontLabels}
@@ -971,11 +928,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--qmh-space-2);
-	}
-	.review-auto {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--qmh-space);
 	}
 
 	/* The one pair on the strip whose value is a control rather than a readout, so the

@@ -58,15 +58,19 @@
 	import { createStructuralUndo, setStructuralUndo, type UndoOffer } from './undo.svelte.js';
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
-	import { createReview, setReview } from './review.svelte.js';
+	import { createReview, setReview, type CardAdd } from './review.svelte.js';
 	import {
 		byBlocks,
+		byCard,
 		onField,
+		reviewText,
 		valueIn,
 		valueWith,
+		type CardProposal,
 		type FieldProposal,
 		type ReviewDrawn
 	} from './review.js';
+	import ReviewCard from './ReviewCard.svelte';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import { REVIEW_KEYS, type FieldController, type LeafViews } from '../core/codec/index.js';
 	import {
@@ -129,7 +133,7 @@
 		onReview,
 		onReviewFocus,
 		onReviewDrawn,
-		reviewAdvance = true,
+		reviewInset = 0,
 		class: className,
 		style
 	}: VisualEditorProps = $props();
@@ -167,6 +171,12 @@
 	/** The card keys as they stood when the host set its review list: an item names its card by
 	 *  index into these, so it stays on that card through every card op since. */
 	let listed: { list: VisualEditorProps['review']; cards: readonly string[] } | undefined;
+	/** A card the list named, taken out and put back under a new key, is still the card it
+	 *  named. */
+	function relist(was: string, now: string): void {
+		const held = cardsListed();
+		listed = { list: review, cards: held.map((key) => (key === was ? now : key)) };
+	}
 	function cardsListed(): readonly string[] {
 		const held = listed;
 		if (held && held.list === review) return held.cards;
@@ -317,17 +327,19 @@
 		const addr = nearestAddrForFieldPath(path);
 		return addr && declaredField(addr) ? resolveCardKey(addr, cardIds) : undefined;
 	};
-	/** Take a field's answer back: the value it replaced written back, if any, and the item
-	 *  reopened. */
+	/** Take a field's or a card's answer back: what it wrote taken back, if anything, and the
+	 *  item reopened and brought into view, where no leaf's own undo scrolls to it. */
 	const giveBack = (id: string, leaf: string, back?: () => void): void => {
 		back?.();
 		reviewing.heard(id, 'reopen', leaf);
+		void reveal(id, false, true);
 	};
 	/** The host's list with each card it names by index moved to where that card stands now. */
 	const reviewItems = $derived.by(() => {
 		const was = cardsListed();
 		if (!review?.length || was === cardIds) return review;
 		return review.map((item) => {
+			if (byCard(item)) return item;
 			const field = cardMoved(item.field, was, cardIds);
 			return field === item.field ? item : { ...item, field };
 		});
@@ -361,24 +373,28 @@
 				addr.field == null ? resolveCardKey({ card: addr.card }, cardIds) : reviewed(path);
 			return key && fieldKeyToString(key);
 		},
-		chorded(id) {
-			if (!reviewAdvance) return;
-			const index = drewOrder.indexOf(id);
-			void tick().then(() => {
-				if (span.alive) void step(1, true, index < 0 ? undefined : { id, index });
-			});
+		listedCards: () => cardsListed(),
+		liveCards: () => cardIds,
+		answered(id, current) {
+			if (!current) return;
+			if (batching) advancing = id;
+			else advanceFrom(id, drewOrder);
 		},
 		writing(on) {
 			writing += on ? 1 : -1;
 		},
 		answer(id, item, action, key) {
 			let back: (() => void) | undefined;
-			if (action === 'accept' && item && onField(item)) {
-				back = takeField(item);
+			if (action === 'accept' && item && (onField(item) || byCard(item))) {
+				back = onField(item) ? takeField(item) : takeCard(item);
 				if (!back) return false;
 			}
 			onReview?.({ id, action });
 			if (action !== 'accept' && action !== 'dismiss') return true;
+			if (item && byCard(item)) {
+				record(id, () => giveBack(id, '', back));
+				return true;
+			}
 			const field = item && onField(item) ? reviewed(item.field) : undefined;
 			const leaf = key ?? (field && fieldKeyToString(field));
 			if (leaf === undefined) return true;
@@ -389,8 +405,7 @@
 					? action === 'accept'
 						? () => void leaves.prose(leaf)?.undoReview()
 						: () => void leaves.prose(leaf)?.reopenReview(id)
-					: () => giveBack(id, leaf, back),
-				back && merged.reviewAccepted
+					: () => giveBack(id, leaf, back)
 			);
 			return true;
 		}
@@ -403,8 +418,6 @@
 	interface Answered {
 		ids: string[];
 		inverses: (() => void)[];
-		/** The toast it stands on; none where the key alone takes it back. */
-		notice?: string;
 	}
 	let journal: Answered[] = [];
 	/** The entry a batch of answers records into. */
@@ -419,13 +432,7 @@
 	}
 	function offerJournal(): void {
 		const top = journal.at(-1);
-		journalOffer =
-			top &&
-			undo.offer(top.notice ?? '', unanswer, {
-				standing: true,
-				quiet: top.notice === undefined,
-				answer: true
-			});
+		journalOffer = top && undo.offer('', unanswer, { standing: true, quiet: true, answer: true });
 	}
 	function unanswer(): void {
 		const top = journal.pop();
@@ -438,7 +445,7 @@
 		}
 		offerJournal();
 	}
-	function record(id: string, inverse: () => void, notice?: string): void {
+	function record(id: string, inverse: () => void): void {
 		if (batching) {
 			batching.ids.push(id);
 			batching.inverses.push(inverse);
@@ -447,7 +454,7 @@
 		// Another step took the key since: the answers before it are no longer the last thing
 		// that happened.
 		if (!journalOffer || !undo.holds(journalOffer)) journal = [];
-		journal.push({ ids: [id], inverses: [inverse], notice });
+		journal.push({ ids: [id], inverses: [inverse] });
 		offerJournal();
 	}
 
@@ -495,15 +502,111 @@
 			return fieldValues((isMain ? doc.main : doc.card(at)).payloadItems)[name];
 		}
 	}
+	/**
+	 * Take a card proposal: the card written or taken out as the editor's own card edit, which
+	 * `onChange` reports with its op. A new card is written with its `$id` where no card holds
+	 * that one, after the card it stands after as drawn. Returns the edit's inverse, which the
+	 * journal runs before any older answer's: a removal puts the card back where it stood, and
+	 * the list still names it. `undefined` where there is nothing to write.
+	 */
+	function takeCard(item: CardProposal): (() => void) | undefined {
+		if ('remove' in item) {
+			const key = cardsListed()[item.remove];
+			const at = key === undefined ? -1 : cardIndexOf(key);
+			if (at < 0) return undefined;
+			const card = doc.card(at);
+			doc.removeCard(at);
+			undo.withdraw();
+			arm.arm();
+			setCards(cardIds.filter((_, k) => k !== at));
+			forget(key);
+			bump('structure', key, undefined, { op: 'remove', at });
+			return () => {
+				const i = Math.min(at, cardIds.length);
+				if (!placeCard(card, i)) return;
+				const back = seq.next();
+				relist(key, back);
+				arm.arm();
+				setCards([...cardIds.slice(0, i), back, ...cardIds.slice(i)]);
+				bump('structure', back, i, { op: 'insert', at: i });
+			};
+		}
+		const lead = [...reviewing.cards.adds].find(([, list]) =>
+			list.some((a) => a.id === item.id)
+		)?.[0];
+		if (lead === undefined) return undefined;
+		const at = lead === 'head' ? 0 : lead === 'end' ? cardIds.length : cardIndexOf(lead) + 1;
+		if (at < 0 || !placeCard(item.add, at)) return undefined;
+		const key = seq.next();
+		arm.arm();
+		setCards([...cardIds.slice(0, at), key, ...cardIds.slice(at)]);
+		reviewing.wrote(item.id, key);
+		bump('structure', key, at, { op: 'insert', at });
+		return () => {
+			const i = cardIndexOf(key);
+			reviewing.wrote(item.id, undefined);
+			if (i < 0) return;
+			doc.removeCard(i);
+			arm.arm();
+			setCards(cardIds.filter((_, k) => k !== i));
+			forget(key);
+			bump('structure', key, undefined, { op: 'remove', at: i });
+		};
+	}
+	/** Write `card` into the document at `at`, with its `$id` where no card holds that one. */
+	function placeCard(card: CardAdd['add'], at: number): boolean {
+		const { id, ...bare } = card;
+		const free = id !== undefined && !cardIds.some((_, k) => doc.card(k).id === id);
+		try {
+			try {
+				doc.unchecked.insertCard(free ? card : bare, at);
+			} catch (e) {
+				if (!free) throw e;
+				doc.unchecked.insertCard(bare, at);
+			}
+			return true;
+		} catch (e) {
+			reportError(onError, {
+				code: 'card-op-failed',
+				severity: 'error',
+				message: `adding a ${card.kind} card failed: ${errorMessage(e)}`,
+				cause: e
+			});
+			return false;
+		}
+	}
+	/** What a new card's preview shows: the title its header would, and the start of its body,
+	 *  else its values as words. */
+	function previewOf(item: CardAdd): { title: string; text: string } {
+		const { add } = item;
+		const schema = quill.schema.card_kinds?.[add.kind];
+		const values = fieldValues(add.payloadItems);
+		const named = (add.ext?.editor as { title?: unknown } | undefined)?.title;
+		const title = cardTitle(
+			schema,
+			add.kind,
+			values,
+			typeof named === 'string' ? named : undefined
+		);
+		const words = { on: merged.reviewOn, off: merged.reviewOff };
+		const text =
+			add.body?.text?.trim() ||
+			Object.values(values)
+				.map((v) => reviewText(v, words))
+				.filter(Boolean)
+				.join(' · ');
+		return { title, text };
+	}
 	setReview(reviewing);
 	span.onEnd(reviewing.dispose);
-	// The lit item, to a host lighting its own list: each change, and not the nothing a mount
-	// starts from.
+	// The current change, to a host counting its place: each change, and not the nothing a
+	// mount starts from.
 	let reported: string | undefined;
 	$effect(() => {
 		const id = reviewing.lit;
 		if (id === reported) return;
 		reported = id;
+		typing = false;
 		onReviewFocus?.(id);
 	});
 	/** The open items drawn, in document order: each id's first element under the root, then
@@ -514,6 +617,8 @@
 		for (const report of reviewing.reports.values()) for (const id of report.ids) drawn.add(id);
 		for (const item of reviewing.items)
 			if (onField(item) && !fieldUndrawn.has(item.id)) drawn.add(item.id);
+		for (const list of reviewing.cards.adds.values()) for (const item of list) drawn.add(item.id);
+		for (const item of reviewing.cards.removes.values()) drawn.add(item.id);
 		const order: string[] = [];
 		const seen = new Set<string>();
 		const take = (id: string | null): void => {
@@ -555,13 +660,17 @@
 		};
 	}
 	// The report, to a host counting its own list: each change, read once the leaves the change
-	// mounted have drawn, so a list just handed over is not reported as anchored nowhere.
+	// mounted have drawn, so a list just handed over is not reported as anchored nowhere. A
+	// review starts on its first change, and goes on to the first open one wherever the current
+	// one went without an answer moving it on.
 	const NO_REPORT = JSON.stringify({ open: [], outdated: [], undrawn: [] } satisfies ReviewDrawn);
 	let drewReport = NO_REPORT;
-	let drewOrder: readonly string[] = [];
+	let drewOrder = $state.raw<readonly string[]>([]);
+	let drewOutdated = $state.raw<readonly string[]>([]);
 	$effect(() => {
 		void reviewing.items;
 		void reviewing.fieldUndrawn;
+		void reviewing.cards;
 		for (const id of reviewing.fieldOutdated) void id;
 		for (const report of reviewing.reports.values()) void report;
 		let live = true;
@@ -569,6 +678,8 @@
 			if (!live || !span.alive) return;
 			const report = reviewReport();
 			drewOrder = report.open;
+			drewOutdated = report.outdated;
+			if (reviewing.lit === undefined && report.open.length) reviewing.reveal(report.open[0]);
 			const joined = JSON.stringify(report);
 			if (joined === drewReport) return;
 			drewReport = joined;
@@ -578,45 +689,133 @@
 			live = false;
 		};
 	});
+	/** The current change answered by a host's batch, to move on from once the batch is done. */
+	let advancing: string | undefined;
+	/**
+	 * Make the next open change current after `id`'s answer, in `order` as it stood before the
+	 * answer, round from the end. The pane scrolls only where that change is out of comfortable
+	 * view, and neither the focus nor the caret moves.
+	 */
+	function advanceFrom(id: string, order: readonly string[]): void {
+		const open = new Set(reviewing.items.map((item) => item.id));
+		const at = order.indexOf(id);
+		const next = [...order.slice(at + 1), ...order.slice(0, Math.max(at, 0))].find((n) =>
+			open.has(n)
+		);
+		if (next === undefined) return;
+		typing = false;
+		reviewing.reveal(next);
+		void reveal(next, false, true);
+	}
 	/** The item a step last went to, and where it stood in the order then, so a step from an
 	 *  item since answered goes on from its place. */
 	let stepped: { id: string; index: number } | undefined;
-	async function step(
-		dir: 1 | -1,
-		focus: boolean,
-		from?: { id: string; index: number }
-	): Promise<string | undefined> {
+	async function step(dir: 1 | -1, focus: boolean): Promise<string | undefined> {
 		if (!span.alive) return undefined;
 		const order = reviewOrder();
 		if (!order.length) return undefined;
-		const at = from ? -1 : order.indexOf(reviewing.lit ?? stepped?.id ?? '');
-		const past = from ?? stepped;
+		const at = order.indexOf(reviewing.lit ?? stepped?.id ?? '');
 		const next =
-			at >= 0 ? at + dir : past ? (dir > 0 ? past.index : past.index - 1) : dir > 0 ? 0 : -1;
+			at >= 0
+				? at + dir
+				: stepped
+					? dir > 0
+						? stepped.index
+						: stepped.index - 1
+					: dir > 0
+						? 0
+						: -1;
 		const index = ((next % order.length) + order.length) % order.length;
 		const id = order[index];
 		stepped = { id, index };
+		typing = false;
 		await reveal(id, focus, true);
 		return id;
 	}
-	const stepKeys = keydownHandler({
+
+	// ── The review keys: the editor's wherever the focus is while a review is open ──────
+	/** Answer the current change, as its card would. False with none open. */
+	function answerCurrent(action: 'accept' | 'dismiss'): boolean {
+		const id = reviewing.lit;
+		return id !== undefined && answerReview([id], action).length > 0;
+	}
+	/** Whether a key at `target` is the review's: anywhere but a text control outside the editor,
+	 *  which keeps its own keys, or another editor. */
+	function reviewHears(target: EventTarget | null): boolean {
+		if (!(target instanceof Element) || !rootEl) return false;
+		if (rootEl.contains(target)) return true;
+		if (target.closest('.qm-editor')) return false;
+		return !target.closest('input, textarea, select, [contenteditable="true"]');
+	}
+	let answerCard = $state<ReviewCard | undefined>();
+	const reviewKeys = keydownHandler({
+		[REVIEW_KEYS.accept]: () => answerCurrent('accept'),
+		[REVIEW_KEYS.dismiss]: () => answerCurrent('dismiss'),
 		[REVIEW_KEYS.next]: () => {
-			void step(1, true);
+			void step(1, inside);
 			return true;
 		},
 		[REVIEW_KEYS.previous]: () => {
-			void step(-1, true);
+			void step(-1, inside);
+			return true;
+		},
+		'Alt-F10': () => {
+			if (!answerCard || document.getSelection()?.isCollapsed === false) return false;
+			void answerCard.enter();
 			return true;
 		}
 	});
-	/** The step chords, from anywhere under the root, ahead of a leaf's own arrows. */
-	function onStepKey(e: KeyboardEvent): void {
-		if (e.isComposing || !reviewing.items.length) return;
+	/** Whether the key being matched was pressed inside the editor, where a step takes the caret
+	 *  with it. */
+	let inside = false;
+	/** The review keys, captured on the document ahead of every other binding of them: a task
+	 *  item's tick, a leaf's arrows, a host's own. */
+	function onReviewKey(e: KeyboardEvent): void {
+		if (e.isComposing || reviewing.lit === undefined || !reviewHears(e.target)) return;
+		inside = !!rootEl?.contains(e.target as Node);
 		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
-		if (!stepKeys({} as never, e)) return;
+		if (!reviewKeys({} as never, e)) return;
 		e.preventDefault();
 		e.stopPropagation();
 	}
+
+	/** The reader is typing: the card keeps out of the way until the pointer moves or the
+	 *  current change does. */
+	let typing = $state(false);
+	let pointerAt = { x: NaN, y: NaN };
+	function onTyped(e: KeyboardEvent): void {
+		if (reviewing.lit === undefined || e.metaKey || e.ctrlKey || e.altKey) return;
+		if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter')
+			typing = true;
+	}
+	function onPointerMove(e: PointerEvent): void {
+		if (!typing) {
+			pointerAt = { x: e.clientX, y: e.clientY };
+			return;
+		}
+		const moved = Math.abs(e.clientX - pointerAt.x) + Math.abs(e.clientY - pointerAt.y);
+		pointerAt = { x: e.clientX, y: e.clientY };
+		if (moved >= MOVED_PX) typing = false;
+	}
+	/** How far, in px, the pointer moves before it means to: a hand resting on a trackpad
+	 *  jitters by less. */
+	const MOVED_PX = 3;
+	/** A press on a change makes it current at once. */
+	function onPick(e: PointerEvent): void {
+		const id = (e.target as Element | null)
+			?.closest?.('[data-qm-review]')
+			?.getAttribute('data-qm-review');
+		if (id && reviewing.items.some((item) => item.id === id)) {
+			typing = false;
+			reviewing.reveal(id);
+		}
+	}
+	/** Where the current change stands, for a screen reader to hear on each step. */
+	const reviewPlace = $derived.by(() => {
+		const id = reviewing.lit;
+		const at = id === undefined ? -1 : drewOrder.indexOf(id);
+		return at < 0 ? '' : merged.reviewPosition(at + 1, drewOrder.length);
+	});
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
 	// cannot do, since which group is open is the card's state (Card §revealLeaf).
 	type CardHandle = {
@@ -1393,48 +1592,81 @@
 	// ── Review ──────────────────────────────────────────────────────────────────
 
 	/**
-	 * Bring the review item `id` to the reader: open the panel holding it, scroll it to the
-	 * middle of the view, and light it. The focus stays where it is, the reader having asked
-	 * to look, unless `focus` asks for it: the caret then goes into the item, or the focus to
-	 * its field, so the chords answer it. False for an item the editor does not draw.
+	 * Bring the review item `id` to the reader as the current change: open the panel holding
+	 * it and scroll it to the middle of the view. The focus stays where it is, the reader having
+	 * asked to look, unless `focus` asks for it: the caret then goes into the item, or the focus
+	 * to its field. False for an item the editor does not draw.
 	 */
 	export function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
 		return reveal(id, opts.focus ?? false, false);
 	}
-	/** {@link revealReview}; a step scrolls an item only as far as its scroller must to show it,
-	 *  so a walk down neighbouring items does not jump the page under each, and an item in a
-	 *  pane that scrolls on its own is shown by that pane. */
+	/** {@link revealReview}; a step scrolls only where the item is out of comfortable view, room
+	 *  for the answer card under it included, so a walk down neighbouring items moves the card
+	 *  and not the page, and an item in a pane that scrolls on its own is shown by that pane. */
 	async function reveal(id: string, focus: boolean, stepping: boolean): Promise<boolean> {
 		if (!span.alive) return false;
 		const key = reviewing.keyOf(id);
-		if (key === undefined) return false;
-		mainCard?.revealLeaf(key);
-		for (const card of cardRefs) card?.revealLeaf(key);
+		const card = byCardId(id);
+		if (key === undefined && !card) return false;
+		if (key !== undefined) {
+			mainCard?.revealLeaf(key);
+			for (const ref of cardRefs) ref?.revealLeaf(key);
+		}
 		if (!(await span.resumes(tick()))) return false;
 		reviewing.reveal(id);
-		if (focus && !leaves.prose(key)?.enterReview(id)) leaves.control(key)?.focus();
-		// The lit item is drawn again, so its element is read once it has been.
+		if (focus && key !== undefined && !leaves.prose(key)?.enterReview(id))
+			leaves.control(key)?.focus();
+		// The current item is drawn again, so its element is read once it has been.
 		if (!(await span.resumes(tick()))) return false;
+		const els = [...(rootEl?.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].filter(
+			(el) => el.getAttribute('data-qm-review') === id
+		);
 		const at =
-			leaves.prose(key)?.reviewElements(id)[0] ??
-			[...(rootEl?.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].find(
-				(el) => el.getAttribute('data-qm-review') === id
-			) ??
-			leaves.control(key)?.el;
+			(key !== undefined ? leaves.prose(key)?.reviewElements(id)[0] : undefined) ??
+			els[0] ??
+			(key !== undefined ? leaves.control(key)?.el : undefined);
+		if (!at || (stepping && comfortable(els.length ? els : [at]))) return true;
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-		at?.scrollIntoView({
-			behavior: reduce ? 'auto' : 'smooth',
-			block: stepping ? 'nearest' : 'center'
-		});
+		at.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
 		return true;
 	}
+	/** Whether the open card item `id` is drawn. */
+	function byCardId(id: string): boolean {
+		for (const list of reviewing.cards.adds.values())
+			if (list.some((a) => a.id === id)) return true;
+		for (const item of reviewing.cards.removes.values()) if (item.id === id) return true;
+		return false;
+	}
+	/** Whether `els` stand in the view the editor scrolls in, clear of the host's chrome at its
+	 *  foot, with the answer card's room under them. */
+	function comfortable(els: readonly HTMLElement[]): boolean {
+		const rects = els.map((el) => el.getBoundingClientRect()).filter((r) => r.width || r.height);
+		if (!rects.length) return false;
+		let top = 0;
+		let bottom = window.innerHeight;
+		for (let at = rootEl ?? null; at; at = at.parentElement) {
+			const { overflowY } = getComputedStyle(at);
+			if (overflowY !== 'auto' && overflowY !== 'scroll') continue;
+			const box = at.getBoundingClientRect();
+			top = Math.max(box.top, 0);
+			bottom = Math.min(box.bottom, window.innerHeight);
+			break;
+		}
+		const room = (spacePx(rootEl, 1) ?? 0) * CARD_ROOM;
+		return (
+			Math.min(...rects.map((r) => r.top)) >= top &&
+			Math.max(...rects.map((r) => r.bottom)) <= bottom - reviewInset - room
+		);
+	}
+	/** The room the answer card takes under a change, in `--_qm-space` rungs. */
+	const CARD_ROOM = 7;
 
 	/**
-	 * Answer items as their buttons would, in document order: `'all'` is every item drawn. An
+	 * Answer items as the answer card would, in document order: `'all'` is every item drawn. An
 	 * item that cannot be answered (a proposal that no longer writes, a value the field's writer
-	 * refuses) stands. `onReview` hears each answer, and neither the focus nor the caret moves.
-	 * The batch raises no toast, the host's to word if it wants one, and ⌘Z takes it back whole.
-	 * Returns the ids answered.
+	 * refuses) stands. `onReview` hears each answer, and neither the focus nor the caret moves;
+	 * where the current change is answered, the next open one is current. ⌘Z takes the call
+	 * back whole. Returns the ids answered.
 	 */
 	export function answerReview(
 		ids: readonly string[] | 'all',
@@ -1453,9 +1685,10 @@
 				if (!item) continue;
 				const key = reviewing.keyOf(id);
 				// Each one is planned against the document the one before it left.
-				const answered = !onField(item)
-					? key !== undefined && !!leaves.prose(key)?.answerReview(id, action)
-					: reviewing.act(id, action);
+				const answered =
+					onField(item) || byCard(item)
+						? reviewing.act(id, action)
+						: key !== undefined && !!leaves.prose(key)?.answerReview(id, action);
 				if (answered) out.push(id);
 			}
 		} finally {
@@ -1467,13 +1700,15 @@
 			journal.push(entry);
 			offerJournal();
 		}
+		const from = advancing;
+		advancing = undefined;
+		if (from !== undefined) advanceFrom(from, order);
 		return out;
 	}
 
-	/** Bring the next or previous open item to the reader, in document order and round from
-	 *  either end, from the lit item or the one last stepped to: the caret in it, or the
-	 *  focus in its field, unless `focus` is false. Resolves its id, `undefined` when none is
-	 *  drawn. */
+	/** Make the next or previous open item current, in document order and round from either
+	 *  end, from the current item or the one last stepped to: the caret in it, or the focus in
+	 *  its field, unless `focus` is false. Resolves its id, `undefined` when none is drawn. */
 	export function stepReview(
 		dir: 1 | -1,
 		opts: { focus?: boolean } = {}
@@ -1548,7 +1783,13 @@
 	}
 </script>
 
-<svelte:document onkeydowncapture={onUndoKey} />
+<svelte:document
+	onkeydowncapture={(e) => {
+		onReviewKey(e);
+		if (!e.defaultPrevented) onUndoKey(e);
+	}}
+	onpointermove={onPointerMove}
+/>
 
 <!-- The keydown is a control's, bubbled: the root resolves which description it raises.
      A file dragged over or dropped is refused here, after any control has seen it. -->
@@ -1558,7 +1799,8 @@
 	{style}
 	data-qm-root
 	bind:this={rootEl}
-	onkeydowncapture={onStepKey}
+	onkeydowncapture={onTyped}
+	onpointerdowncapture={onPick}
 	onkeydown={raiseGuidance}
 	ondragover={refuseFiles}
 	ondrop={refuseFiles}
@@ -1592,32 +1834,64 @@
 		{/if}
 	</div>
 
+	{@render cardsAdded('head')}
 	{@render addAffordance(0)}
 	<!-- A card and the gap under it are one slot, which is what a reorder moves: the
 	 strip below a card is the same strip wherever the card lands, so it rides along
 	 rather than being slid across. It is also the shape `animate:` asks for, being the
 	 keyed block's only child. -->
 	{#each model.cards as c, i (c.id)}
+		{@const removal = reviewing.cards.removes.get(c.id)}
 		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed} in:slot out:slot>
-			<Card
-				bind:this={cardRefs[i]}
-				card={titled(c)}
-				{doc}
-				{quill}
-				isFirst={i === 0}
-				isLast={i === model.cards.length - 1}
-				{kinds}
-				ops={opsFor(c.id, false)}
-				{enumDisallowed}
-				onFocus={handleFocus}
-				onCaretMove={handleCaret}
-				onChange={proseChanged}
-				{onError}
-				{leaves}
-			/>
+			<!-- A removal's mark wraps the whole card it would take out, so the answer card
+			 stands under the card and not on it. -->
+			<div
+				class={[
+					'qm-review-card-remove',
+					{ 'qm-review-on': !!removal, 'qm-review-lit': !!removal && reviewing.lit === removal.id }
+				]}
+				data-qm-review={removal?.id}
+				role={removal ? 'group' : undefined}
+				aria-label={removal ? merged.reviewRemoveCard : undefined}
+				onpointerenter={removal && (() => reviewing.point(removal.id, 'pointer'))}
+				onpointerleave={removal && (() => reviewing.point(undefined, 'pointer'))}
+			>
+				{#if removal}
+					<span class="qm-review-card-tag">{merged.reviewRemoveCard}</span>
+				{/if}
+				<Card
+					bind:this={cardRefs[i]}
+					card={titled(c)}
+					{doc}
+					{quill}
+					isFirst={i === 0}
+					isLast={i === model.cards.length - 1}
+					{kinds}
+					ops={opsFor(c.id, false)}
+					{enumDisallowed}
+					onFocus={handleFocus}
+					onCaretMove={handleCaret}
+					onChange={proseChanged}
+					{onError}
+					{leaves}
+				/>
+			</div>
+			{@render cardsAdded(c.id)}
 			{@render addAffordance(i + 1)}
 		</div>
 	{/each}
+	{@render cardsAdded('end')}
+	<ReviewCard
+		bind:this={answerCard}
+		id={reviewing.lit}
+		root={rootEl}
+		inset={reviewInset}
+		hidden={typing}
+		outdated={reviewing.lit !== undefined && drewOutdated.includes(reviewing.lit)}
+		onAnswer={answerCurrent}
+		onHover={(on) => reviewing.hoverCard(on)}
+	/>
+	<div class="qm-visually-hidden" role="status">{reviewPlace}</div>
 	<!-- The way back to a removed card once its toast has gone: the newest kept step, by
 	 name, at the stack's foot, where the control that adds a card is looked for. -->
 	{#if undo.kept}
@@ -1662,6 +1936,34 @@
  neither dropped nor trapped. The gate lives here rather than at each call site: the
  strip is one decision, and two copies of it drift into a stack with a gap at one
  end. -->
+<!-- The cards proposed new after the card at `lead`, each a preview where it would stand: its
+ kind's title, its own title or the words that name it, and the start of its body. -->
+{#snippet cardsAdded(lead: string)}
+	{@const adds = reviewing.cards.adds.get(lead)}
+	{#if adds?.length}
+		<div class="qm-review-head">
+			{#each adds as item (item.id)}
+				{@const preview = previewOf(item)}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class={['qm-review-card-add', { 'qm-review-lit': reviewing.lit === item.id }]}
+					data-qm-review={item.id}
+					role="group"
+					aria-label={merged.reviewNewCard}
+					onpointerenter={() => reviewing.point(item.id, 'pointer')}
+					onpointerleave={() => reviewing.point(undefined, 'pointer')}
+				>
+					<div class="qm-review-card-add-head">
+						<span class="qm-review-card-add-title">{preview.title}</span>
+						<span class="qm-review-card-tag">{merged.reviewNewCard}</span>
+					</div>
+					{#if preview.text}<p class="qm-review-card-add-text">{preview.text}</p>{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
+{/snippet}
+
 {#snippet addAffordance(atIndex: number)}
 	{#if kinds.length}
 		<!-- The strip past the last card is the append point, the one a reader looks for
@@ -1876,6 +2178,75 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--_qm-space-2);
+	}
+	/* A card proposed new and a card proposed taken out, in the review's one hue: a preview
+	   where the new card would stand, the card's own ground under the tint, and a mark round
+	   the whole of a card that would go, its words receding as a struck word's do. The
+	   current one's mark is a step stronger, as a current proposal's words are. */
+	.qm-review-card-remove {
+		display: contents;
+	}
+	.qm-review-card-remove.qm-review-on {
+		display: flex;
+		flex-direction: column;
+		gap: var(--_qm-space);
+		padding: var(--_qm-space);
+		border-radius: var(--_qm-radius);
+		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+	}
+	.qm-review-card-remove.qm-review-on > :global(.qm-card) {
+		opacity: var(--_qm-opacity-muted);
+	}
+	.qm-review-card-remove.qm-review-lit {
+		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
+	}
+	.qm-review-head {
+		display: flex;
+		flex-direction: column;
+		gap: var(--_qm-space-2);
+	}
+	.qm-review-card-add {
+		display: flex;
+		flex-direction: column;
+		gap: var(--_qm-space);
+		padding: var(--_qm-space-3) var(--_qm-card-inset);
+		border-radius: var(--_qm-radius);
+		background: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint)) var(--_qm-surface);
+	}
+	.qm-review-card-add.qm-review-lit {
+		background: linear-gradient(var(--_qm-review-lit), var(--_qm-review-lit)) var(--_qm-surface);
+	}
+	.qm-review-card-add-head {
+		display: flex;
+		align-items: baseline;
+		gap: var(--_qm-space-2);
+	}
+	.qm-review-card-add-title {
+		font-size: var(--_qm-text-title);
+		font-weight: var(--_qm-weight-mid);
+	}
+	.qm-review-card-tag {
+		font-size: var(--_qm-text-label);
+		font-weight: var(--_qm-weight-mid);
+		color: var(--_qm-ink-label);
+	}
+	.qm-review-card-remove > .qm-review-card-tag {
+		padding-inline: var(--_qm-space-2);
+	}
+	.qm-review-card-add-text {
+		margin: 0;
+		color: var(--_qm-ink-label);
+		white-space: pre-line;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	@media (forced-colors: active) {
+		.qm-review-card-add {
+			outline: var(--_qm-border-width) solid CanvasText;
+		}
 	}
 	/* The strip between two blocks, and the whole of it is the target: a gap is found by
 	 position, so reveal and hit region are the full-bleed row rather than a word to aim

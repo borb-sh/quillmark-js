@@ -1,9 +1,10 @@
-// The editor's review state: the host's list split by where each item draws, and the one item
-// under attention.
+// The editor's review state: the host's list split by where each item draws, and the one current
+// item, which the answer card and the review keys answer.
 //
-// Attention has three sources and one answer. The pointer over an item, the caret in one and a
-// host's reveal each name an item; the lit one is the revealed, else the caret's, else the
-// pointer's.
+// The current item is sticky: a step, a reveal, a click, the caret arriving in an item, or the
+// pointer resting on one names it, and it stays until another is named or it is answered. The
+// pointer names one only after a dwell, and never while it is over the answer card, so a pointer
+// crossing the text on its way to the card does not move the card from under it.
 //
 // An answered item is drawn no more, from the answer and not from the host's next list: the
 // reader's press shows at once however long the host takes to hand over a list without it.
@@ -14,17 +15,31 @@ import type { DocPath } from '../core/address.js';
 import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
 import {
 	byBlocks,
+	byCard,
 	locate,
 	onField,
 	sameValue,
+	type CardProposal,
 	type DeepReview,
 	type FieldProposal,
 	type ReviewItem,
 	type ReviewUndrawn
 } from './review.js';
 
-/** How long a revealed item stays lit, in ms. */
-export const REVEAL_MS = 2400;
+/** How long the pointer rests on an item before it is current, in ms. */
+export const DWELL_MS = 160;
+
+/** A card proposed new, drawn after the card it follows. */
+export type CardAdd = Extract<CardProposal, { add: unknown }>;
+
+/** Where the open card items draw, by the session keys of the cards as they stand. */
+export interface CardsReviewed {
+	/** The new cards after each card, by its key, `head` ahead of every card and `end` past the
+	 *  last, in list order. */
+	adds: ReadonlyMap<string, readonly CardAdd[]>;
+	/** The card each removal marks, by its key. */
+	removes: ReadonlyMap<string, Extract<CardProposal, { remove: number }>>;
+}
 
 export interface Review {
 	/** The host's list, less what was answered here. */
@@ -38,8 +53,12 @@ export interface Review {
 	readonly fieldUndrawn: readonly { id: string; reason: ReviewUndrawn }[];
 	/** The field proposals whose field no longer holds the value their `before` says was read. */
 	readonly fieldOutdated: ReadonlySet<string>;
-	/** The item under attention. */
+	/** The current item: open, drawn, and what the answer card and the review keys answer. */
 	readonly lit: string | undefined;
+	/** Where the open card items draw. */
+	readonly cards: CardsReviewed;
+	/** The card an accepted `add` wrote, by its session key, or none once it is taken back. */
+	wrote(id: string, key: string | undefined): void;
 	/** The items over the field at leaf `key`: its own, and those naming a place inside it,
 	 *  each with the steps to the value it names as the field holds it now. */
 	at(key: string): { proposed?: FieldProposal; nested?: readonly DeepReview[] };
@@ -49,17 +68,20 @@ export interface Review {
 	keyOf(id: string): string | undefined;
 	/** A prose leaf's report of what it draws. */
 	drew(key: string, report: ReviewReport): void;
-	/** The item the pointer or the caret is in, from leaf `from`: a caret's leaving reported by
-	 *  a leaf the caret has already left for another is old news. */
-	point(id: string | undefined, via: ReviewVia, from?: string): void;
-	/** A reader's answer, `chord` where a key gave it. False where it could not be made. */
-	act(id: string, action: ReviewAction, chord?: boolean): boolean;
+	/** The item the pointer or the caret is in, `undefined` where it left one: the caret
+	 *  arriving names it at once, the pointer once it has rested, and leaving names nothing. */
+	point(id: string | undefined, via: ReviewVia): void;
+	/** A reader's answer. False where it could not be made. */
+	act(id: string, action: ReviewAction): boolean;
 	/** An answer leaf `key` has already given, the item listed or not: a reopen and a redo's
 	 *  accept arrive for items the host may have taken off or not yet put back. */
-	heard(id: string, action: ReviewAction, key: string, chord?: boolean): void;
+	heard(id: string, action: ReviewAction, key: string): void;
 	/** A leaf is writing an answer, and is done: its edit is the answer's, not the reader's. */
 	writing(on: boolean): void;
+	/** Make `id` current at once: a step, a reveal, or a click or tap on it. */
 	reveal(id: string): void;
+	/** The pointer is over the answer card, which holds the current item where it is. */
+	hoverCard(on: boolean): void;
 }
 
 export interface ReviewSource {
@@ -80,8 +102,12 @@ export interface ReviewSource {
 	 *  leaf that gave it where one did. `false` where it could not be made, and the item
 	 *  stands. */
 	answer(id: string, item: ReviewItem | undefined, action: ReviewAction, key?: string): boolean;
-	/** An answer a chord gave, once it is made. */
-	chorded?(id: string): void;
+	/** The session keys of the cards as they stood when the list was set, by index. */
+	listedCards(): readonly string[];
+	/** The session keys of the cards as they stand. */
+	liveCards(): readonly string[];
+	/** An accept or a dismissal, once it is made, `current` where the item was the current one. */
+	answered?(id: string, current: boolean): void;
 	writing?(on: boolean): void;
 }
 
@@ -111,9 +137,52 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		}
 		return own;
 	});
+	/** The card each accepted `add` wrote, by item id. */
+	const written = new SvelteMap<string, string>();
+	const cards = $derived.by(() => {
+		const listed = source.listedCards();
+		const live = source.liveCards();
+		const standing = new Set(live);
+		const all = source.items() ?? [];
+		const adds = new Map<string, CardAdd[]>();
+		const removes = new Map<string, Extract<CardProposal, { remove: number }>>();
+		const undrawn: { id: string; reason: ReviewUndrawn }[] = [];
+		const open = new Set(items.map((item) => item.id));
+		for (const [at, item] of all.entries()) {
+			if (!byCard(item) || !open.has(item.id)) continue;
+			if ('remove' in item) {
+				const key = listed[item.remove];
+				if (key !== undefined && standing.has(key)) removes.set(key, item);
+				else undrawn.push({ id: item.id, reason: 'applied' });
+				continue;
+			}
+			const lead = leadOf(all, at, listed, standing);
+			adds.set(lead, [...(adds.get(lead) ?? []), item]);
+		}
+		return { adds, removes, undrawn };
+	});
+	/** Where the `add` at `at` of `all` stands: after the card the nearest earlier add of the same
+	 *  place wrote, else after the card it names, the head, or the end where that card is gone. */
+	function leadOf(
+		all: readonly ReviewItem[],
+		at: number,
+		listed: readonly string[],
+		standing: ReadonlySet<string>
+	): string {
+		const item = all[at] as CardAdd;
+		for (let k = at - 1; k >= 0; k--) {
+			const before = all[k];
+			if (!byCard(before) || !('add' in before) || before.after !== item.after) continue;
+			const key = written.get(before.id);
+			if (key !== undefined && standing.has(key)) return key;
+		}
+		if (item.after === undefined || item.after < 0) return 'head';
+		const key = listed[item.after];
+		return key !== undefined && standing.has(key) ? key : 'end';
+	}
 	const placed = $derived.by(() => {
 		const out = new Map<string, { proposed?: FieldProposal; nested?: DeepReview[] }>();
-		const undrawn: { id: string; reason: ReviewUndrawn }[] = [];
+		const undrawn: { id: string; reason: ReviewUndrawn }[] = [...cards.undrawn];
 		/** The nested proposals whose `before` the field no longer holds. */
 		const moved = new Set<string>();
 		const claims = new Map<string, Set<string>>();
@@ -172,18 +241,21 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return out;
 	});
 
-	let pointer = $state<string | undefined>();
-	let caret = $state<string | undefined>();
-	let caretFrom: string | undefined;
-	let revealed = $state<string | undefined>();
-	let fade: ReturnType<typeof setTimeout> | undefined;
-	const lit = $derived([revealed, caret, pointer].find((id) => id !== undefined && byId.has(id)));
+	let current = $state<string | undefined>();
+	let dwell: ReturnType<typeof setTimeout> | undefined;
+	let overCard = false;
+	const lit = $derived(current !== undefined && byId.has(current) ? current : undefined);
+	const name = (id: string): void => {
+		clearTimeout(dwell);
+		current = id;
+	};
 
-	const answering = (id: string, action: ReviewAction, chord?: boolean): void => {
+	const answering = (id: string, action: ReviewAction): void => {
 		if (action === 'reopen') answered.delete(id);
 		else answered.add(id);
 		answers++;
-		if (chord) source.chorded?.(id);
+		if (action === 'reopen') name(id);
+		else source.answered?.(id, current === id);
 	};
 
 	const self: Review & { dispose(): void } = {
@@ -203,11 +275,18 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		get lit() {
 			return lit;
 		},
+		get cards() {
+			return cards;
+		},
+		wrote(id, key) {
+			if (key === undefined) written.delete(id);
+			else written.set(id, key);
+		},
 		at: (key) => fields.get(key) ?? {},
 		marks: (key) => fields.has(key) || !!drawn.get(key)?.ids.length,
 		keyOf(id) {
 			const item = byId.get(id);
-			if (!item) return undefined;
+			if (!item || byCard(item)) return undefined;
 			if (byBlocks(item)) {
 				const key = source.leafFor(item.field);
 				return key !== undefined && drawn.get(key)?.ids.includes(id) ? key : undefined;
@@ -220,35 +299,34 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (report.ids.length || report.undrawn.length) drawn.set(key, report);
 			else drawn.delete(key);
 		},
-		point(id, via, from) {
-			if (via === 'pointer') {
-				pointer = id;
+		point(id, via) {
+			if (via === 'caret') {
+				if (id !== undefined) name(id);
 				return;
 			}
-			if (id === undefined && from !== undefined && caretFrom !== from) return;
-			caretFrom = from;
-			caret = id;
-			if (id !== undefined) revealed = undefined;
+			clearTimeout(dwell);
+			if (id === undefined || id === current) return;
+			dwell = setTimeout(() => {
+				if (!overCard && byId.has(id)) current = id;
+			}, DWELL_MS);
 		},
-		act(id, action, chord) {
+		act(id, action) {
 			const item = byId.get(id);
 			if (!item || !source.answer(id, item, action)) return false;
-			answering(id, action, chord);
+			answering(id, action);
 			return true;
 		},
 		writing: (on) => source.writing?.(on),
-		heard(id, action, key, chord) {
-			if (source.answer(id, byId.get(id), action, key)) answering(id, action, chord);
+		heard(id, action, key) {
+			if (source.answer(id, byId.get(id), action, key)) answering(id, action);
 		},
-		reveal(id) {
-			clearTimeout(fade);
-			revealed = id;
-			fade = setTimeout(() => {
-				if (revealed === id) revealed = undefined;
-			}, REVEAL_MS);
+		reveal: name,
+		hoverCard(on) {
+			overCard = on;
+			if (on) clearTimeout(dwell);
 		},
 		dispose() {
-			clearTimeout(fade);
+			clearTimeout(dwell);
 		}
 	};
 	return self;
@@ -270,6 +348,8 @@ const NO_REVIEW: Review = {
 	fieldUndrawn: [],
 	fieldOutdated: new Set(),
 	lit: undefined,
+	cards: { adds: new Map(), removes: new Map() },
+	wrote() {},
 	at: () => ({}),
 	marks: () => false,
 	keyOf: () => undefined,
@@ -278,7 +358,8 @@ const NO_REVIEW: Review = {
 	act: () => false,
 	heard() {},
 	writing() {},
-	reveal() {}
+	reveal() {},
+	hoverCard() {}
 };
 
 /** The editor's review state, or {@link NO_REVIEW} off-tree. */

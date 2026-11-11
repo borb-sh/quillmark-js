@@ -116,19 +116,21 @@ export interface VisualEditorProps {
 	formatDiagnostic?: FormatDiagnostic;
 	/**
 	 * What someone other than the reader proposes, for the editor to draw where each item sits
-	 * ({@link ReviewItem}): a proposal as a word-level edit of its own blocks with Accept and
-	 * Dismiss at its end, and a field's proposed value under its control. Declarative: the host
-	 * sets the list once and clears it once, and the editor draws every answer while the list
-	 * holds the item: an answered item is drawn no more, and an accepted one is plain text. A
-	 * card an item names by index is read against the cards as they stood when the list was
-	 * set, so the item stays on its card through `applyCardOps` and the reader's own card
-	 * edits; an item whose card is gone draws nothing.
+	 * ({@link ReviewItem}): a proposal as a word-level edit of its own blocks, a field's proposed
+	 * value under its control, a new card as a preview where it would stand, and a removal as a
+	 * mark on its card. One change is current while any is open, and the answer card on it is
+	 * where a change is answered. Declarative: the host sets the list once and clears it once,
+	 * and the editor draws every answer while the list holds the item: an answered item is drawn
+	 * no more, and an accepted one is plain text. A card an item names by index is read against
+	 * the cards as they stood when the list was set, so the item stays on its card through
+	 * `applyCardOps` and the reader's own card edits; an item whose card is gone draws nothing.
 	 */
 	review?: readonly ReviewItem[];
 	/**
-	 * A reader answered an item: a button on it, `Mod-Enter` / `Mod-.` with the caret or the
-	 * focus in it, or a host's `answerReview`; or undid an answer with ⌘Z, `reopen`. The editor has made every write an answer asks for and draws it,
-	 * so the host leaves `review` as it set it.
+	 * A reader answered an item: the answer card, `Mod-Enter` / `Mod-.` on the current change,
+	 * or a host's `answerReview`; or undid an answer with ⌘Z, `reopen`. The editor has made every
+	 * write an answer asks for, a card's included, and draws it, so the host leaves `review` as
+	 * it set it.
 	 */
 	onReview?: (event: ReviewEvent) => void;
 	/**
@@ -138,15 +140,13 @@ export interface VisualEditorProps {
 	 * host counts and steps its own list by.
 	 */
 	onReviewDrawn?: (drawn: ReviewDrawn) => void;
+	/** The room, in px, the host's chrome takes at the foot of the pane the editor scrolls in,
+	 *  which the answer card keeps clear of. Default `0`. */
+	reviewInset?: number;
 	/**
-	 * Whether an answer given by a chord goes on to the next item, the caret in it, so a held
-	 * walk down a batch answers each in turn. An answer by pointer stays where it was given.
-	 * Default `true`.
-	 */
-	reviewAdvance?: boolean;
-	/**
-	 * The item under attention, `undefined` once nothing is: the pointer over one, the caret
-	 * in one, or one a `revealReview` named. What a host lights its own list by.
+	 * The current change, `undefined` once none is open: the one the answer card and the review
+	 * keys answer. A review starts on its first change, and every answer moves on to the next.
+	 * What a host counts its place in the review by.
 	 */
 	onReviewFocus?: (id: string | undefined) => void;
 	/** Appended to the root's own class: the surface is a mounted element the

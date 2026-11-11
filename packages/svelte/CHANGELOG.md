@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+**A review is answered on one card, on the current change.** The editor floats an answer card on the current change, below it or above it where there is no room, with **Dismiss** and **Accept** and their keys; the buttons at the end of each proposal, a field proposal's answers and the chips are gone. One change is current at a time and stays current until another takes it: a review starts on its first change, the caret or a press makes a change current at once, and the pointer after a short dwell. Every answer to the current change, by key, card or `answerReview`, moves on to the next open one, round from the end, without moving the caret or the focus. **Edited since** is said on the card. `reviewInset` is the px the host's chrome takes at the foot of the pane, which the card keeps clear of; Alt+F10 puts the keyboard on the card. `reviewAdvance` is removed.
+
+**The review keys answer the current change from anywhere on the page.** While a review is open, ⌘/Ctrl+Enter, ⌘/Ctrl+. and ⌘/Ctrl+⌥/Alt+↓ and ↑ answer and step from the preview or the host's bar as from the editor, staying out of another editor and of a text box outside this one. ⌘Z from the host's chrome outside a text box takes back the newest answer.
+
+**A card added or taken out is a review item.** `ReviewItem` gains `{ id, add: Card, after?: number }`, a card to add after the card at that index, and `{ id, remove: number }`, the card at that index to take out, both against the cards as they stood when the list was set. The editor draws an added card as a preview where it would stand and marks a card to take out, steps through them with the rest, and on Accept writes the card as the reader's own card operation, the added card under its `$id`; `onChange` reports a `structure` change and ⌘Z takes it back. `proposalsBetween` returns `{ items }`, with the card items among them; `cards` is removed, and a host no longer writes accepted cards itself.
+
+**No answer raises a toast.** A field's accept no longer stands on a toast; ⌘Z is the way back from every answer. `VisualStrings` no longer extends `ReviewStrings`, and `ReviewStrings` and `DEFAULT_REVIEW_STRINGS` are removed; `reviewAccepted`, `reviewAcceptTitle` and `reviewDismissTitle` give way to `reviewAccept`, `reviewDismiss`, `reviewProposal`, `reviewOutdated`, `reviewPosition`, `reviewNewCard` and `reviewRemoveCard`.
+
 ## v0.35.1 - 2026-11-11
 
 **A field's guidance marker shows at rest.** The ⓘ beside a label with a description past 72 characters stands at the rung a live glyph control rests at, and comes up whole with its field's hover or focus, where it was hidden until then and a reader could not tell the field had guidance.

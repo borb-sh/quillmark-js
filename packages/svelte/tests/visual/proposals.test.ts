@@ -1,5 +1,5 @@
 // The review list an answer makes from the document its writer read: one item per place that
-// changed, at the path the editor draws it under, and the cards added and taken out as rows.
+// changed, at the path the editor draws it under, and an item per card added or taken out.
 import { describe, it, expect } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import { proposalsBetween } from '$lib/visual/proposals';
@@ -126,17 +126,28 @@ describe('a field', () => {
 });
 
 describe('a card', () => {
-	it('is a row: one added after the card it follows, one taken out by its id', () => {
-		const { base, items, cards } = between((answer) => {
+	it('is an item: one added after the card it follows, one taken out, by their indexes', () => {
+		const { items } = between((answer) => {
 			quill().writer(answer).addCard('note', {}, 'A new note.', 2);
 			answer.removeCard(4);
 		});
-		expect(items).toEqual([]);
-		const ids = Array.from({ length: base.cardCount }, (_, i) => base.card(i).id);
-		expect(cards).toMatchObject([
-			{ type: 'remove', id: ids[3], kind: 'figure' },
-			{ type: 'add', card: { kind: 'note' }, after: ids[1] }
+		expect(items).toMatchObject([
+			{ id: 'p0', add: { kind: 'note' }, after: 1 },
+			{ id: 'p1', remove: 3 }
 		]);
+	});
+
+	it('stands a run of added cards after the card the run follows, in order, the head’s with no index', () => {
+		const { items } = between((answer) => {
+			const write = quill().writer(answer);
+			write.addCard('note', {}, 'First.', 0);
+			write.addCard('note', {}, 'Second.', 1);
+		});
+		expect(items).toMatchObject([
+			{ add: { kind: 'note', body: { text: 'First.' } } },
+			{ add: { kind: 'note', body: { text: 'Second.' } } }
+		]);
+		expect(items.every((item) => !('after' in item))).toBe(true);
 	});
 
 	it('keeps its fields’ items under its own path when one before it moves', () => {

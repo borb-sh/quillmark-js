@@ -8,6 +8,7 @@ import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
 import { groupLabel } from '$lib/visual/structure';
 import { quill, example } from '../helpers/fixtures.js';
 import {
+	answerOn,
 	mountEditor,
 	openField,
 	press as key,
@@ -59,11 +60,8 @@ const undoKey = (r: Nested): void => {
 	key(r.target.querySelector<HTMLElement>('.qm-editor')!, 'z', { ctrlKey: true });
 	flushSync();
 };
-const press = (r: Nested, id: string, action: 'accept' | 'dismiss'): void => {
-	const row = r.target.querySelector(`.qm-review-proposal[data-qm-review="${id}"]`)!;
-	row.querySelector<HTMLButtonElement>(`.qm-review-${action}`)!.click();
-	flushSync();
-};
+const press = (r: Nested, id: string, action: 'accept' | 'dismiss'): void =>
+	answerOn(r.target, id, action);
 
 describe('a record’s cell', () => {
 	const contact = (doc: Document): ReviewItem[] => [

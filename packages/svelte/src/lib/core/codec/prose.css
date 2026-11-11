@@ -850,84 +850,13 @@ li.ProseMirror-selectednode::after {
 	content: none;
 }
 
-/* A proposal's two answers, at the end of its last line: chrome set in the paragraph, so
-   at the chrome's face and the label rung whatever the block around it is set in. A run
-   rather than a row, so a proposal takes no line the paragraph did not have; the row is
-   for a block with no line to end. The run stands a space off the words, and the space is
-   a real one, widened: it hangs at the end of a line the answers wrap from, where a margin
-   would indent them. Accept is the one outlined thing in the pair, on the card's own
-   ground so it reads as a button over a tinted block too, and Dismiss rests as a word. */
-.ProseMirror .qm-review-chip {
-	font-family: var(--_qm-font);
-	font-size: var(--_qm-text-label);
-	font-style: normal;
-	font-weight: var(--_qm-weight-mid);
-	line-height: var(--_qm-leading-tight);
-	word-spacing: var(--_qm-space);
-	user-select: none;
-}
-.qm-review-acts {
-	display: inline-flex;
-	gap: var(--_qm-space-half);
-	vertical-align: baseline;
-	word-spacing: normal;
-	white-space: nowrap;
-}
-.ProseMirror .qm-review-chip-row {
-	display: block;
-	margin-block-start: var(--_qm-space);
-}
-.qm-review-act {
-	padding: var(--_qm-space-half) var(--_qm-space-2);
-	border: none;
-	border-radius: var(--_qm-radius-inner);
-	background: transparent;
-	font: inherit;
-	color: var(--_qm-ink-label);
-	cursor: pointer;
-	transition:
-		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
-		color var(--_qm-duration-fast) var(--_qm-ease-reverse);
-}
-.qm-review-act:hover {
-	background: var(--_qm-surface-hover);
-	color: var(--_qm-ink);
-}
-.qm-review-act.qm-review-accept {
-	background: var(--_qm-bg);
-	box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
-	color: var(--_qm-ink);
-}
-.qm-review-act.qm-review-accept:hover {
-	background: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint)) var(--_qm-bg);
-}
-/* Under a finger the two answers are a tap target each, and stand apart. */
-@media (pointer: coarse) {
-	.qm-review-act {
-		padding-block: var(--_qm-space);
-	}
-	.qm-review-acts {
-		gap: var(--_qm-space-2);
-	}
-}
-/* A proposal the reader's own writing meets says so before its answers, in the label's ink:
-   taking it writes over what the reader wrote. */
-.qm-review-outdated-label {
-	align-self: center;
-	color: var(--_qm-ink-label);
-}
-/* Forced colours drop the tint, which is all that tells a proposed word from the document's
-   and Accept from a word beside it. A line under the proposed words, an outline round an
-   added block and the system's button stroke round each answer stand in. */
+/* Forced colours drop the tint, which is all that tells a proposed word from the document's.
+   A line under the proposed words and an outline round an added block stand in. */
 @media (forced-colors: active) {
 	.ProseMirror .qm-review-ins {
 		text-decoration: underline;
 	}
 	.ProseMirror .qm-review-add {
 		outline: var(--_qm-border-width) solid CanvasText;
-	}
-	.qm-review-act.qm-review-accept,
-	.qm-review-act.qm-review-dismiss {
-		border: var(--_qm-border-width) solid ButtonText;
 	}
 }

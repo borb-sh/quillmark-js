@@ -28,7 +28,9 @@
 //
 // The key listens on the document, not on the surface: a removal by the pointer takes the
 // pressed button with it and leaves the focus on the page's body, which no keydown on the
-// surface hears.
+// surface hears. An answer is given from wherever the focus is, a host's panel beside the
+// editor included, so the answers' step is the key's from anywhere on the page but a text
+// control outside the editor, which keeps its own.
 import { getContext, setContext } from 'svelte';
 
 /** How long an offer stands, in ms. Long enough to read the toast and reach its button;
@@ -83,7 +85,9 @@ export interface StructuralUndo {
 	 *  edit has landed since, and the target is the page's body, where a removal under the
 	 *  pointer leaves the focus, when this editor offered last on the page; the handed
 	 *  control; or a control under `root` that keeps no history of its own. A text control
-	 *  that is not the handed one keeps its key from a removal and gives it to a standing step. */
+	 *  that is not the handed one keeps its key from a removal and gives it to a standing step.
+	 *  The answers' step is the key's too at any target outside `root` but a text control, when
+	 *  this editor offered last. */
 	accepts(target: EventTarget | null, root: Element | undefined): boolean;
 	/** Hold the lapse while the toast is under the pointer or the focus, and let it run again. */
 	pause(): void;
@@ -105,6 +109,7 @@ const EDITABLE = 'input, textarea, select, [contenteditable="true"]';
 interface Held {
 	readonly offer: UndoOffer;
 	readonly standing: boolean;
+	readonly answer?: boolean;
 	readonly under?: Held;
 }
 
@@ -157,7 +162,7 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			clear();
 			const offer = { notice, restore };
 			if (keptAs !== undefined) kept = [...kept, { label: keptAs, restore }];
-			if (standing || keptAs !== undefined) last = { offer, standing, under };
+			if (standing || keptAs !== undefined) last = { offer, standing, answer, under };
 			latest = self;
 			if (quiet) return offer;
 			current = offer;
@@ -183,7 +188,10 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			if (!live() || !(target instanceof Element)) return false;
 			if (target === document.body) return latest === self;
 			if (target === handed) return true;
-			return !!root?.contains(target) && (!!last?.standing || !target.closest(EDITABLE));
+			if (root?.contains(target)) return !!last?.standing || !target.closest(EDITABLE);
+			return (
+				!!last?.answer && last.offer === live() && latest === self && !target.closest(EDITABLE)
+			);
 		},
 		pause() {
 			if (!current || paused) return;

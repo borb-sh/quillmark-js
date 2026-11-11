@@ -17,7 +17,6 @@
 // transaction, one undo step, one commit.
 import { closeHistory, isHistoryTransaction, undo } from 'prosemirror-history';
 import { DOMSerializer, Fragment, Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
-import { keydownHandler } from 'prosemirror-keymap';
 import {
 	Plugin,
 	PluginKey,
@@ -30,7 +29,6 @@ import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { arriving, HARD_BREAK, ISLAND_SLOT } from './islands.js';
 import { remoteKey } from './remote.js';
 import { wordDiff, type DiffHunk } from './review-diff.js';
-import { REVIEW_KEYS } from './shortcuts.js';
 
 /**
  * One proposal over a prose leaf, by the blocks that place it.
@@ -63,38 +61,15 @@ export type ReviewAction = 'accept' | 'dismiss' | 'reopen';
 /** What brought an item under attention: the pointer over it, or the caret in it. */
 export type ReviewVia = 'pointer' | 'caret';
 
-/** The words the leaf draws on a proposal's two buttons, and the names of what has no words. */
-export interface ReviewStrings {
-	reviewAccept: string;
-	reviewDismiss: string;
-	/** The two buttons' tooltips, which name their chords (`REVIEW_KEYS`). */
-	reviewAcceptTitle: string;
-	reviewDismissTitle: string;
-	/** The accessible name of a proposal's two buttons as a group. */
-	reviewProposal: string;
-	/** The label before the buttons of a proposal whose paragraph the reader rewrote since. */
-	reviewOutdated: string;
-}
-
-export const DEFAULT_REVIEW_STRINGS: ReviewStrings = {
-	reviewAccept: 'Accept',
-	reviewDismiss: 'Dismiss',
-	reviewAcceptTitle: 'Accept',
-	reviewDismissTitle: 'Dismiss',
-	reviewProposal: 'Proposed change',
-	reviewOutdated: 'Edited since'
-};
-
 /** What the plugin reads and reports through; every reader is live. */
 export interface ReviewChannel {
 	items(): readonly TextReview[];
 	/** The item under attention, drawn a step stronger. */
 	lit(): string | undefined;
-	strings(): ReviewStrings;
 	/** `after` as a document under the leaf's schema; `undefined` where it does not parse. */
 	parse(markdown: string): PMNode | undefined;
-	/** A reader's answer, `chord` where a key gave it. */
-	act(id: string, action: ReviewAction, chord?: boolean): void;
+	/** An answer the leaf gave or took back. */
+	act(id: string, action: ReviewAction): void;
 	/** The leaf is writing a taken proposal, and is done. */
 	writing?(on: boolean): void;
 	/** The item the pointer or the caret is in, `undefined` once it has left. */
@@ -125,7 +100,7 @@ type Answer = 'accept' | 'dismiss';
 
 /** The leaf's review state: the count of its own edits, so the caret's report can tell typing
  *  from arriving, the items answered here, and the item the caret was put into by its id, which
- *  the chords answer while the caret stays where it was put. */
+ *  the caret names while it stays where it was put. */
 interface ReviewState {
 	edits: number;
 	answered: ReadonlyMap<string, Answer>;
@@ -523,90 +498,6 @@ const rewritten = (() => {
 	};
 })();
 
-/** An answer to an item: from a button, from a chord, or `quiet` from a host's call, which moves
- *  neither the caret nor the focus. False where it could not be given, and the item stands. */
-type Act = (id: string, action: Answer, how?: { chord?: boolean; quiet?: boolean }) => boolean;
-
-/** A chord as `aria-keyshortcuts` spells it, `Mod` as either platform's. */
-const ariaKeys = (chord: string): string =>
-	['Meta', 'Control'].map((mod) => chord.replace('Mod', mod).replaceAll('-', '+')).join(' ');
-
-function button(
-	act: Act,
-	id: string,
-	action: 'accept' | 'dismiss',
-	label: string,
-	title: string,
-	keys: string
-): HTMLButtonElement {
-	const el = document.createElement('button');
-	el.type = 'button';
-	el.tabIndex = -1;
-	el.className = `qm-review-act qm-review-${action}`;
-	el.textContent = label;
-	el.title = title;
-	el.setAttribute('aria-keyshortcuts', ariaKeys(keys));
-	// The press keeps the caret where it is: the answer is about the text, not a move off it.
-	el.addEventListener('mousedown', (e) => e.preventDefault());
-	el.addEventListener('click', (e) => {
-		e.preventDefault();
-		act(id, action);
-	});
-	return el;
-}
-
-/** A proposal's two buttons: a run at the end of its last line, or a row of their own under a
- *  block that has no line to end. */
-function chip(
-	strings: ReviewStrings,
-	act: Act,
-	id: string,
-	row: boolean,
-	outdated: boolean
-): HTMLElement {
-	const el = document.createElement(row ? 'div' : 'span');
-	el.className = ['qm-review-chip', row && 'qm-review-chip-row', outdated && 'qm-review-outdated']
-		.filter(Boolean)
-		.join(' ');
-	el.contentEditable = 'false';
-	el.setAttribute('data-qm-review', id);
-	el.setAttribute('role', 'group');
-	el.setAttribute('aria-label', strings.reviewProposal);
-	const acts = document.createElement('span');
-	acts.className = 'qm-review-acts';
-	if (outdated) {
-		const label = document.createElement('span');
-		label.className = 'qm-review-outdated-label';
-		label.textContent = strings.reviewOutdated;
-		acts.append(label);
-	}
-	acts.append(
-		button(act, id, 'accept', strings.reviewAccept, strings.reviewAcceptTitle, REVIEW_KEYS.accept),
-		button(
-			act,
-			id,
-			'dismiss',
-			strings.reviewDismiss,
-			strings.reviewDismissTitle,
-			REVIEW_KEYS.dismiss
-		)
-	);
-	// The space a run of answers stands off its line by, which a wrapped run leaves behind.
-	el.append(row ? '' : ' ', acts);
-	return el;
-}
-
-/** The last textblock's element under `el`, where a run can be appended to its last line. */
-function lastLine(el: HTMLElement): HTMLElement | undefined {
-	let at: HTMLElement = el;
-	for (;;) {
-		if (/^(P|H[1-6]|CODE)$/.test(at.tagName)) return at;
-		const last = at.lastElementChild;
-		if (!(last instanceof HTMLElement)) return undefined;
-		at = last;
-	}
-}
-
 /** The blocks a proposal covered when it arrived, by its id, with the `after` it then held and
  *  the ids of the blocks that placed it. */
 type Bases = Map<string, { after: string; place: readonly string[]; blocks: readonly PMNode[] }>;
@@ -676,7 +567,7 @@ function readOf(
 	return out;
 }
 
-function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases): Drawn {
+function draw(state: EditorState, channel: ReviewChannel, bases: Bases): Drawn {
 	const { answered, renamed } = reviewKey.getState(state)!;
 	const now = (id: string): string => nowOf(renamed, id);
 	const listed = channel.items();
@@ -699,7 +590,6 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 	const lighting = new Set<string>();
 	if (!items.length) return { decos, lighting, spans: [], plans, outdated, undrawn };
 	const { doc } = state;
-	const strings = channel.strings();
 	const serializer = DOMSerializer.fromSchema(state.schema);
 	const lights = (id: string, make: (on: boolean) => Decoration): void => {
 		lighting.add(id);
@@ -836,15 +726,6 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		const $last = doc.resolve(last.pos);
 		/** Past the outermost block holding the last one, or the head of the leaf. */
 		const outer = ahead ? 0 : $last.depth ? $last.after(1) : last.pos + last.node.nodeSize;
-		const row = (): void => {
-			decos.push(
-				Decoration.widget(outer, () => chip(strings, act, item.id, true, stale), {
-					side: ahead ? -1 : 9999,
-					key: `chip:${item.id}:row:${stale}`,
-					stopEvent: () => true
-				})
-			);
-		};
 		if (added.length) {
 			// A proposal that continues the list its paragraph is in adds items to that list.
 			const listed =
@@ -863,10 +744,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 					held.content = held.content.addToEnd(piece.node);
 				else plan.push({ from: piece.at, to: piece.at, content: Fragment.from(piece.node) });
 			}
-			const closing = pieces.length - 1;
-			const chipped = endsInLine(pieces[closing].node);
 			pieces.forEach((piece, n) => {
-				const holds = chipped && n === closing;
 				lights(item.id, (on) =>
 					Decoration.widget(
 						piece.at,
@@ -876,27 +754,16 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 							if (on) el.classList.add('qm-review-lit');
 							el.contentEditable = 'false';
 							el.setAttribute('data-qm-review', item.id);
-							if (holds) lastLine(el)?.append(chip(strings, act, item.id, false, stale));
 							return el;
 						},
 						{
 							side: ahead ? -1000 + n : 1 + n,
-							key: `add:${item.id}:${n}:${on}:${piece.node.toString()}`,
-							stopEvent: (e) => (e.target as Element | null)?.closest?.('.qm-review-chip') != null
+							key: `add:${item.id}:${n}:${on}:${piece.node.toString()}`
 						}
 					)
 				);
 			});
-			if (!chipped) row();
-		} else if (last.node.isTextblock) {
-			decos.push(
-				Decoration.widget(reach(last)[1], () => chip(strings, act, item.id, false, stale), {
-					side: 1,
-					key: `chip:${item.id}:${stale}`,
-					stopEvent: () => true
-				})
-			);
-		} else row();
+		}
 
 		// What a proposal only adds to has the caret anywhere in the block it adds from.
 		spans.push({
@@ -907,13 +774,6 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		});
 	}
 	return { decos, lighting, spans, plans, outdated, undrawn };
-}
-
-/** Whether a block's last leaf is a textblock, so its last line can carry a run. */
-function endsInLine(node: PMNode): boolean {
-	let at: PMNode = node;
-	while (!at.isTextblock && !at.isAtom && at.lastChild) at = at.lastChild;
-	return at.isTextblock;
 }
 
 /** The item the caret is in: the one it was put into by its id while it holds the caret, else
@@ -942,11 +802,11 @@ export interface ReviewLayer {
 	refresh(view: EditorView): void;
 	/** The elements item `id` draws, in document order. */
 	elements(view: EditorView, id: string): HTMLElement[];
-	/** Put the caret in item `id` and take the focus, so the item's chords answer. False for
-	 *  an item the leaf does not draw. */
+	/** Put the caret in item `id` and take the focus. False for an item the leaf does not
+	 *  draw. */
 	enter(view: EditorView, id: string): boolean;
-	/** Answer item `id` as its button would, moving neither the caret nor the focus. False
-	 *  where the leaf does not draw it or cannot write it. */
+	/** Answer item `id`, moving neither the caret nor the focus. False where the leaf does not
+	 *  draw it or cannot write it. */
 	answer(id: string, action: 'accept' | 'dismiss'): boolean;
 	/** Open a dismissal of item `id` again and say so, the dismissal still held here or
 	 *  already pruned by the host taking the item off its list. */
@@ -966,7 +826,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				doc: PMNode;
 				review: ReviewState;
 				items: readonly TextReview[];
-				strings: ReviewStrings;
 				drawn: Drawn;
 		  }
 		| undefined;
@@ -976,28 +835,21 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	let reported = NOTHING;
 	let host: EditorView | undefined;
 	const bases: Bases = new Map();
-	/** Answer an item. Taking a proposal writes it first, and one that can no longer be written
-	 *  stays as it is. A proposal taken by a press while the focus is elsewhere leaves the caret
-	 *  after what landed, in a focused leaf: the edit is the reader's, and so is its undo. */
-	const act: Act = (id, action, how = {}) => {
+	/** Answer an item, moving neither the caret nor the focus. Taking a proposal writes it
+	 *  first, and one that can no longer be written stays as it is. */
+	const act = (id: string, action: Answer): boolean => {
 		const view = host;
 		if (!view || !drawn(view.state).spans.some((span) => span.id === id)) return false;
 		if (action === 'accept') {
 			const plan = drawn(view.state).plans.get(id);
 			const tr = plan && taking(view.state, plan);
 			if (!tr || !plan) return false;
-			const away = !how.quiet && !view.hasFocus();
-			if (away) {
-				const end = tr.mapping.map(Math.max(...plan.map((piece) => piece.to)), 1);
-				tr.setSelection(Selection.near(tr.doc.resolve(Math.min(end, tr.doc.content.size)), -1));
-			}
 			channel.writing?.(true);
 			try {
 				view.dispatch(tr.step(new ReviewAnswer(id, 'accept')));
 			} finally {
 				channel.writing?.(false);
 			}
-			if (away) view.focus();
 		} else {
 			view.dispatch(
 				view.state.tr
@@ -1005,23 +857,16 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 					.setMeta('addToHistory', false)
 			);
 		}
-		channel.act(id, action, how.chord);
+		channel.act(id, action);
 		return true;
 	};
 	const drawn = (state: EditorState): Drawn => {
 		const review = reviewKey.getState(state)!;
 		const items = channel.items();
-		const strings = channel.strings();
-		if (
-			memo &&
-			memo.doc === state.doc &&
-			memo.review === review &&
-			memo.items === items &&
-			memo.strings === strings
-		)
+		if (memo && memo.doc === state.doc && memo.review === review && memo.items === items)
 			return memo.drawn;
-		const next = draw(state, channel, act, bases);
-		memo = { doc: state.doc, review, items, strings, drawn: next };
+		const next = draw(state, channel, bases);
+		memo = { doc: state.doc, review, items, drawn: next };
 		return next;
 	};
 	/** Whether the lit item moving to `lit` changes how anything here reads. */
@@ -1083,19 +928,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		channel.point(next, 'caret');
 	};
 
-	const answer =
-		(action: Answer) =>
-		(state: EditorState): boolean => {
-			const span = spanAt(
-				drawn(state).spans,
-				state.selection.head,
-				reviewKey.getState(state)?.entered
-			);
-			if (!span) return false;
-			act(span.id, action, { chord: true });
-			return true;
-		};
-
 	const plugin = new Plugin<ReviewState>({
 		key: reviewKey,
 		state: {
@@ -1110,10 +942,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		},
 		props: {
 			decorations,
-			handleKeyDown: keydownHandler({
-				[REVIEW_KEYS.accept]: answer('accept'),
-				[REVIEW_KEYS.dismiss]: answer('dismiss')
-			}),
 			handleDOMEvents: {
 				mouseover: (_view, e) => {
 					hover(idAt(e.target));
@@ -1162,7 +990,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		refresh(view) {
 			// Only the lit item moved, and nothing here reads it: the leaf is left alone.
 			const lit = channel.lit();
-			if (memo?.items === channel.items() && memo.strings === channel.strings() && !relit(lit)) {
+			if (memo?.items === channel.items() && !relit(lit)) {
 				if (shown) shown.lit = lit;
 				return;
 			}
@@ -1182,7 +1010,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 				(el) => el.getAttribute('data-qm-review') === id
 			);
 		},
-		answer: (id, action) => act(id, action, { quiet: true }),
+		answer: act,
 		reopen(view, id) {
 			if (reviewKey.getState(view.state)?.answered.get(id) === 'dismiss')
 				view.dispatch(

@@ -152,9 +152,8 @@
 				onSlash: (next) => {
 					slash = next;
 				},
-				reviewStrings: () => t.strings,
-				onReview: (id, action, chord) => reviewing.heard(id, action, leafKey, chord),
-				onReviewPoint: (id, via) => reviewing.point(id, via, leafKey),
+				onReview: (id, action) => reviewing.heard(id, action, leafKey),
+				onReviewPoint: (id, via) => reviewing.point(id, via),
 				onReviewWriting: (on) => reviewing.writing(on),
 				onReviewDrawn: (report) => reviewing.drew(leafKey, report),
 				onFocus,
