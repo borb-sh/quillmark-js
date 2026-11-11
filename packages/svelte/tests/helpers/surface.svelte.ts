@@ -5,7 +5,7 @@ import { mount, unmount, flushSync, tick, type Component } from 'svelte';
 import type { Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
 import type { Delta, EditorError } from '$lib/core';
-import type { ActiveLeaf, CardId, CardOp, EditorChange } from '$lib/visual';
+import type { ActiveLeaf, CardId, CardOp, EditorChange, ReviewProjection } from '$lib/visual';
 import type { ActiveProse } from '$lib/visual/leaves';
 import type { VisualEditorProps } from '$lib/visual/props';
 import { fieldTitle, groupLabel } from '$lib/visual/structure';
@@ -43,6 +43,7 @@ export interface EditorRef {
 	revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
 	answerReview(ids: readonly string[] | 'all', action: 'accept' | 'dismiss' | 'reopen'): string[];
 	stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
+	projectReview(target: Document): ReviewProjection;
 }
 
 /** `VisualEditorInner` also holds the active prose leaf. */

@@ -193,6 +193,18 @@ export interface CreateFieldOpts {
 }
 
 /** The prose-leaf handle (INVARIANTS §Surface). */
+/** A leaf's open proposals written into a copy of its document, and the way between the two. */
+export interface LeafProjection {
+	/** The proposals written, in the order the leaf was handed them. */
+	ids: readonly string[];
+	/** A content offset in the leaf as it stands, as an offset in the projection. */
+	toProjection(pos: number): number;
+	/** A content offset in the projection, as one in the leaf as it stands, or the proposal
+	 *  that adds the block holding it. Inside a stretch a proposal rewrites, the offset is the
+	 *  nearest the leaf holds. */
+	toLive(pos: number): number | { review: string };
+}
+
 export interface FieldController {
 	/** The mounted `container`: the leaf's element, for a caller that has to reach the
 	 *  DOM the view sits in (the arrival wash, `core/bloom.ts`) rather than re-find it. */
@@ -247,6 +259,12 @@ export interface FieldController {
 	reopenReview(id: string): void;
 	/** Undo the leaf's newest step, a taken proposal's, reported as `reopen`. */
 	undoReview(): boolean;
+	/**
+	 * Write every proposal the leaf draws into `target`, a copy of the document the leaf edits,
+	 * as their accepts would commit them, dispatching nothing: the leaf, its history and its
+	 * document are as they were. `undefined` where the leaf draws none.
+	 */
+	projectReview(target: Document): LeafProjection | undefined;
 	/** Ids of the anchors touching content range `[from, to]`: a selection's anchor state. */
 	anchorsInRange(from: number, to: number): string[];
 	/**
@@ -1030,6 +1048,45 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		},
 		undoReview(): boolean {
 			return review?.undo(view) ?? false;
+		},
+		projectReview(target: Document): LeafProjection | undefined {
+			if (!review || held || plaintext) return undefined;
+			const projected = review.project(view.state);
+			if (!projected) return undefined;
+			const { state: next, mapping, added, ids } = projected;
+			const scan = scanDoc(next.doc);
+			const after = lineIndexOf(scan);
+			const anchors = (anchorKey.getState(next)?.anchors ?? []).map((a) => ({
+				id: a.id,
+				start: pmToOffset(after, a.start),
+				end: pmToOffset(after, a.end)
+			}));
+			const newRt = scanContent(scan, anchors);
+			const at = writeAddr(target, addr);
+			try {
+				if (opts.emptyUnsets && !anchors.length && isEmptyContent(newRt)) target.removeField(addr);
+				else if (!changeCommittable(target, addr)) target.replace(at, newRt);
+				else {
+					const change = lower(reconciler.last, newRt);
+					if (change) {
+						askCore(reconciler.last, change);
+						target.apply(at, change);
+					}
+				}
+			} catch {
+				target.replace(at, newRt);
+			}
+			const back = mapping.invert();
+			const live = index;
+			return {
+				ids,
+				toProjection: (pos) => pmToOffset(after, mapping.map(offsetToPM(live, pos))),
+				toLive(pos) {
+					const pm = offsetToPM(after, pos);
+					const adds = added.find((a) => a.from <= pm && pm < a.to);
+					return adds ? { review: adds.id } : pmToOffset(live, back.map(pm));
+				}
+			};
 		},
 		enterReview(id: string): boolean {
 			return review?.enter(view, id) ?? false;

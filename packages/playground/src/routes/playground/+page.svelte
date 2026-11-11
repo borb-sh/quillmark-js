@@ -71,6 +71,16 @@
     Keep ─► review = []
     ⌘Z ─► the newest answers taken back ─► onReview reopen
     the answer card, the review keys ─► the editor's own, on the current item
+
+  While items are open, the preview paints the page as it would read with all of them taken,
+  and the document stays as it is: the recompile compiles a copy the editor writes the open
+  items into, freed once compiled, and both bridge hops go through the projection's map, a
+  pick on a proposed card or paragraph making that item the current change.
+
+    recompile ─► copy = doc.clone() ─► editor.projectReview(copy) ─► session.update(copy) ─► free
+    onReviewDrawn ─► recompile (an answer, the list set, the list cleared)
+    preview click ─► projection.toLive(at) ─► editor.setCaret / editor.revealReview(id)
+    editor caret  ─► projection.toProjection(at) ─► preview.focusPosition
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
@@ -92,7 +102,8 @@
 		CardOp,
 		EditorChange,
 		ReviewDrawn,
-		ReviewItem
+		ReviewItem,
+		ReviewProjection
 	} from '@quillmark/svelte/visual';
 	import type { Delta, RemoteChange, Session } from '@quillmark/collab';
 	import { Preview } from '@quillmark/svelte/preview';
@@ -135,6 +146,7 @@
 				revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
 				answerReview(ids: readonly string[] | 'all', action: 'accept' | 'dismiss'): string[];
 				stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
+				projectReview(target: Document): ReviewProjection;
 		  }
 		| undefined = $state();
 
@@ -145,6 +157,11 @@
 	// What the editor draws of the list: the bar counts and walks this, not the list itself, so
 	// its count and the page agree.
 	let reviewDrawn = $state<ReviewDrawn | undefined>();
+	// The open items the preview last compiled into its copy, and the map between the document's
+	// places and the copy's. The map holds until the next recompile, as both documents do.
+	const SAME: ReviewProjection = { ids: [], toProjection: (at) => at, toLive: (at) => at };
+	let projection: ReviewProjection = SAME;
+	let previewing = $state(0);
 
 	// The live session under `?collab=`, and what the strip says of it.
 	let live: Session | undefined;
@@ -166,7 +183,13 @@
 	let injected = $state<Diagnostic[]>([]);
 	let externalDiagnostics = $state<Diagnostic[]>([]);
 	function syncDiagnostics(): void {
-		externalDiagnostics = session ? [...session.warnings, ...injected] : injected;
+		// A warning of the copy names its place there.
+		const warnings = (session?.warnings ?? []).flatMap((d) => {
+			if (!d.path) return [d];
+			const path = projection.toLive(d.path);
+			return typeof path === 'string' ? [{ ...d, path }] : [];
+		});
+		externalDiagnostics = [...warnings, ...injected];
 	}
 
 	// What this quill's backend emits, probed once per open off its descriptor: the
@@ -222,7 +245,7 @@
 		if (!docHandle) return;
 		if (!session) return reopen();
 		try {
-			const change = session.update(docHandle);
+			const change = compile(session, docHandle);
 			lastChange = change;
 			previewRef?.refresh(change);
 			syncDiagnostics();
@@ -230,6 +253,26 @@
 			// A failed recompile keeps the last-good preview (the session is
 			// transactional); surface it without crashing the shell.
 			console.error('[playground] recompile failed', e);
+		}
+	}
+
+	// The document as the preview paints it: with the open items taken where there are any, in a
+	// copy only this compile reads.
+	function compile(session: LiveSession, doc: Document): ChangeSet {
+		if (!reviewDrawn?.open.length || !editorRef) {
+			projection = SAME;
+			previewing = 0;
+			return session.update(doc);
+		}
+		const copy = doc.clone();
+		try {
+			const projected = editorRef.projectReview(copy);
+			const change = session.update(projected.ids.length ? copy : doc);
+			projection = projected.ids.length ? projected : SAME;
+			previewing = projection.ids.length;
+			return change;
+		} finally {
+			copy.free();
 		}
 	}
 
@@ -270,7 +313,7 @@
 		session = opened;
 		refused = undefined;
 		syncDiagnostics();
-		if (missed) scheduleRecompile();
+		if (missed || reviewDrawn?.open.length) scheduleRecompile();
 	}
 
 	// ── Bridge: preview → editor ────────────────────────────────────────────────
@@ -284,8 +327,11 @@
 	// moves in that same flush.
 	function handlePick(at: Landing): void {
 		lastHit = at;
+		const live = projection.toLive(at);
+		if (!live) return;
 		shown = 1;
-		editorRef?.setCaret(at);
+		if ('review' in live) void editorRef?.revealReview(live.review);
+		else editorRef?.setCaret(live);
 	}
 
 	// ── Bridge: editor → preview ────────────────────────────────────────────────
@@ -298,7 +344,8 @@
 	// The editor already speaks the preview's address grammar, so this hop is a
 	// pass-through; the strip readout is the only reason it is a function at all.
 	function handleCaretMove(at: Place): void {
-		previewRef?.focusPosition(at);
+		const shownAt = projection.toProjection(at);
+		if (shownAt) previewRef?.focusPosition(shownAt);
 		lastFocus = JSON.stringify(at);
 	}
 	// Every edit, whichever lane it came down. A structure op recompiles at once:
@@ -424,6 +471,8 @@
 		reviewItems = undefined;
 		reviewDrawn = undefined;
 		reviewFocus = 'none';
+		projection = SAME;
+		previewing = 0;
 		fonts = [];
 		refused = undefined;
 		editorRef = undefined;
@@ -730,6 +779,11 @@
 				{#if reviewItems}
 					{@const none = opening || !reviewDrawn?.open.length}
 					<span class="review-bar" role="group" aria-label="Review">
+						{#if previewing}
+							<span class="qm-readout" data-testid="review-previewing"
+								>Previewing {previewing} {previewing === 1 ? 'change' : 'changes'}</span
+							>
+						{/if}
 						<button
 							class="qm-control"
 							type="button"
@@ -831,6 +885,7 @@
 						}}
 						onReviewDrawn={(drawn) => {
 							reviewDrawn = drawn;
+							scheduleRecompile();
 						}}
 						{fonts}
 						{fontLabels}

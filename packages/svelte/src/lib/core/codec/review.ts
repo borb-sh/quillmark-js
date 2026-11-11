@@ -24,7 +24,7 @@ import {
 	type EditorState,
 	type Transaction
 } from 'prosemirror-state';
-import { Step, StepResult } from 'prosemirror-transform';
+import { Mapping, Step, StepResult } from 'prosemirror-transform';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { arriving, HARD_BREAK, ISLAND_SLOT } from './islands.js';
 import { remoteKey } from './remote.js';
@@ -308,27 +308,103 @@ interface Drawn {
 function taking(state: EditorState, plan: readonly Piece[]): Transaction | undefined {
 	const tr = state.tr;
 	try {
-		for (const piece of [...plan].sort((a, b) => b.from - a.from)) {
-			let { from, to } = piece;
-			if (piece.lift) {
-				const $at = tr.doc.resolve(from);
-				for (let d = $at.depth; d > 0 && $at.node(d).childCount === 1; d--) {
-					from = $at.before(d);
-					to = $at.after(d);
-				}
-				// A leaf holds a block at the least: its last one is emptied where it stands.
-				if (from === 0 && to === tr.doc.content.size) {
-					tr.replaceWith(from, to, tr.doc.type.createAndFill()!.content);
-					continue;
-				}
-			}
-			tr.replaceWith(from, to, arriving(tr.doc, piece.content));
-		}
+		for (const piece of [...plan].sort((a, b) => b.from - a.from)) writePiece(tr, piece);
 		tr.doc.check();
 	} catch {
 		return undefined;
 	}
 	return tr.docChanged ? closeHistory(tr) : undefined;
+}
+
+/** One piece of a plan written into `tr`, at its place in the document the plan was read over. */
+function writePiece(tr: Transaction, piece: Piece): void {
+	let { from, to } = piece;
+	if (piece.lift) {
+		const $at = tr.doc.resolve(from);
+		for (let d = $at.depth; d > 0 && $at.node(d).childCount === 1; d--) {
+			from = $at.before(d);
+			to = $at.after(d);
+		}
+		// A leaf holds a block at the least: its last one is emptied where it stands.
+		if (from === 0 && to === tr.doc.content.size) {
+			tr.replaceWith(from, to, tr.doc.type.createAndFill()!.content);
+			return;
+		}
+	}
+	tr.replaceWith(from, to, arriving(tr.doc, piece.content));
+}
+
+/** A leaf with every proposal it draws taken: the state the accepts leave it in, without one of
+ *  them dispatched. */
+export interface Projected {
+	/** The leaf's state as its accepts would leave it. */
+	state: EditorState;
+	/** The ids taken, in the order the leaf was handed them. */
+	ids: string[];
+	/** From the leaf as it stands to the projected one. */
+	mapping: Mapping;
+	/** The blocks a proposal adds, as ranges of the projected document, by its id. */
+	added: { id: string; from: number; to: number }[];
+}
+
+/**
+ * Every proposal the leaf draws, taken from the plans it draws them from. The pieces of every
+ * plan are written in one pass, last first, which is what taking them one at a time writes,
+ * since no two proposals the leaf draws share a stretch; where the pieces of two do not make a
+ * document together, each is planned again over what the one before it left, as a batch of
+ * accepts plans it.
+ */
+function projecting(
+	state: EditorState,
+	now: Drawn,
+	redraw: (state: EditorState) => Drawn
+): Projected | undefined {
+	const ids = now.spans.map((span) => span.id);
+	if (!ids.length) return undefined;
+	const pieces = ids.flatMap((id) => (now.plans.get(id) ?? []).map((piece) => ({ id, piece })));
+	pieces.sort((a, b) => b.piece.from - a.piece.from);
+	const tr = state.tr;
+	const adds: { id: string; at: number; step: number }[] = [];
+	try {
+		for (const { id, piece } of pieces) {
+			const step = tr.steps.length;
+			writePiece(tr, piece);
+			if (piece.from === piece.to && piece.content.firstChild?.isBlock)
+				adds.push({ id, at: piece.from, step });
+		}
+		tr.doc.check();
+	} catch {
+		return oneByOne(state, ids, redraw);
+	}
+	const next = state.apply(tr);
+	if (next === state) return undefined;
+	const added = adds.map(({ id, at, step }) => {
+		const after = tr.mapping.slice(step);
+		return { id, from: after.map(at, -1), to: after.map(at, 1) };
+	});
+	return { state: next, ids, mapping: tr.mapping, added };
+}
+
+/** {@link projecting}, each proposal planned over what the one before it left. */
+function oneByOne(
+	state: EditorState,
+	ids: readonly string[],
+	redraw: (state: EditorState) => Drawn
+): Projected | undefined {
+	const mapping = new Mapping();
+	const taken: string[] = [];
+	let at = state;
+	for (const id of ids) {
+		const plan = redraw(at).plans.get(id);
+		const tr = plan && taking(at, plan);
+		if (!tr) continue;
+		const next = at.apply(tr);
+		if (next === at) continue;
+		mapping.appendMapping(tr.mapping);
+		taken.push(id);
+		at = next;
+	}
+	return taken.length ? { state: at, ids: taken, mapping, added: [] } : undefined;
 }
 
 /** A hunk between two paired textblocks. `format` marks one whose words stay and whose
@@ -813,6 +889,9 @@ export interface ReviewLayer {
 	reopen(view: EditorView, id: string): void;
 	/** Undo the leaf's newest history step: an accept's, which reopens its item. */
 	undo(view: EditorView): boolean;
+	/** The leaf with every proposal it draws taken, nothing dispatched; `undefined` where it
+	 *  draws none, or taking them writes nothing. */
+	project(state: EditorState): Projected | undefined;
 }
 
 /**
@@ -1021,6 +1100,10 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			channel.act(id, 'reopen');
 		},
 		undo: (view) => undo(view.state, view.dispatch),
+		project: (state) =>
+			projecting(state, drawn(state), (at) =>
+				at === state ? drawn(state) : draw(at, channel, new Map(bases))
+			),
 		enter(view, id) {
 			const span = drawn(view.state).spans.find((s) => s.id === id);
 			if (!span) return false;

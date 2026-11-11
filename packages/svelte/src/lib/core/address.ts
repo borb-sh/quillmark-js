@@ -155,6 +155,21 @@ export function cardMoved(path: DocPath, was: readonly string[], now: readonly s
 	return core().formatDocPath([{ ...head, index }, ...segs.slice(1)]);
 }
 
+/** The index of the card `path` names, `undefined` where it names none. */
+export function cardOfPath(path: DocPath): number | undefined {
+	const head = segsOf(path)?.[0];
+	return head?.seg === 'card' ? head.index : undefined;
+}
+
+/** `path` naming the card at `index` in place of the card it names; `path` itself where it
+ *  names none. */
+export function pathOnCard(path: DocPath, index: number): DocPath {
+	const segs = segsOf(path);
+	const head = segs?.[0];
+	if (!segs || head?.seg !== 'card' || head.index === index) return path;
+	return core().formatDocPath([{ ...head, index }, ...segs.slice(1)]);
+}
+
 /**
  * `parseDocPath`, with a malformed path as `undefined` rather than a throw. The gate is read
  * outside the try: an uninitialized core is not a malformed path.
