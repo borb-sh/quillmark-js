@@ -210,6 +210,7 @@
 		<Popover.Content
 			customAnchor={triggerEl ?? null}
 			collisionBoundary={bounds}
+			strategy="absolute"
 			side={beside ? 'right' : 'top'}
 			align={beside ? 'center' : 'start'}
 			sideOffset={(spacePx(triggerEl) ?? 0) + reach}
