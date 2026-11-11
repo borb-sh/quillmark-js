@@ -69,8 +69,10 @@ export interface VisualStrings
 	reviewProposal: string;
 	/** The answer card's note on a change whose place no longer holds what its writer read. */
 	reviewOutdated: string;
-	/** Where the current change stands in the review, for a screen reader: `Change 2 of 5`. */
-	reviewPosition: (at: number, of: number) => string;
+	/** Where the current change stands in the review and what it is to, for a screen reader:
+	 *  `Change 2 of 5, Subtitle`. `name` is the field's label, the body's, or the card's title
+	 *  after its tag, and empty where nothing names it. */
+	reviewPosition: (at: number, of: number, name: string) => string;
 	/** The tag on a card proposed new, and the mark on one proposed taken out. */
 	reviewNewCard: string;
 	reviewRemoveCard: string;
@@ -78,6 +80,9 @@ export interface VisualStrings
 	reviewEmpty: string;
 	/** Where a proposal adds a list member past the last, on the answer card. */
 	reviewNewItem: string;
+	/** A control under a proposal, described to assistive tech beside its name: the value it
+	 *  shows is the proposed one, and `current` the value the field holds now. */
+	reviewCurrently: (current: string) => string;
 	/** A switch's two values, as a row words them. */
 	reviewOn: string;
 	reviewOff: string;
@@ -315,11 +320,12 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	reviewDismiss: 'Dismiss',
 	reviewProposal: 'Proposed change',
 	reviewOutdated: 'Changed since proposed',
-	reviewPosition: (at, of) => `Change ${at} of ${of}`,
+	reviewPosition: (at, of, name) => `Change ${at} of ${of}${name ? `, ${name}` : ''}`,
 	reviewNewCard: 'New card',
 	reviewRemoveCard: 'Proposed removal',
 	reviewEmpty: 'Empty',
 	reviewNewItem: 'New item',
+	reviewCurrently: (current) => `Proposed change, currently ${current}`,
 	reviewOn: 'On',
 	reviewOff: 'Off',
 	undoRemoved: (what) => `${what} removed`,

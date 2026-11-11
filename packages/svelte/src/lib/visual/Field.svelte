@@ -537,7 +537,10 @@
 			<ReviewRows entries={nestedReview} />
 		{/if}
 		{#if proposed && !worded}
-			<ReviewProposal item={proposed} />
+			<ReviewProposal
+				item={proposed}
+				current={value ?? ghost ?? (field.control === 'boolean' ? false : undefined)}
+			/>
 		{/if}
 		{#if scalar}
 			<DiagnosticList {diagnostics} />

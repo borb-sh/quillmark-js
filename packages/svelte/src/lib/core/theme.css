@@ -219,10 +219,15 @@
 	   the strength the accent's own tint is held under body text plus what a state resting
 	   on a well has to clear. `lit` is that tint under attention: the pointer over the
 	   item, the caret in it, a host revealing it. `line` is the stroke through the words a
-	   proposal would take, held back so it reads under the ink rather than as it. */
+	   proposal would take, held back so it reads under the ink rather than as it, yet at 3:1 over
+	   the card and a well at both poles, being the one mark a struck word or a tinted control's
+	   edge has that is not colour alone: 75% of the light pole's hue, 60% of the dark's. */
 	--_qm-review-tint: color-mix(in oklab, var(--_qm-review) 20%, transparent);
 	--_qm-review-lit: color-mix(in oklab, var(--_qm-review) 34%, transparent);
-	--_qm-review-line: color-mix(in oklab, var(--_qm-review) 60%, transparent);
+	--_qm-review-line: light-dark(
+		color-mix(in oklab, var(--_qm-review) 75%, transparent),
+		color-mix(in oklab, var(--_qm-review) 60%, transparent)
+	);
 	/* The danger hue held: what a destructive control fills with where the family's
 	   neutral hover rung would read as one more button. Mixed at the accent tint's
 	   strength, so a held tint is a held tint whichever hue it carries. */
