@@ -45,19 +45,19 @@ export type { SlashState, SlashStrings } from './slash.js';
 export { DEFAULT_LEAVE_STRINGS } from './leave.js';
 export type { LeaveStrings } from './leave.js';
 
-// The review layer a leaf draws over its blocks: the visual tier's `strings` set extends its
-// wording and its `ReviewItem` narrows to the leaf's own.
-export { DEFAULT_REVIEW_STRINGS } from './review.js';
+// The review layer a leaf draws over its blocks: the visual tier's `ReviewItem` narrows to the
+// leaf's own.
 export type {
 	BlockPlace,
 	LeafUndrawn,
 	ReviewAction,
 	ReviewReport,
-	ReviewStrings,
 	ReviewVia,
 	TextReview
 } from './review.js';
 export { wordDiff } from './review-diff.js';
+export { valueDiffPlugin } from './value-diff.js';
+export type { ValueProposal } from './value-diff.js';
 export type { DiffHunk } from './review-diff.js';
 
 // The rich editor's shortcuts as a host lists them, read off the tables the keymaps bind from;

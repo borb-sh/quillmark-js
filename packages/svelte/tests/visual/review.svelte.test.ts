@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// Review on the surface: a host's list drawn where each item is, a proposal taken as the
-// editor's own edit, and every answer handed back as an event.
+// Review on the surface: a host's list drawn where each item is, answered on the one answer card
+// or by the review keys, a proposal taken as the editor's own edit, and every answer handed back
+// as an event.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
@@ -22,7 +23,9 @@ import {
 afterEach(unmountAll);
 
 const main = quill().schema.main;
-const toast = (target: HTMLElement) => target.querySelector<HTMLElement>('.qm-toast');
+/** One of the answer card's two buttons. */
+const answer = (target: HTMLElement, action: 'accept' | 'dismiss') =>
+	target.querySelector<HTMLButtonElement>(`.qm-review-card .qm-review-card-${action}`)!;
 const keyOf = (chord: string): string => chord.slice(chord.lastIndexOf('-') + 1);
 const mod = { ctrlKey: true };
 
@@ -68,67 +71,109 @@ describe('a proposed field value', () => {
 	const proposed =
 		(after: unknown) =>
 		(doc: Document): ReviewItem[] => [{ id: 'r1', field: doc.pathFor('columns'), after }];
-	const row = (r: Reviewed) =>
-		openField(r.target, main, 'columns').querySelector<HTMLElement>('.qm-review-proposal')!;
 
-	it('stands under the control as the value that would come', () => {
+	it('strikes the number its control holds and tints the one that would come, writing nothing', async () => {
 		const r = review(proposed(2));
-		expect(row(r).querySelector('ins')?.textContent).toBe('2');
+		const columns = openField(r.target, main, 'columns');
+		const input = columns.querySelector<HTMLInputElement>('.qm-field-control input')!;
+		const held = input.value;
+		const drawn = columns.querySelector('.qm-number-review')!;
+		expect(drawn.querySelector('del')?.textContent).toBe(held);
+		expect(drawn.querySelector('ins')?.textContent).toBe('2');
+		expect(drawn.querySelector('ins')?.getAttribute('data-qm-review')).toBe('r1');
+		expect(columns.querySelector('[data-qm-proposed]')).toBeNull();
+		await settle();
+		expect(r.target.querySelector('.qm-review-card')?.textContent).not.toContain('2');
 		expect(r.doc.getStored('columns')).toBeUndefined();
 	});
 
-	it('is written down the field lane when taken, with the step back on the toast', async () => {
+	it('leaves the default unsaid while it stands', () => {
 		const r = review(proposed(2));
-		row(r).querySelector<HTMLButtonElement>('.qm-review-accept')!.click();
+		const columns = openField(r.target, main, 'columns').closest('.qm-field')!;
+		expect(columns.querySelector('[id$="-default"]')).toBeNull();
+		r.editor.answerReview(['r1'], 'dismiss');
+		flushSync();
+		expect(columns.querySelector('[id$="-default"]')).not.toBeNull();
+	});
+
+	it('shows a switch as the face it would take, marked', () => {
+		const r = review((doc) => [
+			{ id: 'r1', field: doc.pathFor('draft_watermark'), before: false, after: true }
+		]);
+		const field = openField(r.target, main, 'draft_watermark');
+		expect(field.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
+		expect(field.querySelector('[data-qm-proposed]')).not.toBeNull();
+		expect(r.doc.getStored('draft_watermark')).not.toBe(true);
+	});
+
+	it('draws no answers of its own: the answer card on it answers it', async () => {
+		const r = review(proposed(2));
+		expect(openField(r.target, main, 'columns').querySelector('.qm-review-card')).toBeNull();
+		await settle();
+		expect(r.lit.at(-1)).toBe('r1');
+		expect(answer(r.target, 'accept').textContent).toContain('Accept');
+		expect(answer(r.target, 'dismiss').textContent).toContain('Dismiss');
+	});
+
+	it('is written down the field lane when taken, and ⌘Z writes back what it replaced', async () => {
+		const r = review(proposed(2));
+		await settle();
+		answer(r.target, 'accept').click();
 		flushSync();
 		expect(r.doc.getStored('columns')).toBe(2);
 		expect(r.changes.map((c) => c.source)).toEqual(['field']);
 		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
-		expect(r.target.querySelector('.qm-review-proposal')).toBeNull();
+		expect(r.target.querySelector('[data-qm-review~="r1"]')).toBeNull();
+		expect(r.target.querySelector('.qm-toast')).toBeNull();
 
-		toast(r.target)!.querySelector<HTMLButtonElement>('.qm-toast-action')!.click();
-		flushSync();
+		press(document.body, 'z', mod);
 		await settle();
 		expect(r.doc.getStored('columns')).toBeUndefined();
+		expect(r.events.at(-1)).toEqual({ id: 'r1', action: 'reopen' });
 	});
 
-	it('is the lit item while the focus is in its field', () => {
-		const r = review(proposed(2));
+	it('is current once the focus arrives in its field', async () => {
+		const r = review((doc) => [
+			{ id: 'sub', field: doc.pathFor('subtitle'), after: 'A newer subtitle' },
+			...proposed(2)(doc)
+		]);
+		await settle();
 		const control = openField(r.target, main, 'columns').querySelector('.qm-field-control')!;
 		control.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
 		flushSync();
 		expect(r.lit.at(-1)).toBe('r1');
 	});
 
-	it('hands the focus back to the control when answered from its row', () => {
+	it('leaves the focus where it was when answered from the card', async () => {
 		const r = review(proposed(2));
+		await settle();
 		const columns = openField(r.target, main, 'columns');
-		const dismiss = row(r).querySelector<HTMLButtonElement>('.qm-review-dismiss')!;
-		dismiss.focus();
-		dismiss.click();
+		const input = columns.querySelector<HTMLElement>('input')!;
+		input.focus();
+		answer(r.target, 'dismiss').click();
 		flushSync();
-		expect(columns.querySelector('.qm-field-control')!.contains(document.activeElement)).toBe(true);
+		expect(document.activeElement).toBe(input);
 	});
 
-	it('is left alone when turned down', () => {
+	it('is left alone when turned down', async () => {
 		const r = review(proposed(2));
-		row(r).querySelector<HTMLButtonElement>('.qm-review-dismiss')!.click();
-		flushSync();
+		await settle();
+		press(document.body, '.', mod);
 		expect(r.events).toEqual([{ id: 'r1', action: 'dismiss' }]);
 		expect(r.changes).toEqual([]);
-		expect(r.target.querySelector('.qm-review-proposal')).toBeNull();
+		expect(r.target.querySelector('[data-qm-review~="r1"]')).toBeNull();
 	});
 
 	it('stands, unanswered, where the field’s writer refuses it', () => {
 		const r = review(proposed('several'));
-		row(r).querySelector<HTMLButtonElement>('.qm-review-accept')!.click();
+		expect(r.editor.answerReview(['r1'], 'accept')).toEqual([]);
 		flushSync();
 		expect(r.events).toEqual([]);
 		expect(r.errors.map((e) => e.code)).toEqual(['commit-refused']);
-		expect(r.target.querySelector('.qm-review-proposal')).not.toBeNull();
+		expect(r.target.querySelector('[data-qm-review~="r1"]')).not.toBeNull();
 	});
 
-	it('reads a line of words as an edit of the line, and a text leaf re-reads it once taken', () => {
+	it('draws a line of words as an edit of the line in its leaf, and the leaf re-reads it once taken', async () => {
 		const r = review((doc) => [
 			{
 				id: 'r1',
@@ -139,9 +184,11 @@ describe('a proposed field value', () => {
 		]);
 		const before = stored(r.doc, 'subtitle') as string;
 		const subtitle = openField(r.target, main, 'subtitle');
-		const proposal = subtitle.querySelector<HTMLElement>('.qm-review-proposal')!;
-		expect(proposal.querySelector('del')).toBeNull();
-		expect(proposal.querySelector('ins')?.textContent).toBe(', revised');
+		await settle();
+		expect(leaf(subtitle).querySelector('.qm-review-del')).toBeNull();
+		expect(leaf(subtitle).querySelector('.qm-review-ins')?.textContent).toBe(', revised');
+		expect(subtitle.querySelector('[data-qm-proposed]')).toBeNull();
+		expect(stored(r.doc, 'subtitle')).toBe(before);
 		press(leaf(subtitle), keyOf(REVIEW_KEYS.accept), mod);
 		expect(stored(r.doc, 'subtitle')).toBe(`${before}, revised`);
 		expect(leafText(subtitle)).toBe(`${before}, revised`);
@@ -195,16 +242,17 @@ describe('an item in the body', () => {
 		expect(r.target.querySelector('.ProseMirror [data-qm-review="r1"]')).not.toBeNull();
 	});
 
-	it('is the leaf’s own edit when taken, and the event follows the change', () => {
+	it('is the leaf’s own edit when taken, and the event follows the change', async () => {
 		const r = review(first);
-		r.target.querySelector<HTMLButtonElement>('.ProseMirror .qm-review-accept')!.click();
+		await settle();
+		answer(r.target, 'accept').click();
 		flushSync();
 		expect(r.doc.main.body.text.startsWith('A proposed line.')).toBe(true);
 		expect(r.changes.map((c) => c.source)).toEqual(['prose']);
 		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
 	});
 
-	it('takes the caret when revealed with the focus, so its chords answer', async () => {
+	it('takes the caret when revealed with the focus', async () => {
 		const r = review(first);
 		expect(await r.editor.revealReview('r1', { focus: true })).toBe(true);
 		flushSync();
@@ -218,7 +266,7 @@ describe('an item in the body', () => {
 
 	it('is drawn no more once answered, while the list still holds it', () => {
 		const r = review(first);
-		r.target.querySelector<HTMLButtonElement>('.ProseMirror .qm-review-dismiss')!.click();
+		r.editor.answerReview(['r1'], 'dismiss');
 		flushSync();
 		expect(r.target.querySelector('[data-qm-review]')).toBeNull();
 		r.props.review = [...r.props.review!];
@@ -239,9 +287,7 @@ describe('a removed card’s step', () => {
 		r.target.querySelector<HTMLButtonElement>('.qm-card-delete')!.click();
 		flushSync();
 		const without = r.doc.toMarkdown();
-		openField(r.target, main, 'columns')
-			.querySelector<HTMLButtonElement>('.qm-review-accept')!
-			.click();
+		r.editor.answerReview(['r1'], 'accept');
 		flushSync();
 		press(document.body, 'z', mod);
 		flushSync();

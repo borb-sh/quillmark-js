@@ -7,6 +7,7 @@ import type { Document } from '@quillmark/wasm';
 import type { ReviewEvent, ReviewItem } from '$lib/visual';
 import { quill, example } from '../helpers/fixtures.js';
 import {
+	answerOn,
 	leaf,
 	mountEditor,
 	openField,
@@ -58,13 +59,8 @@ function first(doc: Document, field?: string): { field: string; replace: string[
 const abstractText = (doc: Document): string =>
 	(doc.getStored('abstract') as { text: string }).text;
 
-/** The Accept on item `id`, wherever it is drawn. */
-function accept(target: HTMLElement, id: string): void {
-	[...target.querySelectorAll<HTMLButtonElement>('.qm-review-accept')]
-		.find((el) => el.closest('[data-qm-review]')?.getAttribute('data-qm-review') === id)!
-		.click();
-	flushSync();
-}
+/** Accept item `id` from the answer card, the change made current by a press on it. */
+const accept = (target: HTMLElement, id: string): void => answerOn(target, id, 'accept');
 
 const mixed = (doc: Document): ReviewItem[] => [
 	{ id: 'A', ...first(doc), after: 'The body, proposed.' },
@@ -93,7 +89,8 @@ describe('the answer journal', () => {
 			{ id: 'sub', action: 'reopen' },
 			{ id: 'cols', action: 'reopen' }
 		]);
-		expect(r.target.querySelectorAll('.qm-review-proposal')).toHaveLength(2);
+		expect(r.target.querySelector('.qm-number-review [data-qm-review~="cols"]')).not.toBeNull();
+		expect(r.target.querySelector('.qm-review-ins[data-qm-review~="sub"]')).not.toBeNull();
 	});
 
 	it('takes back answers across leaves and fields newest first, from inside the first leaf', async () => {
@@ -140,8 +137,7 @@ describe('the answer journal', () => {
 	it('reopens a dismissal the host took off its list', async () => {
 		const r = journaled(mixed, true);
 		await settle();
-		r.target.querySelector<HTMLButtonElement>('[data-qm-review="A"] .qm-review-dismiss')!.click();
-		flushSync();
+		answerOn(r.target, 'A', 'dismiss');
 		expect(r.props.review!.map((it) => it.id)).not.toContain('A');
 		press(r.target.querySelector<HTMLElement>('.qm-editor')!, 'z', mod);
 		await settle();
@@ -152,7 +148,7 @@ describe('the answer journal', () => {
 		expect(r.target.querySelector('.ProseMirror [data-qm-review="A"]')).not.toBeNull();
 	});
 
-	it('takes back a whole batch with one ⌘Z, the host’s batch raising no toast', async () => {
+	it('takes back a whole batch with one ⌘Z, raising no toast', async () => {
 		const r = journaled(mixed);
 		const body = r.doc.main.body.text;
 		await settle();

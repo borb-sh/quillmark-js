@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 // Review as a batch: what the editor draws of the host's list and why not, answers given by the
-// host's call, and the steps and chords that walk the list.
+// host's call, the one current change every answer moves on from, and the steps and keys that walk
+// the list wherever the focus is.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { REVIEW_KEYS } from '$lib/core/codec';
 import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
-import { quill, example } from '../helpers/fixtures.js';
+import { core, quill, example } from '../helpers/fixtures.js';
 import {
 	mountEditor,
 	press,
@@ -28,8 +29,9 @@ interface Batch extends Mounted<EditorRef> {
 	lit: (string | undefined)[];
 }
 
-function batch(items: (doc: Document) => ReviewItem[], advance?: boolean): Batch {
+function batch(items: (doc: Document) => ReviewItem[], body?: string): Batch {
 	const doc = example();
+	if (body !== undefined) doc.replace({}, core.importMarkdown(body).content);
 	const events: ReviewEvent[] = [];
 	const drawn: ReviewDrawn[] = [];
 	const lit: (string | undefined)[] = [];
@@ -37,8 +39,7 @@ function batch(items: (doc: Document) => ReviewItem[], advance?: boolean): Batch
 		review: items(doc),
 		onReview: (e) => events.push(e),
 		onReviewDrawn: (d) => drawn.push(d),
-		onReviewFocus: (id) => lit.push(id),
-		...(advance === undefined ? {} : { reviewAdvance: advance })
+		onReviewFocus: (id) => lit.push(id)
 	});
 	return { ...mounted, doc, events, drawn, lit };
 }
@@ -206,15 +207,24 @@ describe('answering by the host', () => {
 	});
 });
 
-describe('stepping', () => {
-	it('walks the drawn items in page order and round from the end', async () => {
+describe('the current change', () => {
+	/** A text box beside the editor, as a host's chat input is. */
+	function outside(tag: 'input' | 'button'): HTMLElement {
+		const el = document.createElement(tag);
+		document.body.append(el);
+		el.focus();
+		return el;
+	}
+
+	it('is the first drawn as a review starts, and steps walk the rest in page order, round from the end', async () => {
 		const r = batch(spread);
 		await settle();
 		const { open: order } = r.drawn.at(-1)!;
+		expect(r.lit.at(-1)).toBe(order[0]);
 		const walked: (string | undefined)[] = [];
-		for (let i = 0; i <= order.length; i++)
+		for (let i = 0; i < order.length; i++)
 			walked.push(await r.editor.stepReview(1, { focus: false }));
-		expect(walked).toEqual([...order, order[0]]);
+		expect(walked).toEqual([...order.slice(1), order[0]]);
 		expect(await r.editor.stepReview(-1, { focus: false })).toBe(order.at(-1));
 	});
 
@@ -233,62 +243,94 @@ describe('stepping', () => {
 			];
 		});
 		await settle();
-		expect(await r.editor.stepReview(1)).toBe('A');
+		expect(r.lit.at(-1)).toBe('A');
 		expect(await r.editor.stepReview(1)).toBe('B');
 		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.accept), mod);
 		expect(r.events).toEqual([{ id: 'B', action: 'accept' }]);
 	});
 
-	it('goes to the next and the previous item from the chords, from anywhere in the editor', async () => {
+	it('moves on to the next open one after every answer, by key, by the card and by the host', async () => {
 		const r = batch(spread);
 		await settle();
-		const { open: order } = r.drawn.at(-1)!;
-		const root = r.target.querySelector<HTMLElement>('.qm-editor')!;
-		const chord = async (dir: 'next' | 'previous') => {
-			press(root, keyOf(REVIEW_KEYS[dir]), { ...mod, altKey: true });
-			await settle();
-			await settle();
-		};
-		await chord('next');
-		expect(r.lit.at(-1)).toBe(order[0]);
-		await chord('previous');
-		expect(r.lit.at(-1)).toBe(order.at(-1));
+		const order = r.drawn.at(-1)!.open;
+		press(document.body, keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toEqual([{ id: order[0], action: 'dismiss' }]);
+		expect(r.lit.at(-1)).toBe(order[1]);
+		r.target.querySelector<HTMLButtonElement>('.qm-review-card-accept')!.click();
+		flushSync();
+		expect(r.events.at(-1)).toEqual({ id: order[1], action: 'accept' });
+		expect(r.lit.at(-1)).toBe(order[2]);
+		await settle();
+		expect(r.editor.answerReview([order[2]], 'dismiss')).toEqual([order[2]]);
+		await settle();
+		expect(r.lit.at(-1)).toBeUndefined();
 	});
 
-	it('goes on to the next item after an answer by chord, and stays after one by pointer', async () => {
-		const chorded = batch(spread);
-		await settle();
-		const order = chorded.drawn.at(-1)!.open;
-		expect(await chorded.editor.stepReview(1)).toBe(order[0]);
-		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.dismiss), mod);
-		await settle();
-		await settle();
-		expect(chorded.events).toEqual([{ id: order[0], action: 'dismiss' }]);
-		expect(chorded.lit.at(-1)).toBe(order[1]);
-		unmountAll();
-
-		const pressed = batch(spread);
-		await settle();
-		const first = pressed.drawn.at(-1)!.open[0];
-		const dismiss = [
-			...pressed.target.querySelectorAll<HTMLButtonElement>('.qm-review-dismiss')
-		].find((el) => el.closest('[data-qm-review]')?.getAttribute('data-qm-review') === first)!;
-		dismiss.click();
-		await settle();
-		await settle();
-		expect(pressed.events).toEqual([{ id: first, action: 'dismiss' }]);
-		expect(pressed.lit.filter(Boolean)).toEqual([]);
-	});
-
-	it('stays on the answered item’s place when the host turns advancing off', async () => {
-		const r = batch(spread, false);
+	it('goes on round from the end, and stays where it is when the host answers another', async () => {
+		const r = batch(spread);
 		await settle();
 		const order = r.drawn.at(-1)!.open;
-		await r.editor.stepReview(1);
-		const before = r.lit.length;
-		press(document.activeElement as HTMLElement, keyOf(REVIEW_KEYS.dismiss), mod);
+		await r.editor.stepReview(-1, { focus: false });
+		expect(r.lit.at(-1)).toBe(order[2]);
+		expect(r.editor.answerReview([order[1]], 'dismiss')).toEqual([order[1]]);
 		await settle();
+		expect(r.lit.at(-1)).toBe(order[2]);
+		press(document.body, keyOf(REVIEW_KEYS.accept), mod);
 		await settle();
-		expect(r.lit.slice(before)).not.toContain(order[1]);
+		expect(r.lit.at(-1)).toBe(order[0]);
+	});
+
+	it('is answered and stepped by the keys wherever the focus is, but in a text box outside the editor', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+		const root = r.target.querySelector<HTMLElement>('.qm-editor')!;
+		press(root, keyOf(REVIEW_KEYS.next), { ...mod, altKey: true });
+		await settle();
+		expect(r.lit.at(-1)).toBe(order[1]);
+
+		const button = outside('button');
+		press(button, keyOf(REVIEW_KEYS.previous), { ...mod, altKey: true });
+		await settle();
+		expect(r.lit.at(-1)).toBe(order[0]);
+		expect(document.activeElement).toBe(button);
+		press(button, keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toEqual([{ id: order[0], action: 'dismiss' }]);
+		button.remove();
+
+		const input = outside('input');
+		press(input, keyOf(REVIEW_KEYS.accept), mod);
+		press(input, keyOf(REVIEW_KEYS.next), { ...mod, altKey: true });
+		await settle();
+		expect(r.events).toHaveLength(1);
+		expect(r.lit.at(-1)).toBe(order[1]);
+		input.remove();
+	});
+
+	it('takes the accept key over a task item’s tick for the length of the review', async () => {
+		const r = batch(
+			(doc) => [over(doc, 'r1', '- [ ] the quick red fox')],
+			'- [ ] the quick brown fox\n\n- [ ] a second task'
+		);
+		await settle();
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
+		expect(r.doc.toMarkdown()).toContain('- [ ] the quick red fox');
+		expect(r.doc.toMarkdown()).toContain('- [ ] a second task');
+	});
+
+	it('is named by a press on a change at once, and by the pointer only once it rests', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+		const on = (id: string) => r.target.querySelector<HTMLElement>(`[data-qm-review="${id}"]`)!;
+		on(order[2]).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+		flushSync();
+		expect(r.lit.at(-1)).toBe(order[2]);
+		on(order[1]).dispatchEvent(new PointerEvent('pointerenter'));
+		on(order[1]).dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+		flushSync();
+		expect(r.lit.at(-1)).toBe(order[2]);
 	});
 });

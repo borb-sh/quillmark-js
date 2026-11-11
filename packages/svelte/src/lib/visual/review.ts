@@ -5,7 +5,7 @@
 // A proposal carries what it would write, so taking it is the editor's own edit, down the lane a
 // reader's edit takes: what lands is what was drawn, `onChange` reports it, and the reader's undo
 // takes it back.
-import type { PathStep } from '@quillmark/wasm';
+import type { Card, PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
 import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/index.js';
 
@@ -26,11 +26,28 @@ import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/inde
  *   its writer read. A path to a place inside a record or a
  *   list names that place: a cell, or a member by its index, which `after` absent takes out
  *   and an index past the last appends.
+ * - `add` or `remove`: a whole card, proposed new or proposed taken out (`CardProposal`).
  *
  * An item whose place the editor does not hold draws nothing. An answered item is drawn no
  * more: a dismissed one wrote nothing, and an accepted one is plain text in the document.
  */
-export type ReviewItem = FieldProposal | BlockProposal;
+export type ReviewItem = FieldProposal | BlockProposal | CardProposal;
+
+/**
+ * A card proposed new or taken out, naming cards by their index into the composable cards as they
+ * stood when the list was set, as a path does.
+ *
+ * - `add`: the card, drawn as a preview where it would stand: after the card at `after`, at the
+ *   head of the cards where `after` is absent, and last where that card is gone. Two proposals
+ *   after one card stand in list order. Taken, it is written with its `$id` where no card holds
+ *   that one.
+ * - `remove`: the card at that index, marked whole where it stands.
+ */
+export type CardProposal =
+	{ id: string; add: Card; after?: number } | { id: string; remove: number };
+
+/** Whether an item proposes a whole card. */
+export const byCard = (item: object): item is CardProposal => 'add' in item || 'remove' in item;
 
 /** A proposal over blocks of a rich text field, by their ids. */
 export type BlockProposal =
@@ -342,4 +359,29 @@ export function reviewRuns(before: unknown, after: unknown, words: Words): Revie
 	}
 	if (at < was.length) out.push({ text: was.slice(at) });
 	return out;
+}
+
+/** A proposed value as the text a one-line leaf would hold, `undefined` where it is not text. */
+export function proposedText(after: unknown): string | undefined {
+	if (after == null) return '';
+	if (typeof after === 'string') return after;
+	if (typeof after === 'object' && 'text' in after)
+		return String((after as { text: unknown }).text);
+	return undefined;
+}
+
+/** A proposal its control draws as words over its own value, a line of text's as a word diff and
+ *  a number's as the struck and the proposed figures; `undefined` where it draws none. */
+export function wordedProposal(
+	item: FieldProposal | undefined,
+	control: 'text' | 'number' | undefined
+): { id: string; after: string } | undefined {
+	if (!item || !control) return undefined;
+	const after =
+		control === 'number'
+			? item.after == null
+				? undefined
+				: String(item.after)
+			: proposedText(item.after);
+	return after === undefined ? undefined : { id: item.id, after };
 }

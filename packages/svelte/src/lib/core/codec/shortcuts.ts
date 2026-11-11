@@ -58,9 +58,9 @@ export const TABLE_KEYS = {
 	eraseAlt: 'Delete'
 } as const;
 
-/** An item of review under the caret (`review.ts`), ahead of every other binding of its keys,
- *  so `accept` takes a proposal over a task item's `LIST_KEYS.task`; `next` and `previous` step
- *  through the items from anywhere in the editor. */
+/** The review's keys, the editor's wherever the focus is while a review is open and ahead of
+ *  every other binding of them, so `accept` takes the current change over a task item's
+ *  `LIST_KEYS.task`; `next` and `previous` step through the changes. */
 export const REVIEW_KEYS = {
 	accept: 'Mod-Enter',
 	dismiss: 'Mod-.',
@@ -141,7 +141,7 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutBulletedList: 'Bulleted list',
 	shortcutIndent: 'Nest under the item above',
 	shortcutOutdent: 'Move back up a level',
-	shortcutTask: 'Check or uncheck a task, outside a proposal',
+	shortcutTask: 'Check or uncheck a task, outside a review',
 	shortcutMoveItem: 'Move the item up or down',
 	shortcutNextCell: 'Next cell, adding a row past the last',
 	shortcutPreviousCell: 'Previous cell',
@@ -152,9 +152,9 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutAlignColumn: 'Align a selected column',
 	shortcutDeleteCells: 'Delete the selected cells, rows or columns',
 	shortcutReviewAccept: 'Accept the proposed change',
-	shortcutReviewDismiss: 'Dismiss the proposed change, or undo the change made',
-	shortcutReviewNext: 'Go to the next review item',
-	shortcutReviewPrevious: 'Go to the previous review item'
+	shortcutReviewDismiss: 'Dismiss the proposed change',
+	shortcutReviewNext: 'Go to the next proposed change',
+	shortcutReviewPrevious: 'Go to the previous proposed change'
 };
 
 const F = FIELD_KEYS;

@@ -21,12 +21,10 @@ import { getContext, setContext } from 'svelte';
 import type { Diagnostic } from '@quillmark/wasm';
 import {
 	DEFAULT_LEAVE_STRINGS,
-	DEFAULT_REVIEW_STRINGS,
 	DEFAULT_SHORTCUT_STRINGS,
 	DEFAULT_SLASH_STRINGS,
 	DEFAULT_TABLE_STRINGS,
 	type LeaveStrings,
-	type ReviewStrings,
 	type ShortcutStrings,
 	type SlashStrings,
 	type TableChromeStrings
@@ -34,15 +32,15 @@ import {
 import type { BodyPlaceholder } from './structure.js';
 
 /**
- * The island, the insert menu, the shortcut list and the review layer's keys come from the
+ * The island, the insert menu, the shortcut list and the leave hint's keys come from the
  * codec, which owns all four models (a NodeView inside the leaf, the trigger the leaf's keymap
- * drives, the keymaps' own tables, and the decorations a leaf draws its review with). Extending
+ * drives, the keymaps' own tables, and the plugin that names the way out). Extending
  * rather than restating them is what keeps one English list: a consumer overrides an
  * island handle's name beside the card controls' and the codec still has a default
  * for a leaf mounted directly.
  */
 export interface VisualStrings
-	extends TableChromeStrings, SlashStrings, ShortcutStrings, LeaveStrings, ReviewStrings {
+	extends TableChromeStrings, SlashStrings, ShortcutStrings, LeaveStrings {
 	// ── Card controls (accessible names: the buttons are glyphs) ───────────────
 	cardMoveUp: string;
 	cardMoveDown: string;
@@ -63,11 +61,23 @@ export interface VisualStrings
 	/** The same header where a field inside holds an item of review. */
 	groupReviewed: string;
 
-	// ── Review (the row under a field) ───────────────────────────────────────
-	/** The toast over a field's proposal taken, beside its way back. */
-	reviewAccepted: string;
+	// ── Review ───────────────────────────────────────────────────────────────
+	/** The answer card's two buttons. */
+	reviewAccept: string;
+	reviewDismiss: string;
+	/** The answer card's accessible name. */
+	reviewProposal: string;
+	/** The answer card's note on a change the reader's own writing meets. */
+	reviewOutdated: string;
+	/** Where the current change stands in the review, for a screen reader: `Change 2 of 5`. */
+	reviewPosition: (at: number, of: number) => string;
+	/** The tag on a card proposed new, and the mark on one proposed taken out. */
+	reviewNewCard: string;
+	reviewRemoveCard: string;
 	/** A value that was, or would be, nothing. */
 	reviewEmpty: string;
+	/** Where a proposal adds a list member past the last, on the answer card. */
+	reviewNewItem: string;
 	/** A switch's two values, as a row words them. */
 	reviewOn: string;
 	reviewOff: string;
@@ -301,11 +311,15 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	cardAction: (action, card) => `${action}, ${card}`,
 	groupFlagged: ', has an issue',
 	groupReviewed: ', has changes to review',
-	...DEFAULT_REVIEW_STRINGS,
-	reviewAcceptTitle: `Accept (${chord('↵')})`,
-	reviewDismissTitle: `Dismiss (${chord('.')})`,
-	reviewAccepted: 'Change accepted',
+	reviewAccept: 'Accept',
+	reviewDismiss: 'Dismiss',
+	reviewProposal: 'Proposed change',
+	reviewOutdated: 'Edited since',
+	reviewPosition: (at, of) => `Change ${at} of ${of}`,
+	reviewNewCard: 'New card',
+	reviewRemoveCard: 'Proposed removal',
 	reviewEmpty: 'Empty',
+	reviewNewItem: 'New item',
 	reviewOn: 'On',
 	reviewOff: 'Off',
 	undoRemoved: (what) => `${what} removed`,

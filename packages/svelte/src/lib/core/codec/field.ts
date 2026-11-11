@@ -58,15 +58,14 @@ import { DEFAULT_LEAVE_STRINGS, leavePlugin, type LeaveStrings } from './leave.j
 import { FIELD_KEYS, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
 import {
-	DEFAULT_REVIEW_STRINGS,
 	renameBlocks,
 	reviewLayer,
 	type ReviewAction,
 	type ReviewReport,
-	type ReviewStrings,
 	type ReviewVia,
 	type TextReview
 } from './review.js';
+import { valueDiffPlugin, type ValueProposal } from './value-diff.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { dragMovePlugin } from './drag-move.js';
@@ -167,12 +166,9 @@ export interface CreateFieldOpts {
 	/** An edit leaving the leaf empty removes the field: an optional cell (`t?`), whose
 	 * unanswered `none` is what the empty leaf draws and an empty answer would hide. */
 	emptyUnsets?: boolean;
-	/** The review layer's wording, read per decoration pass (`review.ts`). */
-	reviewStrings?: () => ReviewStrings;
-	/** A reader answered the review item `id`: a proposal's button or its chord, or an undo
-	 *  that took the answer back, `chord` where a key gave it. A proposal taken is written by
-	 *  then. */
-	onReview?(id: string, action: ReviewAction, chord?: boolean): void;
+	/** The leaf answered the review item `id`, or an undo took the answer back. A proposal
+	 *  taken is written by then. */
+	onReview?(id: string, action: ReviewAction): void;
 	/** The leaf is writing a taken proposal, and is done: the commit between is the answer's. */
 	onReviewWriting?(on: boolean): void;
 	/** The review item under the pointer or holding the caret, `undefined` once it has left.
@@ -236,6 +232,9 @@ export interface FieldController {
 	 * `text` leaf holds no anchors and draws none.
 	 */
 	setReview(items: readonly TextReview[], lit?: string): void;
+	/** Draw a whole proposed value over a one-line leaf as a word diff, or none
+	 *  (`value-diff.ts`). A leaf that holds blocks draws none. */
+	setValueProposal(p: ValueProposal | undefined): void;
 	/** The elements the review item `id` draws, in document order; `[]` for one not drawn. */
 	reviewElements(id: string): HTMLElement[];
 	/** Put the caret in the review item `id` and focus the leaf; false for one not drawn. */
@@ -559,7 +558,6 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		: reviewLayer({
 				items: () => reviewItems,
 				lit: () => reviewLit,
-				strings: () => opts.reviewStrings?.() ?? DEFAULT_REVIEW_STRINGS,
 				parse: (markdown) => {
 					if (!parsed.has(markdown)) {
 						let node: PMNode | undefined;
@@ -572,11 +570,14 @@ export function createField(opts: CreateFieldOpts): FieldController {
 					}
 					return parsed.get(markdown);
 				},
-				act: (id, action, chord) => opts.onReview?.(id, action, chord),
+				act: (id, action) => opts.onReview?.(id, action),
 				writing: (on) => opts.onReviewWriting?.(on),
 				point: (id, via) => opts.onReviewPoint?.(id, via),
 				drew: (report) => opts.onReviewDrawn?.(report)
 			});
+
+	let valueProposal: ValueProposal | undefined;
+	const valueDiff = inline ? valueDiffPlugin(() => valueProposal) : undefined;
 
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
@@ -699,7 +700,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
 				cap: opts.cap,
-				afterHistory: [anchorPlugin(seededAnchors), ...(review ? [review.plugin] : [])]
+				afterHistory: [
+					anchorPlugin(seededAnchors),
+					...(review ? [review.plugin] : []),
+					...(valueDiff ? [valueDiff] : [])
+				]
 			})
 		});
 		return { state: built, index: seedIndex };
@@ -1002,6 +1007,17 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			for (const markdown of parsed.keys())
 				if (!items.some((item) => item.after === markdown)) parsed.delete(markdown);
 			review.refresh(view);
+		},
+		setValueProposal(p: ValueProposal | undefined): void {
+			if (!valueDiff) return;
+			if (
+				p?.id === valueProposal?.id &&
+				p?.after === valueProposal?.after &&
+				p?.lit === valueProposal?.lit
+			)
+				return;
+			valueProposal = p;
+			view.setProps({});
 		},
 		reviewElements(id: string): HTMLElement[] {
 			return review?.elements(view, id) ?? [];

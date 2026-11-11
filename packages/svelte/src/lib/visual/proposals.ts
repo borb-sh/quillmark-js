@@ -14,18 +14,10 @@ import { fieldPathForAddr } from '../core/address.js';
 import { sameValue, type ReviewItem } from './review.js';
 import { baseType, fieldValues, oneLine } from './structure.js';
 
-/** A card the answer adds or takes out, which no item draws: a row the host answers itself. */
-export type CardProposal =
-	/** `card` as the answer holds it. `after` is the id of the card it follows in the answer,
-	 *  absent at the head; it can be a card added before it, so a host adds them in list order. */
-	| { type: 'add'; card: Card; after?: string }
-	/** The base's card `id`, of `kind`. */
-	| { type: 'remove'; id: string; kind: string };
-
-/** The review an answer makes: the items the editor draws, and the cards it adds or removes. */
+/** The review an answer makes: the items the editor draws, the cards it adds or takes out
+ *  among them. */
 export interface Proposed {
 	items: ReviewItem[];
-	cards: CardProposal[];
 }
 
 type BlockRead = ReturnType<Document['blocks']>[number];
@@ -42,12 +34,16 @@ let minted = 0;
  * per block the answer rewrote or took out, and one `insert` item per run of blocks it added.
  * Every other field takes an item per place that changed: a record's cell, and a list's member,
  * changed, taken out, or appended past the end, two appends to one list at successive indices.
- * A one-line rich text field, a list that gains members anywhere but its end, a value of a type
- * nothing nests in, and a rich text value inside a record or a list are proposed whole. Values
+ * A list that gains members anywhere but its end is compared member by member at each index, so
+ * each place its controls draw says its own change; a record or a list written where none was is
+ * compared with an empty one. A one-line rich text field, a value of a type nothing nests in, a
+ * field the answer clears, and a rich text value inside a record or a list are proposed whole. Values
  * are in the form the editor's controls are handed, a text cell as its `Content`.
  *
- * Paths are `base`'s. A card the answer retypes is listed as taken out and added; one it moves
- * is not listed. `mint` names each item, and by default names it uniquely for the page.
+ * A card the answer adds is an `add` item after the nearest card before it that the answer
+ * keeps, so cards it adds in a run stand in list order; one it takes out is a `remove` item.
+ * Paths and card indexes are `base`'s. A card the answer retypes is listed as taken out and
+ * added; one it moves is not listed. `mint` names each item, and by default names it uniquely for the page.
  */
 export function proposalsBetween(
 	quill: Quill,
@@ -56,7 +52,6 @@ export function proposalsBetween(
 	mint: () => string = () => `review-${minted++}`
 ): Proposed {
 	const items: ReviewItem[] = [];
-	const cards: CardProposal[] = [];
 	const kinds = Array.from({ length: base.cardCount }, (_, i) => base.card(i).kind);
 	const baseIds = Array.from({ length: base.cardCount }, (_, i) => base.card(i).id ?? '');
 	const answerIds = Array.from({ length: answer.cardCount }, (_, i) => answer.card(i).id ?? '');
@@ -156,25 +151,29 @@ export function proposalsBetween(
 				...(now !== undefined && { after: now })
 			});
 		const kind = f && baseType(f);
-		if (kind === 'object' && f?.properties && isRecord(was) && isRecord(now)) {
-			for (const key of keysOf(f.properties, was, now))
-				value(pathAt, f.properties[key], [...steps, key], was[key], now[key]);
+		if (kind === 'object' && f?.properties && isRecord(now) && (was == null || isRecord(was))) {
+			const held: Record<string, unknown> = isRecord(was) ? was : {};
+			for (const key of keysOf(f.properties, held, now))
+				value(pathAt, f.properties[key], [...steps, key], held[key], now[key]);
 			return;
 		}
-		if (kind !== 'array' || !Array.isArray(was) || !Array.isArray(now)) return whole();
-		const runs = aligned(was, now);
-		if (!runs) return whole();
-		let appended = was.length;
+		if (kind !== 'array' || !Array.isArray(now) || !(was == null || Array.isArray(was)))
+			return whole();
+		const held: readonly unknown[] = Array.isArray(was) ? was : [];
+		const runs = aligned(held, now) ?? [
+			{ from: 0, to: 0, removed: held.length, added: now.length }
+		];
+		let appended = held.length;
 		for (const { from, to, removed, added } of runs) {
 			const paired = Math.min(removed, added);
 			for (let k = 0; k < paired; k++)
-				value(pathAt, f?.items, [...steps, from + k], was[from + k], now[to + k]);
+				value(pathAt, f?.items, [...steps, from + k], held[from + k], now[to + k]);
 			for (let k = paired; k < removed; k++)
 				items.push({
 					id: mint(),
 
 					field: pathAt([...steps, from + k]),
-					before: was[from + k]
+					before: held[from + k]
 				});
 			for (let k = paired; k < added; k++)
 				items.push({
@@ -187,30 +186,29 @@ export function proposalsBetween(
 	};
 
 	diffCard(quill.schema.main, undefined, base.main, answer.main, undefined);
+	/** The base's index of each card the answer keeps as it was, by its answer index. */
+	const kept = new Map<number, number>();
+	const removed: number[] = [];
 	for (const [at, id] of baseIds.entries()) {
 		const answerAt = answerIds.indexOf(id);
 		const was = base.card(at);
-		if (answerAt < 0) {
-			cards.push({ type: 'remove', id, kind: was.kind });
+		const now = answerAt < 0 ? undefined : answer.card(answerAt);
+		if (!now || now.kind !== was.kind) {
+			removed.push(at);
 			continue;
 		}
-		const now = answer.card(answerAt);
-		if (now.kind !== was.kind) {
-			cards.push({ type: 'remove', id, kind: was.kind });
-			continue;
-		}
+		kept.set(answerAt, at);
 		diffCard(quill.schema.card_kinds?.[was.kind], at, was, now, answerAt);
 	}
-	for (const [at, id] of answerIds.entries()) {
-		const at0 = baseIds.indexOf(id);
-		if (at0 >= 0 && base.card(at0).kind === answer.card(at).kind) continue;
-		cards.push({
-			type: 'add',
-			card: answer.card(at),
-			...(at > 0 && { after: answerIds[at - 1] })
-		});
+	for (const at of answerIds.keys()) {
+		if (kept.has(at)) continue;
+		let lead = at - 1;
+		while (lead >= 0 && !kept.has(lead)) lead--;
+		const after = kept.get(lead);
+		items.push({ id: mint(), add: answer.card(at), ...(after !== undefined && { after }) });
 	}
-	return { items, cards };
+	for (const at of removed) items.push({ id: mint(), remove: at });
+	return { items };
 }
 
 const addrOf = (card?: number, field?: string): Addr => ({

@@ -54,7 +54,7 @@
 		textCap
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
-	import { splitReview, type DeepReview } from './review.js';
+	import { wordedProposal, splitReview, type DeepReview } from './review.js';
 	import ReviewRows from './ReviewRows.svelte';
 	import type { LandingBox } from './leaves.js';
 	import { isEmptyContent } from '../core/codec/index.js';
@@ -299,6 +299,12 @@
 			{@const deep = routed.below.get(key)}
 			{@const reviewHere = reviewed.below.get(key)}
 			{@const handsDown = kind === 'object' || kind === 'array'}
+			{@const ownItem = handsDown ? undefined : reviewHere?.find((e) => !e.steps.length)?.item}
+			{@const textOwn = wordedProposal(
+				ownItem,
+				kind === 'number' ? 'number' : kind === 'prose' && shortCell(sub) ? 'text' : undefined
+			)}
+			{@const shown = ownItem && !textOwn && ownItem.after !== undefined ? ownItem.after : obj[key]}
 			{@const own = isContainer(kind) ? undefined : deep?.map((d) => d.diagnostic)}
 			<!-- `for` reaches the labelable controls, a variant through its discriminant; the
 			     date field's focus lives on a segment and a prose cell is a `contenteditable`,
@@ -350,7 +356,7 @@
 							label={named}
 							id={ids?.control}
 							describedBy={describes}
-							value={obj[key] as string | undefined}
+							value={shown as string | undefined}
 							values={sub.values ?? []}
 							fallback={sub.default as string | undefined}
 							blankTitle={sub.ui?.blank_title}
@@ -362,7 +368,8 @@
 							label={named}
 							id={ids?.control}
 							describedBy={describes}
-							value={obj[key] as number | undefined}
+							value={shown as number | undefined}
+							proposed={textOwn}
 							integer={baseType(sub) === 'integer'}
 							fallback={textDefault(sub)}
 							placeholder={noneOf(key, sub)}
@@ -373,7 +380,7 @@
 							label={named}
 							id={ids?.control}
 							describedBy={describes}
-							value={renderedBoolean(obj[key])}
+							value={renderedBoolean(shown)}
 							fallback={sub.default as boolean | undefined}
 							optional={optionalCell(sub)}
 							onCommit={(v) => commitProp(key, v)}
@@ -383,7 +390,7 @@
 							label={named}
 							labelledBy={ids?.label}
 							describedBy={describes}
-							value={obj[key] as string | undefined}
+							value={shown as string | undefined}
 							fallback={sub.default != null ? String(sub.default) : undefined}
 							datetime={baseType(sub) === 'datetime'}
 							onCommit={(v) => commitProp(key, v)}
@@ -393,7 +400,7 @@
 							label={named}
 							id={ids?.control}
 							describedBy={describes}
-							value={obj[key] as string | undefined}
+							value={shown as string | undefined}
 							fallback={textDefault(sub)}
 							placeholder={noneOf(key, sub)}
 							onCommit={(v) => commitProp(key, v)}
@@ -417,6 +424,7 @@
 							onChange={(rt) =>
 								commitProp(key, optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
 							onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
+							proposed={textOwn}
 						/>
 					{:else if kind === 'array'}
 						<!-- The repeater owns its label row, the add chip sharing it (`Field` skips
@@ -494,14 +502,16 @@
 					{/if}
 					<DiagnosticList diagnostics={own} />
 					{#if !handsDown}
-						<ReviewRows entries={reviewHere} value={obj[key]} />
+						<ReviewRows
+							entries={textOwn ? reviewHere?.filter((e) => e.item !== ownItem) : reviewHere}
+						/>
 					{/if}
 				</div>
 			</div>
 		{/each}
 	</div>
 	<DiagnosticList diagnostics={foot} />
-	<ReviewRows entries={reviewFoot} {value} />
+	<ReviewRows entries={reviewFoot} />
 </div>
 
 <style>

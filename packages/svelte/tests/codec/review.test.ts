@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 // The review layer of a prose leaf: a proposal draws over the blocks it names, in the leaf's own
-// flow, and writes nothing while it stands; it reads as an edit of its paragraph, taking it writes
-// what was drawn as plain text; the two chords and the two buttons answer through one channel.
+// flow, and writes nothing while it stands; it reads as an edit of its paragraph, and taking it
+// writes what was drawn as plain text. The leaf draws no answers of its own: the editor's answer
+// card answers through `answerReview`.
 import { describe, it, expect, afterEach } from 'vitest';
 import { redo, undo } from 'prosemirror-history';
 import { TextSelection } from 'prosemirror-state';
-import { createField, REVIEW_KEYS, DEFAULT_REVIEW_STRINGS } from '$lib/core/codec';
+import { createField } from '$lib/core/codec';
 import type {
 	BlockPlace,
 	FieldController,
@@ -93,13 +94,18 @@ function caretIn(leaf: Leaf, text: string): void {
 	view.focus();
 	view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
 }
-const mod = { ctrlKey: true };
-const keyOf = (chord: string): string => chord.slice(chord.lastIndexOf('-') + 1);
+
+/** Answer the first item the leaf draws, as the editor's answer card does. */
+function answerFirst(leaf: Leaf, action: 'accept' | 'dismiss'): void {
+	const id = leaf.el.querySelector('[data-qm-review]')?.getAttribute('data-qm-review');
+	expect(id).toBeTruthy();
+	expect(leaf.field.answerReview(id!, action)).toBe(true);
+}
 
 /** What the reader would read were every proposal taken: the leaf's text less what is struck. */
 function proposedText(el: HTMLElement): string {
 	const copy = el.querySelector('.ProseMirror')!.cloneNode(true) as HTMLElement;
-	for (const gone of copy.querySelectorAll('.qm-review-out, del, .qm-review-chip')) gone.remove();
+	for (const gone of copy.querySelectorAll('.qm-review-out, del')) gone.remove();
 	for (let emptied; (emptied = copy.querySelector('li:empty, ul:empty, ol:empty'));)
 		emptied.remove();
 	return [...copy.children].map((block) => block.textContent).join('\n');
@@ -270,7 +276,7 @@ describe('a proposal', () => {
 		]);
 		expect(texts(leaf.el, 'del.qm-review-del')).toContain('monthly');
 		expect(leaf.el.querySelector('ins.qm-review-ins strong')?.textContent).toBe('monthly');
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		answerFirst(leaf, 'accept');
 		expect(core.exportMarkdown(leaf.doc.main.body)).toBe(
 			core.exportMarkdown(
 				md(
@@ -291,7 +297,7 @@ describe('a proposal', () => {
 			}
 		]);
 		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['signed', 'Friday']);
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		answerFirst(leaf, 'accept');
 		expect(core.exportMarkdown(leaf.doc.main.body)).toBe(
 			core.exportMarkdown(md('Submit the signed report by Monday.'))
 		);
@@ -300,7 +306,7 @@ describe('a proposal', () => {
 	it('draws nothing for a proposal that would write nothing, and says so', () => {
 		const leaf = leafOver('The quick brown fox.');
 		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick brown fox.' }]);
-		expect(leaf.el.querySelector('.qm-review-chip, .qm-review-held')).toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review], .qm-review-held')).toBeNull();
 		expect(leaf.reports.at(-1)?.undrawn).toEqual([{ id: 'r1', reason: 'applied' }]);
 	});
 });
@@ -322,7 +328,7 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 	];
 	const taken = (leaf: Leaf): string => {
 		const drawn = proposedText(leaf.el);
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		answerFirst(leaf, 'accept');
 		expect(shownText(leaf.el)).toBe(drawn);
 		return leaf.doc.main.body.text;
 	};
@@ -346,7 +352,7 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 
 	it('draws nothing where the reader wrote what it proposes', () => {
 		const leaf = typed('red', 'brown', 0, 'brown'.length);
-		expect(leaf.el.querySelector('del, ins, .qm-review-chip')).toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 		expect(leaf.reports.at(-1)?.undrawn).toEqual([{ id: 'r1', reason: 'applied' }]);
 	});
 
@@ -366,9 +372,6 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 			'Keep this. Second, rewritten.'
 		]);
 		expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
-		const chip = leaf.el.querySelector('.qm-review-chip')!;
-		expect(chip.classList.contains('qm-review-outdated')).toBe(true);
-		expect(chip.textContent).toContain(DEFAULT_REVIEW_STRINGS.reviewOutdated);
 		expect(taken(leaf)).toBe('Keep this. Second, rewritten.');
 	});
 
@@ -390,7 +393,7 @@ describe('a proposal by blocks', () => {
 	];
 	const accept = (leaf: Leaf): string => {
 		const drawn = proposedText(leaf.el);
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		answerFirst(leaf, 'accept');
 		expect(shownText(leaf.el)).toBe(drawn);
 		return leaf.doc.main.body.text;
 	};
@@ -433,7 +436,7 @@ describe('a proposal by blocks', () => {
 			{ id: 'r1', replace: ['gone'], after: 'Two.' },
 			{ id: 'r2', insert: { after: 'gone' }, after: 'Two.' }
 		]);
-		expect(leaf.el.querySelector('del, ins, .qm-review-chip, .qm-review-add')).toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 		expect(leaf.reports.at(-1)?.undrawn).toEqual([
 			{ id: 'r1', reason: 'block' },
 			{ id: 'r2', reason: 'block' }
@@ -544,135 +547,80 @@ describe('answering', () => {
 		leaf.acts.length = 0;
 		return leaf;
 	}
-	it('a proposal carries its two buttons, named by the strings', () => {
+	it('draws no answers of its own', () => {
 		const leaf = proposal();
-		const chip = leaf.el.querySelector('.qm-review-chip')!;
-		expect(chip.getAttribute('aria-label')).toBe(DEFAULT_REVIEW_STRINGS.reviewProposal);
-		expect(texts(leaf.el, '.qm-review-act')).toEqual([
-			DEFAULT_REVIEW_STRINGS.reviewAccept,
-			DEFAULT_REVIEW_STRINGS.reviewDismiss
-		]);
+		expect(leaf.el.querySelector('button')).toBeNull();
 	});
 
-	it('Dismiss answers and writes nothing, and the proposal is drawn no more', () => {
+	it('a dismissal answers and writes nothing, and the proposal is drawn no more', () => {
 		const leaf = proposal();
 		const before = leaf.doc.toMarkdown();
-		leaf.el.querySelector<HTMLElement>('.qm-review-dismiss')!.click();
+		expect(leaf.field.answerReview('r1', 'dismiss')).toBe(true);
 		expect(leaf.acts).toEqual([['r1', 'dismiss']]);
-		expect(leaf.el.querySelector('del, ins, .qm-review-chip')).toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 		expect(leaf.doc.toMarkdown()).toBe(before);
 	});
 
-	it('Accept writes the proposal, then answers', () => {
+	it('an accept writes the proposal, then answers', () => {
 		const leaf = proposal();
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		expect(leaf.field.answerReview('r1', 'accept')).toBe(true);
 		expect(leaf.acts).toEqual([['r1', 'accept']]);
 		expect(leaf.doc.main.body.text).toBe('The quick red fox.\nA later paragraph.');
-		expect(leaf.el.querySelector('del, ins, .qm-review-chip')).toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 	});
 
-	it('the chords answer the proposal the caret is in', () => {
-		const taken = proposal();
-		caretIn(taken, 'quick');
-		press(viewOf(taken.field), keyOf(REVIEW_KEYS.accept), mod);
-		expect(taken.acts).toEqual([['r1', 'accept']]);
-		expect(taken.doc.main.body.text).toContain('red fox');
-
-		const turned = proposal();
-		caretIn(turned, 'quick');
-		press(viewOf(turned.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(turned.acts).toEqual([['r1', 'dismiss']]);
-		expect(turned.doc.main.body.text).toContain('brown fox');
-	});
-
-	it('the accept chord takes a proposal over the task item it is in', () => {
-		const leaf = leafOver('- [ ] the quick brown fox');
-		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'brown'), after: 'the quick red fox' }]);
-		const view = viewOf(leaf.field);
-		let at = -1;
-		view.state.doc.descendants((node, pos) => {
-			if (at < 0 && node.isText) at = pos + node.text!.indexOf('quick') + 1;
-		});
-		view.focus();
-		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
-		press(view, keyOf(REVIEW_KEYS.accept), mod);
-		expect(leaf.acts).toEqual([['r1', 'accept']]);
-		expect(leaf.doc.toMarkdown()).toContain('- [ ] the quick red fox');
+	it('leaves the chords to the leaf, which answers none', () => {
+		const leaf = proposal();
+		caretIn(leaf, 'quick');
+		const before = leaf.doc.toMarkdown();
+		press(viewOf(leaf.field), 'Enter', { ctrlKey: true });
+		press(viewOf(leaf.field), '.', { ctrlKey: true });
+		expect(leaf.acts).toEqual([]);
+		expect(leaf.doc.toMarkdown()).toBe(before);
 	});
 
 	it('a dismissed item is drawn again only under a list that holds it anew', () => {
 		const leaf = leafOver('The quick brown fox.');
 		const items: TextReview[] = [{ id: 'r1', ...over(leaf, 'brown'), after: 'The quick red fox.' }];
 		leaf.field.setReview(items);
-		caretIn(leaf, 'quick');
-		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.el.querySelector('.qm-review-chip')).toBeNull();
+		leaf.field.answerReview('r1', 'dismiss');
+		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 		leaf.field.setReview([]);
 		leaf.field.setReview([...items]);
-		expect(leaf.el.querySelector('.qm-review-chip')).not.toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).not.toBeNull();
 	});
 
-	it('the chords pass with the caret in what an accepted proposal wrote', () => {
-		const leaf = proposal();
-		caretIn(leaf, 'later');
-		const before = leaf.doc.toMarkdown();
-		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.accept), mod);
-		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.acts).toEqual([]);
-		expect(leaf.doc.toMarkdown()).toBe(before);
-	});
-
-	it('a pressed Accept leaves the caret after what landed, in a focused leaf', () => {
+	it('an accept moves neither the caret nor the focus', () => {
 		const leaf = proposal();
 		const view = viewOf(leaf.field);
+		expect(leaf.field.answerReview('r1', 'accept')).toBe(true);
 		expect(view.hasFocus()).toBe(false);
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
-		expect(view.hasFocus()).toBe(true);
-		const { $head } = view.state.selection;
-		expect($head.parent.textBetween(0, $head.parentOffset)).toBe('The quick red');
-	});
 
-	it('a pressed Accept keeps the caret after what landed through a refresh', () => {
-		const leaf = leafOver('- first item\n- second item\n\nAfter.');
-		leaf.field.setReview([
-			{ id: 'r1', ...over(leaf, 'second'), after: '- second item\n- third item' }
-		]);
-		const view = viewOf(leaf.field);
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
-		leaf.field.applyExternal();
-		const { $head } = view.state.selection;
-		expect($head.parent.textBetween(0, $head.parentOffset)).toBe('third item');
-	});
-
-	it('a pressed Accept leaves the caret the reader holds where it is', () => {
-		const leaf = proposal();
-		caretIn(leaf, 'later');
-		const view = viewOf(leaf.field);
-		const before = view.state.selection.$head.parentOffset;
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
-		const { $head } = view.state.selection;
+		const held = proposal();
+		caretIn(held, 'later');
+		const at = viewOf(held.field);
+		const before = at.state.selection.$head.parentOffset;
+		held.field.answerReview('r1', 'accept');
+		const { $head } = at.state.selection;
 		expect($head.parent.textContent).toBe('A later paragraph.');
 		expect($head.parentOffset).toBe(before);
 	});
 
-	it('answers a proposal that only adds from anywhere in the paragraph it adds after', () => {
+	it('names a proposal that only adds from anywhere in the paragraph it adds after', () => {
 		const leaf = leafOver('Opening line.\n\nClosing line.');
 		leaf.field.setReview([{ id: 'r1', ...beside(leaf, 'line'), after: 'Inserted.' }]);
 		caretIn(leaf, 'Opening');
 		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
-		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.accept), mod);
-		expect(leaf.doc.main.body.text).toBe('Opening line.\nInserted.\nClosing line.');
 	});
 
-	it('answers the item the caret was put into, of two that share a paragraph', () => {
+	it('names the item the caret was put into, of two that share a paragraph', () => {
 		const leaf = leafOver('Opening line.\n\nSecond is proposed.');
 		leaf.field.setReview([
 			{ id: 'A', ...over(leaf, 'Second'), after: 'Second, rewritten.' },
 			{ id: 'B', ...beside(leaf, 'proposed'), after: 'Added after.' }
 		]);
 		caretIn(leaf, 'Second');
-		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.acts).toEqual([['A', 'dismiss']]);
+		expect(leaf.points.at(-1)).toEqual(['A', 'caret']);
 
 		const entered = leafOver('Opening line.\n\nSecond is proposed.');
 		entered.field.setReview([
@@ -680,8 +628,8 @@ describe('answering', () => {
 			{ id: 'B', ...beside(entered, 'proposed'), after: 'Added after.' }
 		]);
 		expect(entered.field.enterReview('B')).toBe(true);
-		press(viewOf(entered.field), keyOf(REVIEW_KEYS.accept), mod);
-		expect(entered.acts).toEqual([['B', 'accept']]);
+		expect(entered.points.at(-1)).toEqual(['B', 'caret']);
+		expect(entered.field.answerReview('B', 'accept')).toBe(true);
 		expect(entered.doc.main.body.text).toBe('Opening line.\nSecond is proposed.\nAdded after.');
 		expect(texts(entered.el, 'ins.qm-review-ins')).toEqual([', rewritten']);
 	});
@@ -692,17 +640,8 @@ describe('answering', () => {
 		expect(leaf.field.enterReview('r1')).toBe(true);
 		expect(view.hasFocus()).toBe(true);
 		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
-		press(view, keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.acts).toEqual([['r1', 'dismiss']]);
 		expect(leaf.field.enterReview('r2')).toBe(false);
 		expect(leaf.field.enterReview('nowhere')).toBe(false);
-	});
-
-	it('the chords pass where the caret is in no item', () => {
-		const leaf = proposal();
-		caretIn(leaf, 'paragraph');
-		press(viewOf(leaf.field), keyOf(REVIEW_KEYS.dismiss), mod);
-		expect(leaf.acts).toEqual([]);
 	});
 
 	it('reports the item the caret arrives in, and holds off while the reader types in it', () => {
@@ -738,7 +677,7 @@ describe('taking a proposal', () => {
 		const at = to === true ? beside(leaf, from) : over(leaf, from, to ?? from);
 		leaf.field.setReview([{ id: 'r1', ...at, after }]);
 		const drawn = proposedText(leaf.el);
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		answerFirst(leaf, 'accept');
 		expect(leaf.acts).toEqual([['r1', 'accept']]);
 		expect(shownText(leaf.el)).toBe(drawn);
 		return leaf;
@@ -842,7 +781,7 @@ describe('taking a proposal', () => {
 		expect(leaf.drawn.at(-1)).toEqual(['r1']);
 		redo(view.state, view.dispatch);
 		expect(leaf.doc.main.body.text).toBe('The quick red fox.');
-		expect(leaf.el.querySelector('del, ins, .qm-review-chip')).toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 		expect(leaf.acts).toEqual([
 			['r1', 'accept'],
 			['r1', 'reopen'],
@@ -862,14 +801,14 @@ describe('taking a proposal', () => {
 	it('is opened again after a dismissal, and says so', () => {
 		const leaf = leafOver('The quick brown fox.');
 		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red fox.' }]);
-		leaf.el.querySelector<HTMLElement>('.qm-review-dismiss')!.click();
-		expect(leaf.el.querySelector('.qm-review-chip')).toBeNull();
+		answerFirst(leaf, 'dismiss');
+		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 		leaf.field.reopenReview('r1');
 		expect(leaf.acts).toEqual([
 			['r1', 'dismiss'],
 			['r1', 'reopen']
 		]);
-		expect(leaf.el.querySelector('.qm-review-chip')).not.toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).not.toBeNull();
 	});
 
 	it('is opened again after a dismissal the host took off its list', () => {
@@ -881,7 +820,7 @@ describe('taking a proposal', () => {
 			after: 'The quick red fox.'
 		} as const;
 		leaf.field.setReview([item]);
-		leaf.el.querySelector<HTMLElement>('.qm-review-dismiss')!.click();
+		answerFirst(leaf, 'dismiss');
 		leaf.field.setReview([]);
 		leaf.field.reopenReview('r1');
 		expect(leaf.acts).toEqual([
@@ -889,7 +828,7 @@ describe('taking a proposal', () => {
 			['r1', 'reopen']
 		]);
 		leaf.field.setReview([item]);
-		expect(leaf.el.querySelector('.qm-review-chip')).not.toBeNull();
+		expect(leaf.el.querySelector('[data-qm-review]')).not.toBeNull();
 	});
 
 	it('comes back with the words typed into its step, under one undo', () => {
@@ -916,7 +855,7 @@ describe('taking a proposal', () => {
 			{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red cat.' },
 			change
 		]);
-		leaf.el.querySelector<HTMLElement>('.qm-review-accept')!.click();
+		answerFirst(leaf, 'accept');
 		expect(leaf.doc.main.body.text).toBe('The quick red cat.');
 		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
 	});

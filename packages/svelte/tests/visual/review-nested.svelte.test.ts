@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// A proposal for a place inside a field: drawn under the cell or the row it names, taken alone
-// down the lane an edit of that place takes, and taken back alone.
+// A proposal for a place inside a field: drawn in the cell or the row it names, taken alone down
+// the lane an edit of that place takes, and taken back alone.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
@@ -8,6 +8,7 @@ import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
 import { groupLabel } from '$lib/visual/structure';
 import { quill, example } from '../helpers/fixtures.js';
 import {
+	answerOn,
 	mountEditor,
 	openField,
 	press as key,
@@ -40,11 +41,17 @@ function nested(items: (doc: Document) => ReviewItem[], seed?: (doc: Document) =
 	return { ...mounted, doc, events, drawn };
 }
 
-/** The proposal rows under field `name`, each as the words it shows. */
-const rows = (r: Nested, name: string): string[] =>
-	[...openField(r.target, main, name).querySelectorAll('.qm-review-proposal')].map((row) =>
-		(row.querySelector('.qm-review-value')?.textContent ?? '').trim()
-	);
+/** The first element drawing item `id`. */
+const markOf = (root: ParentNode, id: string): Element | null =>
+	root.querySelector(`[data-qm-review~="${id}"]`);
+/** What item `id` draws in place: the words it strikes, then the words it writes. */
+const drawnOf = (root: ParentNode, id: string): [string, string] => {
+	const words = (selector: string) =>
+		[...root.querySelectorAll(`${selector}[data-qm-review~="${id}"]`)]
+			.map((el) => el.textContent)
+			.join('');
+	return [words('.qm-review-del'), words('.qm-review-ins')];
+};
 /** A value with each plain text in it as its words. */
 const texts = (value: unknown): unknown =>
 	JSON.parse(
@@ -59,11 +66,8 @@ const undoKey = (r: Nested): void => {
 	key(r.target.querySelector<HTMLElement>('.qm-editor')!, 'z', { ctrlKey: true });
 	flushSync();
 };
-const press = (r: Nested, id: string, action: 'accept' | 'dismiss'): void => {
-	const row = r.target.querySelector(`.qm-review-proposal[data-qm-review="${id}"]`)!;
-	row.querySelector<HTMLButtonElement>(`.qm-review-${action}`)!.click();
-	flushSync();
-};
+const press = (r: Nested, id: string, action: 'accept' | 'dismiss'): void =>
+	answerOn(r.target, id, action);
 
 describe('a record’s cell', () => {
 	const contact = (doc: Document): ReviewItem[] => [
@@ -84,17 +88,13 @@ describe('a record’s cell', () => {
 	const seed = (doc: Document): void =>
 		void quill().writer(doc).set('contact', { name: 'Ada', email: 'a@example.org' });
 
-	it('is drawn under the cell it names, one row each', async () => {
+	it('draws its change in the cell it names', async () => {
 		const r = nested(contact, seed);
 		await settle();
 		const cells = [...openField(r.target, main, 'contact').querySelectorAll('[data-qm-prop]')];
-		const under = (prop: string) =>
-			cells
-				.find((c) => c.getAttribute('data-qm-prop') === prop)!
-				.querySelector('.qm-review-proposal');
-		expect(under('name')?.getAttribute('data-qm-review')).toBe('name');
-		expect(under('email')?.getAttribute('data-qm-review')).toBe('email');
-		expect(rows(r, 'contact')).toEqual(['AdaGrace', 'ag@example.org']);
+		const cell = (prop: string) => cells.find((c) => c.getAttribute('data-qm-prop') === prop)!;
+		expect(drawnOf(cell('name'), 'name')).toEqual(['Ada', 'Grace']);
+		expect(drawnOf(cell('email'), 'email')).toEqual(['a', 'g']);
 		expect(r.drawn.at(-1)?.outdated).toEqual([]);
 		expect(r.drawn.at(-1)?.undrawn).toEqual([]);
 	});
@@ -150,16 +150,19 @@ describe('a list’s member', () => {
 		];
 	};
 
-	it('is drawn under its row, and one past the last at the list’s foot', async () => {
+	it('draws its change in its row, strikes the row it takes out, and previews the row it adds', async () => {
 		const r = nested(members, seed);
 		await settle();
 		const field = openField(r.target, main, 'signature_block');
-		const rowOf = (id: string) =>
-			field.querySelector(`.qm-review-proposal[data-qm-review="${id}"]`)!.closest('.qm-array-row');
+		const rowOf = (id: string) => markOf(field, id)!.closest('.qm-array-row');
 		expect(rowOf('change')?.getAttribute('data-qm-index')).toBe('0');
+		expect(drawnOf(field, 'change')).toEqual(['A.', 'ADA']);
 		expect(rowOf('drop')?.getAttribute('data-qm-index')).toBe('1');
-		expect(rowOf('add')).toBeNull();
-		expect(rows(r, 'signature_block')).toEqual(['A.ADA LOVELACE', 'Author', 'Item 4: Countess']);
+		expect(field.querySelector('[data-qm-removes]')).toBe(markOf(field, 'drop'));
+		const added = markOf(field, 'add')!;
+		expect(added.classList.contains('qm-review-added')).toBe(true);
+		expect(added.textContent?.trim()).toBe('Countess');
+		expect(r.doc.getStored('signature_block')).toHaveLength(3);
 	});
 
 	it('is taken on the member it read, though another taken first moved it', async () => {
@@ -216,7 +219,7 @@ describe('a list’s member', () => {
 });
 
 describe('a record in a table', () => {
-	it('draws a cell’s proposal under that cell of its row, and takes it alone', async () => {
+	it('marks that cell of its row, and takes it alone', async () => {
 		const r = nested(
 			(doc) => [
 				{
@@ -236,9 +239,7 @@ describe('a record in a table', () => {
 					])
 		);
 		await settle();
-		const row = r.target
-			.querySelector('.qm-review-proposal[data-qm-review="role"]')!
-			.closest('.qm-array-row');
+		const row = markOf(r.target, 'role')!.closest('.qm-array-row');
 		expect(row?.getAttribute('data-qm-index')).toBe('1');
 		press(r, 'role', 'accept');
 		expect(texts(r.doc.getStored('contributors'))).toMatchObject([
@@ -268,6 +269,6 @@ describe('a place inside a closed group', () => {
 		expect(await r.editor.revealReview('name')).toBe(true);
 		flushSync();
 		expect(marked()).toEqual([]);
-		expect(r.target.querySelector('.qm-review-proposal[data-qm-review="name"]')).not.toBeNull();
+		expect(markOf(r.target, 'name')).not.toBeNull();
 	});
 });

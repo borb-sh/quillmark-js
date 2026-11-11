@@ -106,22 +106,23 @@
 	export function applyCardOps(ops: readonly CardOp[]): void {
 		inner?.applyCardOps(ops);
 	}
-	/** Bring the review item `id` to the reader: its panel opened, scrolled to the middle of
-	 *  the view, lit. The focus stays put unless `focus` sends the caret into
-	 *  the item, where its chords answer. False for an item not drawn. */
+	/** Bring the review item `id` to the reader as the current change: its panel opened,
+	 *  scrolled to the middle of the view. The focus stays put unless `focus` sends the caret
+	 *  into the item. False for an item not drawn. */
 	export async function revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean> {
 		return (await inner?.revealReview(id, opts)) ?? false;
 	}
-	/** Answer items as their buttons would, in document order (`'all'`: every item drawn),
-	 *  moving neither the focus nor the caret and raising no toast. Returns the ids answered. */
+	/** Answer items as the answer card would, in document order (`'all'`: every item drawn),
+	 *  moving neither the focus nor the caret; where the current change is among them, the next
+	 *  open one is current. Returns the ids answered. */
 	export function answerReview(
 		ids: readonly string[] | 'all',
 		action: 'accept' | 'dismiss'
 	): string[] {
 		return inner?.answerReview(ids, action) ?? [];
 	}
-	/** Bring the next or previous open item to the reader, round from either end, the caret
-	 *  or the focus in it unless `focus` is false. Resolves its id, `undefined` for none. */
+	/** Make the next or previous open item current, round from either end, the caret or the
+	 *  focus in it unless `focus` is false. Resolves its id, `undefined` for none. */
 	export async function stepReview(
 		dir: 1 | -1,
 		opts?: { focus?: boolean }

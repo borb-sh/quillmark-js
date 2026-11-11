@@ -58,6 +58,10 @@ function write(answer: Document, quill: Quill): void {
 			...contributors.slice(2)
 		]);
 	if ('columns' in fields) writer.set('columns', 2);
+
+	if (quill.schema.card_kinds?.note)
+		writer.addCard('note', {}, 'A note the reviewer would add.', 1);
+	if (answer.cardCount > 2) answer.removeCard(answer.cardCount - 1);
 }
 
 function blocksOf(doc: Document, addr: Addr): ReturnType<Document['blocks']> {

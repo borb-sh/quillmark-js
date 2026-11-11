@@ -113,7 +113,14 @@
 		textCap,
 		type ArrayLayout
 	} from './structure.js';
-	import { splitReview, type DeepReview } from './review.js';
+	import {
+		wordedProposal,
+		reviewText,
+		splitReview,
+		type DeepReview,
+		type FieldProposal
+	} from './review.js';
+	import { review as reviewState } from './review.svelte.js';
 	import ReviewRows from './ReviewRows.svelte';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import { propertyDomIds } from './domid.js';
@@ -240,9 +247,29 @@
 		k < arr.length ? (reviewed.below.get(k) ?? []) : [];
 	const ownReview = (k: number): DeepReview[] => rowReview(k).filter((e) => !e.steps.length);
 	const innerReview = (k: number): DeepReview[] => rowReview(k).filter((e) => e.steps.length);
+	/** A scalar row's own proposal, which the row draws in place: a line of text as a word diff
+	 *  over the row, any other value as the value it would hold. A removal stays a mark. */
+	const rowOwn = (k: number): FieldProposal | undefined =>
+		scalar || control === 'prose'
+			? ownReview(k).find((e) => e.item.after !== undefined)?.item
+			: undefined;
+	const rowText = (k: number): { id: string; after: string } | undefined =>
+		wordedProposal(
+			rowOwn(k),
+			control === 'prose' ? 'text' : control === 'number' ? 'number' : undefined
+		);
+	const rowShown = (k: number): unknown => {
+		const own = rowText(k) ? undefined : rowOwn(k);
+		return own ? own.after : arr[k];
+	};
+	/** A row's marks: its proposals less the one its control draws as text. */
+	const rowMarks = (k: number): DeepReview[] => {
+		const text = rowText(k);
+		return text ? rowReview(k).filter((e) => e.item.id !== text.id) : rowReview(k);
+	};
 	/** What has no row to draw under: a member past the last, and a place no row holds. A
 	 *  table's rows are cells alone, so a member's own item is drawn here too, by its number. */
-	const reviewFoot = $derived([
+	const footAll = $derived([
 		...reviewed.here,
 		...[...reviewed.below].flatMap(([step, list]) => {
 			const held = typeof step === 'number' && step >= 0 && step < arr.length;
@@ -251,6 +278,20 @@
 				.map((e) => ({ steps: [step, ...e.steps], item: e.item }));
 		})
 	]);
+	/** Members past the last, drawn as preview rows where they would stand. */
+	const added = $derived(
+		footAll.filter(
+			(e) =>
+				e.steps.length === 1 &&
+				typeof e.steps[0] === 'number' &&
+				e.steps[0] >= arr.length &&
+				e.item.after !== undefined
+		)
+	);
+	const reviewFoot = $derived(footAll.filter((e) => !added.includes(e)));
+	const reviewing = reviewState();
+	const previewOf = (after: unknown): string =>
+		reviewText(after, { on: t.strings.reviewOn, off: t.strings.reviewOff });
 
 	// Parallel stable ids, one per element, kept in lockstep with the data below.
 	// Seeded eagerly so a non-empty array renders its rows on the first pass:
@@ -1037,12 +1078,12 @@
 							diagnostics={routed.below.get(k)}
 							review={innerReview(k)}
 						/>
-						<ReviewRows entries={ownReview(k)} value={arr[k]} member />
+						<ReviewRows entries={ownReview(k)} member />
 					{:else}
 						<!-- A collapsed row draws no cell, so what its cells would have said is said
 						     under the head, where the row can be seen: the message names the leaf. -->
 						<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
-						<ReviewRows entries={rowReview(k)} value={arr[k]} member />
+						<ReviewRows entries={rowReview(k)} member />
 					{/if}
 				</div>
 			{/each}
@@ -1066,6 +1107,7 @@
 							bind:this={els[id]}
 							content={() => readAt([k])}
 							value={arr[k]}
+							proposed={rowText(k)}
 							plaintext={items != null && literalText(items)}
 							cap={textCap(items)}
 							label={rowName(k)}
@@ -1080,7 +1122,8 @@
 						/>
 					{:else if control === 'number'}
 						<NumberField
-							value={arr[k] as number | undefined}
+							value={rowShown(k) as number | undefined}
+							proposed={rowText(k)}
 							integer={items != null && baseType(items) === 'integer'}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							label={rowName(k)}
@@ -1090,7 +1133,7 @@
 					{:else if control === 'enum'}
 						<!-- The blank is an element's empty answer, drawn as an unanswered one. -->
 						<EnumField
-							value={(arr[k] as string | undefined) || undefined}
+							value={(rowShown(k) as string | undefined) || undefined}
 							values={items?.values ?? []}
 							blankTitle={items?.ui?.blank_title}
 							label={rowName(k)}
@@ -1098,14 +1141,14 @@
 						/>
 					{:else if control === 'boolean'}
 						<BooleanField
-							value={renderedBoolean(arr[k])}
+							value={renderedBoolean(rowShown(k))}
 							label={rowName(k)}
 							onCommit={(v) => commitElement(k, v)}
 						/>
 					{:else if control === 'date'}
 						<DateField
 							bind:this={els[id]}
-							value={(arr[k] as string | undefined) || undefined}
+							value={(rowShown(k) as string | undefined) || undefined}
 							datetime={items != null && baseType(items) === 'datetime'}
 							label={rowName(k)}
 							onCommit={(v) => commitElement(k, v)}
@@ -1113,7 +1156,7 @@
 					{:else}
 						<TextField
 							bind:this={els[id]}
-							value={String(arr[k] ?? '')}
+							value={String(rowShown(k) ?? '')}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							label={rowName(k)}
 							onCommit={(v) => commitElement(k, v)}
@@ -1126,13 +1169,26 @@
 						</div>
 					{/if}
 					<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
-					<ReviewRows entries={rowReview(k)} value={arr[k]} member />
+					<ReviewRows entries={rowMarks(k)} member />
 				</div>
 			{/each}
 		</div>
 	{/if}
+	{#each added as { item } (item.id)}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class={['qm-array-row qm-review-added', { 'qm-review-lit': reviewing.lit === item.id }]}
+			data-qm-review={item.id}
+			role="group"
+			aria-label={t.strings.reviewNewItem}
+			onpointerenter={() => reviewing.point(item.id, 'pointer')}
+			onpointerleave={() => reviewing.point(undefined, 'pointer')}
+		>
+			<span class="qm-review-added-value qm-control-box">{previewOf(item.after)}</span>
+		</div>
+	{/each}
 	<DiagnosticList diagnostics={foot} />
-	<ReviewRows entries={reviewFoot} value={arr} member />
+	<ReviewRows entries={reviewFoot} member />
 </div>
 
 <!-- The remove, one button wherever a row ends: a scalar row's slab, a record row's
@@ -1172,6 +1228,18 @@
 {/snippet}
 
 <style>
+	/* A member the review would add, drawn where it would stand: its value in the review tint,
+	   nothing written. */
+	.qm-review-added-value {
+		display: block;
+		padding: var(--_qm-space) var(--_qm-space-3);
+		background: var(--_qm-review-tint);
+		border-radius: var(--_qm-radius-inner);
+		overflow-wrap: anywhere;
+	}
+	.qm-review-lit .qm-review-added-value {
+		background: var(--_qm-review-lit);
+	}
 	.qm-array {
 		display: flex;
 		flex-direction: column;

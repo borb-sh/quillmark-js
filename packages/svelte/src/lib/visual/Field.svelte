@@ -60,8 +60,7 @@
 	import ReviewProposal from './ReviewProposal.svelte';
 	import ReviewRows from './ReviewRows.svelte';
 	import { review } from './review.svelte.js';
-	import { REVIEW_KEYS } from '../core/codec/index.js';
-	import { keydownHandler } from 'prosemirror-keymap';
+	import { wordedProposal } from './review.js';
 
 	interface Props {
 		field: FieldModel;
@@ -147,8 +146,14 @@
 	// resolves to digits, and the control has to know it follows the render date.
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
+	// A proposal is drawn in the control. The focus arriving in the control makes it current, as
+	// the caret arriving in a leaf's words makes theirs.
+	const reviewing = review();
+	const reviewed = $derived(reviewing.at(leafKey));
+	const proposed = $derived(reviewed.proposed);
 	// Where the field stands against its default, for the label row's end (`FieldLabel`):
-	// unset with the default printing, or written over one that would. A container's
+	// unset with the default printing, or written over one that would. A proposal standing on
+	// the field says the value it would hold, so the default goes unsaid meanwhile. A container's
 	// source is its cells' composed, so only a control holding one value says either.
 	const scalar = $derived(!isContainer(field.control));
 	// A prose leaf commits past the derive (`VisualEditorInner` `proseChanged`), so its
@@ -159,7 +164,7 @@
 		since && since.row === provenance ? since.written : provenance?.source === 'authored'
 	);
 	const defaulted = $derived(
-		scalar && !written && provenance?.source === 'default' && printed !== undefined
+		scalar && !written && provenance?.source === 'default' && printed !== undefined && !proposed
 	);
 	const resettable = $derived(scalar && written && declared !== undefined);
 	const defaultId = $derived(`${domIds.control}-default`);
@@ -318,33 +323,26 @@
 	 * rather than counted twice.
 	 */
 	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
-	// A proposal rests as a row under the control. The focus in the control attends to it, as
-	// the caret in a leaf's words attends to theirs.
-	const reviewing = review();
-	const reviewed = $derived(reviewing.at(leafKey));
-	const proposed = $derived(reviewed.proposed);
+	/** A whole proposed value drawn as words over the control's own: a one-line text leaf's
+	 *  as a word diff, a number's as the struck and the proposed figures. */
+	const worded = $derived(
+		wordedProposal(
+			proposed,
+			field.control === 'number'
+				? 'number'
+				: field.control === 'prose' && field.inline
+					? 'text'
+					: undefined
+		)
+	);
+	/** What a control that cannot draw a proposal as words shows while one stands: the value it
+	 *  would hold, tinted (`ReviewProposal`). */
+	const display = $derived(
+		proposed && !worded && proposed.after !== undefined ? proposed.after : value
+	);
 	/** The items naming a place inside this field: a record's and a list's own controls draw
 	 *  them where they are, any other's under this one. */
 	const nestedReview = $derived(reviewed.nested);
-	/** The chords, with the focus anywhere in the field: the proposal's answers. A prose leaf's
-	 *  own items answer first, in the leaf. */
-	const reviewKeys = keydownHandler({
-		[REVIEW_KEYS.accept]: () => {
-			if (!proposed) return false;
-			reviewing.act(proposed.id, 'accept', true);
-			return true;
-		},
-		[REVIEW_KEYS.dismiss]: () => {
-			if (!proposed) return false;
-			reviewing.act(proposed.id, 'dismiss', true);
-			return true;
-		}
-	});
-	function onReviewKey(e: KeyboardEvent): void {
-		if (e.defaultPrevented || !proposed) return;
-		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
-		if (reviewKeys({} as never, e)) e.preventDefault();
-	}
 
 	const reportFocus = $derived(
 		field.control === 'prose'
@@ -354,9 +352,7 @@
 	);
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<!-- The keydown is a control's, bubbled: the field answers the review chords for it. -->
-<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail} onkeydown={onReviewKey}>
+<div class={['qm-field', { cell: span === 'cell' }]} data-tail={tail}>
 	{#if !ownsLabel && !headed}
 		<FieldLabel
 			label={field.label}
@@ -377,14 +373,16 @@
 	 rule below holds why). One markup for both spans; a field owning its row nests a
 	 level and measures the same. -->
 	<div class="qm-field-stack">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="qm-field-control qm-wash"
 			{@attach registerControl}
 			onfocusin={(e) => {
 				reportFocus?.(e);
-				if (proposed) reviewing.point(proposed.id, 'caret', leafKey);
+				if (proposed) reviewing.point(proposed.id, 'caret');
 			}}
-			onfocusout={() => proposed && reviewing.point(undefined, 'caret', leafKey)}
+			onpointerenter={() => worded && reviewing.point(worded.id, 'pointer')}
+			onpointerleave={() => worded && reviewing.point(undefined, 'pointer')}
 		>
 			{#if field.control === 'prose'}
 				<ProseField
@@ -402,6 +400,7 @@
 					defaultNoteId={defaultId}
 					cap={cap && { ...cap, onCount: (n) => (chars = n) }}
 					{leafKey}
+					proposed={worded}
 					{onFocus}
 					{onCaretMove}
 					onChange={proseCommitted}
@@ -411,7 +410,7 @@
 				/>
 			{:else if field.control === 'enum'}
 				<EnumField
-					value={value as string | undefined}
+					value={display as string | undefined}
 					values={field.schema.values ?? []}
 					fallback={(ghost as string | undefined) ?? declared}
 					blankTitle={field.schema.ui?.blank_title}
@@ -440,7 +439,8 @@
 				/>
 			{:else if field.control === 'number'}
 				<NumberField
-					value={value as number | undefined}
+					value={display as number | undefined}
+					proposed={worded}
 					integer={baseType(field.schema) === 'integer'}
 					fallback={declared}
 					placeholder={none}
@@ -450,7 +450,7 @@
 				/>
 			{:else if field.control === 'boolean'}
 				<BooleanField
-					value={renderedBoolean(value)}
+					value={renderedBoolean(display)}
 					fallback={ghost as boolean | undefined}
 					{optional}
 					id={domIds.control}
@@ -460,7 +460,7 @@
 			{:else if field.control === 'date'}
 				<DateField
 					bind:this={dateEl}
-					value={value as string | undefined}
+					value={display as string | undefined}
 					fallback={stringifyGhost(field.schema.default)}
 					datetime={baseType(field.schema) === 'datetime'}
 					labelledBy={domIds.label}
@@ -517,7 +517,7 @@
 				/>
 			{:else}
 				<TextField
-					value={value as string | undefined}
+					value={display as string | undefined}
 					fallback={declared}
 					placeholder={none}
 					id={domIds.control}
@@ -528,10 +528,10 @@
 		</div>
 
 		{#if field.control !== 'object' && field.control !== 'array'}
-			<ReviewRows entries={nestedReview} {value} />
+			<ReviewRows entries={nestedReview} />
 		{/if}
-		{#if proposed}
-			<ReviewProposal item={proposed} {value} refocus={focusControl} />
+		{#if proposed && !worded}
+			<ReviewProposal item={proposed} />
 		{/if}
 		{#if scalar}
 			<DiagnosticList {diagnostics} />
