@@ -122,6 +122,10 @@
 	}
 	/** Bring the next or previous open item to the reader, round from either end, the caret
 	 *  or the focus in it unless `focus` is false. Resolves its id, `undefined` for none. */
+	/** Answer the current review item. False where there is none. */
+	export function answerCurrent(action: 'accept' | 'dismiss'): boolean {
+		return inner?.answerCurrent(action) ?? false;
+	}
 	export async function stepReview(
 		dir: 1 | -1,
 		opts?: { focus?: boolean }

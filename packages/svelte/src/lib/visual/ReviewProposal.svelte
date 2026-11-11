@@ -62,23 +62,7 @@
 			<span class="qm-review-none">{t.strings.reviewEmpty}</span>
 		{/if}
 	</span>
-	<span class="qm-review-answers">
-		{#if reviewing.fieldOutdated.has(item.id)}
-			<span class="qm-review-outdated-label">{t.strings.reviewOutdated}</span>
-		{/if}
-		<button
-			type="button"
-			class="qm-review-act qm-review-accept qm-focus-ring"
-			title={t.strings.reviewAcceptTitle}
-			onclick={() => answer('accept')}>{t.strings.reviewAccept}</button
-		>
-		<button
-			type="button"
-			class="qm-review-act qm-review-dismiss qm-focus-ring"
-			title={t.strings.reviewDismissTitle}
-			onclick={() => answer('dismiss')}>{t.strings.reviewDismiss}</button
-		>
-	</span>
+
 </div>
 
 <style>

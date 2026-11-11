@@ -59,11 +59,14 @@
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview } from './review.svelte.js';
+	import ReviewCard from './ReviewCard.svelte';
 	import {
 		byBlocks,
+		byCard,
 		onField,
 		valueIn,
 		valueWith,
+		type CardReview,
 		type FieldProposal,
 		type ReviewDrawn
 	} from './review.js';
@@ -129,7 +132,7 @@
 		onReview,
 		onReviewFocus,
 		onReviewDrawn,
-		reviewAdvance = true,
+		reviewInset = 0,
 		class: className,
 		style
 	}: VisualEditorProps = $props();
@@ -328,6 +331,7 @@
 		const was = cardsListed();
 		if (!review?.length || was === cardIds) return review;
 		return review.map((item) => {
+			if (byCard(item)) return item;
 			const field = cardMoved(item.field, was, cardIds);
 			return field === item.field ? item : { ...item, field };
 		});
@@ -361,12 +365,8 @@
 				addr.field == null ? resolveCardKey({ card: addr.card }, cardIds) : reviewed(path);
 			return key && fieldKeyToString(key);
 		},
-		chorded(id) {
-			if (!reviewAdvance) return;
-			const index = drewOrder.indexOf(id);
-			void tick().then(() => {
-				if (span.alive) void step(1, true, index < 0 ? undefined : { id, index });
-			});
+		answered(id) {
+			if (!batching) advanceFrom(id);
 		},
 		writing(on) {
 			writing += on ? 1 : -1;
@@ -497,6 +497,100 @@
 	}
 	setReview(reviewing);
 	span.onEnd(reviewing.dispose);
+	// SPIKE: card items, placed by session key against the cards as they stood when the list was set.
+	const cardReviews = $derived.by(() => {
+		const adds = new Map<string, Extract<CardReview, { add: unknown }>[]>();
+		const removes = new Map<string, Extract<CardReview, { remove: number }>>();
+		const drawn = new Set<string>();
+		const was = cardsListed();
+		for (const item of reviewing.items) {
+			if (!byCard(item)) continue;
+			if ('remove' in item) {
+				const key = was[item.remove];
+				if (key === undefined || !cardIds.includes(key)) continue;
+				removes.set(key, item);
+				drawn.add(item.id);
+				continue;
+			}
+			const lead = item.add.after < 0 ? 'main' : was[item.add.after];
+			const at = lead === undefined || (lead !== 'main' && !cardIds.includes(lead)) ? 'end' : lead;
+			const list = adds.get(at) ?? [];
+			list.push(item);
+			adds.set(at, list);
+			drawn.add(item.id);
+		}
+		return { adds, removes, drawn };
+	});
+	/** The reader is typing: the card stays out of the way until the pointer moves or a step. */
+	let typing = $state(false);
+	let lastMove = { x: -1, y: -1 };
+	function onReviewPointer(e: PointerEvent): void {
+		if (Math.abs(e.clientX - lastMove.x) + Math.abs(e.clientY - lastMove.y) < 3) return;
+		lastMove = { x: e.clientX, y: e.clientY };
+		typing = false;
+	}
+	function onReviewDown(e: PointerEvent): void {
+		const at = (e.target as Element | null)?.closest?.('[data-qm-review]');
+		const id = at?.getAttribute('data-qm-review');
+		if (id) reviewing.pick(id);
+	}
+	/** Make the next open item current, after `id`'s answer is drawn. */
+	function advanceFrom(id: string): void {
+		const order = drewOrder;
+		const index = order.indexOf(id);
+		void tick().then(async () => {
+			if (!span.alive) return;
+			await tick();
+			const now = reviewOrder();
+			if (!now.length) return;
+			const after = index < 0 ? [] : [...order.slice(index + 1), ...order.slice(0, index)];
+			const next = after.find((n) => now.includes(n)) ?? now[0];
+			typing = false;
+			void reveal(next, false, true);
+		});
+	}
+	/** The answer chords, from anywhere in the editor, on the current item. */
+	const answerKeys = keydownHandler({
+		[REVIEW_KEYS.accept]: () => answerCurrent('accept'),
+		[REVIEW_KEYS.dismiss]: () => answerCurrent('dismiss')
+	});
+	function onReviewKey(e: KeyboardEvent): void {
+		if (e.isComposing || !reviewing.items.length) return;
+		const target = e.target as Node | null;
+		if (target !== document.body && !(target && rootEl?.contains(target))) return;
+		if (answerKeys({} as never, e)) {
+			e.preventDefault();
+			e.stopPropagation();
+			return;
+		}
+		if (target && rootEl?.contains(target) && !e.metaKey && !e.ctrlKey && !e.altKey)
+			if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter')
+				typing = true;
+	}
+	/** Answer the current item. False where there is none. */
+	export function answerCurrent(action: 'accept' | 'dismiss'): boolean {
+		const id = reviewing.lit;
+		if (id === undefined) return false;
+		return answerReview([id], action, true).length > 0;
+	}
+	// A review starts on its first item, without moving the caret.
+	$effect(() => {
+		if (reviewing.lit !== undefined || !reviewing.items.length) return;
+		void reviewing.reports.size;
+		void cardReviews;
+		void tick().then(() => {
+			if (!span.alive || reviewing.lit !== undefined) return;
+			const first = reviewOrder()[0];
+			if (first) reviewing.pick(first);
+		});
+	});
+	const reviewPosition = $derived.by(() => {
+		const id = reviewing.lit;
+		void drewTick;
+		const order = drewOrder;
+		const at = id === undefined ? -1 : order.indexOf(id);
+		return at < 0 || order.length < 2 ? undefined : `${at + 1} of ${order.length}`;
+	});
 	// The lit item, to a host lighting its own list: each change, and not the nothing a mount
 	// starts from.
 	let reported: string | undefined;
@@ -514,6 +608,7 @@
 		for (const report of reviewing.reports.values()) for (const id of report.ids) drawn.add(id);
 		for (const item of reviewing.items)
 			if (onField(item) && !fieldUndrawn.has(item.id)) drawn.add(item.id);
+		for (const id of cardReviews.drawn) drawn.add(id);
 		const order: string[] = [];
 		const seen = new Set<string>();
 		const take = (id: string | null): void => {
@@ -543,6 +638,7 @@
 		for (const item of reviewing.items)
 			if (!reported.has(item.id) && !why.has(item.id)) {
 				if (byBlocks(item)) why.set(item.id, 'block');
+				else if (byCard(item) && !cardReviews.drawn.has(item.id)) why.set(item.id, 'block');
 			}
 		const open = reviewOrder();
 		return {
@@ -559,9 +655,12 @@
 	const NO_REPORT = JSON.stringify({ open: [], outdated: [], undrawn: [] } satisfies ReviewDrawn);
 	let drewReport = NO_REPORT;
 	let drewOrder: readonly string[] = [];
+	let drewTick = $state(0);
+	let drewReportOutdated = $state.raw<readonly string[]>([]);
 	$effect(() => {
 		void reviewing.items;
 		void reviewing.fieldUndrawn;
+		void cardReviews;
 		for (const id of reviewing.fieldOutdated) void id;
 		for (const report of reviewing.reports.values()) void report;
 		let live = true;
@@ -569,6 +668,8 @@
 			if (!live || !span.alive) return;
 			const report = reviewReport();
 			drewOrder = report.open;
+			drewReportOutdated = report.outdated;
+			drewTick++;
 			const joined = JSON.stringify(report);
 			if (joined === drewReport) return;
 			drewReport = joined;
@@ -1407,7 +1508,14 @@
 	async function reveal(id: string, focus: boolean, stepping: boolean): Promise<boolean> {
 		if (!span.alive) return false;
 		const key = reviewing.keyOf(id);
-		if (key === undefined) return false;
+		if (key === undefined) {
+			if (!cardReviews.drawn.has(id)) return false;
+			reviewing.reveal(id);
+			if (!(await span.resumes(tick()))) return false;
+			const el = rootEl?.querySelector<HTMLElement>(`[data-qm-review="${CSS.escape(id)}"]`);
+			scrollShy(el, stepping);
+			return true;
+		}
 		mainCard?.revealLeaf(key);
 		for (const card of cardRefs) card?.revealLeaf(key);
 		if (!(await span.resumes(tick()))) return false;
@@ -1421,12 +1529,30 @@
 				(el) => el.getAttribute('data-qm-review') === id
 			) ??
 			leaves.control(key)?.el;
-		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-		at?.scrollIntoView({
-			behavior: reduce ? 'auto' : 'smooth',
-			block: stepping ? 'nearest' : 'center'
-		});
+		scrollShy(at, stepping);
 		return true;
+	}
+	/** Scroll `el` into view only when it is outside comfortable view: a step leaves an item
+	 *  already in view where it is, and only the card moves. */
+	function scrollShy(el: HTMLElement | null | undefined, stepping: boolean): void {
+		if (!el) return;
+		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		if (stepping) {
+			const r = el.getBoundingClientRect();
+			let v = { top: 0, bottom: window.innerHeight };
+			for (let at = rootEl?.parentElement ?? null; at; at = at.parentElement) {
+				const { overflowY } = getComputedStyle(at);
+				if (overflowY === 'auto' || overflowY === 'scroll') {
+					v = at.getBoundingClientRect();
+					break;
+				}
+			}
+			if (rootEl && getComputedStyle(rootEl).overflowY.match(/auto|scroll/))
+				v = rootEl.getBoundingClientRect();
+			const room = 72;
+			if (r.top >= v.top + 8 && r.bottom <= v.bottom - reviewInset - room) return;
+		}
+		el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
 	}
 
 	/**
@@ -1438,7 +1564,8 @@
 	 */
 	export function answerReview(
 		ids: readonly string[] | 'all',
-		action: 'accept' | 'dismiss'
+		action: 'accept' | 'dismiss',
+		single = ids !== 'all' && ids.length === 1
 	): string[] {
 		if (!span.alive) return [];
 		const order = reviewOrder();
@@ -1446,6 +1573,7 @@
 		const out: string[] = [];
 		const entry: Answered = { ids: [], inverses: [] };
 		batching = entry;
+		const advance = single ? asked[0] : undefined;
 		writing++;
 		try {
 			for (const id of asked) {
@@ -1453,7 +1581,9 @@
 				if (!item) continue;
 				const key = reviewing.keyOf(id);
 				// Each one is planned against the document the one before it left.
-				const answered = !onField(item)
+				const answered = byCard(item)
+					? reviewing.act(id, action)
+					: !onField(item)
 					? key !== undefined && !!leaves.prose(key)?.answerReview(id, action)
 					: reviewing.act(id, action);
 				if (answered) out.push(id);
@@ -1467,6 +1597,7 @@
 			journal.push(entry);
 			offerJournal();
 		}
+		if (advance && out.includes(advance)) advanceFrom(advance);
 		return out;
 	}
 
@@ -1548,7 +1679,12 @@
 	}
 </script>
 
-<svelte:document onkeydowncapture={onUndoKey} />
+<svelte:document
+	onkeydowncapture={(e) => {
+		onReviewKey(e);
+		if (!e.defaultPrevented) onUndoKey(e);
+	}}
+/>
 
 <!-- The keydown is a control's, bubbled: the root resolves which description it raises.
      A file dragged over or dropped is refused here, after any control has seen it. -->
@@ -1559,6 +1695,8 @@
 	data-qm-root
 	bind:this={rootEl}
 	onkeydowncapture={onStepKey}
+	onpointermove={onReviewPointer}
+	onpointerdowncapture={onReviewDown}
 	onkeydown={raiseGuidance}
 	ondragover={refuseFiles}
 	ondrop={refuseFiles}
@@ -1592,13 +1730,32 @@
 		{/if}
 	</div>
 
+	{@render cardAdds('main')}
 	{@render addAffordance(0)}
 	<!-- A card and the gap under it are one slot, which is what a reorder moves: the
 	 strip below a card is the same strip wherever the card lands, so it rides along
 	 rather than being slid across. It is also the shape `animate:` asks for, being the
 	 keyed block's only child. -->
 	{#each model.cards as c, i (c.id)}
-		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed} in:slot out:slot>
+		<div
+			class="qm-card-slot"
+			class:qm-review-removing={cardReviews.removes.has(c.id)}
+			bind:this={slotEls[i]}
+			animate:reorder={arm.armed}
+			in:slot
+			out:slot
+		>
+			{#if cardReviews.removes.get(c.id)}
+				{@const rm = cardReviews.removes.get(c.id)!}
+				<div
+					class="qm-review-card-remove"
+					class:qm-review-lit={reviewing.lit === rm.id}
+					data-qm-review={rm.id}
+					onpointerenter={() => reviewing.point(rm.id, 'pointer')}
+				>
+					Proposed removal
+				</div>
+			{/if}
 			<Card
 				bind:this={cardRefs[i]}
 				card={titled(c)}
@@ -1615,9 +1772,21 @@
 				{onError}
 				{leaves}
 			/>
+			{@render cardAdds(c.id)}
 			{@render addAffordance(i + 1)}
 		</div>
 	{/each}
+	{@render cardAdds('end')}
+	<ReviewCard
+		id={reviewing.lit}
+		root={rootEl}
+		inset={reviewInset}
+		hidden={typing}
+		outdated={reviewing.lit !== undefined && drewReportOutdated.includes(reviewing.lit)}
+		position={reviewPosition}
+		onAnswer={(action) => answerCurrent(action)}
+		onHover={(on) => reviewing.hoverCard(on)}
+	/>
 	<!-- The way back to a removed card once its toast has gone: the newest kept step, by
 	 name, at the stack's foot, where the control that adds a card is looked for. -->
 	{#if undo.kept}
@@ -1662,6 +1831,26 @@
  neither dropped nor trapped. The gate lives here rather than at each call site: the
  strip is one decision, and two copies of it drift into a stack with a gap at one
  end. -->
+{#snippet cardAdds(at: string)}
+	{#each cardReviews.adds.get(at) ?? [] as item (item.id)}
+		{#if 'add' in item}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="qm-review-card-add"
+				class:qm-review-lit={reviewing.lit === item.id}
+				data-qm-review={item.id}
+				onpointerenter={() => reviewing.point(item.id, 'pointer')}
+			>
+				<div class="qm-review-card-add-head">
+					<span class="qm-review-card-add-title">{item.add.title ?? item.add.kind}</span>
+					<span class="qm-review-card-add-tag">New card</span>
+				</div>
+				{#if item.add.text}<p class="qm-review-card-add-text">{item.add.text}</p>{/if}
+			</div>
+		{/if}
+	{/each}
+{/snippet}
+
 {#snippet addAffordance(atIndex: number)}
 	{#if kinds.length}
 		<!-- The strip past the last card is the append point, the one a reader looks for
@@ -1953,5 +2142,54 @@
 		transition:
 			opacity var(--_qm-reveal),
 			background-color var(--_qm-reveal);
+	}
+	/* SPIKE: card items drawn by the editor. */
+	.qm-review-card-add {
+		margin-block: var(--_qm-space-3, 0.75rem);
+		padding: 0.75rem var(--_qm-card-inset, 1rem);
+		border-radius: var(--_qm-radius, 0.75rem);
+		background: color-mix(in srgb, var(--_qm-review-tint) 45%, var(--_qm-surface));
+		outline: 1px dashed var(--_qm-review-line);
+		outline-offset: -1px;
+		font-size: 0.875rem;
+	}
+	.qm-review-card-add.qm-review-lit {
+		outline-style: solid;
+		outline-width: 2px;
+	}
+	.qm-review-card-add-head {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+	.qm-review-card-add-title {
+		font-size: 1.125rem;
+		font-weight: 500;
+	}
+	.qm-review-card-add-tag,
+	.qm-review-card-remove {
+		font-size: 0.75rem;
+		color: var(--_qm-ink-label);
+	}
+	.qm-review-card-add-text {
+		margin-top: 0.5rem;
+		color: var(--_qm-ink-label);
+		white-space: pre-line;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	.qm-review-card-remove {
+		padding: 0.25rem var(--_qm-card-inset, 1rem);
+	}
+	.qm-review-card-remove.qm-review-lit {
+		color: var(--_qm-danger);
+	}
+	.qm-review-removing :global(section.qm-card) {
+		opacity: 0.55;
+		outline: 1px dashed var(--_qm-review-line);
+		outline-offset: -1px;
 	}
 </style>

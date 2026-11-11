@@ -30,7 +30,21 @@ import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/inde
  * An item whose place the editor does not hold draws nothing. An answered item is drawn no
  * more: a dismissed one wrote nothing, and an accepted one is plain text in the document.
  */
-export type ReviewItem = FieldProposal | BlockProposal;
+export type ReviewItem = FieldProposal | BlockProposal | CardReview;
+
+/** A card proposed new or proposed taken out, by its index into the cards as they stood when the
+ *  list was set. The editor draws it among its cards; the host writes it, by `applyCardOps`,
+ *  when `onReview` reports it accepted. */
+export type CardReview =
+	| {
+			id: string;
+			/** After the card at this index, `-1` after the main card, past the last for the end. */
+			add: { after: number; kind: string; title?: string; text?: string };
+	  }
+	| { id: string; remove: number };
+
+/** Whether an item proposes a whole card. */
+export const byCard = (item: object): item is CardReview => 'add' in item || 'remove' in item;
 
 /** A proposal over blocks of a rich text field, by their ids. */
 export type BlockProposal =

@@ -836,15 +836,7 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 		const $last = doc.resolve(last.pos);
 		/** Past the outermost block holding the last one, or the head of the leaf. */
 		const outer = ahead ? 0 : $last.depth ? $last.after(1) : last.pos + last.node.nodeSize;
-		const row = (): void => {
-			decos.push(
-				Decoration.widget(outer, () => chip(strings, act, item.id, true, stale), {
-					side: ahead ? -1 : 9999,
-					key: `chip:${item.id}:row:${stale}`,
-					stopEvent: () => true
-				})
-			);
-		};
+		const row = (): void => {};
 		if (added.length) {
 			// A proposal that continues the list its paragraph is in adds items to that list.
 			const listed =
@@ -876,7 +868,6 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 							if (on) el.classList.add('qm-review-lit');
 							el.contentEditable = 'false';
 							el.setAttribute('data-qm-review', item.id);
-							if (holds) lastLine(el)?.append(chip(strings, act, item.id, false, stale));
 							return el;
 						},
 						{
@@ -888,14 +879,6 @@ function draw(state: EditorState, channel: ReviewChannel, act: Act, bases: Bases
 				);
 			});
 			if (!chipped) row();
-		} else if (last.node.isTextblock) {
-			decos.push(
-				Decoration.widget(reach(last)[1], () => chip(strings, act, item.id, false, stale), {
-					side: 1,
-					key: `chip:${item.id}:${stale}`,
-					stopEvent: () => true
-				})
-			);
 		} else row();
 
 		// What a proposal only adds to has the caret anywhere in the block it adds from.

@@ -138,12 +138,9 @@ export interface VisualEditorProps {
 	 * host counts and steps its own list by.
 	 */
 	onReviewDrawn?: (drawn: ReviewDrawn) => void;
-	/**
-	 * Whether an answer given by a chord goes on to the next item, the caret in it, so a held
-	 * walk down a batch answers each in turn. An answer by pointer stays where it was given.
-	 * Default `true`.
-	 */
-	reviewAdvance?: boolean;
+	/** The room, in px, the host's chrome takes at the foot of the pane, which the answer card
+	 *  keeps clear of. */
+	reviewInset?: number;
 	/**
 	 * The item under attention, `undefined` once nothing is: the pointer over one, the caret
 	 * in one, or one a `revealReview` named. What a host lights its own list by.

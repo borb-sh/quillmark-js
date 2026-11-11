@@ -14,6 +14,7 @@ import type { DocPath } from '../core/address.js';
 import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
 import {
 	byBlocks,
+	byCard,
 	locate,
 	onField,
 	sameValue,
@@ -23,8 +24,8 @@ import {
 	type ReviewUndrawn
 } from './review.js';
 
-/** How long a revealed item stays lit, in ms. */
-export const REVEAL_MS = 2400;
+/** How long the pointer rests on an item before it becomes current, in ms. */
+export const DWELL_MS = 160;
 
 export interface Review {
 	/** The host's list, less what was answered here. */
@@ -60,6 +61,10 @@ export interface Review {
 	/** A leaf is writing an answer, and is done: its edit is the answer's, not the reader's. */
 	writing(on: boolean): void;
 	reveal(id: string): void;
+	/** A click or tap on an item: current at once. */
+	pick(id: string): void;
+	/** The pointer is over the answer card, which holds the current item where it is. */
+	hoverCard(on: boolean): void;
 }
 
 export interface ReviewSource {
@@ -80,8 +85,8 @@ export interface ReviewSource {
 	 *  leaf that gave it where one did. `false` where it could not be made, and the item
 	 *  stands. */
 	answer(id: string, item: ReviewItem | undefined, action: ReviewAction, key?: string): boolean;
-	/** An answer a chord gave, once it is made. */
-	chorded?(id: string): void;
+	/** An answer, once it is made: the editor moves on from it. */
+	answered?(id: string): void;
 	writing?(on: boolean): void;
 }
 
@@ -172,18 +177,21 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return out;
 	});
 
-	let pointer = $state<string | undefined>();
-	let caret = $state<string | undefined>();
-	let caretFrom: string | undefined;
-	let revealed = $state<string | undefined>();
-	let fade: ReturnType<typeof setTimeout> | undefined;
-	const lit = $derived([revealed, caret, pointer].find((id) => id !== undefined && byId.has(id)));
+	/** The one current item: sticky, set by a step, a reveal, the caret, a click, or the pointer
+	 *  after a dwell, and held until another names one or it is answered. */
+	let current = $state<string | undefined>();
+	let dwell: ReturnType<typeof setTimeout> | undefined;
+	let overCard = false;
+	const lit = $derived(current !== undefined && byId.has(current) ? current : undefined);
 
 	const answering = (id: string, action: ReviewAction, chord?: boolean): void => {
-		if (action === 'reopen') answered.delete(id);
-		else answered.add(id);
+		void chord;
+		if (action === 'reopen') {
+			answered.delete(id);
+			current = id;
+		} else answered.add(id);
 		answers++;
-		if (chord) source.chorded?.(id);
+		if (action !== 'reopen') source.answered?.(id);
 	};
 
 	const self: Review & { dispose(): void } = {
@@ -207,7 +215,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		marks: (key) => fields.has(key) || !!drawn.get(key)?.ids.length,
 		keyOf(id) {
 			const item = byId.get(id);
-			if (!item) return undefined;
+			if (!item || byCard(item)) return undefined;
 			if (byBlocks(item)) {
 				const key = source.leafFor(item.field);
 				return key !== undefined && drawn.get(key)?.ids.includes(id) ? key : undefined;
@@ -220,15 +228,16 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (report.ids.length || report.undrawn.length) drawn.set(key, report);
 			else drawn.delete(key);
 		},
-		point(id, via, from) {
+		point(id, via) {
 			if (via === 'pointer') {
-				pointer = id;
+				clearTimeout(dwell);
+				if (id === undefined || id === current) return;
+				dwell = setTimeout(() => {
+					if (!overCard && byId.has(id)) current = id;
+				}, DWELL_MS);
 				return;
 			}
-			if (id === undefined && from !== undefined && caretFrom !== from) return;
-			caretFrom = from;
-			caret = id;
-			if (id !== undefined) revealed = undefined;
+			if (id !== undefined) current = id;
 		},
 		act(id, action, chord) {
 			const item = byId.get(id);
@@ -241,14 +250,19 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (source.answer(id, byId.get(id), action, key)) answering(id, action, chord);
 		},
 		reveal(id) {
-			clearTimeout(fade);
-			revealed = id;
-			fade = setTimeout(() => {
-				if (revealed === id) revealed = undefined;
-			}, REVEAL_MS);
+			clearTimeout(dwell);
+			current = id;
+		},
+		pick(id) {
+			clearTimeout(dwell);
+			if (byId.has(id)) current = id;
+		},
+		hoverCard(on) {
+			overCard = on;
+			if (on) clearTimeout(dwell);
 		},
 		dispose() {
-			clearTimeout(fade);
+			clearTimeout(dwell);
 		}
 	};
 	return self;
@@ -278,7 +292,9 @@ const NO_REVIEW: Review = {
 	act: () => false,
 	heard() {},
 	writing() {},
-	reveal() {}
+	reveal() {},
+	pick() {},
+	hoverCard() {}
 };
 
 /** The editor's review state, or {@link NO_REVIEW} off-tree. */
