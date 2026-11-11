@@ -7,7 +7,7 @@ The private app that composes `@quillmark/svelte` and `@quillmark/quiver`: the r
 - **`/`**: the landing page and quickstart, each surface mounted beside the steps that reach it.
 - **`/playground`**: the reference split-pane shell and the harness, with the quill picker, the diagnostic injector and a download over the compiled snapshot.
 
-Harness flags on `/playground`: `?examples=off` opens on the seed rather than the example document, `?tips` supplies a guidance channel, `?foreign` adds a card whose kind the schema cannot project, `?review` stands a reviewer's answer over the showcase's example, as the list `proposalsBetween` makes of it for the editor to draw, and `?collab=<room>` opens the document as a live session over `localStorage`, every tab of the origin on the same room editing one document.
+Harness flags on `/playground`: `?examples=off` opens on the seed rather than the example document, `?tips` supplies a guidance channel, `?foreign` adds a card whose kind the schema cannot project, `?review` stands a reviewer's answer over the showcase's example, as the list `proposalsBetween` makes of it for the editor to draw, with the preview painting the page as it would read with every open item taken, and `?collab=<room>` opens the document as a live session over `localStorage`, every tab of the origin on the same room editing one document.
 
 ## Reaching it from source
 

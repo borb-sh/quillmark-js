@@ -45,6 +45,7 @@ export type {
 	ReviewDrawn,
 	ReviewEvent,
 	ReviewItem,
+	ReviewProjection,
 	ReviewUndrawn
 } from './review.js';
 export type { BlockPlace } from '../core/codec/index.js';

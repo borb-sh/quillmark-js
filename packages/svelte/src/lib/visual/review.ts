@@ -6,7 +6,7 @@
 // reader's edit takes: what lands is what was drawn, `onChange` reports it, and the reader's undo
 // takes it back.
 import type { Card, PathStep } from '@quillmark/wasm';
-import type { DocPath } from '../core/address.js';
+import type { DocPath, Landing } from '../core/address.js';
 import { wordDiff, type BlockPlace, type ReviewAction } from '../core/codec/index.js';
 
 /**
@@ -103,6 +103,32 @@ export interface ReviewDrawn {
 	/** Listed items the editor does not draw, each with why. */
 	undrawn: readonly { id: string; reason: ReviewUndrawn }[];
 }
+
+/**
+ * Every open proposal written into a copy of the document, as the page would read with each one
+ * taken, and the way between places in the live document and places in the copy
+ * (`VisualEditor.projectReview`). A proposal that adds or takes out a card moves the index of
+ * every card after it, and one that adds or rewrites words moves the offsets after them, so a
+ * host bridging the editor to a preview of the copy routes each hop through this.
+ */
+export interface ReviewProjection {
+	/** The proposals written, every one the editor draws, in the page's order. */
+	readonly ids: readonly string[];
+	/** A place in the live document, as the copy holds it; `undefined` where a proposal takes
+	 *  its card out. */
+	toProjection<T extends DocPath | Landing>(at: T): T | undefined;
+	/** A place in the copy, as the live document holds it, or the proposal that adds it: a card
+	 *  or a block that only the copy holds. Inside words a proposal rewrites, the offset is the
+	 *  nearest the live text holds. `undefined` for a card the copy does not hold. */
+	toLive<T extends DocPath | Landing>(at: T): T | { review: string } | undefined;
+}
+
+/** The projection of a review with nothing open: every place is where it is. */
+export const NO_PROJECTION: ReviewProjection = {
+	ids: [],
+	toProjection: (at) => at,
+	toLive: (at) => at
+};
 
 /** A proposal under a field's control. */
 export type FieldProposal = {

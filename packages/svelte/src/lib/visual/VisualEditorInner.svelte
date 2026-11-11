@@ -35,6 +35,8 @@
 		cardPath,
 		nestedAddrForFieldPath,
 		fieldPathForAddr,
+		cardOfPath,
+		pathOnCard,
 		type DocPath,
 		type Landing
 	} from '../core/address.js';
@@ -46,6 +48,7 @@
 		Addr,
 		CardAddr,
 		Diagnostic,
+		Document,
 		PathStep,
 		PayloadItem,
 		QuillFieldSchema,
@@ -62,17 +65,26 @@
 	import {
 		byBlocks,
 		byCard,
+		locate,
 		onField,
 		reviewText,
 		valueIn,
 		valueWith,
+		NO_PROJECTION,
 		type CardProposal,
 		type FieldProposal,
-		type ReviewDrawn
+		type ReviewDrawn,
+		type ReviewItem,
+		type ReviewProjection
 	} from './review.js';
 	import ReviewCard from './ReviewCard.svelte';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
-	import { REVIEW_KEYS, type FieldController, type LeafViews } from '../core/codec/index.js';
+	import {
+		REVIEW_KEYS,
+		type FieldController,
+		type LeafProjection,
+		type LeafViews
+	} from '../core/codec/index.js';
 	import {
 		IdSeq,
 		controlKind,
@@ -327,6 +339,13 @@
 		const addr = nearestAddrForFieldPath(path);
 		return addr && declaredField(addr) ? resolveCardKey(addr, cardIds) : undefined;
 	};
+	/** The key of the prose leaf a rich text field's or a body's path names. */
+	function proseKeyFor(path: DocPath): string | undefined {
+		const addr = addrForFieldPath(path);
+		if (!addr) return undefined;
+		const key = addr.field == null ? resolveCardKey({ card: addr.card }, cardIds) : reviewed(path);
+		return key && fieldKeyToString(key);
+	}
 	/** Take a field's or a card's answer back: what it wrote taken back, if anything, and the
 	 *  item reopened and brought into view, where no leaf's own undo scrolls to it. */
 	const giveBack = (id: string, leaf: string, back?: () => void): void => {
@@ -366,13 +385,7 @@
 				key.card === undefined ? model.main : model.cards[cardIndexOf(key.card as CardId)];
 			return card?.values[key.field];
 		},
-		leafFor(path) {
-			const addr = addrForFieldPath(path);
-			if (!addr) return undefined;
-			const key =
-				addr.field == null ? resolveCardKey({ card: addr.card }, cardIds) : reviewed(path);
-			return key && fieldKeyToString(key);
-		},
+		leafFor: proseKeyFor,
 		listedCards: () => cardsListed(),
 		liveCards: () => cardIds,
 		answered(id, current) {
@@ -1708,6 +1721,187 @@
 		advancing = undefined;
 		if (from !== undefined) advanceFrom(from, order);
 		return out;
+	}
+
+	/**
+	 * Write every open item the editor draws into `target`, a copy of the document the host made,
+	 * as answering them all with Accept would: a field's value through the typed writer, a place
+	 * inside one as the field's whole value with that place changed, a card added or taken out,
+	 * and each prose leaf's proposals from the plans it draws them from. Nothing is written to the
+	 * document, and no hook, history or answer hears of it. Returns the way between places in the
+	 * document and places in `target`, which holds only while neither changes.
+	 */
+	export function projectReview(target: Document): ReviewProjection {
+		if (!span.alive) return NO_PROJECTION;
+		const order = reviewOrder();
+		if (!order.length) return NO_PROJECTION;
+		const open = new Set(order);
+		const byId = new Map(reviewing.items.map((item) => [item.id, item]));
+		const written = new Set<string>();
+
+		const texts = new Map<string, LeafProjection>();
+		for (const [key, report] of reviewing.reports) {
+			if (!report.ids.some((id) => open.has(id))) continue;
+			const projected = leaves.prose(key)?.projectReview(target);
+			if (!projected) continue;
+			texts.set(key, projected);
+			for (const id of projected.ids) written.add(id);
+		}
+
+		for (const [, field] of projectFields(order, byId)) {
+			const at = field.isMain ? undefined : cardIndexOf(field.cardId);
+			if (at !== undefined && at < 0) continue;
+			try {
+				if (field.value === undefined)
+					target.removeField(at === undefined ? field.name : { card: at, field: field.name });
+				else {
+					const w = quill.writer(target);
+					(at === undefined ? w : w.card(at)).set(field.name, field.value);
+				}
+				for (const id of field.ids) written.add(id);
+			} catch {
+				// A value the writer refuses is one its Accept could not write either.
+			}
+		}
+
+		type Slot = { key: string } | { add: CardAdd };
+		const adds = (lead: string): Slot[] =>
+			(reviewing.cards.adds.get(lead) ?? []).filter((a) => open.has(a.id)).map((add) => ({ add }));
+		const gone = new Set<string>();
+		for (const [key, item] of reviewing.cards.removes)
+			if (open.has(item.id)) {
+				gone.add(key);
+				written.add(item.id);
+			}
+		const wanted: Slot[] = [...adds('head')];
+		for (const key of cardIds) {
+			if (!gone.has(key)) wanted.push({ key });
+			wanted.push(...adds(key));
+		}
+		wanted.push(...adds('end'));
+		for (let i = cardIds.length - 1; i >= 0; i--) if (gone.has(cardIds[i])) target.removeCard(i);
+		const slots: Slot[] = [];
+		for (const slot of wanted) {
+			if ('add' in slot && !placeCardIn(target, slot.add.add, slots.length)) continue;
+			if ('add' in slot) written.add(slot.add.id);
+			slots.push(slot);
+		}
+		const projected = new Map(slots.flatMap((slot, j) => ('key' in slot ? [[slot.key, j]] : [])));
+
+		const field = (at: DocPath | Landing): DocPath => (typeof at === 'string' ? at : at.field);
+		const moved = <T extends DocPath | Landing>(at: T, path: DocPath, pos?: number): T =>
+			(typeof at === 'string'
+				? path
+				: { ...(at as Landing), field: path, ...(pos === undefined ? {} : { pos }) }) as T;
+		const ids = order.filter((id) => written.has(id));
+		return {
+			ids,
+			toProjection(at) {
+				let path = field(at);
+				const card = cardOfPath(path);
+				if (card !== undefined && card < cardIds.length) {
+					const j = projected.get(cardIds[card]);
+					if (j === undefined) return undefined;
+					path = pathOnCard(path, j);
+				}
+				const pos = typeof at === 'string' ? undefined : at.pos;
+				const text = pos === undefined ? undefined : texts.get(proseKeyFor(field(at)) ?? '');
+				return moved(at, path, text && pos !== undefined ? text.toProjection(pos) : pos);
+			},
+			toLive(at) {
+				let path = field(at);
+				const card = cardOfPath(path);
+				if (card !== undefined) {
+					const slot = slots[card];
+					if (!slot) return undefined;
+					if ('add' in slot) return { review: slot.add.id };
+					path = pathOnCard(path, cardIndexOf(slot.key));
+				}
+				const pos = typeof at === 'string' ? undefined : at.pos;
+				const text = pos === undefined ? undefined : texts.get(proseKeyFor(path) ?? '');
+				const live = text && pos !== undefined ? text.toLive(pos) : pos;
+				if (typeof live === 'object') return live;
+				return moved(at, path, live);
+			}
+		};
+	}
+	/**
+	 * The value each field holds with every open field item on it taken, by leaf key, in the
+	 * page's order: a place inside a field found again in the value the items before it left, as
+	 * each accept finds it.
+	 */
+	function projectFields(
+		order: readonly string[],
+		byId: ReadonlyMap<string, ReviewItem>
+	): Map<string, { cardId: string; isMain: boolean; name: string; value: unknown; ids: string[] }> {
+		const out = new Map<
+			string,
+			{ cardId: string; isMain: boolean; name: string; value: unknown; ids: string[] }
+		>();
+		const fieldUndrawn = new Set(reviewing.fieldUndrawn.map((u) => u.id));
+		const nested = (item: ReviewItem): item is FieldProposal =>
+			onField(item) && !fieldUndrawn.has(item.id) && !addrForFieldPath(item.field);
+		const left = new Set(order);
+		for (const id of order) {
+			const item = byId.get(id);
+			left.delete(id);
+			if (!item || !onField(item)) continue;
+			const key = reviewed(item.field);
+			if (!key?.field || typeof key.card === 'number') continue;
+			const leaf = fieldKeyToString(key);
+			const isMain = key.card === undefined;
+			const cardId = key.card ?? model.main.id;
+			let held = out.get(leaf);
+			if (!held) {
+				const at = isMain ? 0 : cardIndexOf(cardId);
+				if (at < 0) continue;
+				const value = fieldValues((isMain ? doc.main : doc.card(at)).payloadItems)[key.field];
+				out.set(leaf, (held = { cardId, isMain, name: key.field, value, ids: [] }));
+			}
+			if (addrForFieldPath(item.field)) held.value = item.after;
+			else {
+				const steps = leafTargetFor(item.field)?.steps;
+				if (!steps) continue;
+				// Each item before it on the field claims its member first, as the derive does.
+				const claimed = new Set<string>();
+				let found: readonly PathStep[] | undefined;
+				for (const other of reviewing.items) {
+					if (other !== item && !(left.has(other.id) && nested(other))) continue;
+					const otherKey = reviewed((other as FieldProposal).field);
+					const path =
+						other === item ? steps : leafTargetFor((other as FieldProposal).field)?.steps;
+					if (!otherKey || fieldKeyToString(otherKey) !== leaf || !path) continue;
+					const located = locate(held.value, path, other as FieldProposal, claimed);
+					if (other === item) {
+						found = located.steps;
+						break;
+					}
+				}
+				if (!found) continue;
+				held.value = valueWith(held.value, found, item.after);
+			}
+			held.ids.push(id);
+		}
+		return out;
+	}
+	/** Write `card` into `target` at `at`, with its `$id` where no card there holds that one,
+	 *  as {@link placeCard} writes it into the document. */
+	function placeCardIn(target: Document, card: CardAdd['add'], at: number): boolean {
+		const { id, ...bare } = card;
+		const free =
+			id !== undefined &&
+			!Array.from({ length: target.cardCount }, (_, k) => target.card(k).id).includes(id);
+		try {
+			try {
+				target.unchecked.insertCard(free ? card : bare, at);
+			} catch (e) {
+				if (!free) throw e;
+				target.unchecked.insertCard(bare, at);
+			}
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/** Make the next or previous open item current, in document order and round from either

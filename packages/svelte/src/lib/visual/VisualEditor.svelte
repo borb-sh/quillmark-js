@@ -28,7 +28,9 @@
 	import type { DocPath, Landing } from '../core/address.js';
 	import type { Delta } from '../core/codec/positions.js';
 	import type { CardId, CardOp } from './signals.js';
+	import type { Document } from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
+	import { NO_PROJECTION, type ReviewProjection } from './review.js';
 	import VisualEditorInner from './VisualEditorInner.svelte';
 
 	let props: VisualEditorProps = $props();
@@ -120,6 +122,12 @@
 		action: 'accept' | 'dismiss'
 	): string[] {
 		return inner?.answerReview(ids, action) ?? [];
+	}
+	/** Write every open item the editor draws into `target`, a copy of `doc` the host made, as
+	 *  accepting them all would, without writing to `doc` or raising a hook. Returns the way
+	 *  between places in `doc` and places in `target`, good until either changes. */
+	export function projectReview(target: Document): ReviewProjection {
+		return inner?.projectReview(target) ?? NO_PROJECTION;
 	}
 	/** Make the next or previous open item current, round from either end, the caret or the
 	 *  focus in it unless `focus` is false. Resolves its id, `undefined` for none. */

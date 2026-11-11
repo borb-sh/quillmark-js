@@ -83,4 +83,29 @@ describe('substrate chain', () => {
 		doc.free();
 		quill.free();
 	});
+
+	it('compiles a document other than the one it opened over, and holds none after', async () => {
+		// A host's preview may compile a clone of its document: the session reads the clone
+		// during `update` alone, so the clone frees at once and the original compiles again.
+		const quill = core.Quill.fromTree(loadFixtureTree());
+		const doc = quill.seedDocument();
+		const session = await new Engine().open(quill, doc);
+		const named = () => session.regions().some((r) => r.field.startsWith('cards.section[11]'));
+		const before = session.pageCount;
+		expect(named()).toBe(false);
+
+		const clone = doc.clone();
+		const writer = quill.writer(clone);
+		for (let i = 0; i < 12; i++) writer.addCard('section', { heading: `Added ${i}` }, 'More.', 0);
+		session.update(clone);
+		clone.free();
+		expect(named()).toBe(true);
+
+		session.update(doc);
+		expect(named()).toBe(false);
+		expect(session.pageCount).toBe(before);
+		session.free();
+		doc.free();
+		quill.free();
+	});
 });
