@@ -2442,10 +2442,12 @@
 	   tint over the whole control, laid over it so it takes no room and moves nothing. It takes
 	   the box's `::after` whole, over what the arrival wash or a tap floor set there. A member a
 	   proposal takes out is struck where it stands. */
-	:global([data-qm-proposed]) {
+	:global([data-qm-proposed]),
+	:global(.qm-review-added-box :is(.qm-toggle, .qm-tick)) {
 		position: relative;
 	}
-	:global([data-qm-proposed])::after {
+	:global([data-qm-proposed])::after,
+	:global(.qm-review-added-box :is(.qm-toggle, .qm-tick))::after {
 		content: '';
 		position: absolute;
 		inset: 0;
@@ -2459,7 +2461,8 @@
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	/* The current one takes the review line as a ring as well, as a removed card's mark does. */
-	:global([data-qm-proposed-lit])::after {
+	:global([data-qm-proposed-lit])::after,
+	:global(.qm-review-lit > .qm-review-added-box :is(.qm-toggle, .qm-tick))::after {
 		background: var(--_qm-review-lit);
 		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
 	}
@@ -2468,17 +2471,17 @@
 		text-decoration-color: var(--_qm-review-line);
 	}
 	/* A member a proposal would add, drawn as its own control holding the value: each box in it
-	   under the tint, which a box's own fill keeps beneath, and the current one ringed. */
+	   under the tint, which a box's own fill keeps beneath, and the current one ringed. A switch's
+	   track and a tick's square paint their state over any image, so they take the overlay a
+	   proposed switch does. */
 	:global(.qm-review-added-box) {
 		display: contents;
 		pointer-events: none;
 	}
-	:global(.qm-review-added-box :is(.qm-control-box, .qm-toggle, .qm-tick, .qm-input)) {
+	:global(.qm-review-added-box :is(.qm-control-box, .qm-input)) {
 		background-image: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint));
 	}
-	:global(
-		.qm-review-lit > .qm-review-added-box :is(.qm-control-box, .qm-toggle, .qm-tick, .qm-input)
-	) {
+	:global(.qm-review-lit > .qm-review-added-box :is(.qm-control-box, .qm-input)) {
 		background-image: linear-gradient(var(--_qm-review-lit), var(--_qm-review-lit));
 		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
 	}
