@@ -195,4 +195,36 @@ describe('a field written over its default', () => {
 		await settle();
 		expect(row('kept').source).toBe('authored');
 	});
+
+	// The browser's own undo in an `<input>`, as jsdom cannot run it: the text it restores
+	// and the `input` it fires, then the `change` of leaving.
+	const undoNatively = (el: HTMLInputElement, text: string) => {
+		el.value = text;
+		el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'historyUndo' }));
+		el.dispatchEvent(new Event('change', { bubbles: true }));
+		flushSync();
+	};
+
+	it('is unset again by a number input’s own undo back to its default', () => {
+		const target = open();
+		const pages = field(target, 'Pages');
+		const held = input(pages).value;
+		type(input(pages), '40');
+		type(input(pages), '41');
+		undoNatively(input(pages), '40');
+		expect(row('pages').source).toBe('authored');
+
+		undoNatively(input(pages), held);
+		expect(row('pages').source).toBe('default');
+		expect(tag(pages)?.textContent).toBe(DEFAULT_VISUAL_STRINGS.fieldDefault);
+		expect(reset(pages)).toBeNull();
+	});
+
+	it('stays written where a number input’s undo comes back to the default it had written', () => {
+		const target = open(answering('pages: 12'));
+		const pages = field(target, 'Pages');
+		type(input(pages), '40');
+		undoNatively(input(pages), '12');
+		expect(row('pages').source).toBe('authored');
+	});
 });

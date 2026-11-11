@@ -13,7 +13,9 @@
  (theme.css), and an edit that settles writes it as authored, as `TextField` takes
  its default. A number has no empty answer (quillmark/INVARIANTS §"A blank is a property of the field"),
  so a blank entry commits `undefined`, the unset rung: the parent removes the field,
- the engine renders the default, and the input holds it again.
+ the engine renders the default, and the input holds it again. The input's own undo
+ back to the default it held unwritten settles as `undefined` too, so taking every edit
+ back leaves the field unset, as a text leaf's undo does.
 
  The entry grammar is plain decimal: an optional sign and digits, and for a `number`
  a `.` and an exponent, the form `String()` gives a value too small or large for
@@ -101,6 +103,16 @@
 	const defaulted = $derived(value == null && !!fallback && local === fallback);
 	const drawn = $derived(proposed && proposed.after !== resting ? proposed : undefined);
 
+	// The default the input held while the field was unwritten, kept across the field's own
+	// commits and dropped by anyone else's write: what an undo can return the field to.
+	let unwrittenText: string | undefined;
+	let committed: number | undefined;
+	let undone = false;
+	$effect(() => {
+		if (value == null) [unwrittenText, committed] = [fallback, undefined];
+		else if (value !== committed) unwrittenText = undefined;
+	});
+
 	const partial = $derived(
 		integer ? /^\s*[+-]?\d*\s*$/ : /^\s*[+-]?\d*\.?\d*(?:[eE][+-]?\d*)?\s*$/
 	);
@@ -164,6 +176,11 @@
 		const raw = el.value;
 		const entry = raw.trim();
 		offered = false;
+		if (undone && unwrittenText != null && raw === unwrittenText) {
+			undone = false;
+			if (value != null) onCommit(undefined);
+			return;
+		}
 		if (entry === '') {
 			onCommit(undefined);
 			local = el.value = fallback ?? '';
@@ -172,6 +189,7 @@
 		// Finite as well: a digit run past `Number.MAX_VALUE` reads as `Infinity`.
 		const n = whole.test(entry) ? Number(entry) : NaN;
 		offered = !Number.isFinite(n);
+		if (!offered) committed = n;
 		onCommit(offered ? raw : n);
 	}
 </script>
@@ -194,6 +212,7 @@
 		local = (e.currentTarget as HTMLInputElement).value;
 		reverted = false;
 		settled = undefined;
+		undone = e instanceof InputEvent && e.inputType === 'historyUndo';
 	}}
 	onkeydown={onKey}
 	onchange={(e) => {
