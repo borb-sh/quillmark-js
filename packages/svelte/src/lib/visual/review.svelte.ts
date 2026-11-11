@@ -13,12 +13,15 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
 import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
+import { asContent, planValue } from '../core/codec/index.js';
 import {
 	byBlocks,
 	byCard,
 	locate,
 	onField,
 	sameValue,
+	textProposal,
+	writesProposed,
 	type CardProposal,
 	type DeepReview,
 	type FieldProposal,
@@ -73,6 +76,16 @@ export interface Review {
 	point(id: string | undefined, via: ReviewVia): void;
 	/** A reader's answer. False where it could not be made. */
 	act(id: string, action: ReviewAction): boolean;
+	/** A reader's commit of `value` on a control that shows one value, under the proposal `id`:
+	 *  the proposed value accepts it, any other is written and dismisses it, both one answer.
+	 *  False where it could not be made, and the commit is the caller's. */
+	answerWith(id: string, value: unknown): boolean;
+	/** A leaf of words drawing proposal `id` over what it holds: whether the reader's writing
+	 *  meets it, `undefined` once it draws it no more. */
+	planned(id: string, outdated: boolean | undefined): void;
+	/** What Accept of `item` writes at a place holding `value`: a proposal of words a leaf draws
+	 *  carried onto what the reader wrote since its writer read it, else its `after`. */
+	writes(item: FieldProposal, value: unknown): unknown;
 	/** An answer leaf `key` has already given, the item listed or not: a reopen and a redo's
 	 *  accept arrive for items the host may have taken off or not yet put back. */
 	heard(id: string, action: ReviewAction, key: string): void;
@@ -99,9 +112,15 @@ export interface ReviewSource {
 	 *  one the editor does not hold. */
 	leafFor(path: DocPath): string | undefined;
 	/** A reader's answer, to make and to pass on: `item` where the list holds it, `key` the
-	 *  leaf that gave it where one did. `false` where it could not be made, and the item
-	 *  stands. */
-	answer(id: string, item: ReviewItem | undefined, action: ReviewAction, key?: string): boolean;
+	 *  leaf that gave it where one did, `write` the value a dismissal made by an edit writes.
+	 *  `false` where it could not be made, and the item stands. */
+	answer(
+		id: string,
+		item: ReviewItem | undefined,
+		action: ReviewAction,
+		key?: string,
+		write?: { value: unknown }
+	): boolean;
 	/** The session keys of the cards as they stood when the list was set, by index. */
 	listedCards(): readonly string[];
 	/** The session keys of the cards as they stand. */
@@ -228,7 +247,10 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return { fields: out, undrawn, moved };
 	});
 	const fields = $derived(placed.fields);
-	// A proposal made from a value the field no longer holds would write over the reader's.
+	/** Each proposal of words a leaf draws, by id: whether the reader's writing meets it. */
+	const carried = new SvelteMap<string, boolean>();
+	// A proposal made from a value the field no longer holds would write over the reader's. One a
+	// leaf of words carries is outdated only where the reader's writing meets it.
 	const outdated = $derived.by(() => {
 		const out = new Set<string>(placed.moved);
 		for (const { proposed } of fields.values())
@@ -238,6 +260,9 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 				!sameValue(source.valueAt(proposed.field), proposed.before)
 			)
 				out.add(proposed.id);
+		for (const [id, meets] of carried)
+			if (meets) out.add(id);
+			else out.delete(id);
 		return out;
 	});
 
@@ -316,6 +341,27 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			answering(id, action);
 			return true;
 		},
+		answerWith(id, value) {
+			const item = byId.get(id);
+			if (!item || !onField(item)) return false;
+			const action = writesProposed(value, item.after) ? 'accept' : 'dismiss';
+			const write = action === 'dismiss' ? { value } : undefined;
+			if (!source.answer(id, item, action, undefined, write)) return false;
+			answering(id, action);
+			return true;
+		},
+		planned(id, meets) {
+			if (meets === undefined) carried.delete(id);
+			else if (carried.get(id) !== meets) carried.set(id, meets);
+		},
+		writes(item, value) {
+			const text = carried.has(item.id) ? textProposal(item) : undefined;
+			const live = asContent(value);
+			if (!text?.before || !live || item.after === undefined) return item.after;
+			const { merged } = planValue(text.before, live, text.after);
+			if (merged === text.after) return item.after;
+			return typeof item.after === 'string' ? merged.text : merged;
+		},
 		writing: (on) => source.writing?.(on),
 		heard(id, action, key) {
 			if (source.answer(id, byId.get(id), action, key)) answering(id, action);
@@ -356,6 +402,9 @@ const NO_REVIEW: Review = {
 	drew() {},
 	point() {},
 	act: () => false,
+	answerWith: () => false,
+	planned() {},
+	writes: (item) => item.after,
 	heard() {},
 	writing() {},
 	reveal() {},

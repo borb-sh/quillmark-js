@@ -178,6 +178,9 @@ export interface CreateFieldOpts {
 	 *  whose anchor the leaf holds that it does not draw, each with why. An item whose anchor
 	 *  the leaf does not hold is in neither. */
 	onReviewDrawn?(report: ReviewReport): void;
+	/** On each draw of a whole proposed value, whether the reader's writing meets it
+	 *  (`value-diff.ts`). */
+	onValuePlanned?(id: string, outdated: boolean): void;
 	onFocus?(addr: Addr): void;
 	/** Fired with the new caret offset after an edit or a selection move. */
 	onCaretMove?(addr: Addr, pos: number): void;
@@ -595,7 +598,13 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			});
 
 	let valueProposal: ValueProposal | undefined;
-	const valueDiff = inline ? valueDiffPlugin(() => valueProposal) : undefined;
+	const valueDiff =
+		inline || plaintext
+			? valueDiffPlugin(
+					() => valueProposal,
+					(id, outdated) => opts.onValuePlanned?.(id, outdated)
+				)
+			: undefined;
 
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
@@ -1030,8 +1039,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			if (!valueDiff) return;
 			if (
 				p?.id === valueProposal?.id &&
-				p?.after === valueProposal?.after &&
-				p?.lit === valueProposal?.lit
+				p?.lit === valueProposal?.lit &&
+				JSON.stringify([p?.after, p?.before]) ===
+					JSON.stringify([valueProposal?.after, valueProposal?.before])
 			)
 				return;
 			valueProposal = p;

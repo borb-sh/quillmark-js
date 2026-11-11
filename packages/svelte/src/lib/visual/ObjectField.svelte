@@ -54,7 +54,16 @@
 		textCap
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
-	import { wordedProposal, splitReview, type DeepReview } from './review.js';
+	import {
+		numberProposal,
+		shownValue,
+		splitReview,
+		textProposal,
+		type DeepReview,
+		type FieldProposal
+	} from './review.js';
+	import { review as reviewState } from './review.svelte.js';
+	import { asContent } from '../core/codec/index.js';
 	import ReviewRows from './ReviewRows.svelte';
 	import type { LandingBox } from './leaves.js';
 	import { isEmptyContent } from '../core/codec/index.js';
@@ -266,6 +275,13 @@
 		return !!el;
 	}
 
+	const reviewing = reviewState();
+	/** A commit on a cell that shows one value answers the proposal on it: the proposed value
+	 *  accepts it, any other dismisses it. */
+	function answerOrCommit(item: FieldProposal | undefined, key: string, v: unknown): void {
+		if (item && reviewing.answerWith(item.id, v)) return;
+		commitProp(key, v);
+	}
 	function commitProp(key: string, v: unknown): void {
 		if (v === undefined) {
 			// A nested control cleared (the unset rung): drop the key so the property
@@ -298,13 +314,17 @@
 				sub.description && idBase ? propertyDomIds(idBase, key).description : undefined}
 			{@const deep = routed.below.get(key)}
 			{@const reviewHere = reviewed.below.get(key)}
-			{@const handsDown = kind === 'object' || kind === 'array'}
+			{@const handsDown = isContainer(kind)}
 			{@const ownItem = handsDown ? undefined : reviewHere?.find((e) => !e.steps.length)?.item}
-			{@const textOwn = wordedProposal(
-				ownItem,
-				kind === 'number' ? 'number' : kind === 'prose' && shortCell(sub) ? 'text' : undefined
-			)}
-			{@const shown = ownItem && !textOwn && ownItem.after !== undefined ? ownItem.after : obj[key]}
+			{@const textOwn =
+				kind === 'prose' && (shortCell(sub) || literalText(sub))
+					? textProposal(ownItem, contentDefault(sub))
+					: undefined}
+			{@const numberOwn = kind === 'number' ? numberProposal(ownItem) : undefined}
+			{@const worded = textOwn ?? numberOwn}
+			{@const shownItem = worded ? undefined : ownItem}
+			{@const shown = shownValue(shownItem, obj[key])}
+			{@const commitCell = (v: unknown) => answerOrCommit(shownItem, key, v)}
 			{@const own = isContainer(kind) ? undefined : deep?.map((d) => d.diagnostic)}
 			<!-- `for` reaches the labelable controls, a variant through its discriminant; the
 			     date field's focus lives on a segment and a prose cell is a `contenteditable`,
@@ -361,7 +381,8 @@
 							fallback={sub.default as string | undefined}
 							blankTitle={sub.ui?.blank_title}
 							optional={optionalCell(sub)}
-							onCommit={(v) => commitProp(key, v)}
+							onCommit={commitCell}
+							proposing={!!shownItem}
 						/>
 					{:else if kind === 'number'}
 						<NumberField
@@ -369,7 +390,7 @@
 							id={ids?.control}
 							describedBy={describes}
 							value={shown as number | undefined}
-							proposed={textOwn}
+							proposed={numberOwn}
 							integer={baseType(sub) === 'integer'}
 							fallback={textDefault(sub)}
 							placeholder={noneOf(key, sub)}
@@ -383,7 +404,7 @@
 							value={renderedBoolean(shown)}
 							fallback={sub.default as boolean | undefined}
 							optional={optionalCell(sub)}
-							onCommit={(v) => commitProp(key, v)}
+							onCommit={commitCell}
 						/>
 					{:else if kind === 'date'}
 						<DateField
@@ -393,7 +414,7 @@
 							value={shown as string | undefined}
 							fallback={sub.default != null ? String(sub.default) : undefined}
 							datetime={baseType(sub) === 'datetime'}
-							onCommit={(v) => commitProp(key, v)}
+							onCommit={commitCell}
 						/>
 					{:else if kind === 'text'}
 						<TextField
@@ -411,18 +432,23 @@
 					     leaves the leaf mounted and the caret in it. -->
 						<ProseValue
 							bind:this={proseEls[key]}
-							content={() => contentAt([key])}
-							value={obj[key]}
+							content={() =>
+								shownItem
+									? shownItem.after === undefined
+										? undefined
+										: asContent(shownItem.after)
+									: contentAt([key])}
+							value={shown}
 							fallback={contentDefault(sub)}
 							plaintext={literalText(sub)}
-							placeholder={noneOf(key, sub)}
+							placeholder={ownItem ? undefined : noneOf(key, sub)}
 							{block}
 							label={named}
 							labelledBy={ids?.label}
 							describedBy={countId ? [describes, countId].filter(Boolean).join(' ') : describes}
 							cap={cap && { ...cap, onCount: (n) => (counts[key] = n) }}
 							onChange={(rt) =>
-								commitProp(key, optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
+								commitCell(optionalCell(sub) && isEmptyContent(rt) ? undefined : rt)}
 							onKey={onCellKey ? (e) => onCellKey(e, key) : undefined}
 							proposed={textOwn}
 						/>
@@ -476,6 +502,7 @@
 							contentAt={(path) => contentAt([key, ...path])}
 							onCommit={(v) => commitProp(key, v)}
 							diagnostics={deep}
+							review={reviewHere}
 						/>
 					{:else if kind === 'variant'}
 						<VariantField
@@ -490,6 +517,7 @@
 							contentAt={(path) => contentAt([key, ...path])}
 							onCommit={(v) => commitProp(key, v)}
 							diagnostics={deep}
+							review={reviewHere}
 						/>
 					{:else}
 						<TextField
@@ -503,7 +531,7 @@
 					<DiagnosticList diagnostics={own} />
 					{#if !handsDown}
 						<ReviewRows
-							entries={textOwn ? reviewHere?.filter((e) => e.item !== ownItem) : reviewHere}
+							entries={worded ? reviewHere?.filter((e) => e.item !== ownItem) : reviewHere}
 						/>
 					{/if}
 				</div>

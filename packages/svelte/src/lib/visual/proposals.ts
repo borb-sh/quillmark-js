@@ -12,7 +12,7 @@ import type {
 } from '@quillmark/wasm';
 import { fieldPathForAddr } from '../core/address.js';
 import { sameValue, type ReviewItem } from './review.js';
-import { baseType, fieldValues, oneLine } from './structure.js';
+import { VARIANT_DISCRIMINANT, baseType, fieldValues, oneLine } from './structure.js';
 
 /** The review an answer makes: the items the editor draws, the cards it adds or takes out
  *  among them. */
@@ -36,7 +36,9 @@ let minted = 0;
  * changed, taken out, or appended past the end, two appends to one list at successive indices.
  * A list that gains members anywhere but its end is compared member by member at each index, so
  * each place its controls draw says its own change; a record or a list written where none was is
- * compared with an empty one. A one-line rich text field, a value of a type nothing nests in, a
+ * compared with an empty one. A choice with variants is compared as a record, its discriminant a
+ * cell of it, and a checklist member by member: one ticked or unticked is proposed whole, and one
+ * held on both sides cell by cell. A one-line rich text field, a value of a type nothing nests in, a
  * field the answer clears, and a rich text value inside a record or a list are proposed whole. Values
  * are in the form the editor's controls are handed, a text cell as its `Content`.
  *
@@ -151,10 +153,45 @@ export function proposalsBetween(
 				...(now !== undefined && { after: now })
 			});
 		const kind = f && baseType(f);
-		if (kind === 'object' && f?.properties && isRecord(now) && (was == null || isRecord(was))) {
-			const held: Record<string, unknown> = isRecord(was) ? was : {};
-			for (const key of keysOf(f.properties, held, now))
-				value(pathAt, f.properties[key], [...steps, key], held[key], now[key]);
+		const records = isRecord(now) && (was == null || isRecord(was));
+		const cells: Record<string, unknown> = isRecord(was) ? was : {};
+		if (kind === 'object' && f?.properties && records) {
+			for (const key of keysOf(f.properties, cells, now))
+				value(pathAt, f.properties[key], [...steps, key], cells[key], now[key]);
+			return;
+		}
+		if (kind === 'enum' && f?.variants && records) {
+			const cell = (key: string): QuillFieldSchema | undefined =>
+				key === VARIANT_DISCRIMINANT
+					? { ...f, variants: undefined }
+					: Object.values(f.variants ?? {}).find((world) => world && key in world)?.[key];
+			for (const key of keysOf({ [VARIANT_DISCRIMINANT]: null }, cells, now))
+				value(
+					pathAt,
+					cell(key),
+					[...steps, key],
+					cells[key],
+					(now as Record<string, unknown>)[key]
+				);
+			return;
+		}
+		if (kind === 'matrix' && records) {
+			const next = now as Record<string, unknown>;
+			for (const member of keysOf({}, cells, next)) {
+				const a = cells[member];
+				const b = next[member];
+				if (sameValue(a, b)) continue;
+				if (isRecord(a) && isRecord(b))
+					for (const key of keysOf(f?.properties ?? {}, a, b))
+						value(pathAt, f?.properties?.[key], [...steps, member, key], a[key], b[key]);
+				else
+					items.push({
+						id: mint(),
+						field: pathAt([...steps, member]),
+						...(a !== undefined && { before: a }),
+						...(b !== undefined && { after: b })
+					});
+			}
 			return;
 		}
 		if (kind !== 'array' || !Array.isArray(now) || !(was == null || Array.isArray(was)))

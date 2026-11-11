@@ -18,7 +18,10 @@
 	import EnumField from './EnumField.svelte';
 	import ObjectField from './ObjectField.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
+	import ReviewRows from './ReviewRows.svelte';
 	import type { DeepDiagnostic } from './diagnostics.js';
+	import { shownValue, splitReview, type DeepReview } from './review.js';
+	import { review as reviewState } from './review.svelte.js';
 	import type { LandingBox } from './leaves.js';
 	import {
 		VARIANT_DISCRIMINANT,
@@ -51,6 +54,10 @@
 		 * naming a live cell draws under it; the rest — the discriminant's, a dormant
 		 * world's — draw at the field's foot. */
 		diagnostics?: readonly DeepDiagnostic[];
+		/** The review items naming a place inside this field, each with its steps still to
+		 *  walk: the discriminant's drawn on its select, a live cell's in that cell, and the
+		 *  rest at the field's foot. */
+		review?: readonly DeepReview[];
 	}
 	let {
 		value,
@@ -64,12 +71,41 @@
 		onCommit,
 		optionAllowed,
 		enumDisallowed,
-		diagnostics
+		diagnostics,
+		review
 	}: Props = $props();
 
-	const member = $derived(variantMember(value, ghostMember));
+	const reviewing = reviewState();
+	const reviewed = $derived(splitReview(review));
+	/** The discriminant's own proposal: the select shows the member it would pick, and the
+	 *  cells of that member's world. */
+	const pick = $derived(reviewed.below.get(VARIANT_DISCRIMINANT)?.find((e) => !e.steps.length));
+	const discriminant = $derived(
+		shownValue(pick?.item, value?.[VARIANT_DISCRIMINANT]) as string | undefined
+	);
+	const member = $derived(
+		variantMember(pick ? { ...value, [VARIANT_DISCRIMINANT]: discriminant } : value, ghostMember)
+	);
 	const cells = $derived(variantCells(schema, member));
-	const discriminant = $derived(value?.[VARIANT_DISCRIMINANT] as string | undefined);
+	/** The cells' items, by the live world's keys; the rest stand at the foot. */
+	const cellReview = $derived(
+		[...reviewed.below]
+			.filter(([step]) => live(step))
+			.flatMap(([step, list]) => list.map((e) => ({ steps: [step, ...e.steps], item: e.item })))
+	);
+	const reviewFoot = $derived([
+		...reviewed.here,
+		...[...reviewed.below]
+			.filter(([step]) => !live(step) && step !== VARIANT_DISCRIMINANT)
+			.flatMap(([step, list]) => list.map((e) => ({ steps: [step, ...e.steps], item: e.item })))
+	]);
+	/** A pick under the discriminant's proposal answers it: its member accepts, any other is
+	 *  written and dismisses it. */
+	function commitPick(v: string | undefined): void {
+		const next = commitDiscriminant(value, v);
+		if (pick && reviewing.answerWith(pick.item.id, next?.[VARIANT_DISCRIMINANT])) return;
+		onCommit(next);
+	}
 
 	type Subform = {
 		focus: () => void;
@@ -119,10 +155,12 @@
 		blankTitle={schema.ui?.blank_title}
 		{id}
 		{describedBy}
-		onCommit={(v) => onCommit(commitDiscriminant(value, v))}
+		onCommit={commitPick}
+		proposing={!!pick}
 		{optionAllowed}
 		{enumDisallowed}
 	/>
+	<ReviewRows entries={reviewed.below.get(VARIANT_DISCRIMINANT)} />
 	<!-- Keyed on the member so a flip remounts the cells rather than re-targeting
 	     them: two worlds' cells are different fields that happen to occupy one place,
 	     and a control carrying local state (an unreconciled pick, a caret) across the
@@ -140,12 +178,14 @@
 				{contentAt}
 				onCommit={(obj) => onCommit(obj)}
 				diagnostics={inside}
+				review={cellReview}
 			/>
 		{/key}
 	{/if}
 	<!-- The field's own foot, drawn whether or not a world is: what the live world
 	     cannot hold belongs under the field rather than inside the box its cells sit in. -->
 	<DiagnosticList diagnostics={foot} />
+	<ReviewRows entries={reviewFoot} />
 </div>
 
 <style>

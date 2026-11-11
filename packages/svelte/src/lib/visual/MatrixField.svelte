@@ -65,6 +65,9 @@
 	import ObjectField from './ObjectField.svelte';
 	import MatrixAdd from './MatrixAdd.svelte';
 	import DiagnosticList from './DiagnosticList.svelte';
+	import ReviewRows from './ReviewRows.svelte';
+	import { splitReview, type DeepReview } from './review.js';
+	import { review as reviewState } from './review.svelte.js';
 	import './controls.css';
 
 	interface Props {
@@ -91,6 +94,10 @@
 		/** The diagnostics routed into this field, each with its steps still to walk: one
 		 *  naming a drawn item draws under it, any other at the field's foot. */
 		diagnostics?: readonly DeepDiagnostic[];
+		/** The review items naming a member or a cell inside one, each with its steps still to
+		 *  walk: a member's tick shows the state it would come to, its cells take their own,
+		 *  and an item no drawn member holds stands at the field's foot. */
+		review?: readonly DeepReview[];
 	}
 	let {
 		value,
@@ -102,7 +109,8 @@
 		idBase,
 		contentAt,
 		onCommit,
-		diagnostics
+		diagnostics,
+		review
 	}: Props = $props();
 
 	const members = $derived(matrixMembers(schema.members));
@@ -119,6 +127,30 @@
 		onRoster(schema, id) || added.some((item) => item.id === id);
 	const routed = $derived(splitDeep(diagnostics));
 	const foot = $derived(unrouted(routed, (step) => typeof step === 'string' && drawn(step)));
+
+	const reviewing = reviewState();
+	const reviewed = $derived(splitReview(review));
+	/** A member's own proposal: it ticks or unticks the member whole. */
+	const proposal = (id: string) => reviewed.below.get(id)?.find((e) => !e.steps.length)?.item;
+	/** Whether a member shows as held: as its proposal would leave it, else as stored. */
+	const shownHeld = (id: string): boolean => {
+		const item = proposal(id);
+		return item ? matrixHeld(item.after) : held(id);
+	};
+	/** The member's columns as shown: its proposal's where one ticks it, else the stored. */
+	const shownColumns = (id: string): Record<string, unknown> => {
+		const item = proposal(id);
+		return matrixColumns(item ? item.after : own(map, id));
+	};
+	/** The items inside a member's columns, one step down. */
+	const cellReview = (id: string): DeepReview[] =>
+		(reviewed.below.get(id) ?? []).filter((e) => e.steps.length);
+	const reviewFoot = $derived([
+		...reviewed.here,
+		...[...reviewed.below]
+			.filter(([step]) => typeof step !== 'string' || !drawn(step))
+			.flatMap(([step, list]) => list.map((e) => ({ steps: [step, ...e.steps], item: e.item })))
+	]);
 
 	// A member with no field id space around it still needs an id: the tick is what its
 	// title's `for` names. Stable across SSR and hydration, which a counter is not.
@@ -180,9 +212,12 @@
 	 *  new to write. The reassert after the flush is what the styled controls get from
 	 *  their local, a `$derived` of the value: the document is what the face reads. */
 	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
-		commit(on ? commitMember(map, id, ticked(id)) : unticked(id));
+		const item = proposal(id);
+		if (item && on === matrixHeld(item.after)) reviewing.act(item.id, 'accept');
+		else if (!item || !reviewing.answerWith(item.id, on ? ticked(id) : undefined))
+			commit(on ? commitMember(map, id, ticked(id)) : unticked(id));
 		await flush();
-		if (el.isConnected) el.checked = held(id);
+		if (el.isConnected) el.checked = shownHeld(id);
 	}
 	/** A column edit lands on a held item, an added one keeping its `title`. */
 	function commitColumns(id: string, columns: Record<string, unknown>): void {
@@ -301,7 +336,7 @@
 		bind:this={rosterEl}
 	>
 		{#each members as m (m.id)}
-			{@const on = held(m.id)}
+			{@const on = shownHeld(m.id)}
 			<div
 				class={['qm-member qm-wash', { held: on, open: on && hasColumns }]}
 				data-qm-prop={m.id}
@@ -323,6 +358,7 @@
 						/>
 						<Icon name="check" class="qm-tick-mark" />
 					</span>
+					<ReviewRows entries={reviewed.below.get(m.id)?.filter((e) => !e.steps.length)} />
 					<label class="qm-member-title" id={titleId(m.id)} for={tickId(m.id)}>{m.title}</label>
 				</div>
 				{@render columns(m.id, m.title, on)}
@@ -373,6 +409,7 @@
 		/>
 	{/if}
 	<DiagnosticList diagnostics={foot} />
+	<ReviewRows entries={reviewFoot} />
 </div>
 
 <!-- A held item's columns, one rung in, the way a variant's cells unfold under the
@@ -383,7 +420,7 @@
 	{#if on && hasColumns}
 		<ObjectField
 			bind:this={colEls[id]}
-			value={matrixColumns(own(map, id))}
+			value={shownColumns(id)}
 			properties={schema.properties}
 			label={`${label ?? ''} ${title}`.trim()}
 			idBase={memberBase(id)}
@@ -391,6 +428,7 @@
 			contentAt={(path) => readAt([id, ...path])}
 			onCommit={(cols) => commitColumns(id, cols)}
 			diagnostics={deep?.filter((d) => d.steps[0] !== MATRIX_TITLE)}
+			review={cellReview(id)}
 		/>
 		<DiagnosticList
 			diagnostics={deep?.filter((d) => d.steps[0] === MATRIX_TITLE).map((d) => d.diagnostic)}

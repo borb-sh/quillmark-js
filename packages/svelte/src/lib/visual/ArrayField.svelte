@@ -114,7 +114,9 @@
 		type ArrayLayout
 	} from './structure.js';
 	import {
-		wordedProposal,
+		numberProposal,
+		textProposal,
+		type TextProposal,
 		reviewText,
 		splitReview,
 		type DeepReview,
@@ -253,18 +255,25 @@
 		scalar || control === 'prose'
 			? ownReview(k).find((e) => e.item.after !== undefined)?.item
 			: undefined;
-	const rowText = (k: number): { id: string; after: string } | undefined =>
-		wordedProposal(
-			rowOwn(k),
-			control === 'prose' ? 'text' : control === 'number' ? 'number' : undefined
-		);
+	const rowText = (k: number): TextProposal | undefined =>
+		control === 'prose' ? textProposal(rowOwn(k)) : undefined;
+	const rowNumber = (k: number): { id: string; after: string } | undefined =>
+		control === 'number' ? numberProposal(rowOwn(k)) : undefined;
+	const rowWorded = (k: number): { id: string } | undefined => rowText(k) ?? rowNumber(k);
 	const rowShown = (k: number): unknown => {
-		const own = rowText(k) ? undefined : rowOwn(k);
+		const own = rowWorded(k) ? undefined : rowOwn(k);
 		return own ? own.after : arr[k];
 	};
-	/** A row's marks: its proposals less the one its control draws as text. */
+	/** A commit on a row that shows one value answers the proposal on it: the proposed value
+	 *  accepts it, any other dismisses it. */
+	const commitRow = (k: number, v: unknown): void => {
+		const own = rowWorded(k) ? undefined : rowOwn(k);
+		if (own && reviewing.answerWith(own.id, v)) return;
+		commitElement(k, v);
+	};
+	/** A row's marks: its proposals less the one its control draws as words. */
 	const rowMarks = (k: number): DeepReview[] => {
-		const text = rowText(k);
+		const text = rowWorded(k);
 		return text ? rowReview(k).filter((e) => e.item.id !== text.id) : rowReview(k);
 	};
 	/** What has no row to draw under: a member past the last, and a place no row holds. A
@@ -1123,7 +1132,7 @@
 					{:else if control === 'number'}
 						<NumberField
 							value={rowShown(k) as number | undefined}
-							proposed={rowText(k)}
+							proposed={rowNumber(k)}
 							integer={items != null && baseType(items) === 'integer'}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							label={rowName(k)}
@@ -1137,13 +1146,14 @@
 							values={items?.values ?? []}
 							blankTitle={items?.ui?.blank_title}
 							label={rowName(k)}
-							onCommit={(v) => commitElement(k, v)}
+							onCommit={(v) => commitRow(k, v)}
+							proposing={!!rowOwn(k)}
 						/>
 					{:else if control === 'boolean'}
 						<BooleanField
 							value={renderedBoolean(rowShown(k))}
 							label={rowName(k)}
-							onCommit={(v) => commitElement(k, v)}
+							onCommit={(v) => commitRow(k, v)}
 						/>
 					{:else if control === 'date'}
 						<DateField
@@ -1151,7 +1161,7 @@
 							value={(rowShown(k) as string | undefined) || undefined}
 							datetime={items != null && baseType(items) === 'datetime'}
 							label={rowName(k)}
-							onCommit={(v) => commitElement(k, v)}
+							onCommit={(v) => commitRow(k, v)}
 						/>
 					{:else}
 						<TextField

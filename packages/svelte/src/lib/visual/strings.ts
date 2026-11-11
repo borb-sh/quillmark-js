@@ -67,7 +67,7 @@ export interface VisualStrings
 	reviewDismiss: string;
 	/** The answer card's accessible name. */
 	reviewProposal: string;
-	/** The answer card's note on a change the reader's own writing meets. */
+	/** The answer card's note on a change whose place no longer holds what its writer read. */
 	reviewOutdated: string;
 	/** Where the current change stands in the review, for a screen reader: `Change 2 of 5`. */
 	reviewPosition: (at: number, of: number) => string;
@@ -314,7 +314,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	reviewAccept: 'Accept',
 	reviewDismiss: 'Dismiss',
 	reviewProposal: 'Proposed change',
-	reviewOutdated: 'Edited since',
+	reviewOutdated: 'Changed since proposed',
 	reviewPosition: (at, of) => `Change ${at} of ${of}`,
 	reviewNewCard: 'New card',
 	reviewRemoveCard: 'Proposed removal',
