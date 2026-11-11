@@ -7,6 +7,7 @@ import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { REVIEW_KEYS } from '$lib/core/codec';
 import type { ReviewEvent, ReviewItem } from '$lib/visual';
+import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { quill, example } from '../helpers/fixtures.js';
 import {
 	leaf,
@@ -71,18 +72,33 @@ describe('a proposed field value', () => {
 	const proposed =
 		(after: unknown) =>
 		(doc: Document): ReviewItem[] => [{ id: 'r1', field: doc.pathFor('columns'), after }];
-	const row = (r: Reviewed) =>
-		openField(r.target, main, 'columns').querySelector<HTMLElement>('.qm-review-proposal')!;
+	const said = (r: Reviewed) => r.target.querySelector<HTMLElement>('.qm-review-card-value');
 
-	it('stands under the control as the value that would come', () => {
+	it('marks its control in place and is said on the answer card as the value that would come', async () => {
 		const r = review(proposed(2));
-		expect(row(r).querySelector('ins')?.textContent).toBe('2');
+		const columns = openField(r.target, main, 'columns');
+		expect(columns.querySelector('[data-qm-proposed]')).toBe(
+			columns.querySelector('.qm-field-control')
+		);
+		expect(columns.querySelector('.qm-review-anchor')?.hasAttribute('hidden')).toBe(true);
+		await settle();
+		expect(said(r)?.querySelector('ins')?.textContent).toBe('2');
 		expect(r.doc.getStored('columns')).toBeUndefined();
+	});
+
+	it('says a switch’s change as the words of its two faces', async () => {
+		const r = review((doc) => [
+			{ id: 'r1', field: doc.pathFor('draft_watermark'), before: false, after: true }
+		]);
+		await settle();
+		const value = said(r)!;
+		expect(value.querySelector('del')?.textContent).toBe(DEFAULT_VISUAL_STRINGS.reviewOff);
+		expect(value.querySelector('ins')?.textContent).toBe(DEFAULT_VISUAL_STRINGS.reviewOn);
 	});
 
 	it('draws no answers of its own: the answer card on it answers it', async () => {
 		const r = review(proposed(2));
-		expect(row(r).querySelector('button')).toBeNull();
+		expect(openField(r.target, main, 'columns').querySelector('.qm-review-card')).toBeNull();
 		await settle();
 		expect(r.lit.at(-1)).toBe('r1');
 		expect(answer(r.target, 'accept').textContent).toContain('Accept');
@@ -97,7 +113,7 @@ describe('a proposed field value', () => {
 		expect(r.doc.getStored('columns')).toBe(2);
 		expect(r.changes.map((c) => c.source)).toEqual(['field']);
 		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
-		expect(r.target.querySelector('.qm-review-proposal')).toBeNull();
+		expect(r.target.querySelector('[data-qm-proposed]')).toBeNull();
 		expect(r.target.querySelector('.qm-toast')).toBeNull();
 
 		press(document.body, 'z', mod);
@@ -135,7 +151,7 @@ describe('a proposed field value', () => {
 		press(document.body, '.', mod);
 		expect(r.events).toEqual([{ id: 'r1', action: 'dismiss' }]);
 		expect(r.changes).toEqual([]);
-		expect(r.target.querySelector('.qm-review-proposal')).toBeNull();
+		expect(r.target.querySelector('[data-qm-proposed]')).toBeNull();
 	});
 
 	it('stands, unanswered, where the field’s writer refuses it', () => {
@@ -144,7 +160,7 @@ describe('a proposed field value', () => {
 		flushSync();
 		expect(r.events).toEqual([]);
 		expect(r.errors.map((e) => e.code)).toEqual(['commit-refused']);
-		expect(r.target.querySelector('.qm-review-proposal')).not.toBeNull();
+		expect(r.target.querySelector('[data-qm-proposed]')).not.toBeNull();
 	});
 
 	it('reads a line of words as an edit of the line, and a text leaf re-reads it once taken', async () => {
@@ -158,10 +174,10 @@ describe('a proposed field value', () => {
 		]);
 		const before = stored(r.doc, 'subtitle') as string;
 		const subtitle = openField(r.target, main, 'subtitle');
-		const proposal = subtitle.querySelector<HTMLElement>('.qm-review-proposal')!;
+		await settle();
+		const proposal = said(r)!;
 		expect(proposal.querySelector('del')).toBeNull();
 		expect(proposal.querySelector('ins')?.textContent).toBe(', revised');
-		await settle();
 		press(leaf(subtitle), keyOf(REVIEW_KEYS.accept), mod);
 		expect(stored(r.doc, 'subtitle')).toBe(`${before}, revised`);
 		expect(leafText(subtitle)).toBe(`${before}, revised`);

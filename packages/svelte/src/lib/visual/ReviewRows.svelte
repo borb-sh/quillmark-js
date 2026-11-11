@@ -1,9 +1,8 @@
 <!--
- The review items a container hands to one of its places, drawn under that place's control:
- each a proposal, as the value that would go and the value that would come with its two
- answers. An item naming a place deeper than the control under which it is drawn, which no
- control of its own draws, leads with where it is: the cells and members between, by name and
- number.
+ The review items a container hands to one of its places, each a proposal marked on that place's
+ control and said on the answer card. An item naming a place deeper than the control it marks,
+ which no control of its own draws, is said on the card with where it is: the cells and members
+ between, by name and number.
 -->
 <script lang="ts">
 	import type { PathStep } from '@quillmark/wasm';

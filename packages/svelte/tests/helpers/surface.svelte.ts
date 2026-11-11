@@ -192,7 +192,7 @@ export function press(el: HTMLElement, key: string, init: KeyboardEventInit = {}
 /** Answer review item `id` as a reader does with the pointer: a press on the change makes it
  *  current, and the answer card's button answers it. */
 export function answerOn(target: HTMLElement, id: string, action: 'accept' | 'dismiss'): void {
-	const at = target.querySelector<HTMLElement>(`[data-qm-review="${CSS.escape(id)}"]`);
+	const at = target.querySelector<HTMLElement>(`[data-qm-review~="${CSS.escape(id)}"]`);
 	if (!at) throw new Error(`no review item ${id} drawn`);
 	at.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 	flushSync();

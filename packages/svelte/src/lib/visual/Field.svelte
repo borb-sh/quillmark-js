@@ -145,6 +145,15 @@
 	// resolves to digits, and the control has to know it follows the render date.
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
+	/** The value the control shows, a default standing in included: what a proposal replaces as
+	 *  the reader sees it. */
+	const shown = $derived(
+		value !== undefined || field.control === 'prose'
+			? value
+			: field.control === 'boolean'
+				? (ghost ?? (optional ? undefined : false))
+				: ghost
+	);
 	// Where the field stands against its default, for the label row's end (`FieldLabel`):
 	// unset with the default printing, or written over one that would. A container's
 	// source is its cells' composed, so only a control holding one value says either.
@@ -507,7 +516,7 @@
 			<ReviewRows entries={nestedReview} {value} />
 		{/if}
 		{#if proposed}
-			<ReviewProposal item={proposed} {value} />
+			<ReviewProposal item={proposed} value={shown} />
 		{/if}
 		{#if scalar}
 			<DiagnosticList {diagnostics} />

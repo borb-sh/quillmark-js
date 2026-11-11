@@ -1,9 +1,14 @@
 <!--
- A proposed value, under the control whose value it would replace, as words. In flow, as a
- diagnostic is, so the proposal stands with its field and takes no surface of its own. It is
- drawn as a prose proposal is, what would go struck and what would come tinted: two lines of
- words by the words they differ in, two lists by their members, two records by their keys, any
- other pair of values whole. The answer card answers it, as it answers every change.
+ A proposed value, marked on the control whose value it would replace and said on the answer
+ card. The control takes the mark in place, a ring in the review hue, so a proposal moves nothing
+ around it; what would go and what would come is the card's to say, struck and tinted as prose
+ is: two lines of words by the words they differ in, two lists by their members, two records by
+ their keys, any other pair of values whole.
+
+ It draws nothing of its own. Its anchor stands after the control it marks, and the control is
+ the nearest element before it that is neither another anchor, a diagnostic list nor a row's
+ actions; with none, its parent. The control carries the item's id among its `data-qm-review`
+ tokens, so the card stands on the control and a press on it names the item.
 -->
 <script lang="ts">
 	import { wording } from './strings.js';
@@ -14,7 +19,7 @@
 		item: FieldProposal;
 		/** The value the control holds. */
 		value: unknown;
-		/** Where the value is, for one drawn under a control that is not its own. */
+		/** Where the value is, for one inside the control it marks. */
 		label?: string;
 		/** It takes a list's member out, so nothing comes in its place. */
 		removes?: boolean;
@@ -25,84 +30,52 @@
 	const reviewing = review();
 
 	const words = $derived({ on: t.strings.reviewOn, off: t.strings.reviewOff });
-	const after = $derived(reviewText(item.after, words));
+	const empty = $derived(!reviewText(item.after, words));
 	const runs = $derived(reviewRuns(value, item.after, words));
+
+	$effect(() => {
+		const id = item.id;
+		reviewing.show(id, { label, runs, empty, removes });
+		return () => reviewing.show(id, undefined);
+	});
+
+	const SKIP = '.qm-review-anchor, .qm-diag-list, .qm-row-actions';
+
+	function control(anchor: HTMLElement): HTMLElement | undefined {
+		let at = anchor.previousElementSibling;
+		while (at && at.matches(SKIP)) at = at.previousElementSibling;
+		return (at as HTMLElement | null) ?? anchor.parentElement ?? undefined;
+	}
+
+	function mark(anchor: HTMLElement) {
+		const target = control(anchor);
+		const id = item.id;
+		if (!target) return;
+		const tokens = () => (target.getAttribute('data-qm-review') ?? '').split(' ').filter(Boolean);
+		target.setAttribute('data-qm-review', [...tokens(), id].join(' '));
+		target.setAttribute('data-qm-proposed', '');
+		const enter = () => reviewing.point(id, 'pointer');
+		const leave = () => reviewing.point(undefined, 'pointer');
+		target.addEventListener('pointerenter', enter);
+		target.addEventListener('pointerleave', leave);
+		$effect(() => {
+			const lit = reviewing.lit !== undefined && tokens().includes(reviewing.lit);
+			target.toggleAttribute('data-qm-proposed-lit', lit);
+		});
+		return () => {
+			target.removeEventListener('pointerenter', enter);
+			target.removeEventListener('pointerleave', leave);
+			const rest = tokens().filter((t) => t !== id);
+			if (rest.length) {
+				target.setAttribute('data-qm-review', rest.join(' '));
+				target.toggleAttribute('data-qm-proposed-lit', rest.includes(reviewing.lit ?? ''));
+			} else {
+				target.removeAttribute('data-qm-review');
+				target.removeAttribute('data-qm-proposed');
+				target.removeAttribute('data-qm-proposed-lit');
+			}
+		};
+	}
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-	class={['qm-review-proposal', { 'qm-review-lit': reviewing.lit === item.id }]}
-	data-qm-review={item.id}
-	role="group"
-	aria-label={t.strings.reviewProposal}
-	onpointerenter={() => reviewing.point(item.id, 'pointer')}
-	onpointerleave={() => reviewing.point(undefined, 'pointer')}
->
-	<span class="qm-review-value">
-		{#if label}<span class="qm-review-where">{label}: </span>{/if}
-		{#each runs as run, i (i)}
-			{#if run.kind === 'del'}<del class="qm-review-del">{run.text}</del
-				>{:else if run.kind === 'ins'}<ins class="qm-review-ins">{run.text}</ins
-				>{:else}{run.text}{/if}
-		{/each}
-		{#if !after && !removes}
-			<span class="qm-review-none">{t.strings.reviewEmpty}</span>
-		{/if}
-	</span>
-</div>
-
-<style>
-	/* The value starts on the control's own text column, so the proposal reads as the line the
-	   control would hold. No fill on the row: the tint is on the proposed words, as it is in
-	   prose, and a row is not a second well. */
-	.qm-review-proposal {
-		padding-inline-start: var(--_qm-space-3);
-		font-size: var(--_qm-text-body);
-	}
-	.qm-review-value {
-		min-width: 0;
-		overflow-wrap: anywhere;
-		white-space: pre-wrap;
-	}
-	.qm-review-del {
-		color: var(--_qm-ink-label);
-		text-decoration: line-through;
-		text-decoration-color: var(--_qm-review-line);
-	}
-	.qm-review-ins {
-		text-decoration: none;
-		background: var(--_qm-review-tint);
-		box-shadow:
-			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-tint),
-			var(--_qm-space-half) 0 0 var(--_qm-review-tint);
-		border-radius: var(--_qm-radius-inner);
-		-webkit-box-decoration-break: clone;
-		box-decoration-break: clone;
-		transition:
-			background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
-			box-shadow var(--_qm-duration-fast) var(--_qm-ease-reverse);
-	}
-	.qm-review-del + .qm-review-ins {
-		margin-inline-start: calc(var(--_qm-space) + var(--_qm-space-half));
-	}
-	.qm-review-lit .qm-review-ins {
-		background: var(--_qm-review-lit);
-		box-shadow:
-			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-lit),
-			var(--_qm-space-half) 0 0 var(--_qm-review-lit);
-	}
-	/* Forced colours drop the tint, so the proposed words take the line prose's take
-	   (`codec/prose.css`). */
-	@media (forced-colors: active) {
-		.qm-review-ins {
-			text-decoration: underline;
-		}
-	}
-	.qm-review-where {
-		color: var(--_qm-ink-label);
-	}
-	.qm-review-none {
-		color: var(--_qm-ink-label);
-		font-style: italic;
-	}
-</style>
+<span class="qm-review-anchor" hidden {@attach mark}></span>

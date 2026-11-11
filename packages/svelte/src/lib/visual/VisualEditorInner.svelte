@@ -627,7 +627,7 @@
 			order.push(id);
 		};
 		for (const el of rootEl?.querySelectorAll('[data-qm-review]') ?? [])
-			take(el.getAttribute('data-qm-review'));
+			for (const id of reviewIds(el)) take(id);
 		for (const item of reviewing.items) take(item.id);
 		return order;
 	}
@@ -800,11 +800,15 @@
 	/** How far, in px, the pointer moves before it means to: a hand resting on a trackpad
 	 *  jitters by less. */
 	const MOVED_PX = 3;
+	/** The items an element draws: one for a piece of a change, several for a control that
+	 *  marks a proposal for each place inside it. */
+	function reviewIds(el: Element | null | undefined): string[] {
+		return el?.getAttribute('data-qm-review')?.split(' ').filter(Boolean) ?? [];
+	}
 	/** A press on a change makes it current at once. */
 	function onPick(e: PointerEvent): void {
-		const id = (e.target as Element | null)
-			?.closest?.('[data-qm-review]')
-			?.getAttribute('data-qm-review');
+		const ids = reviewIds((e.target as Element | null)?.closest?.('[data-qm-review]'));
+		const id = ids.includes(reviewing.lit ?? '') ? reviewing.lit : ids[0];
 		if (id && reviewing.items.some((item) => item.id === id)) {
 			typing = false;
 			reviewing.reveal(id);
@@ -1619,7 +1623,7 @@
 		// The current item is drawn again, so its element is read once it has been.
 		if (!(await span.resumes(tick()))) return false;
 		const els = [...(rootEl?.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].filter(
-			(el) => el.getAttribute('data-qm-review') === id
+			(el) => reviewIds(el).includes(id)
 		);
 		const at =
 			(key !== undefined ? leaves.prose(key)?.reviewElements(id)[0] : undefined) ??
@@ -1888,6 +1892,7 @@
 		inset={reviewInset}
 		hidden={typing}
 		outdated={reviewing.lit !== undefined && drewOutdated.includes(reviewing.lit)}
+		value={reviewing.lit !== undefined ? reviewing.values.get(reviewing.lit) : undefined}
 		onAnswer={answerCurrent}
 		onHover={(on) => reviewing.hoverCard(on)}
 	/>
@@ -2214,6 +2219,24 @@
 		padding: var(--_qm-space-3) var(--_qm-card-inset);
 		border-radius: var(--_qm-radius);
 		background: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint)) var(--_qm-surface);
+	}
+	/* A control a field's proposal marks: a ring in the review hue, which takes no room, so the
+	   proposal moves nothing around it. The change itself is the answer card's to say. */
+	:global([data-qm-proposed]) {
+		border-radius: var(--_qm-radius);
+		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		transition: box-shadow var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	:global([data-qm-proposed-lit]) {
+		box-shadow: 0 0 0 calc(2 * var(--_qm-border-width)) var(--_qm-review);
+	}
+	@media (forced-colors: active) {
+		:global([data-qm-proposed]) {
+			outline: var(--_qm-border-width) dashed Highlight;
+		}
+		:global([data-qm-proposed-lit]) {
+			outline-style: solid;
+		}
 	}
 	.qm-review-card-add.qm-review-lit {
 		background: linear-gradient(var(--_qm-review-lit), var(--_qm-review-lit)) var(--_qm-surface);
