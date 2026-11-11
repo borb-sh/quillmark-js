@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.36.0 - 2026-11-11
+
 **A control under a proposal shows what Accept would write.** A one-line or multi-line text field, a multi-line list row and a subform's text cell draw their proposal as a word diff carried from its `before`: words the reader types beside it stay unstruck and are kept by Accept, and the proposal is outdated only where the reader's writing meets the words it rewrites. A one-line rich text field draws a change of formatting alone, the run struck and written again in its new formatting. A proposal that clears a number, a choice, a date or a switch shows the default that would print, else the empty control, where the stored value showed. A rich text cell shows the proposed content. An empty field's placeholder hides while a proposal stands on it.
 
 **Added and removed look the same everywhere.** A list row or table row a proposal adds is drawn in the controls it would have, holding the proposed value and taking no input, where it was a line of raw text; the standing _Add an item_ row gives way to it. A row or a card a proposal takes out is ringed in the review line, its values dimmed and struck, with no tint; a removed record row and a removed card say _Proposed removal_ in their own header, and a removed card no longer gains padding. A preview of an added card lists each field it fills by name, then its body. A switch or a tick under a proposal takes the tint on its own track or square, not on the row it stands in.
