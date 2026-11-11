@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**The answer card stands clear of the change's whole paragraph.** It sat under the line holding the change, over the lines of its paragraph after it; it now sits below the paragraph, or above it where there is no room.
+**The answer card stands clear of the change's whole paragraph.** It sat under the line holding the change, over the lines of its paragraph after it; it now sits beside the paragraph's last line where that line ends short of it, else below the paragraph, or above it where there is no room.
 
 ## v0.36.0 - 2026-11-11
 

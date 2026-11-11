@@ -5,12 +5,13 @@
  stands, so the card is the same two answers on every change. It carries no position: the count
  is the host's bar's.
 
- It sits under the block the change flows in, so it covers no line of its paragraph,
- right-aligned to the text column the change stands in, and flips above that block where there
- is no room below, keeping clear of the host's chrome at the pane's foot
- (`inset`). Over a change taller than the pane it stays pinned at the foot while any of the
- change shows. A change out of the pane keeps its card where it would stand beside it, so the
- card scrolls out with the text and the pane's edge clips it as it clips the text.
+ It sits under the block the change flows in, so it covers no line of its paragraph, or beside
+ that block's last line where the line ends short of it, right-aligned to the text column the
+ change stands in, and flips above that block where there is no room below, keeping clear of the
+ host's chrome at the pane's foot (`inset`). Over a change taller than the pane it stays pinned
+ at the foot while any of the change shows. A change out of the pane keeps its card where it
+ would stand beside it, so the card scrolls out with the text and the pane's edge clips it as it
+ clips the text.
  A change is several elements (struck runs, tinted widgets, added blocks, a row
  under a control, a card's mark), so the box is their union, read anew on each measure: a leaf
  redraws its decorations as it likes, and a box measured once parts from the text it stood on.
@@ -88,9 +89,8 @@
 
 	function place(): void {
 		const els = parts();
-		const rects = els
-			.map((e) => blockOf(e).getBoundingClientRect())
-			.filter((r) => r.width || r.height);
+		const blocks = els.map(blockOf);
+		const rects = blocks.map((b) => b.getBoundingClientRect()).filter((r) => r.width || r.height);
 		if (!el || !rects.length) {
 			placed = false;
 			return;
@@ -109,7 +109,9 @@
 		) ?? root)!;
 		left = Math.max(view.left + gap, column.getBoundingClientRect().right - w);
 		const at = (root ?? el).getBoundingClientRect();
-		const below = lower + gap;
+		const last = blocks.find((b, i) => b !== els[i] && b.getBoundingClientRect().bottom === lower);
+		const tuck = last && lastLine(last);
+		const below = tuck && tuck.right + gap <= left ? tuck.top : lower + gap;
 		const above = upper - gap - h;
 		const fits = below + h <= floor || above >= ceil;
 		const y =
@@ -134,6 +136,19 @@
 		for (let up: HTMLElement | null = at; up && up !== root; up = up.parentElement)
 			if (!/^(inline|contents)/.test(getComputedStyle(up).display)) return up;
 		return at;
+	}
+
+	/** The last line of a block of several, where its words end on it and where it stands: a
+	 *  card beside a short last line covers nothing of the block. */
+	function lastLine(block: HTMLElement): { top: number; right: number } | undefined {
+		const range = document.createRange();
+		range.selectNodeContents(block);
+		const lines = [...range.getClientRects()].filter((r) => r.width && r.height);
+		if (!lines.length) return undefined;
+		const from = Math.max(...lines.map((r) => r.top));
+		const on = lines.filter((r) => r.bottom > from);
+		if (on.length === lines.length) return undefined;
+		return { top: Math.min(...on.map((r) => r.top)), right: Math.max(...on.map((r) => r.right)) };
 	}
 
 	function gapPx(): number {
