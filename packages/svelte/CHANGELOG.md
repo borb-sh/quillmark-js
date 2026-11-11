@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The answer card stands clear of the change's whole paragraph.** It sat under the line holding the change, over the lines of its paragraph after it; it now sits below the paragraph, or above it where there is no room.
+
 ## v0.36.0 - 2026-11-11
 
 **A control under a proposal shows what Accept would write.** A one-line or multi-line text field, a multi-line list row and a subform's text cell draw their proposal as a word diff carried from its `before`: words the reader types beside it stay unstruck and are kept by Accept, and the proposal is outdated only where the reader's writing meets the words it rewrites. A one-line rich text field draws a change of formatting alone, the run struck and written again in its new formatting. A proposal that clears a number, a choice, a date or a switch shows the default that would print, else the empty control, where the stored value showed. A rich text cell shows the proposed content. An empty field's placeholder hides while a proposal stands on it.

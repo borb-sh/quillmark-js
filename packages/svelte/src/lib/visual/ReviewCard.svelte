@@ -5,8 +5,9 @@
  stands, so the card is the same two answers on every change. It carries no position: the count
  is the host's bar's.
 
- It sits under the change, right-aligned to the text column the change stands in, and flips
- above it where there is no room below, keeping clear of the host's chrome at the pane's foot
+ It sits under the block the change flows in, so it covers no line of its paragraph,
+ right-aligned to the text column the change stands in, and flips above that block where there
+ is no room below, keeping clear of the host's chrome at the pane's foot
  (`inset`). Over a change taller than the pane it stays pinned at the foot while any of the
  change shows. A change out of the pane keeps its card where it would stand beside it, so the
  card scrolls out with the text and the pane's edge clips it as it clips the text.
@@ -87,7 +88,9 @@
 
 	function place(): void {
 		const els = parts();
-		const rects = els.map((e) => e.getBoundingClientRect()).filter((r) => r.width || r.height);
+		const rects = els
+			.map((e) => blockOf(e).getBoundingClientRect())
+			.filter((r) => r.width || r.height);
 		if (!el || !rects.length) {
 			placed = false;
 			return;
@@ -123,6 +126,14 @@
 		left = left - at.left + (root?.scrollLeft ?? 0);
 		pinned = shows && !fits;
 		placed = true;
+	}
+
+	/** The block a run of the change flows in, which the card keeps clear of whole: a card on
+	 *  the run's own line covers the lines of its paragraph after it. */
+	function blockOf(at: HTMLElement): HTMLElement {
+		for (let up: HTMLElement | null = at; up && up !== root; up = up.parentElement)
+			if (!/^(inline|contents)/.test(getComputedStyle(up).display)) return up;
+		return at;
 	}
 
 	function gapPx(): number {
