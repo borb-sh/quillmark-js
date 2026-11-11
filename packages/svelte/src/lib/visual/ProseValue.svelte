@@ -66,10 +66,13 @@
 		pmToOffset,
 		offsetToPM,
 		valueEqual,
+		valueDiffPlugin,
+		type ValueProposal,
 		type LeafViews,
 		type TextCap
 	} from '../core/codec/index.js';
 	import { valueLeafSeat } from './leaves.js';
+	import { review } from './review.svelte.js';
 	import { wording } from './strings.js';
 	import './controls.css';
 	import type { Content } from '@quillmark/wasm';
@@ -128,6 +131,8 @@
 		 * array repeater's Enter/Backspace (`ArrayField`). Fires before the view's own
 		 * keymap, so the state it reads is the one this keystroke has yet to change. */
 		onKey?: (e: KeyboardEvent) => void;
+		/** A whole proposed value for a one-line leaf, drawn over its text as a word diff. */
+		proposed?: { id: string; after: string };
 	}
 	let {
 		content,
@@ -142,8 +147,19 @@
 		cap,
 		onChange,
 		lines,
-		onKey
+		onKey,
+		proposed
 	}: Props = $props();
+
+	const reviewing = review();
+	/** The proposal the value-diff plugin reads, and the view it redraws. */
+	let drawnProposal: ValueProposal | undefined;
+	let redraw: (() => void) | undefined;
+	$effect(() => {
+		drawnProposal =
+			proposed && !block ? { ...proposed, lit: reviewing.lit === proposed.id } : undefined;
+		redraw?.();
+	});
 
 	const t = wording();
 	const seat = valueLeafSeat();
@@ -263,7 +279,8 @@
 								inline,
 								placeholder: () => drawn.placeholder,
 								leaveStrings: () => t.strings,
-								cap
+								cap,
+								afterHistory: inline ? [valueDiffPlugin(() => drawnProposal)] : []
 							})
 				});
 			};
@@ -360,6 +377,7 @@
 					}
 				}
 			);
+			redraw = () => mounted.setProps({});
 			const views: LeafViews = {
 				view: mounted,
 				focusedView: () => mounted,
@@ -392,6 +410,7 @@
 				seat?.release(views);
 				follow = undefined;
 				view = undefined;
+				redraw = undefined;
 				mounted.destroy();
 			};
 		});

@@ -61,6 +61,8 @@
 		cap?: TextCap;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
+		/** A whole proposed value for a one-line leaf, drawn over its text as a word diff. */
+		proposed?: { id: string; after: string };
 		onFocus?: (addr: Addr) => void;
 		onCaretMove?: (addr: Addr, pos: number) => void;
 		/** A commit landed on this leaf: the prose change lane. */
@@ -91,6 +93,7 @@
 		emptyUnsets,
 		cap,
 		leafKey,
+		proposed,
 		onFocus,
 		onCaretMove,
 		onChange,
@@ -187,6 +190,9 @@
 
 	$effect(() => {
 		controller?.setReview(reviewing.textAt(leafKey), reviewing.lit);
+	});
+	$effect(() => {
+		controller?.setValueProposal(proposed && { ...proposed, lit: reviewing.lit === proposed.id });
 	});
 
 	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.

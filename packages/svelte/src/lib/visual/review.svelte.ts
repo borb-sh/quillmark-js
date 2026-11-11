@@ -23,7 +23,6 @@ import {
 	type DeepReview,
 	type FieldProposal,
 	type ReviewItem,
-	type ReviewRun,
 	type ReviewUndrawn
 } from './review.js';
 
@@ -83,21 +82,6 @@ export interface Review {
 	reveal(id: string): void;
 	/** The pointer is over the answer card, which holds the current item where it is. */
 	hoverCard(on: boolean): void;
-	/** What a field proposal would change, as the answer card says it, by item id. */
-	readonly values: ReadonlyMap<string, ReviewValue>;
-	/** A field proposal's change for the card, or none once it is drawn no more. */
-	show(id: string, value: ReviewValue | undefined): void;
-}
-
-/** A field proposal's change as the answer card says it: the value that would go struck, the
- *  value that would come tinted. */
-export interface ReviewValue {
-	/** Where the value is, for one inside the control it marks. */
-	label?: string;
-	runs: readonly ReviewRun[];
-	/** Nothing would come: the value is emptied, or a list's member taken out. */
-	empty: boolean;
-	removes: boolean;
 }
 
 export interface ReviewSource {
@@ -274,13 +258,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		else source.answered?.(id, current === id);
 	};
 
-	const values = new SvelteMap<string, ReviewValue>();
 	const self: Review & { dispose(): void } = {
-		values,
-		show(id, value) {
-			if (value) values.set(id, value);
-			else values.delete(id);
-		},
 		get items() {
 			return items;
 		},
@@ -381,9 +359,7 @@ const NO_REVIEW: Review = {
 	heard() {},
 	writing() {},
 	reveal() {},
-	hoverCard() {},
-	values: new Map(),
-	show() {}
+	hoverCard() {}
 };
 
 /** The editor's review state, or {@link NO_REVIEW} off-tree. */

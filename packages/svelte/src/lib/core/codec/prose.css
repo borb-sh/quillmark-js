@@ -829,7 +829,8 @@ li.ProseMirror-selectednode::after {
 		background-color var(--_qm-duration-fast) var(--_qm-ease-reverse),
 		box-shadow var(--_qm-duration-fast) var(--_qm-ease-reverse);
 }
-.ProseMirror .qm-review-lit .qm-review-ins {
+.ProseMirror .qm-review-lit .qm-review-ins,
+.ProseMirror .qm-review-ins.qm-review-lit {
 	background: var(--_qm-review-lit);
 	box-shadow:
 		calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-lit),

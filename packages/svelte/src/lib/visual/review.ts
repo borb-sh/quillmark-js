@@ -360,3 +360,12 @@ export function reviewRuns(before: unknown, after: unknown, words: Words): Revie
 	if (at < was.length) out.push({ text: was.slice(at) });
 	return out;
 }
+
+/** A proposed value as the text a one-line leaf would hold, `undefined` where it is not text. */
+export function proposedText(after: unknown): string | undefined {
+	if (after == null) return '';
+	if (typeof after === 'string') return after;
+	if (typeof after === 'object' && 'text' in after)
+		return String((after as { text: unknown }).text);
+	return undefined;
+}

@@ -56,6 +56,8 @@ export type {
 	TextReview
 } from './review.js';
 export { wordDiff } from './review-diff.js';
+export { valueDiffPlugin } from './value-diff.js';
+export type { ValueProposal } from './value-diff.js';
 export type { DiffHunk } from './review-diff.js';
 
 // The rich editor's shortcuts as a host lists them, read off the tables the keymaps bind from;

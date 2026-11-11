@@ -60,6 +60,7 @@
 	import ReviewProposal from './ReviewProposal.svelte';
 	import ReviewRows from './ReviewRows.svelte';
 	import { review } from './review.svelte.js';
+	import { proposedText } from './review.js';
 
 	interface Props {
 		field: FieldModel;
@@ -145,15 +146,6 @@
 	// resolves to digits, and the control has to know it follows the render date.
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
-	/** The value the control shows, a default standing in included: what a proposal replaces as
-	 *  the reader sees it. */
-	const shown = $derived(
-		value !== undefined || field.control === 'prose'
-			? value
-			: field.control === 'boolean'
-				? (ghost ?? (optional ? undefined : false))
-				: ghost
-	);
 	// Where the field stands against its default, for the label row's end (`FieldLabel`):
 	// unset with the default printing, or written over one that would. A container's
 	// source is its cells' composed, so only a control holding one value says either.
@@ -330,6 +322,17 @@
 	const reviewing = review();
 	const reviewed = $derived(reviewing.at(leafKey));
 	const proposed = $derived(reviewed.proposed);
+	/** A whole proposed value for a one-line text leaf, drawn over its text as a word diff. */
+	const textProposed = $derived.by(() => {
+		if (!proposed || field.control !== 'prose' || !field.inline) return undefined;
+		const after = proposedText(proposed.after);
+		return after === undefined ? undefined : { id: proposed.id, after };
+	});
+	/** What a control that cannot draw a proposal as words shows while one stands: the value it
+	 *  would hold, tinted (`ReviewProposal`). */
+	const display = $derived(
+		proposed && !textProposed && proposed.after !== undefined ? proposed.after : value
+	);
 	/** The items naming a place inside this field: a record's and a list's own controls draw
 	 *  them where they are, any other's under this one. */
 	const nestedReview = $derived(reviewed.nested);
@@ -363,6 +366,7 @@
 	 rule below holds why). One markup for both spans; a field owning its row nests a
 	 level and measures the same. -->
 	<div class="qm-field-stack">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="qm-field-control qm-wash"
 			{@attach registerControl}
@@ -370,6 +374,8 @@
 				reportFocus?.(e);
 				if (proposed) reviewing.point(proposed.id, 'caret');
 			}}
+			onpointerenter={() => textProposed && reviewing.point(textProposed.id, 'pointer')}
+			onpointerleave={() => textProposed && reviewing.point(undefined, 'pointer')}
 		>
 			{#if field.control === 'prose'}
 				<ProseField
@@ -387,6 +393,7 @@
 					defaultNoteId={defaultId}
 					cap={cap && { ...cap, onCount: (n) => (chars = n) }}
 					{leafKey}
+					proposed={textProposed}
 					{onFocus}
 					{onCaretMove}
 					onChange={proseCommitted}
@@ -396,7 +403,7 @@
 				/>
 			{:else if field.control === 'enum'}
 				<EnumField
-					value={value as string | undefined}
+					value={display as string | undefined}
 					values={field.schema.values ?? []}
 					fallback={(ghost as string | undefined) ?? declared}
 					blankTitle={field.schema.ui?.blank_title}
@@ -425,7 +432,7 @@
 				/>
 			{:else if field.control === 'number'}
 				<NumberField
-					value={value as number | undefined}
+					value={display as number | undefined}
 					integer={baseType(field.schema) === 'integer'}
 					fallback={declared}
 					placeholder={none}
@@ -435,7 +442,7 @@
 				/>
 			{:else if field.control === 'boolean'}
 				<BooleanField
-					value={renderedBoolean(value)}
+					value={renderedBoolean(display)}
 					fallback={ghost as boolean | undefined}
 					{optional}
 					id={domIds.control}
@@ -445,7 +452,7 @@
 			{:else if field.control === 'date'}
 				<DateField
 					bind:this={dateEl}
-					value={value as string | undefined}
+					value={display as string | undefined}
 					fallback={stringifyGhost(field.schema.default)}
 					datetime={baseType(field.schema) === 'datetime'}
 					labelledBy={domIds.label}
@@ -502,7 +509,7 @@
 				/>
 			{:else}
 				<TextField
-					value={value as string | undefined}
+					value={display as string | undefined}
 					fallback={declared}
 					placeholder={none}
 					id={domIds.control}
@@ -513,10 +520,10 @@
 		</div>
 
 		{#if field.control !== 'object' && field.control !== 'array'}
-			<ReviewRows entries={nestedReview} {value} />
+			<ReviewRows entries={nestedReview} />
 		{/if}
-		{#if proposed}
-			<ReviewProposal item={proposed} value={shown} />
+		{#if proposed && !textProposed}
+			<ReviewProposal item={proposed} />
 		{/if}
 		{#if scalar}
 			<DiagnosticList {diagnostics} />

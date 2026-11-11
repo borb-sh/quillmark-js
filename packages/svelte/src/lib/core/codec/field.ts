@@ -65,6 +65,7 @@ import {
 	type ReviewVia,
 	type TextReview
 } from './review.js';
+import { valueDiffPlugin, type ValueProposal } from './value-diff.js';
 import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { dragMovePlugin } from './drag-move.js';
@@ -231,6 +232,9 @@ export interface FieldController {
 	 * `text` leaf holds no anchors and draws none.
 	 */
 	setReview(items: readonly TextReview[], lit?: string): void;
+	/** Draw a whole proposed value over a one-line leaf as a word diff, or none
+	 *  (`value-diff.ts`). A leaf that holds blocks draws none. */
+	setValueProposal(p: ValueProposal | undefined): void;
 	/** The elements the review item `id` draws, in document order; `[]` for one not drawn. */
 	reviewElements(id: string): HTMLElement[];
 	/** Put the caret in the review item `id` and focus the leaf; false for one not drawn. */
@@ -572,6 +576,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				drew: (report) => opts.onReviewDrawn?.(report)
 			});
 
+	let valueProposal: ValueProposal | undefined;
+	const valueDiff = inline ? valueDiffPlugin(() => valueProposal) : undefined;
+
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
 
@@ -693,7 +700,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
 				cap: opts.cap,
-				afterHistory: [anchorPlugin(seededAnchors), ...(review ? [review.plugin] : [])]
+				afterHistory: [
+					anchorPlugin(seededAnchors),
+					...(review ? [review.plugin] : []),
+					...(valueDiff ? [valueDiff] : [])
+				]
 			})
 		});
 		return { state: built, index: seedIndex };
@@ -996,6 +1007,17 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			for (const markdown of parsed.keys())
 				if (!items.some((item) => item.after === markdown)) parsed.delete(markdown);
 			review.refresh(view);
+		},
+		setValueProposal(p: ValueProposal | undefined): void {
+			if (!valueDiff) return;
+			if (
+				p?.id === valueProposal?.id &&
+				p?.after === valueProposal?.after &&
+				p?.lit === valueProposal?.lit
+			)
+				return;
+			valueProposal = p;
+			view.setProps({});
 		},
 		reviewElements(id: string): HTMLElement[] {
 			return review?.elements(view, id) ?? [];

@@ -1,9 +1,9 @@
 <!--
- A proposed value, marked on the control whose value it would replace and said on the answer
- card. The control takes the mark in place, a ring in the review hue, so a proposal moves nothing
- around it; what would go and what would come is the card's to say, struck and tinted as prose
- is: two lines of words by the words they differ in, two lists by their members, two records by
- their keys, any other pair of values whole.
+ A proposed value whose control cannot draw it as words, marked on that control. The control
+ shows the value it would hold (its caller hands it `after`) and takes the review tint, so a
+ proposal moves nothing around it; a member a proposal takes out is struck where it stands. A
+ one-line text leaf draws its proposal itself, as a word diff (`value-diff.ts`), and takes no
+ mark.
 
  It draws nothing of its own. Its anchor stands after the control it marks, and the control is
  the nearest element before it that is neither another anchor, a diagnostic list nor a row's
@@ -11,33 +11,17 @@
  tokens, so the card stands on the control and a press on it names the item.
 -->
 <script lang="ts">
-	import { wording } from './strings.js';
-	import { reviewRuns, reviewText, type FieldProposal } from './review.js';
+	import type { FieldProposal } from './review.js';
 	import { review } from './review.svelte.js';
 
 	interface Props {
 		item: FieldProposal;
-		/** The value the control holds. */
-		value: unknown;
-		/** Where the value is, for one inside the control it marks. */
-		label?: string;
 		/** It takes a list's member out, so nothing comes in its place. */
 		removes?: boolean;
 	}
-	let { item, value, label, removes = false }: Props = $props();
+	let { item, removes = false }: Props = $props();
 
-	const t = wording();
 	const reviewing = review();
-
-	const words = $derived({ on: t.strings.reviewOn, off: t.strings.reviewOff });
-	const empty = $derived(!reviewText(item.after, words));
-	const runs = $derived(reviewRuns(value, item.after, words));
-
-	$effect(() => {
-		const id = item.id;
-		reviewing.show(id, { label, runs, empty, removes });
-		return () => reviewing.show(id, undefined);
-	});
 
 	const SKIP = '.qm-review-anchor, .qm-diag-list, .qm-row-actions';
 
@@ -54,6 +38,7 @@
 		const tokens = () => (target.getAttribute('data-qm-review') ?? '').split(' ').filter(Boolean);
 		target.setAttribute('data-qm-review', [...tokens(), id].join(' '));
 		target.setAttribute('data-qm-proposed', '');
+		if (removes) target.setAttribute('data-qm-removes', '');
 		const enter = () => reviewing.point(id, 'pointer');
 		const leave = () => reviewing.point(undefined, 'pointer');
 		target.addEventListener('pointerenter', enter);
@@ -72,6 +57,7 @@
 			} else {
 				target.removeAttribute('data-qm-review');
 				target.removeAttribute('data-qm-proposed');
+				target.removeAttribute('data-qm-removes');
 				target.removeAttribute('data-qm-proposed-lit');
 			}
 		};

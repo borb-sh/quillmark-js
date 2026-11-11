@@ -1892,7 +1892,6 @@
 		inset={reviewInset}
 		hidden={typing}
 		outdated={reviewing.lit !== undefined && drewOutdated.includes(reviewing.lit)}
-		value={reviewing.lit !== undefined ? reviewing.values.get(reviewing.lit) : undefined}
 		onAnswer={answerCurrent}
 		onHover={(on) => reviewing.hoverCard(on)}
 	/>
@@ -2222,22 +2221,39 @@
 		border-radius: var(--_qm-radius);
 		background: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint)) var(--_qm-surface);
 	}
-	/* A control a field's proposal marks: a ring in the review hue, which takes no room, so the
-	   proposal moves nothing around it. The change itself is the answer card's to say. */
+	/* A control showing a value a proposal would write, which it cannot draw as words: the review
+	   tint over the whole control, laid over it so it takes no room and moves nothing. It takes
+	   the box's `::after` whole, over what the arrival wash or a tap floor set there. A member a
+	   proposal takes out is struck where it stands. */
 	:global([data-qm-proposed]) {
-		border-radius: var(--_qm-radius);
-		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
-		transition: box-shadow var(--_qm-duration-fast) var(--_qm-ease-reverse);
+		position: relative;
 	}
-	:global([data-qm-proposed-lit]) {
-		box-shadow: 0 0 0 calc(2 * var(--_qm-border-width)) var(--_qm-review);
+	:global([data-qm-proposed])::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		width: auto;
+		height: auto;
+		transform: none;
+		border-radius: var(--_qm-radius-inner);
+		background: var(--_qm-review-tint);
+		opacity: 1;
+		pointer-events: none;
+		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	:global([data-qm-proposed-lit])::after {
+		background: var(--_qm-review-lit);
+	}
+	:global([data-qm-removes]) {
+		text-decoration: line-through;
+		text-decoration-color: var(--_qm-review-line);
 	}
 	@media (forced-colors: active) {
-		:global([data-qm-proposed]) {
-			outline: var(--_qm-border-width) dashed Highlight;
+		:global([data-qm-proposed])::after {
+			border: var(--_qm-border-width) dashed Highlight;
 		}
-		:global([data-qm-proposed-lit]) {
-			outline-style: solid;
+		:global([data-qm-proposed-lit])::after {
+			border-style: solid;
 		}
 	}
 	.qm-review-card-add.qm-review-lit {

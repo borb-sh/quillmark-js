@@ -89,7 +89,8 @@ describe('the answer journal', () => {
 			{ id: 'sub', action: 'reopen' },
 			{ id: 'cols', action: 'reopen' }
 		]);
-		expect(r.target.querySelectorAll('[data-qm-proposed]')).toHaveLength(2);
+		expect(r.target.querySelector('[data-qm-proposed][data-qm-review~="cols"]')).not.toBeNull();
+		expect(r.target.querySelector('.qm-review-ins[data-qm-review~="sub"]')).not.toBeNull();
 	});
 
 	it('takes back answers across leaves and fields newest first, from inside the first leaf', async () => {

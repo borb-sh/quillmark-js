@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-// A proposal for a place inside a field: marked on the cell or the row it names and said on the
-// answer card, taken alone
-// down the lane an edit of that place takes, and taken back alone.
+// A proposal for a place inside a field: drawn in the cell or the row it names, taken alone down
+// the lane an edit of that place takes, and taken back alone.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
@@ -42,19 +41,17 @@ function nested(items: (doc: Document) => ReviewItem[], seed?: (doc: Document) =
 	return { ...mounted, doc, events, drawn };
 }
 
-/** What the answer card says of each item, made current in turn. */
-async function said(r: Nested, ids: readonly string[]): Promise<string[]> {
-	const out: string[] = [];
-	for (const id of ids) {
-		await r.editor.revealReview(id);
-		flushSync();
-		out.push((r.target.querySelector('.qm-review-card-value')?.textContent ?? '').trim());
-	}
-	return out;
-}
-/** The element marking item `id`. */
+/** The first element drawing item `id`. */
 const markOf = (root: ParentNode, id: string): Element | null =>
-	root.querySelector(`[data-qm-proposed][data-qm-review~="${id}"]`);
+	root.querySelector(`[data-qm-review~="${id}"]`);
+/** What item `id` draws in place: the words it strikes, then the words it writes. */
+const drawnOf = (root: ParentNode, id: string): [string, string] => {
+	const words = (selector: string) =>
+		[...root.querySelectorAll(`${selector}[data-qm-review~="${id}"]`)]
+			.map((el) => el.textContent)
+			.join('');
+	return [words('.qm-review-del'), words('.qm-review-ins')];
+};
 /** A value with each plain text in it as its words. */
 const texts = (value: unknown): unknown =>
 	JSON.parse(
@@ -91,14 +88,13 @@ describe('a record’s cell', () => {
 	const seed = (doc: Document): void =>
 		void quill().writer(doc).set('contact', { name: 'Ada', email: 'a@example.org' });
 
-	it('marks the cell it names, and is said on the answer card', async () => {
+	it('draws its change in the cell it names', async () => {
 		const r = nested(contact, seed);
 		await settle();
 		const cells = [...openField(r.target, main, 'contact').querySelectorAll('[data-qm-prop]')];
 		const cell = (prop: string) => cells.find((c) => c.getAttribute('data-qm-prop') === prop)!;
-		expect(markOf(cell('name'), 'name')).not.toBeNull();
-		expect(markOf(cell('email'), 'email')).not.toBeNull();
-		expect(await said(r, ['name', 'email'])).toEqual(['AdaGrace', 'ag@example.org']);
+		expect(drawnOf(cell('name'), 'name')).toEqual(['Ada', 'Grace']);
+		expect(drawnOf(cell('email'), 'email')).toEqual(['a', 'g']);
 		expect(r.drawn.at(-1)?.outdated).toEqual([]);
 		expect(r.drawn.at(-1)?.undrawn).toEqual([]);
 	});
@@ -154,19 +150,19 @@ describe('a list’s member', () => {
 		];
 	};
 
-	it('marks its row, and the list for one past the last', async () => {
+	it('draws its change in its row, strikes the row it takes out, and previews the row it adds', async () => {
 		const r = nested(members, seed);
 		await settle();
 		const field = openField(r.target, main, 'signature_block');
 		const rowOf = (id: string) => markOf(field, id)!.closest('.qm-array-row');
 		expect(rowOf('change')?.getAttribute('data-qm-index')).toBe('0');
+		expect(drawnOf(field, 'change')).toEqual(['A.', 'ADA']);
 		expect(rowOf('drop')?.getAttribute('data-qm-index')).toBe('1');
-		expect(markOf(field, 'add')?.classList.contains('qm-array-rows')).toBe(true);
-		expect(await said(r, ['change', 'drop', 'add'])).toEqual([
-			'A.ADA LOVELACE',
-			'Author',
-			'New item: Countess'
-		]);
+		expect(field.querySelector('[data-qm-removes]')).toBe(markOf(field, 'drop'));
+		const added = markOf(field, 'add')!;
+		expect(added.classList.contains('qm-review-added')).toBe(true);
+		expect(added.textContent?.trim()).toBe('Countess');
+		expect(r.doc.getStored('signature_block')).toHaveLength(3);
 	});
 
 	it('is taken on the member it read, though another taken first moved it', async () => {

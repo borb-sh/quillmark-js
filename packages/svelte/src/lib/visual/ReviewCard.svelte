@@ -1,10 +1,9 @@
 <!--
  The answer card: one floating surface on the current change of a review, and the one place a
  change is answered by pointer. A quiet Dismiss and a primary Accept, each with its key, and a
- note where the reader's own writing meets the change. For a field's proposal it leads with the
- change itself, what would go struck and what would come tinted, since the control only carries a
- mark: a value drawn under its control moved every field below it. It carries no position: the
- count is the host's bar's.
+ note where the reader's own writing meets the change. The change itself is drawn where it
+ stands, so the card is the same two answers on every change. It carries no position: the count
+ is the host's bar's.
 
  It sits under the change, right-aligned to the text column the change stands in, and flips
  above it where there is no room below. It never goes under the host's chrome at the pane's foot
@@ -21,7 +20,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { chord, wording } from './strings.js';
-	import type { ReviewValue } from './review.svelte.js';
 	import './controls.css';
 
 	interface Props {
@@ -35,12 +33,10 @@
 		hidden: boolean;
 		/** The reader's own writing meets the change. */
 		outdated: boolean;
-		/** What a field's proposal would change, none for a change drawn in the text. */
-		value?: ReviewValue;
 		onAnswer(action: 'accept' | 'dismiss'): void;
 		onHover(on: boolean): void;
 	}
-	let { id, root, inset, hidden, outdated, value, onAnswer, onHover }: Props = $props();
+	let { id, root, inset, hidden, outdated, onAnswer, onHover }: Props = $props();
 
 	const t = wording();
 
@@ -233,19 +229,6 @@
 		if (!el?.contains(e.relatedTarget as Node | null)) from = undefined;
 	}}
 >
-	{#if value}
-		<span class="qm-review-card-value">
-			{#if value.label}<span class="qm-review-where">{value.label}: </span>{/if}
-			{#each value.runs as run, i (i)}
-				{#if run.kind === 'del'}<del class="qm-review-del">{run.text}</del
-					>{:else if run.kind === 'ins'}<ins class="qm-review-ins">{run.text}</ins
-					>{:else}{run.text}{/if}
-			{/each}
-			{#if value.empty && !value.removes}
-				<span class="qm-review-none">{t.strings.reviewEmpty}</span>
-			{/if}
-		</span>
-	{/if}
 	{#if outdated}<span class="qm-review-card-note">{t.strings.reviewOutdated}</span>{/if}
 	<button
 		type="button"
@@ -331,41 +314,6 @@
 		font: inherit;
 		opacity: var(--_qm-opacity-rest);
 	}
-	/* The change reads at the text's size, so it is read as the value and not as chrome. A long
-	   value wraps inside the card's measure rather than widening it past the column. */
-	.qm-review-card-value {
-		max-width: min(32rem, 60vw);
-		padding: var(--_qm-space-half) var(--_qm-space-2);
-		font-size: var(--_qm-text-body);
-		border-inline-end: var(--_qm-border-width) solid var(--_qm-border);
-		overflow-wrap: anywhere;
-		white-space: pre-wrap;
-	}
-	.qm-review-del {
-		color: var(--_qm-ink-label);
-		text-decoration: line-through;
-		text-decoration-color: var(--_qm-review-line);
-	}
-	.qm-review-ins {
-		text-decoration: none;
-		background: var(--_qm-review-tint);
-		box-shadow:
-			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-tint),
-			var(--_qm-space-half) 0 0 var(--_qm-review-tint);
-		border-radius: var(--_qm-radius-inner);
-		-webkit-box-decoration-break: clone;
-		box-decoration-break: clone;
-	}
-	.qm-review-del + .qm-review-ins {
-		margin-inline-start: calc(var(--_qm-space) + var(--_qm-space-half));
-	}
-	.qm-review-where,
-	.qm-review-none {
-		color: var(--_qm-ink-label);
-	}
-	.qm-review-none {
-		font-style: italic;
-	}
 	.qm-review-card-note {
 		padding-inline: var(--_qm-space-2);
 		color: var(--_qm-ink-label);
@@ -380,9 +328,6 @@
 		}
 	}
 	@media (forced-colors: active) {
-		.qm-review-ins {
-			text-decoration: underline;
-		}
 		button {
 			border: var(--_qm-border-width) solid ButtonText;
 		}
