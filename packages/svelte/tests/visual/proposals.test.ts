@@ -90,7 +90,7 @@ describe('a field', () => {
 		expect(removed[0]).not.toHaveProperty('after');
 	});
 
-	it('takes a list gaining a member before its end whole', () => {
+	it('takes a list gaining a member before its end member by member', () => {
 		const { items } = between(
 			(answer) =>
 				void quill()
@@ -99,10 +99,16 @@ describe('a field', () => {
 		);
 		expect(items).toMatchObject([
 			{
-				field: 'main.authors',
-				before: texts(['Ada Lovelace', 'Grace Hopper']),
-				after: texts(['Mary Somerville', 'Ada Lovelace', 'Grace Hopper'])
-			}
+				field: 'main.authors[0]',
+				before: { text: 'Ada Lovelace' },
+				after: { text: 'Mary Somerville' }
+			},
+			{
+				field: 'main.authors[1]',
+				before: { text: 'Grace Hopper' },
+				after: { text: 'Ada Lovelace' }
+			},
+			{ field: 'main.authors[2]', after: { text: 'Grace Hopper' } }
 		]);
 	});
 

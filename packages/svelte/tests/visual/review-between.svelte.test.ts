@@ -72,6 +72,33 @@ describe('an answer’s review list', () => {
 	});
 });
 
+describe('a record or list the answer writes past what a list item names', () => {
+	it('is drawn place by place, and accepted it is the answer', async () => {
+		const doc = example();
+		const answer = doc.clone();
+		const write = quill().writer(answer);
+		write.set('contact', { name: 'Grace', email: 'g@example.org' });
+		write.set('authors', ['Mary Somerville', 'Ada Lovelace', 'Grace Hopper']);
+		expect(doc.getStored('contact')).toBeUndefined();
+		const { items } = proposalsBetween(quill(), doc, answer);
+		expect(items.every((item) => 'field' in item && /[.[]/.test(item.field.slice(5)))).toBe(true);
+		const drawn: ReviewDrawn[] = [];
+		const { editor } = mountEditor(quill(), doc, {
+			review: items,
+			onReviewDrawn: (d) => drawn.push(d)
+		});
+		await settle();
+		expect(drawn.at(-1)!.undrawn).toEqual([]);
+		expect(drawn.at(-1)!.outdated).toEqual([]);
+		expect(editor.answerReview('all', 'accept').length).toBe(items.length);
+		await settle();
+		const now = fieldValues(doc.main.payloadItems);
+		const want = fieldValues(answer.main.payloadItems);
+		for (const name of ['contact', 'authors'])
+			expect(sameValue(now[name], want[name]), name).toBe(true);
+	});
+});
+
 describe('the host’s list', () => {
 	it('is set once and cleared once, the editor drawing each answer while it stands', async () => {
 		const doc = example();

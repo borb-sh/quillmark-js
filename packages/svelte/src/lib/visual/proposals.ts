@@ -34,8 +34,10 @@ let minted = 0;
  * per block the answer rewrote or took out, and one `insert` item per run of blocks it added.
  * Every other field takes an item per place that changed: a record's cell, and a list's member,
  * changed, taken out, or appended past the end, two appends to one list at successive indices.
- * A one-line rich text field, a list that gains members anywhere but its end, a value of a type
- * nothing nests in, and a rich text value inside a record or a list are proposed whole. Values
+ * A list that gains members anywhere but its end is compared member by member at each index, so
+ * each place its controls draw says its own change; a record or a list written where none was is
+ * compared with an empty one. A one-line rich text field, a value of a type nothing nests in, a
+ * field the answer clears, and a rich text value inside a record or a list are proposed whole. Values
  * are in the form the editor's controls are handed, a text cell as its `Content`.
  *
  * A card the answer adds is an `add` item after the nearest card before it that the answer
@@ -149,25 +151,29 @@ export function proposalsBetween(
 				...(now !== undefined && { after: now })
 			});
 		const kind = f && baseType(f);
-		if (kind === 'object' && f?.properties && isRecord(was) && isRecord(now)) {
-			for (const key of keysOf(f.properties, was, now))
-				value(pathAt, f.properties[key], [...steps, key], was[key], now[key]);
+		if (kind === 'object' && f?.properties && isRecord(now) && (was == null || isRecord(was))) {
+			const held: Record<string, unknown> = isRecord(was) ? was : {};
+			for (const key of keysOf(f.properties, held, now))
+				value(pathAt, f.properties[key], [...steps, key], held[key], now[key]);
 			return;
 		}
-		if (kind !== 'array' || !Array.isArray(was) || !Array.isArray(now)) return whole();
-		const runs = aligned(was, now);
-		if (!runs) return whole();
-		let appended = was.length;
+		if (kind !== 'array' || !Array.isArray(now) || !(was == null || Array.isArray(was)))
+			return whole();
+		const held: readonly unknown[] = Array.isArray(was) ? was : [];
+		const runs = aligned(held, now) ?? [
+			{ from: 0, to: 0, removed: held.length, added: now.length }
+		];
+		let appended = held.length;
 		for (const { from, to, removed, added } of runs) {
 			const paired = Math.min(removed, added);
 			for (let k = 0; k < paired; k++)
-				value(pathAt, f?.items, [...steps, from + k], was[from + k], now[to + k]);
+				value(pathAt, f?.items, [...steps, from + k], held[from + k], now[to + k]);
 			for (let k = paired; k < removed; k++)
 				items.push({
 					id: mint(),
 
 					field: pathAt([...steps, from + k]),
-					before: was[from + k]
+					before: held[from + k]
 				});
 			for (let k = paired; k < added; k++)
 				items.push({
