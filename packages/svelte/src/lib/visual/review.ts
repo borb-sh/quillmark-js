@@ -369,3 +369,19 @@ export function proposedText(after: unknown): string | undefined {
 		return String((after as { text: unknown }).text);
 	return undefined;
 }
+
+/** A proposal its control draws as words over its own value, a line of text's as a word diff and
+ *  a number's as the struck and the proposed figures; `undefined` where it draws none. */
+export function wordedProposal(
+	item: FieldProposal | undefined,
+	control: 'text' | 'number' | undefined
+): { id: string; after: string } | undefined {
+	if (!item || !control) return undefined;
+	const after =
+		control === 'number'
+			? item.after == null
+				? undefined
+				: String(item.after)
+			: proposedText(item.after);
+	return after === undefined ? undefined : { id: item.id, after };
+}

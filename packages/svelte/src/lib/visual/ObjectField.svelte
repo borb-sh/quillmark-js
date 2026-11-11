@@ -54,7 +54,7 @@
 		textCap
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
-	import { proposedText, splitReview, type DeepReview } from './review.js';
+	import { wordedProposal, splitReview, type DeepReview } from './review.js';
 	import ReviewRows from './ReviewRows.svelte';
 	import type { LandingBox } from './leaves.js';
 	import { isEmptyContent } from '../core/codec/index.js';
@@ -300,14 +300,11 @@
 			{@const reviewHere = reviewed.below.get(key)}
 			{@const handsDown = kind === 'object' || kind === 'array'}
 			{@const ownItem = handsDown ? undefined : reviewHere?.find((e) => !e.steps.length)?.item}
-			{@const textOwn =
-				ownItem && kind === 'prose' && shortCell(sub)
-					? ((after) => (after === undefined ? undefined : { id: ownItem.id, after }))(
-							proposedText(ownItem.after)
-						)
-					: undefined}
-			{@const shown =
-				ownItem && kind !== 'prose' && ownItem.after !== undefined ? ownItem.after : obj[key]}
+			{@const textOwn = wordedProposal(
+				ownItem,
+				kind === 'number' ? 'number' : kind === 'prose' && shortCell(sub) ? 'text' : undefined
+			)}
+			{@const shown = ownItem && !textOwn && ownItem.after !== undefined ? ownItem.after : obj[key]}
 			{@const own = isContainer(kind) ? undefined : deep?.map((d) => d.diagnostic)}
 			<!-- `for` reaches the labelable controls, a variant through its discriminant; the
 			     date field's focus lives on a segment and a prose cell is a `contenteditable`,
@@ -372,6 +369,7 @@
 							id={ids?.control}
 							describedBy={describes}
 							value={shown as number | undefined}
+							proposed={textOwn}
 							integer={baseType(sub) === 'integer'}
 							fallback={textDefault(sub)}
 							placeholder={noneOf(key, sub)}

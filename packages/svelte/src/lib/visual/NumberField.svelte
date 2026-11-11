@@ -29,9 +29,16 @@
  string to `onCommit`: the boundary's `writer.set` coercion is the judge (throws a
  `QuillmarkError` the parent turns into a field diagnostic, INVARIANTS §Diagnostics). `Number()` alone is no gate: it reads `0x1F` and `Infinity` as
  numbers, and `1.000` as a whole one.
+
+ A proposed value is drawn over the input, the text it holds struck where it stands and the
+ proposed one tinted beside it, as a one-line text leaf draws its own. The input holds its own
+ text throughout, so the caret moves through the struck text and an edit writes what the field
+ holds; once an entry is pending the input shows it, and the drawing keeps its place unseen, so
+ the answer card standing on it stays.
 -->
 <script lang="ts">
 	import './controls.css';
+	import { review } from './review.svelte.js';
 
 	interface Props {
 		value: number | undefined;
@@ -54,13 +61,45 @@
 		/** Enter settled the entry as a number: a list's row moves on from it. Enter
 		 *  claimed here commits at once rather than at the browser's own `change`. */
 		onEnter?: () => void;
+		/** A proposed value, drawn over the input at rest. */
+		proposed?: { id: string; after: string };
 	}
-	let { value, integer, fallback, placeholder, label, id, describedBy, onCommit, onEnter }: Props =
-		$props();
+	let {
+		value,
+		integer,
+		fallback,
+		placeholder,
+		label,
+		id,
+		describedBy,
+		onCommit,
+		onEnter,
+		proposed
+	}: Props = $props();
+
+	const reviewing = review();
+
+	/** The face stands over the input's own box, wherever the input stands in its parent. */
+	function over(face: HTMLElement) {
+		const input = face.previousElementSibling as HTMLElement | null;
+		if (!input) return;
+		const place = () => {
+			face.style.insetBlockStart = `${input.offsetTop}px`;
+			face.style.insetInlineStart = `${input.offsetLeft}px`;
+			face.style.width = `${input.offsetWidth}px`;
+			face.style.height = `${input.offsetHeight}px`;
+		};
+		place();
+		if (typeof ResizeObserver === 'undefined') return;
+		const watch = new ResizeObserver(place);
+		watch.observe(input);
+		return () => watch.disconnect();
+	}
 
 	const resting = $derived(value != null ? String(value) : (fallback ?? ''));
 	let local = $derived(resting);
 	const defaulted = $derived(value == null && !!fallback && local === fallback);
+	const drawn = $derived(proposed && proposed.after !== resting ? proposed : undefined);
 
 	const partial = $derived(
 		integer ? /^\s*[+-]?\d*\s*$/ : /^\s*[+-]?\d*\.?\d*(?:[eE][+-]?\d*)?\s*$/
@@ -145,6 +184,9 @@
 	{id}
 	{placeholder}
 	data-default={defaulted ? '' : undefined}
+	data-proposed-over={drawn && local === resting ? '' : undefined}
+	onpointerenter={() => drawn && reviewing.point(drawn.id, 'pointer')}
+	onpointerleave={() => drawn && reviewing.point(undefined, 'pointer')}
 	aria-label={id ? undefined : label}
 	aria-describedby={describedBy}
 	onbeforeinput={filter}
@@ -159,10 +201,74 @@
 		if (el.value !== settled) commit(el);
 	}}
 />
+{#if drawn}
+	{@const lit = reviewing.lit === drawn.id}
+	<span
+		class={['qm-number-review', { pending: local !== resting }]}
+		aria-hidden="true"
+		{@attach over}
+	>
+		{#if resting}<del class={['qm-review-del', { 'qm-review-lit': lit }]}>{resting}</del>{/if}<ins
+			class={['qm-review-ins', { 'qm-review-lit': lit }]}
+			data-qm-review={drawn.id}>{drawn.after}</ins
+		>
+	</span>
+{/if}
 
 <style>
 	/* Tabular figures, so numbers stacked in a column line up digit for digit. */
-	.qm-input {
+	.qm-input,
+	.qm-number-review {
 		font-variant-numeric: tabular-nums;
+	}
+	:global(:has(> .qm-number-review)) {
+		position: relative;
+	}
+	.qm-input[data-proposed-over] {
+		color: transparent;
+		caret-color: var(--_qm-ink);
+	}
+	.qm-number-review.pending {
+		visibility: hidden;
+	}
+	.qm-number-review {
+		position: absolute;
+		display: flex;
+		align-items: center;
+		box-sizing: border-box;
+		padding: var(--_qm-inset-control);
+		overflow: hidden;
+		font-size: var(--_qm-text-body);
+		line-height: var(--_qm-leading-body);
+		white-space: nowrap;
+		pointer-events: none;
+	}
+	.qm-review-del {
+		color: var(--_qm-ink-label);
+		text-decoration: line-through;
+		text-decoration-color: var(--_qm-review-line);
+	}
+	.qm-review-ins {
+		color: var(--_qm-ink);
+		text-decoration: none;
+		background: var(--_qm-review-tint);
+		box-shadow:
+			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-tint),
+			var(--_qm-space-half) 0 0 var(--_qm-review-tint);
+		border-radius: var(--_qm-radius-inner);
+	}
+	.qm-review-ins.qm-review-lit {
+		background: var(--_qm-review-lit);
+		box-shadow:
+			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-lit),
+			var(--_qm-space-half) 0 0 var(--_qm-review-lit);
+	}
+	.qm-review-del + .qm-review-ins {
+		margin-inline-start: calc(var(--_qm-space) + var(--_qm-space-half));
+	}
+	@media (forced-colors: active) {
+		.qm-review-ins {
+			text-decoration: underline;
+		}
 	}
 </style>

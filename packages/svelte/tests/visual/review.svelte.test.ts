@@ -72,16 +72,28 @@ describe('a proposed field value', () => {
 		(after: unknown) =>
 		(doc: Document): ReviewItem[] => [{ id: 'r1', field: doc.pathFor('columns'), after }];
 
-	it('shows the value that would come in its control, marked, and writes nothing', async () => {
+	it('strikes the number its control holds and tints the one that would come, writing nothing', async () => {
 		const r = review(proposed(2));
 		const columns = openField(r.target, main, 'columns');
-		const control = columns.querySelector('.qm-field-control');
-		expect(columns.querySelector('[data-qm-proposed]')).toBe(control);
-		expect(columns.querySelector('.qm-review-anchor')?.hasAttribute('hidden')).toBe(true);
-		expect(control?.querySelector('input')?.value).toBe('2');
+		const input = columns.querySelector<HTMLInputElement>('.qm-field-control input')!;
+		const held = input.value;
+		const drawn = columns.querySelector('.qm-number-review')!;
+		expect(drawn.querySelector('del')?.textContent).toBe(held);
+		expect(drawn.querySelector('ins')?.textContent).toBe('2');
+		expect(drawn.querySelector('ins')?.getAttribute('data-qm-review')).toBe('r1');
+		expect(columns.querySelector('[data-qm-proposed]')).toBeNull();
 		await settle();
 		expect(r.target.querySelector('.qm-review-card')?.textContent).not.toContain('2');
 		expect(r.doc.getStored('columns')).toBeUndefined();
+	});
+
+	it('leaves the default unsaid while it stands', () => {
+		const r = review(proposed(2));
+		const columns = openField(r.target, main, 'columns').closest('.qm-field')!;
+		expect(columns.querySelector('[id$="-default"]')).toBeNull();
+		r.editor.answerReview(['r1'], 'dismiss');
+		flushSync();
+		expect(columns.querySelector('[id$="-default"]')).not.toBeNull();
 	});
 
 	it('shows a switch as the face it would take, marked', () => {
@@ -111,7 +123,7 @@ describe('a proposed field value', () => {
 		expect(r.doc.getStored('columns')).toBe(2);
 		expect(r.changes.map((c) => c.source)).toEqual(['field']);
 		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
-		expect(r.target.querySelector('[data-qm-proposed]')).toBeNull();
+		expect(r.target.querySelector('[data-qm-review~="r1"]')).toBeNull();
 		expect(r.target.querySelector('.qm-toast')).toBeNull();
 
 		press(document.body, 'z', mod);
@@ -149,7 +161,7 @@ describe('a proposed field value', () => {
 		press(document.body, '.', mod);
 		expect(r.events).toEqual([{ id: 'r1', action: 'dismiss' }]);
 		expect(r.changes).toEqual([]);
-		expect(r.target.querySelector('[data-qm-proposed]')).toBeNull();
+		expect(r.target.querySelector('[data-qm-review~="r1"]')).toBeNull();
 	});
 
 	it('stands, unanswered, where the field’s writer refuses it', () => {
@@ -158,7 +170,7 @@ describe('a proposed field value', () => {
 		flushSync();
 		expect(r.events).toEqual([]);
 		expect(r.errors.map((e) => e.code)).toEqual(['commit-refused']);
-		expect(r.target.querySelector('[data-qm-proposed]')).not.toBeNull();
+		expect(r.target.querySelector('[data-qm-review~="r1"]')).not.toBeNull();
 	});
 
 	it('draws a line of words as an edit of the line in its leaf, and the leaf re-reads it once taken', async () => {

@@ -89,7 +89,7 @@ describe('the answer journal', () => {
 			{ id: 'sub', action: 'reopen' },
 			{ id: 'cols', action: 'reopen' }
 		]);
-		expect(r.target.querySelector('[data-qm-proposed][data-qm-review~="cols"]')).not.toBeNull();
+		expect(r.target.querySelector('.qm-number-review [data-qm-review~="cols"]')).not.toBeNull();
 		expect(r.target.querySelector('.qm-review-ins[data-qm-review~="sub"]')).not.toBeNull();
 	});
 

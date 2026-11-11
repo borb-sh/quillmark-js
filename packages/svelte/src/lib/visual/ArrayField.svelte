@@ -114,7 +114,7 @@
 		type ArrayLayout
 	} from './structure.js';
 	import {
-		proposedText,
+		wordedProposal,
 		reviewText,
 		splitReview,
 		type DeepReview,
@@ -253,13 +253,13 @@
 		scalar || control === 'prose'
 			? ownReview(k).find((e) => e.item.after !== undefined)?.item
 			: undefined;
-	const rowText = (k: number): { id: string; after: string } | undefined => {
-		const own = control === 'prose' ? rowOwn(k) : undefined;
-		const after = own && proposedText(own.after);
-		return own && after !== undefined ? { id: own.id, after } : undefined;
-	};
+	const rowText = (k: number): { id: string; after: string } | undefined =>
+		wordedProposal(
+			rowOwn(k),
+			control === 'prose' ? 'text' : control === 'number' ? 'number' : undefined
+		);
 	const rowShown = (k: number): unknown => {
-		const own = control === 'prose' ? undefined : rowOwn(k);
+		const own = rowText(k) ? undefined : rowOwn(k);
 		return own ? own.after : arr[k];
 	};
 	/** A row's marks: its proposals less the one its control draws as text. */
@@ -1123,6 +1123,7 @@
 					{:else if control === 'number'}
 						<NumberField
 							value={rowShown(k) as number | undefined}
+							proposed={rowText(k)}
 							integer={items != null && baseType(items) === 'integer'}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							label={rowName(k)}

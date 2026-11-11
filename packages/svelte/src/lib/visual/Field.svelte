@@ -60,7 +60,7 @@
 	import ReviewProposal from './ReviewProposal.svelte';
 	import ReviewRows from './ReviewRows.svelte';
 	import { review } from './review.svelte.js';
-	import { proposedText } from './review.js';
+	import { wordedProposal } from './review.js';
 
 	interface Props {
 		field: FieldModel;
@@ -146,8 +146,14 @@
 	// resolves to digits, and the control has to know it follows the render date.
 	const declared = $derived(printedText(field.schema.default));
 	const optional = $derived(optionalCell(field.schema));
+	// A proposal is drawn in the control. The focus arriving in the control makes it current, as
+	// the caret arriving in a leaf's words makes theirs.
+	const reviewing = review();
+	const reviewed = $derived(reviewing.at(leafKey));
+	const proposed = $derived(reviewed.proposed);
 	// Where the field stands against its default, for the label row's end (`FieldLabel`):
-	// unset with the default printing, or written over one that would. A container's
+	// unset with the default printing, or written over one that would. A proposal standing on
+	// the field says the value it would hold, so the default goes unsaid meanwhile. A container's
 	// source is its cells' composed, so only a control holding one value says either.
 	const scalar = $derived(!isContainer(field.control));
 	// A prose leaf commits past the derive (`VisualEditorInner` `proseChanged`), so its
@@ -158,7 +164,7 @@
 		since && since.row === provenance ? since.written : provenance?.source === 'authored'
 	);
 	const defaulted = $derived(
-		scalar && !written && provenance?.source === 'default' && printed !== undefined
+		scalar && !written && provenance?.source === 'default' && printed !== undefined && !proposed
 	);
 	const resettable = $derived(scalar && written && declared !== undefined);
 	const defaultId = $derived(`${domIds.control}-default`);
@@ -317,21 +323,22 @@
 	 * rather than counted twice.
 	 */
 	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
-	// A proposal rests as a row under the control. The focus arriving in the control makes it
-	// current, as the caret arriving in a leaf's words makes theirs.
-	const reviewing = review();
-	const reviewed = $derived(reviewing.at(leafKey));
-	const proposed = $derived(reviewed.proposed);
-	/** A whole proposed value for a one-line text leaf, drawn over its text as a word diff. */
-	const textProposed = $derived.by(() => {
-		if (!proposed || field.control !== 'prose' || !field.inline) return undefined;
-		const after = proposedText(proposed.after);
-		return after === undefined ? undefined : { id: proposed.id, after };
-	});
+	/** A whole proposed value drawn as words over the control's own: a one-line text leaf's
+	 *  as a word diff, a number's as the struck and the proposed figures. */
+	const worded = $derived(
+		wordedProposal(
+			proposed,
+			field.control === 'number'
+				? 'number'
+				: field.control === 'prose' && field.inline
+					? 'text'
+					: undefined
+		)
+	);
 	/** What a control that cannot draw a proposal as words shows while one stands: the value it
 	 *  would hold, tinted (`ReviewProposal`). */
 	const display = $derived(
-		proposed && !textProposed && proposed.after !== undefined ? proposed.after : value
+		proposed && !worded && proposed.after !== undefined ? proposed.after : value
 	);
 	/** The items naming a place inside this field: a record's and a list's own controls draw
 	 *  them where they are, any other's under this one. */
@@ -374,8 +381,8 @@
 				reportFocus?.(e);
 				if (proposed) reviewing.point(proposed.id, 'caret');
 			}}
-			onpointerenter={() => textProposed && reviewing.point(textProposed.id, 'pointer')}
-			onpointerleave={() => textProposed && reviewing.point(undefined, 'pointer')}
+			onpointerenter={() => worded && reviewing.point(worded.id, 'pointer')}
+			onpointerleave={() => worded && reviewing.point(undefined, 'pointer')}
 		>
 			{#if field.control === 'prose'}
 				<ProseField
@@ -393,7 +400,7 @@
 					defaultNoteId={defaultId}
 					cap={cap && { ...cap, onCount: (n) => (chars = n) }}
 					{leafKey}
-					proposed={textProposed}
+					proposed={worded}
 					{onFocus}
 					{onCaretMove}
 					onChange={proseCommitted}
@@ -433,6 +440,7 @@
 			{:else if field.control === 'number'}
 				<NumberField
 					value={display as number | undefined}
+					proposed={worded}
 					integer={baseType(field.schema) === 'integer'}
 					fallback={declared}
 					placeholder={none}
@@ -522,7 +530,7 @@
 		{#if field.control !== 'object' && field.control !== 'array'}
 			<ReviewRows entries={nestedReview} />
 		{/if}
-		{#if proposed && !textProposed}
+		{#if proposed && !worded}
 			<ReviewProposal item={proposed} />
 		{/if}
 		{#if scalar}
