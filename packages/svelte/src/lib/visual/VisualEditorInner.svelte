@@ -838,11 +838,32 @@
 			reviewing.reveal(id);
 		}
 	}
-	/** Where the current change stands, for a screen reader to hear on each step. */
+	/** What the change `id` is to: the field it is drawn in, the body, or the card it adds or
+	 *  takes out. */
+	function reviewName(id: string): string {
+		const item = reviewing.items.find((it) => it.id === id);
+		if (!item) return '';
+		if ('add' in item) return `${merged.reviewNewCard}, ${previewOf(item).title}`;
+		if ('remove' in item) {
+			const c = model.cards.find((c) => reviewing.cards.removes.get(c.id)?.id === id);
+			const t = c && titled(c);
+			return t ? `${merged.reviewRemoveCard}, ${t.titleOverride || t.titlePlaceholder}` : '';
+		}
+		if (addrForFieldPath(item.field)?.field == null && byBlocks(item)) return merged.bodyLabel;
+		const key = reviewed(item.field);
+		if (!key?.field) return '';
+		const isMain = key.card === undefined;
+		const card = isMain ? model.main : model.cards[cardIndexOf(key.card as CardId)];
+		const schema = isMain ? quill.schema.main : quill.schema.card_kinds?.[card?.kind ?? ''];
+		const sub = schema?.fields[key.field];
+		return sub ? fieldTitle(key.field, sub) : humanize(key.field);
+	}
+	/** Where the current change stands and what it is to, for a screen reader to hear on each
+	 *  step. */
 	const reviewPlace = $derived.by(() => {
 		const id = reviewing.lit;
 		const at = id === undefined ? -1 : drewOrder.indexOf(id);
-		return at < 0 ? '' : merged.reviewPosition(at + 1, drewOrder.length);
+		return at < 0 ? '' : merged.reviewPosition(at + 1, drewOrder.length, reviewName(id!));
 	});
 	// Card handles, for `setCaret`'s reveal hop: the one thing a leaf's own controller
 	// cannot do, since which group is open is the card's state (Card §revealLeaf).
@@ -2439,7 +2460,8 @@
 		background: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint)) var(--_qm-surface);
 	}
 	/* A control showing a value a proposal would write, which it cannot draw as words: the review
-	   tint over the whole control, laid over it so it takes no room and moves nothing. It takes
+	   tint over the whole control and an edge in the review line, so the mark is not colour alone,
+	   laid over it so it takes no room and moves nothing. It takes
 	   the box's `::after` whole, over what the arrival wash or a tap floor set there. A member a
 	   proposal takes out is struck where it stands. */
 	:global([data-qm-proposed]),
@@ -2456,15 +2478,21 @@
 		transform: none;
 		border-radius: var(--_qm-radius-inner);
 		background: var(--_qm-review-tint);
+		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
 		opacity: 1;
 		pointer-events: none;
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	/* The current one takes the review line as a ring as well, as a removed card's mark does. */
+	/* A switch's track keeps its own shape under the mark. */
+	:global(.qm-toggle[data-qm-proposed])::after,
+	:global(.qm-review-added-box .qm-toggle)::after {
+		border-radius: inherit;
+	}
+	/* The current one's edge is a step stronger, as a removed card's ring is. */
 	:global([data-qm-proposed-lit])::after,
 	:global(.qm-review-lit > .qm-review-added-box :is(.qm-toggle, .qm-tick))::after {
 		background: var(--_qm-review-lit);
-		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	}
 	:global([data-qm-removes]) {
 		text-decoration: line-through;
@@ -2480,10 +2508,11 @@
 	}
 	:global(.qm-review-added-box :is(.qm-control-box, .qm-input)) {
 		background-image: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint));
+		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
 	}
 	:global(.qm-review-lit > .qm-review-added-box :is(.qm-control-box, .qm-input)) {
 		background-image: linear-gradient(var(--_qm-review-lit), var(--_qm-review-lit));
-		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	}
 	/* A row a proposal would take out: no tint, which only ever means "would come", but a ring
 	   in the review line laid outside the row so it takes no room, its values dimmed and struck

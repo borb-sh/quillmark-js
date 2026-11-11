@@ -5,24 +5,43 @@
  one-line text leaf draws its proposal itself, as a word diff (`value-diff.ts`), and takes no
  mark.
 
- It draws nothing of its own. Its anchor stands after the control it marks, and the control is
+ It draws nothing of its own. Its anchor holds what the mark says to assistive tech, the proposed
+ value being the one the control shows, and each focusable part of the control is described by it. Its anchor stands after the control it marks, and the control is
  the nearest element before it that is neither another anchor, a diagnostic list nor a row's
  actions; with none, its parent. The mark sits on that control's own box (`BOX`) where the
  element found is a cell or a row holding one, so the tint never spreads past the control. The control carries the item's id among its `data-qm-review`
  tokens, so the card stands on the control and a press on it names the item.
 -->
 <script lang="ts">
-	import type { FieldProposal } from './review.js';
+	import { reviewText, type FieldProposal } from './review.js';
 	import { review } from './review.svelte.js';
+	import { wording } from './strings.js';
 
 	interface Props {
 		item: FieldProposal;
 		/** It takes a list's member out, so nothing comes in its place. */
 		removes?: boolean;
+		/** The value the control would show without the proposal, where the caller knows it: a
+		 *  default an unset field prints. Else the value the place holds. */
+		current?: unknown;
 	}
-	let { item, removes = false }: Props = $props();
+	let { item, removes = false, current }: Props = $props();
 
 	const reviewing = review();
+	const t = wording();
+	const describer = $props.id();
+	const description = $derived.by(() => {
+		if (removes) return t.strings.reviewRemoveCard;
+		const words = { on: t.strings.reviewOn, off: t.strings.reviewOff };
+		const now = current ?? reviewing.current(item);
+		const shown = now == null && typeof item.after === 'boolean' ? false : now;
+		return t.strings.reviewCurrently(reviewText(shown, words) || t.strings.reviewEmpty);
+	});
+
+	/** What a reader lands on in the control: the control itself where it takes focus, else each
+	 *  part of it that does, a date's segments. */
+	const FOCUSABLE =
+		'button, input, select, [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
 
 	const SKIP = '.qm-review-anchor, .qm-diag-list, .qm-row-actions';
 
@@ -50,11 +69,23 @@
 		const leave = () => reviewing.point(undefined, 'pointer');
 		target.addEventListener('pointerenter', enter);
 		target.addEventListener('pointerleave', leave);
+		const described = target.matches(FOCUSABLE)
+			? [target]
+			: [...target.querySelectorAll<HTMLElement>(FOCUSABLE)];
+		const by = (el: HTMLElement) =>
+			(el.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
+		for (const el of described)
+			el.setAttribute('aria-describedby', [...by(el), describer].join(' '));
 		$effect(() => {
 			const lit = reviewing.lit !== undefined && tokens().includes(reviewing.lit);
 			target.toggleAttribute('data-qm-proposed-lit', lit);
 		});
 		return () => {
+			for (const el of described) {
+				const rest = by(el).filter((d) => d !== describer);
+				if (rest.length) el.setAttribute('aria-describedby', rest.join(' '));
+				else el.removeAttribute('aria-describedby');
+			}
 			target.removeEventListener('pointerenter', enter);
 			target.removeEventListener('pointerleave', leave);
 			const rest = tokens().filter((t) => t !== id);
@@ -71,4 +102,4 @@
 	}
 </script>
 
-<span class="qm-review-anchor" hidden {@attach mark}></span>
+<span class="qm-review-anchor" id={describer} hidden {@attach mark}>{description}</span>

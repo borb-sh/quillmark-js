@@ -171,7 +171,7 @@ describe('a cleared value', () => {
 		const cols = openField(r.target, main, 'columns').querySelector<HTMLInputElement>('input')!;
 		expect(cols.value === '1' || cols.placeholder === '1').toBe(true);
 		expect(trigger(openField(r.target, main, 'accent')).textContent?.trim()).toBe('slate');
-		const issued = openField(r.target, main, 'issued').textContent ?? '';
+		const issued = openField(r.target, main, 'issued').querySelector('.qm-date')?.textContent ?? '';
 		expect(issued).toContain('2026');
 		expect(issued).not.toContain('03');
 		expect(r.drawn.at(-1)?.outdated).toEqual([]);

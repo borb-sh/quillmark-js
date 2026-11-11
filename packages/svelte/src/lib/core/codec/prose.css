@@ -801,9 +801,13 @@ li.ProseMirror-selectednode::after {
 }
 /* The tint runs a hair past the words on either side, as a highlighter does, without moving
    them: a shadow in the tint's own colour beside the fill, so the line sets as it would
-   without the proposal. */
+   without the proposal. A thin line in the review line under them says it in more than colour,
+   as the strike does for the words that would go. */
 .ProseMirror .qm-review-ins {
-	text-decoration: none;
+	text-decoration: underline;
+	text-decoration-color: var(--_qm-review-line);
+	text-decoration-thickness: var(--_qm-border-width);
+	text-underline-offset: 0.2em;
 	background: var(--_qm-review-tint);
 	box-shadow:
 		calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-tint),
@@ -851,11 +855,11 @@ li.ProseMirror-selectednode::after {
 	content: none;
 }
 
-/* Forced colours drop the tint, which is all that tells a proposed word from the document's.
-   A line under the proposed words and an outline round an added block stand in. */
+/* Forced colours drop the tint and the line's colour. The line under the proposed words stays,
+   in the text's own colour, and an outline round an added block stands in for its tint. */
 @media (forced-colors: active) {
 	.ProseMirror .qm-review-ins {
-		text-decoration: underline;
+		text-decoration-color: currentColor;
 	}
 	.ProseMirror .qm-review-add {
 		outline: var(--_qm-border-width) solid CanvasText;

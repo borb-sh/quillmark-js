@@ -250,7 +250,10 @@
 	}
 	.qm-review-ins {
 		color: var(--_qm-ink);
-		text-decoration: none;
+		text-decoration: underline;
+		text-decoration-color: var(--_qm-review-line);
+		text-decoration-thickness: var(--_qm-border-width);
+		text-underline-offset: 0.2em;
 		background: var(--_qm-review-tint);
 		box-shadow:
 			calc(-1 * var(--_qm-space-half)) 0 0 var(--_qm-review-tint),
@@ -268,7 +271,7 @@
 	}
 	@media (forced-colors: active) {
 		.qm-review-ins {
-			text-decoration: underline;
+			text-decoration-color: currentColor;
 		}
 	}
 </style>

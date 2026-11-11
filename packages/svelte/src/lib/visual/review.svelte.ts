@@ -21,6 +21,7 @@ import {
 	onField,
 	sameValue,
 	textProposal,
+	valueIn,
 	writesProposed,
 	type CardProposal,
 	type DeepReview,
@@ -83,6 +84,8 @@ export interface Review {
 	/** A leaf of words drawing proposal `id` over what it holds: how it stands against it,
 	 *  `undefined` once it draws it no more. One the leaf already reads as is `applied`. */
 	planned(id: string, state: ValueState | undefined): void;
+	/** The value the place `item` names holds now, as its control is handed it. */
+	current(item: FieldProposal): unknown;
 	/** What Accept of `item` writes at a place holding `value`: a proposal of words a leaf draws
 	 *  carried onto what the reader wrote since its writer read it, else its `after`. */
 	writes(item: FieldProposal, value: unknown): unknown;
@@ -314,6 +317,11 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (key === undefined) written.delete(id);
 			else written.set(id, key);
 		},
+		current(item) {
+			if (source.exact(item.field)) return source.valueAt(item.field);
+			const place = source.nested(item.field);
+			return place && valueIn(place.value, place.steps);
+		},
 		at: (key) => fields.get(key) ?? {},
 		marks: (key) => fields.has(key) || !!drawn.get(key)?.ids.length,
 		keyOf(id) {
@@ -411,6 +419,7 @@ const NO_REVIEW: Review = {
 	act: () => false,
 	answerWith: () => false,
 	planned() {},
+	current: () => undefined,
 	writes: (item) => item.after,
 	heard() {},
 	writing() {},
