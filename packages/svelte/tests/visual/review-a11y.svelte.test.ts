@@ -39,6 +39,33 @@ describe('a control under a proposal', () => {
 		expect(description(select)).toContain(words.reviewCurrently('rust'));
 	});
 
+	it('describes each segment of a date, at the top level and in a table cell', async () => {
+		const r = review(
+			(doc) => [
+				{ id: 'issued', field: doc.pathFor('issued'), before: '2026-03-01', after: '2026-04-01' },
+				{ id: 'since', field: `${doc.pathFor('contributors')}[0].since`, after: '2026-04-01' }
+			],
+			(doc) => {
+				quill().writer(doc).set('issued', '2026-03-01');
+				quill()
+					.writer(doc)
+					.set('contributors', [{ name: 'Ada', role: 'author', since: '2025-11-03' }]);
+			}
+		);
+		await settle();
+		for (const [key, held] of [
+			['issued', '2026-03-01'],
+			['contributors', '2025-11-03']
+		]) {
+			const segments = [
+				...openField(r.target, main, key).querySelectorAll('[data-qm-proposed] [role="spinbutton"]')
+			];
+			expect(segments.length).toBeGreaterThan(0);
+			for (const segment of segments)
+				expect(description(segment)).toContain(words.reviewCurrently(held));
+		}
+	});
+
 	it('loses the description with the proposal', async () => {
 		const r = review(
 			(doc) => [{ id: 'accent', field: doc.pathFor('accent'), before: 'rust', after: 'slate' }],

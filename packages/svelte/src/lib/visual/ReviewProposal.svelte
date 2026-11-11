@@ -69,18 +69,35 @@
 		const leave = () => reviewing.point(undefined, 'pointer');
 		target.addEventListener('pointerenter', enter);
 		target.addEventListener('pointerleave', leave);
-		const described = target.matches(FOCUSABLE)
-			? [target]
-			: [...target.querySelectorAll<HTMLElement>(FOCUSABLE)];
 		const by = (el: HTMLElement) =>
 			(el.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
-		for (const el of described)
-			el.setAttribute('aria-describedby', [...by(el), describer].join(' '));
+		const described = new Set<HTMLElement>();
+		// A control draws some of its parts after this mark is laid, a date its segments, and
+		// writes their attributes again as it renders, so each is described as it appears.
+		const describe = (): void => {
+			const parts = target.matches(FOCUSABLE)
+				? [target]
+				: target.querySelectorAll<HTMLElement>(FOCUSABLE);
+			for (const el of parts) {
+				described.add(el);
+				if (!by(el).includes(describer))
+					el.setAttribute('aria-describedby', [...by(el), describer].join(' '));
+			}
+		};
+		describe();
+		const watch = new MutationObserver(describe);
+		watch.observe(target, {
+			subtree: true,
+			childList: true,
+			attributes: true,
+			attributeFilter: ['tabindex', 'aria-describedby', 'contenteditable']
+		});
 		$effect(() => {
 			const lit = reviewing.lit !== undefined && tokens().includes(reviewing.lit);
 			target.toggleAttribute('data-qm-proposed-lit', lit);
 		});
 		return () => {
+			watch.disconnect();
 			for (const el of described) {
 				const rest = by(el).filter((d) => d !== describer);
 				if (rest.length) el.setAttribute('aria-describedby', rest.join(' '));
