@@ -42,6 +42,8 @@
 	let el = $state<HTMLElement | undefined>();
 	let top = $state(0);
 	let left = $state(0);
+	/** Pinned at the pane's foot, where every scroll moves it, so it follows without a glide. */
+	let pinned = $state(false);
 	/** The change shows in the pane, so the card has somewhere to stand. */
 	let placed = $state(false);
 	/** Where the focus was when the keyboard entered the card, to hand it back. */
@@ -94,14 +96,19 @@
 		const w = el.offsetWidth;
 		const column = (els[0].closest('.qm-field, .qm-card, .qm-review-card-add') ?? root)!;
 		left = Math.max(view.left + gap, column.getBoundingClientRect().right - w);
+		const at = (root ?? el).getBoundingClientRect();
 		const below = lower + gap;
 		const above = upper - gap - h;
-		top =
+		const fits = below + h <= floor || above >= ceil;
+		const y =
 			below + h <= floor
 				? below
 				: above >= ceil
 					? above
 					: Math.max(ceil, Math.min(floor - h, below));
+		top = y - at.top + (root?.scrollTop ?? 0);
+		left = left - at.left + (root?.scrollLeft ?? 0);
+		pinned = !fits;
 		placed = true;
 	}
 
@@ -203,7 +210,10 @@
 <!-- The press keeps the focus where it is: the answer is about the text, not a move off it. -->
 <div
 	bind:this={el}
-	class={['qm-review-card qm-popover-surface', { 'qm-review-card-on': shown }]}
+	class={[
+		'qm-review-card qm-popover-surface',
+		{ 'qm-review-card-on': shown, 'qm-review-card-pinned': pinned }
+	]}
 	style:top="{top}px"
 	style:left="{left}px"
 	role="group"
@@ -236,10 +246,12 @@
 </div>
 
 <style>
-	/* Out of flow and over the text, at the popover's lift, translucency and blur. Hidden by
-	   opacity rather than unmounted, so a step glides it from one change to the next. */
+	/* Out of flow and over the text, at the popover's lift, translucency and blur. Placed in the
+	   editor's own coordinates, so it scrolls with the change it stands on rather than chasing it
+	   frame by frame. Hidden by opacity rather than unmounted, so a step glides it from one change
+	   to the next. */
 	.qm-review-card {
-		position: fixed;
+		position: absolute;
 		z-index: 2;
 		display: flex;
 		align-items: center;
@@ -257,6 +269,9 @@
 			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			top var(--_qm-duration-fast) var(--_qm-ease-reverse),
 			left var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-review-card-pinned {
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-review-card-on {
 		opacity: 1;

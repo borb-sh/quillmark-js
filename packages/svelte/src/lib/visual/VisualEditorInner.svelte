@@ -2108,6 +2108,8 @@
 	   back to being one block clipped at its edges. That is the page form; a pane's
 	   frame is the host's, and it spends less (`.qm-pane` below). */
 	:global(:where(.qm-editor)) {
+		/* The answer card's frame: placed in the editor's coordinates, it scrolls with the text. */
+		position: relative;
 		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
