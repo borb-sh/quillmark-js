@@ -150,7 +150,7 @@ describe('a list’s member', () => {
 		];
 	};
 
-	it('draws its change in its row, strikes the row it takes out, and previews the row it adds', async () => {
+	it('draws its change in its row, marks the row it takes out, and shows the row it adds in its own control', async () => {
 		const r = nested(members, seed);
 		await settle();
 		const field = openField(r.target, main, 'signature_block');
@@ -158,10 +158,11 @@ describe('a list’s member', () => {
 		expect(rowOf('change')?.getAttribute('data-qm-index')).toBe('0');
 		expect(drawnOf(field, 'change')).toEqual(['A.', 'ADA']);
 		expect(rowOf('drop')?.getAttribute('data-qm-index')).toBe('1');
-		expect(field.querySelector('[data-qm-removes]')).toBe(markOf(field, 'drop'));
+		expect(field.querySelector('[data-qm-removed]')).toBe(rowOf('drop'));
 		const added = markOf(field, 'add')!;
 		expect(added.classList.contains('qm-review-added')).toBe(true);
-		expect(added.textContent?.trim()).toBe('Countess');
+		expect(added.querySelector('.qm-review-added-box')?.hasAttribute('inert')).toBe(true);
+		expect(added.querySelector('.ProseMirror')?.textContent).toBe('Countess');
 		expect(r.doc.getStored('signature_block')).toHaveLength(3);
 	});
 
@@ -246,6 +247,30 @@ describe('a record in a table', () => {
 			{ name: 'Ada', role: 'author' },
 			{ name: 'Grace', role: 'editor' }
 		]);
+	});
+
+	it('shows a row it adds as the row would stand, each cell in its own control, none of them taking input', async () => {
+		const r = nested(
+			(doc) => [
+				{
+					id: 'add',
+					field: `${doc.pathFor('contributors')}[1]`,
+					after: { name: 'Alan', role: 'reviewer' }
+				}
+			],
+			(doc) =>
+				void quill()
+					.writer(doc)
+					.set('contributors', [{ name: 'Ada', role: 'author' }])
+		);
+		await settle();
+		const added = markOf(openField(r.target, main, 'contributors'), 'add')!;
+		expect(added.classList.contains('qm-array-table-row')).toBe(true);
+		const box = added.querySelector('.qm-review-added-box')!;
+		expect(box.hasAttribute('inert')).toBe(true);
+		expect(box.querySelector('.ProseMirror')?.textContent).toBe('Alan');
+		expect(box.querySelector('.qm-select')?.textContent?.trim()).toBe('reviewer');
+		expect(r.doc.getStored('contributors')).toHaveLength(1);
 	});
 });
 

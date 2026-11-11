@@ -58,9 +58,37 @@ function write(answer: Document, quill: Quill): void {
 			...contributors.slice(2)
 		]);
 	if ('columns' in fields) writer.set('columns', 2);
+	if ('draft_watermark' in fields) writer.set('draft_watermark', true);
+	if ('accent' in fields) writer.set('accent', 'rust');
+	if ('issued' in fields) writer.set('issued', '2026-02-01');
+	if ('tab_stops' in fields) writer.set('tab_stops', [36]);
+	if ('review_dates' in fields) writer.set('review_dates', ['2026-02-01']);
+	if ('proofs_passed' in fields) writer.set('proofs_passed', [true]);
+	if ('audiences' in fields) writer.set('audiences', ['press']);
+	if (Array.isArray(contributors))
+		writer.set('contributors', [
+			...((answer.getStored('contributors') as unknown[]) ?? []),
+			{ name: 'Alan Turing', role: 'reviewer' }
+		]);
+	const signature = answer.getStored('signature_block');
+	if (Array.isArray(signature) && signature.length > 1)
+		writer.set('signature_block', signature.slice(0, -1));
+	const revisions = answer.getStored('revisions');
+	if (Array.isArray(revisions) && revisions.length > 1)
+		writer.set('revisions', revisions.slice(0, 1));
+	const appendices = answer.getStored('appendices');
+	if (Array.isArray(appendices))
+		writer.set('appendices', [...appendices, { title: 'Index', entries: [] }]);
+	const checks = answer.getStored('checks');
+	if ('checks' in fields) writer.set('checks', { ...((checks as object) ?? {}), figures: true });
 
 	if (quill.schema.card_kinds?.note)
-		writer.addCard('note', {}, 'A note the reviewer would add.', 1);
+		writer.addCard(
+			'note',
+			{ label: 'Aside', tone: 'warning' },
+			'A note the reviewer would add.',
+			1
+		);
 	if (answer.cardCount > 2) answer.removeCard(answer.cardCount - 1);
 }
 

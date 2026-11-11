@@ -54,6 +54,24 @@ describe('a proposed card', () => {
 		expect(r.drawn.at(-1)).toMatchObject({ open: ['c0', 'c1'], undrawn: [] });
 	});
 
+	it('previews each field it fills by name, and names a removal in the header of the card it takes out', async () => {
+		const r = mount((doc) =>
+			cardItems(doc, (answer) => {
+				quill().writer(answer).addCard('note', { label: 'Aside' }, 'A note the writer adds.', 2);
+				answer.removeCard(4);
+			})
+		);
+		await settle();
+		const add = r.target.querySelector<HTMLElement>('.qm-review-card-add[data-qm-review="c0"]')!;
+		const values = [...add.querySelectorAll('dd')].map((dd) => dd.textContent);
+		expect(values).toContain('Aside');
+		expect(add.querySelectorAll('dt')).toHaveLength(values.length);
+		const removal = r.target.querySelector<HTMLElement>('.qm-review-card-remove.qm-review-on')!;
+		expect(removal.querySelector('.qm-card-header')?.textContent).toContain(
+			removal.getAttribute('aria-label')
+		);
+	});
+
 	it('is written by the editor when accepted, and ⌘Z takes it back and reopens it', async () => {
 		const r = mount((doc) => cardItems(doc));
 		await settle();

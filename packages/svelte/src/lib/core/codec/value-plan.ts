@@ -22,17 +22,18 @@ export interface ValuePlan {
 	outdated: boolean;
 }
 
-const PARA: ContentBlock = { id: '', kind: 'para' };
+/** Line `k`'s block where a value of words names none of its own. */
+const para = (_: unknown, k: number): ContentBlock => ({ id: `b${k}`, kind: 'para' });
 
 /** A field value of words as a `Content`: a string by its lines, a rich or plain text value as it
  *  is, nothing as the empty line. `undefined` for a value that is not words. */
 export function asContent(value: unknown): Content | undefined {
-	if (value == null) return { text: '', blocks: [PARA] };
-	if (typeof value === 'string') return { text: value, blocks: value.split('\n').map(() => PARA) };
+	if (value == null) return { text: '', blocks: [para(null, 0)] };
+	if (typeof value === 'string') return { text: value, blocks: value.split('\n').map(para) };
 	if (typeof value !== 'object' || typeof (value as { text?: unknown }).text !== 'string')
 		return undefined;
 	const v = value as Content;
-	return Array.isArray(v.blocks) ? v : { ...v, blocks: v.text.split('\n').map(() => PARA) };
+	return Array.isArray(v.blocks) ? v : { ...v, blocks: v.text.split('\n').map(para) };
 }
 
 const markKey = (m: ContentMark): string =>
@@ -141,7 +142,7 @@ function splice(
 	const blocks =
 		lines === c.blocks.length
 			? c.blocks
-			: Array.from({ length: lines }, (_, k) => c.blocks[k] ?? PARA);
+			: Array.from({ length: lines }, (_, k) => c.blocks[k] ?? para(null, k));
 	const out: Content = { ...c, text, blocks };
 	if (marks.length) out.marks = marks;
 	else delete out.marks;

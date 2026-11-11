@@ -7,7 +7,8 @@
 
  It draws nothing of its own. Its anchor stands after the control it marks, and the control is
  the nearest element before it that is neither another anchor, a diagnostic list nor a row's
- actions; with none, its parent. The control carries the item's id among its `data-qm-review`
+ actions; with none, its parent. The mark sits on that control's own box (`BOX`) where the
+ element found is a cell or a row holding one, so the tint never spreads past the control. The control carries the item's id among its `data-qm-review`
  tokens, so the card stands on the control and a press on it names the item.
 -->
 <script lang="ts">
@@ -25,10 +26,16 @@
 
 	const SKIP = '.qm-review-anchor, .qm-diag-list, .qm-row-actions';
 
+	/** A control's own box: what the tint and the ring sit on, at any depth, where the control
+	 *  found is the cell or the row around it. */
+	const BOX = '.qm-control-box, .qm-toggle, .qm-tick';
+
 	function control(anchor: HTMLElement): HTMLElement | undefined {
 		let at = anchor.previousElementSibling;
 		while (at && at.matches(SKIP)) at = at.previousElementSibling;
-		return (at as HTMLElement | null) ?? anchor.parentElement ?? undefined;
+		const found = (at as HTMLElement | null) ?? anchor.parentElement ?? undefined;
+		if (!found || removes || found.matches(BOX)) return found;
+		return found.querySelector<HTMLElement>(BOX) ?? found;
 	}
 
 	function mark(anchor: HTMLElement) {

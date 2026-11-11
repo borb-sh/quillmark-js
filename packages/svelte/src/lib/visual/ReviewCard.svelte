@@ -95,7 +95,9 @@
 		}
 		const h = el.offsetHeight;
 		const w = el.offsetWidth;
-		const column = (els[0].closest('.qm-field, .qm-card, .qm-review-card-add') ?? root)!;
+		const column = (els[0].closest(
+			'.qm-field, .qm-card, .qm-review-card-add, .qm-review-card-remove'
+		) ?? root)!;
 		left = Math.max(view.left + gap, column.getBoundingClientRect().right - w);
 		const at = (root ?? el).getBoundingClientRect();
 		const below = lower + gap;

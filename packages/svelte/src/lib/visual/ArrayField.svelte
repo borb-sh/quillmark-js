@@ -117,12 +117,13 @@
 		numberProposal,
 		textProposal,
 		type TextProposal,
-		reviewText,
 		splitReview,
+		valueIn,
 		type DeepReview,
 		type FieldProposal
 	} from './review.js';
 	import { review as reviewState } from './review.svelte.js';
+	import { asContent } from '../core/codec/index.js';
 	import ReviewRows from './ReviewRows.svelte';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import { propertyDomIds } from './domid.js';
@@ -248,6 +249,14 @@
 	const rowReview = (k: number): DeepReview[] =>
 		k < arr.length ? (reviewed.below.get(k) ?? []) : [];
 	const ownReview = (k: number): DeepReview[] => rowReview(k).filter((e) => !e.steps.length);
+	/** A row's own removal: the proposal that takes the member out, drawn on the whole row. */
+	const removal = (k: number): FieldProposal | undefined =>
+		ownReview(k).find((e) => e.item.after === undefined)?.item;
+	/** A row's items its controls mark, less its removal, which the row draws. */
+	const rowKept = (k: number): DeepReview[] => {
+		const gone = removal(k);
+		return gone ? rowReview(k).filter((e) => e.item !== gone) : rowReview(k);
+	};
 	const innerReview = (k: number): DeepReview[] => rowReview(k).filter((e) => e.steps.length);
 	/** A scalar row's own proposal, which the row draws in place: a line of text as a word diff
 	 *  over the row, any other value as the value it would hold. A removal stays a mark. */
@@ -274,7 +283,21 @@
 	/** A row's marks: its proposals less the one its control draws as words. */
 	const rowMarks = (k: number): DeepReview[] => {
 		const text = rowWorded(k);
-		return text ? rowReview(k).filter((e) => e.item.id !== text.id) : rowReview(k);
+		return text ? rowKept(k).filter((e) => e.item.id !== text.id) : rowKept(k);
+	};
+	/** What a row taken out carries: its item's id, the current one lit, and the pointer naming
+	 *  it, so the row is where the answer card stands. */
+	const removedRow = (k: number) => {
+		const gone = removal(k);
+		return gone
+			? {
+					'data-qm-review': gone.id,
+					'data-qm-removed': '',
+					'data-qm-removed-lit': reviewing.lit === gone.id ? '' : undefined,
+					onpointerenter: () => reviewing.point(gone.id, 'pointer'),
+					onpointerleave: () => reviewing.point(undefined, 'pointer')
+				}
+			: {};
 	};
 	/** What has no row to draw under: a member past the last, and a place no row holds. A
 	 *  table's rows are cells alone, so a member's own item is drawn here too, by its number. */
@@ -283,7 +306,7 @@
 		...[...reviewed.below].flatMap(([step, list]) => {
 			const held = typeof step === 'number' && step >= 0 && step < arr.length;
 			return list
-				.filter((e) => !held || (table && !e.steps.length))
+				.filter((e) => !held || (table && !e.steps.length && e.item.after !== undefined))
 				.map((e) => ({ steps: [step, ...e.steps], item: e.item }));
 		})
 	]);
@@ -299,8 +322,6 @@
 	);
 	const reviewFoot = $derived(footAll.filter((e) => !added.includes(e)));
 	const reviewing = reviewState();
-	const previewOf = (after: unknown): string =>
-		reviewText(after, { on: t.strings.reviewOn, off: t.strings.reviewOff });
 
 	// Parallel stable ids, one per element, kept in lockstep with the data below.
 	// Seeded eagerly so a non-empty array renders its rows on the first pass:
@@ -320,7 +341,7 @@
 			(max == null || max > 0)
 	);
 	/** Whether the standing row is drawn: a gesture lands on it, which holds no element yet. */
-	const onStanding = $derived(standing && ids.length === 0);
+	const onStanding = $derived(standing && ids.length === 0 && !added.length);
 	/** The add chip's standing row after a list of numbers (see the header). */
 	let adding = $state(false);
 	const pending = $derived(adding && control === 'number' && ids.length > 0 && !atCap);
@@ -1007,6 +1028,7 @@
 						data-qm-index={k}
 						bind:this={rowEls[id]}
 						onkeydown={(e) => onRowKey(e, k)}
+						{...removedRow(k)}
 					>
 						<ObjectField
 							bare
@@ -1024,6 +1046,7 @@
 						{@render removeButton(k, true)}
 					</div>
 				{/each}
+				{#each added as { item }, n (item.id)}{@render addedRow(item, arr.length + n)}{/each}
 			</div>
 		</div>
 	{:else if control === 'object'}
@@ -1046,6 +1069,7 @@
 					bind:this={rowEls[id]}
 					animate:reorder={arm.armed}
 					onkeydown={(e) => onRowKey(e, k)}
+					{...removedRow(k)}
 				>
 					<!-- The head is the row in collapsed form, and it is a box: the element IS
 					     a value, the way the enum trigger is, and the slab's grammar (the box's
@@ -1070,6 +1094,9 @@
 							{#if !open.has(id) && preview(k)}
 								<span class="qm-element-preview">{preview(k)}</span>
 							{/if}
+							{#if removal(k)}
+								<span class="qm-review-tag">{t.strings.reviewRemoveCard}</span>
+							{/if}
 						</button>
 						<div class="qm-row-actions">
 							{@render removeButton(k)}
@@ -1087,19 +1114,20 @@
 							diagnostics={routed.below.get(k)}
 							review={innerReview(k)}
 						/>
-						<ReviewRows entries={ownReview(k)} member />
+						<ReviewRows entries={ownReview(k).filter((e) => e.item !== removal(k))} member />
 					{:else}
 						<!-- A collapsed row draws no cell, so what its cells would have said is said
 						     under the head, where the row can be seen: the message names the leaf. -->
 						<DiagnosticList diagnostics={routed.below.get(k)?.map((d) => d.diagnostic)} />
-						<ReviewRows entries={rowReview(k)} member />
+						<ReviewRows entries={rowKept(k)} member />
 					{/if}
 				</div>
 			{/each}
+			{#each added as { item }, n (item.id)}{@render addedRow(item, arr.length + n)}{/each}
 		</div>
 	{:else}
 		<div
-			class={['qm-array-rows qm-wash', { empty: rowIds.length === 0 }]}
+			class={['qm-array-rows qm-wash', { empty: rowIds.length === 0 && !added.length }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
@@ -1108,6 +1136,7 @@
 				<div
 					class={['qm-array-row qm-wash', { standing: id === standingId }]}
 					data-qm-index={k}
+					{...removedRow(k)}
 					bind:this={rowEls[id]}
 					onkeydown={(e) => onRowKey(e, k)}
 				>
@@ -1182,24 +1211,96 @@
 					<ReviewRows entries={rowMarks(k)} member />
 				</div>
 			{/each}
+			{#each added as { item }, n (item.id)}{@render addedRow(item, arr.length + n)}{/each}
 		</div>
 	{/if}
-	{#each added as { item } (item.id)}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			class={['qm-array-row qm-review-added', { 'qm-review-lit': reviewing.lit === item.id }]}
-			data-qm-review={item.id}
-			role="group"
-			aria-label={t.strings.reviewNewItem}
-			onpointerenter={() => reviewing.point(item.id, 'pointer')}
-			onpointerleave={() => reviewing.point(undefined, 'pointer')}
-		>
-			<span class="qm-review-added-value qm-control-box">{previewOf(item.after)}</span>
-		</div>
-	{/each}
 	<DiagnosticList diagnostics={foot} />
 	<ReviewRows entries={reviewFoot} member />
 </div>
+
+<!-- A member the review would add, drawn where it would stand as the row's own control holding
+     the value, tinted and inert: a table's as a row of its cells under the same headers, a record
+     list's collapsed to its summary. The row, not the control, hears the pointer and carries the
+     item, so a press on it names the item and the answer card stands on it. -->
+{#snippet addedRow(item: FieldProposal, k: number)}
+	{@const after = item.after}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class={[
+			'qm-array-row qm-review-added',
+			{
+				'qm-array-table-row': table,
+				'qm-element': control === 'object' && !table,
+				'qm-review-lit': reviewing.lit === item.id
+			}
+		]}
+		data-qm-review={item.id}
+		role="group"
+		aria-label={t.strings.reviewNewItem}
+		onpointerenter={() => reviewing.point(item.id, 'pointer')}
+		onpointerleave={() => reviewing.point(undefined, 'pointer')}
+	>
+		<div class="qm-review-added-box" inert>
+			{#if table}
+				<ObjectField
+					bare
+					value={(after ?? {}) as Record<string, unknown>}
+					properties={items?.properties}
+					label={rowName(k)}
+					contentAt={(path) => asContent(valueIn(after, path))}
+					onCommit={() => {}}
+				/>
+			{:else if control === 'object'}
+				<div class="qm-element-head">
+					<span class="qm-row-handle" aria-hidden="true"></span>
+					<span class="qm-control-box qm-element-summary">
+						<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
+						<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
+						{#if firstShortText(items?.properties, (after ?? {}) as Record<string, unknown>)}
+							<span class="qm-element-preview"
+								>{firstShortText(items?.properties, (after ?? {}) as Record<string, unknown>)}</span
+							>
+						{/if}
+					</span>
+				</div>
+			{:else if control === 'prose'}
+				<ProseValue
+					content={() => asContent(after)}
+					value={after}
+					plaintext={items != null && literalText(items)}
+					label={rowName(k)}
+					onChange={() => {}}
+				/>
+			{:else if control === 'number'}
+				<NumberField
+					value={after as number | undefined}
+					integer={items != null && baseType(items) === 'integer'}
+					label={rowName(k)}
+					onCommit={() => {}}
+				/>
+			{:else if control === 'enum'}
+				<EnumField
+					value={(after as string | undefined) || undefined}
+					values={items?.values ?? []}
+					blankTitle={items?.ui?.blank_title}
+					label={rowName(k)}
+					onCommit={() => {}}
+				/>
+			{:else if control === 'boolean'}
+				<BooleanField value={renderedBoolean(after)} label={rowName(k)} onCommit={() => {}} />
+			{:else if control === 'date'}
+				<DateField
+					value={(after as string | undefined) || undefined}
+					datetime={items != null && baseType(items) === 'datetime'}
+					label={rowName(k)}
+					onCommit={() => {}}
+				/>
+			{:else}
+				<TextField value={String(after ?? '')} label={rowName(k)} onCommit={() => {}} />
+			{/if}
+		</div>
+	</div>
+{/snippet}
 
 <!-- The remove, one button wherever a row ends: a scalar row's slab, a record row's
      slab after its reorder pair, a table row's last track. Out of the tab order where the
@@ -1238,18 +1339,6 @@
 {/snippet}
 
 <style>
-	/* A member the review would add, drawn where it would stand: its value in the review tint,
-	   nothing written. */
-	.qm-review-added-value {
-		display: block;
-		padding: var(--_qm-space) var(--_qm-space-3);
-		background: var(--_qm-review-tint);
-		border-radius: var(--_qm-radius-inner);
-		overflow-wrap: anywhere;
-	}
-	.qm-review-lit .qm-review-added-value {
-		background: var(--_qm-review-lit);
-	}
 	.qm-array {
 		display: flex;
 		flex-direction: column;
@@ -1541,6 +1630,13 @@
 	}
 	/* What the closed record holds, after its name and a rung under it: the label ink,
 	 on the line's remainder, and the first to give way where the line runs short. */
+	.qm-review-tag {
+		flex: none;
+		margin-inline-start: auto;
+		font-size: var(--_qm-text-label);
+		font-weight: var(--_qm-weight-mid);
+		color: var(--_qm-ink-label);
+	}
 	.qm-element-preview {
 		flex: 1 1 0;
 		min-width: 0;

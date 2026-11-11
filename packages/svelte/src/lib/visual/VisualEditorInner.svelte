@@ -95,6 +95,8 @@
 		cardTitle,
 		kindTitle,
 		fieldValues,
+		fieldTitle,
+		humanize,
 		bodyEnabled,
 		provenanceMap,
 		resolvedByCardIndex,
@@ -596,7 +598,11 @@
 	}
 	/** What a new card's preview shows: the title its header would, and the start of its body,
 	 *  else its values as words. */
-	function previewOf(item: CardAdd): { title: string; text: string } {
+	function previewOf(item: CardAdd): {
+		title: string;
+		fields: { label: string; value: string }[];
+		text: string;
+	} {
 		const { add } = item;
 		const schema = quill.schema.card_kinds?.[add.kind];
 		const values = fieldValues(add.payloadItems);
@@ -608,13 +614,12 @@
 			typeof named === 'string' ? named : undefined
 		);
 		const words = { on: merged.reviewOn, off: merged.reviewOff };
-		const text =
-			add.body?.text?.trim() ||
-			Object.values(values)
-				.map((v) => reviewText(v, words))
-				.filter(Boolean)
-				.join(' · ');
-		return { title, text };
+		const fields = Object.entries(values).flatMap(([key, v]) => {
+			const value = reviewText(v, words);
+			const field = schema?.fields[key];
+			return value ? [{ label: field ? fieldTitle(key, field) : humanize(key), value }] : [];
+		});
+		return { title, fields, text: add.body?.text?.trim() ?? '' };
 	}
 	setReview(reviewing);
 	span.onEnd(reviewing.dispose);
@@ -2069,9 +2074,6 @@
 				onpointerenter={removal && (() => reviewing.point(removal.id, 'pointer'))}
 				onpointerleave={removal && (() => reviewing.point(undefined, 'pointer'))}
 			>
-				{#if removal}
-					<span class="qm-review-card-tag">{merged.reviewRemoveCard}</span>
-				{/if}
 				<Card
 					bind:this={cardRefs[i]}
 					card={titled(c)}
@@ -2087,6 +2089,7 @@
 					onChange={proseChanged}
 					{onError}
 					{leaves}
+					tag={removal ? merged.reviewRemoveCard : undefined}
 				/>
 			</div>
 			{@render cardsAdded(c.id)}
@@ -2170,6 +2173,14 @@
 						<span class="qm-review-card-add-title">{preview.title}</span>
 						<span class="qm-review-card-tag">{merged.reviewNewCard}</span>
 					</div>
+					{#if preview.fields.length}
+						<dl class="qm-review-card-add-fields">
+							{#each preview.fields as { label, value }, n (n)}
+								<dt>{label}</dt>
+								<dd>{value}</dd>
+							{/each}
+						</dl>
+					{/if}
 					{#if preview.text}<p class="qm-review-card-add-text">{preview.text}</p>{/if}
 				</div>
 			{/each}
@@ -2404,18 +2415,15 @@
 		display: contents;
 	}
 	.qm-review-card-remove.qm-review-on {
-		display: flex;
-		flex-direction: column;
-		gap: var(--_qm-space);
-		padding: var(--_qm-space);
+		display: block;
 		border-radius: var(--_qm-radius);
-		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
 	}
 	.qm-review-card-remove.qm-review-on > :global(.qm-card) {
 		opacity: var(--_qm-opacity-muted);
 	}
 	.qm-review-card-remove.qm-review-lit {
-		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
+		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	}
 	.qm-review-head {
 		display: flex;
@@ -2434,10 +2442,12 @@
 	   tint over the whole control, laid over it so it takes no room and moves nothing. It takes
 	   the box's `::after` whole, over what the arrival wash or a tap floor set there. A member a
 	   proposal takes out is struck where it stands. */
-	:global([data-qm-proposed]) {
+	:global([data-qm-proposed]),
+	:global(.qm-review-added-box :is(.qm-toggle, .qm-tick)) {
 		position: relative;
 	}
-	:global([data-qm-proposed])::after {
+	:global([data-qm-proposed])::after,
+	:global(.qm-review-added-box :is(.qm-toggle, .qm-tick))::after {
 		content: '';
 		position: absolute;
 		inset: 0;
@@ -2450,10 +2460,52 @@
 		pointer-events: none;
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
-	:global([data-qm-proposed-lit])::after {
+	/* The current one takes the review line as a ring as well, as a removed card's mark does. */
+	:global([data-qm-proposed-lit])::after,
+	:global(.qm-review-lit > .qm-review-added-box :is(.qm-toggle, .qm-tick))::after {
 		background: var(--_qm-review-lit);
+		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
 	}
 	:global([data-qm-removes]) {
+		text-decoration: line-through;
+		text-decoration-color: var(--_qm-review-line);
+	}
+	/* A member a proposal would add, drawn as its own control holding the value: each box in it
+	   under the tint, which a box's own fill keeps beneath, and the current one ringed. A switch's
+	   track and a tick's square paint their state over any image, so they take the overlay a
+	   proposed switch does. */
+	:global(.qm-review-added-box) {
+		display: contents;
+		pointer-events: none;
+	}
+	:global(.qm-review-added-box :is(.qm-control-box, .qm-input)) {
+		background-image: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint));
+	}
+	:global(.qm-review-lit > .qm-review-added-box :is(.qm-control-box, .qm-input)) {
+		background-image: linear-gradient(var(--_qm-review-lit), var(--_qm-review-lit));
+		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+	}
+	/* A row a proposal would take out: no tint, which only ever means "would come", but a ring
+	   in the review line laid outside the row so it takes no room, its values dimmed and struck
+	   and its labels left alone. The current one's ring is a step stronger, as a removed card's. */
+	:global([data-qm-removed]) {
+		border-radius: var(--_qm-radius-inner);
+		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+	}
+	:global([data-qm-removed-lit]) {
+		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
+	}
+	:global(
+		[data-qm-removed]
+			:is(
+				.qm-control-box:not(.qm-element-summary),
+				.qm-toggle,
+				.qm-tick,
+				.qm-input,
+				.qm-element-preview
+			)
+	) {
+		opacity: var(--_qm-opacity-muted);
 		text-decoration: line-through;
 		text-decoration-color: var(--_qm-review-line);
 	}
@@ -2463,6 +2515,16 @@
 		}
 		:global([data-qm-proposed-lit])::after {
 			border-style: solid;
+		}
+		:global([data-qm-removed]) {
+			outline: var(--_qm-border-width) dashed Highlight;
+		}
+		:global([data-qm-removed-lit]) {
+			outline-style: solid;
+		}
+		:global(.qm-review-added-box :is(.qm-control-box, .qm-toggle, .qm-tick, .qm-input)) {
+			outline: var(--_qm-border-width) dashed Highlight;
+			outline-offset: calc(-1 * var(--_qm-border-width));
 		}
 	}
 	.qm-review-card-add.qm-review-lit {
@@ -2482,8 +2544,19 @@
 		font-weight: var(--_qm-weight-mid);
 		color: var(--_qm-ink-label);
 	}
-	.qm-review-card-remove > .qm-review-card-tag {
-		padding-inline: var(--_qm-space-2);
+	.qm-review-card-add-fields {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: var(--_qm-space) var(--_qm-space-3);
+		margin: 0;
+		font-size: var(--_qm-text-label);
+	}
+	.qm-review-card-add-fields dt {
+		color: var(--_qm-ink-label);
+	}
+	.qm-review-card-add-fields dd {
+		margin: 0;
+		overflow-wrap: anywhere;
 	}
 	.qm-review-card-add-text {
 		margin: 0;
