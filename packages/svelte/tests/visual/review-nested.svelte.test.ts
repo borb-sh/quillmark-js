@@ -297,3 +297,37 @@ describe('a place inside a closed group', () => {
 		expect(markOf(r.target, 'name')).not.toBeNull();
 	});
 });
+
+describe('a cell of an unticked matrix member', () => {
+	const severity = (doc: Document): ReviewItem[] => [
+		{ id: 'severity', field: `${doc.pathFor('checks')}.figures.severity`, after: 'major' }
+	];
+
+	it('shows the member as Accept would leave it, ticked, and marks the cell', async () => {
+		const r = nested(severity);
+		await settle();
+		expect(r.drawn.at(-1)?.open).toEqual(['severity']);
+		const field = openField(r.target, main, 'checks');
+		const member = field.querySelector<HTMLElement>('[data-qm-prop="figures"]')!;
+		expect(member.querySelector<HTMLInputElement>('.qm-tick-input')!.checked).toBe(true);
+		const mark = markOf(member, 'severity');
+		expect(mark?.closest('[data-qm-prop="severity"]')).not.toBeNull();
+		expect(r.doc.getStored('checks')).not.toHaveProperty('figures');
+		press(r, 'severity', 'accept');
+		expect(texts(r.doc.getStored('checks'))).toMatchObject({ figures: { severity: 'major' } });
+	});
+
+	it('turns the proposal down where the reader unticks the member, writing nothing', async () => {
+		const r = nested(severity);
+		await settle();
+		const field = openField(r.target, main, 'checks');
+		const tick = field.querySelector<HTMLInputElement>('[data-qm-prop="figures"] .qm-tick-input')!;
+		tick.click();
+		flushSync();
+		await settle();
+		expect(r.events.map((e) => [e.id, e.action])).toEqual([['severity', 'dismiss']]);
+		expect(r.doc.getStored('checks')).not.toHaveProperty('figures');
+		expect(tick.checked).toBe(false);
+		expect(r.drawn.at(-1)?.open).toEqual([]);
+	});
+});

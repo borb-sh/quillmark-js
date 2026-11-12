@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A proposal for a cell of an unticked matrix member is drawn.** It was reported open with nothing on the page marking it; the member now shows ticked, as taking the proposal leaves it, with the cell marked under its columns, and unticking the member turns the proposal down.
+
 **A number field's own undo back to its default leaves it unset.** Undoing an edit in a number field back to the default it showed unwritten left the default written, tagged with a reset; it now unsets the field again, as a text field's undo does.
 
 **`VisualEditor` exposes `revealField(field)`.** It opens the group holding a mounted field, scrolls it to the nearest edge of the fold and plays the arrival wash, without focusing it. A host lands on a field this way on a touch screen, where `focusField` raises the on-screen keyboard.
