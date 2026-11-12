@@ -9,7 +9,14 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Diagnostic } from '@quillmark/wasm';
-import { DEFAULT_VISUAL_STRINGS, chord, mergeStrings, diagnosticText } from '$lib/visual/strings';
+import {
+	DEFAULT_VISUAL_STRINGS,
+	chord,
+	keycap,
+	keyshortcut,
+	mergeStrings,
+	diagnosticText
+} from '$lib/visual/strings';
 import type { VisualEditorProps } from '$lib/visual/props';
 import { quill } from '../helpers/fixtures.js';
 import { mountEditor, unmountAll } from '../helpers/surface.svelte.js';
@@ -47,6 +54,26 @@ describe('chord', () => {
 	});
 });
 
+describe('keycap and keyshortcut', () => {
+	it('print a binding as a keycap, a letter in capitals and a named key as its glyph', () => {
+		expect(keycap('Mod-b', 'MacIntel')).toBe('⌘B');
+		expect(keycap('Mod-b', 'Win32')).toBe('Ctrl+B');
+		expect(keycap('Mod-Shift-x', 'MacIntel')).toBe('⇧⌘X');
+		expect(keycap('Mod-Shift-x', 'Win32')).toBe('Ctrl+Shift+X');
+		expect(keycap('Alt-ArrowUp', 'MacIntel')).toBe('⌥↑');
+		expect(keycap('Alt-ArrowUp', 'Win32')).toBe('Alt+↑');
+		expect(keycap('Alt-F10', 'Win32')).toBe('Alt+F10');
+	});
+
+	it('spell the same binding for `aria-keyshortcuts`, Mod as the platform binds it', () => {
+		expect(keyshortcut('Mod-b', 'MacIntel')).toBe('Meta+B');
+		expect(keyshortcut('Mod-b', 'Win32')).toBe('Control+B');
+		expect(keyshortcut('Mod-Shift-7', 'Win32')).toBe('Control+Shift+7');
+		expect(keyshortcut('Alt-ArrowUp', 'MacIntel')).toBe('Alt+ArrowUp');
+		expect(keyshortcut('Alt-F10', 'MacIntel')).toBe('Alt+F10');
+	});
+});
+
 describe('strings on the mounted surface', () => {
 	it('renders an overridden accessible name and leaves the rest English', () => {
 		const { target } = open({
@@ -64,8 +91,10 @@ describe('strings on the mounted surface', () => {
 		expect(append?.textContent).toBe('+ Ajouter une carte');
 
 		// An untouched key still reads the package's English on the same surface.
-		const titles = [...target.querySelectorAll('[title]')].map((el) => el.getAttribute('title'));
-		expect(titles).toContain(DEFAULT_VISUAL_STRINGS.cardMoveUp);
+		const tips = [...target.querySelectorAll('[data-qm-tip]')].map((el) =>
+			el.getAttribute('data-qm-tip')
+		);
+		expect(tips).toContain(DEFAULT_VISUAL_STRINGS.cardMoveUp);
 	});
 
 	it('draws the `+` on an add control itself, the string being its words and its name', () => {
@@ -91,7 +120,7 @@ describe('strings on the mounted surface', () => {
 		expect(controls.map((b) => b.getAttribute('aria-label'))).toEqual(
 			[S.cardMoveUp, S.cardMoveDown, S.cardDelete].map((a) => S.cardAction(a, name))
 		);
-		expect(controls.map((b) => b.getAttribute('title'))).toEqual([
+		expect(controls.map((b) => b.getAttribute('data-qm-tip'))).toEqual([
 			S.cardMoveUp,
 			S.cardMoveDown,
 			S.cardDelete

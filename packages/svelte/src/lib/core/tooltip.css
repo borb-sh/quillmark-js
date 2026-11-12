@@ -1,0 +1,49 @@
+/* The tip a glyph control raises (`core/tooltip.ts`), which imports this sheet, so the
+   editor's chrome and a leaf mounted on its own draw the same one.
+
+   A floating surface, so it takes the stroke and the lift a surface with no plane under
+   it stands on (INVARIANTS §Styling), on the raised rung and opaque: it is a word or two
+   over glyphs, and nothing behind it is worth reading through. One rung in from a
+   control's own corner and at the label size, so it reads as a note on a control and
+   never as one more control.
+
+   Placed in the root it is appended to, over every other floating surface, the format
+   bar and the table island's clusters being where half its controls stand. It takes no
+   pointer: a tip between the pointer and the next control would be a tip in the way.
+
+   It arrives by a fade and leaves at once. A scale would move a surface this small more
+   than it shows it, and a tip is lowered by the press or the key that makes it stale. A
+   tip that follows another along a row of controls does not arrive again. */
+:where(.qm-tip) {
+	position: absolute;
+	z-index: 4;
+	display: flex;
+	gap: var(--_qm-space-2);
+	width: max-content;
+	padding: var(--_qm-space-half) var(--_qm-space-2);
+	border: var(--_qm-border-width) solid var(--_qm-border);
+	border-radius: var(--_qm-radius-inner);
+	background: var(--_qm-surface-raised);
+	box-shadow: var(--_qm-lift);
+	font-family: var(--_qm-font);
+	font-size: var(--_qm-text-label);
+	line-height: var(--_qm-leading-tight);
+	color: var(--_qm-ink);
+	white-space: nowrap;
+	pointer-events: none;
+	user-select: none;
+}
+:where(.qm-tip[data-arriving]) {
+	animation: qm-tip-in var(--_qm-duration-fast) var(--_qm-ease-reverse);
+}
+/* The shortcut, a step off the name it follows: the name is what the control is, the
+   keys a way to it. */
+:where(.qm-tip kbd) {
+	font: inherit;
+	color: var(--_qm-ink-label);
+}
+@keyframes qm-tip-in {
+	from {
+		opacity: 0;
+	}
+}

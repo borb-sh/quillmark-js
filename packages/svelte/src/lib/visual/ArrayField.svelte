@@ -89,7 +89,7 @@
 -->
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
-	import { wording } from './strings.js';
+	import { keycap, wording } from './strings.js';
 	import { structuralUndo } from './undo.svelte.js';
 
 	// The surface's words, ambient from the editor root; the package's English
@@ -1312,7 +1312,7 @@
 	<button
 		type="button"
 		class="qm-icon-btn qm-row-btn qm-remove qm-focus-ring"
-		title={t.strings.arrayRemove}
+		data-qm-tip={t.strings.arrayRemove}
 		aria-label={rowAction(t.strings.arrayRemove, k)}
 		aria-keyshortcuts={control === 'object' && !table ? undefined : 'Alt+ArrowUp Alt+ArrowDown'}
 		tabindex={stop ? undefined : -1}
@@ -1329,7 +1329,8 @@
 	<span
 		class="qm-row-handle"
 		aria-hidden="true"
-		title={t.strings.arrayDrag}
+		data-qm-tip={t.strings.arrayDrag}
+		data-qm-tip-keys={keycap('Alt-↑/↓')}
 		onpointerdown={(e) => drag.down(e, k)}
 		onpointermove={drag.move}
 		onpointerup={drag.up}

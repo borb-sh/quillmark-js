@@ -44,6 +44,7 @@
 	import { bloom } from '../core/bloom.js';
 	import { createLifespan } from '../core/teardown.js';
 	import { spacePx } from '../core/rungs.js';
+	import { tooltips } from '../core/tooltip.js';
 	import type {
 		Addr,
 		CardAddr,
@@ -2028,6 +2029,7 @@
 	{style}
 	data-qm-root
 	bind:this={rootEl}
+	{@attach tooltips}
 	onkeydowncapture={onTyped}
 	onpointerdowncapture={onPick}
 	onkeydown={raiseGuidance}

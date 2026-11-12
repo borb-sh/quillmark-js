@@ -74,7 +74,7 @@
 -->
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { wording } from './strings.js';
+	import { keycap, keyshortcut, wording } from './strings.js';
 
 	// The surface's words, ambient from the editor root; the package's English
 	// off-tree, so this component renders standalone too.
@@ -89,6 +89,7 @@
 	import type { IconName } from './icons/nodes.js';
 	import {
 		FIELD_KEYS,
+		LIST_KEYS,
 		hasMarks,
 		rangeAnchor,
 		toggleList,
@@ -113,19 +114,41 @@
 
 	const SETTLE_MS = 450;
 	/** The six content formatting marks. `anchor` is withheld: it draws nothing until
-	 *  comments do. One string per mark carries both the tooltip and the accessible name. */
-	const MARKS: { name: string; icon: IconName; title: string }[] = $derived([
-		{ name: 'strong', icon: 'bold', title: t.strings.formatBold },
-		{ name: 'em', icon: 'italic', title: t.strings.formatEmphasis },
-		{ name: 'underline', icon: 'underline', title: t.strings.formatUnderline },
-		{ name: 'strike', icon: 'strikethrough', title: t.strings.formatStrikethrough },
-		{ name: 'code', icon: 'code', title: t.strings.formatCode },
-		{ name: 'link', icon: 'link', title: t.strings.formatLink }
+	 *  comments do. A mark's string is its name, to assistive tech and in its tip
+	 *  (`core/tooltip.ts`); its shortcut is read off the binding, drawn in the tip and
+	 *  stated as `aria-keyshortcuts`, so the name is never the chord too. */
+	const MARKS: { name: string; icon: IconName; label: string; keys: string }[] = $derived([
+		{ name: 'strong', icon: 'bold', label: t.strings.formatBold, keys: FIELD_KEYS.bold },
+		{ name: 'em', icon: 'italic', label: t.strings.formatEmphasis, keys: FIELD_KEYS.italic },
+		{
+			name: 'underline',
+			icon: 'underline',
+			label: t.strings.formatUnderline,
+			keys: FIELD_KEYS.underline
+		},
+		{
+			name: 'strike',
+			icon: 'strikethrough',
+			label: t.strings.formatStrikethrough,
+			keys: FIELD_KEYS.strike
+		},
+		{ name: 'code', icon: 'code', label: t.strings.formatCode, keys: FIELD_KEYS.code },
+		{ name: 'link', icon: 'link', label: t.strings.formatLink, keys: FIELD_KEYS.link }
 	]);
 
-	const LISTS: { ordered: boolean; icon: IconName; title: string }[] = $derived([
-		{ ordered: true, icon: 'list-ordered', title: t.strings.formatNumberedList },
-		{ ordered: false, icon: 'list', title: t.strings.formatBulletedList }
+	const LISTS: { ordered: boolean; icon: IconName; label: string; keys: string }[] = $derived([
+		{
+			ordered: true,
+			icon: 'list-ordered',
+			label: t.strings.formatNumberedList,
+			keys: LIST_KEYS.numbered
+		},
+		{
+			ordered: false,
+			icon: 'list',
+			label: t.strings.formatBulletedList,
+			keys: LIST_KEYS.bulleted
+		}
 	]);
 
 	let open = $state(false);
@@ -519,7 +542,9 @@
 			 floating-ui's positioning box: spread, never styled. `inert` is the half
 			 of the dismissal the recipe cannot carry: the surface is still on screen
 			 for the length of the fade, and a surface on its way out is not a thing
-			 to click, tab into, or read. -->
+			 to click, tab into, or read. `data-qm-tip-side` is the side the surface
+			 landed on, so a button's tip (`core/tooltip.ts`) clears the whole surface
+			 on the side away from the selection. -->
 			{#snippet child({ props, wrapperProps, open: raised })}
 				<div {...wrapperProps}>
 					<div
@@ -527,6 +552,7 @@
 						{...props}
 						class="qm-format-popover qm-popover-surface"
 						data-qm-root
+						data-qm-tip-side={props['data-side']}
 						inert={!raised}
 						onkeydown={onBarKeyDown}
 						onfocusout={onBarFocusOut}
@@ -577,14 +603,16 @@
 								class="qm-format-buttons"
 								role="group"
 								aria-label={t.strings.formatGroup}
-								aria-keyshortcuts={FIELD_KEYS.formatBar.replaceAll('-', '+')}
+								aria-keyshortcuts={keyshortcut(FIELD_KEYS.formatBar)}
 							>
 								{#each MARKS as m (m.name)}
 									<button
 										type="button"
 										class="qm-icon-btn qm-mark-btn qm-focus-ring"
-										title={m.title}
-										aria-label={m.title}
+										data-qm-tip={m.label}
+										data-qm-tip-keys={keycap(m.keys)}
+										aria-label={m.label}
+										aria-keyshortcuts={keyshortcut(m.keys)}
 										onmousedown={keepFocus}
 										onclick={() => toggle(m.name)}><Icon name={m.icon} /></button
 									>
@@ -593,7 +621,6 @@
 									<span class="qm-format-divider" aria-hidden="true"></span>
 									<select
 										class="qm-font-select qm-focus-ring"
-										title={t.strings.formatFont}
 										aria-label={t.strings.formatFont}
 										value={family ?? MIXED}
 										onchange={(e) => pickFamily(e.currentTarget.value)}
@@ -613,8 +640,10 @@
 										<button
 											type="button"
 											class="qm-icon-btn qm-mark-btn qm-focus-ring"
-											title={l.title}
-											aria-label={l.title}
+											data-qm-tip={l.label}
+											data-qm-tip-keys={keycap(l.keys)}
+											aria-label={l.label}
+											aria-keyshortcuts={keyshortcut(l.keys)}
 											onmousedown={keepFocus}
 											onclick={() => toggleLines(l.ordered)}><Icon name={l.icon} /></button
 										>

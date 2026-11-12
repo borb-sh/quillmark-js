@@ -34,6 +34,7 @@ import type {
 	Quill
 } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
+import { tooltips } from '../tooltip.js';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
 import { decode, fitsLeaf } from './decode.js';
@@ -635,6 +636,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const lineBox = Number.parseFloat(getComputedStyle(container).lineHeight);
 	const clearance = Number.isFinite(lineBox) ? lineBox : undefined;
 
+	// An island's chrome names itself by tip, and a leaf mounted outside the editor has no shell
+	// that serves them.
+	const root = block ? container.closest<HTMLElement>('[data-qm-root]') : null;
+	const releaseTips = root ? tooltips(root) : undefined;
+
 	// Prepended, so what the caller draws inside `container` (a held leaf's note)
 	// follows the text it is about.
 	view = new EditorView((dom) => container.prepend(dom), {
@@ -1120,6 +1126,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			};
 		},
 		destroy(): void {
+			releaseTips?.();
 			view.destroy();
 		}
 	};

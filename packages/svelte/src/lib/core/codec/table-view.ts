@@ -218,12 +218,13 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 /**
  * A band button. It swallows its own `mousedown` (prosemirror-menu's trick) so the browser does not
- * focus it and blur the cell whose caret the op is measured against.
+ * focus it and blur the cell whose caret the op is measured against. Its label is its accessible
+ * name and, the button drawing a glyph or nothing, its tip (`core/tooltip.ts`).
  */
 function chromeButton(className: string, label: string, run: () => void): HTMLButtonElement {
 	const btn = el('button', className);
 	btn.type = 'button';
-	btn.title = label;
+	btn.setAttribute('data-qm-tip', label);
 	btn.setAttribute('aria-label', label);
 	btn.addEventListener('mousedown', (e) => e.preventDefault());
 	btn.addEventListener('click', (e) => {
@@ -1621,6 +1622,7 @@ class TableIslandView implements NodeView {
 		const cluster = el('div', 'qm-table-align');
 		cluster.setAttribute('role', 'group');
 		cluster.setAttribute('aria-label', s.tableColumn(c + 1));
+		cluster.setAttribute('data-qm-tip-side', 'bottom');
 		cluster.hidden = true;
 		// The cluster's own edge is no button, and a press on it would otherwise take the
 		// focus off the caret the write lands back on.
@@ -1649,6 +1651,7 @@ class TableIslandView implements NodeView {
 	private headerToggle(header: boolean, s: TableChromeStrings): HTMLElement {
 		const cluster = el('div', 'qm-table-align');
 		cluster.setAttribute('data-header', '');
+		cluster.setAttribute('data-qm-tip-side', 'bottom');
 		cluster.hidden = true;
 		cluster.addEventListener('mousedown', (e) => e.preventDefault());
 		const btn = chromeButton('qm-table-align-option', s.tableHeaderToggle, () => {
@@ -1680,6 +1683,8 @@ class TableIslandView implements NodeView {
 			const btn = chromeButton('qm-table-cells-option', label, run);
 			btn.tabIndex = -1;
 			btn.textContent = label;
+			// The label is drawn, and a tip would say it twice.
+			btn.removeAttribute('data-qm-tip');
 			cluster.appendChild(btn);
 		}
 		return cluster;
@@ -1700,6 +1705,7 @@ class TableIslandView implements NodeView {
 			else this.write(insertColumn(props, columnCount(props) - 1), { r: 0, c: columnCount(props) });
 		});
 		btn.setAttribute('data-axis', axis);
+		if (axis === 'row') btn.setAttribute('data-qm-tip-side', 'bottom');
 		btn.tabIndex = -1;
 		btn.appendChild(el('span', 'qm-table-add-bar'));
 		return btn;

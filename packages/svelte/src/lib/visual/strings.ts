@@ -107,8 +107,8 @@ export interface VisualStrings
 	/** A list's add chip: its words after the `+` the chip draws, and its accessible name. */
 	arrayAdd: string;
 	arrayRemove: string;
-	/** The drag handle on an `object` row: its tooltip, which names the keys that move
-	 *  the row too. */
+	/** The drag handle on an `object` row: its tooltip, which draws the keys that move the
+	 *  row beside it. */
 	arrayDrag: string;
 	/** What a list's standing row ghosts, the row that is not an element yet: the words
 	 *  say what typing there does. */
@@ -201,6 +201,9 @@ export interface VisualStrings
 
 	// ── Formatting popover ────────────────────────────────────────────────────
 	formatGroup: string;
+	/** A mark or list button's name: its accessible name and its tooltip. The name alone:
+	 *  the button's shortcut is read off its binding, drawn beside the name in the tooltip
+	 *  and stated to assistive tech as `aria-keyshortcuts`. */
 	formatBold: string;
 	formatEmphasis: string;
 	formatUnderline: string;
@@ -216,11 +219,8 @@ export interface VisualStrings
 	fontDefault: string;
 	/** What the picker reads over a selection setting more than one family. */
 	fontMixed: string;
-	/** The anchor button's accessible name. The popover withholds the button, so
-	 *  nothing draws this or the title below. */
+	/** The anchor button's name. The popover withholds the button, so nothing draws this. */
 	formatAnchor: string;
-	/** Its hover title, which says what an anchor is; the name above only says what. */
-	formatAnchorTitle: string;
 	/** The link prompt's address input: its accessible name. */
 	linkAddress: string;
 	linkPlaceholder: string;
@@ -290,28 +290,72 @@ export interface VisualStrings
  */
 export type FormatDiagnostic = (d: Diagnostic) => string | undefined;
 
-/**
- * A `Mod` chord as the writer's platform prints it: `⌘B` on Apple's, `Ctrl+B`
- * elsewhere, and `Shift-7` as `⇧⌘7` or `Ctrl+Shift+7`. The platform test is the one
- * `prosemirror-keymap` resolves `Mod` by, so a tooltip names the chord the keymap binds.
- */
-export function chord(
-	key: string,
-	platform = typeof navigator === 'undefined' ? '' : navigator.platform
-): string {
-	const shift = key.startsWith('Shift-');
-	const bare = shift ? key.slice('Shift-'.length) : key;
-	if (/Mac|iP(hone|[oa]d)/.test(platform)) return `${shift ? '⇧' : ''}⌘${bare}`;
-	return `Ctrl+${shift ? 'Shift+' : ''}${bare}`;
+/** The platform test `prosemirror-keymap` resolves `Mod` by, so what is printed is what
+ *  the keymap binds. */
+const APPLE = /Mac|iP(hone|[oa]d)/;
+const platformHere = (): string => (typeof navigator === 'undefined' ? '' : navigator.platform);
+
+/** A binding in `prosemirror-keymap` notation, apart: its modifiers and its key, a letter
+ *  in capitals as a keycap and `aria-keyshortcuts` both spell it. */
+function parseBinding(binding: string): { mods: Set<string>; key: string } {
+	const parts = binding.split('-');
+	const key = parts.pop() ?? '';
+	return { mods: new Set(parts), key: /^[a-z]$/.test(key) ? key.toUpperCase() : key };
 }
 
-/** An `Alt` chord as the writer's platform prints it: `⌥↑` on Apple's, `Alt+↑` elsewhere,
- *  on the test {@link chord} reads. */
-export function alt(
-	key: string,
-	platform = typeof navigator === 'undefined' ? '' : navigator.platform
-): string {
-	return /Mac|iP(hone|[oa]d)/.test(platform) ? `⌥${key}` : `Alt+${key}`;
+/** What a named key prints as. */
+const KEY_GLYPH: Readonly<Record<string, string>> = {
+	ArrowUp: '↑',
+	ArrowDown: '↓',
+	ArrowLeft: '←',
+	ArrowRight: '→',
+	Enter: '↵'
+};
+/** Apple's marks for the modifiers, in the order its menus print them. */
+const APPLE_MODS: readonly (readonly [string, string])[] = [
+	['Ctrl', '⌃'],
+	['Alt', '⌥'],
+	['Shift', '⇧'],
+	['Mod', '⌘']
+];
+
+/**
+ * A binding as the writer's platform prints it, for the hint beside a control's name:
+ * `Mod-b` is `⌘B` on Apple's and `Ctrl+B` elsewhere, `Mod-Shift-7` is `⇧⌘7` or
+ * `Ctrl+Shift+7`, `Alt-ArrowUp` is `⌥↑` or `Alt+↑`.
+ */
+export function keycap(binding: string, platform = platformHere()): string {
+	const { mods, key } = parseBinding(binding);
+	const cap = KEY_GLYPH[key] ?? key;
+	if (APPLE.test(platform))
+		return APPLE_MODS.map(([mod, mark]) => (mods.has(mod) ? mark : '')).join('') + cap;
+	const names = [
+		mods.has('Mod') || mods.has('Ctrl') ? 'Ctrl' : '',
+		mods.has('Alt') ? 'Alt' : '',
+		mods.has('Shift') ? 'Shift' : ''
+	];
+	return [...names.filter(Boolean), cap].join('+');
+}
+
+/**
+ * The same binding as `aria-keyshortcuts` spells it, which is where a control states its
+ * shortcut to assistive tech, its name staying its name: `Mod-b` is `Meta+B` on Apple's
+ * and `Control+B` elsewhere.
+ */
+export function keyshortcut(binding: string, platform = platformHere()): string {
+	const { mods, key } = parseBinding(binding);
+	const names = [
+		mods.has('Mod') ? (APPLE.test(platform) ? 'Meta' : 'Control') : '',
+		mods.has('Ctrl') ? 'Control' : '',
+		mods.has('Alt') ? 'Alt' : '',
+		mods.has('Shift') ? 'Shift' : ''
+	];
+	return [...names.filter(Boolean), key].join('+');
+}
+
+/** A `Mod` chord over a key already printed, as {@link keycap} prints it: `⌘↵`, `Ctrl+.`. */
+export function chord(key: string, platform = platformHere()): string {
+	return keycap(`Mod-${key}`, platform);
 }
 
 /** How many fields `diagAnnounced` names before it counts the rest, so a host's batch over
@@ -349,7 +393,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	addCard: 'Add card',
 	arrayAdd: 'Add',
 	arrayRemove: 'Remove',
-	arrayDrag: `Drag to move (${alt('↑/↓')})`,
+	arrayDrag: 'Drag to move',
 	arrayStanding: 'Add an item…',
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
@@ -392,19 +436,18 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	proseHeld: "This field has formatting it can't edit here. It is kept as it is.",
 	fieldGuidance: (label) => `${label} guidance`,
 	formatGroup: 'Formatting',
-	formatBold: `Bold (${chord('B')})`,
-	formatEmphasis: `Italic (${chord('I')})`,
-	formatUnderline: `Underline (${chord('U')})`,
-	formatStrikethrough: `Strikethrough (${chord('Shift-X')})`,
-	formatCode: `Code (${chord('E')})`,
-	formatLink: `Link (${chord('K')})`,
-	formatNumberedList: `Numbered list (${chord('Shift-7')})`,
-	formatBulletedList: `Bulleted list (${chord('Shift-8')})`,
+	formatBold: 'Bold',
+	formatEmphasis: 'Italic',
+	formatUnderline: 'Underline',
+	formatStrikethrough: 'Strikethrough',
+	formatCode: 'Code',
+	formatLink: 'Link',
+	formatNumberedList: 'Numbered list',
+	formatBulletedList: 'Bulleted list',
 	formatFont: 'Font',
 	fontDefault: 'Default font',
 	fontMixed: 'Mixed fonts',
 	formatAnchor: 'Anchor',
-	formatAnchorTitle: 'Anchor — an identity handle over the selection',
 	linkAddress: 'Link address',
 	linkPlaceholder: 'https://…',
 	linkApply: 'Apply',

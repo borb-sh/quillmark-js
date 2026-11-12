@@ -178,9 +178,9 @@ main:
 		const mounted = mountEditor(q, doc);
 		const t = table(mounted.target);
 		const first = t.querySelector<HTMLElement>('.qm-array-table-row')!;
-		expect([...first.querySelectorAll('.qm-row-btn')].map((b) => b.getAttribute('title'))).toEqual([
-			'Remove'
-		]);
+		expect(
+			[...first.querySelectorAll('.qm-row-btn')].map((b) => b.getAttribute('data-qm-tip'))
+		).toEqual(['Remove']);
 		// Named with the row it acts on; the action alone is the tooltip.
 		expect(first.querySelector('.qm-row-btn')?.getAttribute('aria-label')).toBe(
 			'Remove Contributors 1'
