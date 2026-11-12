@@ -26,9 +26,11 @@ import {
 	type CardProposal,
 	type DeepReview,
 	type FieldProposal,
+	type ReviewDrawn,
 	type ReviewItem,
 	type ReviewUndrawn
 } from './review.js';
+import { orderOf, type CardLayout } from './review-order.js';
 
 /** How long the pointer rests on an item before it is current, in ms. */
 export const DWELL_MS = 160;
@@ -57,6 +59,10 @@ export interface Review {
 	readonly fieldUndrawn: readonly { id: string; reason: ReviewUndrawn }[];
 	/** The field proposals whose field no longer holds the value their `before` says was read. */
 	readonly fieldOutdated: ReadonlySet<string>;
+	/** The open items drawn, in the page's order. */
+	readonly order: readonly string[];
+	/** What the editor draws of the host's list, and why it draws what it does not. */
+	readonly report: ReviewDrawn;
 	/** The current item: open, drawn, and what the answer card and the review keys answer. */
 	readonly lit: string | undefined;
 	/** Where the open card items draw. */
@@ -124,6 +130,8 @@ export interface ReviewSource {
 		key?: string,
 		write?: { value: unknown }
 	): boolean;
+	/** The main card, then each card of the stack, each with its leaves as it draws them. */
+	layout(): readonly CardLayout[];
 	/** The session keys of the cards as they stood when the list was set, by index. */
 	listedCards(): readonly string[];
 	/** The session keys of the cards as they stand. */
@@ -276,6 +284,52 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		return [...placed.undrawn, ...applied.map(([id]) => ({ id, reason: 'applied' as const }))];
 	});
 
+	/** The open items drawn, in the page's order; one whose leaf no card lays out, last, in the
+	 *  list's order. */
+	const order = $derived.by(() => {
+		const undrawn = new Set(undrawnFields.map((u) => u.id));
+		const out = orderOf({
+			layout: source.layout(),
+			adds: cards.adds,
+			removes: cards.removes,
+			at: (key) => fields.get(key) ?? {},
+			reports: drawn,
+			undrawn
+		});
+		const placed = new Set(out);
+		const reported = new Set<string>();
+		for (const report of drawn.values()) for (const id of report.ids) reported.add(id);
+		for (const item of items) {
+			if (placed.has(item.id) || byCard(item)) continue;
+			if (onField(item) ? !undrawn.has(item.id) : reported.has(item.id)) out.push(item.id);
+		}
+		return out;
+	});
+	const report = $derived.by((): ReviewDrawn => {
+		const reported = new Set<string>();
+		const stale = new Set(outdated);
+		const why = new Map<string, ReviewUndrawn>();
+		for (const leaf of drawn.values()) {
+			for (const id of leaf.ids) reported.add(id);
+			for (const id of leaf.outdated) stale.add(id);
+			for (const { id, reason } of leaf.undrawn) {
+				reported.add(id);
+				why.set(id, reason);
+			}
+		}
+		for (const { id, reason } of undrawnFields) why.set(id, reason);
+		for (const item of items)
+			if (!reported.has(item.id) && !why.has(item.id) && byBlocks(item)) why.set(item.id, 'block');
+		return {
+			open: order,
+			outdated: order.filter((id) => stale.has(id)),
+			undrawn: items.flatMap((item) => {
+				const reason = why.get(item.id);
+				return reason ? [{ id: item.id, reason }] : [];
+			})
+		};
+	});
+
 	let current = $state<string | undefined>();
 	let dwell: ReturnType<typeof setTimeout> | undefined;
 	let overCard = false;
@@ -306,6 +360,12 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		},
 		get fieldOutdated() {
 			return outdated;
+		},
+		get order() {
+			return order;
+		},
+		get report() {
+			return report;
 		},
 		get lit() {
 			return lit;
@@ -408,6 +468,8 @@ const NO_REVIEW: Review = {
 	reports: new Map(),
 	fieldUndrawn: [],
 	fieldOutdated: new Set(),
+	order: [],
+	report: { open: [], outdated: [], undrawn: [] },
 	lit: undefined,
 	cards: { adds: new Map(), removes: new Map() },
 	wrote() {},

@@ -85,7 +85,8 @@ export type LeafUndrawn = 'parse' | 'taken' | 'applied' | 'block';
 
 /** What a leaf draws of the items it was handed. */
 export interface ReviewReport {
-	/** The ids drawn, in the order the items were listed. */
+	/** The ids drawn, in the leaf's order: what is added ahead of the first block, then each
+	 *  block's rewrite ahead of what is added after it. */
 	ids: readonly string[];
 	/** The drawn proposals the reader's own writing meets: words both changed, or a block one
 	 *  names gone or no longer the block it read. */
@@ -274,6 +275,8 @@ function tail(doc: PMNode, from: number): PMNode[] {
 interface Span {
 	id: string;
 	adds?: boolean;
+	/** Whether it adds ahead of the leaf's first block. */
+	ahead?: boolean;
 	from: number;
 	to: number;
 }
@@ -845,6 +848,7 @@ function draw(state: EditorState, channel: ReviewChannel, bases: Bases): Drawn {
 		spans.push({
 			id: item.id,
 			adds: !covered.length,
+			ahead,
 			from: reach(covered[0] ?? last)[0],
 			to: reach(last)[1]
 		});
@@ -971,7 +975,9 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	/** Tell the channel what the leaf draws, where that moved. */
 	const report = (state: EditorState): void => {
 		const { spans, outdated, undrawn } = drawn(state);
-		const next: ReviewReport = { ids: spans.map((s) => s.id), outdated, undrawn };
+		const turn = (s: Span): number => (s.ahead ? 0 : s.adds ? 2 : 1);
+		const placed = [...spans].sort((a, b) => a.from - b.from || turn(a) - turn(b));
+		const next: ReviewReport = { ids: placed.map((s) => s.id), outdated, undrawn };
 		const joined = JSON.stringify(next);
 		if (joined === reported) return;
 		reported = joined;

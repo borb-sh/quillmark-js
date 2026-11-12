@@ -31,6 +31,7 @@ function store(
 		leafFor: (path) => path,
 		valueAt: () => undefined,
 		nested: () => undefined,
+		layout: () => [{ key: 'main', leaves: [{ key: 'main.title' }, { key: 'main.body' }] }],
 		listedCards: () => cards.listed,
 		liveCards: () => live,
 		answer(id, _item, action) {
@@ -193,5 +194,24 @@ describe('an answer', () => {
 		const { review } = store(true);
 		review.act('proposal', 'dismiss');
 		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['first', 'proposal']);
+	});
+});
+
+describe('the report', () => {
+	// The title's field holds nothing here, so its proposal's `before` is not what it holds.
+	it('lists the open items in the page’s order, with no editor mounted', () => {
+		const { review } = store();
+		expect(review.order).toEqual(['title', 'first', 'proposal']);
+		expect(review.report).toEqual({ open: review.order, outdated: ['title'], undrawn: [] });
+	});
+
+	it('says why an item no leaf reports draws nothing', () => {
+		const { review } = store();
+		review.drew('main.body', { ids: ['first'], outdated: ['first'], undrawn: [] });
+		expect(review.report).toEqual({
+			open: ['title', 'first'],
+			outdated: ['title', 'first'],
+			undrawn: [{ id: 'proposal', reason: 'block' }]
+		});
 	});
 });

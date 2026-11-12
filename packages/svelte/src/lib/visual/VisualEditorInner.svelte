@@ -78,6 +78,7 @@
 		type ReviewProjection
 	} from './review.js';
 	import ReviewCard from './ReviewCard.svelte';
+	import { cardLayout } from './review-order.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import {
 		REVIEW_KEYS,
@@ -388,6 +389,7 @@
 			return card?.values[key.field];
 		},
 		leafFor: proseKeyFor,
+		layout: () => [cardLayout(model.main), ...model.cards.map(cardLayout)],
 		listedCards: () => cardsListed(),
 		liveCards: () => cardIds,
 		answered(id, current) {
@@ -633,56 +635,6 @@
 		typing = false;
 		onReviewFocus?.(id);
 	});
-	/** The open items drawn, in document order: each id's first element under the root, then
-	 *  any drawn one not yet in the DOM, in list order. */
-	function reviewOrder(): string[] {
-		const fieldUndrawn = new Set(reviewing.fieldUndrawn.map((u) => u.id));
-		const drawn = new Set<string>();
-		for (const report of reviewing.reports.values()) for (const id of report.ids) drawn.add(id);
-		for (const item of reviewing.items)
-			if (onField(item) && !fieldUndrawn.has(item.id)) drawn.add(item.id);
-		for (const list of reviewing.cards.adds.values()) for (const item of list) drawn.add(item.id);
-		for (const item of reviewing.cards.removes.values()) drawn.add(item.id);
-		const order: string[] = [];
-		const seen = new Set<string>();
-		const take = (id: string | null): void => {
-			if (id === null || !drawn.has(id) || seen.has(id)) return;
-			seen.add(id);
-			order.push(id);
-		};
-		for (const el of rootEl?.querySelectorAll('[data-qm-review]') ?? [])
-			for (const id of reviewIds(el)) take(id);
-		for (const item of reviewing.items) take(item.id);
-		return order;
-	}
-	/** What the editor draws of the host's list, and why it draws what it does not. */
-	function reviewReport(): ReviewDrawn {
-		const reported = new Set<string>();
-		const outdated = new Set(reviewing.fieldOutdated);
-		const why = new Map<string, ReviewDrawn['undrawn'][number]['reason']>();
-		for (const report of reviewing.reports.values()) {
-			for (const id of report.ids) reported.add(id);
-			for (const id of report.outdated) outdated.add(id);
-			for (const { id, reason } of report.undrawn) {
-				reported.add(id);
-				why.set(id, reason);
-			}
-		}
-		for (const { id, reason } of reviewing.fieldUndrawn) why.set(id, reason);
-		for (const item of reviewing.items)
-			if (!reported.has(item.id) && !why.has(item.id)) {
-				if (byBlocks(item)) why.set(item.id, 'block');
-			}
-		const open = reviewOrder();
-		return {
-			open,
-			outdated: open.filter((id) => outdated.has(id)),
-			undrawn: reviewing.items.flatMap((item) => {
-				const reason = why.get(item.id);
-				return reason ? [{ id: item.id, reason }] : [];
-			})
-		};
-	}
 	// The report, to a host counting its own list: each change, read once the leaves the change
 	// mounted have drawn, so a list just handed over is not reported as anchored nowhere. A
 	// review starts on its first change, and goes on to the first open one wherever the current
@@ -692,15 +644,11 @@
 	let drewOrder = $state.raw<readonly string[]>([]);
 	let drewOutdated = $state.raw<readonly string[]>([]);
 	$effect(() => {
-		void reviewing.items;
-		void reviewing.fieldUndrawn;
-		void reviewing.cards;
-		for (const id of reviewing.fieldOutdated) void id;
-		for (const report of reviewing.reports.values()) void report;
+		void reviewing.report;
 		let live = true;
 		void tick().then(() => {
 			if (!live || !span.alive) return;
-			const report = reviewReport();
+			const report = reviewing.report;
 			drewOrder = report.open;
 			drewOutdated = report.outdated;
 			if (reviewing.lit === undefined && report.open.length) reviewing.reveal(report.open[0]);
@@ -736,7 +684,7 @@
 	let stepped: { id: string; index: number } | undefined;
 	async function step(dir: 1 | -1, focus: boolean): Promise<string | undefined> {
 		if (!span.alive) return undefined;
-		const order = reviewOrder();
+		const order = reviewing.order;
 		if (!order.length) return undefined;
 		const at = order.indexOf(reviewing.lit ?? stepped?.id ?? '');
 		const next =
@@ -1732,9 +1680,9 @@
 		action: 'accept' | 'dismiss'
 	): string[] {
 		if (!span.alive) return [];
-		const order = reviewOrder();
+		const order = reviewing.order;
 		// Accepting every item leaves the outdated ones open: each would write over the reader.
-		const outdated = new Set(ids === 'all' && action === 'accept' ? reviewReport().outdated : []);
+		const outdated = new Set(ids === 'all' && action === 'accept' ? reviewing.report.outdated : []);
 		const asked =
 			ids === 'all'
 				? order.filter((id) => !outdated.has(id))
@@ -1780,7 +1728,7 @@
 	 */
 	export function projectReview(target: Document): ReviewProjection {
 		if (!span.alive) return NO_PROJECTION;
-		const order = reviewOrder();
+		const order = reviewing.order;
 		if (!order.length) return NO_PROJECTION;
 		const open = new Set(order);
 		const byId = new Map(reviewing.items.map((item) => [item.id, item]));
