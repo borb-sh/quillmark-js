@@ -7,6 +7,7 @@
 **A number field's own undo back to its default leaves it unset.** Undoing an edit in a number field back to the default it showed unwritten left the default written, tagged with a reset; it now unsets the field again, as a text field's undo does.
 
 **`VisualEditor` exposes `revealField(field)`.** It opens the group holding a mounted field, scrolls it to the nearest edge of the fold and plays the arrival wash, without focusing it. A host lands on a field this way on a touch screen, where `focusField` raises the on-screen keyboard.
+
 **A review's order no longer waits for the page.** `onReviewDrawn`'s `open`, `stepReview` and `answerReview` take their order from the document's own layout, where they read it off the page: an item whose control had not mounted yet was last until it had. Proposals for the cells of a collapsed row come in the order the open row draws them, where they came in the list's.
 
 **The answer card stands clear of the change's whole paragraph.** It sat under the line holding the change, over the lines of its paragraph after it; it now sits beside the paragraph's last line where that line ends short of it, else below the paragraph, or above it where there is no room.
