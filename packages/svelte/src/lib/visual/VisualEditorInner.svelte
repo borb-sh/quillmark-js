@@ -2151,7 +2151,7 @@
 				<span class="qm-toast-notice">{undo.current.notice}</span>
 				<button
 					type="button"
-					class="qm-toast-action qm-focus-ring"
+					class="qm-toast-action qm-chip qm-focus-ring"
 					aria-keyshortcuts="Meta+Z Control+Z"
 					onclick={() => undo.take()}>{merged.undoAction}</button
 				>
@@ -2293,19 +2293,14 @@
 		color: var(--_qm-ink);
 		pointer-events: auto;
 	}
+	/* A chip (controls.css), in the toast's own corner. It stands at the ink and the chrome's
+	   weight where a chip rests at the label rung: it is the one action here, and the notice
+	   beside it is at the ink, so a rung under that would set the action quieter than the
+	   sentence it acts on. */
 	.qm-toast-action {
-		min-height: var(--_qm-tap-min);
-		padding-inline: var(--_qm-space-2);
-		border: 0;
 		border-radius: var(--_qm-radius-pill);
-		background: transparent;
-		font: inherit;
-		font-weight: var(--_qm-weight-strong);
-		color: var(--_qm-accent);
-		cursor: pointer;
-	}
-	.qm-toast-action:hover {
-		background: var(--_qm-accent-tint);
+		font-weight: var(--_qm-weight-mid);
+		color: var(--_qm-ink);
 	}
 	/* Words at the label ink, unboxed: the stack's foot already holds one outlined pill, and
 	   a second would stand as its equal. */
@@ -2425,7 +2420,7 @@
 	}
 	/* A card proposed new and a card proposed taken out, in the review's one hue: a preview
 	   where the new card would stand, the card's own ground under the tint, and a mark round
-	   the whole of a card that would go, its words receding as a struck word's do. The
+	   the whole of a card that would go, its values struck as a removed row's are. The
 	   current one's mark is a step stronger, as a current proposal's words are. */
 	.qm-review-card-remove {
 		display: contents;
@@ -2434,9 +2429,6 @@
 		display: block;
 		border-radius: var(--_qm-radius);
 		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
-	}
-	.qm-review-card-remove.qm-review-on > :global(.qm-card) {
-		opacity: var(--_qm-opacity-muted);
 	}
 	.qm-review-card-remove.qm-review-lit {
 		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
@@ -2510,8 +2502,8 @@
 		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	}
 	/* A row a proposal would take out: no tint, which only ever means "would come", but a ring
-	   in the review line laid outside the row so it takes no room, its values dimmed and struck
-	   and its labels left alone. The current one's ring is a step stronger, as a removed card's. */
+	   in the review line laid outside the row so it takes no room, its values struck and its
+	   labels left alone. The current one's ring is a step stronger, as a removed card's. */
 	:global([data-qm-removed]) {
 		border-radius: var(--_qm-radius-inner);
 		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
@@ -2519,17 +2511,15 @@
 	:global([data-qm-removed-lit]) {
 		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	}
+	/* What a removed row or card holds is what the reader reads to answer it, so its words
+	   step back to the label ink under the strike, as a struck word does in a paragraph
+	   (`codec/prose.css`), and no further: the ring, the strike and the tag say removed. A
+	   switch and a tick have no word to strike and keep their state as drawn. */
 	:global(
-		[data-qm-removed]
-			:is(
-				.qm-control-box:not(.qm-element-summary),
-				.qm-toggle,
-				.qm-tick,
-				.qm-input,
-				.qm-element-preview
-			)
+		:is([data-qm-removed], .qm-review-card-remove.qm-review-on)
+			:is(.qm-control-box:not(.qm-element-summary), .qm-input, .qm-prose, .qm-element-preview)
 	) {
-		opacity: var(--_qm-opacity-muted);
+		color: var(--_qm-ink-label);
 		text-decoration: line-through;
 		text-decoration-color: var(--_qm-review-line);
 	}

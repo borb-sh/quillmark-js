@@ -339,7 +339,7 @@ li.ProseMirror-selectednode::after {
 	font-style: normal;
 	line-height: 1;
 	white-space: nowrap;
-	color: var(--_qm-ink-label);
+	color: var(--_qm-ink-label-raised);
 	pointer-events: none;
 }
 .qm-leave-hint:empty {
@@ -457,10 +457,13 @@ li.ProseMirror-selectednode::after {
 /* The header row is the one weight distinction the island draws: `header` is a
    separate field in the model rather than a flag on a row, so the surface says so.
    It takes a tone with it, the band rung, a step toward the ink at both poles. The
-   rest of a table's type is paper's. */
+   rest of a table's type is paper's. Its words hold the ink whatever the table inherits:
+   the band leaves the label rung under 4.5:1 at the dark pole, so a header in a table
+   that would go is struck and not stepped back. */
 .qm-table-header-row .qm-table-cell {
 	font-weight: var(--_qm-weight-strong);
 	background: var(--_qm-surface-band);
+	color: var(--_qm-ink);
 }
 /* The corner cells take the frame's corner, inside its stroke, so a header's band or a
    selection's wash keeps to the rounded edge rather than painting a square one over
@@ -846,9 +849,16 @@ li.ProseMirror-selectednode::after {
 		calc(-1 * var(--_qm-space)) 0 0 var(--_qm-review-lit),
 		var(--_qm-space) 0 0 var(--_qm-review-lit);
 }
-/* A block the proposal takes whole that has no words to strike: a rule, an island. */
-.ProseMirror .qm-review-out:is(hr, div) {
+/* A block the proposal takes whole that is no line of words. A rule has nothing to read
+   and recedes. An island's words are struck where they stand, at the ink a struck word
+   takes, so a table that would go is still read cell by cell. */
+.ProseMirror hr.qm-review-out {
 	opacity: var(--_qm-opacity-muted);
+}
+.ProseMirror div.qm-review-out {
+	color: var(--_qm-ink-label);
+	text-decoration: line-through;
+	text-decoration-color: var(--_qm-review-line);
 }
 /* The empty paragraph a proposal writes into shows the proposal, not the leaf's ghost. */
 .ProseMirror .qm-review-held.qm-prose-placeholder[data-placeholder]::after {

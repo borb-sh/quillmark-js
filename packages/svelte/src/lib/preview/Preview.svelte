@@ -196,7 +196,7 @@
 		background: var(--_qm-surface-popover);
 		backdrop-filter: blur(var(--_qm-blur));
 		box-shadow: var(--_qm-lift);
-		color: var(--_qm-ink-label);
+		color: var(--_qm-ink-label-raised);
 		font-family: var(--_qm-font);
 		font-size: var(--_qm-text-label);
 		font-variant-numeric: tabular-nums;

@@ -24,6 +24,12 @@
 
 **The defaults of `formatBold`, `formatEmphasis`, `formatUnderline`, `formatStrikethrough`, `formatCode`, `formatLink`, `formatNumberedList`, `formatBulletedList` and `arrayDrag` are the name alone**: `Bold`, where it was `Bold (Ctrl+B)`, and `Drag to move`, where it was `Drag to move (Alt+↑/↓)`. A host that overrides one of these with a chord inside it should take the chord out, or the tip shows it twice and a screen reader hears it in the name. `formatAnchorTitle` is removed from `VisualStrings`; nothing drew it. The font picker and the table's Merge and Split buttons, which draw their own words, no longer carry a hover title.
 
+**A proposed removal stays readable.** A list row, a record row or a table row a proposal takes out has its values struck at the label ink, as a struck word is in a paragraph, where they stood at half opacity. A card a proposal takes out keeps its own ground and its labels at their ink, its field values and its body struck the same way, where the whole card was drawn at half opacity with nothing struck. A switch or a tick in a removed row keeps its state as drawn. A table a proposal takes whole out of a body is struck cell by cell, where it was faded.
+
+**Label ink holds its contrast on floating surfaces.** Over a menu, a popover, the answer card, a tooltip, the Tab hint beside a body and the preview's zoom pill, the label ink lifts by the step the raised surface takes off the card. In dark mode the answer card's **Dismiss**, a field's guidance, the slash menu's tokens and an enum list's _Default_ tag read as a label does on a card, where they fell to about 4.1:1; over a white card nothing changes, and a palette pinned through `--qm-bg` and `--qm-fg` takes the same step. Under a menu's cursor the row's token or tag steps to the ink.
+
+**The undo toast's action is drawn as a chip.** _Undo_ stands at the ink and the chrome's weight, where it was heavier than the notice beside it and lighter in ink, in the accent grey. Under forced colours it takes a chip's edge.
+
 **Cards hold their edges in forced colours.** Under `forced-colors: active` a card draws a line around it, which the dropped fill no longer can, and a card's automatic title reads in the text colour, where it read as disabled grey.
 
 **A proposal for a cell of an unticked matrix member is drawn.** It was reported open with nothing on the page marking it; the member now shows ticked, as taking the proposal leaves it, with the cell marked under its columns, and unticking the member turns the proposal down.
