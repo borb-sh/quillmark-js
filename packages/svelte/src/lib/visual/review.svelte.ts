@@ -130,10 +130,8 @@ export interface ReviewSource {
 		key?: string,
 		write?: { value: unknown }
 	): boolean;
-	/** The main card, then each card of the stack, each with its leaf keys as it draws them. */
+	/** The main card, then each card of the stack, each with its leaves as it draws them. */
 	layout(): readonly CardLayout[];
-	/** Where a place inside the field at leaf `key` is drawn among the places inside it. */
-	rank(key: string, steps: readonly PathStep[]): readonly number[];
 	/** The session keys of the cards as they stood when the list was set, by index. */
 	listedCards(): readonly string[];
 	/** The session keys of the cards as they stand. */
@@ -296,8 +294,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			removes: cards.removes,
 			at: (key) => fields.get(key) ?? {},
 			reports: drawn,
-			undrawn,
-			rank: source.rank
+			undrawn
 		});
 		const placed = new Set(out);
 		const reported = new Set<string>();

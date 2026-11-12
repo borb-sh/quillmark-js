@@ -92,7 +92,6 @@
 		isContainer,
 		shortCell,
 		schemaAt,
-		rankAt,
 		cardSections,
 		cardTitle,
 		kindTitle,
@@ -391,13 +390,6 @@
 		},
 		leafFor: proseKeyFor,
 		layout: () => [cardLayout(model.main), ...model.cards.map(cardLayout)],
-		rank(key, steps) {
-			for (const card of [model.main, ...model.cards])
-				for (const section of card.sections)
-					for (const f of section.fields)
-						if (`${card.id}:${f.name}` === key) return rankAt(f.schema, steps);
-			return steps.map(() => Number.MAX_SAFE_INTEGER);
-		},
 		listedCards: () => cardsListed(),
 		liveCards: () => cardIds,
 		answered(id, current) {
@@ -652,11 +644,6 @@
 	let drewOrder = $state.raw<readonly string[]>([]);
 	let drewOutdated = $state.raw<readonly string[]>([]);
 	$effect(() => {
-		void reviewing.items;
-		void reviewing.fieldUndrawn;
-		void reviewing.cards;
-		for (const id of reviewing.fieldOutdated) void id;
-		for (const report of reviewing.reports.values()) void report;
 		void reviewing.report;
 		let live = true;
 		void tick().then(() => {

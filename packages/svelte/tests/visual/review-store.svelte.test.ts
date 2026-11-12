@@ -31,8 +31,7 @@ function store(
 		leafFor: (path) => path,
 		valueAt: () => undefined,
 		nested: () => undefined,
-		layout: () => [{ key: 'main', leaves: ['main.title', 'main.body'] }],
-		rank: (_key, steps) => steps.map((step) => (typeof step === 'number' ? step : 0)),
+		layout: () => [{ key: 'main', leaves: [{ key: 'main.title' }, { key: 'main.body' }] }],
 		listedCards: () => cards.listed,
 		liveCards: () => live,
 		answer(id, _item, action) {

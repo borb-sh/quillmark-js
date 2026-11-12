@@ -1,26 +1,39 @@
 // The page's order of the review items the editor draws, from what the editor holds: the card
 // stack, each card's fields as it lays them out, and each leaf's report of what it draws.
-import type { PathStep } from '@quillmark/wasm';
+import type { QuillFieldSchema } from '@quillmark/wasm';
 import type { ReviewReport } from '../core/codec/index.js';
-import type { CardModel } from './structure.js';
+import { rankAt, type CardModel } from './structure.js';
 import type { DeepReview, FieldProposal } from './review.js';
 
-/** A card as the page stands it: its session key, and its leaf keys in the order it draws them. */
-export interface CardLayout {
+/** A leaf as its card draws it: its key, and for a field its schema and the value it holds, which
+ *  place what is drawn inside it. */
+export interface LeafLayout {
 	key: string;
-	leaves: readonly string[];
+	schema?: QuillFieldSchema;
+	value?: unknown;
 }
 
-/** The leaf keys of `card` in the order it draws them: its ungrouped sections, its panels, then
+/** A card as the page stands it: its session key, and its leaves in the order it draws them. */
+export interface CardLayout {
+	key: string;
+	leaves: readonly LeafLayout[];
+}
+
+/** The leaves of `card` in the order it draws them: its ungrouped sections, its panels, then
  *  its body. */
 export function cardLayout(card: CardModel): CardLayout {
-	const leaves: string[] = [];
+	const leaves: LeafLayout[] = [];
 	if (!card.unschemable) {
 		const ungrouped = card.sections.filter((s) => s.group == null);
 		const grouped = card.sections.filter((s) => s.group != null);
 		for (const section of [...ungrouped, ...grouped])
-			for (const field of section.fields) leaves.push(`${card.id}:${field.name}`);
-		if (card.hasBody) leaves.push(`${card.id}:$body`);
+			for (const field of section.fields)
+				leaves.push({
+					key: `${card.id}:${field.name}`,
+					schema: field.schema,
+					value: card.values[field.name]
+				});
+		if (card.hasBody) leaves.push({ key: `${card.id}:$body` });
 	}
 	return { key: card.id, leaves };
 }
@@ -38,8 +51,6 @@ export interface Drawn {
 	reports: ReadonlyMap<string, ReviewReport>;
 	/** The field items no control draws. */
 	undrawn: ReadonlySet<string>;
-	/** Where a place inside the field at `key` is drawn among the places inside it. */
-	rank?(key: string, steps: readonly PathStep[]): readonly number[];
 }
 
 const byRank = (a: readonly number[], b: readonly number[]): number => {
@@ -56,15 +67,13 @@ export function orderOf(drawn: Drawn): string[] {
 		seen.add(id);
 		out.push(id);
 	};
-	const leaf = (key: string): void => {
+	const leaf = ({ key, schema, value }: LeafLayout): void => {
 		const { proposed, nested } = drawn.at(key);
 		if (proposed && !drawn.undrawn.has(proposed.id)) take(proposed.id);
-		const inside = (nested ?? []).filter((e) => !drawn.undrawn.has(e.item.id));
-		const ranked = inside.map((e, n) => ({
-			id: e.item.id,
-			rank: drawn.rank?.(key, e.steps) ?? e.steps.map((s) => (typeof s === 'number' ? s : n))
-		}));
-		for (const { id } of ranked.sort((a, b) => byRank(a.rank, b.rank))) take(id);
+		const inside = (nested ?? [])
+			.filter((e) => !drawn.undrawn.has(e.item.id))
+			.map((e) => ({ id: e.item.id, rank: schema ? rankAt(schema, e.steps, value) : [] }));
+		for (const { id } of inside.sort((a, b) => byRank(a.rank, b.rank))) take(id);
 		for (const id of drawn.reports.get(key)?.ids ?? []) take(id);
 	};
 	const adds = (lead: string): void => {
@@ -73,7 +82,7 @@ export function orderOf(drawn: Drawn): string[] {
 	drawn.layout.forEach((card, n) => {
 		const removal = drawn.removes.get(card.key);
 		if (removal) take(removal.id);
-		for (const key of card.leaves) leaf(key);
+		for (const at of card.leaves) leaf(at);
 		adds(n === 0 ? 'head' : card.key);
 	});
 	adds('end');

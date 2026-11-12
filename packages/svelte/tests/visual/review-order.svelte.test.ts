@@ -102,18 +102,27 @@ it('blocks and cards listed in reverse', async () => {
 });
 
 it("a matrix's cells and a list's members listed in reverse", async () => {
-	const { last, page, listed } = await run((doc) => {
-		const p = (name: string) => doc.pathFor(name);
-		const items: ReviewItem[] = [
-			{ id: 'added-severity', field: `${p('checks')}.kerning_pairs.severity`, after: 'minor' },
-			{ id: 'added-note', field: `${p('checks')}.kerning_pairs.note`, after: 'Loose.' },
-			{ id: 'roster-severity', field: `${p('checks')}.spelling.severity`, after: 'minor' },
-			{ id: 'roster-note', field: `${p('checks')}.spelling.note`, after: 'One typo.' },
-			{ id: 'keyword-1', field: `${p('keywords')}[1]`, after: 'two' },
-			{ id: 'keyword-0', field: `${p('keywords')}[0]`, after: 'one' }
-		];
-		return items;
-	});
+	const { last, page, listed } = await run(
+		(doc) => {
+			const p = (name: string) => doc.pathFor(name);
+			const items: ReviewItem[] = [
+				{ id: 'later-note', field: `${p('checks')}.widows.note`, after: 'Two.' },
+				{ id: 'added-severity', field: `${p('checks')}.kerning_pairs.severity`, after: 'minor' },
+				{ id: 'added-note', field: `${p('checks')}.kerning_pairs.note`, after: 'Loose.' },
+				{ id: 'roster-severity', field: `${p('checks')}.spelling.severity`, after: 'minor' },
+				{ id: 'roster-note', field: `${p('checks')}.spelling.note`, after: 'One typo.' },
+				{ id: 'keyword-1', field: `${p('keywords')}[1]`, after: 'two' },
+				{ id: 'keyword-0', field: `${p('keywords')}[0]`, after: 'one' }
+			];
+			return items;
+		},
+		(doc) => {
+			const checks = doc.getStored('checks') as Record<string, unknown>;
+			quill()
+				.writer(doc)
+				.set('checks', { widows: { title: 'Widows' }, ...checks });
+		}
+	);
 	expect(last.undrawn).toEqual([]);
 	expect(last.open).toEqual(page);
 	expect(last.open).not.toEqual(listed);
