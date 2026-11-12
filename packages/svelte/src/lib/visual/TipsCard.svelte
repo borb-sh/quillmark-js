@@ -79,7 +79,7 @@
 		{/if}
 		<button type="button" class="qm-icon-btn qm-tips-action qm-focus-ring" onclick={advance}>
 			{#if isLast}
-				{t.strings.tipsDismiss} <Icon name="trash-2" />
+				{t.strings.tipsDismiss} <Icon name="x" />
 			{:else}
 				{t.strings.tipsNext} <Icon name="arrow-right" />
 			{/if}

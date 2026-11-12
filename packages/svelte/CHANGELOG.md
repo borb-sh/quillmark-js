@@ -10,6 +10,16 @@
 
 **A screen reader hears a problem when it appears.** The editor keeps one hidden status region and says in it the errors the page draws, once they have changed and held still: one error with its field's label, several as a count and their fields, and the last one clearing once. A field's own list was a status region inserted with its text already in it, which a screen reader may not say; it loses the role and stays its control's error message. The errors a document opens with are not said. `VisualStrings` gains `diagAnnounced`, handed each error's field label and text. The preview says a failed paint, the pages running out, and the pages standing again after either, where its message carried no role; a recompile over a page that still fails says nothing more. `PreviewStrings` gains `restored`, default _Preview restored._
 
+**A field's guidance marker waits for its field.** The ⓘ beside a described label is hidden until the pointer or the focus is anywhere in its field, label or control, and holds its place meanwhile, so nothing shifts as it arrives. It stays while its guidance is open, ⌘/Ctrl+/ raises guidance from the control as before, and on a screen with no hover it rests drawn. It stood at rest beside every described label.
+
+**A date field is one Tab stop.** Tab enters a date on its first segment and leaves from whichever segment the focus is on; ← and → walk the segments, and one step past the last reaches **Today**, which is out of the tab order. Each segment and the toggle were stops of their own, four to a date and six to a date and time.
+
+**The tips card's Dismiss draws a close glyph**, where it drew the bin a card's delete draws.
+
+**Every add control draws its own `+`.** `arrayAdd` defaults to `Add`, where it was `+ Add`: the chip draws the glyph, as the add-card strip does ahead of `addCard`, so a `strings` value is words alone and is the control's accessible name. A host that overrode `arrayAdd` with a leading `+` drops it.
+
+**Assistive tech can tell one card from the next.** A card's section is named by the title its header shows, so each card is a region, and its title input is named for its card through `cardAction`, `Card title, Findings`, where every card's read `Card title`. A recovery shell is named by its kind and a proposed card's preview by its tag and title. The main card stays unnamed.
+
 **Cards hold their edges in forced colours.** Under `forced-colors: active` a card draws a line around it, which the dropped fill no longer can, and a card's automatic title reads in the text colour, where it read as disabled grey.
 
 **A proposal for a cell of an unticked matrix member is drawn.** It was reported open with nothing on the page marking it; the member now shows ticked, as taking the proposal leaves it, with the cell marked under its columns, and unticking the member turns the proposal down.

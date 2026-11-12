@@ -73,6 +73,26 @@ describe('the card header', () => {
 		typeLeaf(field(section, 'Heading'), 'Methods');
 		expect(title.value).toBe('Renamed');
 	});
+
+	it('names a card’s region by the title it shows, the stored one while a rename is typed', () => {
+		const mounted = mountEditor(quill(), example());
+		const names = cards(mounted.target).map((c) => c.getAttribute('aria-label'));
+		expect(names.every((n) => n)).toBe(true);
+		expect(names).toEqual(
+			cards(mounted.target).map((c) => header(c).value || header(c).placeholder)
+		);
+		expect(mounted.target.querySelector('.qm-card.qm-main')!.hasAttribute('aria-label')).toBe(
+			false
+		);
+
+		const section = cards(mounted.target)[0];
+		const before = section.getAttribute('aria-label');
+		rename(header(section), 'Renamed');
+		expect(section.getAttribute('aria-label')).toBe(before);
+		header(section).blur();
+		flushSync();
+		expect(section.getAttribute('aria-label')).toBe('Renamed');
+	});
 });
 
 /** Type `value` into a focused title a keystroke at a time, as the input events land. */

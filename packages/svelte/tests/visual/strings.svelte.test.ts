@@ -68,6 +68,17 @@ describe('strings on the mounted surface', () => {
 		expect(titles).toContain(DEFAULT_VISUAL_STRINGS.cardMoveUp);
 	});
 
+	it('draws the `+` on an add control itself, the string being its words and its name', () => {
+		const { target } = open({ strings: { addCard: 'Ajouter une carte', arrayAdd: 'Ajouter' } });
+		const append = [...target.querySelectorAll('.qm-add-btn')].at(-1)!;
+		const chip = target.querySelector('.qm-add-el')!;
+		expect(append.getAttribute('aria-label')).toBe('Ajouter une carte');
+		expect(chip.getAttribute('aria-label')).toBe('Ajouter');
+		expect(chip.textContent).toBe(append.textContent!.replace('Ajouter une carte', 'Ajouter'));
+		for (const words of [DEFAULT_VISUAL_STRINGS.addCard, DEFAULT_VISUAL_STRINGS.arrayAdd])
+			expect(words).toMatch(/^\p{L}/u);
+	});
+
 	it('names each card control for the card it acts on, the action alone its tooltip', () => {
 		const { target } = open({});
 		const S = DEFAULT_VISUAL_STRINGS;
@@ -85,6 +96,9 @@ describe('strings on the mounted surface', () => {
 			S.cardMoveDown,
 			S.cardDelete
 		]);
+		// The title input is one of them, and the card's own section carries the title alone.
+		expect(title.getAttribute('aria-label')).toBe(S.cardAction(S.cardTitle, name));
+		expect(card.getAttribute('aria-label')).toBe(name);
 	});
 
 	it('re-renders when the wording changes under a live mount', () => {

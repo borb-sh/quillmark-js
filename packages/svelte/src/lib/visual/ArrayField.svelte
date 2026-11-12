@@ -979,9 +979,10 @@
 				type="button"
 				class="qm-add-el qm-chip qm-focus-ring qm-tap-floor"
 				bind:this={addEl}
+				aria-label={t.strings.arrayAdd}
 				aria-describedby={max != null ? countId : undefined}
 				disabled={atCap}
-				onclick={add}>{t.strings.arrayAdd}</button
+				onclick={add}>{`+ ${t.strings.arrayAdd}`}</button
 			>
 		</span>
 	</div>

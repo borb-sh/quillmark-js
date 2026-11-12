@@ -61,6 +61,13 @@
  focus. Leaving with a segment filled puts the stored date back; a field storing no
  date puts its segments back by remounting the primitive, which re-reads an unchanged
  empty value as nothing to sync.
+
+ The field is one Tab stop (INVARIANTS §"A date field is one Tab stop"). The primitive
+ makes every segment a stop, so each is drawn through its `child` snippet, which is where
+ a `tabindex` outranks the primitive's own: the stop is the segment the focus is on, the
+ first while the focus is elsewhere, and Tab from any of them leaves the field. The
+ arrows walk the segments, the primitive's own keys, and one step past the last onto the
+ Today toggle and back, so the toggle is out of the tab order and still under the keys.
 -->
 <script lang="ts">
 	import { flushSync } from 'svelte';
@@ -110,13 +117,21 @@
 	let { value, fallback, label, labelledBy, describedBy, datetime, onCommit }: Props = $props();
 
 	let wrapEl: HTMLElement | undefined = $state();
+	let todayEl: HTMLButtonElement | undefined = $state();
+	/** The segments that take the focus. `literal` is the separator between them: present,
+	 * never focusable. */
+	const segmentEls = (): HTMLElement[] => [
+		...(wrapEl?.querySelectorAll<HTMLElement>('[data-segment]:not([data-segment="literal"])') ?? [])
+	];
 	/** Take the caret: what the label click, and a parent placing focus here, calls.
 	 * The first segment, not the field: focus lives on a segment (which is why the
-	 * ring is `.qm-focus-ring-within`), and the container holds none. `literal` is the
-	 * separator between segments: present, never focusable. */
+	 * ring is `.qm-focus-ring-within`), and the container holds none. */
 	export function focus(): void {
-		wrapEl?.querySelector<HTMLElement>('[data-segment]:not([data-segment="literal"])')?.focus();
+		segmentEls()[0]?.focus();
 	}
+	/** The field's one Tab stop while the focus is inside: a segment by its part, or the
+	 *  toggle as {@link TODAY}. Unset, the stop is the first segment. */
+	let stop = $state<string | undefined>(undefined);
 
 	/** The part of a stored string this control edits: all of a `datetime`, and the date
 	 *  half of a `date`, anything past `YYYY-MM-DD` being no part of its type. */
@@ -196,7 +211,22 @@
 	/** Focus moving between segments is neither an entry nor a leaving. */
 	const within = (e: FocusEvent): boolean => !!wrapEl?.contains(e.relatedTarget as Node | null);
 	function enter(e: FocusEvent): void {
+		stop = (e.target as HTMLElement).dataset.segment ?? TODAY;
 		if (!within(e) && value == null && fallbackDate) seat = true;
+	}
+	/** One step past the last segment is the toggle, and one step back returns. */
+	function step(e: KeyboardEvent): void {
+		if (!todayEl || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+		const last = segmentEls().at(-1);
+		const to =
+			e.key === 'ArrowRight' && e.target === last
+				? todayEl
+				: e.key === 'ArrowLeft' && e.target === todayEl
+					? last
+					: undefined;
+		if (!to) return;
+		e.preventDefault();
+		to.focus();
 	}
 	const filled = (): boolean =>
 		[...(wrapEl?.querySelectorAll('[data-segment]') ?? [])].some(
@@ -209,6 +239,7 @@
 	}
 	function leave(e: FocusEvent): void {
 		if (within(e)) return;
+		stop = undefined;
 		const seated = seat;
 		seat = false;
 		const emptied = held;
@@ -314,13 +345,17 @@
 				aria-describedby={describedBy}
 				data-ghosted={ghost ? '' : undefined}
 				data-default={seated || follows ? '' : undefined}
-				onkeydown={settle}
+				onkeydown={(e: KeyboardEvent) => {
+					settle();
+					step(e);
+				}}
 			>
 				{#snippet children({ segments })}
 					<!-- Keyed by index: `part` repeats (the `literal` separators between
 					 segments all carry it) so a part-keyed block collides. -->
 					{@const hour = segments.find((seg) => seg.part === 'hour')?.value}
 					{@const twelve = segments.some((seg) => seg.part === 'dayPeriod')}
+					{@const first = segments.find((seg) => seg.part !== 'literal')?.part}
 					{#each segments as seg, i (i)}
 						{@const shown = segmentText(seg.part, seg.value, hour, twelve)}
 						<BitsDateField.Segment
@@ -328,7 +363,11 @@
 							part={seg.part}
 							data-ghosted={shown.ghosted}
 						>
-							{shown.text}
+							{#snippet child({ props })}
+								{@const roving =
+									seg.part === 'literal' ? {} : { tabindex: seg.part === (stop ?? first) ? 0 : -1 }}
+								<span {...props} {...roving}>{shown.text}</span>
+							{/snippet}
 						</BitsDateField.Segment>
 					{/each}
 					{#if unread}
@@ -338,6 +377,8 @@
 						<button
 							type="button"
 							class="qm-chip qm-tap-floor qm-focus-ring qm-date-today"
+							bind:this={todayEl}
+							tabindex={stop === TODAY ? 0 : -1}
 							aria-pressed={!!follows}
 							aria-keyshortcuts="T"
 							data-default={follows === 'default' ? '' : undefined}

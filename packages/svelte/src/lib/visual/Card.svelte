@@ -85,6 +85,12 @@
 	// title because a re-derive mid-edit hands `card` back with the title it stored.
 	let draft = $state<string | undefined>(undefined);
 	const shownTitle = $derived(draft ?? card.titleOverride);
+	/** What names the card to assistive tech: its section, and its title input after the
+	 *  input's own word. The stored title, never the rename in flight, so no name changes
+	 *  under the reader typing it. */
+	const named = $derived(
+		card.unschemable ? humanize(card.kind) : card.titleOverride.trim() || card.titlePlaceholder
+	);
 
 	// A focus the shell hands over (`focusHeader`) is not armed for replacement: the key
 	// that pressed a delete, pressed again, would retitle the card it landed on.
@@ -221,11 +227,14 @@
  ({@link FieldHint}): a surface portals to `[data-qm-root]`, so the card is not its
  ancestor and nothing else marks the box its guidance belongs in. Its value is the card's
  kind, `main` for the main card, which is the one schema-named hook a host's stylesheet
- is promised (THEMING §"What a stylesheet may aim at"). -->
+ is promised (THEMING §"What a stylesheet may aim at"). Named, the section is a region,
+ so a reader moving by landmark hears each card by the title its header shows; `main`
+ shows none and stays the unnamed form the regions follow. -->
 <section
 	bind:this={el}
 	class={['qm-card', { 'qm-main': card.isMain, 'qm-unschemable': card.unschemable }]}
 	data-qm-card={card.kind}
+	aria-label={card.isMain ? undefined : named}
 >
 	{#if card.unschemable}
 		{@render recoveryShell()}
@@ -239,7 +248,7 @@
 							class="qm-card-title qm-focus-ring"
 							value={shownTitle}
 							placeholder={card.titlePlaceholder}
-							aria-label={t.strings.cardTitle}
+							aria-label={t.strings.cardAction(t.strings.cardTitle, named)}
 							size="1"
 							onmousedown={onTitleMousedown}
 							onfocus={onTitleFocus}

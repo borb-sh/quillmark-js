@@ -2179,7 +2179,7 @@
 					class={['qm-review-card-add', { 'qm-review-lit': reviewing.lit === item.id }]}
 					data-qm-review={item.id}
 					role="group"
-					aria-label={merged.reviewNewCard}
+					aria-label={`${merged.reviewNewCard}, ${preview.title}`}
 					onpointerenter={() => reviewing.point(item.id, 'pointer')}
 					onpointerleave={() => reviewing.point(undefined, 'pointer')}
 				>
@@ -2210,14 +2210,14 @@
 		 on hover is the space the new card takes. -->
 		{@const marked = atIndex === model.cards.length}
 		<div class={['qm-add-card', { 'qm-add-card-marked': marked }]}>
-			<!-- Marked, the words are the accessible name and no `aria-label` doubles
-			 them; bare, the same words land as the label, the strip having no
-			 content to carry them. -->
+			<!-- The string is the name on every strip: marked, the strip draws a `+` ahead
+			 of the words, which is the template's glyph and no part of the name; bare,
+			 it has no content to carry them. -->
 			{#if kinds.length === 1}
 				<button
 					type="button"
 					class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
-					aria-label={marked ? undefined : merged.addCard}
+					aria-label={merged.addCard}
 					onclick={() => addCard(atIndex, kinds[0], true)}
 					>{#if marked}{`+ ${merged.addCard}`}{/if}</button
 				>
@@ -2230,7 +2230,7 @@
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger
 						class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
-						aria-label={marked ? undefined : merged.addCard}
+						aria-label={merged.addCard}
 						>{#if marked}{`+ ${merged.addCard}`}{/if}</DropdownMenu.Trigger
 					>
 					<DropdownMenu.Portal to={rootEl}>

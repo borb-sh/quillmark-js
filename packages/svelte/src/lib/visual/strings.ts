@@ -45,12 +45,13 @@ export interface VisualStrings
 	cardMoveUp: string;
 	cardMoveDown: string;
 	cardDelete: string;
-	/** The card-title input's accessible name. */
+	/** The card-title input's own word in its accessible name, which {@link cardAction}
+	 *  completes with the card's title: `Card title, Findings`. */
 	cardTitle: string;
 	/**
-	 * A card control's accessible name, the action and the card it acts on, by the title
-	 * the header shows: `Delete card, Findings`. The action alone stays the tooltip.
-	 * Parametric, so word order stays the translator's.
+	 * A card control's accessible name, the control's own word and the card it is on, by
+	 * the title the header shows: `Delete card, Findings`. An action alone stays the
+	 * tooltip. Parametric, so word order stays the translator's.
 	 */
 	cardAction: (action: string, card: string) => string;
 
@@ -96,13 +97,14 @@ export interface VisualStrings
 	undoRestore: (what: string) => string;
 
 	// ── The add affordance ────────────────────────────────────────────────────
-	/** The trailing strip's visible words, drawn after a `+`, and every
-	 * strip's accessible name. One string over
+	/** The trailing strip's visible words and every strip's accessible name. Words alone,
+	 * as every add control's string is: the control draws its own `+`. One string over
 	 * one kind and many: the trigger seeds a card, and which kind is the menu's word
 	 * to say or the schema's to have already settled. */
 	addCard: string;
 
 	// ── Array control ─────────────────────────────────────────────────────────
+	/** A list's add chip: its words after the `+` the chip draws, and its accessible name. */
 	arrayAdd: string;
 	arrayRemove: string;
 	/** The drag handle on an `object` row: its tooltip, which names the keys that move
@@ -345,7 +347,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	undoAction: 'Undo',
 	undoRestore: (what) => `Restore ${what}`,
 	addCard: 'Add card',
-	arrayAdd: '+ Add',
+	arrayAdd: 'Add',
 	arrayRemove: 'Remove',
 	arrayDrag: `Drag to move (${alt('↑/↓')})`,
 	arrayStanding: 'Add an item…',
