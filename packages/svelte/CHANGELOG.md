@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A review item can name its card by `$id`.** `card` on a field, block or removal item and `afterCard` on an added card name the card by its `$id`, wherever it stands, where the path's index, `remove` and `after` name it by its place when the list was set. `proposalsBetween` fills them in, so its list holds over a document whose cards were added, removed or moved since the snapshot: each item is drawn on its own card, and one whose card is gone is `undrawn` where it was drawn on the card that took its index.
+
 **A proposal for a cell of an unticked matrix member is drawn.** It was reported open with nothing on the page marking it; the member now shows ticked, as taking the proposal leaves it, with the cell marked under its columns, and unticking the member turns the proposal down.
 
 **A number field's own undo back to its default leaves it unset.** Undoing an edit in a number field back to the default it showed unwritten left the default written, tagged with a reset; it now unsets the field again, as a text field's undo does.

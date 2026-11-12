@@ -136,6 +136,8 @@ export interface ReviewSource {
 	listedCards(): readonly string[];
 	/** The session keys of the cards as they stand. */
 	liveCards(): readonly string[];
+	/** The session key of the card holding `$id` `id`, `undefined` where none does. */
+	cardFor(id: string): string | undefined;
 	/** An accept or a dismissal, once it is made, `current` where the item was the current one. */
 	answered?(id: string, current: boolean): void;
 	writing?(on: boolean): void;
@@ -181,7 +183,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		for (const [at, item] of all.entries()) {
 			if (!byCard(item) || !open.has(item.id)) continue;
 			if ('remove' in item) {
-				const key = listed[item.remove];
+				const key = item.card === undefined ? listed[item.remove] : source.cardFor(item.card);
 				if (key !== undefined && standing.has(key)) removes.set(key, item);
 				else undrawn.push({ id: item.id, reason: 'applied' });
 				continue;
@@ -202,9 +204,15 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		const item = all[at] as CardAdd;
 		for (let k = at - 1; k >= 0; k--) {
 			const before = all[k];
-			if (!byCard(before) || !('add' in before) || before.after !== item.after) continue;
+			if (!byCard(before) || !('add' in before)) continue;
+			if (before.afterCard !== item.afterCard) continue;
+			if (item.afterCard === undefined && before.after !== item.after) continue;
 			const key = written.get(before.id);
 			if (key !== undefined && standing.has(key)) return key;
+		}
+		if (item.afterCard !== undefined) {
+			const key = source.cardFor(item.afterCard);
+			return key !== undefined && standing.has(key) ? key : 'end';
 		}
 		if (item.after === undefined || item.after < 0) return 'head';
 		const key = listed[item.after];

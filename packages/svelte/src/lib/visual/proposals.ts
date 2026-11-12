@@ -44,7 +44,8 @@ let minted = 0;
  *
  * A card the answer adds is an `add` item after the nearest card before it that the answer
  * keeps, so cards it adds in a run stand in list order; one it takes out is a `remove` item.
- * Paths and card indexes are `base`'s. A card the answer retypes is listed as taken out and
+ * Paths and card indexes are `base`'s, and an item on a card, after one or taking one out names
+ * it by its `$id` too where it has one. A card the answer retypes is listed as taken out and
  * added; one it moves is not listed. `mint` names each item, and by default names it uniquely for the page.
  */
 export function proposalsBetween(
@@ -235,16 +236,24 @@ export function proposalsBetween(
 			continue;
 		}
 		kept.set(answerAt, at);
+		const first = items.length;
 		diffCard(quill.schema.card_kinds?.[was.kind], at, was, now, answerAt);
+		if (id) for (const item of items.slice(first)) Object.assign(item, { card: id });
 	}
 	for (const at of answerIds.keys()) {
 		if (kept.has(at)) continue;
 		let lead = at - 1;
 		while (lead >= 0 && !kept.has(lead)) lead--;
 		const after = kept.get(lead);
-		items.push({ id: mint(), add: answer.card(at), ...(after !== undefined && { after }) });
+		items.push({
+			id: mint(),
+			add: answer.card(at),
+			...(after !== undefined && { after }),
+			...(after !== undefined && baseIds[after] && { afterCard: baseIds[after] })
+		});
 	}
-	for (const at of removed) items.push({ id: mint(), remove: at });
+	for (const at of removed)
+		items.push({ id: mint(), remove: at, ...(baseIds[at] && { card: baseIds[at] }) });
 	return { items };
 }
 
