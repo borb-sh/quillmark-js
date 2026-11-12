@@ -28,6 +28,11 @@ import { asContent, wordDiff, type BlockPlace, type ReviewAction } from '../core
  *   and an index past the last appends.
  * - `add` or `remove`: a whole card, proposed new or proposed taken out (`CardProposal`).
  *
+ * A `field` on a card names the card by its index, read against the cards as they stood when
+ * the list was set. `card` beside it names the card by its `$id` instead, wherever it stands
+ * now: the path's index is then not read, and an id no card holds is a place the editor does
+ * not hold.
+ *
  * An item whose place the editor does not hold draws nothing. An answered item is drawn no
  * more: a dismissed one wrote nothing, and an accepted one is plain text in the document.
  */
@@ -42,9 +47,13 @@ export type ReviewItem = FieldProposal | BlockProposal | CardProposal;
  *   after one card stand in list order. Taken, it is written with its `$id` where no card holds
  *   that one.
  * - `remove`: the card at that index, marked whole where it stands.
+ *
+ * `afterCard` and `card` name that card by its `$id` instead, wherever it stands now, and the
+ * index beside one is then not read: an id no card holds is the card gone.
  */
 export type CardProposal =
-	{ id: string; add: Card; after?: number } | { id: string; remove: number };
+	| { id: string; add: Card; after?: number; afterCard?: string }
+	| { id: string; remove: number; card?: string };
 
 /** Whether an item proposes a whole card. */
 export const byCard = (item: object): item is CardProposal => 'add' in item || 'remove' in item;
@@ -54,11 +63,12 @@ export type BlockProposal =
 	| {
 			id: string;
 			field: DocPath;
+			card?: string;
 			replace: readonly string[];
 			before?: string;
 			after: string;
 	  }
-	| { id: string; field: DocPath; insert: BlockPlace; after: string };
+	| { id: string; field: DocPath; card?: string; insert: BlockPlace; after: string };
 
 /** Whether an item names blocks of a rich text field, which its prose leaf draws. */
 export const byBlocks = (item: object): item is BlockProposal =>
@@ -134,6 +144,7 @@ export const NO_PROJECTION: ReviewProjection = {
 export type FieldProposal = {
 	id: string;
 	field: DocPath;
+	card?: string;
 	before?: unknown;
 	after?: unknown;
 };

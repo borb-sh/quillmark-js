@@ -356,13 +356,26 @@
 		reviewing.heard(id, 'reopen', leaf);
 		void reveal(id, false, true);
 	};
-	/** The host's list with each card it names by index moved to where that card stands now. */
+	/** The session key of the card holding `$id` `id`. */
+	function cardKeyFor(id: string): string | undefined {
+		return cardIds.find((_, k) => doc.card(k).id === id);
+	}
+	/** The host's list with each card a path names moved to where that card stands now: the card
+	 *  holding the item's `card`, else the one at the path's index when the list was set. */
 	const reviewItems = $derived.by(() => {
 		const was = cardsListed();
-		if (!review?.length || was === cardIds) return review;
+		const now = cardIds;
+		if (!review?.length) return review;
+		if (was === now && !review.some((item) => 'card' in item && item.card !== undefined))
+			return review;
 		return review.map((item) => {
 			if (byCard(item)) return item;
-			const field = cardMoved(item.field, was, cardIds);
+			let field: DocPath;
+			if (item.card === undefined) field = cardMoved(item.field, was, now);
+			else {
+				const key = cardKeyFor(item.card);
+				field = pathOnCard(item.field, key === undefined ? now.length : now.indexOf(key));
+			}
 			return field === item.field ? item : { ...item, field };
 		});
 	});
@@ -392,6 +405,7 @@
 		layout: () => [cardLayout(model.main), ...model.cards.map(cardLayout)],
 		listedCards: () => cardsListed(),
 		liveCards: () => cardIds,
+		cardFor: cardKeyFor,
 		answered(id, current) {
 			if (!current) return;
 			if (batching) advancing = id;
@@ -534,9 +548,9 @@
 	 */
 	function takeCard(item: CardProposal): (() => void) | undefined {
 		if ('remove' in item) {
-			const key = cardsListed()[item.remove];
+			const key = item.card === undefined ? cardsListed()[item.remove] : cardKeyFor(item.card);
 			const at = key === undefined ? -1 : cardIndexOf(key);
-			if (at < 0) return undefined;
+			if (key === undefined || at < 0) return undefined;
 			const card = doc.card(at);
 			doc.removeCard(at);
 			undo.withdraw();

@@ -34,6 +34,7 @@ function store(
 		layout: () => [{ key: 'main', leaves: [{ key: 'main.title' }, { key: 'main.body' }] }],
 		listedCards: () => cards.listed,
 		liveCards: () => live,
+		cardFor: () => undefined,
 		answer(id, _item, action) {
 			answers.push([id, action]);
 			return !refuse;
