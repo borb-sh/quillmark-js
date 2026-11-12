@@ -160,7 +160,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 ### The matrix
 
-**The control composes each member's schema from the roster and the field's properties**, since the boundary serializes only the roster. The document keeps no answer for an unheld member, so the control keeps an unticked member's columns for the mount. Commit is whole, through one `writer.set`.
+**The control composes each member's schema from the roster and the field's properties**, since the boundary serializes only the roster. The document keeps no answer for an unheld member, so the control keeps an unticked member's columns for the mount. Commit is whole, through one `writer.set`. A proposal for a cell of an unheld member shows the member held, since taking it writes the member, and unticking that member turns the proposal down; drawn unheld, the member has no cell to mark, and the proposal is reported open with nothing on the page.
 
 ### Surface
 

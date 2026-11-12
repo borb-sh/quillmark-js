@@ -132,10 +132,11 @@
 	const reviewed = $derived(splitReview(review));
 	/** A member's own proposal: it ticks or unticks the member whole. */
 	const proposal = (id: string) => reviewed.below.get(id)?.find((e) => !e.steps.length)?.item;
-	/** Whether a member shows as held: as its proposal would leave it, else as stored. */
+	/** Whether a member shows as held: as its proposal would leave it, else as stored, an
+	 *  unheld one under a proposal for a cell of it held, as taking that proposal writes it. */
 	const shownHeld = (id: string): boolean => {
 		const item = proposal(id);
-		return item ? matrixHeld(item.after) : held(id);
+		return item ? matrixHeld(item.after) : held(id) || cellReview(id).length > 0;
 	};
 	/** The member's columns as shown: its proposal's where one ticks it, else the stored. */
 	const shownColumns = (id: string): Record<string, unknown> => {
@@ -213,7 +214,10 @@
 	 *  their local, a `$derived` of the value: the document is what the face reads. */
 	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
 		const item = proposal(id);
+		const cells = cellReview(id);
 		if (item && on === matrixHeld(item.after)) reviewing.act(item.id, 'accept');
+		else if (!item && !on && !held(id) && cells.length)
+			for (const { item: cell } of cells) reviewing.act(cell.id, 'dismiss');
 		else if (!item || !reviewing.answerWith(item.id, on ? ticked(id) : undefined))
 			commit(on ? commitMember(map, id, ticked(id)) : unticked(id));
 		await flush();
