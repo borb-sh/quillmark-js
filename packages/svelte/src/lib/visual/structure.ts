@@ -2,7 +2,9 @@
 // orchestration lives in VisualEditor.svelte.
 import {
 	VARIANT_DISCRIMINANT_KEY,
+	type Card,
 	type Content,
+	type Document,
 	type PathStep,
 	type PayloadItem,
 	type QuillCardSchema,
@@ -951,5 +953,21 @@ export class IdSeq {
 	/** `count` fresh ids, in order. */
 	take(count: number): string[] {
 		return Array.from({ length: count }, () => this.next());
+	}
+}
+
+/** Write `card` into `target` at `at`, under its `$id` where no card there holds that one and
+ *  the document takes it, else under one the document mints. Throws where the card cannot be
+ *  written. */
+export function placeCardInto(target: Document, card: Card, at: number): void {
+	const { id, ...bare } = card;
+	const free =
+		id !== undefined &&
+		!Array.from({ length: target.cardCount }, (_, k) => target.card(k).id).includes(id);
+	try {
+		target.unchecked.insertCard(free ? card : bare, at);
+	} catch (e) {
+		if (!free) throw e;
+		target.unchecked.insertCard(bare, at);
 	}
 }
