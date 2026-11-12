@@ -3,6 +3,8 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import type { Card } from '@quillmark/wasm';
 import { createReview, DWELL_MS } from '$lib/visual/review.svelte';
+import { nextOpen, stepIn } from '$lib/visual/review-order';
+import { createStructuralUndo } from '$lib/visual/undo.svelte';
 import type { ReviewAction } from '$lib/core/codec';
 import type { ReviewItem } from '$lib/visual';
 
@@ -23,7 +25,9 @@ function store(
 	let items = $state<ReviewItem[]>(ITEMS);
 	let live = $state(cards.live);
 	const answers: [string, ReviewAction][] = [];
-	const answered: [string, boolean][] = [];
+	const answered: [string, (readonly string[])?][] = [];
+	const undone: string[] = [];
+	const undo = createStructuralUndo();
 	const review = createReview({
 		items: () => items,
 		keyFor: (path) => path,
@@ -34,17 +38,30 @@ function store(
 		layout: () => [{ key: 'main', leaves: [{ key: 'main.title' }, { key: 'main.body' }] }],
 		listedCards: () => cards.listed,
 		liveCards: () => live,
-		answer(id, _item, action) {
+		cardFor: () => undefined,
+		undo,
+		answer(id, item, action) {
 			answers.push([id, action]);
+			if (refuse) return false;
+			if (action === 'reopen') return true;
+			return () => {
+				undone.push(id);
+				review.heard(id, 'reopen', item && 'field' in item ? item.field : '');
+			};
+		},
+		answerProse(key, id, action) {
+			review.heard(id, action, key);
 			return !refuse;
 		},
-		answered: (id, current) => answered.push([id, current])
+		answered: (id, order) => answered.push(order ? [id, order] : [id])
 	});
 	review.drew('main.body', { ids: ['first', 'proposal'], outdated: [], undrawn: [] });
 	return {
 		review,
 		answers,
 		answered,
+		undone,
+		undo,
 		list: (next: ReviewItem[]) => (items = next),
 		cards: (next: string[]) => (live = next)
 	};
@@ -90,10 +107,7 @@ describe('the current item', () => {
 		review.reveal('title');
 		review.act('first', 'dismiss');
 		review.act('title', 'accept');
-		expect(answered).toEqual([
-			['first', false],
-			['title', true]
-		]);
+		expect(answered).toEqual([['title']]);
 		expect(review.lit).toBeUndefined();
 		review.reveal('proposal');
 		review.heard('first', 'reopen', 'main.body');
@@ -213,5 +227,105 @@ describe('the report', () => {
 			outdated: ['title', 'first'],
 			undrawn: [{ id: 'proposal', reason: 'block' }]
 		});
+	});
+});
+
+describe('the answer journal', () => {
+	it('takes the answers back newest first, each reopened', () => {
+		const { review, undone, undo } = store();
+		review.act('title', 'accept');
+		review.act('first', 'dismiss');
+		expect(undo.take()).toBe(true);
+		expect(undone).toEqual(['first']);
+		expect(review.items.map((item) => item.id)).toEqual(['first', 'proposal']);
+		expect(undo.take()).toBe(true);
+		expect(undone).toEqual(['first', 'title']);
+		expect(review.items).toEqual(ITEMS);
+		expect(undo.take()).toBe(false);
+	});
+
+	it('ends at an edit that is no answer’s, and not at an answer’s own write', () => {
+		const { review, undone, undo } = store();
+		review.act('title', 'accept');
+		review.writing(true);
+		review.settled();
+		review.writing(false);
+		review.act('first', 'dismiss');
+		review.settled();
+		expect(undo.take()).toBe(false);
+		expect(undone).toEqual([]);
+	});
+
+	it('starts over once another step has taken the key', () => {
+		const { review, undone, undo } = store();
+		review.act('title', 'accept');
+		undo.offer('', () => undefined);
+		review.act('first', 'dismiss');
+		expect(undo.take()).toBe(true);
+		expect(undo.take()).toBe(false);
+		expect(undone).toEqual(['first']);
+	});
+});
+
+describe('a batch of answers', () => {
+	it('answers in the page’s order, and is taken back whole, last answer first', () => {
+		const { review, answers, undone, undo } = store();
+		expect(review.answer(['proposal', 'title'], 'dismiss')).toEqual(['title', 'proposal']);
+		expect(answers).toEqual([
+			['title', 'dismiss'],
+			['proposal', 'dismiss']
+		]);
+		expect(undo.take()).toBe(true);
+		expect(undone).toEqual(['proposal', 'title']);
+		expect(review.items).toEqual(ITEMS);
+		expect(undo.take()).toBe(false);
+	});
+
+	it('leaves the outdated items open when every item is accepted, and takes them when dismissed', () => {
+		const { review } = store();
+		const { outdated } = review.report;
+		expect(outdated.length).toBeGreaterThan(0);
+		const accepted = review.answer('all', 'accept');
+		expect(accepted.length).toBeGreaterThan(0);
+		expect(review.items.map((item) => item.id)).toEqual(outdated);
+		expect(review.answer('all', 'dismiss')).toEqual(outdated);
+		expect(review.items).toEqual([]);
+	});
+
+	it('moves on from the current item once, with the order as it stood before', () => {
+		const { review, answered } = store();
+		const before = review.order;
+		review.reveal('first');
+		review.answer('all', 'dismiss');
+		expect(answered).toEqual([['first', before]]);
+	});
+
+	it('returns only what could be answered', () => {
+		const { review } = store(true);
+		expect(review.answer('all', 'dismiss')).toEqual([]);
+		expect(review.items).toEqual(ITEMS);
+	});
+});
+
+describe('the walk', () => {
+	const order = ['a', 'b', 'c'];
+	it('moves on to the next open item after an answer, round from the end', () => {
+		expect(nextOpen(order, 'a', new Set(['b', 'c']))).toBe('b');
+		expect(nextOpen(order, 'c', new Set(['a', 'b']))).toBe('a');
+		expect(nextOpen(order, 'b', new Set(['a']))).toBe('a');
+		expect(nextOpen(order, 'b', new Set())).toBeUndefined();
+	});
+
+	it('steps from the current item, round from either end', () => {
+		expect(stepIn(order, 1, 'c')).toBe(order.indexOf('a'));
+		expect(stepIn(order, -1, 'a')).toBe(order.indexOf('c'));
+		expect(stepIn(order, 1, undefined)).toBe(0);
+		expect(stepIn(order, -1, undefined)).toBe(order.length - 1);
+		expect(stepIn([], 1, undefined)).toBeUndefined();
+	});
+
+	it('steps on from the place an answered item held', () => {
+		expect(stepIn(order, 1, 'gone', 1)).toBe(1);
+		expect(stepIn(order, -1, 'gone', 1)).toBe(0);
 	});
 });

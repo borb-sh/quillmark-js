@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A review item can name its card by `$id`.** `card` on a field, block or removal item and `afterCard` on an added card name the card by its `$id`, wherever it stands, where the path's index, `remove` and `after` name it by its place when the list was set. `proposalsBetween` fills them in, so its list holds over a document whose cards were added, removed or moved since the snapshot: each item is drawn on its own card, and one whose card is gone is `undrawn` where it was drawn on the card that took its index.
+
 **Every text surface names itself to assistive tech.** A prose leaf, a list row's text and a table cell are textboxes, one-line or multi-line as they edit, where they were unroled `contenteditable` regions carrying a name. An enum's list is named by its field, and its divider no longer stands in the list as a separator. The link prompt's address box is named _Link address_, where it took the Link button's name and chord. The Today toggle states its `T` key. `VisualStrings` gains `fieldGuidance`, the guidance marker's name, and `linkAddress`.
 
 **Key hints, the link prompt and the preview's own text read in the theme.** The answer card's key hints are drawn in their button's ink, where they were faded under contrast. The link prompt's address and placeholder take the theme's ink, where they took the browser's black and grey. The preview's empty and error messages stand centred at label size, the empty one in the label ink and the error in the danger hue, and a focused preview pane draws the package's ring inside its edge. The recovery shell's kind picker is drawn as every other input, with the package's focus ring, and a disabled chip no longer darkens on hover.

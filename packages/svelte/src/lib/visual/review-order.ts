@@ -90,3 +90,29 @@ export function orderOf(drawn: Drawn): string[] {
 	adds('end');
 	return out;
 }
+
+/** The open item an answer to `id` moves on to: the next one after it in `order`, as it stood
+ *  before the answer, round from the end. `undefined` where none is left. */
+export function nextOpen(
+	order: readonly string[],
+	id: string,
+	open: ReadonlySet<string>
+): string | undefined {
+	const at = order.indexOf(id);
+	return [...order.slice(at + 1), ...order.slice(0, Math.max(at, 0))].find((n) => open.has(n));
+}
+
+/** Where a step in `dir` lands in `order`, round from either end: from `from` where the order
+ *  holds it, else from the place `stepped` held when it was last stepped to, which a later item
+ *  has taken, else from the nearer end. `undefined` in an empty order. */
+export function stepIn(
+	order: readonly string[],
+	dir: 1 | -1,
+	from: string | undefined,
+	stepped?: number
+): number | undefined {
+	if (!order.length) return undefined;
+	const at = from === undefined ? -1 : order.indexOf(from);
+	const next = at >= 0 ? at + dir : dir > 0 ? (stepped ?? 0) : (stepped ?? 0) - 1;
+	return ((next % order.length) + order.length) % order.length;
+}
