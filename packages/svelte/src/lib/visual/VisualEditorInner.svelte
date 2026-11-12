@@ -1522,6 +1522,16 @@
 		const box = await land(found, undefined);
 		if (span.alive) bloom(box);
 	}
+	/** Reveal the field at `field`, scroll it into the fold and wash it, taking no focus:
+	 *  the landing a host makes on a touch screen, where a focus raises the keyboard. A
+	 *  nested address reveals and washes its field, a row being something only a focus
+	 *  opens. */
+	export async function revealField(field: DocPath): Promise<void> {
+		const found = await revealLeaf(field);
+		if (!found) return missed(`no mounted field at ${field}`, field);
+		found.control.el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+		bloom(found.control.el);
+	}
 	/** Play the arrival wash over the field at `field` and touch nothing else: no focus,
 	 *  no reveal, no scroll. A field in a closed panel is skipped, its box clipped to
 	 *  nothing; a nested address washes its field's box, a row being something only a
