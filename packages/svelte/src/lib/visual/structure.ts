@@ -532,6 +532,49 @@ function stepInto(schema: QuillFieldSchema, step: PathStep): QuillFieldSchema | 
 	}
 }
 
+/**
+ * Where the place at `steps` under `field` is drawn among the places inside the field, a number
+ * for each step: a list's member by its index, a record's cell by its declared order, a matrix's
+ * member by the roster's and an added one after them, a variant's discriminant ahead of its
+ * cells. A step the schema does not declare is last.
+ */
+export function rankAt(field: QuillFieldSchema, steps: readonly PathStep[]): number[] {
+	const out: number[] = [];
+	let cursor: QuillFieldSchema | undefined = field;
+	const among = (keys: readonly string[], step: PathStep): number => {
+		const at = keys.indexOf(String(step));
+		return at < 0 ? Number.MAX_SAFE_INTEGER : at;
+	};
+	for (const step of steps) {
+		if (!cursor) {
+			out.push(Number.MAX_SAFE_INTEGER);
+			continue;
+		}
+		switch (controlKind(cursor)) {
+			case 'array':
+				out.push(typeof step === 'number' ? step : Number.MAX_SAFE_INTEGER);
+				break;
+			case 'object':
+				out.push(among(Object.keys(cursor.properties ?? {}), step));
+				break;
+			case 'matrix':
+				out.push(among(Object.keys(cursor.members ?? {}), step));
+				break;
+			case 'variant': {
+				const world = Object.values(cursor.variants ?? {}).find((cells) =>
+					Object.hasOwn(cells, String(step))
+				);
+				out.push(step === VARIANT_DISCRIMINANT ? 0 : 1 + among(Object.keys(world ?? {}), step));
+				break;
+			}
+			default:
+				out.push(Number.MAX_SAFE_INTEGER);
+		}
+		cursor = stepInto(cursor, step);
+	}
+	return out;
+}
+
 // ── Short cells and layouts ──────────────────────────────────────────────────
 
 /**
