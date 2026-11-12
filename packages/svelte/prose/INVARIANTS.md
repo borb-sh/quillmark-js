@@ -82,7 +82,7 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 
 **Per field: the authored value, else the `default:` where it prints, else words about the value.**
 
-- **A default that prints is drawn a step off the ink, and nothing is written until an edit takes it**, so tabbing through a card freezes nothing against the next quill version. A text leaf's undo back to the default it held unwritten unsets the field, so taking every edit back freezes nothing either.
+- **A default that prints is drawn a step off the ink, and nothing is written until an edit takes it**, so tabbing through a card freezes nothing against the next quill version. An undo back to the default a text leaf or a number input held unwritten unsets the field, so taking every edit back freezes nothing either.
 - **Emptying a control writes what empty means for its field**: the empty answer where a default would otherwise print, a removed key for an optional cell, an unset for a number.
 - **A card's field that holds one value says at its label where it stands against a default that prints**: a tag while the default is what shows, and once written, one reset there that unsets the field. Rejected: the way back inside each control, which a listbox has a row for and a text field has nowhere for, emptying it being the empty answer.
 
