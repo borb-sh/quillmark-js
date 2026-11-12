@@ -56,8 +56,9 @@
 </script>
 
 {#if diagnostics && diagnostics.length}
-	<!-- role=status: commit errors appear mid-typing; announce without stealing focus. -->
-	<div class="qm-diag-list" id={listId} role="status" {@attach markInvalid}>
+	<!-- Not a live region: the list arrives with its text in it, so the editor's standing
+	     region says it (INVARIANTS §Diagnostics). -->
+	<div class="qm-diag-list" id={listId} {@attach markInvalid}>
 		{#each diagnostics as d, i (i)}
 			<span class="qm-diag-line">{diagnosticText(d, t.formatDiagnostic, t.strings)}</span>
 		{/each}

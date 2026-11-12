@@ -148,6 +148,10 @@ export interface VisualStrings
 	diagTypeMismatch: (expected: string) => string;
 	/** `validation::format_violation`: the value misses a string format (`args.format`). */
 	diagFormatViolation: (format: string) => string;
+	/** What a screen reader hears once the errors the fields draw have changed and come to
+	 *  rest: each error's field label and its text, in the page's order, and none once the
+	 *  last has cleared. */
+	diagAnnounced: (issues: readonly { field: string; message: string }[]) => string;
 
 	// ── Where a field stands against its default (the label row's end) ───────
 	/** The tag on a field whose `default:` is what prints. */
@@ -308,6 +312,10 @@ export function alt(
 	return /Mac|iP(hone|[oa]d)/.test(platform) ? `⌥${key}` : `Alt+${key}`;
 }
 
+/** How many fields `diagAnnounced` names before it counts the rest, so a host's batch over
+ *  a whole document is still one sentence. */
+const FIELDS_NAMED = 3;
+
 /** The package's English. Every key, so the merge below is total. */
 export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	...DEFAULT_TABLE_STRINGS,
@@ -360,6 +368,14 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 			: format === 'datetime'
 				? 'Not a real date and time. Check the day, month and time.'
 				: `Doesn't match the ${format} format.`,
+	diagAnnounced: (issues) => {
+		if (issues.length === 0) return 'No issues.';
+		if (issues.length === 1) return `${issues[0].field}: ${issues[0].message}`;
+		const fields = [...new Set(issues.map((issue) => issue.field))];
+		const named = fields.slice(0, FIELDS_NAMED).join(', ');
+		const rest = fields.length - FIELDS_NAMED;
+		return `${issues.length} issues: ${named}${rest > 0 ? `, and ${rest} more` : ''}.`;
+	},
 	fieldDefault: 'Default',
 	fieldReset: 'Reset',
 	enumUnsetTag: 'Default',

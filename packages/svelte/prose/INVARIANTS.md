@@ -148,6 +148,8 @@ Under `forced-colors: active` a fill is dropped, so there a card draws a `Canvas
 
 **What a diagnostic says is the consumer's, up to a residue.** Validation and edit codes can be re-worded from `args`; parse and render messages carry backend prose no string table can key, so the built-in text stands there.
 
+**A diagnostic is heard from one standing region, never from its own list.** The editor keeps one hidden status region mounted and empty, and says in it the errors the page draws once they have changed and held still: one error with its field, several as a count and their fields, the last one clearing once (`diagAnnounced`). What a mount starts from is not a change, and a set that returns to what was last said says nothing, so a host validating on every keystroke speaks when the typing rests. The list stays its control's error message, heard on arriving at the control. Rejected: `role="status"` on each list, which enters the page with its text already in it, so a screen reader may not say it, and which a host's batch raises once per field; and sharing the undo toast's region, which is read whole, so a diagnostic would repeat the toast standing in it.
+
 **Diagnostics are not the error channel.** A `Diagnostic` is about the document and draws on its field; an `EditorError` is about the surface, a failure it already recovered from, and reaches `onError`.
 
 ### What the surface says
@@ -303,6 +305,8 @@ The bidirectional codec between one content field and one ProseMirror document. 
 **The preview is a pure view.** It paints and reads geometry off a `LiveSession` the consumer opened, and never mutates it, so one session can take edits from any source. Every option is bound once; a swap is the consumer's.
 
 **The preview leaves no ink of its own on the page.** It is the surface a user proofs against, so nothing advertises clickability and nothing marks the editor's active field.
+
+**The pane's message is heard as a change of state, not as a paint.** A hidden status region stands empty in the pane from the mount and takes the message once the pane has held still: a failed paint, the pages running out, and the pages standing again after either was said (`restored`). A recompile over a page that still fails clears the message and raises it again, which is no change, and a fresh seed's empty pane is where a mount starts, so neither is said. Rejected: a role on the message itself, which arrives with its text in it and would speak on every such recompile.
 
 **Paint is bounded by what is visible.** A canvas per visible page plus a margin, mounted and unmounted on scroll. A page that fails to paint shows a message in its slot rather than blanking the pane.
 

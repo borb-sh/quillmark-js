@@ -229,7 +229,7 @@ While a review is open, `REVIEW_KEYS` answer the current item from anywhere on t
 
 ### Wording
 
-The package ships English and a seam to replace it. `strings` is keyed and **partial**: set what you have translations for, and the rest stay the package's. Several keys are **accessible names** rather than decoration (the card controls, the add trigger), so an untranslated surface reads the wrong language to a screen reader. `DEFAULT_VISUAL_STRINGS` is the English, exported so you can compose against it. `<Preview>` takes its own `strings`: the states it shows when there is nothing to paint, the zoom pill's action, and the names a screen reader hears for the pane and each page.
+The package ships English and a seam to replace it. `strings` is keyed and **partial**: set what you have translations for, and the rest stay the package's. Several keys are **accessible names** rather than decoration (the card controls, the add trigger), so an untranslated surface reads the wrong language to a screen reader. `DEFAULT_VISUAL_STRINGS` is the English, exported so you can compose against it. `<Preview>` takes its own `strings`: the states it shows when there is nothing to paint, the zoom pill's action, and what a screen reader hears: the names of the pane and each page, and the pages standing again after a state it was told of.
 
 ```svelte
 <VisualEditor
@@ -244,7 +244,7 @@ The package ships English and a seam to replace it. `strings` is keyed and **par
 />
 ```
 
-`formatDiagnostic` gets the whole `Diagnostic` and returns `undefined` to take its own message. Validation and edit diagnostics re-word from `code`, `path` and `args`; parse errors and render warnings carry their detail inside English text and stand as they are ([INVARIANTS.md](prose/INVARIANTS.md#diagnostics)).
+`formatDiagnostic` gets the whole `Diagnostic` and returns `undefined` to take its own message. Validation and edit diagnostics re-word from `code`, `path` and `args`; parse errors and render warnings carry their detail inside English text and stand as they are ([INVARIANTS.md](prose/INVARIANTS.md#diagnostics)). A screen reader hears the errors the page draws from one hidden status region, once they have changed and held still, in the words of `diagAnnounced`, which is handed each error's field label and text.
 
 ### Fonts
 

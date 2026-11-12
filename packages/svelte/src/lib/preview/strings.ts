@@ -5,6 +5,8 @@ export interface PreviewStrings {
 	renderFailed: string;
 	/** A compile with zero pages: recoverable, and the commonest state of a fresh seed. */
 	noPages: string;
+	/** What a screen reader hears when pages stand again after it heard either of the two. */
+	restored: string;
 	/** The zoom pill's action, after the percentage it shows. */
 	resetZoom: string;
 	/** The pane's accessible name, where the container carries none of its own. */
@@ -17,6 +19,7 @@ export interface PreviewStrings {
 export const DEFAULT_PREVIEW_STRINGS: PreviewStrings = {
 	renderFailed: 'Preview failed to render.',
 	noPages: 'No pages to preview.',
+	restored: 'Preview restored.',
 	resetZoom: 'reset zoom',
 	previewLabel: 'Document preview',
 	pageLabel: (page, count) => `Page ${page} of ${count}`

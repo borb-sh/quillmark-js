@@ -5,10 +5,11 @@ import type { ReviewReport } from '../core/codec/index.js';
 import { rankAt, type CardModel } from './structure.js';
 import type { DeepReview, FieldProposal } from './review.js';
 
-/** A leaf as its card draws it: its key, and for a field its schema and the value it holds, which
- *  place what is drawn inside it. */
+/** A leaf as its card draws it: its key, and for a field its name, and the schema and the value
+ *  it holds, which place what is drawn inside it. */
 export interface LeafLayout {
 	key: string;
+	name?: string;
 	schema?: QuillFieldSchema;
 	value?: unknown;
 }
@@ -30,6 +31,7 @@ export function cardLayout(card: CardModel): CardLayout {
 			for (const field of section.fields)
 				leaves.push({
 					key: `${card.id}:${field.name}`,
+					name: field.name,
 					schema: field.schema,
 					value: card.values[field.name]
 				});

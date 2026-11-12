@@ -68,6 +68,10 @@ const CONTAINER_CLASS = 'qm-preview';
 const MESSAGE_CLASS = 'qm-preview-message';
 const EMPTY_CLASS = 'qm-preview-empty';
 const ERROR_CLASS = 'qm-preview-error';
+const LIVE_CLASS = 'qm-preview-live';
+/** How long the pane's state holds before it is spoken: a recompile over a page that still fails
+ *  clears the message and raises it again, and that is no change to hear. */
+const SPOKEN_MS = 500;
 
 export function createPreview(session: LiveSession, opts: PreviewOptions): PreviewController {
 	const container = opts.container;
@@ -82,6 +86,36 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 	if (ownsRole) container.setAttribute('role', 'region');
 	if (ownsName) container.setAttribute('aria-label', t.previewLabel);
 
+	// What a screen reader hears of the message below. The region stands empty from the mount,
+	// since one inserted with its text already in it may not be heard, and takes the message once
+	// it has held still. Pages standing again are said only after a message was, and the state a
+	// mount starts from is not a change, so a fresh seed's empty pane says nothing. Hidden by its
+	// own style rather than a sheet's, as a slot is drawn (`paint.ts`), so it leaves no ink where
+	// no sheet reaches it (INVARIANTS §"The preview").
+	const live = document.createElement('div');
+	live.className = LIVE_CLASS;
+	live.setAttribute('role', 'status');
+	Object.assign(live.style, {
+		position: 'absolute',
+		width: '1px',
+		height: '1px',
+		overflow: 'hidden',
+		clipPath: 'inset(50%)',
+		whiteSpace: 'nowrap'
+	});
+	container.appendChild(live);
+	let heard = session.pageCount === 0 ? t.noPages : '';
+	let settling: ReturnType<typeof setTimeout> | undefined;
+	function settle(): void {
+		clearTimeout(settling);
+		settling = setTimeout(() => {
+			const shown = message?.textContent ?? '';
+			if (shown === heard) return;
+			heard = shown;
+			live.textContent = shown || (live.textContent ? t.restored : '');
+		}, SPOKEN_MS);
+	}
+
 	// One element, restamped: the message states are mutually exclusive.
 	let message: HTMLElement | undefined;
 	function showMessage(text: string, state: string): void {
@@ -91,10 +125,12 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 		}
 		message.className = `${MESSAGE_CLASS} ${state}`;
 		message.textContent = text;
+		settle();
 	}
 	function hideMessage(): void {
 		message?.remove();
 		message = undefined;
+		settle();
 	}
 
 	// A paint that throws is caught per slot and surfaced through the message rather than aborting
@@ -188,6 +224,8 @@ export function createPreview(session: LiveSession, opts: PreviewOptions): Previ
 			viewport.destroy();
 			paintLoop.destroy();
 			hideMessage();
+			clearTimeout(settling);
+			live.remove();
 			container.classList.remove(CONTAINER_CLASS);
 			if (ownsRole) container.removeAttribute('role');
 			if (ownsName) container.removeAttribute('aria-label');

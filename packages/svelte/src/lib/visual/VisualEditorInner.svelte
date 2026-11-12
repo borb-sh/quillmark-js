@@ -57,7 +57,7 @@
 	} from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
 	import type { Delta } from '../core/codec/positions.js';
-	import { mergeStrings, setWording } from './strings.js';
+	import { diagnosticText, mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo, type UndoOffer } from './undo.svelte.js';
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
@@ -1406,6 +1406,38 @@
 		cards: tree.cards.map((c) => patched[c.id] ?? c)
 	});
 
+	// ── What a screen reader hears of the diagnostics (INVARIANTS §Diagnostics) ──
+	/** How long the drawn errors hold before they are spoken, so an edit's validation and
+	 *  the diagnostics a host raises for it are one announcement, and a set that returns
+	 *  to what was last said meanwhile says nothing. */
+	const SPOKEN_MS = 500;
+	/** Every error a leaf of the page draws, in the page's order, under its field's label. */
+	const issues = $derived(
+		[model.main, ...model.cards].flatMap((card) =>
+			cardLayout(card).leaves.flatMap(({ key, name, schema }) => {
+				const field = name !== undefined && schema ? fieldTitle(name, schema) : merged.bodyLabel;
+				return (diagByKey.get(key) ?? []).map((d) => ({
+					field,
+					message: diagnosticText(d, formatDiagnostic, merged)
+				}));
+			})
+		)
+	);
+	const issuesKey = $derived(JSON.stringify(issues));
+	// What a mount starts from is not a change, so the first set is held as said.
+	let spokenKey: string | undefined;
+	let spoken = $state('');
+	$effect(() => {
+		const key = issuesKey;
+		spokenKey ??= key;
+		if (key === spokenKey) return;
+		const timer = setTimeout(() => {
+			spokenKey = issuesKey;
+			spoken = merged.diagAnnounced(issues);
+		}, SPOKEN_MS);
+		return () => clearTimeout(timer);
+	});
+
 	// ── Public entry points ─────────────────────────────────────────────────────
 	/**
 	 * Resolve a preview {@link Landing} to a mounted leaf and land in it.
@@ -2087,6 +2119,9 @@
 		onHover={(on) => reviewing.hoverCard(on)}
 	/>
 	<div class="qm-visually-hidden" role="status">{reviewPlace}</div>
+	<!-- Beside the review's region rather than in it or in the toast's: a status is read whole,
+	 so a shared one would repeat what the other said. -->
+	<div class="qm-visually-hidden qm-diag-live" role="status">{spoken}</div>
 	<!-- The way back to a removed card once its toast has gone: the newest kept step, by
 	 name, at the stack's foot, where the control that adds a card is looked for. -->
 	{#if undo.kept}

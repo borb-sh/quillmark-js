@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { createPreview } from '$lib/preview/controller';
 import { DEFAULT_PREVIEW_STRINGS } from '$lib/preview/strings';
 import type { LiveSession, FieldRegion } from '@quillmark/wasm';
-import { change, mockSession, stubPaintGlobals } from '../helpers/session.js';
+import { FakeIO, change, mockSession, stubPaintGlobals } from '../helpers/session.js';
 
 beforeAll(stubPaintGlobals);
 
@@ -39,6 +39,80 @@ describe('preview controller empty-state across page-count transitions', () => {
 		preview.destroy();
 		expect(isEmpty()).toBe(false);
 		expect(container.classList.contains('qm-preview')).toBe(false);
+	});
+});
+
+// What a screen reader hears of the pane's message: a region mounted empty, which takes the
+// message once the pane's state has changed and held still.
+describe('the pane’s live region', () => {
+	const S = DEFAULT_PREVIEW_STRINGS;
+	beforeEach(() => void vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
+	afterEach(() => void vi.useRealTimers());
+
+	const live = () => container.querySelector('[role="status"]')!;
+	const rest = () => vi.runOnlyPendingTimers();
+	/** A session whose paint is refused while `failing` holds. */
+	function refusing(pageCount: number) {
+		const state = { failing: true };
+		const session = {
+			...mockSession(pageCount),
+			paint: () => {
+				if (state.failing) throw new Error('backend refused to paint');
+			}
+		} as unknown as LiveSession;
+		return { session, state };
+	}
+
+	it('stands empty from the mount, and a fresh seed’s empty pane says nothing', () => {
+		const preview = createPreview(mockSession(0), { container });
+		expect(live().textContent).toBe('');
+		rest();
+		expect(live().textContent).toBe('');
+		preview.refresh(change(1));
+		rest();
+		expect(live().textContent).toBe('');
+		preview.destroy();
+		expect(container.querySelector('[role="status"]')).toBeNull();
+	});
+
+	it('says a failed paint once it has held, and the pages standing again', () => {
+		const { session, state } = refusing(1);
+		const preview = createPreview(session, { container });
+		FakeIO.last!.report(true);
+		expect(live().textContent).toBe('');
+		rest();
+		expect(live().textContent).toBe(S.renderFailed);
+
+		state.failing = false;
+		preview.refresh(change(1));
+		rest();
+		expect(live().textContent).toBe(S.restored);
+		preview.destroy();
+	});
+
+	it('says nothing more for a recompile the failure outlasts', () => {
+		const { session } = refusing(1);
+		const preview = createPreview(session, { container });
+		FakeIO.last!.report(true);
+		rest();
+		const heard = new MutationObserver(() => {});
+		heard.observe(live(), { childList: true, characterData: true, subtree: true });
+		preview.refresh(change(1));
+		rest();
+		expect(heard.takeRecords()).toEqual([]);
+		heard.disconnect();
+		preview.destroy();
+	});
+
+	it('says the pages running out, and their return', () => {
+		const preview = createPreview(mockSession(2), { container });
+		preview.refresh(change(0));
+		rest();
+		expect(live().textContent).toBe(S.noPages);
+		preview.refresh(change(1));
+		rest();
+		expect(live().textContent).toBe(S.restored);
+		preview.destroy();
 	});
 });
 
