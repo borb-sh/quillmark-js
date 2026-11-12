@@ -58,7 +58,7 @@
 	import type { VisualEditorProps } from './props.js';
 	import type { Delta } from '../core/codec/positions.js';
 	import { mergeStrings, setWording } from './strings.js';
-	import { createStructuralUndo, setStructuralUndo, type UndoOffer } from './undo.svelte.js';
+	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview, type CardAdd } from './review.svelte.js';
@@ -78,7 +78,7 @@
 		type ReviewProjection
 	} from './review.js';
 	import ReviewCard from './ReviewCard.svelte';
-	import { cardLayout } from './review-order.js';
+	import { cardLayout, nextOpen, stepIn } from './review-order.js';
 	import type { CardId, CardOp, ChangeSource } from './signals.js';
 	import {
 		REVIEW_KEYS,
@@ -98,6 +98,7 @@
 		fieldValues,
 		fieldTitle,
 		humanize,
+		placeCardInto,
 		bodyEnabled,
 		provenanceMap,
 		resolvedByCardIndex,
@@ -232,7 +233,7 @@
 	function report(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
-		settled();
+		reviewing.settled();
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
 	}
 	function rederive(): void {
@@ -406,14 +407,9 @@
 		listedCards: () => cardsListed(),
 		liveCards: () => cardIds,
 		cardFor: cardKeyFor,
-		answered(id, current) {
-			if (!current) return;
-			if (batching) advancing = id;
-			else advanceFrom(id, drewOrder);
-		},
-		writing(on) {
-			writing += on ? 1 : -1;
-		},
+		undo,
+		answered: (id, order) => advanceFrom(id, order ?? drewOrder),
+		answerProse: (key, id, action) => !!leaves.prose(key)?.answerReview(id, action),
 		answer(id, item, action, key, write) {
 			let back: (() => void) | undefined;
 			if (write && item && onField(item)) {
@@ -425,72 +421,18 @@
 			}
 			onReview?.({ id, action });
 			if (action !== 'accept' && action !== 'dismiss') return true;
-			if (item && byCard(item)) {
-				record(id, () => giveBack(id, '', back));
-				return true;
-			}
+			if (item && byCard(item)) return () => giveBack(id, '', back);
 			const field = item && onField(item) ? reviewed(item.field) : undefined;
 			const leaf = key ?? (field && fieldKeyToString(field));
 			if (leaf === undefined) return true;
 			const prose = key !== undefined && !field;
-			record(
-				id,
-				prose
-					? action === 'accept'
-						? () => void leaves.prose(leaf)?.undoReview()
-						: () => void leaves.prose(leaf)?.reopenReview(id)
-					: () => giveBack(id, leaf, back)
-			);
-			return true;
+			return prose
+				? action === 'accept'
+					? () => void leaves.prose(leaf)?.undoReview()
+					: () => void leaves.prose(leaf)?.reopenReview(id)
+				: () => giveBack(id, leaf, back);
 		}
 	});
-
-	// ── The answer journal: the review answers since the reader's last edit, each undone by
-	// ⌘Z from anywhere in the editor, newest first, its item reopened with it. An edit that is
-	// not an answer empties it: an inverse is good against the document it was recorded over. An answer's own writes, and an inverse's, go down the
-	// lanes an edit does, so they are flagged while they are made.
-	interface Answered {
-		ids: string[];
-		inverses: (() => void)[];
-	}
-	let journal: Answered[] = [];
-	/** The entry a batch of answers records into. */
-	let batching: Answered | undefined;
-	let journalOffer: UndoOffer | undefined;
-	let writing = 0;
-	function settled(): void {
-		if (writing) return;
-		journal = [];
-		journalOffer = undefined;
-		undo.settle();
-	}
-	function offerJournal(): void {
-		const top = journal.at(-1);
-		journalOffer = top && undo.offer('', unanswer, { standing: true, quiet: true, answer: true });
-	}
-	function unanswer(): void {
-		const top = journal.pop();
-		if (!top) return;
-		writing++;
-		try {
-			for (const inverse of [...top.inverses].reverse()) inverse();
-		} finally {
-			writing--;
-		}
-		offerJournal();
-	}
-	function record(id: string, inverse: () => void): void {
-		if (batching) {
-			batching.ids.push(id);
-			batching.inverses.push(inverse);
-			return;
-		}
-		// Another step took the key since: the answers before it are no longer the last thing
-		// that happened.
-		if (!journalOffer || !undo.holds(journalOffer)) journal = [];
-		journal.push({ ids: [id], inverses: [inverse] });
-		offerJournal();
-	}
 
 	/**
 	 * Take a field's proposal: its value down the lane the field's own control commits by, so
@@ -515,7 +457,7 @@
 			leaves.prose(leaf)?.applyExternal();
 			return true;
 		};
-		writing++;
+		reviewing.writing(true);
 		try {
 			const before = doc.getStored(addr);
 			const to = (place: unknown): unknown => (edit ? edit.value : reviewing.writes(item, place));
@@ -529,7 +471,7 @@
 			if (!write(after)) return undefined;
 			return () => void write(before);
 		} finally {
-			writing--;
+			reviewing.writing(false);
 		}
 
 		/** The field's value as its control is handed it, read anew. */
@@ -592,15 +534,8 @@
 	}
 	/** Write `card` into the document at `at`, with its `$id` where no card holds that one. */
 	function placeCard(card: CardAdd['add'], at: number): boolean {
-		const { id, ...bare } = card;
-		const free = id !== undefined && !cardIds.some((_, k) => doc.card(k).id === id);
 		try {
-			try {
-				doc.unchecked.insertCard(free ? card : bare, at);
-			} catch (e) {
-				if (!free) throw e;
-				doc.unchecked.insertCard(bare, at);
-			}
+			placeCardInto(doc, card, at);
 			return true;
 		} catch (e) {
 			reportError(onError, {
@@ -675,19 +610,13 @@
 			live = false;
 		};
 	});
-	/** The current change answered by a host's batch, to move on from once the batch is done. */
-	let advancing: string | undefined;
 	/**
 	 * Make the next open change current after `id`'s answer, in `order` as it stood before the
 	 * answer, round from the end. The pane scrolls only where that change is out of comfortable
 	 * view, and neither the focus nor the caret moves.
 	 */
 	function advanceFrom(id: string, order: readonly string[]): void {
-		const open = new Set(reviewing.items.map((item) => item.id));
-		const at = order.indexOf(id);
-		const next = [...order.slice(at + 1), ...order.slice(0, Math.max(at, 0))].find((n) =>
-			open.has(n)
-		);
+		const next = nextOpen(order, id, new Set(reviewing.items.map((item) => item.id)));
 		if (next === undefined) return;
 		typing = false;
 		reviewing.reveal(next);
@@ -699,19 +628,8 @@
 	async function step(dir: 1 | -1, focus: boolean): Promise<string | undefined> {
 		if (!span.alive) return undefined;
 		const order = reviewing.order;
-		if (!order.length) return undefined;
-		const at = order.indexOf(reviewing.lit ?? stepped?.id ?? '');
-		const next =
-			at >= 0
-				? at + dir
-				: stepped
-					? dir > 0
-						? stepped.index
-						: stepped.index - 1
-					: dir > 0
-						? 0
-						: -1;
-		const index = ((next % order.length) + order.length) % order.length;
+		const index = stepIn(order, dir, reviewing.lit ?? stepped?.id, stepped?.index);
+		if (index === undefined) return undefined;
 		const id = order[index];
 		stepped = { id, index };
 		typing = false;
@@ -917,7 +835,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
-		settled();
+		reviewing.settled();
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
 
@@ -1171,10 +1089,7 @@
 		const { card } = gone;
 		const i = removed.place(gone, cardIds);
 		try {
-			const taken = card.id !== undefined && cardIds.some((_, k) => doc.card(k).id === card.id);
-			const back = { ...card };
-			if (taken) delete back.id;
-			doc.unchecked.insertCard(back, i);
+			placeCardInto(doc, card, i);
 		} catch (e) {
 			reportError(onError, {
 				code: 'card-op-failed',
@@ -1693,43 +1608,7 @@
 		ids: readonly string[] | 'all',
 		action: 'accept' | 'dismiss'
 	): string[] {
-		if (!span.alive) return [];
-		const order = reviewing.order;
-		// Accepting every item leaves the outdated ones open: each would write over the reader.
-		const outdated = new Set(ids === 'all' && action === 'accept' ? reviewing.report.outdated : []);
-		const asked =
-			ids === 'all'
-				? order.filter((id) => !outdated.has(id))
-				: order.filter((id) => ids.includes(id));
-		const out: string[] = [];
-		const entry: Answered = { ids: [], inverses: [] };
-		batching = entry;
-		writing++;
-		try {
-			for (const id of asked) {
-				const item = reviewing.items.find((it) => it.id === id);
-				if (!item) continue;
-				const key = reviewing.keyOf(id);
-				// Each one is planned against the document the one before it left.
-				const answered =
-					onField(item) || byCard(item)
-						? reviewing.act(id, action)
-						: key !== undefined && !!leaves.prose(key)?.answerReview(id, action);
-				if (answered) out.push(id);
-			}
-		} finally {
-			writing--;
-			batching = undefined;
-		}
-		if (entry.ids.length) {
-			if (!journalOffer || !undo.holds(journalOffer)) journal = [];
-			journal.push(entry);
-			offerJournal();
-		}
-		const from = advancing;
-		advancing = undefined;
-		if (from !== undefined) advanceFrom(from, order);
-		return out;
+		return span.alive ? reviewing.answer(ids, action) : [];
 	}
 
 	/**
@@ -1900,17 +1779,8 @@
 	/** Write `card` into `target` at `at`, with its `$id` where no card there holds that one,
 	 *  as {@link placeCard} writes it into the document. */
 	function placeCardIn(target: Document, card: CardAdd['add'], at: number): boolean {
-		const { id, ...bare } = card;
-		const free =
-			id !== undefined &&
-			!Array.from({ length: target.cardCount }, (_, k) => target.card(k).id).includes(id);
 		try {
-			try {
-				target.unchecked.insertCard(free ? card : bare, at);
-			} catch (e) {
-				if (!free) throw e;
-				target.unchecked.insertCard(bare, at);
-			}
+			placeCardInto(target, card, at);
 			return true;
 		} catch {
 			return false;

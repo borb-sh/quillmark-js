@@ -8,6 +8,12 @@
 //
 // An answered item is drawn no more, from the answer and not from the host's next list: the
 // reader's press shows at once however long the host takes to hand over a list without it.
+//
+// The answer journal holds the answers since the reader's last edit, each undone by ⌘Z from
+// anywhere in the editor, newest first, its item reopened with it. An edit that is not an answer
+// empties it: an inverse is good against the document it was recorded over. An answer's own
+// writes, and an inverse's, go down the lanes an edit does, so they are flagged while they are
+// made.
 import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { PathStep } from '@quillmark/wasm';
@@ -31,6 +37,7 @@ import {
 	type ReviewUndrawn
 } from './review.js';
 import { orderOf, type CardLayout } from './review-order.js';
+import type { StructuralUndo, UndoOffer } from './undo.svelte.js';
 
 /** How long the pointer rests on an item before it is current, in ms. */
 export const DWELL_MS = 160;
@@ -83,6 +90,13 @@ export interface Review {
 	point(id: string | undefined, via: ReviewVia): void;
 	/** A reader's answer. False where it could not be made. */
 	act(id: string, action: ReviewAction): boolean;
+	/** Answer items as the answer card would, in the page's order: `'all'` is every item drawn,
+	 *  less on Accept the outdated ones, each of which would write over the reader. Each is
+	 *  planned against the document the one before it left, and one that cannot be answered
+	 *  stands. ⌘Z takes the call back whole. Returns the ids answered. */
+	answer(ids: readonly string[] | 'all', action: 'accept' | 'dismiss'): string[];
+	/** An edit landed that is no answer's: the answers before it can no longer be taken back. */
+	settled(): void;
 	/** A reader's commit of `value` on a control that shows one value, under the proposal `id`:
 	 *  the proposed value accepts it, any other is written and dismisses it, both one answer.
 	 *  False where it could not be made, and the commit is the caller's. */
@@ -122,14 +136,20 @@ export interface ReviewSource {
 	leafFor(path: DocPath): string | undefined;
 	/** A reader's answer, to make and to pass on: `item` where the list holds it, `key` the
 	 *  leaf that gave it where one did, `write` the value a dismissal made by an edit writes.
-	 *  `false` where it could not be made, and the item stands. */
+	 *  `false` where it could not be made, and the item stands; a function is the way back, which
+	 *  takes back what the answer wrote and reopens the item. */
 	answer(
 		id: string,
 		item: ReviewItem | undefined,
 		action: ReviewAction,
 		key?: string,
 		write?: { value: unknown }
-	): boolean;
+	): boolean | (() => void);
+	/** Answer the item the prose leaf at `key` draws, as its answer card would. False where the
+	 *  leaf could not. */
+	answerProse(key: string, id: string, action: 'accept' | 'dismiss'): boolean;
+	/** The editor's undo, which holds the newest journal entry for the key. */
+	undo: StructuralUndo;
 	/** The main card, then each card of the stack, each with its leaves as it draws them. */
 	layout(): readonly CardLayout[];
 	/** The session keys of the cards as they stood when the list was set, by index. */
@@ -138,9 +158,9 @@ export interface ReviewSource {
 	liveCards(): readonly string[];
 	/** The session key of the card holding `$id` `id`, `undefined` where none does. */
 	cardFor(id: string): string | undefined;
-	/** An accept or a dismissal, once it is made, `current` where the item was the current one. */
-	answered?(id: string, current: boolean): void;
-	writing?(on: boolean): void;
+	/** The current item was answered: move on from it, in `order` where a batch of answers gives
+	 *  the order it stood in before them. */
+	answered?(id: string, order?: readonly string[]): void;
 }
 
 export function createReview(source: ReviewSource): Review & { dispose(): void } {
@@ -347,12 +367,54 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		current = id;
 	};
 
-	const answering = (id: string, action: ReviewAction): void => {
+	interface Answered {
+		ids: string[];
+		inverses: (() => void)[];
+	}
+	let journal: Answered[] = [];
+	/** The entry a batch of answers records into, and the current item it answered. */
+	let batching: (Answered & { moved?: string }) | undefined;
+	let offer: UndoOffer | undefined;
+	let writing = 0;
+	const offerJournal = (): void => {
+		offer = journal.length
+			? source.undo.offer('', unanswer, { standing: true, quiet: true, answer: true })
+			: undefined;
+	};
+	const unanswer = (): void => {
+		const top = journal.pop();
+		if (!top) return;
+		writing++;
+		try {
+			for (const inverse of [...top.inverses].reverse()) inverse();
+		} finally {
+			writing--;
+		}
+		offerJournal();
+	};
+	const record = (entry: Answered): void => {
+		// Another step took the key since: the answers before it are no longer the last thing
+		// that happened.
+		if (!offer || !source.undo.holds(offer)) journal = [];
+		journal.push(entry);
+		offerJournal();
+	};
+
+	const answering = (id: string, action: ReviewAction, made: true | (() => void)): void => {
+		if (made !== true) {
+			if (batching) {
+				batching.ids.push(id);
+				batching.inverses.push(made);
+			} else record({ ids: [id], inverses: [made] });
+		}
+		const was = current === id;
 		if (action === 'reopen') answered.delete(id);
 		else answered.add(id);
 		answers++;
 		if (action === 'reopen') name(id);
-		else source.answered?.(id, current === id);
+		else if (!was) return;
+		else if (batching) batching.moved = id;
+		else source.answered?.(id);
 	};
 
 	const self: Review & { dispose(): void } = {
@@ -420,17 +482,55 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		},
 		act(id, action) {
 			const item = byId.get(id);
-			if (!item || !source.answer(id, item, action)) return false;
-			answering(id, action);
+			const made = item && source.answer(id, item, action);
+			if (!made) return false;
+			answering(id, action, made);
 			return true;
+		},
+		answer(ids, action) {
+			const before = order;
+			const stale = new Set(ids === 'all' && action === 'accept' ? report.outdated : []);
+			const asked =
+				ids === 'all'
+					? before.filter((id) => !stale.has(id))
+					: before.filter((id) => ids.includes(id));
+			const out: string[] = [];
+			const entry: Answered & { moved?: string } = { ids: [], inverses: [] };
+			batching = entry;
+			writing++;
+			try {
+				for (const id of asked) {
+					const item = byId.get(id);
+					if (!item) continue;
+					const key = self.keyOf(id);
+					const made =
+						onField(item) || byCard(item)
+							? self.act(id, action)
+							: key !== undefined && source.answerProse(key, id, action);
+					if (made) out.push(id);
+				}
+			} finally {
+				writing--;
+				batching = undefined;
+			}
+			if (entry.ids.length) record({ ids: entry.ids, inverses: entry.inverses });
+			if (entry.moved !== undefined) source.answered?.(entry.moved, before);
+			return out;
+		},
+		settled() {
+			if (writing) return;
+			journal = [];
+			offer = undefined;
+			source.undo.settle();
 		},
 		answerWith(id, value) {
 			const item = byId.get(id);
 			if (!item || !onField(item)) return false;
 			const action = writesProposed(value, item.after) ? 'accept' : 'dismiss';
 			const write = action === 'dismiss' ? { value } : undefined;
-			if (!source.answer(id, item, action, undefined, write)) return false;
-			answering(id, action);
+			const made = source.answer(id, item, action, undefined, write);
+			if (!made) return false;
+			answering(id, action, made);
 			return true;
 		},
 		planned(id, state) {
@@ -445,9 +545,12 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (merged === text.after) return item.after;
 			return typeof item.after === 'string' ? merged.text : merged;
 		},
-		writing: (on) => source.writing?.(on),
+		writing(on) {
+			writing += on ? 1 : -1;
+		},
 		heard(id, action, key) {
-			if (source.answer(id, byId.get(id), action, key)) answering(id, action);
+			const made = source.answer(id, byId.get(id), action, key);
+			if (made) answering(id, action, made);
 		},
 		reveal: name,
 		hoverCard(on) {
@@ -487,6 +590,8 @@ const NO_REVIEW: Review = {
 	drew() {},
 	point() {},
 	act: () => false,
+	answer: () => [],
+	settled() {},
 	answerWith: () => false,
 	planned() {},
 	current: () => undefined,
