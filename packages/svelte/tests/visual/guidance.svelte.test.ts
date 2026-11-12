@@ -10,6 +10,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { quill, example, quillFromYaml } from '../helpers/fixtures.js';
+import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import {
 	field,
 	leaf,
@@ -58,6 +59,15 @@ describe('the guidance key', () => {
 		const hints = [...target.querySelectorAll<HTMLElement>('.qm-field-hint')];
 		expect(hints.length).toBeGreaterThan(0);
 		expect(hints.filter((h) => h.tabIndex !== -1)).toEqual([]);
+	});
+
+	it('names each glyph for the field it is about', () => {
+		const { target } = mountEditor(quill(), example());
+		const { hint } = contactNote(target);
+		const label = hint.closest('.qm-field-label-row')!.querySelector('.qm-field-label span')!;
+		expect(hint.getAttribute('aria-label')).toBe(
+			DEFAULT_VISUAL_STRINGS.fieldGuidance(label.textContent!)
+		);
 	});
 
 	it('raises the focused control’s own description, and lowers it again', () => {

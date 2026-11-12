@@ -129,6 +129,27 @@
 		padding: var(--_qm-space-4);
 		background: var(--_qm-surface-sunken);
 	}
+	/* Inset, so the scrollport does not clip it. */
+	:global(:where(.qm-preview:focus-visible)) {
+		outline: var(--_qm-ring);
+		outline-offset: calc(-1 * var(--_qm-ring-reach));
+	}
+
+	/* The message in place of the pages (controller.ts): words about the pane, at the chrome's
+	   label size, where a page would stand. */
+	:global(:where(.qm-preview-message)) {
+		padding: var(--_qm-space-5) var(--_qm-space-4);
+		font-family: var(--_qm-font);
+		font-size: var(--_qm-text-label);
+		line-height: var(--_qm-leading-body);
+		text-align: center;
+	}
+	:global(:where(.qm-preview-empty)) {
+		color: var(--_qm-ink-label);
+	}
+	:global(:where(.qm-preview-error)) {
+		color: var(--_qm-danger);
+	}
 
 	/* The arrival wash on the page (`wash.ts`): a plane at a field's box, its tone the editor's,
 	   reaching a hair past the ink's tight box and rounded, as a control's wash is a box's own. Over

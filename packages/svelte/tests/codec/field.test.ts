@@ -615,6 +615,27 @@ describe('createField accessible name (a11y follow-up)', () => {
 		expect(viewOf(field).dom.hasAttribute('aria-label')).toBe(false);
 		field.destroy();
 	});
+
+	it('states a textbox, one-line or multi-line as the leaf edits', () => {
+		const doc = example();
+		const line = createField({
+			doc,
+			quill: quill(),
+			addr: { field: 'title' },
+			container: mount(),
+			inline: true,
+			label: 'Title'
+		});
+		const body = createField({ doc, quill: quill(), addr: {}, container: mount() });
+		for (const [field, multiline] of [
+			[line, 'false'],
+			[body, 'true']
+		] as const) {
+			expect(viewOf(field).dom.getAttribute('role')).toBe('textbox');
+			expect(viewOf(field).dom.getAttribute('aria-multiline')).toBe(multiline);
+			field.destroy();
+		}
+	});
 });
 
 // The ghost is chrome: it decorates an empty leaf, never enters the document, and

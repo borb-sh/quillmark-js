@@ -432,6 +432,7 @@
 			<label class="qm-recovery-retype">
 				{t.strings.retypeLabel}
 				<select
+					class="qm-control-box qm-focus-ring"
 					onchange={(e) => {
 						const el = e.currentTarget as HTMLSelectElement;
 						if (el.value) ops.retype(el.value);
@@ -877,14 +878,14 @@
 		font-size: var(--_qm-text-label);
 		color: var(--_qm-ink-label);
 	}
-	/* The one native control the surface draws, on the box's own recipe (controls.css).
-	 `font` carries no colour, so the value's ink is restated over the UA's. */
-	.qm-recovery-retype select {
-		font: inherit;
-		color: var(--_qm-ink);
-		border: none;
-		border-radius: var(--_qm-radius-inner);
-		background: var(--_qm-surface-well);
-		padding: var(--_qm-space-half) var(--_qm-space-2);
+	/* Forced colours drop a plane's tone, so a card draws its edge, and the placeholder's
+	 GrayText would read the automatic title as disabled. */
+	@media (forced-colors: active) {
+		.qm-card {
+			border: var(--_qm-border-width) solid CanvasText;
+		}
+		.qm-card-title::placeholder {
+			color: CanvasText;
+		}
 	}
 </style>

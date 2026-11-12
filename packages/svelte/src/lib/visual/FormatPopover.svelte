@@ -545,7 +545,7 @@
 									class="qm-link-input qm-focus-ring"
 									type="text"
 									placeholder={t.strings.linkPlaceholder}
-									aria-label={t.strings.formatLink}
+									aria-label={t.strings.linkAddress}
 									bind:value={linkValue}
 								/>
 								<button type="submit" class="qm-icon-btn qm-mark-btn qm-focus-ring"
@@ -689,6 +689,10 @@
 		border: none;
 		border-radius: var(--_qm-radius-inner);
 		background: var(--_qm-surface-well);
+		color: var(--_qm-ink);
 		min-width: 12rem;
+	}
+	.qm-link-input::placeholder {
+		color: var(--_qm-ink-label);
 	}
 </style>

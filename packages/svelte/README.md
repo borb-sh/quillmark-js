@@ -89,7 +89,7 @@ const preview = createPreview(session, {
 preview.refresh(session.update(doc)); // repaint dirtyPages ∩ visible
 ```
 
-In Svelte, `<Preview {session} onPick={…} />` exposes the same verbs (`refresh`, `scrollToField`, `focusPosition`, `endFollow`, `setZoom`) via `bind:this`.
+In Svelte, `<Preview {session} onPick={…} />` exposes the same verbs (`refresh`, `scrollToField`, `focusPosition`, `washField`, `endFollow`, `setZoom`) via `bind:this`.
 
 `<Preview>` binds **once**, at mount: swapping `session`, `margin`, `onPick`, `onError` or `strings` in place changes nothing on screen and reports `rebind-ignored` through `onError` at `dev` severity, naming the prop. Swap by remounting (`{#key session}`); drive in-place edits through `refresh(change)`. `class` and `style` are the exceptions, landing on the root element and staying live.
 
@@ -237,7 +237,7 @@ The package ships English and a seam to replace it. `strings` is keyed and **par
 	{quill}
 	strings={{
 		cardDelete: 'Supprimer la carte',
-		addCard: '+ Ajouter une carte'
+		addCard: 'Ajouter une carte'
 	}}
 	formatDiagnostic={(d) =>
 		d.code === 'validation::type_mismatch' ? `${d.path} : type incorrect` : undefined}

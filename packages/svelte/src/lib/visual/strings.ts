@@ -189,6 +189,9 @@ export interface VisualStrings
 	 *  an island in a one-line leaf, an island in any subform cell), which it draws
 	 *  read-only rather than lose. */
 	proseHeld: string;
+	/** A field's guidance marker, named for the field it is about: `Subject guidance`.
+	 *  Parametric, so word order stays the translator's. */
+	fieldGuidance: (label: string) => string;
 
 	// ── Formatting popover ────────────────────────────────────────────────────
 	formatGroup: string;
@@ -212,6 +215,8 @@ export interface VisualStrings
 	formatAnchor: string;
 	/** Its hover title, which says what an anchor is; the name above only says what. */
 	formatAnchorTitle: string;
+	/** The link prompt's address input: its accessible name. */
+	linkAddress: string;
 	linkPlaceholder: string;
 	linkApply: string;
 	/** Drawn only where the selection carries a link. */
@@ -367,6 +372,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	dateToday: 'Today',
 	optionalGhost: 'None',
 	proseHeld: "This field has formatting it can't edit here. It is kept as it is.",
+	fieldGuidance: (label) => `${label} guidance`,
 	formatGroup: 'Formatting',
 	formatBold: `Bold (${chord('B')})`,
 	formatEmphasis: `Italic (${chord('I')})`,
@@ -381,6 +387,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	fontMixed: 'Mixed fonts',
 	formatAnchor: 'Anchor',
 	formatAnchorTitle: 'Anchor — an identity handle over the selection',
+	linkAddress: 'Link address',
 	linkPlaceholder: 'https://…',
 	linkApply: 'Apply',
 	linkRemove: 'Remove',

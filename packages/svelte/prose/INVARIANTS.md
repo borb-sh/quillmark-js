@@ -42,6 +42,8 @@ The rules a change to `@quillmark/svelte` must keep, the reason behind each, and
 - **A stroke on something floating**: a menu, a popover, the table island's alignment cluster, which have no plane under them to step off.
 - **A stroke that is a state**: the dashed edge on a card the schema cannot project.
 
+Under `forced-colors: active` a fill is dropped, so there a card draws a `CanvasText` edge in place of its tone, the one outline a plane takes.
+
 ## The boundary
 
 **Adding a construct upstream is a compile error here.** Block kinds, container kinds, mark types and island types are closed past their `x-` names, and each place that names a set names it against the boundary's own union (an exhaustive `switch`, a `satisfies`, a `Record` keyed by the union). Rejected: a literal check, which compiles unchanged against a widened union and silently drops the new member.

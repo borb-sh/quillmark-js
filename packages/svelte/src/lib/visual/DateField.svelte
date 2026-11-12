@@ -339,6 +339,7 @@
 							type="button"
 							class="qm-chip qm-tap-floor qm-focus-ring qm-date-today"
 							aria-pressed={!!follows}
+							aria-keyshortcuts="T"
 							data-default={follows === 'default' ? '' : undefined}
 							onclick={toggle}
 						>

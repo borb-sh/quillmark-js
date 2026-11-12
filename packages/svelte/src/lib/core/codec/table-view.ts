@@ -1723,7 +1723,12 @@ class TableIslandView implements NodeView {
 				doc: decode(cellContent(seed), cellSchema),
 				plugins: cellPlugins(this.cellKeys(r, c), () => this.outer)
 			}),
-			attributes: { 'aria-label': name, class: 'qm-table-cell-editor' },
+			attributes: {
+				role: 'textbox',
+				'aria-multiline': 'true',
+				'aria-label': name,
+				class: 'qm-table-cell-editor'
+			},
 			// A cell is one of the leaf's lines, so a reveal keeps the leaf's clearance, not PM's
 			// 5px default, and the same scroll padding (`reveal.ts`).
 			...revealProps(this.deps.clearance),

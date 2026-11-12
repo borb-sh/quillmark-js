@@ -240,8 +240,8 @@
 :where(.qm-chip) {
 	color: var(--_qm-ink-label);
 }
-:where(.qm-add-affordance:hover),
-:where(.qm-chip:hover) {
+:where(.qm-add-affordance:hover:not(:disabled)),
+:where(.qm-chip:hover:not(:disabled, [aria-disabled='true'])) {
 	color: var(--_qm-ink);
 }
 :where(.qm-chip svg),

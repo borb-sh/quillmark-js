@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+**Every text surface names itself to assistive tech.** A prose leaf, a list row's text and a table cell are textboxes, one-line or multi-line as they edit, where they were unroled `contenteditable` regions carrying a name. An enum's list is named by its field, and its divider no longer stands in the list as a separator. The link prompt's address box is named _Link address_, where it took the Link button's name and chord. The Today toggle states its `T` key. `VisualStrings` gains `fieldGuidance`, the guidance marker's name, and `linkAddress`.
+
+**Key hints, the link prompt and the preview's own text read in the theme.** The answer card's key hints are drawn in their button's ink, where they were faded under contrast. The link prompt's address and placeholder take the theme's ink, where they took the browser's black and grey. The preview's empty and error messages stand centred at label size, the empty one in the label ink and the error in the danger hue, and a focused preview pane draws the package's ring inside its edge. The recovery shell's kind picker is drawn as every other input, with the package's focus ring, and a disabled chip no longer darkens on hover.
+
+**Cards hold their edges in forced colours.** Under `forced-colors: active` a card draws a line around it, which the dropped fill no longer can, and a card's automatic title reads in the text colour, where it read as disabled grey.
+
 **A proposal for a cell of an unticked matrix member is drawn.** It was reported open with nothing on the page marking it; the member now shows ticked, as taking the proposal leaves it, with the cell marked under its columns, and unticking the member turns the proposal down.
 
 **A number field's own undo back to its default leaves it unset.** Undoing an edit in a number field back to the default it showed unwritten left the default written, tagged with a reset; it now unsets the field again, as a text field's undo does.

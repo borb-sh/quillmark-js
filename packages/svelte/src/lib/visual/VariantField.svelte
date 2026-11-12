@@ -154,6 +154,7 @@
 		fallback={ghostMember}
 		blankTitle={schema.ui?.blank_title}
 		{id}
+		{labelledBy}
 		{describedBy}
 		onCommit={commitPick}
 		proposing={!!pick}

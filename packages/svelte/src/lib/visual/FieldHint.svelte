@@ -33,6 +33,7 @@
 	import Icon from './icons/Icon.svelte';
 	import { spacePx } from '../core/rungs.js';
 	import { renderGuidance } from './guidance.js';
+	import { wording } from './strings.js';
 	import './controls.css';
 
 	interface Props {
@@ -45,6 +46,7 @@
 		describedBy?: string;
 	}
 	let { description, label, describedBy }: Props = $props();
+	const t = wording();
 
 	let open = $state(false);
 	let triggerEl = $state<HTMLButtonElement | undefined>(undefined);
@@ -149,7 +151,7 @@
 	type="button"
 	class="qm-field-hint qm-icon-btn qm-focus-ring qm-tap-floor"
 	tabindex="-1"
-	aria-label="{label} guidance"
+	aria-label={t.strings.fieldGuidance(label)}
 	aria-expanded={open}
 	aria-describedby={describedBy}
 	onpointerenter={(e) => {

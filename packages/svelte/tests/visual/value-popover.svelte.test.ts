@@ -252,6 +252,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 
 		const input = document.querySelector<HTMLInputElement>('.qm-link-input')!;
 		expect(document.activeElement).toBe(input);
+		expect(input.getAttribute('aria-label')).toBe(DEFAULT_VISUAL_STRINGS.linkAddress);
 		input.value = 'example.com';
 		input.dispatchEvent(new Event('input', { bubbles: true }));
 		input.form!.requestSubmit();
