@@ -40,7 +40,7 @@
    keys a way to it. */
 :where(.qm-tip kbd) {
 	font: inherit;
-	color: var(--_qm-ink-label);
+	color: var(--_qm-ink-label-raised);
 }
 @keyframes qm-tip-in {
 	from {
