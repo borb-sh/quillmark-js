@@ -59,6 +59,8 @@ describe('tooltips', () => {
 
 	it('raises at once under keyboard focus, and lowers as the focus leaves', () => {
 		const { root, named } = mount();
+		// jsdom reads `:focus-visible` off the last key or pointer event the window saw.
+		document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
 		named.focus();
 		expect(tip(root)?.textContent).toBe('Move up');
 		named.blur();
