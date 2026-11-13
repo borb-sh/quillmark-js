@@ -29,9 +29,10 @@
 		addr: Addr;
 		inline?: boolean;
 		plaintext?: boolean;
+		paragraphs?: boolean;
 		/**
 		 * Draw no box: the card body's leaf, and nothing else. Not `block`, which is a
-		 * different predicate: a `richtext` field declaring `multiline: true` is block
+		 * different predicate: a `richtext` field declaring `shape: blocks` is block
 		 * prose and still a control in a row of controls, so only the caller knows what
 		 * is paper.
 		 */
@@ -83,6 +84,7 @@
 		addr,
 		inline,
 		plaintext,
+		paragraphs,
 		unframed,
 		label,
 		labelledBy,
@@ -141,6 +143,7 @@
 				container,
 				inline,
 				plaintext,
+				paragraphs,
 				label,
 				labelledBy,
 				describedBy,
@@ -241,7 +244,7 @@
 	.qm-prose-block :global(.ProseMirror) {
 		min-height: calc(1em * var(--_qm-leading-body));
 	}
-	/* Paper, and the withheld box is what says so. Not `block` alone: `multiline` is the
+	/* Paper, and the withheld box is what says so. Not `block` alone: `shape` is the
 	 quill's to declare, so a schema spelling it on a richtext field puts a block leaf in
 	 a field row, where this rung would break the height agreement above. */
 	.qm-prose-block:not(.qm-control-box) {

@@ -287,6 +287,8 @@ The bidirectional codec between one content field and one ProseMirror document. 
 
 **A `text` field's schema declares no mark types.** Mark-freedom is the schema's rather than a rule per path, because the boundary refuses a marked `text` value only at render, where no commit-time gate catches it.
 
+**A leaf's schema holds exactly what its field's `shape` does.** A `richtext` of `shape: lines` mounts paragraphs, hard breaks and marks and no other node, so a list or a heading cannot be typed, pasted or accepted into it. The engine refuses such a value at the write (`validation::not_lines`), which would reach the reader as an edit that silently failed to land.
+
 **A `text` field writes its whole literal string through `writer.set`.** A content object would round-trip through markdown and change what the author typed.
 
 **`codec/prose.css` predicts nothing about the size a quill sets a span at.**

@@ -393,6 +393,7 @@
 					{addr}
 					inline={field.inline}
 					plaintext={field.plaintext}
+					paragraphs={field.paragraphs}
 					fallback={printed ? (ghost as Content) : undefined}
 					placeholder={proposed ? undefined : none}
 					emptyUnsets={optional}

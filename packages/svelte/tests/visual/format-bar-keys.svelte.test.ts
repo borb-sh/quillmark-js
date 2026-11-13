@@ -24,7 +24,7 @@ main:
   fields:
     intro:
       type: richtext
-      multiline: true
+      shape: blocks
 `;
 const LIBRARY: LibraryFace[] = [
 	{ family: 'Tinos', weight: 400, style: 'normal', index: 0, data: new Uint8Array([1]) }

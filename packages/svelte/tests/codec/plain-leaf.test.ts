@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// A `text` field declaring `multiline: true` holds lines: upstream's literal codec
+// A `text` field declaring `shape: lines` holds lines: upstream's literal codec
 // reads one line per `\n`, so a leaf narrowed to one textblock would join an address's
 // lines and commit the joined text on the first edit. Multiline, the leaf runs
 // paragraphs and hard breaks, held over content upstream's `isPlain` refuses; one
@@ -26,7 +26,7 @@ main:
   fields:
     address:
       type: text
-      multiline: true
+      shape: lines
       default: ""
     line:
       type: text
@@ -83,7 +83,7 @@ function paste(view: EditorView, text: string): void {
 	view.dom.dispatchEvent(event);
 }
 
-describe('a text field declaring `multiline: true`', () => {
+describe('a text field declaring `shape: lines`', () => {
 	it('keeps both lines of an address through an edit', () => {
 		const doc = load();
 		const errors: string[] = [];

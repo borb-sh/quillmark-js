@@ -33,13 +33,12 @@ main:
   fields:
     title:
       type: richtext
-      multiline: false
     line:
       type: text
       default: ""
     address:
       type: text
-      multiline: true
+      shape: lines
       default: ""
     pages:
       type: integer
@@ -48,7 +47,6 @@ card_kinds:
     fields:
       heading:
         type: richtext
-        multiline: false
 `;
 const probe = () => quillFromYaml(YAML);
 const STRUCTURED = '- one\n- two\n\npara ![i](a.png)';

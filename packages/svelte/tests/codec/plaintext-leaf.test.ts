@@ -28,10 +28,9 @@ main:
   fields:
     note:
       type: text
-      multiline: true
+      shape: lines
     tag:
       type: richtext
-      multiline: false
 `;
 
 const q = probeQuill(QUILL_YAML);

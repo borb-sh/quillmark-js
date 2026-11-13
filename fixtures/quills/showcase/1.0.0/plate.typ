@@ -135,10 +135,15 @@
   align(center, block(width: 78%, text(size: 9.5pt, qm.data.epigraph)))
 }
 
-// ── Abstract, keywords ──────────────────────────────────────────────────────
+// ── Abstract, copies, keywords ──────────────────────────────────────────────────────
 #if qm.data.at("abstract", default: "") != "" {
   v(8pt)
   block(inset: (left: 14pt), text(size: 9.5pt, qm.data.abstract))
+}
+
+#if qm.data.at("copies_to", default: "") != "" {
+  v(4pt)
+  text(size: 9pt, { strong[Copies to: ]; linebreak(); qm.data.copies_to })
 }
 
 #let keywords = qm.data.at("keywords", default: ())

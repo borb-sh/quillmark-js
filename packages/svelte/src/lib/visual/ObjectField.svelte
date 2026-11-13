@@ -43,6 +43,7 @@
 		fieldModels,
 		fieldTitle,
 		isContainer,
+		linesOnly,
 		literalText,
 		mountKey,
 		optionalCell,
@@ -442,6 +443,7 @@
 							value={shown}
 							fallback={contentDefault(sub)}
 							plaintext={literalText(sub)}
+							paragraphs={linesOnly(sub)}
 							placeholder={ownItem ? undefined : noneOf(key, sub)}
 							{block}
 							label={named}

@@ -28,8 +28,9 @@
  it, so the echo replaces nothing and the caret and the history stay.
 
  The schema is the declared type's where the parent has room for it: a subform cell
- declaring `multiline: true` takes the full row ({@link ObjectField}), a `richtext` one
- on the block schema and a `text` one on the plain schema, paragraphs and hard breaks.
+ declaring a `shape` takes the full row ({@link ObjectField}), a `richtext` of blocks
+ on the block schema, a `richtext` of lines on the lines schema and a `text` one on the
+ plain schema, paragraphs and hard breaks.
  An array element is one textblock whatever it declares, since Enter there is the
  repeater's, and a paste or a drop of several lines into one is a row per line, as Enter
  would open them, up to the array's `max:`, the last row taking what is left joined and
@@ -95,8 +96,11 @@
 		 * as the field of that type mounts. */
 		plaintext?: boolean;
 		/** A multi-block schema, for a cell the parent draws at full width: the block
-		 * schema, or the plain one with `plaintext`. Absent, the leaf is one textblock. */
+		 * schema, the plain one with `plaintext`, or the lines one with `paragraphs`.
+		 * Absent, the leaf is one textblock. */
 		block?: boolean;
+		/** A `richtext` cell of `shape: lines`: formatted paragraphs and hard breaks. */
+		paragraphs?: boolean;
 		/** Accessible name for the editable region, where nothing else names it: an
 		 * array has no per-element label. A cell with a label element takes
 		 * `labelledBy`. */
@@ -141,6 +145,7 @@
 		fallback,
 		plaintext = false,
 		block = false,
+		paragraphs = false,
 		label,
 		labelledBy,
 		describedBy,
@@ -243,7 +248,7 @@
 	function mountView(mount: HTMLDivElement): () => void {
 		return untrack(() => {
 			const inline = !block;
-			const leaf = { inline, plaintext, islands: false };
+			const leaf = { inline, plaintext, paragraphs, islands: false };
 			// Read per attribute pass, not captured: an element's name carries its index,
 			// which a remove above it moves.
 			const names = () => drawn;
@@ -279,7 +284,7 @@
 				// The same keymap and plugin stack a `createField` leaf mounts (shared
 				// `proseLeafPlugins`), minus the anchor-position plugin: anchors are dropped on
 				// the parent's value write, per the header.
-				const schema = held ? blockSchema : leafSchema({ plaintext, inline });
+				const schema = held ? blockSchema : leafSchema({ plaintext, inline, paragraphs });
 				return EditorState.create({
 					doc: decode(rt, schema),
 					plugins: held

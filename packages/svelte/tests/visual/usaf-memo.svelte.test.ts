@@ -75,13 +75,13 @@ describe('the shipped quill on the surface', () => {
 	});
 
 	it('takes a `text` field as the one-line leaf it declares', () => {
-		// Most of this quill is `text` declaring no `multiline`, so the leaf is a
+		// Most of this quill is `text` declaring no `shape`, so the leaf is a
 		// one-line one and `packable` takes the `ui.compact` beside it.
 		const byName = Object.fromEntries(fieldModels(memo().schema.main).map((m) => [m.name, m]));
 		expect(byName.authority_line.control).toBe('prose');
 		expect(byName.authority_line.plaintext).toBe(true);
 		expect(byName.authority_line.inline).toBe(true);
-		expect(byName.tag_line.inline).toBe(true); // a richtext, `multiline: false`
+		expect(byName.tag_line.inline).toBe(true); // a richtext declaring no `shape`
 		expect(byName.dissemination.compact).toBe(true);
 
 		// And on the surface, where a packed field is a `cell` and a declined one — or one

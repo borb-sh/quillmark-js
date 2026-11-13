@@ -54,8 +54,8 @@ const f = (over: Partial<QuillFieldSchema>): QuillFieldSchema =>
 
 describe('controlKind', () => {
 	it('maps each field type to its control', () => {
-		expect(controlKind(f({ type: 'richtext', multiline: true }))).toBe('prose');
-		expect(controlKind(f({ type: 'text', multiline: true }))).toBe('prose');
+		expect(controlKind(f({ type: 'richtext', shape: 'blocks' }))).toBe('prose');
+		expect(controlKind(f({ type: 'text', shape: 'lines' }))).toBe('prose');
 		expect(controlKind(f({ type: 'text' }))).toBe('prose');
 		expect(controlKind(f({ type: 'enum', values: ['a'] }))).toBe('enum');
 		expect(controlKind(f({ type: 'number' }))).toBe('number');
@@ -85,10 +85,10 @@ const unknownType = (over: Record<string, unknown>): QuillFieldSchema =>
 	over as unknown as QuillFieldSchema;
 
 describe('the text field', () => {
-	it('mounts `text` as a literal prose leaf, one line unless `multiline: true`', () => {
+	it('mounts `text` as a literal prose leaf, one line unless it declares a `shape`', () => {
 		for (const type of ['text', 'text?'] as const) {
 			const short = f({ type });
-			const tall = f({ type, multiline: true });
+			const tall = f({ type, shape: 'lines' });
 			expect(controlKind(short)).toBe('prose');
 			expect(controlKind(tall)).toBe('prose');
 			expect([oneLine(short), literalText(short)]).toEqual([true, true]);
@@ -96,10 +96,10 @@ describe('the text field', () => {
 		}
 	});
 
-	it('reads a `richtext` line shape off `multiline`, which it always carries', () => {
-		expect(oneLine(f({ type: 'richtext', multiline: false }))).toBe(true);
-		expect(oneLine(f({ type: 'richtext', multiline: true }))).toBe(false);
-		expect(literalText(f({ type: 'richtext', multiline: false }))).toBe(false);
+	it('reads a `richtext` shape off `shape`, absent on one line', () => {
+		expect(oneLine(f({ type: 'richtext' }))).toBe(true);
+		expect(oneLine(f({ type: 'richtext', shape: 'blocks' }))).toBe(false);
+		expect(literalText(f({ type: 'richtext' }))).toBe(false);
 	});
 
 	it('projects one-line `text` as a packable leaf, and multiline as block', () => {
@@ -107,7 +107,7 @@ describe('the text field', () => {
 			fields: {
 				subject: f({ type: 'text' }),
 				rank: f({ type: 'text', ui: { compact: true } }),
-				address: f({ type: 'text', multiline: true, ui: { compact: true } }),
+				address: f({ type: 'text', shape: 'lines', ui: { compact: true } }),
 				unit: f({ type: 'text', ui: { compact: true } })
 			}
 		});
@@ -133,16 +133,16 @@ describe('the text field', () => {
 			properties: { page: { type: 'integer' }, label: { type: 'text' } }
 		});
 		expect(shortCell(f({ type: 'text' }))).toBe(true);
-		expect(shortCell(f({ type: 'text', multiline: true }))).toBe(false);
+		expect(shortCell(f({ type: 'text', shape: 'lines' }))).toBe(false);
 		expect(arrayLayout(f({ type: 'array', ui: { layout: 'table' }, items }))).toBe('table');
 	});
 
 	it('remounts a field whose line shape moves under its name', () => {
 		expect(mountKey('a', f({ type: 'text' }))).not.toBe(
-			mountKey('a', f({ type: 'text', multiline: true }))
+			mountKey('a', f({ type: 'text', shape: 'lines' }))
 		);
 		expect(mountKey('a', f({ type: 'array', items: { type: 'text' } }))).not.toBe(
-			mountKey('a', f({ type: 'array', items: { type: 'text', multiline: true } }))
+			mountKey('a', f({ type: 'array', items: { type: 'text', shape: 'lines' } }))
 		);
 	});
 });
@@ -160,8 +160,8 @@ describe('fieldModels', () => {
 				number: f({ type: 'number' }),
 				boolean: f({ type: 'boolean' }),
 				text: f({ type: 'text' }),
-				multiline: f({ type: 'text', multiline: true }),
-				richtext: f({ type: 'richtext', multiline: true }),
+				multiline: f({ type: 'text', shape: 'lines' }),
+				richtext: f({ type: 'richtext', shape: 'blocks' }),
 				array: f({ type: 'array', items: f({ type: 'date' }) }),
 				object: f({ type: 'object', properties: {} }),
 				matrix: f({ type: 'matrix', members: {} }),
@@ -273,7 +273,7 @@ describe('titleText + cardTitle', () => {
 		const fields = {
 			tone: f({ type: 'enum', values: ['a'] }),
 			heading: f({ type: 'text' }),
-			lead: f({ type: 'richtext', multiline: false })
+			lead: f({ type: 'richtext' })
 		};
 		const titled = { fields, title: 'Routing indorsement' };
 		const untitled = { fields };
@@ -376,8 +376,8 @@ describe('placeFields', () => {
 			mk('world', true, { control: 'variant', schema: { type: 'enum', values: ['a'] } }),
 			arr('strings', true, { type: 'text' }),
 			arr('untyped', true),
-			arr('inline_prose', true, { type: 'richtext', multiline: false }),
-			arr('blocks', true, { type: 'richtext', multiline: true }),
+			arr('inline_prose', true, { type: 'richtext' }),
+			arr('blocks', true, { type: 'richtext', shape: 'blocks' }),
 			arr('objects', true, { type: 'object' })
 		];
 		expect(spans(declined).every(([, span]) => span === 'full')).toBe(true);
@@ -585,12 +585,12 @@ describe('against the real showcase schema', () => {
 
 	it('reads the line shape off what the boundary serves', () => {
 		const byName = Object.fromEntries(fieldModels(main()).map((m) => [m.name, m]));
-		// `subtitle` is a `text` declaring no `multiline`, so it is a one-line literal
+		// `subtitle` is a `text` declaring no `shape`, so it is a one-line literal
 		// leaf and `packable` takes the `ui.compact` it asks for.
 		expect(byName.subtitle.schema.type).toBe('text');
 		expect(byName.subtitle.plaintext).toBe(true);
 		expect(byName.subtitle.inline).toBe(true);
-		expect(byName.epigraph.inline).toBe(true); // richtext, `multiline: false`
+		expect(byName.epigraph.inline).toBe(true); // richtext declaring no `shape`
 		expect(byName.subtitle.compact).toBe(true);
 		// Packable and alone is still `full`: a run of one has nothing to pack against.
 		expect(placeFields([byName.subtitle])).toEqual([{ field: byName.subtitle, span: 'full' }]);
@@ -667,8 +667,8 @@ describe('optional cells', () => {
 
 	it('keep the base type’s shape: a `text?` cell is one line, a table column', () => {
 		expect(shortCell(f({ type: 'text?' }))).toBe(true);
-		expect(shortCell(f({ type: 'text?', multiline: true }))).toBe(false);
-		expect(shortCell(f({ type: 'richtext?', multiline: true }))).toBe(false);
+		expect(shortCell(f({ type: 'text?', shape: 'lines' }))).toBe(false);
+		expect(shortCell(f({ type: 'richtext?', shape: 'blocks' }))).toBe(false);
 		const items = f({
 			type: 'object',
 			properties: { note: f({ type: 'text?' }), on: f({ type: 'boolean?' }) }
@@ -718,7 +718,7 @@ describe('arrayLayout', () => {
 		lead: f({ type: 'boolean' }),
 		n: f({ type: 'integer' }),
 		tag: f({ type: 'text' }),
-		line: f({ type: 'richtext', multiline: false })
+		line: f({ type: 'richtext' })
 	};
 	const arr = (properties: Record<string, QuillFieldSchema>, layout?: 'table') =>
 		({
@@ -735,10 +735,10 @@ describe('arrayLayout', () => {
 
 	it('declines for a block prose cell or a container, at every width', () => {
 		expect(
-			arrayLayout(arr({ ...short, body: f({ type: 'richtext', multiline: true }) }, 'table'))
+			arrayLayout(arr({ ...short, body: f({ type: 'richtext', shape: 'blocks' }) }, 'table'))
 		).toBe('list');
 		expect(
-			arrayLayout(arr({ ...short, address: f({ type: 'text', multiline: true }) }, 'table'))
+			arrayLayout(arr({ ...short, address: f({ type: 'text', shape: 'lines' }) }, 'table'))
 		).toBe('list');
 		expect(
 			arrayLayout(
@@ -780,7 +780,7 @@ describe('schemaAt', () => {
 			properties: {
 				tours: f({
 					type: 'array',
-					items: { type: 'object', properties: { title: f({ type: 'text', multiline: true }) } }
+					items: { type: 'object', properties: { title: f({ type: 'text', shape: 'lines' }) } }
 				})
 			}
 		}

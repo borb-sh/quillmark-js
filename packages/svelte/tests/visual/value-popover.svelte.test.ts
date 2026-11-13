@@ -44,13 +44,13 @@ main:
       type: array
       items:
         type: richtext
-        multiline: true
+        shape: blocks
       default: []
     errata:
       type: array
       items:
         type: text
-        multiline: true
+        shape: lines
       default: []
     jobs:
       type: array
@@ -61,7 +61,6 @@ main:
             type: text
           summary:
             type: richtext
-            multiline: false
       default: []
     crew:
       type: array
@@ -72,7 +71,6 @@ main:
             type: text
           note:
             type: richtext
-            multiline: false
       ui:
         layout: table
       default: []
@@ -83,10 +81,10 @@ main:
           type: text
         note:
           type: richtext
-          multiline: true
+          shape: blocks
     intro:
       type: richtext
-      multiline: true
+      shape: blocks
     pages:
       type: integer
 `;
