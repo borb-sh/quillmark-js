@@ -63,6 +63,12 @@
  answering, while the rows stand as that step left them. An edit in a row since is the
  row's to undo first. A removal offered on the toast is the same step.
 
+ A `text` element declaring `multiline: true` is a row holding lines of its own, on the
+ plain schema its field mounts: Enter is a line break in the row, a paste of several lines
+ lands in it, and neither edge key joins it to a neighbour, since two such rows are two
+ things rather than two lines of one. ⌘/Ctrl+Enter inserts the sibling below, as it does
+ from any row, and Backspace removes the row once it holds no line.
+
  An empty list of lines (any element but an `object`) draws a standing row to type
  into, so a list's first line takes no press of the add chip first. The row is not an
  element and draws as one that is not there yet: a row's own box with no remove, holding
@@ -108,6 +114,7 @@
 		declaredContent,
 		fieldTitle,
 		literalText,
+		oneLine,
 		renderedBoolean,
 		schemaAt,
 		textCap,
@@ -220,6 +227,11 @@
 	// has text elements.
 	const control = $derived(items ? controlKind(items) : 'text');
 	const table = $derived(layout === 'table' && control === 'object');
+	/** A `text` element declaring `multiline: true`: a row holding lines of its own, so
+	 *  Enter is the row's and the list's insert takes the chord. */
+	const tall = $derived(
+		control === 'prose' && items != null && literalText(items) && !oneLine(items)
+	);
 	const columns = $derived(Object.entries(items?.properties ?? {}));
 	/** A column's track. A cell that fills its width takes a share of what the field has
 	 *  spare, a control of one width (an enum, a date, a number) rests at its content,
@@ -897,6 +909,7 @@
 			return;
 		}
 		if (e.key === 'Enter') {
+			if (tall && !(e.metaKey || e.ctrlKey)) return;
 			e.preventDefault();
 			insertAfter(k, column);
 		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target, column)) {
@@ -1178,11 +1191,15 @@
 							label={rowName(k)}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onChange={(rt) => commitElement(k, rt)}
-							lines={{
-								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
-								onLines: (rt, below, caret) => spill(k, rt, below, caret),
-								onJoin: (dir) => join(dir < 0 ? k - 1 : k)
-							}}
+							block={tall}
+							enterBreaks={tall}
+							lines={tall
+								? undefined
+								: {
+										room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
+										onLines: (rt, below, caret) => spill(k, rt, below, caret),
+										onJoin: (dir) => join(dir < 0 ? k - 1 : k)
+									}}
 							onKey={(e) => onElementKey(e, k)}
 						/>
 					{:else if control === 'number'}
@@ -1295,6 +1312,7 @@
 					content={() => asContent(after)}
 					value={after}
 					plaintext={items != null && literalText(items)}
+					block={tall}
 					label={rowName(k)}
 					onChange={() => {}}
 				/>

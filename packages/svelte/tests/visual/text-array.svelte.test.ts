@@ -263,6 +263,88 @@ describe('an array of `text`', () => {
 // its elements rest as authored strings, the scalar field's rest form, and the row reads
 // one at the codec the declared type names, so the emphasis is lowered by the boundary
 // rather than by the row.
+describe('an array of `text` declaring `multiline: true`', () => {
+	const blocks = (target: HTMLElement) => leaves(target, 'Signatories');
+	const stored = (doc: Document) => literal(doc.getStored('signatories')) as string[];
+
+	it('mounts a row holding lines as one leaf it can edit', () => {
+		const q = quill();
+		const doc = example();
+		const seeded = stored(doc);
+		expect(seeded[0]).toContain('\n');
+
+		const { target } = mountEditor(q, doc);
+		expect(blocks(target)).toHaveLength(seeded.length);
+		expect(blocks(target)[0].getAttribute('contenteditable')).toBe('true');
+		expect(blocks(target)[0].getAttribute('aria-multiline')).toBe('true');
+	});
+
+	it('keeps Enter in the row, as a line break', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('signatories', ['abcdef', 'ghi']);
+		const { target, editor } = mountEditor(q, doc);
+
+		await editor.setCaret({ field: 'main.signatories[0]', pos: 3, granularity: 'cluster' });
+		await tick();
+		press(blocks(target)[0], 'Enter', { cancelable: true });
+		await settle();
+		expect(blocks(target)).toHaveLength(2);
+		const [first, second] = stored(doc);
+		expect(first).toBe('abc\ndef');
+		expect(second).toBe('ghi');
+	});
+
+	it.each([{ ctrlKey: true }, { metaKey: true }])(
+		'opens the next row on Enter with %o, the caret in it',
+		async (chord) => {
+			const q = quill();
+			const doc = example();
+			const seeded = stored(doc);
+			const { target } = mountEditor(q, doc);
+
+			blocks(target)[0].focus();
+			press(blocks(target)[0], 'Enter', { ...chord, cancelable: true });
+			await settle();
+			expect(stored(doc)).toEqual([seeded[0], '', ...seeded.slice(1)]);
+			expect(document.activeElement).toBe(blocks(target)[1]);
+		}
+	);
+
+	it('takes a paste of several lines into the row', () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('signatories', ['']);
+		const { target } = mountEditor(q, doc);
+
+		paste(blocks(target)[0], 'one\ntwo');
+		expect(stored(doc)).toEqual(['one\ntwo']);
+	});
+
+	it('joins no row onto the one above on Backspace at its start', async () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('signatories', ['abc', 'def']);
+		const { target, editor } = mountEditor(q, doc);
+
+		await editor.setCaret({ field: 'main.signatories[1]', pos: 0, granularity: 'cluster' });
+		await tick();
+		press(blocks(target)[1], 'Backspace', { cancelable: true });
+		await settle();
+		expect(stored(doc)).toEqual(['abc', 'def']);
+	});
+
+	it('removes a row on Backspace once it holds no line', () => {
+		const q = quill();
+		const doc = example();
+		q.writer(doc).set('signatories', ['abc', '']);
+		const { target } = mountEditor(q, doc);
+
+		press(blocks(target)[1], 'Backspace');
+		expect(stored(doc)).toEqual(['abc']);
+	});
+});
+
 describe('an array of richtext loaded from markdown', () => {
 	it('mounts authored-string elements as prose rows, with emphasis lowered', () => {
 		const doc = core.Document.parse(`~~~

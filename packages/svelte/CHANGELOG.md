@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A list of multi-line `text` holds lines in each row.** An array whose `items` is a `text` declaring `multiline: true` draws each element as a row that grows with its lines: Enter is a line of the row, a paste of several lines lands in the row, and Backspace at a row's start joins it to no neighbour. ⌘/Ctrl+Enter opens the next row, as it does from any row of a list, and Backspace removes a row that holds no line. Such a row was one line, Enter opened the next row, and an element stored with a line break was held read-only.
+
 **A table's row and a line of a list move by a drag handle.** A row of a `layout: table` array and an element of a list of lines or scalars draw the grip a record's row draws, coming up with the row under the pointer, where they moved by Alt+↑/↓ alone. A table's grip stands in a first track pinned to the start of the box the table scrolls in, as its remove is pinned to the end, so it stays in reach when the table scrolls sideways.
 
 **A table's text columns share the field's width.** A column of text or prose cells takes a share of the width the field has, where each stood at a fixed width and a table of three such columns scrolled sideways in a form narrower than about 715px. A prose column's floor narrows to its share before the table scrolls, so the columns fit down to about 7rem each, and a column of an enum, a date or a number still rests at its content.

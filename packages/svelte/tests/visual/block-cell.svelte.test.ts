@@ -178,14 +178,14 @@ describe('a narrowed leaf over structure it cannot hold', () => {
 		expect(mounted.changes).toEqual([]);
 	});
 
-	it('holds a multi-line text element, one textblock whatever it declares', () => {
+	it('edits a multi-line text element, its lines kept', () => {
 		const q = probe();
 		const doc = load();
 		const mounted = mountEditor(q, doc);
 		const leaf = field(mounted.target, 'Tags').querySelectorAll<HTMLElement>('.ProseMirror')[1];
 
-		expect(leaf.getAttribute('contenteditable')).toBe('false');
-		expect(heldNote(leaf)).not.toBeNull();
+		expect(leaf.getAttribute('contenteditable')).toBe('true');
+		expect(leaf.hasAttribute('aria-describedby')).toBe(false);
 		// The line break a narrowed decode would have joined to a space.
 		expect(leaf.querySelector('p')?.innerHTML).toBe('12 Main St<br>Springfield');
 	});

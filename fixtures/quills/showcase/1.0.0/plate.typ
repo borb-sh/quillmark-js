@@ -158,6 +158,14 @@
   })
 }
 
+// A `signatories` row is a `text` holding lines of its own, which reach the page as its
+// line breaks.
+#let signatories = qm.data.at("signatories", default: ())
+#if signatories.len() > 0 {
+  v(6pt)
+  text(size: 9pt, grid(columns: 2, column-gutter: 24pt, row-gutter: 10pt, ..signatories))
+}
+
 // ── Body ────────────────────────────────────────────────────────────────────
 #v(10pt)
 #columns(qm.data.at("columns", default: 1), qm.data.at("$body"))

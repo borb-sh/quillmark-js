@@ -30,7 +30,8 @@
  The schema is the declared type's where the parent has room for it: a subform cell
  declaring `multiline: true` takes the full row ({@link ObjectField}), a `richtext` one
  on the block schema and a `text` one on the plain schema, paragraphs and hard breaks.
- An array element is one textblock whatever it declares, since Enter there is the
+ A `text` array element declaring it mounts the plain schema too, and keeps its Enter
+ ({@link ArrayField}). Every other array element is one textblock, since Enter there is the
  repeater's, and a paste or a drop of several lines into one is a row per line, as Enter
  would open them, up to the array's `max:`, the last row taking what is left joined and
  then the row's text after the landing point (`lines`). There is no slash menu at either width, and no island view.
@@ -49,7 +50,9 @@
 	import { EditorState, Selection } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
 	import {
+		BODY_KEYS,
 		blockSchema,
+		breakKeymap,
 		createReconciler,
 		decode,
 		emptyContent,
@@ -97,6 +100,9 @@
 		/** A multi-block schema, for a cell the parent draws at full width: the block
 		 * schema, or the plain one with `plaintext`. Absent, the leaf is one textblock. */
 		block?: boolean;
+		/** Enter is a line break rather than a paragraph: a row of a list, whose lines stand
+		 * together as one thing ({@link ArrayField}). */
+		enterBreaks?: boolean;
 		/** Accessible name for the editable region, where nothing else names it: an
 		 * array has no per-element label. A cell with a label element takes
 		 * `labelledBy`. */
@@ -141,6 +147,7 @@
 		fallback,
 		plaintext = false,
 		block = false,
+		enterBreaks = false,
 		label,
 		labelledBy,
 		describedBy,
@@ -389,7 +396,12 @@
 								return true;
 							}
 							onKey?.(e);
-							return false;
+							if (e.defaultPrevented || !enterBreaks || held || e.key !== 'Enter') return false;
+							if (e.isComposing || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return false;
+							const lineBreak = breakKeymap(mounted.state.schema)[BODY_KEYS.lineBreak];
+							if (!lineBreak?.(mounted.state, mounted.dispatch)) return false;
+							e.preventDefault();
+							return true;
 						}
 					}
 				}

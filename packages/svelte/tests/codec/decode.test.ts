@@ -203,8 +203,8 @@ describe('one-line / plain constraints', () => {
 		['trailing spaces', 'a  \nb  ', 'doc(paragraph("a  ", hard_break, "b  "))']
 	])('the plain schema holds %s, and projects back to the same lines', (_, value, shape) => {
 		const doc = quill().seedDocument();
-		doc.unchecked.storeField('errata', [value]);
-		const rt = quill().reader(doc).getContentAt('errata', [0])!;
+		doc.unchecked.storeField('signatories', [value]);
+		const rt = quill().reader(doc).getContentAt('signatories', [0])!;
 		doc.free();
 
 		const pm = decode(rt, plainSchema);

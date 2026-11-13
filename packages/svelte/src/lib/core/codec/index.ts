@@ -108,6 +108,8 @@ export { inputRulesPlugin } from './inputrules.js';
 // The body leaf's structural keys: `createField` binds the composed chains
 // (`bodyKeymap`); the suite drives both it and the list link directly.
 export { bodyKeymap } from './keymap.js';
+export { breakKeymap } from './breaks.js';
+export { BODY_KEYS } from './shortcuts.js';
 export { listKeymap } from './lists.js';
 
 // The list toggle the keymap binds to Mod-Shift-7/8, and the selection toolbar's list

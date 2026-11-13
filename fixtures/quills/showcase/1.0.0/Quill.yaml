@@ -164,14 +164,30 @@ main:
       type: array
       items:
         type: text
-        multiline: true
       default: []
       ui:
         group: content
       example:
         - Fig. 2 is mislabelled — the **asterisks** here are the text, not emphasis.
         - Page 4 gives the wrong year.
-      description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text; `multiline: true`, so a row holds lines."
+      description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text; one line each, so Enter opens the next row."
+
+    signatories:
+      type: array
+      items:
+        type: text
+        multiline: true
+      default: []
+      ui:
+        group: content
+      example:
+        - |-
+          Ada Lovelace
+          Analyst
+        - |-
+          Charles Babbage
+          Engineer
+      description: "Who signs, each a block of lines. A `text` item declaring `multiline: true` holds lines of its own, so Enter in a row is a line of that row and Ctrl/⌘+Enter opens the next row."
 
     epigraph:
       type: richtext
