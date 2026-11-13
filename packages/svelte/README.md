@@ -213,7 +213,7 @@ The editor makes every write an answer asks for:
 | `dismiss` | Turned a proposal down.                 | Nothing.                                                                                           |
 | `reopen`  | Undid an accept or a dismissal with ⌘Z. | Before the event, what an accept wrote is taken back by its own undo. The item is open again.      |
 
-Every answer to the current item moves on to the next open one, in the page's order and round from the end, without moving the caret or the focus, so a review is a run of answers. A review starts on its first item. The caret entering an item or a press on one makes it current at once, and the pointer resting on one makes it current after a short dwell; leaving an item keeps it current.
+Every answer to the current item moves on to the next open one, in the page's order and round from the end, without moving the caret or the focus, so a review is a run of answers. A review starts on its first item. The caret entering an item or a press on one makes it current at once; the pointer over one does not, and leaving an item keeps it current.
 
 An answered item is drawn no more from the moment of the answer: a dismissed one wrote nothing, and an accepted one is plain text in the document, the reader's like any other. The editor keeps no record of what an accept replaced; a host that offers to take a whole answer back keeps its own snapshot of the document from before it.
 

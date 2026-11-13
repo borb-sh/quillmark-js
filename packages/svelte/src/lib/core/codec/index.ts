@@ -47,14 +47,7 @@ export type { LeaveStrings } from './leave.js';
 
 // The review layer a leaf draws over its blocks: the visual tier's `ReviewItem` narrows to the
 // leaf's own.
-export type {
-	BlockPlace,
-	LeafUndrawn,
-	ReviewAction,
-	ReviewReport,
-	ReviewVia,
-	TextReview
-} from './review.js';
+export type { BlockPlace, LeafUndrawn, ReviewAction, ReviewReport, TextReview } from './review.js';
 export { wordDiff } from './review-diff.js';
 export { valueDiffPlugin } from './value-diff.js';
 export type { ValueProposal, ValueState } from './value-diff.js';

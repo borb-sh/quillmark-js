@@ -58,9 +58,6 @@ export type BlockPlace = { after: string } | { before: string } | 'end';
  *  for it taken back by the leaf's own undo. */
 export type ReviewAction = 'accept' | 'dismiss' | 'reopen';
 
-/** What brought an item under attention: the pointer over it, or the caret in it. */
-export type ReviewVia = 'pointer' | 'caret';
-
 /** What the plugin reads and reports through; every reader is live. */
 export interface ReviewChannel {
 	items(): readonly TextReview[];
@@ -72,8 +69,8 @@ export interface ReviewChannel {
 	act(id: string, action: ReviewAction): void;
 	/** The leaf is writing a taken proposal, and is done. */
 	writing?(on: boolean): void;
-	/** The item the pointer or the caret is in, `undefined` once it has left. */
-	point(id: string | undefined, via: ReviewVia): void;
+	/** The item the caret is in, `undefined` once it has left. */
+	point(id: string | undefined): void;
 	/** What the leaf draws and what it holds and does not draw, on each change of either. */
 	drew(report: ReviewReport): void;
 }
@@ -984,17 +981,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		channel.drew(next);
 	};
 
-	let hovered: string | undefined;
-	const hover = (id: string | undefined): void => {
-		if (id === hovered) return;
-		hovered = id;
-		channel.point(id, 'pointer');
-	};
-	const idAt = (target: EventTarget | null): string | undefined =>
-		(target instanceof Element ? target.closest('[data-qm-review]') : null)?.getAttribute(
-			'data-qm-review'
-		) ?? undefined;
-
 	let caret: string | undefined;
 	/** The item the reader typed in, quiet until the caret has left it. */
 	let muted: string | undefined;
@@ -1010,7 +996,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		const next = at === muted ? undefined : at;
 		if (next === caret) return;
 		caret = next;
-		channel.point(next, 'caret');
+		channel.point(next);
 	};
 
 	const plugin = new Plugin<ReviewState>({
@@ -1028,14 +1014,6 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		props: {
 			decorations,
 			handleDOMEvents: {
-				mouseover: (_view, e) => {
-					hover(idAt(e.target));
-					return false;
-				},
-				mouseleave: () => {
-					hover(undefined);
-					return false;
-				},
 				focus: (view) => {
 					follow(view, false);
 					return false;
@@ -1061,8 +1039,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 					follow(view, reviewKey.getState(prev)?.edits !== reviewKey.getState(view.state)?.edits);
 				},
 				destroy() {
-					if (hovered !== undefined) channel.point(undefined, 'pointer');
-					if (caret !== undefined) channel.point(undefined, 'caret');
+					if (caret !== undefined) channel.point(undefined);
 					if (reported !== NOTHING) channel.drew({ ids: [], outdated: [], undrawn: [] });
 					host = undefined;
 				}

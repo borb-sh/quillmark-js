@@ -39,9 +39,8 @@
 		/** The reader's own writing meets the change. */
 		outdated: boolean;
 		onAnswer(action: 'accept' | 'dismiss'): void;
-		onHover(on: boolean): void;
 	}
-	let { id, root, inset, hidden, outdated, onAnswer, onHover }: Props = $props();
+	let { id, root, inset, hidden, outdated, onAnswer }: Props = $props();
 
 	const t = wording();
 
@@ -260,8 +259,6 @@
 	aria-label={t.strings.reviewProposal}
 	aria-hidden={!shown}
 	inert={!shown}
-	onpointerenter={() => onHover(true)}
-	onpointerleave={() => onHover(false)}
 	onmousedown={(e) => e.preventDefault()}
 	{onkeydown}
 	onfocusout={(e) => {

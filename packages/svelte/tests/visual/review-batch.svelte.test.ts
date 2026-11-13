@@ -356,7 +356,7 @@ describe('the current change', () => {
 		expect(r.doc.toMarkdown()).toContain('- [ ] a second task');
 	});
 
-	it('is named by a press on a change at once, and by the pointer only once it rests', async () => {
+	it('is named by a press on a change at once, and never by the pointer over one', async () => {
 		const r = batch(spread);
 		await settle();
 		const order = r.drawn.at(-1)!.open;

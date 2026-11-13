@@ -574,7 +574,6 @@
 		return { title, fields, text: add.body?.text?.trim() ?? '' };
 	}
 	setReview(reviewing);
-	span.onEnd(reviewing.dispose);
 	// The current change, to a host counting its place: each change, and not the nothing a
 	// mount starts from.
 	let reported: string | undefined;
@@ -1993,8 +1992,6 @@
 				data-qm-review={removal?.id}
 				role={removal ? 'group' : undefined}
 				aria-label={removal ? merged.reviewRemoveCard : undefined}
-				onpointerenter={removal && (() => reviewing.point(removal.id, 'pointer'))}
-				onpointerleave={removal && (() => reviewing.point(undefined, 'pointer'))}
 			>
 				<Card
 					bind:this={cardRefs[i]}
@@ -2027,7 +2024,6 @@
 		hidden={typing}
 		outdated={reviewing.lit !== undefined && drewOutdated.includes(reviewing.lit)}
 		onAnswer={answerCurrent}
-		onHover={(on) => reviewing.hoverCard(on)}
 	/>
 	<div class="qm-visually-hidden" role="status">{reviewPlace}</div>
 	<!-- Beside the review's region rather than in it or in the toast's: a status is read whole,
@@ -2091,8 +2087,6 @@
 					data-qm-review={item.id}
 					role="group"
 					aria-label={`${merged.reviewNewCard}, ${preview.title}`}
-					onpointerenter={() => reviewing.point(item.id, 'pointer')}
-					onpointerleave={() => reviewing.point(undefined, 'pointer')}
 				>
 					<div class="qm-review-card-add-head">
 						<span class="qm-review-card-add-title">{preview.title}</span>
