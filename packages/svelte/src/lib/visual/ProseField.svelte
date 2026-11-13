@@ -157,7 +157,7 @@
 					slash = next;
 				},
 				onReview: (id, action) => reviewing.heard(id, action, leafKey),
-				onReviewPoint: (id, via) => reviewing.point(id, via),
+				onReviewPoint: (id) => reviewing.point(id),
 				onReviewWriting: (on) => reviewing.writing(on),
 				onReviewDrawn: (report) => reviewing.drew(leafKey, report),
 				onValuePlanned: (id, state) => reviewing.planned(id, state),

@@ -2,7 +2,7 @@
 // The review state's one current item, where the card items draw, and what an answer takes off.
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import type { Card } from '@quillmark/wasm';
-import { createReview, DWELL_MS } from '$lib/visual/review.svelte';
+import { createReview } from '$lib/visual/review.svelte';
 import { nextOpen, stepIn } from '$lib/visual/review-order';
 import { createStructuralUndo } from '$lib/visual/undo.svelte';
 import type { ReviewAction } from '$lib/core/codec';
@@ -68,38 +68,15 @@ function store(
 }
 
 describe('the current item', () => {
-	it('is named by the caret arriving, a reveal, or the pointer once it rests, and kept when they leave', () => {
+	it('is named by the caret arriving or a reveal, and kept when the caret leaves', () => {
 		const { review } = store();
 		expect(review.lit).toBeUndefined();
-		review.point('proposal', 'caret');
+		review.point('proposal');
 		expect(review.lit).toBe('proposal');
-		review.point(undefined, 'caret');
+		review.point(undefined);
 		expect(review.lit).toBe('proposal');
 		review.reveal('title');
 		expect(review.lit).toBe('title');
-		review.point('first', 'pointer');
-		expect(review.lit).toBe('title');
-		vi.advanceTimersByTime(DWELL_MS);
-		expect(review.lit).toBe('first');
-		review.point(undefined, 'pointer');
-		expect(review.lit).toBe('first');
-	});
-
-	it('is not moved by a pointer that leaves before it rests, or rests over the answer card', () => {
-		const { review } = store();
-		review.reveal('title');
-		review.point('first', 'pointer');
-		review.point(undefined, 'pointer');
-		vi.advanceTimersByTime(DWELL_MS);
-		expect(review.lit).toBe('title');
-		review.point('first', 'pointer');
-		review.hoverCard(true);
-		vi.advanceTimersByTime(DWELL_MS);
-		expect(review.lit).toBe('title');
-		review.hoverCard(false);
-		review.point('first', 'pointer');
-		vi.advanceTimersByTime(DWELL_MS);
-		expect(review.lit).toBe('first');
 	});
 
 	it('lights nothing once answered, says it was current, and is the item an undo reopens', () => {

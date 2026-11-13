@@ -202,8 +202,6 @@
 	{placeholder}
 	data-default={defaulted ? '' : undefined}
 	data-proposed-over={drawn && local === resting ? '' : undefined}
-	onpointerenter={() => drawn && reviewing.point(drawn.id, 'pointer')}
-	onpointerleave={() => drawn && reviewing.point(undefined, 'pointer')}
 	aria-label={id ? undefined : label}
 	aria-describedby={describedBy}
 	onbeforeinput={filter}

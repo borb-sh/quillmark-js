@@ -299,17 +299,15 @@
 		const text = rowWorded(k);
 		return text ? rowKept(k).filter((e) => e.item.id !== text.id) : rowKept(k);
 	};
-	/** What a row taken out carries: its item's id, the current one lit, and the pointer naming
-	 *  it, so the row is where the answer card stands. */
+	/** What a row taken out carries: its item's id and the current one lit, so the row is where
+	 *  the answer card stands. */
 	const removedRow = (k: number) => {
 		const gone = removal(k);
 		return gone
 			? {
 					'data-qm-review': gone.id,
 					'data-qm-removed': '',
-					'data-qm-removed-lit': reviewing.lit === gone.id ? '' : undefined,
-					onpointerenter: () => reviewing.point(gone.id, 'pointer'),
-					onpointerleave: () => reviewing.point(undefined, 'pointer')
+					'data-qm-removed-lit': reviewing.lit === gone.id ? '' : undefined
 				}
 			: {};
 	};
@@ -1264,8 +1262,6 @@
 		data-qm-review={item.id}
 		role="group"
 		aria-label={t.strings.reviewNewItem}
-		onpointerenter={() => reviewing.point(item.id, 'pointer')}
-		onpointerleave={() => reviewing.point(undefined, 'pointer')}
 	>
 		<div class="qm-review-added-box" inert>
 			{#if table}
