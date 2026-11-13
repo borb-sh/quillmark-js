@@ -3,17 +3,31 @@
 // the document it read into the list the editor draws. Where the opened document lacks what an
 // edit reads, the edit is left out.
 import type { Addr, Document, Quill } from '@quillmark/wasm';
-import { proposalsBetween, type Proposed } from '@quillmark/svelte/visual';
+import {
+	proposalsBetween,
+	type Proposed,
+	type ReviewItem,
+	type ReviewLabel
+} from '@quillmark/svelte/visual';
 
 /** The answer's review: the opened document is the one its writer read. */
 export function seedReview(doc: Document, quill: Quill): Proposed {
 	const answer = doc.clone();
 	try {
 		write(answer, quill);
-		return proposalsBetween(quill, doc, answer);
+		return proposalsBetween(quill, doc, answer, { label });
 	} finally {
 		answer.free();
 	}
+}
+
+/** Why the writer made each change, and its kind, as a host's assistant says them. */
+function label(item: ReviewItem): ReviewLabel {
+	if ('add' in item || 'remove' in item)
+		return { note: 'Reshapes the document around its sections.', group: 'structure' };
+	if ('replace' in item || 'insert' in item)
+		return { note: 'Tightens the wording without changing what it says.', group: 'wording' };
+	return { note: 'Fills in a detail the reviewer knew.', group: 'details' };
 }
 
 /** The writer's answer, written into its copy. */

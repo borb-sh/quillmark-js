@@ -45,12 +45,13 @@ export type {
 	ReviewDrawn,
 	ReviewEvent,
 	ReviewItem,
+	ReviewLabel,
 	ReviewProjection,
 	ReviewUndrawn
 } from './review.js';
 export type { BlockPlace } from '../core/codec/index.js';
 export { proposalsBetween } from './proposals.js';
-export type { Proposed } from './proposals.js';
+export type { Proposed, ProposalsOpts } from './proposals.js';
 export type { ReviewAction } from '../core/codec/index.js';
 export { REVIEW_KEYS } from '../core/codec/index.js';
 

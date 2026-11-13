@@ -42,8 +42,11 @@ export interface EditorRef {
 	refresh(): void;
 	applyCardOps(ops: readonly CardOp[]): void;
 	revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean>;
-	answerReview(ids: readonly string[] | 'all', action: 'accept' | 'dismiss' | 'reopen'): string[];
-	stepReview(dir: 1 | -1, opts?: { focus?: boolean }): Promise<string | undefined>;
+	answerReview(
+		ids: readonly string[] | 'all' | { group: string },
+		action: 'accept' | 'dismiss' | 'reopen'
+	): string[];
+	stepReview(dir: 1 | -1, opts?: { focus?: boolean; group?: string }): Promise<string | undefined>;
 	projectReview(target: Document): ReviewProjection;
 }
 

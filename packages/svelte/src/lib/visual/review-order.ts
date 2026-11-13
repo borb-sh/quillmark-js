@@ -104,15 +104,22 @@ export function nextOpen(
 
 /** Where a step in `dir` lands in `order`, round from either end: from `from` where the order
  *  holds it, else from the place `stepped` held when it was last stepped to, which a later item
- *  has taken, else from the nearer end. `undefined` in an empty order. */
+ *  has taken, else from the nearer end. With `keep`, the step passes over every item it refuses.
+ *  `undefined` where no item is left to land on. */
 export function stepIn(
 	order: readonly string[],
 	dir: 1 | -1,
 	from: string | undefined,
-	stepped?: number
+	stepped?: number,
+	keep: (id: string) => boolean = () => true
 ): number | undefined {
-	if (!order.length) return undefined;
+	const n = order.length;
+	if (!n) return undefined;
 	const at = from === undefined ? -1 : order.indexOf(from);
-	const next = at >= 0 ? at + dir : dir > 0 ? (stepped ?? 0) : (stepped ?? 0) - 1;
-	return ((next % order.length) + order.length) % order.length;
+	const first = at >= 0 ? at + dir : dir > 0 ? (stepped ?? 0) : (stepped ?? 0) - 1;
+	for (let k = 0; k < n; k++) {
+		const index = (((first + dir * k) % n) + n) % n;
+		if (keep(order[index])) return index;
+	}
+	return undefined;
 }

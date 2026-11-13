@@ -625,10 +625,16 @@
 	/** The item a step last went to, and where it stood in the order then, so a step from an
 	 *  item since answered goes on from its place. */
 	let stepped: { id: string; index: number } | undefined;
-	async function step(dir: 1 | -1, focus: boolean): Promise<string | undefined> {
+	async function step(dir: 1 | -1, focus: boolean, group?: string): Promise<string | undefined> {
 		if (!span.alive) return undefined;
 		const order = reviewing.order;
-		const index = stepIn(order, dir, reviewing.lit ?? stepped?.id, stepped?.index);
+		const index = stepIn(
+			order,
+			dir,
+			reviewing.lit ?? stepped?.id,
+			stepped?.index,
+			group === undefined ? undefined : inGroup(group)
+		);
 		if (index === undefined) return undefined;
 		const id = order[index];
 		stepped = { id, index };
@@ -1654,18 +1660,32 @@
 	/** The room the answer card takes under a change, in `--_qm-space` rungs. */
 	const CARD_ROOM = 7;
 
+	/** Whether the item `id` is listed in `group`. */
+	function inGroup(group: string): (id: string) => boolean {
+		const ids = new Set(reviewing.items.filter((i) => i.group === group).map((i) => i.id));
+		return (id) => ids.has(id);
+	}
+
 	/**
-	 * Answer items as the answer card would, in document order: `'all'` is every item drawn. An
+	 * Answer items as the answer card would, in document order: `'all'` is every item drawn, and
+	 * `{ group }` every item drawn in that group, which as `'all'` does accepts none outdated. An
 	 * item that cannot be answered (a proposal that no longer writes, a value the field's writer
 	 * refuses) stands. `onReview` hears each answer, and neither the focus nor the caret moves;
 	 * where the current change is answered, the next open one is current. ⌘Z takes the call
 	 * back whole. Returns the ids answered.
 	 */
 	export function answerReview(
-		ids: readonly string[] | 'all',
+		ids: readonly string[] | 'all' | { group: string },
 		action: 'accept' | 'dismiss'
 	): string[] {
-		return span.alive ? reviewing.answer(ids, action) : [];
+		if (!span.alive) return [];
+		if (ids === 'all' || Array.isArray(ids)) return reviewing.answer(ids, action);
+		const has = inGroup((ids as { group: string }).group);
+		const stale = new Set(action === 'accept' ? drewOutdated : []);
+		return reviewing.answer(
+			reviewing.order.filter((id) => has(id) && !stale.has(id)),
+			action
+		);
 	}
 
 	/**
@@ -1846,12 +1866,13 @@
 
 	/** Make the next or previous open item current, in document order and round from either
 	 *  end, from the current item or the one last stepped to: the caret in it, or the focus in
-	 *  its field, unless `focus` is false. Resolves its id, `undefined` when none is drawn. */
+	 *  its field, unless `focus` is false. With `group`, only that group's items are stepped to.
+	 *  Resolves its id, `undefined` when none is drawn. */
 	export function stepReview(
 		dir: 1 | -1,
-		opts: { focus?: boolean } = {}
+		opts: { focus?: boolean; group?: string } = {}
 	): Promise<string | undefined> {
-		return step(dir, opts.focus ?? true);
+		return step(dir, opts.focus ?? true, opts.group);
 	}
 
 	function holds(cardId: CardId): boolean {
@@ -2023,6 +2044,9 @@
 		inset={reviewInset}
 		hidden={typing}
 		outdated={reviewing.lit !== undefined && drewOutdated.includes(reviewing.lit)}
+		note={reviewing.lit === undefined
+			? undefined
+			: reviewing.items.find((i) => i.id === reviewing.lit)?.note}
 		onAnswer={answerCurrent}
 	/>
 	<div class="qm-visually-hidden" role="status">{reviewPlace}</div>
