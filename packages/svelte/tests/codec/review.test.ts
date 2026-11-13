@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { redo, undo } from 'prosemirror-history';
 import { TextSelection } from 'prosemirror-state';
-import { createField } from '$lib/core/codec';
+import { createField, REVIEW_KEYS } from '$lib/core/codec';
 import type {
 	BlockPlace,
 	FieldController,
@@ -572,8 +572,8 @@ describe('answering', () => {
 		const leaf = proposal();
 		caretIn(leaf, 'quick');
 		const before = leaf.doc.toMarkdown();
-		press(viewOf(leaf.field), 'Enter', { ctrlKey: true });
-		press(viewOf(leaf.field), '.', { ctrlKey: true });
+		for (const chord of [REVIEW_KEYS.accept, REVIEW_KEYS.dismiss])
+			press(viewOf(leaf.field), chord.split('-').at(-1)!, { ctrlKey: true });
 		expect(leaf.acts).toEqual([]);
 		expect(leaf.doc.toMarkdown()).toBe(before);
 	});

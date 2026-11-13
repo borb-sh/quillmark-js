@@ -307,6 +307,42 @@ describe('the current change', () => {
 		input.remove();
 	});
 
+	it('leaves the answer keys to a leaf the reader types in, and the first press elsewhere brings the card back', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		press(body, 'a');
+		press(body, keyOf(REVIEW_KEYS.dismiss), mod);
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([]);
+
+		const button = outside('button');
+		press(button, keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toEqual([]);
+		press(button, keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toEqual([{ id: order[0], action: 'dismiss' }]);
+		button.remove();
+	});
+
+	it('brings a change out of view back on the first answer key, and answers it on the next', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+		const root = r.target.querySelector<HTMLElement>('.qm-editor')!;
+		const at = r.target.querySelector<HTMLElement>(`[data-qm-review~="${order[0]}"]`)!;
+		const line = at.offsetHeight || 1;
+		root.getBoundingClientRect = () => new DOMRect(0, 0, 1, window.innerHeight);
+		at.getBoundingClientRect = () => new DOMRect(0, window.innerHeight, 1, line);
+		press(document.body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([]);
+		expect(r.lit.at(-1)).toBe(order[0]);
+
+		at.getBoundingClientRect = () => new DOMRect(0, 0, 1, line);
+		press(document.body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);
+	});
+
 	it('takes the accept key over a task item’s tick for the length of the review', async () => {
 		const r = batch(
 			(doc) => [over(doc, 'r1', '- [ ] the quick red fox')],

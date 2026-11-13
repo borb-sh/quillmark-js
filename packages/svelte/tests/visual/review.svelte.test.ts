@@ -158,7 +158,7 @@ describe('a proposed field value', () => {
 	it('is left alone when turned down', async () => {
 		const r = review(proposed(2));
 		await settle();
-		press(document.body, '.', mod);
+		press(document.body, keyOf(REVIEW_KEYS.dismiss), mod);
 		expect(r.events).toEqual([{ id: 'r1', action: 'dismiss' }]);
 		expect(r.changes).toEqual([]);
 		expect(r.target.querySelector('[data-qm-review~="r1"]')).toBeNull();

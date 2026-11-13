@@ -60,10 +60,11 @@ export const TABLE_KEYS = {
 
 /** The review's keys, the editor's wherever the focus is while a review is open and ahead of
  *  every other binding of them, so `accept` takes the current change over a task item's
- *  `LIST_KEYS.task`; `next` and `previous` step through the changes. */
+ *  `LIST_KEYS.task` and `dismiss` over a text leaf's own delete; `next` and `previous` step
+ *  through the changes. */
 export const REVIEW_KEYS = {
 	accept: 'Mod-Enter',
-	dismiss: 'Mod-.',
+	dismiss: 'Mod-Backspace',
 	next: 'Mod-Alt-ArrowDown',
 	previous: 'Mod-Alt-ArrowUp'
 } as const;

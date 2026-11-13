@@ -309,7 +309,8 @@ const KEY_GLYPH: Readonly<Record<string, string>> = {
 	ArrowDown: '↓',
 	ArrowLeft: '←',
 	ArrowRight: '→',
-	Enter: '↵'
+	Enter: '↵',
+	Backspace: '⌫'
 };
 /** Apple's marks for the modifiers, in the order its menus print them. */
 const APPLE_MODS: readonly (readonly [string, string])[] = [
@@ -351,11 +352,6 @@ export function keyshortcut(binding: string, platform = platformHere()): string 
 		mods.has('Shift') ? 'Shift' : ''
 	];
 	return [...names.filter(Boolean), key].join('+');
-}
-
-/** A `Mod` chord over a key already printed, as {@link keycap} prints it: `⌘↵`, `Ctrl+.`. */
-export function chord(key: string, platform = platformHere()): string {
-	return keycap(`Mod-${key}`, platform);
 }
 
 /** How many fields `diagAnnounced` names before it counts the rest, so a host's batch over
