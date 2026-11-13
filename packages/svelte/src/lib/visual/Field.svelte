@@ -382,10 +382,8 @@
 			{@attach registerControl}
 			onfocusin={(e) => {
 				reportFocus?.(e);
-				if (proposed) reviewing.point(proposed.id, 'caret');
+				if (proposed) reviewing.point(proposed.id);
 			}}
-			onpointerenter={() => worded && reviewing.point(worded.id, 'pointer')}
-			onpointerleave={() => worded && reviewing.point(undefined, 'pointer')}
 		>
 			{#if field.control === 'prose'}
 				<ProseField

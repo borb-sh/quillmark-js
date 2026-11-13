@@ -12,7 +12,6 @@ import type {
 	FieldController,
 	ReviewAction,
 	ReviewReport,
-	ReviewVia,
 	TextReview
 } from '$lib/core/codec';
 import type { Document } from '@quillmark/wasm';
@@ -26,7 +25,7 @@ interface Leaf {
 	field: FieldController;
 	el: HTMLElement;
 	acts: [string, ReviewAction][];
-	points: [string | undefined, ReviewVia][];
+	points: (string | undefined)[];
 	drawn: string[][];
 	reports: ReviewReport[];
 }
@@ -50,7 +49,7 @@ function leafOver(markdown: string): Leaf {
 		addr: {},
 		container: el,
 		onReview: (id, action) => acts.push([id, action]),
-		onReviewPoint: (id, via) => points.push([id, via]),
+		onReviewPoint: (id) => points.push(id),
 		onReviewDrawn: (report) => {
 			drawn.push([...report.ids]);
 			reports.push(report);
@@ -610,7 +609,7 @@ describe('answering', () => {
 		const leaf = leafOver('Opening line.\n\nClosing line.');
 		leaf.field.setReview([{ id: 'r1', ...beside(leaf, 'line'), after: 'Inserted.' }]);
 		caretIn(leaf, 'Opening');
-		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
+		expect(leaf.points.at(-1)).toBe('r1');
 	});
 
 	it('names the item the caret was put into, of two that share a paragraph', () => {
@@ -620,7 +619,7 @@ describe('answering', () => {
 			{ id: 'B', ...beside(leaf, 'proposed'), after: 'Added after.' }
 		]);
 		caretIn(leaf, 'Second');
-		expect(leaf.points.at(-1)).toEqual(['A', 'caret']);
+		expect(leaf.points.at(-1)).toBe('A');
 
 		const entered = leafOver('Opening line.\n\nSecond is proposed.');
 		entered.field.setReview([
@@ -628,7 +627,7 @@ describe('answering', () => {
 			{ id: 'B', ...beside(entered, 'proposed'), after: 'Added after.' }
 		]);
 		expect(entered.field.enterReview('B')).toBe(true);
-		expect(entered.points.at(-1)).toEqual(['B', 'caret']);
+		expect(entered.points.at(-1)).toBe('B');
 		expect(entered.field.answerReview('B', 'accept')).toBe(true);
 		expect(entered.doc.main.body.text).toBe('Opening line.\nSecond is proposed.\nAdded after.');
 		expect(texts(entered.el, 'ins.qm-review-ins')).toEqual([', rewritten']);
@@ -639,7 +638,7 @@ describe('answering', () => {
 		const view = viewOf(leaf.field);
 		expect(leaf.field.enterReview('r1')).toBe(true);
 		expect(view.hasFocus()).toBe(true);
-		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
+		expect(leaf.points.at(-1)).toBe('r1');
 		expect(leaf.field.enterReview('r2')).toBe(false);
 		expect(leaf.field.enterReview('nowhere')).toBe(false);
 	});
@@ -647,25 +646,16 @@ describe('answering', () => {
 	it('reports the item the caret arrives in, and holds off while the reader types in it', () => {
 		const leaf = proposal();
 		caretIn(leaf, 'quick');
-		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
+		expect(leaf.points.at(-1)).toBe('r1');
 		const view = viewOf(leaf.field);
 		view.dispatch(view.state.tr.insertText('x'));
-		expect(leaf.points.at(-1)).toEqual([undefined, 'caret']);
+		expect(leaf.points.at(-1)).toBe(undefined);
 		const said = leaf.points.length;
 		view.dispatch(view.state.tr.insertText('y'));
 		expect(leaf.points).toHaveLength(said);
 		caretIn(leaf, 'later');
 		caretIn(leaf, 'quick');
-		expect(leaf.points.at(-1)).toEqual(['r1', 'caret']);
-	});
-
-	it('reports the item under the pointer, and its leaving', () => {
-		const leaf = proposal();
-		const mark = leaf.el.querySelector('del.qm-review-del')!;
-		mark.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-		expect(leaf.points.at(-1)).toEqual(['r1', 'pointer']);
-		leaf.el.querySelector('.ProseMirror')!.dispatchEvent(new MouseEvent('mouseleave'));
-		expect(leaf.points.at(-1)).toEqual([undefined, 'pointer']);
+		expect(leaf.points.at(-1)).toBe('r1');
 	});
 });
 

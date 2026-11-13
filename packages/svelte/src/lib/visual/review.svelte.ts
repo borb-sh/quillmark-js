@@ -1,10 +1,9 @@
 // The editor's review state: the host's list split by where each item draws, and the one current
 // item, which the answer card and the review keys answer.
 //
-// The current item is sticky: a step, a reveal, a click, the caret arriving in an item, or the
-// pointer resting on one names it, and it stays until another is named or it is answered. The
-// pointer names one only after a dwell, and never while it is over the answer card, so a pointer
-// crossing the text on its way to the card does not move the card from under it.
+// The current item is sticky: a step, a reveal, a click or the caret arriving in an item names
+// it, and it stays until another is named or it is answered. The pointer passing over an item
+// names nothing.
 //
 // An answered item is drawn no more, from the answer and not from the host's next list: the
 // reader's press shows at once however long the host takes to hand over a list without it.
@@ -18,7 +17,7 @@ import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
-import type { ReviewAction, ReviewReport, ReviewVia, TextReview } from '../core/codec/index.js';
+import type { ReviewAction, ReviewReport, TextReview } from '../core/codec/index.js';
 import { asContent, planValue, type ValueState } from '../core/codec/index.js';
 import {
 	byBlocks,
@@ -38,9 +37,6 @@ import {
 } from './review.js';
 import { orderOf, type CardLayout } from './review-order.js';
 import type { StructuralUndo, UndoOffer } from './undo.svelte.js';
-
-/** How long the pointer rests on an item before it is current, in ms. */
-export const DWELL_MS = 160;
 
 /** A card proposed new, drawn after the card it follows. */
 export type CardAdd = Extract<CardProposal, { add: unknown }>;
@@ -85,9 +81,9 @@ export interface Review {
 	keyOf(id: string): string | undefined;
 	/** A prose leaf's report of what it draws. */
 	drew(key: string, report: ReviewReport): void;
-	/** The item the pointer or the caret is in, `undefined` where it left one: the caret
-	 *  arriving names it at once, the pointer once it has rested, and leaving names nothing. */
-	point(id: string | undefined, via: ReviewVia): void;
+	/** The item the caret is in, `undefined` where it left one: arriving names it at once, and
+	 *  leaving names nothing. */
+	point(id: string | undefined): void;
 	/** A reader's answer. False where it could not be made. */
 	act(id: string, action: ReviewAction): boolean;
 	/** Answer items as the answer card would, in the page's order: `'all'` is every item drawn,
@@ -116,8 +112,6 @@ export interface Review {
 	writing(on: boolean): void;
 	/** Make `id` current at once: a step, a reveal, or a click or tap on it. */
 	reveal(id: string): void;
-	/** The pointer is over the answer card, which holds the current item where it is. */
-	hoverCard(on: boolean): void;
 }
 
 export interface ReviewSource {
@@ -163,7 +157,7 @@ export interface ReviewSource {
 	answered?(id: string, order?: readonly string[]): void;
 }
 
-export function createReview(source: ReviewSource): Review & { dispose(): void } {
+export function createReview(source: ReviewSource): Review {
 	/** The ids answered, each until a list arrives without it. */
 	const answered = new Set<string>();
 	let answers = $state(0);
@@ -359,11 +353,8 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 	});
 
 	let current = $state<string | undefined>();
-	let dwell: ReturnType<typeof setTimeout> | undefined;
-	let overCard = false;
 	const lit = $derived(current !== undefined && byId.has(current) ? current : undefined);
 	const name = (id: string): void => {
-		clearTimeout(dwell);
 		current = id;
 	};
 
@@ -417,7 +408,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 		else source.answered?.(id);
 	};
 
-	const self: Review & { dispose(): void } = {
+	const self: Review = {
 		get items() {
 			return items;
 		},
@@ -469,16 +460,8 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			if (report.ids.length || report.undrawn.length) drawn.set(key, report);
 			else drawn.delete(key);
 		},
-		point(id, via) {
-			if (via === 'caret') {
-				if (id !== undefined) name(id);
-				return;
-			}
-			clearTimeout(dwell);
-			if (id === undefined || id === current) return;
-			dwell = setTimeout(() => {
-				if (!overCard && byId.has(id)) current = id;
-			}, DWELL_MS);
+		point(id) {
+			if (id !== undefined) name(id);
 		},
 		act(id, action) {
 			const item = byId.get(id);
@@ -552,14 +535,7 @@ export function createReview(source: ReviewSource): Review & { dispose(): void }
 			const made = source.answer(id, byId.get(id), action, key);
 			if (made) answering(id, action, made);
 		},
-		reveal: name,
-		hoverCard(on) {
-			overCard = on;
-			if (on) clearTimeout(dwell);
-		},
-		dispose() {
-			clearTimeout(dwell);
-		}
+		reveal: name
 	};
 	return self;
 }
@@ -598,8 +574,7 @@ const NO_REVIEW: Review = {
 	writes: (item) => item.after,
 	heard() {},
 	writing() {},
-	reveal() {},
-	hoverCard() {}
+	reveal() {}
 };
 
 /** The editor's review state, or {@link NO_REVIEW} off-tree. */
