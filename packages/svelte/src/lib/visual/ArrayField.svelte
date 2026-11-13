@@ -37,14 +37,14 @@
  container or a block prose cell.
 
  The row's controls are inside the element: a slab over the end of the element's own
- box, taking its two end-side corners: the remove. An `object` row's drag handle hangs
+ box, taking its two end-side corners: the remove. Every element's drag handle hangs
  off its start edge instead, as a table grip does. So a row's box is the element's box, and an array's rows end where
  every other field's control does. On an object element that box is the summary rather
  than the open row: a destructive control belongs to the line it sits on, not to
- everything that line has unfolded. A table's row carries the remove alone, in its last
- track and pinned to the end edge of the box the table scrolls in, so the one control
- the row draws never needs a scroll to reach. A table's row and a line carry no handle:
- their reorder is the key's alone.
+ everything that line has unfolded. A table's row carries the handle in its first track
+ and the remove in its last, each pinned to its edge of the box the table scrolls in, so
+ neither control the row draws ever needs a scroll to reach. The standing row is no
+ element and carries no handle.
 
  Keys carry the list without the mouse: Enter inserts a sibling below and takes the
  caret there, and short of a prose line's end splits the line there, as a bulleted list
@@ -52,7 +52,7 @@
  prose line's start joins it onto the line above and Delete at its end joins the next
  onto it, each one commit; Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
  anywhere in a row of the list moves it, the nearest row answering and never
- the record around a nested one, and on an `object` row is the twin of the handle's drag. A move is one splice of the ids
+ the record around a nested one: the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
  its id for life and no prose leaf inside it remounts; the open row stays open across
  its own move, and `animate:reorder` holds the moving row as it holds a card.
@@ -221,6 +221,20 @@
 	const control = $derived(items ? controlKind(items) : 'text');
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
+	/** A column's track. A cell that fills its width takes a share of what the field has
+	 *  spare, a control of one width (an enum, a date, a number) rests at its content,
+	 *  and a switch at its mark; every track's base is what its cells cannot shrink
+	 *  below, so a field too narrow for the floors scrolls sideways. */
+	const tracks = $derived(
+		columns
+			.map(([, sub]) => {
+				const kind = controlKind(sub);
+				if (kind === 'boolean') return 'auto';
+				if (kind === 'prose' || kind === 'text') return 'minmax(min-content, 1fr)';
+				return 'minmax(min-content, max-content)';
+			})
+			.join(' ')
+	);
 	const defaulted = $derived(value == null && (fallback?.length ?? 0) > 0);
 	// A bare value is the one-element list the render floor wraps it into (quillmark/INVARIANTS
 	// §"Coercion is the type predicate"), and the reader answers no element of it.
@@ -921,26 +935,31 @@
 		move: (k, to) => {
 			const id = ids[k];
 			move(k, to);
-			// The row's summary takes the focus, so the keys that move it or take the move
-			// back act on the row the pointer just moved.
+			// The row takes the focus, its summary or else its first control, so the keys
+			// that move it or take the move back act on the row the pointer just moved.
 			void (async () => {
 				if (!(await span.resumes(tick()))) return;
-				const summary = rowEls[id]?.querySelector<HTMLElement>('.qm-element-summary');
-				if (summary && !rowEls[id]?.contains(document.activeElement))
-					summary.focus({ preventScroll: true });
+				const row = rowEls[id];
+				if (!row || row.contains(document.activeElement)) return;
+				const summary = row.querySelector<HTMLElement>('.qm-element-summary');
+				if (summary) summary.focus({ preventScroll: true });
+				else if (table) cellEls[id]?.focus();
+				else focusRow(id);
 			})();
 		}
 	});
 	onDestroy(drag.release);
 
 	/** Whether cells stand past the table scroller's end edge, under the pinned remove,
-	 *  which is what the fade before the remove draws on. */
+	 *  and past its start edge, under the pinned handle: what the fade beside each draws on. */
 	let tableOverflow = $state(false);
+	let tableScrolled = $state(false);
 	/** The head row spans every track, so its box is the content width a new row or a
 	 *  longer cell changes. */
 	function trackOverflow(el: HTMLElement): () => void {
 		const measure = () => {
 			tableOverflow = el.scrollWidth - el.clientWidth - Math.abs(el.scrollLeft) > 1;
+			tableScrolled = Math.abs(el.scrollLeft) > 1;
 		};
 		measure();
 		el.addEventListener('scroll', measure, { passive: true });
@@ -997,7 +1016,9 @@
 			<div
 				class="qm-array-table-scroller"
 				data-overflow={tableOverflow ? '' : undefined}
+				data-scrolled={tableScrolled ? '' : undefined}
 				style:--table-cols={columns.length}
+				style:--table-tracks={tracks}
 				{@attach trackOverflow}
 			>
 				<!-- The header names the columns, so a cell carries no label of its own: its
@@ -1005,6 +1026,7 @@
 				     guidance affordance rides the header, being the column's rather than any
 				     one cell's. -->
 				<div class="qm-array-table-head">
+					<span class="qm-array-table-head-start"></span>
 					{#each columns as [key, sub] (key)}
 						<div
 							class={[
@@ -1025,12 +1047,14 @@
 				{#each ids as id, k (id)}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
-						class="qm-array-row qm-array-table-row qm-wash"
+						class={['qm-array-row qm-array-table-row qm-wash', { lifted: drag.lifted(k) }]}
+						data-drop={drag.dropSide(k)}
 						data-qm-index={k}
 						bind:this={rowEls[id]}
 						onkeydown={(e) => onRowKey(e, k)}
 						{...removedRow(k)}
 					>
+						{@render handle(k)}
 						<ObjectField
 							bare
 							bind:this={cellEls[id]}
@@ -1135,12 +1159,14 @@
 			{#each rowIds as id, k (id)}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
-					class={['qm-array-row qm-wash', { standing: id === standingId }]}
+					class={['qm-array-row qm-wash', { standing: id === standingId, lifted: drag.lifted(k) }]}
+					data-drop={drag.dropSide(k)}
 					data-qm-index={k}
 					{...removedRow(k)}
 					bind:this={rowEls[id]}
 					onkeydown={(e) => onRowKey(e, k)}
 				>
+					{#if id !== standingId}{@render handle(k)}{/if}
 					{#if control === 'prose'}
 						<ProseValue
 							bind:this={els[id]}
@@ -1320,11 +1346,11 @@
 	>
 {/snippet}
 
-<!-- An `object` row's drag handle, a table grip's twin hung off the row's start edge.
-     Pointer-only and out of the accessibility tree: a press on it does nothing, so a
-     button there would be one a screen reader activates to no effect. Its twin is
-     Alt+↑/↓ from anywhere in the row, which the summary announces, as a table's or a
-     line's remove does for its own row. -->
+<!-- An element's drag handle, a table grip's twin hung off the row's start edge, or in a
+     table's row its first track. Pointer-only and out of the accessibility tree: a press
+     on it does nothing, so a button there would be one a screen reader activates to no
+     effect. Its twin is Alt+↑/↓ from anywhere in the row, which a record's summary
+     announces, as a table's or a line's remove does for its own row. -->
 {#snippet handle(k: number)}
 	<span
 		class="qm-row-handle"
@@ -1487,11 +1513,12 @@
 	}
 	/* The handle is a table grip's twin (prose.css §"One grip per line"): a pill carrying
 	 the grip's marks, hung off the row's start edge in the `--_qm-nest` every row stands
-	 in from the stroke outside it, which a group's panel clips at. It rests
+	 in from the stroke outside it, which a group's panel clips at. The pill rests
 	 at nothing, where the remove rests faint, and comes up with the row the pointer is
 	 on, staying up through the drag it carries; a band flush with the row keeps the
 	 pointer on the row all the way to it. The pointer owns the gesture, not the page's
-	 scroll. */
+	 scroll. A record's pill centres on its summary; a line's and a table row's stand on
+	 the first line, which a wrapping cell grows away from. */
 	.qm-row-handle {
 		position: absolute;
 		inset-block: 0;
@@ -1503,8 +1530,6 @@
 		color: var(--_qm-ink-label);
 		cursor: grab;
 		touch-action: none;
-		opacity: 0;
-		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-row-handle-bar {
 		display: flex;
@@ -1514,25 +1539,37 @@
 		height: var(--_qm-tap-min);
 		border-radius: var(--_qm-radius-pill);
 		background: var(--_qm-surface-band);
+		opacity: 0;
+		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-array-row > .qm-row-handle {
+		align-items: start;
+	}
+	.qm-array-row > .qm-row-handle > .qm-row-handle-bar {
+		margin-block-start: calc((var(--_qm-box-line) - var(--_qm-tap-min)) / 2);
 	}
 	.qm-row-handle-bar :global(svg) {
 		width: var(--_qm-space-3);
 		height: var(--_qm-space-3);
 	}
-	.qm-array-row:hover > .qm-element-head > .qm-row-handle,
-	.qm-element.lifted > .qm-element-head > .qm-row-handle {
+	.qm-array-row:hover > .qm-row-handle > .qm-row-handle-bar,
+	.qm-array-row:hover > .qm-element-head > .qm-row-handle > .qm-row-handle-bar,
+	.qm-array-row.lifted > .qm-row-handle > .qm-row-handle-bar,
+	.qm-element.lifted > .qm-element-head > .qm-row-handle > .qm-row-handle-bar {
 		opacity: 1;
 	}
+	.qm-array-row.lifted > .qm-row-handle,
 	.qm-element.lifted > .qm-element-head > .qm-row-handle {
 		cursor: grabbing;
 	}
 	/* The lifted row is a tone, and the drop is one rule on the edge it would land
 	 against, drawn out of flow so nothing reflows under the drag: the table island's
 	 own pair. */
-	.qm-element.lifted > .qm-element-head > .qm-element-summary {
+	.qm-element.lifted > .qm-element-head > .qm-element-summary,
+	.qm-array-row.lifted:not(.qm-element) > :global(:not(.qm-row-handle, .qm-remove)) {
 		opacity: var(--_qm-opacity-muted);
 	}
-	.qm-element[data-drop]::before {
+	.qm-array-row[data-drop]::before {
 		content: '';
 		position: absolute;
 		inset-inline: 0;
@@ -1541,10 +1578,10 @@
 		border-radius: var(--_qm-radius-pill);
 		pointer-events: none;
 	}
-	.qm-element[data-drop='before']::before {
+	.qm-array-row[data-drop='before']::before {
 		top: calc(-0.5 * (var(--_qm-space) + var(--_qm-ring-width)));
 	}
-	.qm-element[data-drop='after']::before {
+	.qm-array-row[data-drop='after']::before {
 		bottom: calc(-0.5 * (var(--_qm-space) + var(--_qm-ring-width)));
 	}
 	/* ── An object element ──────────────────────────────────────────────────────
@@ -1659,45 +1696,59 @@
 	 over boxes are the figure a row of compact fields draws. A corner reads square at a
 	 stroke, so the wash takes none here.
 
-	 The grid is a box inside the stroke, and the one that scrolls: the stroke and the
-	 inset hold still while the columns move, and the clip is the inset's edge rather than
-	 the stroke's. One grid over the header and every row: a column per property, then a
-	 track for the row's remove. The header and each row subgrid onto it, so a
-	 cell's edge is its column's whatever the row above it holds. The row packs at the
-	 start rather than sharing the field's leftover width between the columns: a table
-	 carries its own rhythm, and stretching four short cells across a field sets them
-	 apart by the width the card happens to have.
+	 The grid is a box inside the stroke, and the one that scrolls: the stroke holds still
+	 while the columns move, and the clip is the grid's edge rather than the stroke's.
+	 The stroke is drawn over the grid, whose pad reaches back across it, so the plane
+	 the pinned handle stands on never paints it out. One
+	 grid over the header and every row: a track for the row's handle, a column per
+	 property, then a track for the row's remove. The header and each row subgrid onto
+	 it, so a cell's edge is its column's whatever the row above it holds. The handle's
+	 track is the nest the stroke keeps from the cells less the gutter after it, so the
+	 cells stand a nest in from the stroke as an open row's do.
 
-	 A track rests at what its cells cannot shrink below and grows no further than its
-	 widest, so a field too narrow for them all overflows the grid's box and scrolls
-	 sideways. A fixed floor as the track's base would instead hand each column a share of
-	 the width and leave a control that does not shrink — a date's segments — painting
-	 over the column beside it; the floor rides the header cell, which every column has.
+	 A column's track is the component's (`tracks`): a cell that fills its width shares
+	 what the field has spare with every other such column, so a table of text fills the
+	 field as one text field does, while a control of one width rests at its content and
+	 a short cell never stands a field's width from its neighbour. Every track's base is
+	 what its cells cannot shrink below, so a field too narrow for them all overflows the
+	 grid's box and scrolls sideways. A fixed floor as the track's base would instead hand
+	 each column a share of the width and leave a control that does not shrink — a date's
+	 segments — painting over the column beside it; the floor rides the header cell, which
+	 every column has.
 
 	 The pad is the clip box's, the ring on a cell at that box's own edge reaching past
-	 its content; the margin takes the same distance back, so the tracks stand a nest in
-	 from the label row above them and the caps keep their rung. The box keeps the
-	 remove's track clear of the scrolls it makes itself, so a cell scrolled into view
-	 lands beside the pinned button rather than under it.
+	 its content; the margin takes the same distance back. The box keeps the pinned
+	 tracks clear of the scrolls it makes itself, so a cell scrolled into view lands
+	 beside a pinned button rather than under it. The box is a container, so a header
+	 cell can state its floor as a share of the width the columns have.
 
 	 The names are the array's own: `.qm-table` is the codec's island (`prose.css`), an
 	 unscoped stylesheet in this package, and a box wearing that name takes the island's
 	 hairline whatever this block says. */
 	.qm-array-rows.qm-array-table {
-		border-inline-start: var(--_qm-vertical-width) solid var(--_qm-border);
-		padding-inline-start: var(--_qm-nest);
+		padding-inline-start: var(--_qm-vertical-width);
 		padding-block: var(--_qm-space);
 		border-radius: 0;
 	}
+	.qm-array-rows.qm-array-table::before {
+		content: '';
+		position: absolute;
+		inset-block: 0;
+		inset-inline-start: 0;
+		width: var(--_qm-vertical-width);
+		background: var(--_qm-border);
+		z-index: 2;
+	}
 	.qm-array-table-scroller {
+		--_grip-track: calc(var(--_qm-nest) - var(--_qm-space));
 		display: grid;
-		grid-template-columns:
-			repeat(var(--table-cols), minmax(min-content, max-content))
-			auto;
+		grid-template-columns: var(--_grip-track) var(--table-tracks) auto;
 		justify-content: start;
 		gap: var(--_qm-space);
 		overflow-x: auto;
-		scroll-padding-inline-end: calc(var(--_qm-tap-min) + var(--_qm-space));
+		container-type: inline-size;
+		scroll-padding-inline: calc(var(--_qm-nest) + var(--_qm-ring-reach))
+			calc(var(--_qm-tap-min) + var(--_qm-space));
 		padding: var(--_qm-ring-reach);
 		margin: calc(-1 * var(--_qm-ring-reach));
 	}
@@ -1721,7 +1772,11 @@
 	 sooner. Without it the column rests at its header's own width, its cells still
 	 clearing the mark, which no track can shrink below. It is the table's to state
 	 because the table is where a column is a width of its own; in a section's grid and
-	 in a subform's, a boolean stands in a track its neighbours share. */
+	 in a subform's, a boolean stands in a track its neighbours share.
+
+	 A prose column's floor is its share of the width the columns have, between the two
+	 floors: the wide one while the field holds every column at it, so a cell wraps no
+	 sooner than it must, then down to the narrow one before the table scrolls. */
 	.qm-array-table-col {
 		min-width: var(--_qm-track-min);
 	}
@@ -1729,50 +1784,92 @@
 		min-width: 0;
 	}
 	.qm-array-table-col.prose {
-		min-width: var(--_qm-track-prose);
+		min-width: clamp(
+			var(--_qm-track-min),
+			(100cqi - var(--_qm-nest) - var(--_qm-tap-min)) / var(--table-cols) - var(--_qm-space),
+			var(--_qm-track-prose)
+		);
 	}
-	/* The remove is the row's last track, pinned to the end edge of the box the table
-	 scrolls in: sticky, so it rests in its track while the table fits and rides over
-	 the cells once the box scrolls, on the card's plane so what passes under it is
-	 hidden rather than overprinted, and stretched to the row so no cell shows above or
-	 below it. Always drawn: a table's rows are many and the eye finds the control by
-	 its column. The header's end cell pins with it, or the labels would scroll under
-	 nothing while the cells scroll under a plane.
+	/* The handle is the row's first track and the remove its last, each pinned to its
+	 edge of the box the table scrolls in: sticky, so it rests in its track while the
+	 table fits and rides over the cells once the box scrolls, on the card's plane so what
+	 passes under it is hidden rather than overprinted, and stretched to the row so no cell
+	 shows above or below it. The remove is always drawn: a table's rows are many and the
+	 eye finds the control by its column. The header's end cells pin with them, or the
+	 labels would scroll under nothing while the cells scroll under a plane.
 
 	 The inset is the content box's, so the ring's reach fits inside the clip; the plane
 	 spread over that same reach hides the sliver of cell the pad would show past the
-	 button, and the ring paints over it.
+	 button, and the ring paints over it. The handle's pill reaches over the gutter after
+	 its track, where the plane stops short of the cell beside it.
 
 	 The slab's grammar goes with the slab: a button on the row's own plane takes the
 	 icon family's radius at all four corners, where one cut into a box takes that box's
 	 end-side pair and squares the rest. */
 	.qm-array-table-row > .qm-remove,
-	.qm-array-table-head-end {
+	.qm-array-table-head-end,
+	.qm-array-table-row > .qm-row-handle,
+	.qm-array-table-head-start {
 		position: sticky;
-		inset-inline-end: 0;
+		z-index: 1;
 		background: var(--_qm-surface);
 		box-shadow: 0 0 0 var(--_qm-ring-reach) var(--_qm-surface);
 	}
-	/* While cells stand past the end edge, the slab fades them in over a step before it
-	 rather than cutting them at its edge: the column the cut hides is still there. */
+	.qm-array-table-row > .qm-remove,
+	.qm-array-table-head-end {
+		inset-inline-end: 0;
+	}
+	.qm-array-table-row > .qm-row-handle,
+	.qm-array-table-head-start {
+		inset-inline-start: 0;
+	}
+	.qm-array-table-row > .qm-row-handle {
+		inset-block: auto;
+		inset-inline-end: auto;
+		width: auto;
+		align-self: stretch;
+		justify-content: start;
+	}
+	.qm-array-table-row > .qm-row-handle > .qm-row-handle-bar {
+		flex: none;
+		width: var(--_qm-nest);
+	}
+	/* While cells stand past an edge, the slab beside it fades them in over a step rather
+	 than cutting them at its edge: the column the cut hides is still there. */
 	.qm-array-table-row > .qm-remove::before,
-	.qm-array-table-head-end::before {
+	.qm-array-table-head-end::before,
+	.qm-array-table-row > .qm-row-handle::before,
+	.qm-array-table-head-start::before {
 		content: '';
 		position: absolute;
 		inset-block: calc(-1 * var(--_qm-ring-reach));
-		inset-inline-end: calc(100% + var(--_qm-ring-reach));
 		width: var(--_qm-space-3);
-		background: linear-gradient(to right, transparent, var(--_qm-surface));
 		pointer-events: none;
 		opacity: 0;
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-array-table-row > .qm-remove::before,
+	.qm-array-table-head-end::before {
+		inset-inline-end: calc(100% + var(--_qm-ring-reach));
+		background: linear-gradient(to right, transparent, var(--_qm-surface));
+	}
+	.qm-array-table-row > .qm-row-handle::before,
+	.qm-array-table-head-start::before {
+		inset-inline-start: calc(100% + var(--_qm-ring-reach));
+		background: linear-gradient(to left, transparent, var(--_qm-surface));
 	}
 	.qm-array-table-row > .qm-remove:dir(rtl)::before,
 	.qm-array-table-head-end:dir(rtl)::before {
 		background: linear-gradient(to left, transparent, var(--_qm-surface));
 	}
+	.qm-array-table-row > .qm-row-handle:dir(rtl)::before,
+	.qm-array-table-head-start:dir(rtl)::before {
+		background: linear-gradient(to right, transparent, var(--_qm-surface));
+	}
 	.qm-array-table-scroller[data-overflow] > .qm-array-table-row > .qm-remove::before,
-	.qm-array-table-scroller[data-overflow] .qm-array-table-head-end::before {
+	.qm-array-table-scroller[data-overflow] .qm-array-table-head-end::before,
+	.qm-array-table-scroller[data-scrolled] > .qm-array-table-row > .qm-row-handle::before,
+	.qm-array-table-scroller[data-scrolled] .qm-array-table-head-start::before {
 		opacity: 1;
 	}
 	/* The glyph stands on the row's first line with the cells, however far the slab
@@ -1785,16 +1882,25 @@
 		border-radius: var(--_qm-radius-inner);
 		color: var(--_qm-ink-label);
 	}
-	/* The pad past the slab, flat: the plane's spread above rounds with the slab's
+	/* The pad past each slab, flat: the plane's spread above rounds with the slab's
 	 corners, and a cell scrolled under them shows through at the clip. */
 	.qm-array-table-row > .qm-remove::after,
-	.qm-array-table-head-end::after {
+	.qm-array-table-head-end::after,
+	.qm-array-table-row > .qm-row-handle::after,
+	.qm-array-table-head-start::after {
 		content: '';
 		position: absolute;
 		inset-block: calc(-1 * var(--_qm-ring-reach));
-		inset-inline-start: 100%;
 		width: var(--_qm-ring-reach);
 		background: var(--_qm-surface);
+	}
+	.qm-array-table-row > .qm-remove::after,
+	.qm-array-table-head-end::after {
+		inset-inline-start: 100%;
+	}
+	.qm-array-table-row > .qm-row-handle::after,
+	.qm-array-table-head-start::after {
+		inset-inline-end: 100%;
 	}
 	/* The label line's own type: size, weight and leading are `.qm-field-label`'s, so
 	 the two read as one register. Inner radius: the chip family is the card's, and this
@@ -1819,7 +1925,7 @@
 	}
 	/* No hover to come up on: the handle stands with the controls, already at rest. */
 	@media (hover: none) {
-		.qm-row-handle {
+		.qm-row-handle-bar {
 			opacity: 1;
 		}
 	}

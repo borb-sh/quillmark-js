@@ -186,7 +186,7 @@ main:
 			'Remove Contributors 1'
 		);
 
-		// The row draws no handle; Alt+↑/↓ from a cell moves it, the caret riding with it.
+		// Alt+↑/↓ from a cell moves the row, the caret riding with it.
 		const cell = nameCell(t, 0);
 		cell.focus();
 		press(cell, 'ArrowDown', { altKey: true, cancelable: true });

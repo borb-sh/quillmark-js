@@ -426,18 +426,17 @@
 	   `vector-effect: non-scaling-stroke`, so every glyph strokes at one weight. */
 	--_qm-glyph-stroke: calc(var(--_qm-glyph-control) / 12);
 	/* The narrowest track a control that fills its width stays usable in: a table's
-	   column floors at it, rises no further than its content, and a row of them scrolls
-	   sideways rather than crushing a cell. A column drawing a mark takes no floor — a
-	   switch is one width at every width, so there is no width for it to be usable in
-	   (`ArrayField`). What the field has spare stands after the last column, an inner
-	   grid carrying its own rhythm rather than the card's. Under the field minimum the
-	   capacity ladder steps at (`.qm-tracks`), since a cell in a row has the header to
-	   name it and no label of its own to fit. A threshold rather than a rhythm choice,
-	   so it does not move with `--qm-space`. */
+	   column floors at it, and a row of them scrolls sideways rather than crushing a
+	   cell. A column drawing a mark takes no floor — a switch is one width at every
+	   width, so there is no width for it to be usable in (`ArrayField`). Under the field
+	   minimum the capacity ladder steps at (`.qm-tracks`), since a cell in a row has the
+	   header to name it and no label of its own to fit. A threshold rather than a rhythm
+	   choice, so it does not move with `--qm-space`. */
 	--_qm-track-min: 7rem;
-	/* A prose column's floor: its cell wraps, and at `--_qm-track-min` a line holds a
-	   word, standing the row many lines tall beside cells one line tall. A multiple of
-	   the floor, so the two move together. */
+	/* A prose column's floor while the field has the width: its cell wraps, and at
+	   `--_qm-track-min` a line holds a word, standing the row many lines tall beside cells
+	   one line tall. Short of the width it gives way down to `--_qm-track-min` before the
+	   table scrolls (`ArrayField`). A multiple of the floor, so the two move together. */
 	--_qm-track-prose: calc(var(--_qm-track-min) * 2);
 
 	/* ── Type ────────────────────────────────────────────────────────────────

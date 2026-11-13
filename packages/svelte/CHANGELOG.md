@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A table's row and a line of a list move by a drag handle.** A row of a `layout: table` array and an element of a list of lines or scalars draw the grip a record's row draws, coming up with the row under the pointer, where they moved by Alt+↑/↓ alone. A table's grip stands in a first track pinned to the start of the box the table scrolls in, as its remove is pinned to the end, so it stays in reach when the table scrolls sideways.
+
+**A table's text columns share the field's width.** A column of text or prose cells takes a share of the width the field has, where each stood at a fixed width and a table of three such columns scrolled sideways in a form narrower than about 715px. A prose column's floor narrows to its share before the table scrolls, so the columns fit down to about 7rem each, and a column of an enum, a date or a number still rests at its content.
+
 **A review item can name its card by `$id`.** `card` on a field, block or removal item and `afterCard` on an added card name the card by its `$id`, wherever it stands, where the path's index, `remove` and `after` name it by its place when the list was set. `proposalsBetween` fills them in, so its list holds over a document whose cards were added, removed or moved since the snapshot: each item is drawn on its own card, and one whose card is gone is `undrawn` where it was drawn on the card that took its index.
 
 **Every text surface names itself to assistive tech.** A prose leaf, a list row's text and a table cell are textboxes, one-line or multi-line as they edit, where they were unroled `contenteditable` regions carrying a name. An enum's list is named by its field, and its divider no longer stands in the list as a separator. The link prompt's address box is named _Link address_, where it took the Link button's name and chord. The Today toggle states its `T` key. `VisualStrings` gains `fieldGuidance`, the guidance marker's name, and `linkAddress`.
