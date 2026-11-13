@@ -34,6 +34,7 @@ import type {
 	Quill
 } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
+import { tooltips } from '../tooltip.js';
 import type { EditorErrorHandler } from '../errors.js';
 import { reportError, errorMessage } from '../errors.js';
 import { decode, fitsLeaf } from './decode.js';
@@ -498,34 +499,31 @@ function changeCommittable(doc: Document, addr: Addr): boolean {
 }
 
 /**
- * The naming attributes for the `contenteditable`, shared with `ProseValue`. `aria-labelledby`
- * supersedes `aria-label`, and `undefined` is returned whole when a leaf takes neither, since
- * ProseMirror reads the absence.
+ * The `contenteditable`'s role and naming attributes, shared with `ProseValue`. A `div` takes no
+ * name without a role, so every leaf states itself a textbox, one-line or not by `multiline`.
+ * `aria-labelledby` supersedes `aria-label`.
  */
-export function proseAttributes(opts: {
-	label?: string;
-	labelledBy?: string;
-	describedBy?: string;
-}): Record<string, string> | undefined {
-	const attrs: Record<string, string> = {};
+export function proseAttributes(
+	opts: { label?: string; labelledBy?: string; describedBy?: string },
+	multiline: boolean
+): Record<string, string> {
+	const attrs: Record<string, string> = { role: 'textbox', 'aria-multiline': String(multiline) };
 	if (opts.labelledBy) attrs['aria-labelledby'] = opts.labelledBy;
 	else if (opts.label) attrs['aria-label'] = opts.label;
 	if (opts.describedBy) attrs['aria-describedby'] = opts.describedBy;
-	return Object.keys(attrs).length ? attrs : undefined;
+	return attrs;
 }
 
-/** A held leaf's attributes, described by its note as well. A non-editable view is no
- *  textbox to assistive tech or to Tab, so a held leaf states both itself. */
+/** A held leaf's attributes, described by its note as well. A held leaf draws its structure
+ *  in the block schema, and a non-editable view is no tab stop, so it states both itself. */
 export function heldAttributes(
 	opts: { label?: string; labelledBy?: string; describedBy?: string },
 	noteId: string | undefined
 ): Record<string, string> {
 	const describedBy = [opts.describedBy, noteId].filter(Boolean).join(' ') || undefined;
 	return {
-		...proseAttributes({ ...opts, describedBy }),
-		role: 'textbox',
+		...proseAttributes({ ...opts, describedBy }, true),
 		'aria-readonly': 'true',
-		'aria-multiline': 'true',
 		tabindex: '0'
 	};
 }
@@ -614,12 +612,15 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// `not_single_line` on a one-line `text` field.
 	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext, islands: true });
 	let held = holds(reconciler.last);
-	const named = proseAttributes(opts) ?? {};
+	const named = proseAttributes(opts, !inline);
 	const defaultNamed = {
-		...proseAttributes({
-			...opts,
-			describedBy: [opts.describedBy, opts.defaultNoteId].filter(Boolean).join(' ') || undefined
-		}),
+		...proseAttributes(
+			{
+				...opts,
+				describedBy: [opts.describedBy, opts.defaultNoteId].filter(Boolean).join(' ') || undefined
+			},
+			!inline
+		),
 		'data-default': ''
 	};
 	const heldNamed = heldAttributes(opts, opts.heldNoteId);
@@ -634,6 +635,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// where the derivation is out of reach (jsdom).
 	const lineBox = Number.parseFloat(getComputedStyle(container).lineHeight);
 	const clearance = Number.isFinite(lineBox) ? lineBox : undefined;
+
+	// An island's chrome names itself by tip, and a leaf mounted outside the editor has no shell
+	// that serves them.
+	const root = block ? container.closest<HTMLElement>('[data-qm-root]') : null;
+	const releaseTips = root ? tooltips(root) : undefined;
 
 	// Prepended, so what the caller draws inside `container` (a held leaf's note)
 	// follows the text it is about.
@@ -1120,6 +1126,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			};
 		},
 		destroy(): void {
+			releaseTips?.();
 			view.destroy();
 		}
 	};

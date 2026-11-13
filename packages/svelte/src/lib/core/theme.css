@@ -198,6 +198,17 @@
 	--_qm-ink: var(--_qm-fg);
 	--_qm-ink-default: color-mix(in oklab, var(--_qm-fg), var(--_qm-bg) 20%);
 	--_qm-ink-label: color-mix(in oklab, var(--_qm-fg), var(--_qm-bg) 35%);
+	/* `label` over a floating surface. `raised` lifts the plane off the card while the rung
+	   stays where the card put it, so it stands that much nearer the plane: under 4.5:1 on
+	   the dark default. Here the rung lifts by the plane's own step and keeps over `raised`
+	   the distance it keeps over the card. The card's share of the mix is 35%, so the card
+	   going 23% toward white under it moves the rung the 8% `raised` moves. No step over a
+	   white card, where `raised` takes none. */
+	--_qm-ink-label-raised: color-mix(
+		in oklab,
+		var(--_qm-fg),
+		color-mix(in oklab, var(--_qm-bg), #fff 23%) 35%
+	);
 	/* The arrival wash (`core/bloom.ts`). Its alpha is a peak, not a tint: the
 	   wash animates from and back to zero, never held, so it reads over the leaf it
 	   lands on while the leaf rests clean. */
@@ -327,8 +338,9 @@
 	   control resting at nothing reads as arriving rather than as switching. */
 	--_qm-reveal: 500ms cubic-bezier(0.4, 0, 0.2, 1);
 	/* A wait rather than a trip: how long a caret rests on an empty line before the
-	   slash hint comes up. Longer than the gap between two keystrokes, so typing on
-	   through an Enter never draws it. */
+	   slash hint comes up, and a pointer on a glyph control before its tip does
+	   (`core/tooltip.ts`). Longer than the gap between two keystrokes, so typing on
+	   through an Enter never draws it, and than a pointer takes to cross a control. */
 	--_qm-hint-wait: 500ms;
 
 	/* ── Geometry ──────────────────────────────────────────────────────────*/
@@ -510,6 +522,21 @@
 	font-family: var(--_qm-font);
 	color: var(--_qm-ink);
 	line-height: var(--_qm-leading-body);
+}
+
+/* A floating surface holds the label rung against its own plane, so what it carries at
+   that rung — a row's shortcut, a tag, a note, a quiet answer — reads over it as it does
+   over a card, and no component on one has to know where it stands. Stated here and not
+   in the recipes (`visual/controls.css`): a floating surface is mostly a root itself, so
+   a declaration from another sheet would tie with the rule above and leave the rung to
+   the order a bundler emits the two in. */
+:where(.qm-menu-surface, .qm-popover-surface) {
+	--_qm-ink-label: var(--_qm-ink-label-raised);
+}
+/* A menu's cursor fills its row, which takes that distance back, so under it the rung
+   steps to the ink: the ladder a chip takes under the pointer (`visual/controls.css`). */
+:where(.qm-menu-item[data-highlighted]) {
+	--_qm-ink-label: var(--_qm-ink);
 }
 
 /* More contrast steps the two rungs that identify a control rather than a list of

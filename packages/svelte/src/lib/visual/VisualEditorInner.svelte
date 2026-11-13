@@ -44,6 +44,7 @@
 	import { bloom } from '../core/bloom.js';
 	import { createLifespan } from '../core/teardown.js';
 	import { spacePx } from '../core/rungs.js';
+	import { tooltips } from '../core/tooltip.js';
 	import type {
 		Addr,
 		CardAddr,
@@ -57,7 +58,7 @@
 	} from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
 	import type { Delta } from '../core/codec/positions.js';
-	import { mergeStrings, setWording } from './strings.js';
+	import { diagnosticText, mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
@@ -1335,6 +1336,38 @@
 		cards: tree.cards.map((c) => patched[c.id] ?? c)
 	});
 
+	// ── What a screen reader hears of the diagnostics (INVARIANTS §Diagnostics) ──
+	/** How long the drawn errors hold before they are spoken, so an edit's validation and
+	 *  the diagnostics a host raises for it are one announcement, and a set that returns
+	 *  to what was last said meanwhile says nothing. */
+	const SPOKEN_MS = 500;
+	/** Every error a leaf of the page draws, in the page's order, under its field's label. */
+	const issues = $derived(
+		[model.main, ...model.cards].flatMap((card) =>
+			cardLayout(card).leaves.flatMap(({ key, name, schema }) => {
+				const field = name !== undefined && schema ? fieldTitle(name, schema) : merged.bodyLabel;
+				return (diagByKey.get(key) ?? []).map((d) => ({
+					field,
+					message: diagnosticText(d, formatDiagnostic, merged)
+				}));
+			})
+		)
+	);
+	const issuesKey = $derived(JSON.stringify(issues));
+	// What a mount starts from is not a change, so the first set is held as said.
+	let spokenKey: string | undefined;
+	let spoken = $state('');
+	$effect(() => {
+		const key = issuesKey;
+		spokenKey ??= key;
+		if (key === spokenKey) return;
+		const timer = setTimeout(() => {
+			spokenKey = issuesKey;
+			spoken = merged.diagAnnounced(issues);
+		}, SPOKEN_MS);
+		return () => clearTimeout(timer);
+	});
+
 	// ── Public entry points ─────────────────────────────────────────────────────
 	/**
 	 * Resolve a preview {@link Landing} to a mounted leaf and land in it.
@@ -1880,6 +1913,7 @@
 	{style}
 	data-qm-root
 	bind:this={rootEl}
+	{@attach tooltips}
 	onkeydowncapture={onTyped}
 	onpointerdowncapture={onPick}
 	onkeydown={raiseGuidance}
@@ -1971,6 +2005,9 @@
 		onHover={(on) => reviewing.hoverCard(on)}
 	/>
 	<div class="qm-visually-hidden" role="status">{reviewPlace}</div>
+	<!-- Beside the review's region rather than in it or in the toast's: a status is read whole,
+	 so a shared one would repeat what the other said. -->
+	<div class="qm-visually-hidden qm-diag-live" role="status">{spoken}</div>
 	<!-- The way back to a removed card once its toast has gone: the newest kept step, by
 	 name, at the stack's foot, where the control that adds a card is looked for. -->
 	{#if undo.kept}
@@ -1998,7 +2035,7 @@
 				<span class="qm-toast-notice">{undo.current.notice}</span>
 				<button
 					type="button"
-					class="qm-toast-action qm-focus-ring"
+					class="qm-toast-action qm-chip qm-focus-ring"
 					aria-keyshortcuts="Meta+Z Control+Z"
 					onclick={() => undo.take()}>{merged.undoAction}</button
 				>
@@ -2028,7 +2065,7 @@
 					class={['qm-review-card-add', { 'qm-review-lit': reviewing.lit === item.id }]}
 					data-qm-review={item.id}
 					role="group"
-					aria-label={merged.reviewNewCard}
+					aria-label={`${merged.reviewNewCard}, ${preview.title}`}
 					onpointerenter={() => reviewing.point(item.id, 'pointer')}
 					onpointerleave={() => reviewing.point(undefined, 'pointer')}
 				>
@@ -2059,14 +2096,14 @@
 		 on hover is the space the new card takes. -->
 		{@const marked = atIndex === model.cards.length}
 		<div class={['qm-add-card', { 'qm-add-card-marked': marked }]}>
-			<!-- Marked, the words are the accessible name and no `aria-label` doubles
-			 them; bare, the same words land as the label, the strip having no
-			 content to carry them. -->
+			<!-- The string is the name on every strip: marked, the strip draws a `+` ahead
+			 of the words, which is the template's glyph and no part of the name; bare,
+			 it has no content to carry them. -->
 			{#if kinds.length === 1}
 				<button
 					type="button"
 					class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
-					aria-label={marked ? undefined : merged.addCard}
+					aria-label={merged.addCard}
 					onclick={() => addCard(atIndex, kinds[0], true)}
 					>{#if marked}{`+ ${merged.addCard}`}{/if}</button
 				>
@@ -2079,7 +2116,7 @@
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger
 						class="qm-add-btn qm-add-affordance qm-tap-floor qm-focus-ring"
-						aria-label={marked ? undefined : merged.addCard}
+						aria-label={merged.addCard}
 						>{#if marked}{`+ ${merged.addCard}`}{/if}</DropdownMenu.Trigger
 					>
 					<DropdownMenu.Portal to={rootEl}>
@@ -2140,19 +2177,14 @@
 		color: var(--_qm-ink);
 		pointer-events: auto;
 	}
+	/* A chip (controls.css), in the toast's own corner. It stands at the ink and the chrome's
+	   weight where a chip rests at the label rung: it is the one action here, and the notice
+	   beside it is at the ink, so a rung under that would set the action quieter than the
+	   sentence it acts on. */
 	.qm-toast-action {
-		min-height: var(--_qm-tap-min);
-		padding-inline: var(--_qm-space-2);
-		border: 0;
 		border-radius: var(--_qm-radius-pill);
-		background: transparent;
-		font: inherit;
-		font-weight: var(--_qm-weight-strong);
-		color: var(--_qm-accent);
-		cursor: pointer;
-	}
-	.qm-toast-action:hover {
-		background: var(--_qm-accent-tint);
+		font-weight: var(--_qm-weight-mid);
+		color: var(--_qm-ink);
 	}
 	/* Words at the label ink, unboxed: the stack's foot already holds one outlined pill, and
 	   a second would stand as its equal. */
@@ -2272,7 +2304,7 @@
 	}
 	/* A card proposed new and a card proposed taken out, in the review's one hue: a preview
 	   where the new card would stand, the card's own ground under the tint, and a mark round
-	   the whole of a card that would go, its words receding as a struck word's do. The
+	   the whole of a card that would go, its values struck as a removed row's are. The
 	   current one's mark is a step stronger, as a current proposal's words are. */
 	.qm-review-card-remove {
 		display: contents;
@@ -2281,9 +2313,6 @@
 		display: block;
 		border-radius: var(--_qm-radius);
 		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
-	}
-	.qm-review-card-remove.qm-review-on > :global(.qm-card) {
-		opacity: var(--_qm-opacity-muted);
 	}
 	.qm-review-card-remove.qm-review-lit {
 		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
@@ -2357,8 +2386,8 @@
 		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	}
 	/* A row a proposal would take out: no tint, which only ever means "would come", but a ring
-	   in the review line laid outside the row so it takes no room, its values dimmed and struck
-	   and its labels left alone. The current one's ring is a step stronger, as a removed card's. */
+	   in the review line laid outside the row so it takes no room, its values struck and its
+	   labels left alone. The current one's ring is a step stronger, as a removed card's. */
 	:global([data-qm-removed]) {
 		border-radius: var(--_qm-radius-inner);
 		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
@@ -2366,17 +2395,15 @@
 	:global([data-qm-removed-lit]) {
 		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
 	}
+	/* What a removed row or card holds is what the reader reads to answer it, so its words
+	   step back to the label ink under the strike, as a struck word does in a paragraph
+	   (`codec/prose.css`), and no further: the ring, the strike and the tag say removed. A
+	   switch and a tick have no word to strike and keep their state as drawn. */
 	:global(
-		[data-qm-removed]
-			:is(
-				.qm-control-box:not(.qm-element-summary),
-				.qm-toggle,
-				.qm-tick,
-				.qm-input,
-				.qm-element-preview
-			)
+		:is([data-qm-removed], .qm-review-card-remove.qm-review-on)
+			:is(.qm-control-box:not(.qm-element-summary), .qm-input, .qm-prose, .qm-element-preview)
 	) {
-		opacity: var(--_qm-opacity-muted);
+		color: var(--_qm-ink-label);
 		text-decoration: line-through;
 		text-decoration-color: var(--_qm-review-line);
 	}

@@ -65,7 +65,13 @@ export type { DiffHunk } from './review-diff.js';
 // The rich editor's shortcuts as a host lists them, read off the tables the keymaps bind from;
 // the visual tier's `strings` set extends their wording, and the formatting popover binds its
 // link chord from `FIELD_KEYS`.
-export { DEFAULT_SHORTCUT_STRINGS, FIELD_KEYS, REVIEW_KEYS, editorShortcuts } from './shortcuts.js';
+export {
+	DEFAULT_SHORTCUT_STRINGS,
+	FIELD_KEYS,
+	LIST_KEYS,
+	REVIEW_KEYS,
+	editorShortcuts
+} from './shortcuts.js';
 export type { EditorShortcut, ShortcutScope, ShortcutStrings } from './shortcuts.js';
 
 // Schemas (the decode/encode target; the VisualEditor mounts them). `hasMarks` is

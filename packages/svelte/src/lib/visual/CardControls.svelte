@@ -36,7 +36,7 @@
 		<button
 			type="button"
 			class="qm-chip qm-focus-ring"
-			title={t.strings.cardMoveUp}
+			data-qm-tip={t.strings.cardMoveUp}
 			aria-label={t.strings.cardAction(t.strings.cardMoveUp, name)}
 			aria-disabled={isFirst || undefined}
 			tabindex={isFirst ? -1 : undefined}
@@ -45,7 +45,7 @@
 		<button
 			type="button"
 			class="qm-chip qm-focus-ring"
-			title={t.strings.cardMoveDown}
+			data-qm-tip={t.strings.cardMoveDown}
 			aria-label={t.strings.cardAction(t.strings.cardMoveDown, name)}
 			aria-disabled={isLast || undefined}
 			tabindex={isLast ? -1 : undefined}
@@ -55,7 +55,7 @@
 	<button
 		type="button"
 		class="qm-chip qm-card-delete qm-focus-ring"
-		title={t.strings.cardDelete}
+		data-qm-tip={t.strings.cardDelete}
 		aria-label={t.strings.cardAction(t.strings.cardDelete, name)}
 		onclick={onDelete}><Icon name="trash-2" /></button
 	>

@@ -3,8 +3,7 @@
  Commits at `change` (blur/Enter), not per keystroke: a partial numeric entry
  (`-`, `1.`) is never a document state worth a boundary round-trip, and
  committing it live flashes a coercion diagnostic + `console.error` on every
- intermediate prefix, announced by `DiagnosticList`'s `role="status"` live
- region. Where the parent moves on at Enter (`onEnter`), Enter commits at once and
+ intermediate prefix. Where the parent moves on at Enter (`onEnter`), Enter commits at once and
  the move follows a number, never a blank or a refused entry. Escape takes a pending
  entry back to what the field holds, as it takes a card rename back, and the focus
  stays; with nothing pending the key is not claimed.

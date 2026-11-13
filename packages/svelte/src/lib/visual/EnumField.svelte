@@ -37,6 +37,8 @@
 		/** `<label for>` target. Set → the label names this trigger, so `aria-label`
 		 * comes off: two names is where implementations disagree about which wins. */
 		id?: string;
+		/** The field's label element, which names the list as `label` does where it is unset. */
+		labelledBy?: string;
 		/** The parked `description` (FieldLabel): announced after the name. */
 		describedBy?: string;
 		onCommit: (v: string | undefined) => void;
@@ -57,6 +59,7 @@
 		optional = false,
 		label,
 		id,
+		labelledBy,
 		describedBy,
 		onCommit,
 		optionAllowed,
@@ -129,6 +132,8 @@
 				collisionBoundary={portalTarget ?? []}
 				strategy="absolute"
 				sideOffset={spacePx(wrapEl)}
+				aria-labelledby={labelledBy}
+				aria-label={labelledBy ? undefined : label}
 			>
 				<!-- The list portals out of the trigger's DOM but into the nearest
 				     `[data-qm-root]`, and carries the marker itself, like FormatPopover.
@@ -170,7 +175,7 @@
 						<!-- The reset is the sentinel, offered once there is something to reset:
 						     unset, the list's check already stands where a reset would land. -->
 						{#if !unset}
-							<div class="qm-select-divider" role="separator"></div>
+							<div class="qm-select-divider" aria-hidden="true"></div>
 							<Select.Item
 								class="qm-menu-item qm-select-item qm-select-unset"
 								value={UNSET}

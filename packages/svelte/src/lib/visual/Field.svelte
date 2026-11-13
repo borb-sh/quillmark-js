@@ -419,6 +419,7 @@
 					blankTitle={field.schema.ui?.blank_title}
 					{optional}
 					id={domIds.control}
+					labelledBy={domIds.label}
 					{describedBy}
 					onCommit={answerOrCommit}
 					proposing={!!proposed}

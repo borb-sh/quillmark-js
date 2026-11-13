@@ -395,7 +395,7 @@
 					<button
 						type="button"
 						class="qm-icon-btn qm-focus-ring qm-member-remove"
-						title={t.strings.matrixRemove(name)}
+						data-qm-tip={t.strings.matrixRemove(name)}
 						aria-label={t.strings.matrixRemove(name)}
 						onclick={() => removeItem(item.id, name)}><Icon name="x" /></button
 					>

@@ -15,8 +15,9 @@ import { flushSync } from 'svelte';
 import { toggleMark } from 'prosemirror-commands';
 import { AllSelection, TextSelection } from 'prosemirror-state';
 import type { Content, Document, PathStep, TableProps } from '@quillmark/wasm';
-import { hasMarks } from '$lib/core/codec';
+import { FIELD_KEYS, hasMarks } from '$lib/core/codec';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual';
+import { keycap, keyshortcut } from '$lib/visual/strings';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	field,
@@ -232,9 +233,14 @@ describe('the formatting popover over a by-value prose leaf', () => {
 		const popover = await surface();
 		expect(popover).not.toBeNull();
 		expect(labels(popover!)).toEqual(SIX);
-		popover!
-			.querySelector<HTMLButtonElement>(`[aria-label="${DEFAULT_VISUAL_STRINGS.formatBold}"]`)!
-			.click();
+		// A button's name is its name alone: the chord is stated beside it, and drawn in its tip.
+		const strong = popover!.querySelector<HTMLButtonElement>(
+			`[aria-label="${DEFAULT_VISUAL_STRINGS.formatBold}"]`
+		)!;
+		expect(strong.getAttribute('aria-keyshortcuts')).toBe(keyshortcut(FIELD_KEYS.bold));
+		expect(strong.getAttribute('data-qm-tip-keys')).toBe(keycap(FIELD_KEYS.bold));
+		expect(strong.hasAttribute('title')).toBe(false);
+		strong.click();
 		flushSync();
 		expect(q.reader(doc).getContentAt({ field: 'notes' }, [0])?.marks).toEqual(STRONG);
 	});
@@ -252,6 +258,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 
 		const input = document.querySelector<HTMLInputElement>('.qm-link-input')!;
 		expect(document.activeElement).toBe(input);
+		expect(input.getAttribute('aria-label')).toBe(DEFAULT_VISUAL_STRINGS.linkAddress);
 		input.value = 'example.com';
 		input.dispatchEvent(new Event('input', { bubbles: true }));
 		input.form!.requestSubmit();

@@ -45,12 +45,13 @@ export interface VisualStrings
 	cardMoveUp: string;
 	cardMoveDown: string;
 	cardDelete: string;
-	/** The card-title input's accessible name. */
+	/** The card-title input's own word in its accessible name, which {@link cardAction}
+	 *  completes with the card's title: `Card title, Findings`. */
 	cardTitle: string;
 	/**
-	 * A card control's accessible name, the action and the card it acts on, by the title
-	 * the header shows: `Delete card, Findings`. The action alone stays the tooltip.
-	 * Parametric, so word order stays the translator's.
+	 * A card control's accessible name, the control's own word and the card it is on, by
+	 * the title the header shows: `Delete card, Findings`. An action alone stays the
+	 * tooltip. Parametric, so word order stays the translator's.
 	 */
 	cardAction: (action: string, card: string) => string;
 
@@ -96,17 +97,18 @@ export interface VisualStrings
 	undoRestore: (what: string) => string;
 
 	// ── The add affordance ────────────────────────────────────────────────────
-	/** The trailing strip's visible words, drawn after a `+`, and every
-	 * strip's accessible name. One string over
+	/** The trailing strip's visible words and every strip's accessible name. Words alone,
+	 * as every add control's string is: the control draws its own `+`. One string over
 	 * one kind and many: the trigger seeds a card, and which kind is the menu's word
 	 * to say or the schema's to have already settled. */
 	addCard: string;
 
 	// ── Array control ─────────────────────────────────────────────────────────
+	/** A list's add chip: its words after the `+` the chip draws, and its accessible name. */
 	arrayAdd: string;
 	arrayRemove: string;
-	/** The drag handle on an `object` row: its tooltip, which names the keys that move
-	 *  the row too. */
+	/** The drag handle on an `object` row: its tooltip, which draws the keys that move the
+	 *  row beside it. */
 	arrayDrag: string;
 	/** What a list's standing row ghosts, the row that is not an element yet: the words
 	 *  say what typing there does. */
@@ -148,6 +150,10 @@ export interface VisualStrings
 	diagTypeMismatch: (expected: string) => string;
 	/** `validation::format_violation`: the value misses a string format (`args.format`). */
 	diagFormatViolation: (format: string) => string;
+	/** What a screen reader hears once the errors the fields draw have changed and come to
+	 *  rest: each error's field label and its text, in the page's order, and none once the
+	 *  last has cleared. */
+	diagAnnounced: (issues: readonly { field: string; message: string }[]) => string;
 
 	// ── Where a field stands against its default (the label row's end) ───────
 	/** The tag on a field whose `default:` is what prints. */
@@ -189,9 +195,15 @@ export interface VisualStrings
 	 *  an island in a one-line leaf, an island in any subform cell), which it draws
 	 *  read-only rather than lose. */
 	proseHeld: string;
+	/** A field's guidance marker, named for the field it is about: `Subject guidance`.
+	 *  Parametric, so word order stays the translator's. */
+	fieldGuidance: (label: string) => string;
 
 	// ── Formatting popover ────────────────────────────────────────────────────
 	formatGroup: string;
+	/** A mark or list button's name: its accessible name and its tooltip. The name alone:
+	 *  the button's shortcut is read off its binding, drawn beside the name in the tooltip
+	 *  and stated to assistive tech as `aria-keyshortcuts`. */
 	formatBold: string;
 	formatEmphasis: string;
 	formatUnderline: string;
@@ -207,11 +219,10 @@ export interface VisualStrings
 	fontDefault: string;
 	/** What the picker reads over a selection setting more than one family. */
 	fontMixed: string;
-	/** The anchor button's accessible name. The popover withholds the button, so
-	 *  nothing draws this or the title below. */
+	/** The anchor button's name. The popover withholds the button, so nothing draws this. */
 	formatAnchor: string;
-	/** Its hover title, which says what an anchor is; the name above only says what. */
-	formatAnchorTitle: string;
+	/** The link prompt's address input: its accessible name. */
+	linkAddress: string;
 	linkPlaceholder: string;
 	linkApply: string;
 	/** Drawn only where the selection carries a link. */
@@ -279,29 +290,77 @@ export interface VisualStrings
  */
 export type FormatDiagnostic = (d: Diagnostic) => string | undefined;
 
-/**
- * A `Mod` chord as the writer's platform prints it: `⌘B` on Apple's, `Ctrl+B`
- * elsewhere, and `Shift-7` as `⇧⌘7` or `Ctrl+Shift+7`. The platform test is the one
- * `prosemirror-keymap` resolves `Mod` by, so a tooltip names the chord the keymap binds.
- */
-export function chord(
-	key: string,
-	platform = typeof navigator === 'undefined' ? '' : navigator.platform
-): string {
-	const shift = key.startsWith('Shift-');
-	const bare = shift ? key.slice('Shift-'.length) : key;
-	if (/Mac|iP(hone|[oa]d)/.test(platform)) return `${shift ? '⇧' : ''}⌘${bare}`;
-	return `Ctrl+${shift ? 'Shift+' : ''}${bare}`;
+/** The platform test `prosemirror-keymap` resolves `Mod` by, so what is printed is what
+ *  the keymap binds. */
+const APPLE = /Mac|iP(hone|[oa]d)/;
+const platformHere = (): string => (typeof navigator === 'undefined' ? '' : navigator.platform);
+
+/** A binding in `prosemirror-keymap` notation, apart: its modifiers and its key, a letter
+ *  in capitals as a keycap and `aria-keyshortcuts` both spell it. */
+function parseBinding(binding: string): { mods: Set<string>; key: string } {
+	const parts = binding.split('-');
+	const key = parts.pop() ?? '';
+	return { mods: new Set(parts), key: /^[a-z]$/.test(key) ? key.toUpperCase() : key };
 }
 
-/** An `Alt` chord as the writer's platform prints it: `⌥↑` on Apple's, `Alt+↑` elsewhere,
- *  on the test {@link chord} reads. */
-export function alt(
-	key: string,
-	platform = typeof navigator === 'undefined' ? '' : navigator.platform
-): string {
-	return /Mac|iP(hone|[oa]d)/.test(platform) ? `⌥${key}` : `Alt+${key}`;
+/** What a named key prints as. */
+const KEY_GLYPH: Readonly<Record<string, string>> = {
+	ArrowUp: '↑',
+	ArrowDown: '↓',
+	ArrowLeft: '←',
+	ArrowRight: '→',
+	Enter: '↵'
+};
+/** Apple's marks for the modifiers, in the order its menus print them. */
+const APPLE_MODS: readonly (readonly [string, string])[] = [
+	['Ctrl', '⌃'],
+	['Alt', '⌥'],
+	['Shift', '⇧'],
+	['Mod', '⌘']
+];
+
+/**
+ * A binding as the writer's platform prints it, for the hint beside a control's name:
+ * `Mod-b` is `⌘B` on Apple's and `Ctrl+B` elsewhere, `Mod-Shift-7` is `⇧⌘7` or
+ * `Ctrl+Shift+7`, `Alt-ArrowUp` is `⌥↑` or `Alt+↑`.
+ */
+export function keycap(binding: string, platform = platformHere()): string {
+	const { mods, key } = parseBinding(binding);
+	const cap = KEY_GLYPH[key] ?? key;
+	if (APPLE.test(platform))
+		return APPLE_MODS.map(([mod, mark]) => (mods.has(mod) ? mark : '')).join('') + cap;
+	const names = [
+		mods.has('Mod') || mods.has('Ctrl') ? 'Ctrl' : '',
+		mods.has('Alt') ? 'Alt' : '',
+		mods.has('Shift') ? 'Shift' : ''
+	];
+	return [...names.filter(Boolean), cap].join('+');
 }
+
+/**
+ * The same binding as `aria-keyshortcuts` spells it, which is where a control states its
+ * shortcut to assistive tech, its name staying its name: `Mod-b` is `Meta+B` on Apple's
+ * and `Control+B` elsewhere.
+ */
+export function keyshortcut(binding: string, platform = platformHere()): string {
+	const { mods, key } = parseBinding(binding);
+	const names = [
+		mods.has('Mod') ? (APPLE.test(platform) ? 'Meta' : 'Control') : '',
+		mods.has('Ctrl') ? 'Control' : '',
+		mods.has('Alt') ? 'Alt' : '',
+		mods.has('Shift') ? 'Shift' : ''
+	];
+	return [...names.filter(Boolean), key].join('+');
+}
+
+/** A `Mod` chord over a key already printed, as {@link keycap} prints it: `⌘↵`, `Ctrl+.`. */
+export function chord(key: string, platform = platformHere()): string {
+	return keycap(`Mod-${key}`, platform);
+}
+
+/** How many fields `diagAnnounced` names before it counts the rest, so a host's batch over
+ *  a whole document is still one sentence. */
+const FIELDS_NAMED = 3;
 
 /** The package's English. Every key, so the merge below is total. */
 export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
@@ -332,9 +391,9 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	undoAction: 'Undo',
 	undoRestore: (what) => `Restore ${what}`,
 	addCard: 'Add card',
-	arrayAdd: '+ Add',
+	arrayAdd: 'Add',
 	arrayRemove: 'Remove',
-	arrayDrag: `Drag to move (${alt('↑/↓')})`,
+	arrayDrag: 'Drag to move',
 	arrayStanding: 'Add an item…',
 	arrayRowAction: (action, row) => `${action} ${row}`,
 	arrayCount: (count, max) => `${count} / ${max}`,
@@ -355,6 +414,14 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 			: format === 'datetime'
 				? 'Not a real date and time. Check the day, month and time.'
 				: `Doesn't match the ${format} format.`,
+	diagAnnounced: (issues) => {
+		if (issues.length === 0) return 'No issues.';
+		if (issues.length === 1) return `${issues[0].field}: ${issues[0].message}`;
+		const fields = [...new Set(issues.map((issue) => issue.field))];
+		const named = fields.slice(0, FIELDS_NAMED).join(', ');
+		const rest = fields.length - FIELDS_NAMED;
+		return `${issues.length} issues: ${named}${rest > 0 ? `, and ${rest} more` : ''}.`;
+	},
 	fieldDefault: 'Default',
 	fieldReset: 'Reset',
 	enumUnsetTag: 'Default',
@@ -367,20 +434,21 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	dateToday: 'Today',
 	optionalGhost: 'None',
 	proseHeld: "This field has formatting it can't edit here. It is kept as it is.",
+	fieldGuidance: (label) => `${label} guidance`,
 	formatGroup: 'Formatting',
-	formatBold: `Bold (${chord('B')})`,
-	formatEmphasis: `Italic (${chord('I')})`,
-	formatUnderline: `Underline (${chord('U')})`,
-	formatStrikethrough: `Strikethrough (${chord('Shift-X')})`,
-	formatCode: `Code (${chord('E')})`,
-	formatLink: `Link (${chord('K')})`,
-	formatNumberedList: `Numbered list (${chord('Shift-7')})`,
-	formatBulletedList: `Bulleted list (${chord('Shift-8')})`,
+	formatBold: 'Bold',
+	formatEmphasis: 'Italic',
+	formatUnderline: 'Underline',
+	formatStrikethrough: 'Strikethrough',
+	formatCode: 'Code',
+	formatLink: 'Link',
+	formatNumberedList: 'Numbered list',
+	formatBulletedList: 'Bulleted list',
 	formatFont: 'Font',
 	fontDefault: 'Default font',
 	fontMixed: 'Mixed fonts',
 	formatAnchor: 'Anchor',
-	formatAnchorTitle: 'Anchor — an identity handle over the selection',
+	linkAddress: 'Link address',
 	linkPlaceholder: 'https://…',
 	linkApply: 'Apply',
 	linkRemove: 'Remove',

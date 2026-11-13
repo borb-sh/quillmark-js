@@ -40,6 +40,7 @@ describe('the recovery shell', () => {
 		expect(card).not.toBeNull();
 		// Humanized in the title, verbatim in the note.
 		expect(card.querySelector('.qm-card-title-static')?.textContent).toBe(humanize('legacy_kind'));
+		expect(card.getAttribute('aria-label')).toBe(humanize('legacy_kind'));
 		expect(card.querySelector('.qm-recovery-note')?.textContent).toContain('legacy_kind');
 		// The two exits, both drawn: retype offers every kind the quill declares, and delete
 		// sits on the header a declared card carries.

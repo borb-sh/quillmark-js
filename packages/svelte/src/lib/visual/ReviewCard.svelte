@@ -350,7 +350,6 @@
 	}
 	kbd {
 		font: inherit;
-		opacity: var(--_qm-opacity-rest);
 	}
 	.qm-review-card-note {
 		padding-inline: var(--_qm-space-2);

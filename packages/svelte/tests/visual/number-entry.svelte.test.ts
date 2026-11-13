@@ -204,7 +204,7 @@ main:
 		.resolve()
 		.main.fields.find((r: ResolvedField) => r.name === 'pages')!;
 	expect(row.source).toBe('default');
-	const status = () => pages.querySelector('[role="status"]')?.textContent?.trim() ?? '';
+	const status = () => pages.querySelector('.qm-diag-list')?.textContent?.trim() ?? '';
 	expect(status()).not.toBe('');
 
 	// Escape takes the refused entry back, and the refusal with it, writing nothing.

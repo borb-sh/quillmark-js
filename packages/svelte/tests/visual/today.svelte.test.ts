@@ -186,3 +186,47 @@ describe('a `default: today`', () => {
 		expect(stored('stamped')).toBe(renderDate());
 	});
 });
+
+// A date field is one Tab stop, its segments and its toggle roving under it.
+describe('the tab order', () => {
+	const parts = (scope: HTMLElement): HTMLElement[] =>
+		[...scope.querySelectorAll<HTMLElement>('[data-segment]')].filter(
+			(s) => s.getAttribute('data-segment') !== 'literal'
+		);
+	const stops = (scope: HTMLElement): HTMLElement[] =>
+		[...scope.querySelectorAll<HTMLElement>('.qm-date-wrap [tabindex]')].filter(
+			(el) => el.tabIndex === 0
+		);
+
+	it('holds one stop per field, the first segment while the focus is elsewhere', () => {
+		const target = open('dated: 2026-03-14');
+		for (const name of ['Dated', 'Stamped', 'Logged']) {
+			const scope = field(target, name);
+			expect(stops(scope), name).toEqual([parts(scope)[0]]);
+		}
+	});
+
+	it('moves the stop with the focus, so Tab leaves the field from any segment', () => {
+		const logged = field(open('logged: "2026-03-04T10:30"'), 'Logged');
+		const minute = segment(logged, 'minute');
+		minute.focus();
+		flushSync();
+		expect(stops(logged)).toEqual([minute]);
+		minute.blur();
+		flushSync();
+		expect(stops(logged)).toEqual([parts(logged)[0]]);
+	});
+
+	it('reaches the toggle one arrow past the last segment, and returns', () => {
+		const dated = field(open('dated: 2026-03-14'), 'Dated');
+		const last = parts(dated).at(-1)!;
+		last.focus();
+		flushSync();
+		press(last, 'ArrowRight');
+		expect(document.activeElement).toBe(toggle(dated));
+		expect(stops(dated)).toEqual([toggle(dated)]);
+		press(toggle(dated), 'ArrowLeft');
+		expect(document.activeElement).toBe(last);
+		expect(stops(dated)).toEqual([last]);
+	});
+});

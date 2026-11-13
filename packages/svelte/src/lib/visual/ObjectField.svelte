@@ -375,6 +375,7 @@
 						<EnumField
 							label={named}
 							id={ids?.control}
+							labelledBy={ids?.label}
 							describedBy={describes}
 							value={shown as string | undefined}
 							values={sub.values ?? []}
