@@ -6,7 +6,8 @@
  is the host's bar's.
 
  It sits under the block the change flows in, so it covers no line of its paragraph, or beside
- that block's last line where the line ends short of it, right-aligned to the text column the
+ that block's last line where the line ends short of it, centred on a block of one line such as a
+ one-line field's, right-aligned to the text column the
  change stands in, and flips above that block where there is no room below, keeping clear of the
  host's chrome at the pane's foot (`inset`). Over a change taller than the pane it stays pinned
  at the foot while any of the change shows. A change out of the pane keeps its card where it
@@ -110,7 +111,7 @@
 		left = Math.max(view.left + gap, column.getBoundingClientRect().right - w);
 		const at = (root ?? el).getBoundingClientRect();
 		const last = blocks.find((b, i) => b !== els[i] && b.getBoundingClientRect().bottom === lower);
-		const tuck = last && lastLine(last);
+		const tuck = last && lastLine(last, h);
 		const below = tuck && tuck.right + gap <= left ? tuck.top : lower + gap;
 		const above = upper - gap - h;
 		const fits = below + h <= floor || above >= ceil;
@@ -138,17 +139,21 @@
 		return at;
 	}
 
-	/** The last line of a block of several, where its words end on it and where it stands: a
-	 *  card beside a short last line covers nothing of the block. */
-	function lastLine(block: HTMLElement): { top: number; right: number } | undefined {
+	/** Where a card `h` tall stands beside the last line of a block, and where the line's words
+	 *  end: a card beside a short last line covers nothing of the block, and beside a one-line
+	 *  field's text, centred on it, nothing of the field after it. */
+	function lastLine(block: HTMLElement, h: number): { top: number; right: number } | undefined {
 		const range = document.createRange();
 		range.selectNodeContents(block);
 		const lines = [...range.getClientRects()].filter((r) => r.width && r.height);
 		if (!lines.length) return undefined;
 		const from = Math.max(...lines.map((r) => r.top));
 		const on = lines.filter((r) => r.bottom > from);
-		if (on.length === lines.length) return undefined;
-		return { top: Math.min(...on.map((r) => r.top)), right: Math.max(...on.map((r) => r.right)) };
+		const top = Math.min(...on.map((r) => r.top));
+		const right = Math.max(...on.map((r) => r.right));
+		if (on.length < lines.length) return { top, right };
+		const bottom = Math.max(...on.map((r) => r.bottom));
+		return { top: (top + bottom - h) / 2, right };
 	}
 
 	function gapPx(): number {
@@ -356,7 +361,7 @@
 		color: var(--_qm-ink-label);
 	}
 	/* Under a finger the keys are no help, and each answer is a tap target. */
-	@media (pointer: coarse) {
+	@media (pointer: coarse), (hover: none) {
 		kbd {
 			display: none;
 		}
