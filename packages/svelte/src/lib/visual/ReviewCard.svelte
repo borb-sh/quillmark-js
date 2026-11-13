@@ -1,7 +1,8 @@
 <!--
  The answer card: one floating surface on the current change of a review, and the one place a
- change is answered by pointer. A quiet Dismiss and a primary Accept, each with its key, and a
- note where the reader's own writing meets the change. The change itself is drawn where it
+ change is answered by pointer. A quiet Dismiss and a primary Accept, each with its key, a note
+ where the reader's own writing meets the change, and above them the line the proposal's writer
+ gave for it, cut to one line. The change itself is drawn where it
  stands, so the card is the same two answers on every change. It carries no position: the count
  is the host's bar's.
 
@@ -39,9 +40,12 @@
 		hidden: boolean;
 		/** The reader's own writing meets the change. */
 		outdated: boolean;
+		/** Why, as the proposal's writer says it. */
+		note?: string;
 		onAnswer(action: 'accept' | 'dismiss'): void;
 	}
-	let { id, root, inset, hidden, outdated, onAnswer }: Props = $props();
+	let { id, root, inset, hidden, outdated, note, onAnswer }: Props = $props();
+	const noteId = $props.id();
 
 	const t = wording();
 
@@ -262,6 +266,7 @@
 	style:left="{left}px"
 	role="group"
 	aria-label={t.strings.reviewProposal}
+	aria-describedby={note ? noteId : undefined}
 	aria-hidden={!shown}
 	inert={!shown}
 	onmousedown={(e) => e.preventDefault()}
@@ -270,23 +275,26 @@
 		if (!el?.contains(e.relatedTarget as Node | null)) from = undefined;
 	}}
 >
-	{#if outdated}<span class="qm-review-card-note">{t.strings.reviewOutdated}</span>{/if}
-	<button
-		type="button"
-		class="qm-review-card-dismiss qm-focus-ring"
-		tabindex="-1"
-		aria-keyshortcuts={keyshortcut(REVIEW_KEYS.dismiss)}
-		onclick={() => answer('dismiss')}
-		>{t.strings.reviewDismiss}<kbd>{keycap(REVIEW_KEYS.dismiss)}</kbd></button
-	>
-	<button
-		type="button"
-		class="qm-review-card-accept qm-focus-ring"
-		tabindex="-1"
-		aria-keyshortcuts={keyshortcut(REVIEW_KEYS.accept)}
-		onclick={() => answer('accept')}
-		>{t.strings.reviewAccept}<kbd>{keycap(REVIEW_KEYS.accept)}</kbd></button
-	>
+	{#if note}<p id={noteId} class="qm-review-card-reason" title={note}>{note}</p>{/if}
+	<div class="qm-review-card-answers">
+		{#if outdated}<span class="qm-review-card-note">{t.strings.reviewOutdated}</span>{/if}
+		<button
+			type="button"
+			class="qm-review-card-dismiss qm-focus-ring"
+			tabindex="-1"
+			aria-keyshortcuts={keyshortcut(REVIEW_KEYS.dismiss)}
+			onclick={() => answer('dismiss')}
+			>{t.strings.reviewDismiss}<kbd>{keycap(REVIEW_KEYS.dismiss)}</kbd></button
+		>
+		<button
+			type="button"
+			class="qm-review-card-accept qm-focus-ring"
+			tabindex="-1"
+			aria-keyshortcuts={keyshortcut(REVIEW_KEYS.accept)}
+			onclick={() => answer('accept')}
+			>{t.strings.reviewAccept}<kbd>{keycap(REVIEW_KEYS.accept)}</kbd></button
+		>
+	</div>
 </div>
 
 <style>
@@ -299,7 +307,7 @@
 		z-index: 2;
 		width: max-content;
 		display: flex;
-		align-items: center;
+		flex-direction: column;
 		gap: var(--_qm-space-half);
 		padding: var(--_qm-space-half);
 		font-family: var(--_qm-font);
@@ -355,6 +363,21 @@
 	}
 	kbd {
 		font: inherit;
+	}
+	.qm-review-card-answers {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: var(--_qm-space-half);
+	}
+	.qm-review-card-reason {
+		max-width: min(24rem, calc(100vw - 4 * var(--_qm-space-2)));
+		margin: 0;
+		padding: var(--_qm-space-half) var(--_qm-space-2) 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		color: var(--_qm-ink);
 	}
 	.qm-review-card-note {
 		padding-inline: var(--_qm-space-2);

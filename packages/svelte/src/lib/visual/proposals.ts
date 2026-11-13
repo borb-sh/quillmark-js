@@ -11,7 +11,7 @@ import type {
 	QuillFieldSchema
 } from '@quillmark/wasm';
 import { fieldPathForAddr } from '../core/address.js';
-import { sameValue, type ReviewItem } from './review.js';
+import { sameValue, type ReviewItem, type ReviewLabel } from './review.js';
 import { VARIANT_DISCRIMINANT, baseType, fieldValues, oneLine } from './structure.js';
 
 /** The review an answer makes: the items the editor draws, the cards it adds or takes out
@@ -46,14 +46,20 @@ let minted = 0;
  * keeps, so cards it adds in a run stand in list order; one it takes out is a `remove` item.
  * Paths and card indexes are `base`'s, and an item on a card, after one or taking one out names
  * it by its `$id` too where it has one. A card the answer retypes is listed as taken out and
- * added; one it moves is not listed. `mint` names each item, and by default names it uniquely for the page.
+ * added; one it moves is not listed.
+ *
+ * `mint`, or `opts.mint`, names each item, and by default names it uniquely for the page.
+ * `opts.label` is handed each item once the list is made and returns its `note` and `group`,
+ * from what the host knows of the edit that made it: a block id or a field path it wrote.
  */
 export function proposalsBetween(
 	quill: Quill,
 	base: Document,
 	answer: Document,
-	mint: () => string = () => `review-${minted++}`
+	opts: (() => string) | ProposalsOpts = {}
 ): Proposed {
+	const { mint = () => `review-${minted++}`, label } =
+		typeof opts === 'function' ? { mint: opts } : opts;
 	const items: ReviewItem[] = [];
 	const kinds = Array.from({ length: base.cardCount }, (_, i) => base.card(i).kind);
 	const baseIds = Array.from({ length: base.cardCount }, (_, i) => base.card(i).id ?? '');
@@ -254,7 +260,19 @@ export function proposalsBetween(
 	}
 	for (const at of removed)
 		items.push({ id: mint(), remove: at, ...(baseIds[at] && { card: baseIds[at] }) });
+	if (label)
+		for (const item of items) {
+			const { note, group } = label(item) ?? {};
+			if (note !== undefined) item.note = note;
+			if (group !== undefined) item.group = group;
+		}
 	return { items };
+}
+
+/** How `proposalsBetween` names and labels the items it makes. */
+export interface ProposalsOpts {
+	mint?: () => string;
+	label?: (item: Readonly<ReviewItem>) => ReviewLabel | undefined;
 }
 
 const addrOf = (card?: number, field?: string): Addr => ({

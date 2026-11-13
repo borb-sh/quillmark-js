@@ -35,8 +35,22 @@ import { asContent, wordDiff, type BlockPlace, type ReviewAction } from '../core
  *
  * An item whose place the editor does not hold draws nothing. An answered item is drawn no
  * more: a dismissed one wrote nothing, and an accepted one is plain text in the document.
+ *
+ * Every item may carry `note` and `group` (`ReviewLabel`).
  */
-export type ReviewItem = FieldProposal | BlockProposal | CardProposal;
+export type ReviewItem = (FieldProposal | BlockProposal | CardProposal) & ReviewLabel;
+
+/**
+ * What the proposal's writer says of an item, beside where it stands.
+ *
+ * - `note`: why, in one line. The answer card shows it above its answers, cut to one line.
+ * - `group`: the kind of change it is, a name of the host's. `stepReview` and `answerReview`
+ *   take a group to step through or answer its items alone.
+ */
+export interface ReviewLabel {
+	note?: string;
+	group?: string;
+}
 
 /**
  * A card proposed new or taken out, naming cards by their index into the composable cards as they

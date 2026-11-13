@@ -118,11 +118,12 @@
 	export async function revealReview(id: string, opts?: { focus?: boolean }): Promise<boolean> {
 		return (await inner?.revealReview(id, opts)) ?? false;
 	}
-	/** Answer items as the answer card would, in document order (`'all'`: every item drawn),
-	 *  moving neither the focus nor the caret; where the current change is among them, the next
-	 *  open one is current. Returns the ids answered. */
+	/** Answer items as the answer card would, in document order (`'all'`: every item drawn;
+	 *  `{ group }`: every item drawn in that group, accepting none outdated), moving neither the
+	 *  focus nor the caret; where the current change is among them, the next open one is current.
+	 *  Returns the ids answered. */
 	export function answerReview(
-		ids: readonly string[] | 'all',
+		ids: readonly string[] | 'all' | { group: string },
 		action: 'accept' | 'dismiss'
 	): string[] {
 		return inner?.answerReview(ids, action) ?? [];
@@ -134,10 +135,11 @@
 		return inner?.projectReview(target) ?? NO_PROJECTION;
 	}
 	/** Make the next or previous open item current, round from either end, the caret or the
-	 *  focus in it unless `focus` is false. Resolves its id, `undefined` for none. */
+	 *  focus in it unless `focus` is false, and among the items of `group` alone where it is
+	 *  given. Resolves its id, `undefined` for none. */
 	export async function stepReview(
 		dir: 1 | -1,
-		opts?: { focus?: boolean }
+		opts?: { focus?: boolean; group?: string }
 	): Promise<string | undefined> {
 		return (await inner?.stepReview(dir, opts)) ?? undefined;
 	}

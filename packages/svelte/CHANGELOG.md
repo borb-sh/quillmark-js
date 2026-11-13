@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A review item can say why, and belong to a group.** `ReviewItem` takes an optional `note`, which the answer card shows above its answers cut to one line and names as the card's description, and an optional `group`, a name of the host's. `stepReview` takes `{ group }` to step through that group's items alone, and `answerReview` takes `{ group }` to answer them, accepting none outdated as `'all'` does. `proposalsBetween`'s fourth argument takes `{ mint, label }`, `label` returning each item's `note` and `group`; a function there is still `mint`. `ReviewLabel` and `ProposalsOpts` are exported.
+
 **A table's row and a line of a list move by a drag handle.** A row of a `layout: table` array and an element of a list of lines or scalars draw the grip a record's row draws, coming up with the row under the pointer, where they moved by Alt+↑/↓ alone. A table's grip stands in a first track pinned to the start of the box the table scrolls in, as its remove is pinned to the end, so it stays in reach when the table scrolls sideways.
 
 **A table's text columns share the field's width.** A column of text or prose cells takes a share of the width the field has, where each stood at a fixed width and a table of three such columns scrolled sideways in a form narrower than about 715px. A prose column's floor narrows to its share before the table scrolls, so the columns fit down to about 7rem each, and a column of an enum, a date or a number still rests at its content.
