@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A table's row and a line of a list move by a drag handle.** A row of a `layout: table` array and an element of a list of lines or scalars draw the grip a record's row draws, coming up with the row under the pointer, where they moved by Alt+↑/↓ alone. A table's grip stands in a first track pinned to the start of the box the table scrolls in, as its remove is pinned to the end, so it stays in reach when the table scrolls sideways.
+
+**A table's text columns share the field's width.** A column of text or prose cells takes a share of the width the field has, where each stood at a fixed width and a table of three such columns scrolled sideways in a form narrower than about 715px. A prose column's floor narrows to its share before the table scrolls, so the columns fit down to about 7rem each, and a column of an enum, a date or a number still rests at its content.
+
 **The pointer no longer moves the answer card.** The current change is named by a press, the caret, a step or a reveal; the pointer resting on a change made it current after a dwell, so the card moved under a pointer lying still when the page scrolled beneath it. `createField`'s `onReviewPoint` reports the caret alone and takes the id alone, and the `ReviewVia` type is gone.
 
 **A review item can name its card by `$id`.** `card` on a field, block or removal item and `afterCard` on an added card name the card by its `$id`, wherever it stands, where the path's index, `remove` and `after` name it by its place when the list was set. `proposalsBetween` fills them in, so its list holds over a document whose cards were added, removed or moved since the snapshot: each item is drawn on its own card, and one whose card is gone is `undrawn` where it was drawn on the card that took its index.
