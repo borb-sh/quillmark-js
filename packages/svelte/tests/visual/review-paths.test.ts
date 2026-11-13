@@ -31,6 +31,11 @@ describe('a member a proposal read', () => {
 		expect(locate(['a', 'c'], [1], proposal('b'), new Set()).found).toBe(false);
 	});
 
+	it('is found from an index past the end of a list that has shortened', () => {
+		expect(locate(['b'], [1], proposal('b'), new Set())).toEqual({ steps: [0], found: true });
+		expect(locate(['a', 'd'], [3], proposal('a'), new Set())).toEqual({ steps: [0], found: true });
+	});
+
 	it('is not one another proposal of the list already holds', () => {
 		const claimed = new Set<string>();
 		expect(locate(['x', 'x'], [0], proposal('x'), claimed).steps).toEqual([0]);
