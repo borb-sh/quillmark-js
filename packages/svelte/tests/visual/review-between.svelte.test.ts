@@ -97,6 +97,23 @@ describe('a record or list the answer writes past what a list item names', () =>
 		for (const name of ['contact', 'authors'])
 			expect(sameValue(now[name], want[name]), name).toBe(true);
 	});
+
+	it('takes out every member the answer removes, each found where the removals before it left it', async () => {
+		const doc = example();
+		const answer = doc.clone();
+		quill().writer(answer).set('contributors', []);
+		const { items } = proposalsBetween(quill(), doc, answer);
+		const drawn: ReviewDrawn[] = [];
+		const { editor } = mountEditor(quill(), doc, {
+			review: items,
+			onReviewDrawn: (d) => drawn.push(d)
+		});
+		await settle();
+		expect(editor.answerReview('all', 'accept').length).toBe(items.length);
+		await settle();
+		expect(drawn.at(-1)!.open).toEqual([]);
+		expect(doc.getStored('contributors')).toEqual(answer.getStored('contributors'));
+	});
 });
 
 describe('the host’s list', () => {

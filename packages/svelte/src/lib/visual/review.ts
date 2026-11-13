@@ -236,7 +236,7 @@ export function locate(
 	const free = (i: number): boolean =>
 		sameValue(list[i], before) && !claimed.has(JSON.stringify([...head, i]));
 	if (free(at)) return { steps: claim(steps), found: true };
-	for (let d = 1; d < list.length; d++)
+	for (let d = 1; d <= Math.max(at, list.length - 1 - at); d++)
 		for (const i of [at - d, at + d])
 			if (i >= 0 && i < list.length && free(i)) return { steps: claim([...head, i]), found: true };
 	return { steps, found: false };
