@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Dismiss is ⌘/Ctrl+Backspace, and an answer key answers only a change in view.** `REVIEW_KEYS.dismiss` is `Mod-Backspace`, where it was `Mod-.`, beside accept's `Mod-Enter`. With the current change scrolled out of the pane, the first press of either key brings it back and the next answers it, where a key answered a change the reader could not see. While the reader types in the editor, where the answer card steps aside, both keys stay the leaf's own, so ⌘/Ctrl+Backspace deletes and ⌘/Ctrl+Enter ticks a task until the pointer moves or a step brings the card back. A host that prints the chords by hand prints the new one; `editorShortcuts` and the card's hints carry it.
+
 **A review item can name its card by `$id`.** `card` on a field, block or removal item and `afterCard` on an added card name the card by its `$id`, wherever it stands, where the path's index, `remove` and `after` name it by its place when the list was set. `proposalsBetween` fills them in, so its list holds over a document whose cards were added, removed or moved since the snapshot: each item is drawn on its own card, and one whose card is gone is `undrawn` where it was drawn on the card that took its index.
 
 **Every text surface names itself to assistive tech.** A prose leaf, a list row's text and a table cell are textboxes, one-line or multi-line as they edit, where they were unroled `contenteditable` regions carrying a name. An enum's list is named by its field, and its divider no longer stands in the list as a separator. The link prompt's address box is named _Link address_, where it took the Link button's name and chord. The Today toggle states its `T` key. `VisualStrings` gains `fieldGuidance`, the guidance marker's name, and `linkAddress`.

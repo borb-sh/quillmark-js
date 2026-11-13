@@ -127,7 +127,7 @@ export interface VisualEditorProps {
 	 */
 	review?: readonly ReviewItem[];
 	/**
-	 * A reader answered an item: the answer card, `Mod-Enter` / `Mod-.` on the current change,
+	 * A reader answered an item: the answer card, the `REVIEW_KEYS` on the current change,
 	 * or a host's `answerReview`; or undid an answer with ⌘Z, `reopen`. The editor has made every
 	 * write an answer asks for, a card's included, and draws it, so the host leaves `review` as
 	 * it set it.

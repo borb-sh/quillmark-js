@@ -4,6 +4,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
+import { REVIEW_KEYS } from '$lib/core/codec';
 import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
 import { proposalsBetween } from '$lib/visual/proposals';
 import { quill, example } from '../helpers/fixtures.js';
@@ -133,7 +134,7 @@ describe('a proposed card', () => {
 		press(document.body, 'ArrowDown', { ...mod, altKey: true });
 		await settle();
 		expect(lit()).toBe('c1');
-		press(document.body, '.', mod);
+		press(document.body, REVIEW_KEYS.dismiss.split('-').at(-1)!, mod);
 		await settle();
 		expect(r.events).toEqual([{ id: 'c1', action: 'dismiss' }]);
 		expect(lit()).toBe('c0');

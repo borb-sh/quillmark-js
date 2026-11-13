@@ -11,7 +11,6 @@ import { flushSync } from 'svelte';
 import type { Diagnostic } from '@quillmark/wasm';
 import {
 	DEFAULT_VISUAL_STRINGS,
-	chord,
 	keycap,
 	keyshortcut,
 	mergeStrings,
@@ -37,20 +36,6 @@ describe('mergeStrings', () => {
 
 	it('takes the package set whole when nothing is passed', () => {
 		expect(mergeStrings(undefined)).toBe(DEFAULT_VISUAL_STRINGS);
-	});
-});
-
-describe('chord', () => {
-	it('spells Mod as the platform prints it', () => {
-		for (const platform of ['MacIntel', 'iPhone', 'iPad'])
-			expect(chord('K', platform), platform).toBe('⌘K');
-		for (const platform of ['Win32', 'Linux x86_64', ''])
-			expect(chord('K', platform), platform).toBe('Ctrl+K');
-	});
-
-	it('spells Shift in the order each platform prints it', () => {
-		expect(chord('Shift-7', 'MacIntel')).toBe('⇧⌘7');
-		expect(chord('Shift-7', 'Win32')).toBe('Ctrl+Shift+7');
 	});
 });
 

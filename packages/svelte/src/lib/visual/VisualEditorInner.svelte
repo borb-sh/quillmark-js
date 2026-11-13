@@ -644,6 +644,17 @@
 		const id = reviewing.lit;
 		return id !== undefined && answerReview([id], action).length > 0;
 	}
+	/** An answer key: the card's, so it answers only a change the card stands on in view. A
+	 *  press while the reader types in the editor is the leaf's own key, and any other press
+	 *  with the change out of view or the card out of the way brings both back. */
+	function answerByKey(action: 'accept' | 'dismiss'): boolean {
+		const id = reviewing.lit;
+		if (id === undefined || (typing && inside)) return false;
+		if (!typing && inView(id)) return answerCurrent(action);
+		typing = false;
+		void reveal(id, false, true);
+		return true;
+	}
 	/** Whether a key at `target` is the review's: anywhere but a text control outside the editor,
 	 *  which keeps its own keys, or another editor. */
 	function reviewHears(target: EventTarget | null): boolean {
@@ -654,8 +665,8 @@
 	}
 	let answerCard = $state<ReviewCard | undefined>();
 	const reviewKeys = keydownHandler({
-		[REVIEW_KEYS.accept]: () => answerCurrent('accept'),
-		[REVIEW_KEYS.dismiss]: () => answerCurrent('dismiss'),
+		[REVIEW_KEYS.accept]: () => answerByKey('accept'),
+		[REVIEW_KEYS.dismiss]: () => answerByKey('dismiss'),
 		[REVIEW_KEYS.next]: () => {
 			void step(1, inside);
 			return true;
@@ -1587,9 +1598,7 @@
 			leaves.control(key)?.focus();
 		// The current item is drawn again, so its element is read once it has been.
 		if (!(await span.resumes(tick()))) return false;
-		const els = [...(rootEl?.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].filter(
-			(el) => reviewIds(el).includes(id)
-		);
+		const els = reviewEls(id);
 		const at =
 			(key !== undefined ? leaves.prose(key)?.reviewElements(id)[0] : undefined) ??
 			els[0] ??
@@ -1606,26 +1615,42 @@
 		for (const item of reviewing.cards.removes.values()) if (item.id === id) return true;
 		return false;
 	}
-	/** Whether `els` stand in the view the editor scrolls in, clear of the host's chrome at its
-	 *  foot, with the answer card's room under them. */
-	function comfortable(els: readonly HTMLElement[]): boolean {
-		const rects = els.map((el) => el.getBoundingClientRect()).filter((r) => r.width || r.height);
-		if (!rects.length) return false;
-		let top = 0;
-		let bottom = window.innerHeight;
+	/** The elements that draw the item `id`. */
+	function reviewEls(id: string): HTMLElement[] {
+		return [...(rootEl?.querySelectorAll<HTMLElement>('[data-qm-review]') ?? [])].filter((el) =>
+			reviewIds(el).includes(id)
+		);
+	}
+	/** The band of the window the editor shows through: its nearest scroller's. */
+	function pane(): { top: number; bottom: number } {
 		for (let at = rootEl ?? null; at; at = at.parentElement) {
 			const { overflowY } = getComputedStyle(at);
 			if (overflowY !== 'auto' && overflowY !== 'scroll') continue;
 			const box = at.getBoundingClientRect();
-			top = Math.max(box.top, 0);
-			bottom = Math.min(box.bottom, window.innerHeight);
-			break;
+			return { top: Math.max(box.top, 0), bottom: Math.min(box.bottom, window.innerHeight) };
 		}
+		return { top: 0, bottom: window.innerHeight };
+	}
+	const boxes = (els: readonly HTMLElement[]): DOMRect[] =>
+		els.map((el) => el.getBoundingClientRect()).filter((r) => r.width || r.height);
+	/** Whether `els` stand in the view the editor scrolls in, clear of the host's chrome at its
+	 *  foot, with the answer card's room under them. */
+	function comfortable(els: readonly HTMLElement[]): boolean {
+		const rects = boxes(els);
+		if (!rects.length) return false;
+		const { top, bottom } = pane();
 		const room = (spacePx(rootEl, 1) ?? 0) * CARD_ROOM;
 		return (
 			Math.min(...rects.map((r) => r.top)) >= top &&
 			Math.max(...rects.map((r) => r.bottom)) <= bottom - reviewInset - room
 		);
+	}
+	/** Whether any of the item `id` shows in that view, which is where its answer card stands.
+	 *  An editor with no box of its own measures nothing, and every item counts as shown. */
+	function inView(id: string): boolean {
+		if (!rootEl || !boxes([rootEl]).length) return true;
+		const { top, bottom } = pane();
+		return boxes(reviewEls(id)).some((r) => r.bottom > top && r.top < bottom - reviewInset);
 	}
 	/** The room the answer card takes under a change, in `--_qm-space` rungs. */
 	const CARD_ROOM = 7;

@@ -23,7 +23,8 @@
 -->
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { chord, wording } from './strings.js';
+	import { REVIEW_KEYS } from '../core/codec/index.js';
+	import { keycap, keyshortcut, wording } from './strings.js';
 	import './controls.css';
 
 	interface Props {
@@ -272,15 +273,17 @@
 		type="button"
 		class="qm-review-card-dismiss qm-focus-ring"
 		tabindex="-1"
-		aria-keyshortcuts="Meta+. Control+."
-		onclick={() => answer('dismiss')}>{t.strings.reviewDismiss}<kbd>{chord('.')}</kbd></button
+		aria-keyshortcuts={keyshortcut(REVIEW_KEYS.dismiss)}
+		onclick={() => answer('dismiss')}
+		>{t.strings.reviewDismiss}<kbd>{keycap(REVIEW_KEYS.dismiss)}</kbd></button
 	>
 	<button
 		type="button"
 		class="qm-review-card-accept qm-focus-ring"
 		tabindex="-1"
-		aria-keyshortcuts="Meta+Enter Control+Enter"
-		onclick={() => answer('accept')}>{t.strings.reviewAccept}<kbd>{chord('↵')}</kbd></button
+		aria-keyshortcuts={keyshortcut(REVIEW_KEYS.accept)}
+		onclick={() => answer('accept')}
+		>{t.strings.reviewAccept}<kbd>{keycap(REVIEW_KEYS.accept)}</kbd></button
 	>
 </div>
 
