@@ -65,10 +65,6 @@
 		target.setAttribute('data-qm-review', [...tokens(), id].join(' '));
 		target.setAttribute('data-qm-proposed', '');
 		if (removes) target.setAttribute('data-qm-removes', '');
-		const enter = () => reviewing.point(id, 'pointer');
-		const leave = () => reviewing.point(undefined, 'pointer');
-		target.addEventListener('pointerenter', enter);
-		target.addEventListener('pointerleave', leave);
 		const by = (el: HTMLElement) =>
 			(el.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
 		const described = new Set<HTMLElement>();
@@ -103,8 +99,6 @@
 				if (rest.length) el.setAttribute('aria-describedby', rest.join(' '));
 				else el.removeAttribute('aria-describedby');
 			}
-			target.removeEventListener('pointerenter', enter);
-			target.removeEventListener('pointerleave', leave);
 			const rest = tokens().filter((t) => t !== id);
 			if (rest.length) {
 				target.setAttribute('data-qm-review', rest.join(' '));

@@ -63,7 +63,6 @@ import {
 	reviewLayer,
 	type ReviewAction,
 	type ReviewReport,
-	type ReviewVia,
 	type TextReview
 } from './review.js';
 import { valueDiffPlugin, type ValueProposal, type ValueState } from './value-diff.js';
@@ -172,9 +171,9 @@ export interface CreateFieldOpts {
 	onReview?(id: string, action: ReviewAction): void;
 	/** The leaf is writing a taken proposal, and is done: the commit between is the answer's. */
 	onReviewWriting?(on: boolean): void;
-	/** The review item under the pointer or holding the caret, `undefined` once it has left.
-	 *  The caret's report holds off while the reader types inside the item. */
-	onReviewPoint?(id: string | undefined, via: ReviewVia): void;
+	/** The review item holding the caret, `undefined` once it has left. The report holds off
+	 *  while the reader types inside the item. */
+	onReviewPoint?(id: string | undefined): void;
 	/** What the leaf draws of the review items, on each change: the ids drawn, and the items
 	 *  whose anchor the leaf holds that it does not draw, each with why. An item whose anchor
 	 *  the leaf does not hold is in neither. */
@@ -591,7 +590,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				},
 				act: (id, action) => opts.onReview?.(id, action),
 				writing: (on) => opts.onReviewWriting?.(on),
-				point: (id, via) => opts.onReviewPoint?.(id, via),
+				point: (id) => opts.onReviewPoint?.(id),
 				drew: (report) => opts.onReviewDrawn?.(report)
 			});
 
