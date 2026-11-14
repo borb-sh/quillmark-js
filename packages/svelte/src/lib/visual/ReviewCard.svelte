@@ -10,7 +10,10 @@
  that block's last line where the line ends short of it, centred on a block of one line such as a
  one-line field's, right-aligned to the text column the
  change stands in, and flips above that block where there is no room below, keeping clear of the
- host's chrome at the pane's foot (`inset`). Over a change taller than the pane it stays pinned
+ host's chrome at the pane's foot (`inset`). A property sharing its row with others takes the
+ card beside its line only where the card stands within the property's own slot, and under the
+ row otherwise: the column's edge is the whole subform's, so beside the line of a property that
+ ends short of it the card covers the value of the next. Over a change taller than the pane it stays pinned
  at the foot while any of the change shows. A change out of the pane keeps its card where it
  would stand beside it, so the card scrolls out with the text and the pane's edge clips it as it
  clips the text.
@@ -116,7 +119,9 @@
 		const at = (root ?? el).getBoundingClientRect();
 		const last = blocks.find((b, i) => b !== els[i] && b.getBoundingClientRect().bottom === lower);
 		const tuck = last && lastLine(last, h);
-		const below = tuck && tuck.right + gap <= left ? tuck.top : lower + gap;
+		const slot = last?.closest('.qm-object-prop')?.getBoundingClientRect();
+		const beside = tuck && tuck.right + gap <= left && (!slot || left + w <= slot.right + 1);
+		const below = beside ? tuck.top : lower + gap;
 		const above = upper - gap - h;
 		const fits = below + h <= floor || above >= ceil;
 		const y =
