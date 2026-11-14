@@ -1516,7 +1516,7 @@
 	 the grip's marks, hung off the row's start edge in the `--_qm-nest` every row stands
 	 in from the stroke outside it, which a group's panel clips at. The pill rests
 	 at nothing, where the remove rests faint, and comes up with the row the pointer is
-	 on, staying up through the drag it carries; a band flush with the row keeps the
+	 on or the focus is in, staying up through the drag it carries; with no hover, the row the focus is in alone; a band flush with the row keeps the
 	 pointer on the row all the way to it. The pointer owns the gesture, not the page's
 	 scroll. A record's pill centres on its summary; a line's and a table row's stand on
 	 the first line, which a wrapping cell grows away from. */
@@ -1557,7 +1557,9 @@
 		height: var(--_qm-space-3);
 	}
 	.qm-array-row:hover > .qm-row-handle > .qm-row-handle-bar,
+	.qm-array-row:focus-within > .qm-row-handle > .qm-row-handle-bar,
 	.qm-array-row:hover > .qm-element-head > .qm-row-handle > .qm-row-handle-bar,
+	.qm-array-row:focus-within > .qm-element-head > .qm-row-handle > .qm-row-handle-bar,
 	.qm-array-row.lifted > .qm-row-handle > .qm-row-handle-bar,
 	.qm-element.lifted > .qm-element-head > .qm-row-handle > .qm-row-handle-bar {
 		opacity: 1;
@@ -1926,11 +1928,5 @@
 	}
 	.qm-add-el:disabled {
 		opacity: var(--_qm-opacity-idle);
-	}
-	/* No hover to come up on: the handle stands with the controls, already at rest. */
-	@media (hover: none) {
-		.qm-row-handle-bar {
-			opacity: 1;
-		}
 	}
 </style>
