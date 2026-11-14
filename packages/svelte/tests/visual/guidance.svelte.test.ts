@@ -135,29 +135,20 @@ describe('a description', () => {
 		const q = quillFromYaml(DESCRIBED_YAML);
 		return mountEditor(q, q.seedDocument()).target;
 	}
-	const brief = (scope: Element) => scope.querySelector<HTMLElement>('.qm-field-brief');
 
-	it('stands under its label where it is short, its markdown drawn', () => {
+	it.each(['Short', 'Long'])('stands behind its glyph, never under its label: %s', (name) => {
 		const target = open();
-		const short = field(target, 'Short');
-		expect(short.querySelector('.qm-field-hint')).toBeNull();
-		expect(brief(short)!.querySelector('code')).not.toBeNull();
-		expect(brief(short)!.textContent).not.toMatch(/[`*]/);
-		expect(describedText(leaf(short))).toEqual([brief(short)!.textContent]);
+		const scope = field(target, name);
+		const row = scope.querySelector('.qm-field-label-row')!;
+		const [words] = describedText(leaf(scope));
+		expect(row.querySelector('.qm-field-hint')).not.toBeNull();
+		for (const node of row.children)
+			if (!node.matches('.qm-visually-hidden')) expect(node.textContent).not.toContain(words);
 	});
 
-	it('raises nothing for a description already on screen', () => {
-		const target = open();
-		const input = leaf(field(target, 'Short'));
-		input.focus();
-		press(input, '/', { ctrlKey: true });
-		expect(raised(target)).toEqual([]);
-	});
-
-	it('keeps a long one behind its glyph, described by its words alone', () => {
+	it('draws its markdown in the popover, described by its words alone', () => {
 		const target = open();
 		const long = field(target, 'Long');
-		expect(brief(long)).toBeNull();
 		const [words] = describedText(leaf(long));
 		expect(words).not.toMatch(/[`\]]/);
 
@@ -170,5 +161,17 @@ describe('a description', () => {
 		expect(surface.querySelector('code')).not.toBeNull();
 		// A link is drawn as its words: the surface is not one to land in.
 		expect(surface.querySelector('a')).toBeNull();
+	});
+
+	it('raises a short one by the key too', () => {
+		const target = open();
+		const short = field(target, 'Short');
+		const input = leaf(short);
+		input.focus();
+		press(input, '/', { ctrlKey: true });
+		expect(raised(target)).toEqual([hintOf(short)]);
+		const surface = document.querySelector<HTMLElement>('.qm-hint-popover')!;
+		expect(surface.querySelector('code')).not.toBeNull();
+		expect(surface.textContent).not.toMatch(/[`*]/);
 	});
 });
