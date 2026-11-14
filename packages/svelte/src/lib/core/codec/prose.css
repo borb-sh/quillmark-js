@@ -72,6 +72,12 @@ li.ProseMirror-selectednode::after {
 	margin-top: var(--_qm-space-3);
 }
 
+/* A leaf of lines sets its paragraphs single spaced, as the page does: in that shape a
+   paragraph break and a hard break are one line break. */
+.ProseMirror[data-qm-lines] > * + * {
+	margin-top: 0;
+}
+
 /* A blockquote's UA indent was its only mark, and the reset above takes it. The rule
    and the inset carry it instead: the same hairline every surface reads, so a quote
    reads as set apart without a fill or a second box. */

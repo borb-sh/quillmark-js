@@ -6,6 +6,10 @@
 
 **`revealReview` with `{ focus: true }` focuses the control drawing a change inside a field.** For a change to a place inside a field, such as an object's property, the focus lands on the control at that place, where it went to the field's first control and typing landed in another property than the one the answer keys acted on. `stepReview` lands the same way.
 
+**A field of lines is single spaced.** A `text` or `richtext` leaf of `shape: lines` sets its lines flush, as the page prints them, where each line Enter opened stood off the last by the gap between the body's paragraphs. The leaf carries `data-qm-lines`, which `prose.css` keys the rule on.
+
+**An element of a list holds the lines its `items` declare.** A list whose `items` declares `shape: lines` or `blocks` mounts each element as its scalar field of that shape mounts, where every element edited as one line and one holding a line break was held read-only. In such an element Enter breaks a line and ⌘/Ctrl+Enter inserts the next element, and a paste of several lines stays in the element; a list of one-line elements keeps Enter's insert, split and the paste into rows.
+
 **A list of one element draws no drag handle.** A record's row, a table's row and a line stand without the grip, its tip and its grab cursor while the list holds nothing to move them past, and draw it once a second element is added. Alt+↑/↓ is unchanged.
 
 **A drag handle comes up on the row the pointer is over or the focus is in.** It rests hidden otherwise, on a device with no hover as well, where every handle stood drawn.
