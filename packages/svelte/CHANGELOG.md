@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.37.0 - 2026-11-14
+
 **On `@quillmark/wasm` 0.138.** The peer range is `>=0.138.0-0`. A field's line shape is read from the schema's `shape`, absent on one line, `"lines"` or `"blocks"`, where it was read from `multiline`; a quill that still spells `multiline:` loads through 0.138 with a warning and draws as before. A newline inside a paragraph of Markdown is a line break there, so a body or a `richtext` value hard-wrapped in its source opens with a break at each wrap (Quillmark's 0.137 → 0.138 migration).
 
 **A `richtext` field of `shape: lines` edits as formatted lines.** The leaf holds paragraphs and line breaks with every mark, bold, a link, a font, and no list, heading, quote, code block, table or image: Enter opens a paragraph, Shift+Enter a line, and `1.` or `-` typed at the start of a line stays the text it is, as the engine reads it. Pasted text lands literally, a newline a line and a blank line a paragraph. There is no slash menu, and Tab leaves the field. A value holding a block the shape does not is held read-only under the note a one-line field shows, where a field declared this way drew the block editor and its write was refused. `createField` takes `paragraphs` for it, beside `inline` and `plaintext`, and `linesSchema` is exported.
