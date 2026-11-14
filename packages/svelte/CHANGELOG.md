@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**The answer card keeps one edge, and stays out of the next field of a shared row.** The card is right-aligned to the form's edge on every field, where a field in the left half of a row took it at its own edge and Accept moved sideways from change to change. A change in a field or a property that shares its row, a group's left column or a table's cell, took the card beside its line over the value of the one after it; the card stands beside the line only where it fits the change's own slot, and under the row otherwise.
+
+**An open change at rest stands back from the current one.** A control or a row under a proposal has a dashed edge at rest and a solid, heavier one when current, where both were solid, and the resting tint is 12% of the review hue, down from 20%.
+
 **Every field description stands behind its info marker.** A description of 72 characters or fewer is shown in the marker's popover on the field's hover or focus, as a longer one is, where it was set in flow under the field's label with no marker. Its inline markdown still draws as marks in the popover.
 
 **`revealReview` with `{ focus: true }` focuses the control drawing a change inside a field.** For a change to a place inside a field, such as an object's property, the focus lands on the control at that place, where it went to the field's first control and typing landed in another property than the one the answer keys acted on. `stepReview` lands the same way.
