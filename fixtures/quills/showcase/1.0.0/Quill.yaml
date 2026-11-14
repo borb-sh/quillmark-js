@@ -172,14 +172,13 @@ main:
       type: array
       items:
         type: text
-        shape: lines
       default: []
       ui:
         group: content
       example:
         - Fig. 2 is mislabelled — the **asterisks** here are the text, not emphasis.
         - Page 4 gives the wrong year.
-      description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text; `shape: lines`, so a row holds lines."
+      description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text. One line each, so Enter starts the next row."
 
     epigraph:
       type: richtext

@@ -509,13 +509,16 @@ function changeCommittable(doc: Document, addr: Addr): boolean {
 /**
  * The `contenteditable`'s role and naming attributes, shared with `ProseValue`. A `div` takes no
  * name without a role, so every leaf states itself a textbox, one-line or not by `multiline`.
- * `aria-labelledby` supersedes `aria-label`.
+ * `aria-labelledby` supersedes `aria-label`. A leaf on a schema of paragraphs and hard breaks
+ * alone carries `data-qm-lines`, which sets its paragraphs single spaced (`prose.css`).
  */
 export function proseAttributes(
 	opts: { label?: string; labelledBy?: string; describedBy?: string },
-	multiline: boolean
+	multiline: boolean,
+	lines = false
 ): Record<string, string> {
 	const attrs: Record<string, string> = { role: 'textbox', 'aria-multiline': String(multiline) };
+	if (lines) attrs['data-qm-lines'] = '';
 	if (opts.labelledBy) attrs['aria-labelledby'] = opts.labelledBy;
 	else if (opts.label) attrs['aria-label'] = opts.label;
 	if (opts.describedBy) attrs['aria-describedby'] = opts.describedBy;
@@ -623,14 +626,16 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const holds = (rt: Content): boolean =>
 		!fitsLeaf(rt, { inline, plaintext, paragraphs, islands: true });
 	let held = holds(reconciler.last);
-	const named = proseAttributes(opts, !inline);
+	const lines = isParagraphsSchema(schema);
+	const named = proseAttributes(opts, !inline, lines);
 	const defaultNamed = {
 		...proseAttributes(
 			{
 				...opts,
 				describedBy: [opts.describedBy, opts.defaultNoteId].filter(Boolean).join(' ') || undefined
 			},
-			!inline
+			!inline,
+			lines
 		),
 		'data-default': ''
 	};
