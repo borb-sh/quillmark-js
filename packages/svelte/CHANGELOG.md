@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Every field description stands behind its info marker.** A description of 72 characters or fewer is shown in the marker's popover on the field's hover or focus, as a longer one is, where it was set in flow under the field's label with no marker. Its inline markdown still draws as marks in the popover.
+
 **A field of lines is single spaced.** A `text` or `richtext` leaf of `shape: lines` sets its lines flush, as the page prints them, where each line Enter opened stood off the last by the gap between the body's paragraphs. The leaf carries `data-qm-lines`, which `prose.css` keys the rule on.
 
 **An element of a list holds the lines its `items` declare.** A list whose `items` declares `shape: lines` or `blocks` mounts each element as its scalar field of that shape mounts, where every element edited as one line and one holding a line break was held read-only. In such an element Enter breaks a line and ⌘/Ctrl+Enter inserts the next element, and a paste of several lines stays in the element; a list of one-line elements keeps Enter's insert, split and the paste into rows.

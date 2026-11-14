@@ -10,9 +10,8 @@
  hands the click to `onActivate`. Both halves are needed: `for` on a non-labelable
  element is inert and invalid.
 
- One non-gating label decoration: the `description`. A short one (`isBrief`) stands in
- flow under the label, the row's second line, and is itself the node that describes the
- control. A longer one is an info marker raising a themed popover ({@link FieldHint}).
+ One non-gating label decoration: the `description`, an info marker raising a themed
+ popover ({@link FieldHint}), whatever its length.
 
  The row's end says where the field stands against its `default:` (INVARIANTS §"The
  commitment ladder"). While the default is what prints, a tag says so in words, and the
@@ -20,7 +19,7 @@
  holds the way back: one button for every control, arriving with the field's hover or
  focus as the guidance marker does, and named for its field.
 
- The description describes, it does not name. Behind a marker it is parked in an
+ The description describes, it does not name. It is parked in an
  always-present visually-hidden node here and the control carries `aria-describedby`: name then
  role then description, which is the announcement the markup visually implies. In
  the name it would instead prepend ~110 characters of guidance (the reference
@@ -33,7 +32,7 @@
 -->
 <script lang="ts">
 	import FieldHint from './FieldHint.svelte';
-	import { guidanceText, isBrief, renderGuidance } from './guidance.js';
+	import { guidanceText } from './guidance.js';
 	import { wording } from './strings.js';
 	import './controls.css';
 
@@ -52,9 +51,6 @@
 		onActivate?: () => void;
 		/** Schema `description`, or undefined: the affordance renders only when set. */
 		description?: string;
-		/** A short description stands under the label ({@link isBrief}). Off where the
-		 *  row has no second line to give, a table column's head. */
-		brief?: boolean;
 		/** A capped field's character count, drawn at the row's end. */
 		count?: string;
 		/** The count's own id, for the control's `aria-describedby`. */
@@ -73,7 +69,6 @@
 		descriptionId,
 		onActivate,
 		description,
-		brief = true,
 		count,
 		countId,
 		defaulted = false,
@@ -82,14 +77,9 @@
 	}: Props = $props();
 
 	const resetId = $props.id();
-	const inFlow = $derived(brief && description != null && isBrief(description));
-	/** The description is DOM, not text (`renderGuidance`), so it is written in. */
-	function paint(line: HTMLElement): void {
-		line.replaceChildren(renderGuidance(description ?? ''));
-	}
 </script>
 
-<div class={['qm-field-label-row', { briefed: inFlow }]}>
+<div class="qm-field-label-row">
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_click_events_have_key_events -->
 	<!-- The handler stands in for exactly what `for` would have done, on the controls
 	     where `for` is inert. It adds no keyboard surface because it needs none: a
@@ -103,10 +93,7 @@
 	>
 		<span>{label}</span>
 	</label>
-	{#if inFlow}
-		<!-- The node that describes the control is the line a reader sees. -->
-		<div class="qm-field-brief" id={descriptionId} {@attach paint}></div>
-	{:else if description}
+	{#if description}
 		<!-- Outside the `<label>`, both of them: a trigger inside it would put its own
 		 name in the control's, and the parked copy would put all ~110 characters
 		 there. A `<button>` in a label is at least safe from the other hazard:
@@ -153,29 +140,6 @@
 		line-height: var(--_qm-leading-tight);
 		color: var(--_qm-ink-label);
 		min-width: 0;
-	}
-	/* A short description, in flow: the row's own second line, so the field's grid still
-	 counts one label track and a row-sharing neighbour's control starts level. Last
-	 whatever stands at the first line's end. One weight under the label, which names
-	 where this only describes. */
-	.qm-field-label-row.briefed {
-		flex-wrap: wrap;
-		row-gap: 0;
-	}
-	.qm-field-brief {
-		order: 1;
-		flex: 0 0 100%;
-		min-width: 0;
-		font-size: var(--_qm-text-label);
-		line-height: var(--_qm-leading-body);
-		color: var(--_qm-ink-label);
-	}
-	.qm-field-brief :global(p) {
-		margin: 0;
-	}
-	.qm-field-brief :global(code) {
-		font-family: var(--_qm-font-mono);
-		font-size: inherit;
 	}
 	.qm-field-count {
 		margin-inline-start: auto;

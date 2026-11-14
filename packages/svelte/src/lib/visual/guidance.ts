@@ -23,14 +23,6 @@ export function renderGuidance(markdown: string): Node {
 	}
 }
 
-/** The longest description that stands under its label: about a line at the label rung
- *  across a card, two in a half-width field. Past it the text goes behind the marker,
- *  in flow under every field being the density a card avoids (`FieldHint`). */
-const BRIEF_MAX = 72;
-
-/** Whether a description stands in flow under its label, with no marker to raise. */
-export const isBrief = (description: string): boolean => description.length <= BRIEF_MAX;
-
 /** A description as the words alone, for the node that describes its control. */
 export const guidanceText = (markdown: string): string =>
 	renderGuidance(markdown).textContent ?? markdown;
@@ -54,9 +46,6 @@ function guidanceTrigger(from: Element, root: Element): HTMLElement | undefined 
 		for (const id of el.getAttribute('aria-describedby')!.split(/\s+/)) {
 			const trigger = root.querySelector<HTMLElement>(`.qm-field-hint[aria-describedby="${id}"]`);
 			if (trigger) return trigger;
-			// A description under its label is on screen already, and the key is not the
-			// container's to answer for it.
-			if (document.getElementById(id)?.matches('.qm-field-brief')) return undefined;
 		}
 		el = el.parentElement?.closest('[aria-describedby]') ?? null;
 	}
