@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.37.1 - 2026-11-14
+
 **A checklist's held item rests as one line.** A ticked item with details shows its name, then the first line of words its details hold in the label ink, and a chevron that opens them in the item's own column, so no other item moves. Ticking or adding an item opens it, and so does a proposal or an error on one of its details.
 
 **The answer card keeps one edge, and stays out of the next field of a shared row.** The card is right-aligned to the form's edge on every field, where a field in the left half of a row took it at its own edge and Accept moved sideways from change to change. A change in a field or a property that shares its row, a group's left column or a table's cell, took the card beside its line over the value of the one after it; the card stands beside the line only where it fits the change's own slot, and under the row otherwise.
