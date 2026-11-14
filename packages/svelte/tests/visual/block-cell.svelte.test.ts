@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // A block `richtext` cell on a record row takes the block schema and the whole row, so
-// a list it holds survives an edit, and a `multiline: true` `text` cell takes the
+// a list it holds survives an edit, and a `shape: lines` `text` cell takes the
 // plain schema and the whole row, so an address keeps its lines. A leaf narrowed to one
 // textblock over content that holds more is read-only and commits nothing, so no
 // keystroke writes the flattening back. The reference quill declares none of these
@@ -39,22 +39,22 @@ main:
             type: text
           details:
             type: richtext
-            multiline: true
+            shape: blocks
           address:
             type: text
-            multiline: true
+            shape: lines
       default: []
     notes:
       type: array
       items:
         type: richtext
-        multiline: true
+        shape: blocks
       default: []
     tags:
       type: array
       items:
         type: text
-        multiline: true
+        shape: lines
       default: []
 `;
 const probe = () => quillFromYaml(YAML);

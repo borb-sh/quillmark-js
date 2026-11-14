@@ -34,15 +34,14 @@ main:
       max: 5
     note:
       type: text
-      multiline: true
+      shape: lines
       max: 8
     tag:
       type: richtext
-      multiline: false
       max: 6
     memo:
       type: richtext
-      multiline: true
+      shape: blocks
       max: 12
 `);
 

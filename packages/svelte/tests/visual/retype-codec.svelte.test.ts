@@ -31,12 +31,12 @@ card_kinds:
     fields:
       note:
         type: text
-        multiline: true
+        shape: lines
   richnote:
     fields:
       note:
         type: richtext
-        multiline: true
+        shape: blocks
 `;
 const probe = () => quillFromYaml(YAML);
 

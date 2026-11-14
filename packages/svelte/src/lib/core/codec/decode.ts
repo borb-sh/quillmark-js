@@ -95,18 +95,20 @@ export function fitsPlain(rt: Content): boolean {
 }
 
 /**
- * Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed and {@link
- * fitsPlain} plain, past which the decode drops what the first commit would store. On the block
+ * Whether a leaf so declared edits `rt` losing nothing: {@link fitsInline} narrowed, {@link
+ * fitsPlain} plain and upstream's `isLines` on a leaf of `paragraphs`, past which the decode drops
+ * what the first commit would store. On the block
  * schema, anything but a construct read and not edited (`isEditedIsland`) and an island where the
  * leaf mounts no island view (`islands`), which draws as a placeholder atom a keystroke deletes
  * unseen.
  */
 export function fitsLeaf(
 	rt: Content,
-	leaf: { inline: boolean; plaintext: boolean; islands: boolean }
+	leaf: { inline: boolean; plaintext: boolean; paragraphs?: boolean; islands: boolean }
 ): boolean {
 	if (leaf.inline) return fitsInline(rt);
 	if (leaf.plaintext) return fitsPlain(rt);
+	if (leaf.paragraphs) return core().isLines(rt);
 	const islands = rt.islands ?? [];
 	if (!leaf.islands && islands.length) return false;
 	return islands.every((isl) => isEditedIsland(isl.type));

@@ -27,7 +27,7 @@ main:
   fields:
     intro:
       type: richtext
-      multiline: true
+      shape: blocks
 `;
 
 const face = (family: string, weight = 400, index = 0): LibraryFace => ({

@@ -35,7 +35,6 @@ main:
       type: array
       items:
         type: richtext
-        multiline: false
         max: 3
 `);
 const load = (): Document =>

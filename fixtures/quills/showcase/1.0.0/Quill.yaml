@@ -32,13 +32,11 @@ main:
   fields:
     colophon:
       type: richtext
-      multiline: false
       default: ""
       description: Set in the bundled monospace face at the foot of the last page. The one field declaring no `ui.group`, so it stands above the groups.
 
     title:
       type: richtext
-      multiline: false
       ui:
         group: identity
       example: The Showcase Quill
@@ -141,17 +139,27 @@ main:
 
     abstract:
       type: richtext
-      multiline: true
+      shape: blocks
       ui:
         group: content
       example: "A block richtext leaf: it holds paragraphs, so it never shares a row however compact it asks to be."
-      description: "The standing summary. Block richtext — `multiline: true`, so the leaf takes the block floor."
+      description: "The standing summary. Block richtext — `shape: blocks`, so the leaf takes the block floor."
+
+    copies_to:
+      type: richtext
+      shape: lines
+      ui:
+        group: content
+      default: ""
+      example: |-
+        Research Directorate
+        *Library*, Building 4
+      description: "Who receives a copy, one per line. A `richtext` of `shape: lines`: formatted lines with no list, heading or table, so `1.` opening a line stays text."
 
     keywords:
       type: array
       items:
         type: richtext
-        multiline: false
       default: []
       ui:
         group: content
@@ -164,18 +172,17 @@ main:
       type: array
       items:
         type: text
-        multiline: true
+        shape: lines
       default: []
       ui:
         group: content
       example:
         - Fig. 2 is mislabelled — the **asterisks** here are the text, not emphasis.
         - Page 4 gives the wrong year.
-      description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text; `multiline: true`, so a row holds lines."
+      description: "Corrections, verbatim. A `text` item rests as its literal string, so a row is a text leaf and markdown inside one is text; `shape: lines`, so a row holds lines."
 
     epigraph:
       type: richtext
-      multiline: false
       default: "*Everything here exists to be tested.*"
       ui:
         group: content
@@ -202,7 +209,6 @@ main:
                   default: 0
                 note:
                   type: richtext
-                  multiline: false
                   default: ""
             default: []
             description: The appendix's entries, a record list one rung further in.
@@ -322,7 +328,6 @@ main:
                   type: text
                 text:
                   type: richtext
-                  multiline: false
                   default: ""
             default: []
             description: Who was told of the hold, and what they were told. A variant cell holding a record list whose rows carry a `richtext` cell, so a container draws at the one depth a variant reaches and its content cells region under it.
@@ -427,12 +432,12 @@ main:
             description: What changed, in the reviser's own words. A content cell, and so a cell of a row the preview can land a click on.
           rationale:
             type: richtext
-            multiline: true
+            shape: blocks
             default: ""
             description: Why it changed, at whatever length. Block richtext, so the cell holds paragraphs and lists and spans the row under its label; one holding a table or an image is held read-only.
           passage:
             type: text
-            multiline: true
+            shape: lines
             default: ""
             description: The changed passage as it now reads, line for line. Multiline text, so the cell holds lines and spans the row too.
       default: []
@@ -527,7 +532,6 @@ card_kinds:
         description: The section's heading, and the card's own title.
       lead:
         type: richtext
-        multiline: false
         default: ""
         ui:
           group: structure
@@ -624,7 +628,6 @@ card_kinds:
         description: How the figure sits in the flow. The one variant-bearing enum on a card kind.
       caption:
         type: richtext
-        multiline: false
         default: ""
         example: "A figure's *caption*."
         description: Set under the figure.

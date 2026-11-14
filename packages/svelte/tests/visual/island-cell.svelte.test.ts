@@ -42,7 +42,7 @@ main:
             type: text
           details:
             type: richtext
-            multiline: true
+            shape: blocks
       default: []
     pages:
       type: integer

@@ -66,7 +66,13 @@ import {
 	type TextReview
 } from './review.js';
 import { valueDiffPlugin, type ValueProposal, type ValueState } from './value-diff.js';
-import { blockSchema, isBlockSchema, isInlineSchema, leafSchema, plainSchema } from './schema.js';
+import {
+	blockSchema,
+	isBlockSchema,
+	isInlineSchema,
+	isParagraphsSchema,
+	leafSchema
+} from './schema.js';
 import { linkPastePlugin } from './link-paste.js';
 import { dragMovePlugin } from './drag-move.js';
 import { linePastePlugin } from './line-paste.js';
@@ -103,6 +109,9 @@ export interface CreateFieldOpts {
 	/** A mark-free schema (a `text` field): literal text, no formatting and no
 	 *  anchors, in paragraphs and hard breaks or, with `inline`, one textblock. */
 	plaintext?: boolean;
+	/** A `richtext` field of `shape: lines`: formatted paragraphs and hard breaks, with no
+	 *  list, heading, quote, code block or island. */
+	paragraphs?: boolean;
 	/** The id of the note the caller draws inside `container` for a held leaf →
 	 *  `aria-describedby` while it holds. */
 	heldNoteId?: string;
@@ -538,7 +547,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	const inline = !!opts.inline;
 	const plaintext = !!opts.plaintext;
 	// The declared type picks the schema; `plaintext` suppresses every mark (`schema.ts`).
-	const schema: Schema = leafSchema({ plaintext, inline });
+	const paragraphs = !!opts.paragraphs;
+	const schema: Schema = leafSchema({ plaintext, inline, paragraphs });
 	const block = isBlockSchema(schema);
 	// Bound once: the reader reads live, so every read sees the commit before it.
 	const reader: DocumentReader = opts.quill.reader(doc);
@@ -580,7 +590,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 					if (!parsed.has(markdown)) {
 						let node: PMNode | undefined;
 						try {
-							node = decode(core().importMarkdown(markdown).content, schema);
+							const shape = paragraphs && !inline ? 'lines' : undefined;
+							node = decode(core().importMarkdown(markdown, shape).content, schema);
 						} catch {
 							node = undefined;
 						}
@@ -609,7 +620,8 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// Judged of the value being mounted rather than read off a diagnostic: a routed set
 	// can predate the value it arrives with, and `validation::not_plain` stands in for
 	// `not_single_line` on a one-line `text` field.
-	const holds = (rt: Content): boolean => !fitsLeaf(rt, { inline, plaintext, islands: true });
+	const holds = (rt: Content): boolean =>
+		!fitsLeaf(rt, { inline, plaintext, paragraphs, islands: true });
 	let held = holds(reconciler.last);
 	const named = proseAttributes(opts, !inline);
 	const defaultNamed = {
@@ -1205,20 +1217,20 @@ export function proseLeafPlugins(
 			taskPlugin(),
 			nestingPlugin()
 		);
-	if (schema === plainSchema) list.push(plainClipboardPlugin());
+	if (isParagraphsSchema(schema)) list.push(plainClipboardPlugin(schema));
 	if (isInlineSchema(schema)) list.push(linePastePlugin());
 	if (opts.placeholder) list.push(ghostPlugin(opts));
 	return list;
 }
 
 /**
- * A plain leaf's clipboard text is literal both ways, spelled as the engine spells a `text` value:
+ * The clipboard text of a leaf of paragraphs is literal both ways, spelled as the engine spells a `text` value:
  * a lone `\n` a hard break, a blank line a paragraph boundary, and a run of `\n` its pairs as
  * paragraph boundaries, an odd one over a hard break before them. Upstream's defaults split pasted
  * text on any run of newlines and write a copy's breaks as nothing.
  */
-function plainClipboardPlugin(): Plugin {
-	const { paragraph, hard_break } = plainSchema.nodes;
+function plainClipboardPlugin(schema: Schema): Plugin {
+	const { paragraph, hard_break } = schema.nodes;
 	const line = (text: string) =>
 		paragraph.create(
 			null,
@@ -1226,7 +1238,7 @@ function plainClipboardPlugin(): Plugin {
 				.split('\n')
 				.flatMap((part, i) => [
 					...(i ? [hard_break.create()] : []),
-					...(part ? [plainSchema.text(part)] : [])
+					...(part ? [schema.text(part)] : [])
 				])
 		);
 	return new Plugin({

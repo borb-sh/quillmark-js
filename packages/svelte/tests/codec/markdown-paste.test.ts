@@ -178,7 +178,7 @@ describe('a block leaf reads markdown text', () => {
 	});
 });
 
-// The reference quill declares no block `richtext` field beside a `multiline: true`
+// The reference quill declares no block `richtext` field beside a `shape: lines`
 // `text` on the main card, so the four leaves are built here.
 describe('only a block leaf reads it', () => {
 	const q = probeQuill(`
@@ -193,13 +193,12 @@ main:
   fields:
     notes:
       type: richtext
-      multiline: true
+      shape: blocks
     summary:
       type: richtext
-      multiline: false
     address:
       type: text
-      multiline: true
+      shape: lines
     line:
       type: text
 `);

@@ -74,6 +74,7 @@ export {
 	inlineSchema,
 	plaintextSchema,
 	plainSchema,
+	linesSchema,
 	leafSchema,
 	hasMarks
 } from './schema.js';

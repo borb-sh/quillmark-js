@@ -36,7 +36,7 @@ main:
       type: array
       items:
         type: richtext
-        multiline: true
+        shape: blocks
       default: []
     jobs:
       type: array
@@ -47,7 +47,6 @@ main:
             type: text
           summary:
             type: richtext
-            multiline: false
       default: []
     pages:
       type: integer

@@ -3,8 +3,9 @@
 // formatting set. Each set is closed upstream, so the schema names its whole vocabulary.
 // `blockSchema` is the full field; `inlineSchema` the single-textblock form for a one-line
 // `richtext`; `plaintextSchema` that without marks, for a one-line `text`; `plainSchema` a `text`
-// field declaring `multiline: true` (paragraphs and hard breaks only); `cellSchema` the inline form
-// with hard breaks, for a table cell. Anchors are not marks here (decorations).
+// field declaring `shape: lines` (paragraphs and hard breaks only); `linesSchema` that with marks,
+// for a `richtext` field declaring `shape: lines`; `cellSchema` the inline form with hard breaks,
+// for a table cell. Anchors are not marks here (decorations).
 //
 // `toDOM` and `parseDOM` are one tier: a copy and a paste inside one body run the whole document
 // through them (INVARIANTS §"Markdown at the edges"), so every attribute written here is read back here.
@@ -312,7 +313,7 @@ export const cellSchema = new Schema({
 });
 
 /**
- * A `text` field declaring `multiline: true`: paragraphs and hard breaks, no marks, islands or
+ * A `text` field declaring `shape: lines`: paragraphs and hard breaks, no marks, islands or
  * containers, the shape `Content::is_plain` admits. Its literal text spells a break as a `\n` and a
  * paragraph boundary as a blank line.
  */
@@ -326,11 +327,37 @@ export const plainSchema = new Schema({
 	marks: {}
 });
 
+/**
+ * A `richtext` field declaring `shape: lines`: the plain schema with the full mark set, the shape
+ * `Content::is_lines` admits. Formatted lines with no list, heading, quote, code block or island.
+ */
+export const linesSchema = new Schema({
+	nodes: {
+		doc: { content: 'paragraph+' },
+		paragraph: blockNodes.paragraph,
+		text: inlineLeafNodes.text,
+		hard_break: inlineLeafNodes.hard_break
+	},
+	marks
+});
+
 /** The schema a leaf of the declared type mounts: `inline` narrows either type to one
- *  textblock, and `plaintext` takes its marks away. */
-export function leafSchema(opts: { plaintext?: boolean; inline?: boolean }): Schema {
+ *  textblock, `plaintext` takes its marks away, and `paragraphs` holds a `richtext` to
+ *  paragraphs and hard breaks. */
+export function leafSchema(opts: {
+	plaintext?: boolean;
+	inline?: boolean;
+	paragraphs?: boolean;
+}): Schema {
 	if (opts.plaintext) return opts.inline ? plaintextSchema : plainSchema;
-	return opts.inline ? inlineSchema : blockSchema;
+	if (opts.inline) return inlineSchema;
+	return opts.paragraphs ? linesSchema : blockSchema;
+}
+
+/** True for the two schemas of paragraphs and hard breaks alone, {@link plainSchema} and
+ *  {@link linesSchema}: what a leaf's literal clipboard mounts on. */
+export function isParagraphsSchema(schema: Schema): boolean {
+	return schema === plainSchema || schema === linesSchema;
 }
 
 /** Whether `schema` can carry formatting at all: false for the two mark-free schemas.

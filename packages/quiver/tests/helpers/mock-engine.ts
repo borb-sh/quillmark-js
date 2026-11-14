@@ -26,7 +26,9 @@ export function mockQuillLoad(): {
 	const spy = vi.spyOn(core.Quill, 'fromTree').mockImplementation(fake);
 	const bundleSpy = vi
 		.spyOn(core.Quill, 'fromBundle')
-		.mockImplementation((bytes: Uint8Array) => fake(new Map(Object.entries(unzipSync(bytes)))));
+		.mockImplementation((bytes) =>
+			fake(new Map(Object.entries(unzipSync(Uint8Array.from(bytes)))))
+		);
 	return {
 		calls,
 		spy,

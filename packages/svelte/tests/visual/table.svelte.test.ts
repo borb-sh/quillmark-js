@@ -87,7 +87,6 @@ main:
             type: text
           note:
             type: richtext
-            multiline: false
           lead:
             type: boolean
       ui:

@@ -48,9 +48,10 @@ export interface FieldModel {
 	label: string;
 	/** Chrome-only; never gates. */
 	description: string | undefined;
-	/** Prose-leaf flags: {@link oneLine} and {@link literalText}. */
+	/** Prose-leaf flags: {@link oneLine}, {@link literalText} and {@link linesOnly}. */
 	inline: boolean;
 	plaintext: boolean;
+	paragraphs: boolean;
 }
 
 /** A panel section, a top-level `object`'s or a legacy `ui.group`'s: its label and the
@@ -210,9 +211,14 @@ export function baseType(f: QuillFieldSchema): QuillFieldType {
 }
 
 /** Whether a content field is one line: one paragraph, no container, no island. A `text`
- *  or `richtext` field is one line unless it declares `multiline: true`. */
+ *  or `richtext` field is one line unless it declares a `shape`. */
 export function oneLine(f: QuillFieldSchema): boolean {
-	return f.multiline !== true;
+	return f.shape === undefined;
+}
+
+/** Whether a `richtext` field holds formatted lines and no block: `shape: lines`. */
+export function linesOnly(f: QuillFieldSchema): boolean {
+	return baseType(f) === 'richtext' && f.shape === 'lines';
 }
 
 /** Whether a content field's codec is the literal one: `text`. */
@@ -259,10 +265,10 @@ export function mountKey(name: string, f: QuillFieldSchema): string {
 	return [
 		name,
 		f.type,
-		oneLine(f),
+		f.shape ?? '',
 		f.max ?? '',
 		items?.type ?? '',
-		items ? oneLine(items) : '',
+		items?.shape ?? '',
 		items?.max ?? ''
 	].join('\u0000');
 }
@@ -713,7 +719,8 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 			label: fieldTitle(name, schema),
 			description: schema.description,
 			inline: oneLine(schema),
-			plaintext: literalText(schema)
+			plaintext: literalText(schema),
+			paragraphs: linesOnly(schema)
 		};
 	});
 }

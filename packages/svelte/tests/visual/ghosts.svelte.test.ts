@@ -49,13 +49,11 @@ main:
       type: text
     lead:
       type: richtext
-      multiline: false
     kept:
       type: text
       default: Kept
     motto:
       type: richtext
-      multiline: false
       default: "*Always* be testing."
     signed_for:
       type: text
@@ -95,7 +93,7 @@ main:
       type: text?
     remark:
       type: richtext?
-      multiline: true
+      shape: blocks
     lines:
       type: array
       items:
@@ -116,7 +114,6 @@ main:
           type: text
         motto:
           type: richtext
-          multiline: false
           default: "*Always* be testing."
         desk:
           type: text
