@@ -27,6 +27,7 @@
 -->
 <script lang="ts">
 	import { onDestroy, tick as flush } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { wording } from './strings.js';
 	import { structuralUndo } from './undo.svelte.js';
 
@@ -45,6 +46,7 @@
 		baseType,
 		commitMember,
 		declaredContent,
+		firstShortText,
 		matrixColumns,
 		matrixDeclares,
 		matrixEmpty,
@@ -165,6 +167,32 @@
 	/** An added item's title input: the `title` cell's own control id. */
 	const itemTitleId = (id: string): string => propertyDomIds(memberBase(id), MATRIX_TITLE).control;
 
+	/** The disclosure glyph, at the size an array row's takes. */
+	const CHEVRON = 16;
+	/** The held items whose details are unfolded, for this mount: a held item rests as one
+	 *  line, and a tick or an add opens it, its details being what the author came to fill. */
+	const expanded = new SvelteSet<string>();
+	/** Whether a held item's details are drawn: unfolded by the reader, or holding a
+	 *  proposal for one of its cells, which is marked on the cell. */
+	const isOpen = (id: string): boolean =>
+		hasColumns && (expanded.has(id) || cellReview(id).length > 0);
+	/** What a folded item shows of its details: the words an array row's summary reads. */
+	const tail = (id: string): string | undefined =>
+		firstShortText(schema.properties, shownColumns(id));
+	function toggle(id: string): void {
+		if (expanded.has(id)) expanded.delete(id);
+		else expanded.add(id);
+	}
+	/** The added item whose name is being edited, its rest face a press away. */
+	let renaming = $state<string | undefined>();
+	async function rename(id: string): Promise<void> {
+		renaming = id;
+		await flush();
+		const el = own(titleEls, id);
+		el?.focus();
+		el?.setSelectionRange(el.value.length, el.value.length);
+	}
+
 	/** The columns an untick took, by member id, for a retick in this mount to restore. */
 	const stash = new Map<string, Record<string, unknown>>();
 	/** Commit the map; one holding nothing is the field's empty answer (`matrixEmpty`). */
@@ -181,6 +209,7 @@
 	const memberEls: Record<string, HTMLElement | undefined> = $state({});
 	const tickEls: Record<string, HTMLInputElement | undefined> = $state({});
 	const titleEls: Record<string, HTMLInputElement | undefined> = $state({});
+	const nameEls: Record<string, HTMLButtonElement | undefined> = $state({});
 	const colEls: Record<string, Subform | undefined> = $state({});
 	let rosterEl = $state<HTMLElement | undefined>();
 	let addEl = $state<{ focus: () => void } | undefined>();
@@ -215,6 +244,8 @@
 	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
 		const item = proposal(id);
 		const cells = cellReview(id);
+		if (on) expanded.add(id);
+		else expanded.delete(id);
 		if (item && on === matrixHeld(item.after)) reviewing.act(item.id, 'accept');
 		else if (!item && !on && !held(id) && cells.length)
 			for (const { item: cell } of cells) reviewing.act(cell.id, 'dismiss');
@@ -245,7 +276,7 @@
 		await flush();
 		// The caret goes where the row was: the next added item, else the add box.
 		const next = added[at] ?? added[at - 1];
-		if (next) own(titleEls, next.id)?.focus();
+		if (next) own(nameEls, next.id)?.focus();
 		else addEl?.focus();
 		undo.hand(document.activeElement);
 	}
@@ -258,7 +289,7 @@
 			: id;
 		commit(commitMember(map, back, item));
 		await flush();
-		own(titleEls, back)?.focus();
+		own(nameEls, back)?.focus();
 	}
 
 	// ── The add box ────────────────────────────────────────────────────────────
@@ -268,6 +299,7 @@
 		undo.withdraw();
 		const id = addedId(title, taken);
 		commit(commitMember(map, id, memberWrite({}, title)));
+		expanded.add(id);
 		await flush();
 		const box = own(memberEls, id);
 		// The item's columns are what the author came to fill; a checklist has none, and
@@ -282,7 +314,7 @@
 		const first = members[0];
 		if (first) return own(tickEls, first.id)?.focus();
 		const item = added[0];
-		if (item) return own(titleEls, item.id)?.focus();
+		if (item) return own(nameEls, item.id)?.focus();
 		addEl?.focus();
 	}
 	/** The box an arrival wash blooms in: the roster, not the label row above it, this
@@ -307,13 +339,21 @@
 			return undefined;
 		}
 		const column = rest[0];
-		const cells = own(colEls, id);
 		const member = own(memberEls, id);
-		if (column !== undefined && column !== MATRIX_TITLE && cells) {
-			const inner = cells.focusPath(rest, pos);
-			return inner instanceof Promise ? inner.then((box) => box ?? member) : (inner ?? member);
+		if (column === MATRIX_TITLE && !onRoster(schema, id)) {
+			return rename(id).then(() => member);
 		}
-		(own(tickEls, id) ?? own(titleEls, id))?.focus();
+		if (column !== undefined && column !== MATRIX_TITLE && hasColumns && shownHeld(id)) {
+			const into = (cells: Subform | undefined): LandingBox => {
+				if (!cells) return member;
+				const inner = cells.focusPath(rest, pos);
+				return inner instanceof Promise ? inner.then((box) => box ?? member) : (inner ?? member);
+			};
+			if (own(colEls, id)) return into(own(colEls, id));
+			expanded.add(id);
+			return flush().then(() => into(own(colEls, id)));
+		}
+		(own(tickEls, id) ?? own(nameEls, id))?.focus();
 		return member;
 	}
 </script>
@@ -342,7 +382,7 @@
 		{#each members as m (m.id)}
 			{@const on = shownHeld(m.id)}
 			<div
-				class={['qm-member qm-wash', { held: on, open: on && hasColumns }]}
+				class={['qm-member qm-wash', { held: on, open: on && isOpen(m.id) }]}
 				data-qm-prop={m.id}
 				bind:this={memberEls[m.id]}
 			>
@@ -364,6 +404,9 @@
 					</span>
 					<ReviewRows entries={reviewed.below.get(m.id)?.filter((e) => !e.steps.length)} />
 					<label class="qm-member-title" id={titleId(m.id)} for={tickId(m.id)}>{m.title}</label>
+					{#if on && hasColumns}
+						{@render disclosure(m.id, m.title)}
+					{/if}
 				</div>
 				{@render columns(m.id, m.title, on)}
 			</div>
@@ -371,7 +414,7 @@
 		{#each added as item, k (item.id)}
 			{@const name = item.title || t.strings.matrixItemTitle(label ?? '', k + 1)}
 			<div
-				class={['qm-member qm-wash held added', { open: hasColumns }]}
+				class={['qm-member qm-wash held added', { open: isOpen(item.id) }]}
 				data-qm-prop={item.id}
 				bind:this={memberEls[item.id]}
 			>
@@ -381,17 +424,38 @@
 						<span class="qm-tick-input qm-tick-fixed"></span>
 						<Icon name="check" class="qm-tick-mark" />
 					</span>
-					<input
-						class="qm-input qm-focus-ring qm-member-title-input"
-						type="text"
-						id={itemTitleId(item.id)}
-						data-qm-prop={MATRIX_TITLE}
-						aria-label={t.strings.matrixItemTitle(label ?? '', k + 1)}
-						value={item.title}
-						bind:this={titleEls[item.id]}
-						oninput={(e) => retitle(item.id, e.currentTarget.value)}
-					/>
-					<span class="qm-member-title" id={titleId(item.id)} hidden>{name}</span>
+					{#if renaming === item.id}
+						<input
+							class="qm-input qm-focus-ring qm-member-title-input"
+							type="text"
+							id={itemTitleId(item.id)}
+							data-qm-prop={MATRIX_TITLE}
+							aria-label={t.strings.matrixItemTitle(label ?? '', k + 1)}
+							value={item.title}
+							bind:this={titleEls[item.id]}
+							oninput={(e) => retitle(item.id, e.currentTarget.value)}
+							onblur={() => (renaming = undefined)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === 'Escape') {
+									e.preventDefault();
+									renaming = undefined;
+									flush().then(() => own(nameEls, item.id)?.focus());
+								}
+							}}
+						/>
+					{:else}
+						<!-- The name rests as the roster's titles do, and a press edits it. -->
+						<button
+							type="button"
+							class="qm-member-title qm-member-name qm-focus-ring"
+							aria-label={t.strings.matrixRename(name)}
+							bind:this={nameEls[item.id]}
+							onclick={() => rename(item.id)}><span id={titleId(item.id)}>{name}</span></button
+						>
+					{/if}
+					{#if hasColumns && renaming !== item.id}
+						{@render disclosure(item.id, name)}
+					{/if}
 					<button
 						type="button"
 						class="qm-icon-btn qm-focus-ring qm-member-remove"
@@ -421,7 +485,7 @@
      a tick elsewhere leaves this subform mounted and the caret in it. -->
 {#snippet columns(id: string, title: string, on: boolean)}
 	{@const deep = routed.below.get(id)}
-	{#if on && hasColumns}
+	{#if on && isOpen(id)}
 		<ObjectField
 			bind:this={colEls[id]}
 			value={shownColumns(id)}
@@ -440,6 +504,22 @@
 	{:else}
 		<DiagnosticList diagnostics={deep?.map((d) => d.diagnostic)} />
 	{/if}
+{/snippet}
+
+<!-- A held item's disclosure: its details' first line of words, muted after the name,
+     and the chevron that unfolds them, the way a record row opens. -->
+{#snippet disclosure(id: string, title: string)}
+	{@const words = isOpen(id) ? undefined : tail(id)}
+	<button
+		type="button"
+		class="qm-focus-ring qm-member-summary"
+		aria-expanded={isOpen(id)}
+		aria-label={t.strings.matrixDetails(title)}
+		onclick={() => toggle(id)}
+	>
+		<span class="qm-member-tail">{words ?? ''}</span>
+		<Icon name="chevron-right" class="qm-member-chevron" size={CHEVRON} />
+	</button>
 {/snippet}
 
 <style>
@@ -499,6 +579,69 @@
 	 its row of tracks shares, and each track holds one member's columns alone. */
 	.qm-matrix-roster:not(.compact) > .qm-member.open {
 		margin-block: var(--_qm-space);
+	}
+	/* Abreast, an open item takes the row whole: its details read at the width a form
+	 does, and the tracks around it stay a grid with no hole beside it. */
+	.qm-matrix-roster.compact > .qm-member.open {
+		grid-column: 1 / -1;
+	}
+	/* The rest of the line is the disclosure: the details' words at the label ink, cut
+	 to the line, then the chevron, which turns down as the details open. */
+	.qm-member-summary {
+		flex: 1;
+		min-width: 0;
+		align-self: stretch;
+		display: flex;
+		align-items: center;
+		gap: var(--_qm-space);
+		padding: 0;
+		margin: 0;
+		border: none;
+		border-radius: var(--_qm-radius-inner);
+		background: transparent;
+		font: inherit;
+		color: var(--_qm-ink-label);
+		text-align: start;
+		cursor: pointer;
+	}
+	.qm-member-tail {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		font-size: var(--_qm-text-body);
+		line-height: var(--_qm-leading-tight);
+	}
+	.qm-member-summary :global(.qm-member-chevron) {
+		flex-shrink: 0;
+		stroke-width: var(--_qm-glyph-stroke);
+		opacity: var(--_qm-opacity-rest);
+		transition:
+			transform var(--_qm-duration-slow) var(--_qm-ease-reverse),
+			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-member-summary:hover :global(.qm-member-chevron),
+	.qm-member-summary:focus-visible :global(.qm-member-chevron) {
+		opacity: 1;
+	}
+	.qm-member-summary[aria-expanded='true'] :global(.qm-member-chevron) {
+		transform: rotate(90deg);
+	}
+	/* An added item's name at rest is a title like the roster's, a button only in that a
+	 press edits it. */
+	.qm-member-name {
+		padding: 0;
+		margin: 0;
+		border: none;
+		background: transparent;
+		font: inherit;
+		text-align: start;
+		cursor: text;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		flex-shrink: 1;
 	}
 	/* The tick and its title on one line, the line holding the tap floor a tick alone
 	 would not reach: the title is the target, the `for` carrying its press to the input. */
