@@ -8,6 +8,10 @@
 
 **An element of a list holds the lines its `items` declare.** A list whose `items` declares `shape: lines` or `blocks` mounts each element as its scalar field of that shape mounts, where every element edited as one line and one holding a line break was held read-only. In such an element Enter breaks a line and ⌘/Ctrl+Enter inserts the next element, and a paste of several lines stays in the element; a list of one-line elements keeps Enter's insert, split and the paste into rows.
 
+**A list of one element draws no drag handle.** A record's row, a table's row and a line stand without the grip, its tip and its grab cursor while the list holds nothing to move them past, and draw it once a second element is added. Alt+↑/↓ is unchanged.
+
+**A drag handle comes up on the row the pointer is over or the focus is in.** It rests hidden otherwise, on a device with no hover as well, where every handle stood drawn.
+
 ## v0.37.0 - 2026-11-14
 
 **On `@quillmark/wasm` 0.138.** The peer range is `>=0.138.0-0`. A field's line shape is read from the schema's `shape`, absent on one line, `"lines"` or `"blocks"`, where it was read from `multiline`; a quill that still spells `multiline:` loads through 0.138 with a warning and draws as before. A newline inside a paragraph of Markdown is a line break there, so a body or a `richtext` value hard-wrapped in its source opens with a break at each wrap (Quillmark's 0.137 → 0.138 migration).

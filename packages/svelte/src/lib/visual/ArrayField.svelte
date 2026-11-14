@@ -38,7 +38,8 @@
 
  The row's controls are inside the element: a slab over the end of the element's own
  box, taking its two end-side corners: the remove. Every element's drag handle hangs
- off its start edge instead, as a table grip does. So a row's box is the element's box, and an array's rows end where
+ off its start edge instead, as a table grip does, once the list holds a second element
+ to move it past; a lone element's handle is an empty track. So a row's box is the element's box, and an array's rows end where
  every other field's control does. On an object element that box is the summary rather
  than the open row: a destructive control belongs to the line it sits on, not to
  everything that line has unfolded. A table's row carries the handle in its first track
@@ -1360,18 +1361,22 @@
      effect. Its twin is Alt+↑/↓ from anywhere in the row, which a record's summary
      announces, as a table's or a line's remove does for its own row. -->
 {#snippet handle(k: number)}
-	<span
-		class="qm-row-handle"
-		aria-hidden="true"
-		data-qm-tip={t.strings.arrayDrag}
-		data-qm-tip-keys={keycap('Alt-↑/↓')}
-		onpointerdown={(e) => drag.down(e, k)}
-		onpointermove={drag.move}
-		onpointerup={drag.up}
-		onpointercancel={drag.up}
-		onlostpointercapture={drag.up}
-		><span class="qm-row-handle-bar"><Icon name="grip-vertical" /></span></span
-	>
+	{#if ids.length < 2}
+		<span class="qm-row-handle" aria-hidden="true"></span>
+	{:else}
+		<span
+			class="qm-row-handle"
+			aria-hidden="true"
+			data-qm-tip={t.strings.arrayDrag}
+			data-qm-tip-keys={keycap('Alt-↑/↓')}
+			onpointerdown={(e) => drag.down(e, k)}
+			onpointermove={drag.move}
+			onpointerup={drag.up}
+			onpointercancel={drag.up}
+			onlostpointercapture={drag.up}
+			><span class="qm-row-handle-bar"><Icon name="grip-vertical" /></span></span
+		>
+	{/if}
 {/snippet}
 
 <style>
@@ -1523,7 +1528,7 @@
 	 the grip's marks, hung off the row's start edge in the `--_qm-nest` every row stands
 	 in from the stroke outside it, which a group's panel clips at. The pill rests
 	 at nothing, where the remove rests faint, and comes up with the row the pointer is
-	 on, staying up through the drag it carries; a band flush with the row keeps the
+	 on or the focus is in, staying up through the drag it carries; with no hover, the row the focus is in alone; a band flush with the row keeps the
 	 pointer on the row all the way to it. The pointer owns the gesture, not the page's
 	 scroll. A record's pill centres on its summary; a line's and a table row's stand on
 	 the first line, which a wrapping cell grows away from. */
@@ -1538,6 +1543,9 @@
 		color: var(--_qm-ink-label);
 		cursor: grab;
 		touch-action: none;
+	}
+	.qm-row-handle:empty {
+		cursor: auto;
 	}
 	.qm-row-handle-bar {
 		display: flex;
@@ -1561,7 +1569,9 @@
 		height: var(--_qm-space-3);
 	}
 	.qm-array-row:hover > .qm-row-handle > .qm-row-handle-bar,
+	.qm-array-row:focus-within > .qm-row-handle > .qm-row-handle-bar,
 	.qm-array-row:hover > .qm-element-head > .qm-row-handle > .qm-row-handle-bar,
+	.qm-array-row:focus-within > .qm-element-head > .qm-row-handle > .qm-row-handle-bar,
 	.qm-array-row.lifted > .qm-row-handle > .qm-row-handle-bar,
 	.qm-element.lifted > .qm-element-head > .qm-row-handle > .qm-row-handle-bar {
 		opacity: 1;
@@ -1930,11 +1940,5 @@
 	}
 	.qm-add-el:disabled {
 		opacity: var(--_qm-opacity-idle);
-	}
-	/* No hover to come up on: the handle stands with the controls, already at rest. */
-	@media (hover: none) {
-		.qm-row-handle-bar {
-			opacity: 1;
-		}
 	}
 </style>
