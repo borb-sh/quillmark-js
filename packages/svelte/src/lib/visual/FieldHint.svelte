@@ -9,11 +9,9 @@
  on touch, which leaves guidance the reference quill puts on nearly every field
  reachable on a tablet only through a screen reader.
 
- Floating, for a description past a line or so (`isBrief`): the reference quill's
- descriptions run to a median of ~110 characters and past 250 at the tail, and
- permanently in flow that is several wrapped lines under every field, which is the
- density the card is built to avoid. A short one stands under its label instead
- ({@link FieldLabel}) and raises no marker.
+ Floating, for every description: the reference quill's descriptions run to a median
+ of ~110 characters and past 250 at the tail, and permanently in flow that is several
+ wrapped lines under every field, which is the density the card is built to avoid.
 
  The popover is chrome, not the announcement. Its content is `aria-hidden`: the
  description reaches assistive tech through the always-present parked node
