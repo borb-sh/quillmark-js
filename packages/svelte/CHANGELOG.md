@@ -12,6 +12,12 @@
 
 **A drag handle comes up on the row the pointer is over or the focus is in.** It rests hidden otherwise, on a device with no hover as well, where every handle stood drawn.
 
+**A list row's remove comes up with the row as its drag handle does.** The × rests hidden until the pointer is over the row or the focus is in it, where it rested faint on every row; it keeps its place, its name and its tab stop, and rests drawn on a device with no hover.
+
+**A closed record in a list is titled by what it holds.** A collapsed element whose record has a one-line text cell shows those words alone, without the `Item N` before them; one with none, and every open element, keeps `Item N`. The element's accessible name keeps its number.
+
+**A checklist's "Add to …" box draws its + inside the box.** The box spans the list's width with the glyph at its start, where the glyph stood outside it in the ticks' column.
+
 ## v0.37.0 - 2026-11-14
 
 **On `@quillmark/wasm` 0.138.** The peer range is `>=0.138.0-0`. A field's line shape is read from the schema's `shape`, absent on one line, `"lines"` or `"blocks"`, where it was read from `multiline`; a quill that still spells `multiline:` loads through 0.138 with a warning and draws as before. A newline inside a paragraph of Markdown is a line break there, so a body or a `richtext` value hard-wrapped in its source opens with a break at each wrap (Quillmark's 0.137 → 0.138 migration).
