@@ -1580,7 +1580,8 @@
 	 * Bring the review item `id` to the reader as the current change: open the panel holding
 	 * it and scroll it to the middle of the view. The focus stays where it is, the reader having
 	 * asked to look, unless `focus` asks for it: the caret then goes into the item, or the focus
-	 * to its field. False for an item the editor does not draw.
+	 * to the control drawing it, a property inside a field included. False for an item the
+	 * editor does not draw.
 	 */
 	export function revealReview(id: string, opts: { focus?: boolean } = {}): Promise<boolean> {
 		return reveal(id, opts.focus ?? false, false);
@@ -1599,8 +1600,12 @@
 		}
 		if (!(await span.resumes(tick()))) return false;
 		reviewing.reveal(id);
-		if (focus && key !== undefined && !leaves.prose(key)?.enterReview(id))
-			leaves.control(key)?.focus();
+		if (focus && key !== undefined && !leaves.prose(key)?.enterReview(id)) {
+			const control = leaves.control(key);
+			const steps = reviewing.at(key).nested?.find((e) => e.item.id === id)?.steps;
+			if (steps && control?.focusPath) control.focusPath(steps);
+			else control?.focus();
+		}
 		// The current item is drawn again, so its element is read once it has been.
 		if (!(await span.resumes(tick()))) return false;
 		const els = reviewEls(id);
@@ -1866,8 +1871,8 @@
 
 	/** Make the next or previous open item current, in document order and round from either
 	 *  end, from the current item or the one last stepped to: the caret in it, or the focus in
-	 *  its field, unless `focus` is false. With `group`, only that group's items are stepped to.
-	 *  Resolves its id, `undefined` when none is drawn. */
+	 *  the control drawing it, unless `focus` is false. With `group`, only that group's items
+	 *  are stepped to. Resolves its id, `undefined` when none is drawn. */
 	export function stepReview(
 		dir: 1 | -1,
 		opts: { focus?: boolean; group?: string } = {}

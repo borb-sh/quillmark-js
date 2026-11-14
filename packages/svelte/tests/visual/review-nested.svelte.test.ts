@@ -114,6 +114,15 @@ describe('a record’s cell', () => {
 		]);
 	});
 
+	it('takes the focus to its own cell when brought to the reader with it', async () => {
+		const r = nested((doc) => contact(doc).filter((item) => item.id === 'email'), seed);
+		await settle();
+		expect(await r.editor.revealReview('email', { focus: true })).toBe(true);
+		flushSync();
+		const cell = openField(r.target, main, 'contact').querySelector('[data-qm-prop="email"]')!;
+		expect(cell.contains(document.activeElement)).toBe(true);
+	});
+
 	it('is outdated where the cell no longer holds what was read', async () => {
 		const r = nested(
 			(doc) => [

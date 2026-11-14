@@ -8,9 +8,21 @@
 
 **An open change at rest stands back from the current one.** A control or a row under a proposal has a dashed edge at rest and a solid, heavier one when current, where both were solid, and the resting tint is 12% of the review hue, down from 20%.
 
+**`revealReview` with `{ focus: true }` focuses the control drawing a change inside a field.** For a change to a place inside a field, such as an object's property, the focus lands on the control at that place, where it went to the field's first control and typing landed in another property than the one the answer keys acted on. `stepReview` lands the same way.
+
+**A field of lines is single spaced.** A `text` or `richtext` leaf of `shape: lines` sets its lines flush, as the page prints them, where each line Enter opened stood off the last by the gap between the body's paragraphs. The leaf carries `data-qm-lines`, which `prose.css` keys the rule on.
+
+**An element of a list holds the lines its `items` declare.** A list whose `items` declares `shape: lines` or `blocks` mounts each element as its scalar field of that shape mounts, where every element edited as one line and one holding a line break was held read-only. In such an element Enter breaks a line and ⌘/Ctrl+Enter inserts the next element, and a paste of several lines stays in the element; a list of one-line elements keeps Enter's insert, split and the paste into rows.
+
 **A list of one element draws no drag handle.** A record's row, a table's row and a line stand without the grip, its tip and its grab cursor while the list holds nothing to move them past, and draw it once a second element is added. Alt+↑/↓ is unchanged.
 
 **A drag handle comes up on the row the pointer is over or the focus is in.** It rests hidden otherwise, on a device with no hover as well, where every handle stood drawn.
+
+**A list row's remove comes up with the row as its drag handle does.** The × rests hidden until the pointer is over the row or the focus is in it, where it rested faint on every row; it keeps its place, its name and its tab stop, and rests drawn on a device with no hover.
+
+**A closed record in a list is titled by what it holds.** A collapsed element whose record has a one-line text cell shows those words alone, without the `Item N` before them; one with none, and every open element, keeps `Item N`. The element's accessible name keeps its number.
+
+**A checklist's "Add to …" box draws its + inside the box.** The box spans the list's width with the glyph at its start, where the glyph stood outside it in the ticks' column.
 
 ## v0.37.0 - 2026-11-14
 

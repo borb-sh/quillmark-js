@@ -76,6 +76,7 @@ export {
 	plainSchema,
 	linesSchema,
 	leafSchema,
+	isParagraphsSchema,
 	hasMarks
 } from './schema.js';
 

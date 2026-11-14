@@ -12,12 +12,12 @@
  draws the count beside it: a disabled button takes no focus, so a `title` reaches
  neither a screen reader nor a touch user, and the count is the carrier.
 
- An `object` element collapses: the row is its own summary — a box titled `Item` and
- its 1-based number, whatever the record holds — and opens onto {@link ObjectField}.
- Collapsed, the summary draws the words of the record's first one-line text cell after
- the title, at the label ink: what tells one closed row from the next, and no part of
- the row's name.
- Open, the summary keeps its words, its chevron and its remove where they stood, and
+ An `object` element collapses: the row is its own summary, a box that opens onto
+ {@link ObjectField}. Collapsed, the summary draws the words of the record's first
+ one-line text cell, what tells one closed row from the next; a record with none, and
+ every open one, is titled `Item` and its 1-based number. The words are no part of the
+ row's name, which keeps the number.
+ Open, the summary keeps its chevron and its remove where they stood, and
  lets its box go: a line at the tap rung over the subform, so the one thing a press
  on it moves is the chevron. Each row opens and closes on its own: a
  press on a summary toggles that row, and opening one leaves every other where it
@@ -51,7 +51,7 @@
  caret there, and short of a prose line's end splits the line there, as a bulleted list
  does; a paste of several lines into a prose row opens a row per line; Backspace at a
  prose line's start joins it onto the line above and Delete at its end joins the next
- onto it, each one commit; Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
+ onto it, each one commit. A prose element whose `items` declares a `shape` holds lines of its own, so Enter breaks a line inside it and ⌘/Ctrl+Enter inserts the sibling, and a paste stays in the element. Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
  anywhere in a row of the list moves it, the nearest row answering and never
  the record around a nested one: the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
@@ -108,7 +108,9 @@
 		firstShortText,
 		declaredContent,
 		fieldTitle,
+		linesOnly,
 		literalText,
+		oneLine,
 		renderedBoolean,
 		schemaAt,
 		textCap,
@@ -220,6 +222,9 @@
 	// `contentAt` whatever the element rests as. An array declaring no `items`
 	// has text elements.
 	const control = $derived(items ? controlKind(items) : 'text');
+	/** A prose element whose `items` declares a `shape`: its own lines, which Enter breaks and
+	 *  ⌘/Ctrl+Enter leaves for a sibling. */
+	const multiline = $derived(control === 'prose' && items != null && !oneLine(items));
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
 	/** A column's track. A cell that fills its width takes a share of what the field has
@@ -896,6 +901,7 @@
 			return;
 		}
 		if (e.key === 'Enter') {
+			if (multiline && !(e.ctrlKey || e.metaKey)) return;
 			e.preventDefault();
 			insertAfter(k, column);
 		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target, column)) {
@@ -1114,9 +1120,10 @@
 							     screen, where this unfolds in place. Same glyph, same rotation and
 							     same rung as a panel header's, so the surface has one disclosure. -->
 							<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
-							<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
 							{#if !open.has(id) && preview(k)}
 								<span class="qm-element-preview">{preview(k)}</span>
+							{:else}
+								<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
 							{/if}
 							{#if removal(k)}
 								<span class="qm-review-tag">{t.strings.reviewRemoveCard}</span>
@@ -1173,15 +1180,19 @@
 							value={arr[k]}
 							proposed={rowText(k)}
 							plaintext={items != null && literalText(items)}
+							block={multiline}
+							paragraphs={items != null && linesOnly(items)}
 							cap={textCap(items)}
 							label={rowName(k)}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onChange={(rt) => commitElement(k, rt)}
-							lines={{
-								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
-								onLines: (rt, below, caret) => spill(k, rt, below, caret),
-								onJoin: (dir) => join(dir < 0 ? k - 1 : k)
-							}}
+							lines={multiline
+								? undefined
+								: {
+										room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
+										onLines: (rt, below, caret) => spill(k, rt, below, caret),
+										onJoin: (dir) => join(dir < 0 ? k - 1 : k)
+									}}
 							onKey={(e) => onElementKey(e, k)}
 						/>
 					{:else if control === 'number'}
@@ -1279,11 +1290,12 @@
 					<span class="qm-row-handle" aria-hidden="true"></span>
 					<span class="qm-control-box qm-element-summary">
 						<Icon name="chevron-right" class="qm-el-chevron" size={CHEVRON} />
-						<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
 						{#if firstShortText(items?.properties, (after ?? {}) as Record<string, unknown>)}
 							<span class="qm-element-preview"
 								>{firstShortText(items?.properties, (after ?? {}) as Record<string, unknown>)}</span
 							>
+						{:else}
+							<span class="qm-element-title">{t.strings.elementItem(k + 1)}</span>
 						{/if}
 					</span>
 				</div>
@@ -1292,6 +1304,8 @@
 					content={() => asContent(after)}
 					value={after}
 					plaintext={items != null && literalText(items)}
+					block={multiline}
+					paragraphs={items != null && linesOnly(items)}
 					label={rowName(k)}
 					onChange={() => {}}
 				/>
@@ -1475,16 +1489,18 @@
 	 `.qm-icon-btn`'s radius, which is the same rung the box draws; a slab standing before
 	 another gives up its corners on both sides.
 
-	 It comes up on its own row rather than on the field: a destructive control is offered
-	 by the row the pointer is on, not by every row at once. Hover is where the remove says destructive, ink with fill, a
-	 tint alone being a wash under a label-toned glyph. */
+	 It waits for its row as the handle does (INVARIANTS §"A field's own chrome waits for
+	 the field"): a destructive control is offered by the row the pointer is on or the
+	 focus is in, not by every row at once, holding its box meanwhile and arriving by
+	 opacity, and resting drawn where nothing hovers. Hover is where the remove says
+	 destructive, ink with fill, a tint alone being a wash under a label-toned glyph. */
 	.qm-row-actions {
 		position: absolute;
 		inset-block: 0;
 		inset-inline-end: 0;
 		display: flex;
 		color: var(--_qm-ink-label);
-		opacity: var(--_qm-opacity-rest);
+		opacity: 0;
 		transition: opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-row-btn {
@@ -1508,6 +1524,11 @@
 	.qm-array-row:focus-within > .qm-element-head > .qm-row-actions {
 		opacity: 1;
 	}
+	@media (hover: none) {
+		.qm-row-actions {
+			opacity: 1;
+		}
+	}
 	.qm-remove:hover:not(:disabled) {
 		background: var(--_qm-danger-tint);
 		color: var(--_qm-danger);
@@ -1515,7 +1536,7 @@
 	/* The handle is a table grip's twin (prose.css §"One grip per line"): a pill carrying
 	 the grip's marks, hung off the row's start edge in the `--_qm-nest` every row stands
 	 in from the stroke outside it, which a group's panel clips at. The pill rests
-	 at nothing, where the remove rests faint, and comes up with the row the pointer is
+	 at nothing, as the remove does, and comes up with the row the pointer is
 	 on or the focus is in, staying up through the drag it carries; with no hover, the row the focus is in alone; a band flush with the row keeps the
 	 pointer on the row all the way to it. The pointer owns the gesture, not the page's
 	 scroll. A record's pill centres on its summary; a line's and a table row's stand on
@@ -1664,35 +1685,29 @@
 	.qm-element.open > .qm-element-head :global(.qm-el-chevron) {
 		transform: rotate(90deg);
 	}
-	/* The title is the row's name, at the ink as a card's is, on one line however long
-	 the label runs. */
-	.qm-element-title {
+	/* The title is the row's name, and the words a closed record shows in its place, at
+	 the ink as a card's is, on one line however long they run. */
+	.qm-element-title,
+	.qm-element-preview {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: var(--_qm-ink);
+	}
+	.qm-element-title {
 		font-variant-numeric: tabular-nums;
 	}
-	/* What the closed record holds, after its name and a rung under it: the label ink,
-	 on the line's remainder, and the first to give way where the line runs short. */
+	.qm-element-preview {
+		flex: 1 1 0;
+		min-width: 0;
+		text-align: start;
+	}
 	.qm-review-tag {
 		flex: none;
 		margin-inline-start: auto;
 		font-size: var(--_qm-text-label);
 		font-weight: var(--_qm-weight-mid);
 		color: var(--_qm-ink-label);
-	}
-	.qm-element-preview {
-		flex: 1 1 0;
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		text-align: start;
-		color: var(--_qm-ink-label);
-	}
-	.qm-element-summary:has(.qm-element-preview) > .qm-element-title {
-		flex-shrink: 0;
 	}
 	/* ── A table ────────────────────────────────────────────────────────────────
 	 Every row of it is open, so it stands where an open row's subform stands: a rung
