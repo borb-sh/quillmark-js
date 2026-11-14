@@ -4,9 +4,12 @@
  list, one member to a row, or abreast on the section's track ladder under
  `ui.compact`; each member is a real checkbox whose checked state is the member's
  presence, with its title as the `<label for>`, an unheld member reading at the label
- ink and a held one at the value ink. A held member unfolds its columns beneath its
- title, drawn by {@link ObjectField} over the matrix's `properties` at the member's key;
- zero columns is a checklist and unfolds nothing.
+ ink and a held one at the value ink. A held member rests as one line, its title then
+ the words of its first one-line text column at the label ink, and a disclosure there
+ unfolds its columns beneath it, drawn by {@link ObjectField} over the matrix's
+ `properties` at the member's key, in the member's own track, so opening one moves no
+ other. A tick, an add and a landing unfold the member, as does a proposal or a
+ diagnostic on one of its columns; zero columns is a checklist and unfolds nothing.
 
  An open matrix's added items follow the roster in id order, as the plate prints them:
  held by being present, so each draws a fixed tick, its `title` as an input, a remove,
@@ -27,6 +30,7 @@
 -->
 <script lang="ts">
 	import { onDestroy, tick as flush } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { wording } from './strings.js';
 	import { structuralUndo } from './undo.svelte.js';
 
@@ -45,6 +49,7 @@
 		baseType,
 		commitMember,
 		declaredContent,
+		firstShortText,
 		matrixColumns,
 		matrixDeclares,
 		matrixEmpty,
@@ -165,6 +170,25 @@
 	/** An added item's title input: the `title` cell's own control id. */
 	const itemTitleId = (id: string): string => propertyDomIds(memberBase(id), MATRIX_TITLE).control;
 
+	/** The disclosure glyph, at the size an array row's takes. */
+	const CHEVRON = 16;
+	/** The held items whose details are unfolded, for this mount: a held item rests as one
+	 *  line, and a tick or an add opens it, its details being what the author came to fill. */
+	const expanded = new SvelteSet<string>();
+	/** Whether a held item's details are drawn: unfolded by the reader, or holding a
+	 *  proposal or a diagnostic for one of its cells, each drawn on its cell. */
+	const isOpen = (id: string): boolean =>
+		hasColumns &&
+		(expanded.has(id) ||
+			cellReview(id).length > 0 ||
+			(routed.below.get(id)?.some((d) => d.steps[0] !== MATRIX_TITLE) ?? false));
+	/** What a folded item shows of its details: the words an array row's summary reads. */
+	const tail = (id: string): string | undefined =>
+		firstShortText(schema.properties, shownColumns(id));
+	function toggle(id: string): void {
+		if (expanded.has(id)) expanded.delete(id);
+		else expanded.add(id);
+	}
 	/** The columns an untick took, by member id, for a retick in this mount to restore. */
 	const stash = new Map<string, Record<string, unknown>>();
 	/** Commit the map; one holding nothing is the field's empty answer (`matrixEmpty`). */
@@ -215,6 +239,8 @@
 	async function tick(id: string, on: boolean, el: HTMLInputElement): Promise<void> {
 		const item = proposal(id);
 		const cells = cellReview(id);
+		if (on) expanded.add(id);
+		else expanded.delete(id);
 		if (item && on === matrixHeld(item.after)) reviewing.act(item.id, 'accept');
 		else if (!item && !on && !held(id) && cells.length)
 			for (const { item: cell } of cells) reviewing.act(cell.id, 'dismiss');
@@ -268,6 +294,7 @@
 		undo.withdraw();
 		const id = addedId(title, taken);
 		commit(commitMember(map, id, memberWrite({}, title)));
+		expanded.add(id);
 		await flush();
 		const box = own(memberEls, id);
 		// The item's columns are what the author came to fill; a checklist has none, and
@@ -307,11 +334,16 @@
 			return undefined;
 		}
 		const column = rest[0];
-		const cells = own(colEls, id);
 		const member = own(memberEls, id);
-		if (column !== undefined && column !== MATRIX_TITLE && cells) {
-			const inner = cells.focusPath(rest, pos);
-			return inner instanceof Promise ? inner.then((box) => box ?? member) : (inner ?? member);
+		if (column !== undefined && column !== MATRIX_TITLE && hasColumns && shownHeld(id)) {
+			const into = (cells: Subform | undefined): LandingBox => {
+				if (!cells) return member;
+				const inner = cells.focusPath(rest, pos);
+				return inner instanceof Promise ? inner.then((box) => box ?? member) : (inner ?? member);
+			};
+			if (own(colEls, id)) return into(own(colEls, id));
+			expanded.add(id);
+			return flush().then(() => into(own(colEls, id)));
 		}
 		(own(tickEls, id) ?? own(titleEls, id))?.focus();
 		return member;
@@ -342,7 +374,7 @@
 		{#each members as m (m.id)}
 			{@const on = shownHeld(m.id)}
 			<div
-				class={['qm-member qm-wash', { held: on, open: on && hasColumns }]}
+				class={['qm-member qm-wash', { held: on, open: on && isOpen(m.id) }]}
 				data-qm-prop={m.id}
 				bind:this={memberEls[m.id]}
 			>
@@ -364,6 +396,9 @@
 					</span>
 					<ReviewRows entries={reviewed.below.get(m.id)?.filter((e) => !e.steps.length)} />
 					<label class="qm-member-title" id={titleId(m.id)} for={tickId(m.id)}>{m.title}</label>
+					{#if on && hasColumns}
+						{@render disclosure(m.id, m.title)}
+					{/if}
 				</div>
 				{@render columns(m.id, m.title, on)}
 			</div>
@@ -371,7 +406,7 @@
 		{#each added as item, k (item.id)}
 			{@const name = item.title || t.strings.matrixItemTitle(label ?? '', k + 1)}
 			<div
-				class={['qm-member qm-wash held added', { open: hasColumns }]}
+				class={['qm-member qm-wash held added', { open: isOpen(item.id) }]}
 				data-qm-prop={item.id}
 				bind:this={memberEls[item.id]}
 			>
@@ -392,6 +427,9 @@
 						oninput={(e) => retitle(item.id, e.currentTarget.value)}
 					/>
 					<span class="qm-member-title" id={titleId(item.id)} hidden>{name}</span>
+					{#if hasColumns}
+						{@render disclosure(item.id, name)}
+					{/if}
 					<button
 						type="button"
 						class="qm-icon-btn qm-focus-ring qm-member-remove"
@@ -421,7 +459,7 @@
      a tick elsewhere leaves this subform mounted and the caret in it. -->
 {#snippet columns(id: string, title: string, on: boolean)}
 	{@const deep = routed.below.get(id)}
-	{#if on && hasColumns}
+	{#if on && isOpen(id)}
 		<ObjectField
 			bind:this={colEls[id]}
 			value={shownColumns(id)}
@@ -440,6 +478,22 @@
 	{:else}
 		<DiagnosticList diagnostics={deep?.map((d) => d.diagnostic)} />
 	{/if}
+{/snippet}
+
+<!-- A held item's disclosure: its details' first line of words, muted after the name,
+     and the chevron that unfolds them, the way a record row opens. -->
+{#snippet disclosure(id: string, title: string)}
+	{@const words = isOpen(id) ? undefined : tail(id)}
+	<button
+		type="button"
+		class="qm-focus-ring qm-member-summary"
+		aria-expanded={isOpen(id)}
+		aria-label={t.strings.matrixDetails(title)}
+		onclick={() => toggle(id)}
+	>
+		<span class="qm-member-tail">{words ?? ''}</span>
+		<Icon name="chevron-right" class="qm-member-chevron" size={CHEVRON} />
+	</button>
 {/snippet}
 
 <style>
@@ -499,6 +553,49 @@
 	 its row of tracks shares, and each track holds one member's columns alone. */
 	.qm-matrix-roster:not(.compact) > .qm-member.open {
 		margin-block: var(--_qm-space);
+	}
+	/* The rest of the line is the disclosure: the details' words at the label ink, cut
+	 to the line, then the chevron, which turns down as the details open. */
+	.qm-member-summary {
+		flex: 1;
+		min-width: 0;
+		align-self: stretch;
+		display: flex;
+		align-items: center;
+		gap: var(--_qm-space);
+		padding: 0;
+		margin: 0;
+		border: none;
+		border-radius: var(--_qm-radius-inner);
+		background: transparent;
+		font: inherit;
+		color: var(--_qm-ink-label);
+		text-align: start;
+		cursor: pointer;
+	}
+	.qm-member-tail {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		font-size: var(--_qm-text-body);
+		line-height: var(--_qm-leading-tight);
+	}
+	.qm-member-summary :global(.qm-member-chevron) {
+		flex-shrink: 0;
+		stroke-width: var(--_qm-glyph-stroke);
+		opacity: var(--_qm-opacity-rest);
+		transition:
+			transform var(--_qm-duration-slow) var(--_qm-ease-reverse),
+			opacity var(--_qm-duration-fast) var(--_qm-ease-reverse);
+	}
+	.qm-member-summary:hover :global(.qm-member-chevron),
+	.qm-member-summary:focus-visible :global(.qm-member-chevron) {
+		opacity: 1;
+	}
+	.qm-member-summary[aria-expanded='true'] :global(.qm-member-chevron) {
+		transform: rotate(90deg);
 	}
 	/* The tick and its title on one line, the line holding the tap floor a tick alone
 	 would not reach: the title is the target, the `for` carrying its press to the input. */

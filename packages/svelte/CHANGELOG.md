@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A checklist's held item rests as one line.** A ticked item with details shows its name, then the first line of words its details hold in the label ink, and a chevron that opens them in the item's own column, so no other item moves. Ticking or adding an item opens it, and so does a proposal or an error on one of its details.
+
 **`revealReview` with `{ focus: true }` focuses the control drawing a change inside a field.** For a change to a place inside a field, such as an object's property, the focus lands on the control at that place, where it went to the field's first control and typing landed in another property than the one the answer keys acted on. `stepReview` lands the same way.
 
 **A field of lines is single spaced.** A `text` or `richtext` leaf of `shape: lines` sets its lines flush, as the page prints them, where each line Enter opened stood off the last by the gap between the body's paragraphs. The leaf carries `data-qm-lines`, which `prose.css` keys the rule on.
