@@ -204,7 +204,7 @@ describe('an array of objects', () => {
 		expect(read(q, doc, 'revisions')).toEqual([{ note: 'First cut', pages: 3 }]);
 	});
 
-	it('names a row by its number, and opens each row on its own', () => {
+	it('titles a closed row by its words or else its number, and opens each row on its own', () => {
 		const q = quill();
 		const doc = emptied(q);
 		const { target } = mountEditor(q, doc);
@@ -224,19 +224,27 @@ describe('an array of objects', () => {
 		flushSync();
 		expect(summaries(arr).map((s) => s.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
 
-		// A row's title is its number whatever it holds, the same words open or collapsed,
-		// and the title it draws is inside the name it is spoken by.
-		const titles = rows.map((r) => r.querySelector('.qm-element-title')?.textContent?.trim());
-		expect(titles).toEqual([S.elementItem(1), S.elementItem(2)]);
+		// A closed row with words to show draws them in place of its number, and an open
+		// one its number; the name it is spoken by keeps the number either way.
+		const heads = () =>
+			summaries(arr).map((r) =>
+				r.querySelector(':is(.qm-element-title, .qm-element-preview)')?.textContent?.trim()
+			);
+		expect(heads()).toEqual(['Fig. 2 relabelled', S.elementItem(2)]);
+		expect(rows[0].querySelector('.qm-element-title')).toBeNull();
 		rows.forEach((r, k) => {
 			expect(r.getAttribute('aria-label')).toBe(S.elementUntitled('Revisions', k + 1));
-			expect(r.getAttribute('aria-label')!.toLowerCase()).toContain(titles[k]!.toLowerCase());
 		});
+		expect(rows[1].getAttribute('aria-label')!.toLowerCase()).toContain(
+			S.elementItem(2).toLowerCase()
+		);
 
 		// Pressing an open row closes it, so an array can rest with nothing unfolded.
 		rows[1].click();
 		flushSync();
 		expect(summaries(arr).map((s) => s.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
+		// A closed row with no words to show keeps its number.
+		expect(heads()).toEqual(['Fig. 2 relabelled', S.elementItem(2)]);
 	});
 
 	it('draws a list of one record open on mount', () => {

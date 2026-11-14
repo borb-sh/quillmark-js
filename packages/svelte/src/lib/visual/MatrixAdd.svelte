@@ -2,8 +2,7 @@
  An open matrix's add box (INVARIANTS §"The matrix"): a plain text input. Enter adds
  what was typed, trimmed, and clears the box, and so does the focus leaving it: words
  typed there are an item, not a draft a click elsewhere discards. Escape clears it
- unadded. It is drawn as the item
- it adds, unwritten: the plus in the tick's column and the words in the title's.
+ unadded. It is a box the width of the list, the plus inside it at its start.
 -->
 <script lang="ts">
 	import Icon from './icons/Icon.svelte';
@@ -66,21 +65,22 @@
 	.qm-matrix-add {
 		min-width: 0;
 	}
-	/* An added item's head (`MatrixField.svelte`): the glyph a tick's width at the
-	 tick's place, the gap after it the head's, and the input pulled back over that gap
-	 by its own inset, so its words start where the titles above them do. A `<label>`,
-	 so a press on the glyph lands in the box. */
+	/* The glyph stands inside the box, at its start inset, as a list's standing row draws
+	 its words inside its own: the box is the whole row, and the input's words start a
+	 gap past the glyph. A `<label>`, so a press on the glyph lands in the box. */
 	.qm-matrix-add-field {
+		position: relative;
 		display: flex;
 		align-items: center;
-		gap: var(--_qm-space-2);
 		min-width: 0;
 	}
 	.qm-matrix-add :global(.qm-matrix-add-glyph) {
-		flex-shrink: 0;
+		position: absolute;
+		inset-inline-start: var(--_qm-space-3);
 		width: var(--_qm-glyph-control);
 		height: var(--_qm-glyph-control);
 		color: var(--_qm-ink-label);
+		pointer-events: none;
 	}
 	/* At rest the box is the add chip it stands in for: no well, and its words at the
 	 label ink in full, as the add chip's are: words take the text floor, not the rest rung
@@ -88,8 +88,7 @@
 	.qm-matrix-add-field .qm-input {
 		flex: 1;
 		min-width: 0;
-		margin-inline-start: calc(-1 * var(--_qm-space-2));
-		padding-inline-start: var(--_qm-space-2);
+		padding-inline-start: calc(var(--_qm-space-3) + var(--_qm-glyph-control) + var(--_qm-space-2));
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
 	}
 	.qm-matrix-add-field .qm-input:placeholder-shown:not(:focus) {

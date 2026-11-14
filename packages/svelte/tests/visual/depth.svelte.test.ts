@@ -58,7 +58,7 @@ describe('a nested array property', () => {
 		);
 	});
 
-	it('shows a collapsed row its record’s first text cell after the title, and drops it open', () => {
+	it('shows a collapsed row its record’s first text cell in place of the title, and its title open', () => {
 		const q = quill();
 		const doc = example();
 		const outer = appendices(mountEditor(q, doc).target);
@@ -68,9 +68,13 @@ describe('a nested array property', () => {
 		expect(previews()).toEqual(tree.map((a) => a.title));
 		// The preview is no part of the row's name.
 		expect(summaryTexts(outer)).toEqual(tree.map((_, k) => S.elementUntitled('Appendices', k + 1)));
+		const titles = () =>
+			summaries(outer).map((s) => s.querySelector('.qm-element-title')?.textContent);
+		expect(titles()).toEqual(tree.map(() => undefined));
 		summaries(outer)[0].click();
 		flushSync();
 		expect(previews()).toEqual([undefined, ...tree.slice(1).map((a) => a.title)]);
+		expect(titles()).toEqual([S.elementItem(1), ...tree.slice(1).map(() => undefined)]);
 	});
 
 	it('opens one entry at a time, two rungs in, and commits the whole tree by value', () => {
