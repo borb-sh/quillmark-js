@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`revealReview` with `{ focus: true }` focuses the control drawing a change inside a field.** For a change to a place inside a field, such as an object's property, the focus lands on the control at that place, where it went to the field's first control and typing landed in another property than the one the answer keys acted on. `stepReview` lands the same way.
+
 **A list of one element draws no drag handle.** A record's row, a table's row and a line stand without the grip, its tip and its grab cursor while the list holds nothing to move them past, and draw it once a second element is added. Alt+↑/↓ is unchanged.
 
 **A drag handle comes up on the row the pointer is over or the focus is in.** It rests hidden otherwise, on a device with no hover as well, where every handle stood drawn.
