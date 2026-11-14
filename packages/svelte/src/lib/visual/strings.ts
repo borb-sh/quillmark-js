@@ -181,6 +181,8 @@ export interface VisualStrings
 	matrixItemTitle: (list: string, index: number) => string;
 	/** An added item's remove control, named for the item. */
 	matrixRemove: (title: string) => string;
+	/** A held item's disclosure, named for the item: it opens and closes its details. */
+	matrixDetails: (title: string) => string;
 
 	// ── Date control ──────────────────────────────────────────────────────────
 	/** The date field's toggle, pressed while the field holds `today`: the render
@@ -427,6 +429,7 @@ export const DEFAULT_VISUAL_STRINGS: VisualStrings = {
 	matrixAdd: (list) => (list ? `Add to ${list}…` : 'Add…'),
 	matrixItemTitle: (list, index) => `${list ? `${list} item` : 'Item'} ${index}`,
 	matrixRemove: (title) => `Remove ${title}`,
+	matrixDetails: (title) => `${title} details`,
 	dateToday: 'Today',
 	optionalGhost: 'None',
 	proseHeld: "This field has formatting it can't edit here. It is kept as it is.",

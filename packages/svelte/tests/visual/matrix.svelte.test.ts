@@ -160,6 +160,35 @@ describe('a matrix field', () => {
 		expect(stored(doc)).toEqual({ fonts: true, margins: { note: 'x', severity: 'major' } });
 	});
 
+	it('folds a stored held item to its line, and opens it on its disclosure or a tick', () => {
+		const q = quill();
+		const doc = q.seedDocument();
+		doc.unchecked.storeField('checks', { spelling: { note: 'Two typos', severity: 'minor' } });
+		const m = matrix(mountEditor(q, doc).target);
+		const spelling = member(m, titles.spelling);
+		const summary = () => spelling.querySelector<HTMLButtonElement>('.qm-member-summary')!;
+		const tail = () => spelling.querySelector('.qm-member-tail')?.textContent;
+
+		expect(spelling.querySelector('.qm-object')).toBeNull();
+		expect(summary().getAttribute('aria-expanded')).toBe('false');
+		expect(tail()).toBe('Two typos');
+
+		summary().click();
+		flushSync();
+		expect(spelling.querySelector('.qm-object')).not.toBeNull();
+		expect(summary().getAttribute('aria-expanded')).toBe('true');
+		expect(tail()).toBe('');
+
+		summary().click();
+		flushSync();
+		expect(spelling.querySelector('.qm-object')).toBeNull();
+
+		// A tick opens what it holds: the details are what the author came to fill.
+		tick(m, titles.fonts).click();
+		flushSync();
+		expect(member(m, titles.fonts).querySelector('.qm-object')).not.toBeNull();
+	});
+
 	it('keys as a checkbox group: every tick a tab stop, and no arrow walk', () => {
 		const q = quill();
 		const mounted = mountEditor(q, q.seedDocument());
