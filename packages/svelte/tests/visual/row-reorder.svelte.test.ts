@@ -84,6 +84,21 @@ describe('reorder on an object row', () => {
 		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
 	});
 
+	it('draws no grip on a lone element, and draws it once a second one is added', async () => {
+		const q = quill();
+		const doc = example();
+		doc.unchecked.storeField('revisions', [{ note: 'A', pages: 1 }]);
+		const arr = revisions(mountEditor(q, doc).target);
+		const grips = () => rows(arr).map((row) => row.querySelector('.qm-row-handle-bar'));
+		expect(handle(arr, 0).hasAttribute('data-qm-tip')).toBe(false);
+		expect(grips()).toEqual([null]);
+
+		arr.querySelector<HTMLButtonElement>('.qm-add-el')!.click();
+		await settle();
+		expect(grips()).toHaveLength(2);
+		expect(grips().every((g) => g != null)).toBe(true);
+	});
+
 	it('marks the lifted row and the drop while the drag is held, and leaves no trace', () => {
 		const q = quill();
 		const doc = threeRows();
