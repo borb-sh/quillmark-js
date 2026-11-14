@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.138.0.** A newline inside a paragraph prints as a line break, so a body wrapped across source lines prints its wraps, and a `text` or `richtext` field declares `shape: line | lines | blocks` where it declared `multiline`, which `check` reports as `quill::deprecated_multiline` (Quillmark's 0.137 → 0.138 migration).
+
 **The app prints.** A **Print** button beside **Download PDF** hands the same PDF to the browser's print dialog, opening it in a tab to print from on a phone and in Safari.
 
 ## v0.24.0 - 2026-11-09
