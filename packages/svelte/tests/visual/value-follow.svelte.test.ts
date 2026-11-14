@@ -36,7 +36,6 @@ main:
       type: array
       items:
         type: richtext
-        shape: blocks
       default: []
     jobs:
       type: array
@@ -124,7 +123,7 @@ describe('a by-value prose leaf over an external write', () => {
 		const leaf = noteLeaf(mounted);
 		expect(leaf.getAttribute('contenteditable')).toBe('true');
 
-		q.writer(doc).set('notes', [LIST]);
+		doc.unchecked.storeField('notes', [core.importMarkdown(LIST).content]);
 		rederive(mounted);
 		expect(leaf.getAttribute('contenteditable')).toBe('false');
 		expect(heldNote(leaf)).not.toBeNull();

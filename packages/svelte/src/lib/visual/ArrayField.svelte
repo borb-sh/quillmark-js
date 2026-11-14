@@ -50,7 +50,7 @@
  caret there, and short of a prose line's end splits the line there, as a bulleted list
  does; a paste of several lines into a prose row opens a row per line; Backspace at a
  prose line's start joins it onto the line above and Delete at its end joins the next
- onto it, each one commit; Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
+ onto it, each one commit. A prose element whose `items` declares a `shape` holds lines of its own, so Enter breaks a line inside it and ⌘/Ctrl+Enter inserts the sibling, and a paste stays in the element. Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
  anywhere in a row of the list moves it, the nearest row answering and never
  the record around a nested one: the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
@@ -107,7 +107,9 @@
 		firstShortText,
 		declaredContent,
 		fieldTitle,
+		linesOnly,
 		literalText,
+		oneLine,
 		renderedBoolean,
 		schemaAt,
 		textCap,
@@ -219,6 +221,9 @@
 	// `contentAt` whatever the element rests as. An array declaring no `items`
 	// has text elements.
 	const control = $derived(items ? controlKind(items) : 'text');
+	/** A prose element whose `items` declares a `shape`: its own lines, which Enter breaks and
+	 *  ⌘/Ctrl+Enter leaves for a sibling. */
+	const multiline = $derived(control === 'prose' && items != null && !oneLine(items));
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
 	/** A column's track. A cell that fills its width takes a share of what the field has
@@ -895,6 +900,7 @@
 			return;
 		}
 		if (e.key === 'Enter') {
+			if (multiline && !(e.ctrlKey || e.metaKey)) return;
 			e.preventDefault();
 			insertAfter(k, column);
 		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target, column)) {
@@ -1172,15 +1178,19 @@
 							value={arr[k]}
 							proposed={rowText(k)}
 							plaintext={items != null && literalText(items)}
+							block={multiline}
+							paragraphs={items != null && linesOnly(items)}
 							cap={textCap(items)}
 							label={rowName(k)}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
 							onChange={(rt) => commitElement(k, rt)}
-							lines={{
-								room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
-								onLines: (rt, below, caret) => spill(k, rt, below, caret),
-								onJoin: (dir) => join(dir < 0 ? k - 1 : k)
-							}}
+							lines={multiline
+								? undefined
+								: {
+										room: () => (max == null ? Infinity : max - Math.max(arr.length, 1)),
+										onLines: (rt, below, caret) => spill(k, rt, below, caret),
+										onJoin: (dir) => join(dir < 0 ? k - 1 : k)
+									}}
 							onKey={(e) => onElementKey(e, k)}
 						/>
 					{:else if control === 'number'}
@@ -1291,6 +1301,8 @@
 					content={() => asContent(after)}
 					value={after}
 					plaintext={items != null && literalText(items)}
+					block={multiline}
+					paragraphs={items != null && linesOnly(items)}
 					label={rowName(k)}
 					onChange={() => {}}
 				/>

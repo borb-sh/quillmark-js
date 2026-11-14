@@ -44,13 +44,11 @@ main:
       type: array
       items:
         type: richtext
-        shape: blocks
       default: []
     errata:
       type: array
       items:
         type: text
-        shape: lines
       default: []
     jobs:
       type: array
@@ -329,7 +327,7 @@ describe('the formatting popover over a by-value prose leaf', () => {
 		expect(leaf.getAttribute('contenteditable')).toBe('true');
 		expect(editor.getActiveLeaf()?.views.view.dom).toBe(leaf);
 
-		q.writer(doc).set('notes', [LIST, 'Second note']);
+		doc.unchecked.storeField('notes', [core.importMarkdown(LIST).content, 'Second note']);
 		rederive(mounted);
 		expect(leaf.getAttribute('contenteditable')).toBe('false');
 		expect(editor.getActiveLeaf()).toBeUndefined();

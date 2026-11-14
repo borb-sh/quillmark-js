@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 // A block `richtext` cell on a record row takes the block schema and the whole row, so
 // a list it holds survives an edit, and a `shape: lines` `text` cell takes the
-// plain schema and the whole row, so an address keeps its lines. A leaf narrowed to one
-// textblock over content that holds more is read-only and commits nothing, so no
-// keystroke writes the flattening back. The reference quill declares none of these
-// shapes, so the probe is its own quill.
+// plain schema and the whole row, so an address keeps its lines. A one-line leaf over
+// content that holds more is read-only and commits nothing, so no keystroke writes the
+// flattening back. The reference quill declares none of these shapes, so the probe is
+// its own quill.
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Content, Document } from '@quillmark/wasm';
@@ -48,13 +48,16 @@ main:
       type: array
       items:
         type: richtext
-        shape: blocks
       default: []
     tags:
       type: array
       items:
         type: text
-        shape: lines
+      default: []
+    labels:
+      type: array
+      items:
+        type: text
       default: []
 `;
 const probe = () => quillFromYaml(YAML);
@@ -78,6 +81,7 @@ const load = (): Document =>
 			'tags:',
 			'  - |',
 			'    plain block scalar',
+			'labels:',
 			'  - |-',
 			'    12 Main St',
 			'    Springfield',
@@ -178,11 +182,11 @@ describe('a narrowed leaf over structure it cannot hold', () => {
 		expect(mounted.changes).toEqual([]);
 	});
 
-	it('holds a multi-line text element, one textblock whatever it declares', () => {
+	it('holds a multi-line value in a one-line text element', () => {
 		const q = probe();
 		const doc = load();
 		const mounted = mountEditor(q, doc);
-		const leaf = field(mounted.target, 'Tags').querySelectorAll<HTMLElement>('.ProseMirror')[1];
+		const leaf = field(mounted.target, 'Labels').querySelector<HTMLElement>('.ProseMirror')!;
 
 		expect(leaf.getAttribute('contenteditable')).toBe('false');
 		expect(heldNote(leaf)).not.toBeNull();

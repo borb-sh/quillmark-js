@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A field of lines is single spaced.** A `text` or `richtext` leaf of `shape: lines` sets its lines flush, as the page prints them, where each line Enter opened stood off the last by the gap between the body's paragraphs. The leaf carries `data-qm-lines`, which `prose.css` keys the rule on.
+
+**An element of a list holds the lines its `items` declare.** A list whose `items` declares `shape: lines` or `blocks` mounts each element as its scalar field of that shape mounts, where every element edited as one line and one holding a line break was held read-only. In such an element Enter breaks a line and ⌘/Ctrl+Enter inserts the next element, and a paste of several lines stays in the element; a list of one-line elements keeps Enter's insert, split and the paste into rows.
+
 ## v0.37.0 - 2026-11-14
 
 **On `@quillmark/wasm` 0.138.** The peer range is `>=0.138.0-0`. A field's line shape is read from the schema's `shape`, absent on one line, `"lines"` or `"blocks"`, where it was read from `multiline`; a quill that still spells `multiline:` loads through 0.138 with a warning and draws as before. A newline inside a paragraph of Markdown is a line break there, so a body or a `richtext` value hard-wrapped in its source opens with a break at each wrap (Quillmark's 0.137 → 0.138 migration).

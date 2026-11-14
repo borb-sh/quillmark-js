@@ -58,6 +58,7 @@
 		heldAttributes,
 		joinLines,
 		leafSchema,
+		isParagraphsSchema,
 		pastedLines,
 		pmToContent,
 		proseAttributes,
@@ -278,7 +279,8 @@
 			// Which of `aria-label` / `aria-labelledby` wins is the codec's one answer
 			// (`proseAttributes`), so a cell carrying a label element and a row carrying
 			// none cannot name their regions by different rules.
-			const plainNamed = () => proseAttributes(names(), !inline);
+			const lineLeaf = isParagraphsSchema(leafSchema({ plaintext, inline, paragraphs }));
+			const plainNamed = () => proseAttributes(names(), !inline, lineLeaf);
 			const heldNamed = () => heldAttributes(names(), heldId);
 			const build = (rt: Content): EditorState => {
 				// The same keymap and plugin stack a `createField` leaf mounts (shared
