@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A list of one element draws no drag handle.** A record's row, a table's row and a line stand without the grip, its tip and its grab cursor while the list holds nothing to move them past, and draw it once a second element is added. Alt+↑/↓ is unchanged.
+
 ## v0.37.0 - 2026-11-14
 
 **On `@quillmark/wasm` 0.138.** The peer range is `>=0.138.0-0`. A field's line shape is read from the schema's `shape`, absent on one line, `"lines"` or `"blocks"`, where it was read from `multiline`; a quill that still spells `multiline:` loads through 0.138 with a warning and draws as before. A newline inside a paragraph of Markdown is a line break there, so a body or a `richtext` value hard-wrapped in its source opens with a break at each wrap (Quillmark's 0.137 → 0.138 migration).
