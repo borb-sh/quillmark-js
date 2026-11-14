@@ -2347,18 +2347,20 @@
 	}
 	/* A card proposed new and a card proposed taken out, in the review's one hue: a preview
 	   where the new card would stand, the card's own ground under the tint, and a mark round
-	   the whole of a card that would go, its values struck as a removed row's are. The
-	   current one's mark is a step stronger, as a current proposal's words are. */
+	   the whole of a card that would go, its values struck as a removed row's are. An edge
+	   is dashed at rest and solid and a step heavier on the current one, so the one the
+	   answer card is for is told from the open ones round it by more than strength. */
 	.qm-review-card-remove {
 		display: contents;
 	}
 	.qm-review-card-remove.qm-review-on {
 		display: block;
 		border-radius: var(--_qm-radius);
-		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		outline: var(--_qm-border-width) dashed var(--_qm-review-line);
 	}
 	.qm-review-card-remove.qm-review-lit {
-		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
+		outline-style: solid;
+		outline-width: var(--_qm-vertical-width);
 	}
 	.qm-review-head {
 		display: flex;
@@ -2392,7 +2394,8 @@
 		transform: none;
 		border-radius: var(--_qm-radius-inner);
 		background: var(--_qm-review-tint);
-		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		outline: var(--_qm-border-width) dashed var(--_qm-review-line);
+		outline-offset: calc(-1 * var(--_qm-border-width));
 		opacity: 1;
 		pointer-events: none;
 		transition: background-color var(--_qm-duration-fast) var(--_qm-ease-reverse);
@@ -2402,11 +2405,13 @@
 	:global(.qm-review-added-box .qm-toggle)::after {
 		border-radius: inherit;
 	}
-	/* The current one's edge is a step stronger, as a removed card's ring is. */
+	/* The current one's edge is solid and a step heavier, as a removed card's ring is. */
 	:global([data-qm-proposed-lit])::after,
 	:global(.qm-review-lit > .qm-review-added-box :is(.qm-toggle, .qm-tick))::after {
 		background: var(--_qm-review-lit);
-		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
+		outline-style: solid;
+		outline-width: var(--_qm-vertical-width);
+		outline-offset: calc(-1 * var(--_qm-vertical-width));
 	}
 	:global([data-qm-removes]) {
 		text-decoration: line-through;
@@ -2422,21 +2427,25 @@
 	}
 	:global(.qm-review-added-box :is(.qm-control-box, .qm-input)) {
 		background-image: linear-gradient(var(--_qm-review-tint), var(--_qm-review-tint));
-		box-shadow: inset 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		outline: var(--_qm-border-width) dashed var(--_qm-review-line);
+		outline-offset: calc(-1 * var(--_qm-border-width));
 	}
 	:global(.qm-review-lit > .qm-review-added-box :is(.qm-control-box, .qm-input)) {
 		background-image: linear-gradient(var(--_qm-review-lit), var(--_qm-review-lit));
-		box-shadow: inset 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
+		outline-style: solid;
+		outline-width: var(--_qm-vertical-width);
+		outline-offset: calc(-1 * var(--_qm-vertical-width));
 	}
 	/* A row a proposal would take out: no tint, which only ever means "would come", but a ring
 	   in the review line laid outside the row so it takes no room, its values struck and its
 	   labels left alone. The current one's ring is a step stronger, as a removed card's. */
 	:global([data-qm-removed]) {
 		border-radius: var(--_qm-radius-inner);
-		box-shadow: 0 0 0 var(--_qm-border-width) var(--_qm-review-line);
+		outline: var(--_qm-border-width) dashed var(--_qm-review-line);
 	}
 	:global([data-qm-removed-lit]) {
-		box-shadow: 0 0 0 var(--_qm-vertical-width) var(--_qm-review-line);
+		outline-style: solid;
+		outline-width: var(--_qm-vertical-width);
 	}
 	/* What a removed row or card holds is what the reader reads to answer it, so its words
 	   step back to the label ink under the strike, as a struck word does in a paragraph
@@ -2451,21 +2460,11 @@
 		text-decoration-color: var(--_qm-review-line);
 	}
 	@media (forced-colors: active) {
-		:global([data-qm-proposed])::after {
-			border: var(--_qm-border-width) dashed Highlight;
-		}
-		:global([data-qm-proposed-lit])::after {
-			border-style: solid;
-		}
-		:global([data-qm-removed]) {
-			outline: var(--_qm-border-width) dashed Highlight;
-		}
-		:global([data-qm-removed-lit]) {
-			outline-style: solid;
-		}
+		.qm-review-card-remove.qm-review-on,
+		:global([data-qm-proposed])::after,
+		:global([data-qm-removed]),
 		:global(.qm-review-added-box :is(.qm-control-box, .qm-toggle, .qm-tick, .qm-input)) {
-			outline: var(--_qm-border-width) dashed Highlight;
-			outline-offset: calc(-1 * var(--_qm-border-width));
+			outline-color: Highlight;
 		}
 	}
 	.qm-review-card-add.qm-review-lit {

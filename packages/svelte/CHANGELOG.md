@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**The answer card stays out of the next field of a shared row.** A change in a property that shares its row, a group's left column or a table's cell, took the card beside its line at the column's edge, over the value of the property after it. The card stands beside the line only where it fits the property's own slot, and under the row otherwise, at the same edge.
+
+**An open change at rest stands back from the current one.** A control or a row under a proposal has a dashed edge at rest and a solid, heavier one when current, where both were solid, and the resting tint is 12% of the review hue, down from 20%.
+
 **A list of one element draws no drag handle.** A record's row, a table's row and a line stand without the grip, its tip and its grab cursor while the list holds nothing to move them past, and draw it once a second element is added. Alt+↑/↓ is unchanged.
 
 **A drag handle comes up on the row the pointer is over or the focus is in.** It rests hidden otherwise, on a device with no hover as well, where every handle stood drawn.
