@@ -61,7 +61,8 @@ export interface Review {
 	readonly reports: ReadonlyMap<string, ReviewReport>;
 	/** The field items no control draws, each with why. */
 	readonly fieldUndrawn: readonly { id: string; reason: ReviewUndrawn }[];
-	/** The field proposals whose field no longer holds the value their `before` says was read. */
+	/** The field proposals whose field no longer holds the value their `before` says was read,
+	 *  and the removals of a card the reader has written in since they arrived. */
 	readonly fieldOutdated: ReadonlySet<string>;
 	/** The open items drawn, in the page's order. */
 	readonly order: readonly string[];
@@ -98,6 +99,9 @@ export interface Review {
 	answer(ids: readonly string[] | 'all', action: 'accept' | 'dismiss'): string[];
 	/** An edit landed that is no answer's: the answers before it can no longer be taken back. */
 	settled(): void;
+	/** The reader wrote in a field or the body of the card at session key `card`: a removal
+	 *  standing on it is outdated, an answer's own write excepted. */
+	edited(card: string): void;
 	/** A reader's commit of `value` on a control that shows one value, under the proposal `id`:
 	 *  the proposed value accepts it, any other is written and dismisses it, both one answer.
 	 *  False where it could not be made, and the commit is the caller's. */
@@ -306,12 +310,17 @@ export function createReview(source: ReviewSource): Review {
 		return { fields: out, undrawn, moved };
 	});
 	const fields = $derived(placed.fields);
+	/** The removals the reader has written in the card of since they arrived, each by the item
+	 *  it was recorded against, so a list set anew reads its removals afresh. */
+	const touched = new SvelteMap<string, ReviewItem>();
 	/** Each proposal of words a leaf draws, by id: how it stands against what the leaf holds. */
 	const carried = new SvelteMap<string, ValueState>();
-	// A proposal made from a value the field no longer holds would write over the reader's. One a
-	// leaf of words carries is outdated only where the reader's writing meets it.
+	// A proposal made from a value the field no longer holds would write over the reader's, as a
+	// removal would take what the reader wrote in its card. One a leaf of words carries is
+	// outdated only where the reader's writing meets it.
 	const outdated = $derived.by(() => {
 		const out = new Set<string>(placed.moved);
+		for (const item of cards.removes.values()) if (touched.get(item.id) === item) out.add(item.id);
 		for (const { proposed, more } of fields.values())
 			for (const p of proposed ? [proposed, ...(more ?? [])] : [])
 				if ('before' in p && !sameValue(source.valueAt(p.field), p.before)) out.add(p.id);
@@ -528,6 +537,11 @@ export function createReview(source: ReviewSource): Review {
 			offer = undefined;
 			source.undo.settle();
 		},
+		edited(card) {
+			if (writing) return;
+			const item = cards.removes.get(card);
+			if (item && touched.get(item.id) !== item) touched.set(item.id, item);
+		},
 		answerWith(id, value) {
 			const item = byId.get(id);
 			if (!item || !onField(item)) return false;
@@ -590,6 +604,7 @@ const NO_REVIEW: Review = {
 	act: () => false,
 	answer: () => [],
 	settled() {},
+	edited() {},
 	answerWith: () => false,
 	planned() {},
 	current: () => undefined,

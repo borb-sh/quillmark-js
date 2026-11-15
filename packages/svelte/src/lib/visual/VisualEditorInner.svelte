@@ -236,6 +236,7 @@
 	function report(source: ChangeSource, cardId?: CardId, at?: Addr | number, op?: CardOp): void {
 		const path =
 			at == null ? undefined : typeof at === 'number' ? cardPath(at, liveKinds()) : pathFor(at);
+		if (source !== 'structure' && cardId !== undefined) reviewing.edited(cardId);
 		reviewing.settled();
 		onChange?.({ source, cardId, path, ...(op ? { op } : {}) });
 	}
@@ -418,6 +419,8 @@
 			if (write && item && onField(item)) {
 				back = takeField(item, write);
 				if (!back) return false;
+				const card = reviewed(item.field)?.card;
+				if (typeof card === 'string') reviewing.edited(card);
 			} else if (action === 'accept' && item && (onField(item) || byCard(item))) {
 				back = onField(item) ? takeField(item) : takeCard(item);
 				if (!back) return false;
@@ -856,6 +859,7 @@
 		const cardId = cardIdOf(plain);
 		if (cardId == null) return;
 		refreshTitle(plain, cardId);
+		reviewing.edited(cardId);
 		reviewing.settled();
 		onChange?.({ source: 'prose', cardId, path: pathFor(plain) });
 	}
@@ -2463,6 +2467,21 @@
 			:is(.qm-control-box:not(.qm-element-summary), .qm-input, .qm-prose, .qm-element-preview)
 	) {
 		color: var(--_qm-ink-label);
+	}
+	/* The strike falls on a value alone, never on the box holding it, which would carry it onto
+	   an empty field's hint and a button's label: a strike drawn on a box reaches every word
+	   in it. A date's segments are a value only once none of them is a hint. */
+	:global(
+		:is([data-qm-removed], .qm-review-card-remove.qm-review-on)
+			:is(
+				.qm-input:not(:placeholder-shown),
+				.ProseMirror > :not(.qm-prose-placeholder),
+				.qm-select:not([data-ghosted='']) .qm-select-shown,
+				.qm-date:not(:has([data-ghosted='hint'])) .qm-date-segment,
+				.qm-date-unread,
+				.qm-element-preview
+			)
+	) {
 		text-decoration: line-through;
 		text-decoration-color: var(--_qm-review-line);
 	}
