@@ -117,7 +117,7 @@
 	import {
 		numberProposal,
 		putsIn,
-		textProposal,
+		textsOf,
 		type TextProposal,
 		splitReview,
 		valueIn,
@@ -295,11 +295,17 @@
 		scalar || control === 'prose'
 			? ownReview(k).find((e) => e.item.after !== undefined)?.item
 			: undefined;
-	const rowText = (k: number): TextProposal | undefined =>
-		control === 'prose' ? textProposal(rowOwn(k)) : undefined;
+	const rowText = (k: number): TextProposal[] | undefined =>
+		control === 'prose'
+			? textsOf(
+					ownReview(k)
+						.filter((e) => e.item.after !== undefined)
+						.map((e) => e.item)
+				)
+			: undefined;
 	const rowNumber = (k: number): { id: string; after: string } | undefined =>
 		control === 'number' ? numberProposal(rowOwn(k)) : undefined;
-	const rowWorded = (k: number): { id: string } | undefined => rowText(k) ?? rowNumber(k);
+	const rowWorded = (k: number): { id: string } | undefined => rowText(k)?.[0] ?? rowNumber(k);
 	const rowShown = (k: number): unknown => {
 		const own = rowWorded(k) ? undefined : rowOwn(k);
 		return own ? own.after : arr[k];
@@ -313,8 +319,8 @@
 	};
 	/** A row's marks: its proposals less the one its control draws as words. */
 	const rowMarks = (k: number): DeepReview[] => {
-		const text = rowWorded(k);
-		return text ? rowKept(k).filter((e) => e.item.id !== text.id) : rowKept(k);
+		const drawn = new Set([...(rowText(k) ?? []), rowNumber(k)].map((p) => p?.id));
+		return rowKept(k).filter((e) => !drawn.has(e.item.id));
 	};
 	/** What a row taken out carries: its item's id and the current one lit, so the row is where
 	 *  the answer card stands. */

@@ -1,4 +1,4 @@
-// A field's whole proposed value, drawn as a word diff over a leaf of lines: the words Accept would
+// A field's proposed values, a whole one or each run of one answer, drawn as a word diff over a leaf of lines: the words Accept would
 // strike struck where they stand, the words it would write tinted beside them in their own
 // formatting, nothing written. What is drawn is the difference between the leaf as it reads and
 // what Accept would write (`planValue`), so the reader's words beside a proposal stay unstruck.
@@ -53,13 +53,27 @@ function inserted(schema: Schema, c: Content, from: number, to: number): Node {
 
 function draw(
 	state: EditorState,
-	p: ValueProposal,
+	proposals: readonly ValueProposal[],
 	planned?: (id: string, state: ValueState) => void
 ): DecorationSet {
 	const scan = scanDoc(state.doc);
 	const live = scanContent(scan);
 	const index = lineIndexOf(scan);
 	const at = (offset: number): number => offsetToPM(index, offset);
+	return DecorationSet.create(
+		state.doc,
+		proposals.flatMap((p) => decorations(state, live, at, p, planned))
+	);
+}
+
+/** One proposal's marks over the leaf as it reads, `live`. */
+function decorations(
+	state: EditorState,
+	live: Content,
+	at: (offset: number) => number,
+	p: ValueProposal,
+	planned?: (id: string, state: ValueState) => void
+): Decoration[] {
 	const { merged, outdated } = planValue(p.before, live, p.after);
 	const changes = valueChanges(live, merged);
 	planned?.(p.id, !changes.length ? 'applied' : outdated ? 'outdated' : 'open');
@@ -95,23 +109,24 @@ function draw(
 			)
 		);
 	});
-	return DecorationSet.create(state.doc, decos);
+	return decos;
 }
 
 /**
- * The plugin, reading the proposal live: a caller that moves it redraws with `setProps`.
- * `planned` hears, on each draw, how the proposal stands against what the leaf holds.
+ * The plugin, reading the proposals live: a caller that moves them redraws with `setProps`.
+ * Each is a run of one answer or a whole value, drawn apart. `planned` hears, on each draw, how
+ * each stands against what the leaf holds.
  */
 export function valueDiffPlugin(
-	read: () => ValueProposal | undefined,
+	read: () => readonly ValueProposal[],
 	planned?: (id: string, state: ValueState) => void
 ): Plugin {
 	return new Plugin({
 		key: valueDiffKey,
 		props: {
 			decorations(state) {
-				const p = read();
-				return p ? draw(state, p, planned) : null;
+				const proposals = read();
+				return proposals.length ? draw(state, proposals, planned) : null;
 			}
 		}
 	});

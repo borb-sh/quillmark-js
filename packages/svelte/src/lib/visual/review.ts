@@ -468,6 +468,16 @@ export function textProposal(
 	return { id: item.id, after, ...(before && { before }) };
 }
 
+/** A place's proposals over a leaf of words, each run of one answer, or `undefined` where any
+ *  of them is not words or there are none. */
+export function textsOf(
+	items: readonly FieldProposal[],
+	cleared?: Content
+): TextProposal[] | undefined {
+	const list = items.map((item) => textProposal(item, cleared));
+	return list.length && list.every((p) => p !== undefined) ? (list as TextProposal[]) : undefined;
+}
+
 /** A number's proposal, drawn over its input as the struck and the proposed figures; `undefined`
  *  for one that clears it, which the input shows as what Accept leaves. */
 export function numberProposal(

@@ -137,8 +137,9 @@
 		 * array repeater's Enter/Backspace (`ArrayField`). Fires before the view's own
 		 * keymap, so the state it reads is the one this keystroke has yet to change. */
 		onKey?: (e: KeyboardEvent) => void;
-		/** A whole proposed value for a leaf of lines, drawn over its text as a word diff. */
-		proposed?: TextProposal;
+		/** Proposed values over the leaf's words, a whole one or each run of one answer, drawn
+		 *  over its text as a word diff. */
+		proposed?: readonly TextProposal[];
 	}
 	let {
 		content,
@@ -159,17 +160,17 @@
 	}: Props = $props();
 
 	const reviewing = review();
-	/** The proposal the value-diff plugin reads, and the view it redraws. */
-	let drawnProposal: ValueProposal | undefined;
+	/** The proposals the value-diff plugin reads, and the view it redraws. */
+	let drawnProposals: readonly ValueProposal[] = [];
 	let redraw: (() => void) | undefined;
 	$effect(() => {
-		drawnProposal = proposed ? { ...proposed, lit: reviewing.lit === proposed.id } : undefined;
+		drawnProposals = (proposed ?? []).map((p) => ({ ...p, lit: reviewing.lit === p.id }));
 		redraw?.();
 	});
 	$effect(() => {
-		const id = proposed?.id;
+		const ids = (proposed ?? []).map((p) => p.id);
 		return () => {
-			if (id !== undefined) reviewing.planned(id, undefined);
+			for (const id of ids) reviewing.planned(id, undefined);
 		};
 	});
 
@@ -295,7 +296,7 @@
 								cap,
 								afterHistory: [
 									valueDiffPlugin(
-										() => drawnProposal,
+										() => drawnProposals,
 										(id, state) => reviewing.planned(id, state)
 									)
 								]

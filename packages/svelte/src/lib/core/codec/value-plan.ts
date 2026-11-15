@@ -180,3 +180,94 @@ export function planValue(before: Content | undefined, live: Content, after: Con
 	}
 	return { merged, outdated: false };
 }
+
+/** Unchanged lines that may stand between two runs of changed lines on one proposal. */
+const RUN_GAP = 2;
+
+/** Line `k` of `c`, as a value of its own. */
+function lineOf(c: Content, starts: number[], k: number): { text: string; marks: ContentMark[] } {
+	const from = starts[k];
+	const to = k + 1 < starts.length ? starts[k + 1] - 1 : c.text.length;
+	return { text: c.text.slice(from, to), marks: marksIn(c, from, to, 0) };
+}
+
+/** Where each line of `c` starts. */
+function lineStarts(c: Content): number[] {
+	const out = [0];
+	for (let i = 0; i < c.text.length; i++) if (c.text[i] === '\n') out.push(i + 1);
+	return out;
+}
+
+/**
+ * `after` as one proposal per run of lines it changes in `before`: each `before` with that run
+ * alone written as `after` has it, in reading order. Runs at most two unchanged lines apart are
+ * one. Lines pair by their words and formatting along their longest common run, so a line added
+ * or taken out is one run, never every line below it. A value that holds more than lines of
+ * words, or one that changes a single run, is `[after]`.
+ */
+export function lineRuns(before: Content, after: Content): Content[] {
+	if ([before, after].some(structured)) return [after];
+	const bs = lineStarts(before);
+	const as = lineStarts(after);
+	if (bs.length !== before.blocks.length || as.length !== after.blocks.length) return [after];
+	const key = (c: Content, starts: number[], k: number): string =>
+		JSON.stringify(lineOf(c, starts, k));
+	const bk = bs.map((_, k) => key(before, bs, k));
+	const ak = as.map((_, k) => key(after, as, k));
+	const m = bk.length;
+	const n = ak.length;
+	const lcs = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+	for (let i = m - 1; i >= 0; i--)
+		for (let j = n - 1; j >= 0; j--)
+			lcs[i][j] = bk[i] === ak[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+	const runs: { b: number; be: number; a: number; ae: number }[] = [];
+	let i = 0;
+	let j = 0;
+	let open: { b: number; a: number } | undefined;
+	const close = (): void => {
+		if (!open) return;
+		const last = runs.at(-1);
+		if (last && open.b - last.be <= RUN_GAP) {
+			last.be = i;
+			last.ae = j;
+		} else runs.push({ b: open.b, be: i, a: open.a, ae: j });
+		open = undefined;
+	};
+	while (i < m || j < n) {
+		if (i < m && j < n && bk[i] === ak[j]) {
+			close();
+			i++;
+			j++;
+		} else {
+			open ??= { b: i, a: j };
+			if (j >= n || (i < m && lcs[i + 1][j] >= lcs[i][j + 1])) i++;
+			else j++;
+		}
+	}
+	close();
+	if (runs.length < 2) return [after];
+	return runs.map((run) => {
+		const lines = [
+			...bs.slice(0, run.b).map((_, k) => lineOf(before, bs, k)),
+			...as.slice(run.a, run.ae).map((_, k) => lineOf(after, as, run.a + k)),
+			...bs.slice(run.be).map((_, k) => lineOf(before, bs, run.be + k))
+		];
+		const blocks = [
+			...before.blocks.slice(0, run.b),
+			...after.blocks.slice(run.a, run.ae),
+			...before.blocks.slice(run.be)
+		];
+		let at = 0;
+		const marks: ContentMark[] = [];
+		for (const line of lines) {
+			for (const mark of line.marks)
+				marks.push({ ...mark, start: mark.start + at, end: mark.end + at });
+			at += line.text.length + 1;
+		}
+		const out: Content = { ...before, text: lines.map((l) => l.text).join('\n'), blocks };
+		if (marks.length) out.marks = marks;
+		else delete out.marks;
+		delete out.anchors;
+		return out;
+	});
+}

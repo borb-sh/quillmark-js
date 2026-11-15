@@ -256,9 +256,9 @@ export interface FieldController {
 	 * `text` leaf holds no anchors and draws none.
 	 */
 	setReview(items: readonly TextReview[], lit?: string): void;
-	/** Draw a whole proposed value over a one-line leaf as a word diff, or none
-	 *  (`value-diff.ts`). A leaf that holds blocks draws none. */
-	setValueProposal(p: ValueProposal | undefined): void;
+	/** Draw proposed values over the leaf as a word diff, a whole value or each run of one
+	 *  answer, or none (`value-diff.ts`). */
+	setValueProposals(proposals: readonly ValueProposal[]): void;
 	/** The elements the review item `id` draws, in document order; `[]` for one not drawn. */
 	reviewElements(id: string): HTMLElement[];
 	/** Put the caret in the review item `id` and focus the leaf; false for one not drawn. */
@@ -608,9 +608,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				drew: (report) => opts.onReviewDrawn?.(report)
 			});
 
-	let valueProposal: ValueProposal | undefined;
+	let valueProposals: readonly ValueProposal[] = [];
 	const valueDiff = valueDiffPlugin(
-		() => valueProposal,
+		() => valueProposals,
 		(id, state) => opts.onValuePlanned?.(id, state)
 	);
 
@@ -1050,15 +1050,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				if (!items.some((item) => item.after === markdown)) parsed.delete(markdown);
 			review.refresh(view);
 		},
-		setValueProposal(p: ValueProposal | undefined): void {
-			if (
-				p?.id === valueProposal?.id &&
-				p?.lit === valueProposal?.lit &&
-				JSON.stringify([p?.after, p?.before]) ===
-					JSON.stringify([valueProposal?.after, valueProposal?.before])
-			)
-				return;
-			valueProposal = p;
+		setValueProposals(proposals: readonly ValueProposal[]): void {
+			const key = (list: readonly ValueProposal[]): string =>
+				JSON.stringify(list.map((p) => [p.id, p.lit, p.after, p.before]));
+			if (key(proposals) === key(valueProposals)) return;
+			valueProposals = proposals;
 			view.setProps({});
 		},
 		reviewElements(id: string): HTMLElement[] {
