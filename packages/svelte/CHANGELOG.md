@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.38.0 - 2026-11-15
+
 **A body rewritten whole is the answer, whatever order its proposals are taken in.** The blocks a proposal adds take ids of their own, where they wore the ids of the answer they were read from, so one standing ahead of a kept block of the same id took that id: over a template, accepting a whole-body rewrite, or each of its items in turn, removed an added paragraph in place of a template bullet, which stayed.
 
 **Writing in a card under a proposed removal outdates the removal.** A reader's edit to a field or the body of a card after its removal item arrived marks the removal outdated: the answer card says it changed and `answerReview('all', 'accept')` leaves it open, so the card and what was written in it stay; the removal's own Accept still takes the card out. The removal's strike now falls on the card's values alone, leaving an empty field's hint, such as a date's `mm / dd / yyyy`, and a button's label, such as Today, unstruck.
