@@ -323,11 +323,11 @@
 	 * rather than counted twice.
 	 */
 	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
-	/** A whole proposed value drawn as words over the control's own: a leaf of lines' as a word
-	 *  diff, carried onto what the reader wrote since its writer read it, a number's as the struck
-	 *  and the proposed figures. */
+	/** A whole proposed value drawn as words over the control's own: a text field's as a word
+	 *  diff, whatever its kind, carried onto what the reader wrote since its writer read it, a
+	 *  number's as the struck and the proposed figures. */
 	const texted = $derived(
-		field.control === 'prose' && (field.inline || field.plaintext)
+		field.control === 'prose'
 			? textProposal(proposed, printed ? (ghost as Content) : undefined)
 			: undefined
 	);

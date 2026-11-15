@@ -43,8 +43,7 @@
 		fieldModels,
 		fieldTitle,
 		isContainer,
-		linesOnly,
-		literalText,
+		leafFlags,
 		mountKey,
 		optionalCell,
 		own,
@@ -324,10 +323,7 @@
 			{@const reviewHere = reviewed.below.get(key)}
 			{@const handsDown = isContainer(kind)}
 			{@const ownItem = handsDown ? undefined : reviewHere?.find((e) => !e.steps.length)?.item}
-			{@const textOwn =
-				kind === 'prose' && (shortCell(sub) || literalText(sub) || linesOnly(sub))
-					? textProposal(ownItem, contentDefault(sub))
-					: undefined}
+			{@const textOwn = kind === 'prose' ? textProposal(ownItem, contentDefault(sub)) : undefined}
 			{@const numberOwn = kind === 'number' ? numberProposal(ownItem) : undefined}
 			{@const worded = textOwn ?? numberOwn}
 			{@const shownItem = worded ? undefined : ownItem}
@@ -451,8 +447,8 @@
 									: contentAt([key])}
 							value={shown}
 							fallback={contentDefault(sub)}
-							plaintext={literalText(sub)}
-							paragraphs={linesOnly(sub)}
+							plaintext={leafFlags(sub).plaintext}
+							paragraphs={leafFlags(sub).paragraphs}
 							placeholder={ownItem ? undefined : noneOf(key, sub)}
 							{block}
 							label={named}

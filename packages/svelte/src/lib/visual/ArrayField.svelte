@@ -108,9 +108,7 @@
 		firstShortText,
 		declaredContent,
 		fieldTitle,
-		linesOnly,
-		literalText,
-		oneLine,
+		leafFlags,
 		renderedBoolean,
 		schemaAt,
 		textCap,
@@ -224,7 +222,7 @@
 	const control = $derived(items ? controlKind(items) : 'text');
 	/** A prose element whose `items` declares a `shape`: its own lines, which Enter breaks and
 	 *  ⌘/Ctrl+Enter leaves for a sibling. */
-	const multiline = $derived(control === 'prose' && items != null && !oneLine(items));
+	const multiline = $derived(control === 'prose' && !leafFlags(items).inline);
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
 	/** A column's track. A cell that fills its width takes a share of what the field has
@@ -1178,9 +1176,9 @@
 							content={() => readAt([k])}
 							value={arr[k]}
 							proposed={rowText(k)}
-							plaintext={items != null && literalText(items)}
+							plaintext={leafFlags(items).plaintext}
 							block={multiline}
-							paragraphs={items != null && linesOnly(items)}
+							paragraphs={leafFlags(items).paragraphs}
 							cap={textCap(items)}
 							label={rowName(k)}
 							placeholder={id === standingId ? t.strings.arrayStanding : undefined}
@@ -1302,9 +1300,9 @@
 				<ProseValue
 					content={() => asContent(after)}
 					value={after}
-					plaintext={items != null && literalText(items)}
+					plaintext={leafFlags(items).plaintext}
 					block={multiline}
-					paragraphs={items != null && linesOnly(items)}
+					paragraphs={leafFlags(items).paragraphs}
 					label={rowName(k)}
 					onChange={() => {}}
 				/>

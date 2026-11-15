@@ -163,10 +163,7 @@
 	let drawnProposal: ValueProposal | undefined;
 	let redraw: (() => void) | undefined;
 	$effect(() => {
-		drawnProposal =
-			proposed && (!block || plaintext || paragraphs)
-				? { ...proposed, lit: reviewing.lit === proposed.id }
-				: undefined;
+		drawnProposal = proposed ? { ...proposed, lit: reviewing.lit === proposed.id } : undefined;
 		redraw?.();
 	});
 	$effect(() => {
@@ -296,15 +293,12 @@
 								placeholder: () => drawn.placeholder,
 								leaveStrings: () => t.strings,
 								cap,
-								afterHistory:
-									inline || plaintext || paragraphs
-										? [
-												valueDiffPlugin(
-													() => drawnProposal,
-													(id, state) => reviewing.planned(id, state)
-												)
-											]
-										: []
+								afterHistory: [
+									valueDiffPlugin(
+										() => drawnProposal,
+										(id, state) => reviewing.planned(id, state)
+									)
+								]
 							})
 				});
 			};

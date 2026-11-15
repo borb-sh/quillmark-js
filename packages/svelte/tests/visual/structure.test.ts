@@ -42,8 +42,7 @@ import {
 	addedId,
 	matrixDeclares,
 	matrixEmpty,
-	oneLine,
-	literalText,
+	textKind,
 	mountKey
 } from '$lib/visual/structure';
 import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
@@ -91,15 +90,21 @@ describe('the text field', () => {
 			const tall = f({ type, shape: 'lines' });
 			expect(controlKind(short)).toBe('prose');
 			expect(controlKind(tall)).toBe('prose');
-			expect([oneLine(short), literalText(short)]).toEqual([true, true]);
-			expect([oneLine(tall), literalText(tall)]).toEqual([false, true]);
+			expect(textKind(short)).toEqual({ type: 'text', shape: 'line' });
+			expect(textKind(tall)).toEqual({ type: 'text', shape: 'lines' });
 		}
 	});
 
 	it('reads a `richtext` shape off `shape`, absent on one line', () => {
-		expect(oneLine(f({ type: 'richtext' }))).toBe(true);
-		expect(oneLine(f({ type: 'richtext', shape: 'blocks' }))).toBe(false);
-		expect(literalText(f({ type: 'richtext' }))).toBe(false);
+		expect(textKind(f({ type: 'richtext' }))).toEqual({ type: 'richtext', shape: 'line' });
+		expect(textKind(f({ type: 'richtext?', shape: 'blocks' }))).toEqual({
+			type: 'richtext',
+			shape: 'blocks'
+		});
+	});
+
+	it('reads no text kind off a field that is not text', () => {
+		expect(textKind(f({ type: 'number' }))).toBeUndefined();
 	});
 
 	it('projects one-line `text` as a packable leaf, and multiline as block', () => {

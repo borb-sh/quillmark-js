@@ -48,7 +48,7 @@ export interface FieldModel {
 	label: string;
 	/** Chrome-only; never gates. */
 	description: string | undefined;
-	/** Prose-leaf flags: {@link oneLine}, {@link literalText} and {@link linesOnly}. */
+	/** Prose-leaf flags, from {@link leafFlags}. */
 	inline: boolean;
 	plaintext: boolean;
 	paragraphs: boolean;
@@ -210,26 +210,40 @@ export function baseType(f: QuillFieldSchema): QuillFieldType {
 	return (optionalCell(f) ? f.type.slice(0, -1) : f.type) as QuillFieldType;
 }
 
-/** Whether a content field is one line: one paragraph, no container, no island. A `text`
- *  or `richtext` field is one line unless it declares a `shape`. */
-export function oneLine(f: QuillFieldSchema): boolean {
-	return f.shape === undefined;
+/** A text field's kind: how its characters read, literally (`text`) or as marks (`richtext`), and
+ *  how much it holds, each shape holding all the one before it does. */
+export interface TextKind {
+	type: 'text' | 'richtext';
+	shape: 'line' | 'lines' | 'blocks';
 }
 
-/** Whether a `richtext` field holds formatted lines and no block: `shape: lines`. */
-export function linesOnly(f: QuillFieldSchema): boolean {
-	return baseType(f) === 'richtext' && f.shape === 'lines';
+/** A field's text kind, read once from its schema; `undefined` for a field that is not text. A
+ *  field that declares no `shape` is one line. */
+export function textKind(f: QuillFieldSchema): TextKind | undefined {
+	const type = baseType(f);
+	if (type !== 'text' && type !== 'richtext') return undefined;
+	return { type, shape: f.shape ?? 'line' };
 }
 
-/** Whether a content field's codec is the literal one: `text`. */
-export function literalText(f: QuillFieldSchema): boolean {
-	return baseType(f) === 'text';
+/** What a prose leaf is built from: the kind, spelled as the leaf schema reads it. */
+export function leafFlags(f: QuillFieldSchema | undefined): {
+	inline: boolean;
+	plaintext: boolean;
+	paragraphs: boolean;
+} {
+	const kind = f && textKind(f);
+	return {
+		inline: kind?.shape === 'line',
+		plaintext: kind?.type === 'text',
+		paragraphs: kind?.type === 'richtext' && kind.shape === 'lines'
+	};
 }
 
 /** The character cap a content field's `max:` declares, `undefined` on any other. */
 export function textCap(f: QuillFieldSchema | undefined): TextCap | undefined {
 	if (f?.max == null || controlKind(f) !== 'prose') return undefined;
-	return { max: f.max, trimEnd: literalText(f) && oneLine(f) };
+	const kind = textKind(f);
+	return { max: f.max, trimEnd: kind?.type === 'text' && kind.shape === 'line' };
 }
 
 /**
@@ -257,7 +271,7 @@ export function declaredContent(v: unknown, markdown: boolean): Content | undefi
 }
 
 /** A field's `{#each}` key: its name and what a mounted leaf reads once, its type,
- *  {@link oneLine} and `max:`, and its elements'. A retype or a quill swap that changes
+ *  `shape` and `max:`, and its elements'. A retype or a quill swap that changes
  *  any of them under a name remounts the field, where a kept leaf would commit on the old
  *  schema. */
 export function mountKey(name: string, f: QuillFieldSchema): string {
@@ -605,7 +619,7 @@ export function rankAt(
  */
 export function shortCell(sub: QuillFieldSchema): boolean {
 	const kind = controlKind(sub);
-	if (kind === 'prose') return oneLine(sub);
+	if (kind === 'prose') return textKind(sub)?.shape === 'line';
 	return (
 		kind === 'text' || kind === 'enum' || kind === 'number' || kind === 'boolean' || kind === 'date'
 	);
@@ -718,9 +732,7 @@ export function fieldModels(cardSchema: Pick<QuillCardSchema, 'fields'>): FieldM
 			compact: schema.ui?.compact ?? packsByDefault(control),
 			label: fieldTitle(name, schema),
 			description: schema.description,
-			inline: oneLine(schema),
-			plaintext: literalText(schema),
-			paragraphs: linesOnly(schema)
+			...leafFlags(schema)
 		};
 	});
 }

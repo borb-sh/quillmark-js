@@ -12,7 +12,7 @@ import type {
 } from '@quillmark/wasm';
 import { fieldPathForAddr } from '../core/address.js';
 import { sameValue, type ReviewItem, type ReviewLabel } from './review.js';
-import { VARIANT_DISCRIMINANT, baseType, fieldValues, oneLine } from './structure.js';
+import { VARIANT_DISCRIMINANT, baseType, fieldValues, textKind } from './structure.js';
 
 /** The review an answer makes: the items the editor draws, the cards it adds or takes out
  *  among them. */
@@ -80,7 +80,8 @@ export function proposalsBetween(
 		const fields = schema?.fields ?? {};
 		for (const name of keysOf(fields, before, after)) {
 			const f = fields[name] as QuillFieldSchema | undefined;
-			if (f && baseType(f) === 'richtext' && !oneLine(f)) {
+			const kind = f && textKind(f);
+			if (kind?.type === 'richtext' && kind.shape !== 'line') {
 				blocks(pathOf(at, name), base, addrOf(at, name), answer, addrOf(answerAt, name));
 				continue;
 			}

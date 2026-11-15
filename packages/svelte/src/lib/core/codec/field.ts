@@ -609,13 +609,10 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			});
 
 	let valueProposal: ValueProposal | undefined;
-	const valueDiff =
-		inline || plaintext
-			? valueDiffPlugin(
-					() => valueProposal,
-					(id, state) => opts.onValuePlanned?.(id, state)
-				)
-			: undefined;
+	const valueDiff = valueDiffPlugin(
+		() => valueProposal,
+		(id, state) => opts.onValuePlanned?.(id, state)
+	);
 
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
@@ -749,11 +746,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
 				cap: opts.cap,
-				afterHistory: [
-					anchorPlugin(seededAnchors),
-					...(review ? [review.plugin] : []),
-					...(valueDiff ? [valueDiff] : [])
-				]
+				afterHistory: [anchorPlugin(seededAnchors), ...(review ? [review.plugin] : []), valueDiff]
 			})
 		});
 		return { state: built, index: seedIndex };
@@ -1058,7 +1051,6 @@ export function createField(opts: CreateFieldOpts): FieldController {
 			review.refresh(view);
 		},
 		setValueProposal(p: ValueProposal | undefined): void {
-			if (!valueDiff) return;
 			if (
 				p?.id === valueProposal?.id &&
 				p?.lit === valueProposal?.lit &&
