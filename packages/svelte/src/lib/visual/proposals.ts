@@ -109,7 +109,7 @@ export function proposalsBetween(
 		toAddr: Addr
 	): void => {
 		const was = blocksOf(from, fromAddr);
-		const now = blocksOf(to, toAddr);
+		const now = leading(was, blocksOf(to, toAddr));
 		const nowById = new Map(now.map((b) => [b.id, b]));
 		for (const b of was) {
 			const next = nowById.get(b.id);
@@ -298,6 +298,31 @@ const addrOf = (card?: number, field?: string): Addr => ({
 	...(card !== undefined && { card }),
 	...(field !== undefined && { field })
 });
+
+/**
+ * `now` with the first block's id on the block that is the first block read: a rewrite keeps that
+ * id on whichever block it puts first, so blocks added above the first read as its rewrite.
+ *
+ * Of the blocks ahead of the next one `now` keeps, the first reading as the first block did is it,
+ * or, where the block put first is of another kind, the first of the first block's kind. The block
+ * put first then takes an id `was` does not hold, so it and those after it up to that block are
+ * added before it.
+ */
+function leading(was: readonly BlockRead[], now: BlockRead[]): BlockRead[] {
+	const first = was[0];
+	if (!first || now[0]?.id !== first.id || now[0].markdown === first.markdown) return now;
+	const held = new Set(was.map((b) => b.id));
+	let end = 1;
+	while (end < now.length && !held.has(now[end].id)) end++;
+	const ahead = now.slice(1, end);
+	const at =
+		ahead.findIndex((b) => b.markdown === first.markdown) + 1 ||
+		(now[0].kind !== first.kind && ahead.findIndex((b) => b.kind === first.kind) + 1);
+	if (!at) return now;
+	let added = `${first.id}+`;
+	while (held.has(added)) added += '+';
+	return now.map((b, i) => (i === 0 ? { ...b, id: added } : i === at ? { ...b, id: first.id } : b));
+}
 
 /** The blocks of the value at `addr`, none where it holds none. */
 function blocksOf(doc: Document, addr: Addr): BlockRead[] {

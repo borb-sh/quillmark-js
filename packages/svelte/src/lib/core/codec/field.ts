@@ -798,7 +798,7 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				if (change) {
 					const asked = askCore(oldRt, change);
 					doc.apply(at, change);
-					if (asked.size) adopt();
+					if (asked.size || change.steps.some((step) => 'setBlock' in step)) adopt();
 				}
 			}
 			reconciler.commit(readLeaf(reader, addr));
@@ -876,8 +876,11 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		nodes.forEach((n, i) => {
 			if (n.id === stored[i]) return;
 			tr.setNodeAttribute(n.pos, n.key, stored[i]);
-			// A split's copy of an id the first half keeps is no rename.
-			if (typeof n.id === 'string' && !stored.includes(n.id)) renamed.push([n.id, stored[i]]);
+			if (typeof n.id !== 'string') return;
+			// A split's copy of an id the first half keeps is no rename. A block written above the
+			// first takes the first's id, which leaves the block that held it.
+			const kept = stored.indexOf(n.id);
+			if (kept < 0 || nodes[kept].id !== n.id) renamed.push([n.id, stored[i]]);
 		});
 		renameBlocks(tr, renamed);
 		if (tr.docChanged) view.updateState(view.state.apply(tr.setMeta('addToHistory', false)));

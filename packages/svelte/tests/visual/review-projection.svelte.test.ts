@@ -75,6 +75,22 @@ describe('a review projected into a copy', () => {
 			a.removeCard(3);
 		}));
 
+	it('writes blocks added above the first block ahead of it, as their accept does', async () => {
+		const r = mount((a) => a.revise({}, `## Purpose\n\n${a.toMarkdown({})}`));
+		await settle();
+		const { copy } = project(r);
+		expect(
+			copy
+				.blocks({})
+				.map((b) => b.markdown)
+				.slice(0, 2)
+		).toEqual(['## Purpose', r.doc.blocks({})[0].markdown]);
+		r.editor.answerReview('all', 'accept');
+		await settle();
+		expect(copy.toMarkdown()).toBe(r.doc.toMarkdown());
+		copy.free();
+	});
+
 	it('writes a leaf’s rewrites and additions from the plans its accepts take', () =>
 		writesWhatAcceptWrites((a) => {
 			const [first, , second, last] = a.blocks({});

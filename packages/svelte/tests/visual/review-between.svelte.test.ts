@@ -207,3 +207,75 @@ describe('the host’s list', () => {
 		).toBe(true);
 	});
 });
+
+describe('a body the answer adds to above its first block', () => {
+	const bodyOf = (d: Document): string[] => d.blocks({}).map((b) => b.markdown);
+	const ahead = (added: string, first = (md: string) => md) => {
+		const doc = example();
+		const [lead, ...rest] = doc.toMarkdown({}).split('\n\n');
+		const answer = doc.clone();
+		answer.revise({}, [added, first(lead), ...rest].join('\n\n'));
+		let n = 0;
+		return { doc, answer, items: proposalsBetween(quill(), doc, answer, () => `p${n++}`).items };
+	};
+
+	it.each([
+		['a heading', '## Purpose'],
+		['a paragraph', 'A paragraph the writer adds.'],
+		['a heading and a paragraph', '## Purpose\n\nA paragraph the writer adds.']
+	])('takes %s as one insert before the first block, struck nowhere', async (_, added) => {
+		const { doc, answer, items } = ahead(added);
+		const first = doc.blocks({})[0].id;
+		expect(items).toMatchObject([{ insert: { before: first }, after: added }]);
+		const { editor, target } = mountEditor(quill(), doc, { review: items });
+		await settle();
+		expect(target.querySelector('.qm-review-del')).toBeNull();
+		expect(editor.answerReview(['p0'], 'accept')).toEqual(['p0']);
+		await settle();
+		expect(bodyOf(doc)).toEqual(bodyOf(answer));
+	});
+
+	it('takes a heading above a first block it rewrites as an insert and that rewrite', async () => {
+		const { doc, answer, items } = ahead('## Purpose', (md) => md.replace('full', 'whole'));
+		const first = doc.blocks({})[0].id;
+		expect(items).toMatchObject([
+			{ replace: [first] },
+			{ insert: { before: first }, after: '## Purpose' }
+		]);
+		for (const order of [items, items.toReversed()]) {
+			const doc = example();
+			const { editor } = mountEditor(quill(), doc, { review: items });
+			await settle();
+			for (const { id } of order) expect(editor.answerReview([id], 'accept'), id).toEqual([id]);
+			await settle();
+			expect(bodyOf(doc)).toEqual(bodyOf(answer));
+			unmountAll();
+		}
+	});
+
+	it('draws what is added after a block a rewrite retypes, once the rewrite is taken', async () => {
+		const doc = example();
+		const [first] = doc.blocks({});
+		const items: ReviewItem[] = [
+			{
+				id: 'p0',
+				field: 'main.body',
+				replace: [first.id],
+				before: first.markdown,
+				after: '## Purpose'
+			},
+			{ id: 'p1', field: 'main.body', insert: { after: first.id }, after: first.markdown }
+		];
+		const drawn: ReviewDrawn[] = [];
+		const { editor } = mountEditor(quill(), doc, {
+			review: items,
+			onReviewDrawn: (d) => drawn.push(d)
+		});
+		await settle();
+		expect(editor.answerReview(['p0'], 'accept')).toEqual(['p0']);
+		await settle();
+		expect(drawn.at(-1)).toMatchObject({ open: ['p1'], undrawn: [] });
+		expect(editor.answerReview(['p1'], 'accept')).toEqual(['p1']);
+		expect(bodyOf(doc).slice(0, 2)).toEqual(['## Purpose', first.markdown]);
+	});
+});

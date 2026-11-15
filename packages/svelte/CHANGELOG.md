@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Blocks an answer adds above the body's first block are one insert ahead of it.** `proposalsBetween` proposes them as an `insert` before the first block, which stays as the reader has it, where the store's rewrite keeps the first block's id on whatever block it puts first and they read as the first block rewritten plus that block added back after it: a heading added at the top drew the first paragraph struck and, accepted alone or by `answerReview('all', 'accept')`, removed it. A block the editor writes above the first now hands the first block's id on to the block that held it, and a rewrite that changes a block's kind, a paragraph into a heading, keeps the block's id in the editor as the store does, so a proposal naming that block still draws after either is taken.
+
 ## v0.38.0 - 2026-11-15
 
 **A body rewritten whole is the answer, whatever order its proposals are taken in.** The blocks a proposal adds take ids of their own, where they wore the ids of the answer they were read from, so one standing ahead of a kept block of the same id took that id: over a template, accepting a whole-body rewrite, or each of its items in turn, removed an added paragraph in place of a template bullet, which stayed.
