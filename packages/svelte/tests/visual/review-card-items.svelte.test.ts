@@ -8,7 +8,17 @@ import { REVIEW_KEYS } from '$lib/core/codec';
 import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
 import { proposalsBetween } from '$lib/visual/proposals';
 import { quill, example } from '../helpers/fixtures.js';
-import { mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	leaf,
+	mountEditor,
+	openList,
+	paste,
+	pick,
+	press,
+	settle,
+	trigger,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -138,5 +148,61 @@ describe('a proposed card', () => {
 		await settle();
 		expect(r.events).toEqual([{ id: 'c1', action: 'dismiss' }]);
 		expect(lit()).toBe('c0');
+	});
+});
+
+describe('a removal of a card the reader writes in', () => {
+	const removal = (target: HTMLElement) =>
+		target.querySelector<HTMLElement>('.qm-review-card-remove.qm-review-on')!;
+
+	it('is outdated by writing in its body, so Accept All keeps the card and what was written', async () => {
+		const r = mount((doc) => cardItems(doc));
+		await settle();
+		expect(r.drawn.at(-1)?.outdated).toEqual([]);
+		const body = [...removal(r.target).querySelectorAll<HTMLElement>('.ProseMirror')].at(-1)!;
+		paste(leaf(body), 'Written under the removal.');
+		await settle();
+		expect(r.drawn.at(-1)?.outdated).toEqual(['c1']);
+
+		expect(r.editor.answerReview('all', 'accept')).toEqual(['c0']);
+		await settle();
+		expect(r.doc.cardCount).toBe(example().cardCount + 1);
+		expect(r.doc.toMarkdown()).toContain('Written under the removal.');
+		expect(r.drawn.at(-1)).toMatchObject({ open: ['c1'], outdated: ['c1'] });
+	});
+
+	it('is outdated by a field of its card written, and its own Accept still takes the card out', async () => {
+		const r = mount((doc) => cardItems(doc));
+		await settle();
+		const select = trigger(removal(r.target));
+		const shown = select.textContent?.trim();
+		openList(select);
+		const other = [...document.querySelectorAll<HTMLElement>('.qm-select-item')]
+			.map((el) => el.querySelector('.qm-select-label')?.textContent?.trim())
+			.find((label) => label && label !== shown)!;
+		press(document.body, 'Escape');
+		pick(select, other);
+		await settle();
+		expect(r.drawn.at(-1)?.outdated).toEqual(['c1']);
+
+		expect(r.editor.answerReview(['c1'], 'accept')).toEqual(['c1']);
+		await settle();
+		expect(r.doc.cardCount).toBe(example().cardCount - 1);
+	});
+
+	it('stands as it was over an answer written in its card', async () => {
+		const r = mount((doc) => [
+			{
+				id: 'words',
+				field: doc.pathFor({ card: 3 }),
+				replace: [doc.blocks({ card: 3 })[0].id],
+				after: 'Proposed words.'
+			},
+			{ id: 'take', remove: 3 }
+		]);
+		await settle();
+		expect(r.editor.answerReview(['words'], 'accept')).toEqual(['words']);
+		await settle();
+		expect(r.drawn.at(-1)).toMatchObject({ open: ['take'], outdated: [] });
 	});
 });
