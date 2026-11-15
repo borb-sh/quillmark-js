@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Writing in a card under a proposed removal outdates the removal.** A reader's edit to a field or the body of a card after its removal item arrived marks the removal outdated: the answer card says it changed and `answerReview('all', 'accept')` leaves it open, so the card and what was written in it stay; the removal's own Accept still takes the card out. The removal's strike now falls on the card's values alone, leaving an empty field's hint, such as a date's `mm / dd / yyyy`, and a button's label, such as Today, unstruck.
+
 **A text field draws its proposal as words, whatever its kind and wherever it sits.** A `text` or `richtext` field of any shape strikes the words a whole-value proposal takes out and tints the ones it writes in its own leaf, inside a record or a list as at the top of a card: a memo's recipients or signature block as `richtext` lines, and a revision's rationale as `richtext` blocks, list items included, where each showed the proposed value under a tint with nothing struck.
 
 **`proposalsBetween` proposes a field of lines one run of changed lines at a time, wherever it sits.** A `text` or `richtext` field of one line or of lines takes one item per run of lines the answer changes, each the value read with that run alone written, runs at most two unchanged lines apart one item, and the leaf draws each run as words and takes it alone. A top-level `richtext` of `lines` took one item per paragraph, so an addressee added above the rest read as the first line rewritten plus that line added, and taking only the first dropped an addressee; a field inside a record took one item for every change at once.
