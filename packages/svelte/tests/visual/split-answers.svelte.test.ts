@@ -27,6 +27,9 @@ typst:
   plate_file: plate.typ
 main:
   fields:
+    distribution:
+      type: richtext
+      shape: lines
     header:
       type: object
       properties:
@@ -43,6 +46,7 @@ main:
 `);
 
 interface Header {
+	distribution: string[];
 	memoFor: string[];
 	cc: string[];
 	details: string[];
@@ -51,11 +55,13 @@ interface Header {
 const block = (lines: string[], by: string): string[] =>
 	lines.flatMap((line, k) => (k ? ['', `${by}${line}`] : [`${by}${line}`]));
 
-const memo = ({ memoFor, cc, details }: Header): Document => {
+const memo = ({ distribution, memoFor, cc, details }: Header): Document => {
 	const doc = core.Document.parse(
 		[
 			'~~~',
 			'$quill: split@1.0.0',
+			'distribution: |-',
+			...block(distribution, '  '),
 			'header:',
 			'  memo_for: |-',
 			...block(memoFor, '    '),
@@ -73,9 +79,21 @@ const memo = ({ memoFor, cc, details }: Header): Document => {
 
 const OFFICES = ['1 OG/CC', '2 MXG/CC', '3 MSG/CC', '4 MDG/CC', '5 CS/CC', '6 FSS/CC', '7 LRS/CC'];
 const PARAS = ['Led a team of four.', 'Cut the backlog by half.', 'Ran the audit.'];
-const BASE: Header = { memoFor: OFFICES, cc: ['A', 'B', 'C'], details: PARAS };
+const BASE: Header = {
+	distribution: OFFICES,
+	memoFor: OFFICES,
+	cc: ['A', 'B', 'C'],
+	details: PARAS
+};
 
 const CASES: [string, Header][] = [
+	[
+		'two runs of lines at the top of the card',
+		{
+			...BASE,
+			distribution: OFFICES.map((o, k) => (k === 1 ? '2 OSS/CC' : k === 6 ? '7 CES/CC' : o))
+		}
+	],
 	[
 		'two runs of lines',
 		{ ...BASE, memoFor: OFFICES.map((o, k) => (k === 1 ? '2 OSS/CC' : k === 6 ? '7 CES/CC' : o)) }
@@ -110,6 +128,7 @@ const partly = (answer: Header, part: 0 | 1): string => {
 		return now.filter((v) => was.includes(v) || v === keep.v);
 	};
 	return memo({
+		distribution: pick(BASE.distribution, answer.distribution),
 		memoFor: pick(BASE.memoFor, answer.memoFor),
 		cc: pick(BASE.cc, answer.cc),
 		details: pick(BASE.details, answer.details)
