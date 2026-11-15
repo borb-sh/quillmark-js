@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A cell of rich text lines inside a record draws its proposal as words.** A `richtext` property of `shape: lines`, such as a memo's recipient or signature block, strikes the words a proposal takes out and tints the ones it writes in its own leaf, as a one-line or a multi-line `text` cell does, where it showed the proposed value under a tint with nothing struck.
+**A text field draws its proposal as words, whatever its kind and wherever it sits.** A `text` or `richtext` field of any shape strikes the words a whole-value proposal takes out and tints the ones it writes in its own leaf, inside a record or a list as at the top of a card: a memo's recipients or signature block as `richtext` lines, and a revision's rationale as `richtext` blocks, list items included, where each showed the proposed value under a tint with nothing struck.
 
 **`enumOptionAllowed` reaches an enum inside an object field.** The hook is asked for an enum property of a field's object subform, at any depth and as a plain enum or a variant, with a third argument `steps` naming the properties from the field down to it (`['level']` for `classification.level`), and `enumDisallowed` draws its refused options as it does a field's own. A field's own enum control is asked with `steps` absent. An enum inside a list or matrix cell is still offered whole.
 

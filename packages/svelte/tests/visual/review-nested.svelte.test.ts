@@ -284,12 +284,19 @@ describe('a record in a table', () => {
 	});
 });
 
-describe('a record’s cell of rich text lines', () => {
-	const yaml = `quill:
+describe('a record’s text cell, whatever its kind', () => {
+	const kinds = [
+		['text', 'line'],
+		['text', 'lines'],
+		['richtext', 'line'],
+		['richtext', 'lines'],
+		['richtext', 'blocks']
+	] as const;
+	const yaml = (type: string, shape: string) => `quill:
   name: header
   version: 1.0.0
   backend: typst
-  description: A record holding a cell of rich text lines.
+  description: A record holding a text cell.
 typst:
   plate_file: plate.typ
 main:
@@ -298,8 +305,7 @@ main:
       type: object
       properties:
         recipient:
-          type: richtext
-          shape: lines
+          type: ${type}${shape === 'line' ? '' : `\n          shape: ${shape}`}
 `;
 	const memo = (recipient: string[]): Document =>
 		core.Document.parse(
@@ -310,20 +316,43 @@ main:
 				)
 				.join('\n')
 		);
+	const lines = (shape: string, last: string): string[] =>
+		shape === 'line' ? [`ORG/SYM ${last}`] : ['ORG/SYM', '', last];
 
-	it('draws its change as words in the cell, and is taken as the field', async () => {
-		const q = quillFromYaml(yaml);
-		const doc = memo(['ORG/SYM', '', '123 MXG/CC']);
-		const answer = memo(['ORG/SYM', '', '123 OG/CC']);
+	it.each(kinds)(
+		'draws a %s of %s proposal as words in the cell, and is taken as the field',
+		async (type, shape) => {
+			const q = quillFromYaml(yaml(type, shape));
+			const doc = memo(lines(shape, '123 MXG/CC'));
+			const answer = memo(lines(shape, '123 OG/CC'));
+			q.conform(doc);
+			q.conform(answer);
+			const { items } = proposalsBetween(q, doc, answer, () => 'recipient');
+			const drawn: ReviewDrawn[] = [];
+			const r = mountEditor(q, doc, { review: items, onReviewDrawn: (d) => drawn.push(d) });
+			await settle();
+			const cell = openField(r.target, q.schema.main, 'header').querySelector(
+				'[data-qm-prop="recipient"]'
+			)!;
+			expect(drawnOf(cell, 'recipient')).toEqual(['MXG', 'OG']);
+			expect(drawn.at(-1)?.open).toEqual(['recipient']);
+			answerOn(r.target, 'recipient', 'accept');
+			expect(doc.toMarkdown()).toBe(answer.toMarkdown());
+		}
+	);
+	it('draws a change inside a list of a block cell as words, and is taken as the field', async () => {
+		const q = quillFromYaml(yaml('richtext', 'blocks'));
+		const doc = memo(['Intro.', '', '- one', '- two']);
+		const answer = memo(['Intro.', '', '- one', '- three']);
+		q.conform(doc);
+		q.conform(answer);
 		const { items } = proposalsBetween(q, doc, answer, () => 'recipient');
-		const drawn: ReviewDrawn[] = [];
-		const r = mountEditor(q, doc, { review: items, onReviewDrawn: (d) => drawn.push(d) });
+		const r = mountEditor(q, doc, { review: items });
 		await settle();
 		const cell = openField(r.target, q.schema.main, 'header').querySelector(
 			'[data-qm-prop="recipient"]'
 		)!;
-		expect(drawnOf(cell, 'recipient')).toEqual(['MXG', 'OG']);
-		expect(drawn.at(-1)?.open).toEqual(['recipient']);
+		expect(drawnOf(cell, 'recipient')).toEqual(['two', 'three']);
 		answerOn(r.target, 'recipient', 'accept');
 		expect(doc.toMarkdown()).toBe(answer.toMarkdown());
 	});
