@@ -431,6 +431,19 @@ describe('a proposal by blocks', () => {
 		expect(leaf.doc.main.body.text).toBe('One.\nAdded.\nAdded too.');
 	});
 
+	it('rewrites a block into more that leave every block of the leaf its id', () => {
+		const leaf = leafOver('One.\n\nTwo.');
+		const [one, two] = ids(leaf);
+		leaf.field.setReview([
+			{ id: 'split', replace: [one], after: 'One.\n\nMore.' },
+			{ id: 'drop', replace: [two], after: '' }
+		]);
+		expect(leaf.field.answerReview('split', 'accept')).toBe(true);
+		expect(ids(leaf)).toContain(two);
+		expect(leaf.field.answerReview('drop', 'accept')).toBe(true);
+		expect(leaf.doc.main.body.text).toBe('One.\nMore.');
+	});
+
 	it('rewrites a body whole to one text, whatever order its items are taken in', () => {
 		const body = 'Write here.\n\n- Use bullets.\n\n  - Indent deeper.\n\nYou can **bold**.';
 		const items = (leaf: Leaf): TextReview[] => {
