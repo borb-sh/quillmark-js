@@ -1255,8 +1255,8 @@
 			retype: (kind: string) => retypeCardById(id, kind),
 			rename: (title: string) => renameCardById(id, title),
 			diagFor: (field?: string) => diagByKey.get(leafKey(field)),
-			enumAllowed: (field: string, value: string) =>
-				enumOptionAllowed?.(makeAddr(id, isMain, field), value) ?? true
+			enumAllowed: (field: string, value: string, steps?: readonly PathStep[]) =>
+				enumOptionAllowed?.(makeAddr(id, isMain, field), value, steps) ?? true
 		};
 	}
 

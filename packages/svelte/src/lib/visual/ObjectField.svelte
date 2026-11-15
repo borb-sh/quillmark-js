@@ -130,6 +130,11 @@
 		 * one naming a property draws under that property's control, and one naming
 		 * nothing this subform holds draws at its foot (`diagnostics.ts`). */
 		diagnostics?: readonly DeepDiagnostic[];
+		/** Enum-option policy for an enum property at any depth of this subform, `steps` the
+		 *  properties from here down to it. */
+		optionAllowed?: (value: string, steps: readonly PathStep[]) => boolean;
+		/** How a refused option draws: greyed (default) or left out. */
+		enumDisallowed?: 'hide' | 'disable';
 		/** The review items naming a place inside this subform, each with its steps still to
 		 *  walk: one naming a cell draws under the cell's control, one naming a place inside a
 		 *  record or a list cell is handed to it, and the rest draw under the cell they are in
@@ -150,6 +155,8 @@
 		placed = false,
 		onCellKey,
 		diagnostics,
+		optionAllowed,
+		enumDisallowed,
 		review
 	}: Props = $props();
 
@@ -385,6 +392,8 @@
 							optional={optionalCell(sub)}
 							onCommit={commitCell}
 							proposing={!!shownItem}
+							optionAllowed={optionAllowed && ((v) => optionAllowed(v, [key]))}
+							{enumDisallowed}
 						/>
 					{:else if kind === 'number'}
 						<NumberField
@@ -483,6 +492,8 @@
 							value={obj[key] as Record<string, unknown> | undefined}
 							properties={sub.properties}
 							{placed}
+							optionAllowed={optionAllowed && ((v, steps) => optionAllowed(v, [key, ...steps]))}
+							{enumDisallowed}
 							label={ids ? undefined : fallbackName(key, sub)}
 							idBase={ids?.control}
 							labelledBy={ids?.label}
@@ -513,6 +524,8 @@
 							value={obj[key] as Record<string, unknown> | undefined}
 							schema={sub}
 							ghostMember={sub.default as string | undefined}
+							optionAllowed={optionAllowed && ((v) => optionAllowed(v, [key]))}
+							{enumDisallowed}
 							label={fieldTitle(key, sub)}
 							id={ids?.control}
 							labelledBy={ids?.label}

@@ -83,9 +83,9 @@
 		 * the label and the control find each other. */
 		domIds: FieldDomIds;
 		onCommitScalar: (value: unknown) => void;
-		/** Enum-option policy: `false` marks that option unavailable. Only the enum
-		 * control reads this pair. */
-		optionAllowed?: (value: string) => boolean;
+		/** Enum-option policy: `false` marks that option unavailable, on the field's own
+		 * enum control (`steps` absent) or on an enum `steps` down its object subform. */
+		optionAllowed?: (value: string, steps?: readonly PathStep[]) => boolean;
 		/** How a refused option draws: greyed (default) or left out. */
 		enumDisallowed?: 'hide' | 'disable';
 		/** A focus inside the field: its address, and the steps down to the cell holding
@@ -495,6 +495,8 @@
 					bind:this={objectEl}
 					value={value as Record<string, unknown> | undefined}
 					properties={field.schema.properties}
+					{optionAllowed}
+					{enumDisallowed}
 					{flat}
 					placed
 					label={field.label}
