@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A cell of rich text lines inside a record draws its proposal as words.** A `richtext` property of `shape: lines`, such as a memo's recipient or signature block, strikes the words a proposal takes out and tints the ones it writes in its own leaf, as a one-line or a multi-line `text` cell does, where it showed the proposed value under a tint with nothing struck.
+
 ## v0.37.1 - 2026-11-14
 
 **A checklist's held item rests as one line.** A ticked item with details shows its name, then the first line of words its details hold in the label ink, and a chevron that opens them in the item's own column, so no other item moves. Ticking or adding an item opens it, and so does a proposal or an error on one of its details.

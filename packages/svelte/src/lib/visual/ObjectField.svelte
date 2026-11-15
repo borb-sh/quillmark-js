@@ -318,7 +318,7 @@
 			{@const handsDown = isContainer(kind)}
 			{@const ownItem = handsDown ? undefined : reviewHere?.find((e) => !e.steps.length)?.item}
 			{@const textOwn =
-				kind === 'prose' && (shortCell(sub) || literalText(sub))
+				kind === 'prose' && (shortCell(sub) || literalText(sub) || linesOnly(sub))
 					? textProposal(ownItem, contentDefault(sub))
 					: undefined}
 			{@const numberOwn = kind === 'number' ? numberProposal(ownItem) : undefined}
