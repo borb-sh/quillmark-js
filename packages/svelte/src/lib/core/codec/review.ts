@@ -239,12 +239,19 @@ function reach(leaf: Leaf): [number, number] {
 		: [leaf.pos, leaf.pos + leaf.node.nodeSize];
 }
 
+/** `node`'s attributes without the id of the stored part it decodes from. */
+const unnamed = (node: PMNode): PMNode['attrs'] =>
+	'id' in node.attrs ? { ...node.attrs, id: null } : node.attrs;
+
 /** `doc`'s blocks from its `from`th leaf on, in the containers they sat in. A numbered list
- *  that lost its head keeps counting from where the kept items stood. */
+ *  that lost its head keeps counting from where the kept items stood. They carry no ids: the
+ *  ones `doc` was read under are its own, and a leaf's block wearing one would lose it to an
+ *  added block that stands ahead of it. */
 function tail(doc: PMNode, from: number): PMNode[] {
 	let seen = 0;
 	const keep = (node: PMNode): PMNode | undefined => {
-		if (node.isTextblock || node.isAtom) return seen++ >= from ? node : undefined;
+		if (node.isTextblock || node.isAtom)
+			return seen++ >= from ? node.type.create(unnamed(node), node.content, node.marks) : undefined;
 		const kids: PMNode[] = [];
 		let dropped = 0;
 		node.forEach((child) => {
@@ -255,8 +262,8 @@ function tail(doc: PMNode, from: number): PMNode[] {
 		if (!kids.length) return undefined;
 		const attrs =
 			node.type.name === 'ordered_list'
-				? { ...node.attrs, start: (node.attrs.start as number) + dropped }
-				: node.attrs;
+				? { ...unnamed(node), start: (node.attrs.start as number) + dropped }
+				: unnamed(node);
 		return node.type.create(attrs, kids);
 	};
 	const out: PMNode[] = [];

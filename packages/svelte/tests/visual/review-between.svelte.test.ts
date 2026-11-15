@@ -5,11 +5,11 @@
 // it alone.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
-import type { ReviewDrawn, ReviewEvent } from '$lib/visual';
+import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
 import { proposalsBetween } from '$lib/visual/proposals';
 import { sameValue } from '$lib/visual/review';
 import { fieldValues } from '$lib/visual/structure';
-import { quill, example } from '../helpers/fixtures.js';
+import { core, quill, example } from '../helpers/fixtures.js';
 import { mountEditor, press, settle, unmountAll } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -113,6 +113,52 @@ describe('a record or list the answer writes past what a list item names', () =>
 		await settle();
 		expect(drawn.at(-1)!.open).toEqual([]);
 		expect(doc.getStored('contributors')).toEqual(answer.getStored('contributors'));
+	});
+});
+
+describe('a body the answer rewrites whole', () => {
+	/** A template's body, a paragraph, a bullet holding a bullet and two paragraphs, rewritten as
+	 *  the first paragraph rewritten, the rest taken out, and two paragraphs added after it. */
+	function rewritten(): { doc: Document; answer: Document; items: ReviewItem[] } {
+		const doc = example();
+		doc.replace(
+			{},
+			core.importMarkdown(
+				'Write here.\n\n- Use bullets.\n\n  - Indent to go deeper.\n\nYou can **bold**.\n\nNumbered for you.'
+			).content
+		);
+		const answer = doc.clone();
+		const [first, ...rest] = answer.blocks({}).map((b) => b.id);
+		answer.applyBlocks({}, [
+			{ op: 'replace', id: first, markdown: 'One.' },
+			...rest.map((id) => ({ op: 'delete' as const, id })),
+			{ op: 'insertAfter', id: first, markdown: 'Two.\n\nThree.' }
+		]);
+		let n = 0;
+		return { doc, answer, items: proposalsBetween(quill(), doc, answer, () => `p${n++}`).items };
+	}
+	const bodyOf = (d: Document): string[] => d.blocks({}).map((b) => b.markdown);
+
+	it('accepted whole is the answer, and one ⌘Z takes it back', async () => {
+		const { doc, answer, items } = rewritten();
+		const base = bodyOf(doc);
+		const { editor, target } = mountEditor(quill(), doc, { review: items });
+		await settle();
+		expect(editor.answerReview('all', 'accept').length).toBe(items.length);
+		await settle();
+		expect(bodyOf(doc)).toEqual(bodyOf(answer));
+		press(target.querySelector<HTMLElement>('.qm-editor')!, 'z', { ctrlKey: true });
+		await settle();
+		expect(bodyOf(doc)).toEqual(base);
+	});
+
+	it('accepted one item at a time is the answer, last item first', async () => {
+		const { doc, answer, items } = rewritten();
+		const { editor } = mountEditor(quill(), doc, { review: items });
+		await settle();
+		for (const { id } of items.toReversed())
+			expect(editor.answerReview([id], 'accept'), id).toEqual([id]);
+		expect(bodyOf(doc)).toEqual(bodyOf(answer));
 	});
 });
 
