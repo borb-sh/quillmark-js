@@ -86,24 +86,43 @@ const BASE: Header = {
 	details: PARAS
 };
 
-const CASES: [string, Header][] = [
+/** Each case: the answer, then the document with only its first part written, then its second. */
+const CASES: [string, Header, Header, Header][] = (
 	[
-		'two runs of lines at the top of the card',
-		{
-			...BASE,
-			distribution: OFFICES.map((o, k) => (k === 1 ? '2 OSS/CC' : k === 6 ? '7 CES/CC' : o))
-		}
-	],
-	[
-		'two runs of lines',
-		{ ...BASE, memoFor: OFFICES.map((o, k) => (k === 1 ? '2 OSS/CC' : k === 6 ? '7 CES/CC' : o)) }
-	],
-	['two members put into a list apart', { ...BASE, cc: ['X', 'A', 'B', 'Y', 'C'] }],
-	[
-		'two paragraphs',
-		{ ...BASE, details: ['Led a team of six.', PARAS[1], 'Ran the annual audit.'] }
-	]
-];
+		['distribution', OFFICES, ['2 OSS/CC', '7 CES/CC'], [1, 6]],
+		['memoFor', OFFICES, ['2 OSS/CC', '7 CES/CC'], [1, 6]],
+		['details', PARAS, ['Led a team of six.', 'Ran the annual audit.'], [0, 2]]
+	] as [keyof Header, string[], string[], number[]][]
+)
+	.map(([key, was, words, at]): [string, Header, Header, Header] => {
+		const put = (ks: number[]) => was.map((v, k) => (ks.includes(k) ? words[at.indexOf(k)] : v));
+		return [
+			`two rewrites of ${key}`,
+			{ ...BASE, [key]: put(at) },
+			{ ...BASE, [key]: put([at[0]]) },
+			{ ...BASE, [key]: put([at[1]]) }
+		];
+	})
+	.concat([
+		[
+			'a line added at the top of memoFor and one rewritten far below',
+			{ ...BASE, memoFor: ['HQ USAF/CC', ...OFFICES.slice(0, 6), '7 CES/CC'] },
+			{ ...BASE, memoFor: ['HQ USAF/CC', ...OFFICES] },
+			{ ...BASE, memoFor: [...OFFICES.slice(0, 6), '7 CES/CC'] }
+		],
+		[
+			'a paragraph added at the top of details and one rewritten below',
+			{ ...BASE, details: ['Took command in May.', ...PARAS.slice(0, 2), 'Ran the annual audit.'] },
+			{ ...BASE, details: ['Took command in May.', ...PARAS] },
+			{ ...BASE, details: [...PARAS.slice(0, 2), 'Ran the annual audit.'] }
+		],
+		[
+			'two members put into cc apart',
+			{ ...BASE, cc: ['X', 'A', 'B', 'Y', 'C'] },
+			{ ...BASE, cc: ['X', 'A', 'B', 'C'] },
+			{ ...BASE, cc: ['A', 'B', 'Y', 'C'] }
+		]
+	]);
 
 const mounted = async (answer: Header) => {
 	const doc = memo(BASE);
@@ -116,26 +135,19 @@ const mounted = async (answer: Header) => {
 	return { doc, items, r };
 };
 
-/** The document with only `parts` of the answer's two parts written. */
-const partly = (answer: Header, part: 0 | 1): string => {
-	const pick = <T>(was: T[], now: T[]): T[] => {
-		if (was === now) return was;
-		const changed = now
-			.map((v, k) => ({ v, k }))
-			.filter(({ v, k }) => (was.length === now.length ? v !== was[k] : !was.includes(v)));
-		const keep = changed[part];
-		if (was.length === now.length) return was.map((v, k) => (k === keep.k ? keep.v : v));
-		return now.filter((v) => was.includes(v) || v === keep.v);
-	};
-	return memo({
-		distribution: pick(BASE.distribution, answer.distribution),
-		memoFor: pick(BASE.memoFor, answer.memoFor),
-		cc: pick(BASE.cc, answer.cc),
-		details: pick(BASE.details, answer.details)
-	}).toMarkdown();
+/** Whether every value of words the document holds names each of its blocks once. */
+const idsApart = (doc: Document): boolean => {
+	const values = [
+		doc.getStored({ field: 'distribution' }),
+		...['memo_for', 'details'].map((k) => q.reader(doc).getContentAt({ field: 'header' }, [k]))
+	] as { blocks?: { id: string | null }[] }[];
+	return values.every((v) => {
+		const ids = (v?.blocks ?? []).map((b) => b.id).filter((id) => id != null);
+		return new Set(ids).size === ids.length;
+	});
 };
 
-describe.each(CASES)('an answer split into %s', (_, answer) => {
+describe.each(CASES)('an answer split into %s', (_, answer, ...parts) => {
 	const whole = memo(answer).toMarkdown();
 
 	it('is two items over one field', async () => {
@@ -155,6 +167,7 @@ describe.each(CASES)('an answer split into %s', (_, answer) => {
 			await settle();
 		}
 		expect(doc.toMarkdown()).toBe(whole);
+		expect(idsApart(doc)).toBe(true);
 	});
 
 	it('takes both by Accept all as the answer, and one undo restores the document', async () => {
@@ -178,6 +191,7 @@ describe.each(CASES)('an answer split into %s', (_, answer) => {
 		await settle();
 		answerOn(r.target, items[kept].id, 'accept');
 		await settle();
-		expect(doc.toMarkdown()).toBe(partly(answer, kept));
+		expect(doc.toMarkdown()).toBe(memo(parts[kept]).toMarkdown());
+		expect(idsApart(doc)).toBe(true);
 	});
 });

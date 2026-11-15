@@ -274,7 +274,7 @@ export function lineRuns(
 			...before.blocks.slice(0, run.b),
 			...after.blocks.slice(run.a, run.ae),
 			...before.blocks.slice(run.be)
-		];
+		].map((b, k) => ({ ...b, id: `b${k}` }));
 		let at = 0;
 		const marks: ContentMark[] = [];
 		for (const line of lines) {
