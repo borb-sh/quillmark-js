@@ -16,7 +16,14 @@
 // words that land are the words that were drawn. It goes down the lane a keystroke takes: one
 // transaction, one undo step, one commit.
 import { closeHistory, isHistoryTransaction, undo } from 'prosemirror-history';
-import { DOMSerializer, Fragment, Mark, type Node as PMNode, type Schema } from 'prosemirror-model';
+import {
+	DOMSerializer,
+	Fragment,
+	Mark,
+	type Node as PMNode,
+	type ResolvedPos,
+	type Schema
+} from 'prosemirror-model';
 import {
 	Plugin,
 	PluginKey,
@@ -37,7 +44,8 @@ import { wordDiff, type DiffHunk } from './review-diff.js';
  * proposes their removal. Its blocks pair with the paragraphs in order, each drawn as an edit of the one
  * it pairs with while the two are one kind of block; past the first that is not, the paragraphs
  * left are struck whole and the blocks left are added after the outermost block holding the last
- * paragraph, or as the next items of its list. One that names where it adds, by `insert`, proposes new blocks the same way after the block it names, or before the leaf's
+ * paragraph, or, where they open a list, as items at the depth the store spells them: a block of a
+ * nested list indented two spaces for each list around its own. One that names where it adds, by `insert`, proposes new blocks the same way after the block it names, or before the leaf's
  * first; in a leaf that holds one empty paragraph it proposes that paragraph's text. A paragraph
  * takes one proposal that rewrites it and one that adds after it, and a later item of either kind
  * naming it draws nothing.
@@ -631,6 +639,26 @@ function placeOf(
 	return { cover: [], beside, ahead, missing: false };
 }
 
+/** A list marker, after the spaces that open a line. */
+const MARKER = /^ *(?:[-*+]|\d{1,9}[.)])(?: |$)/;
+
+/**
+ * Markdown as the store spells a block of a nested list, read back: each line indented two
+ * spaces for every list around the block's own, which a parse alone reads as a sibling or as
+ * code. `markdown` with that indent taken off, and `nest`, the lists it stood in past the first.
+ */
+function unnest(markdown: string): { markdown: string; nest: number } {
+	const first = markdown.match(/^[ \n]*/)![0];
+	const spaces = first.length - first.lastIndexOf('\n') - 1;
+	const nest = Math.floor(spaces / 2);
+	if (!nest || !MARKER.test(markdown.slice(first.length - spaces))) return { markdown, nest: 0 };
+	const indent = ' '.repeat(2 * nest);
+	const lines = markdown
+		.split('\n')
+		.map((l) => (l.startsWith(indent) ? l.slice(indent.length) : l));
+	return { markdown: lines.join('\n'), nest };
+}
+
 /** The blocks a proposal's writer read, by the id each was read under; `undefined` where
  *  `before` does not read as one block for each id. */
 const reads = new WeakMap<readonly string[], Map<string, Map<string, PMNode> | undefined>>();
@@ -642,7 +670,8 @@ function readOf(
 	let row = reads.get(ids);
 	if (!row) reads.set(ids, (row = new Map()));
 	if (row.has(before)) return row.get(before);
-	const doc = before.trim() ? channel.parse(before) : undefined;
+	const read = unnest(before).markdown;
+	const doc = read.trim() ? channel.parse(read) : undefined;
 	const blocks = doc ? leavesOf(doc) : [];
 	const out =
 		blocks.length === ids.length ? new Map(ids.map((id, k) => [id, blocks[k].node])) : undefined;
@@ -701,7 +730,8 @@ function draw(state: EditorState, channel: ReviewChannel, bases: Bases): Drawn {
 			continue;
 		}
 
-		const proposed = item.after.trim() ? channel.parse(item.after) : undefined;
+		const { markdown: after, nest } = unnest(item.after);
+		const proposed = after.trim() ? channel.parse(after) : undefined;
 		if (item.after.trim() && !proposed) {
 			undrawn.push({ id: item.id, reason: 'parse' });
 			continue;
@@ -810,17 +840,11 @@ function draw(state: EditorState, channel: ReviewChannel, bases: Bases): Drawn {
 		/** Past the outermost block holding the last one, or the head of the leaf. */
 		const outer = ahead ? 0 : $last.depth ? $last.after(1) : last.pos + last.node.nodeSize;
 		if (added.length) {
-			// A proposal that continues the list its paragraph is in adds items to that list.
-			const listed =
-				!ahead &&
-				$last.parent.type.name === 'list_item' &&
-				added[0].type === $last.node($last.depth - 1).type;
 			const pieces: { at: number; node: PMNode }[] = [];
-			if (listed) {
-				const at = $last.after($last.depth);
-				added[0].forEach((li) => pieces.push({ at, node: li }));
-			}
-			for (const node of listed ? added.slice(1) : added) pieces.push({ at: outer, node });
+			const into = ahead ? undefined : listPlace($last, last, added[0], nest);
+			if (into?.whole) pieces.push({ at: into.at, node: added[0] });
+			else if (into) added[0].forEach((li) => pieces.push({ at: into.at, node: li }));
+			for (const node of into ? added.slice(1) : added) pieces.push({ at: outer, node });
 			for (const piece of pieces) {
 				const held = plan.at(-1);
 				if (held && !held.lift && held.from === piece.at && held.to === piece.at)
@@ -858,6 +882,34 @@ function draw(state: EditorState, channel: ReviewChannel, bases: Bases): Drawn {
 		});
 	}
 	return { decos, lighting, spans, plans, outdated, undrawn };
+}
+
+/**
+ * Where a list a proposal adds after `last` goes, at the depth it was written at: the list it
+ * opens with stood in `nest` lists past the first. At the depth of a list `last` is in, its items
+ * follow the item of that list holding `last`; one deeper, they open the list under `last` in its
+ * item, or are that list, `whole`, where the item holds none. `undefined` where the list is not
+ * the kind of the one it would join, or `last` stands in no list.
+ */
+function listPlace(
+	$last: ResolvedPos,
+	last: Leaf,
+	list: PMNode,
+	nest: number
+): { at: number; whole?: true } | undefined {
+	const items: number[] = [];
+	for (let d = 1; d <= $last.depth; d++) if ($last.node(d).type.name === 'list_item') items.push(d);
+	if (!items.length || !/_list$/.test(list.type.name)) return undefined;
+	const level = Math.min(nest, items.length);
+	if (level === items.length) {
+		if ($last.parent.type.name !== 'list_item') return undefined;
+		const end = last.pos + last.node.nodeSize;
+		const under = $last.doc.resolve(end).nodeAfter;
+		if (under?.type === list.type) return { at: end + 1 };
+		return { at: end, whole: true };
+	}
+	const item = items[level];
+	return $last.node(item - 1).type === list.type ? { at: $last.after(item) } : undefined;
 }
 
 /** The item the caret is in: the one it was put into by its id while it holds the caret, else
