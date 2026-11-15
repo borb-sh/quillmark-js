@@ -68,6 +68,7 @@
 		byCard,
 		locate,
 		putsIn,
+		membersOf,
 		onField,
 		reviewText,
 		valueIn,
@@ -472,8 +473,8 @@
 				const steps = reviewing.at(leaf).nested?.find((e) => e.item.id === item.id)?.steps;
 				if (!steps) return undefined;
 				const value = current();
-				after = putsIn(item)
-					? valueInserting(value, steps, item.after)
+				after = putsIn(item, steps)
+					? valueInserting(value, steps, membersOf(item))
 					: valueWith(value, steps, to(valueIn(value, steps)));
 			} else after = to(current());
 			if (!write(after)) return undefined;
@@ -1849,15 +1850,21 @@
 					const path =
 						other === item ? steps : leafTargetFor((other as FieldProposal).field)?.steps;
 					if (!otherKey || fieldKeyToString(otherKey) !== leaf || !path) continue;
-					const located = locate(held.value, path, other as FieldProposal, claimed);
+					const located = locate(
+						held.value,
+						path,
+						other as FieldProposal,
+						claimed,
+						reviewing.later(other.id)
+					);
 					if (other === item) {
 						found = located.steps;
 						break;
 					}
 				}
 				if (!found) continue;
-				held.value = putsIn(item as FieldProposal)
-					? valueInserting(held.value, found, (item as FieldProposal).after)
+				held.value = putsIn(item as FieldProposal, found)
+					? valueInserting(held.value, found, membersOf(item as FieldProposal))
 					: valueWith(held.value, found, reviewing.writes(item, valueIn(held.value, found)));
 			}
 			held.ids.push(id);

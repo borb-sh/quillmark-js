@@ -115,3 +115,60 @@ describe('a member put in before the end of a list', () => {
 		expect(doc.toMarkdown()).toBe(answer.toMarkdown());
 	});
 });
+
+describe('members appended past the end of a list', () => {
+	const orders = [
+		[2, 0, 1],
+		[1, 2, 0],
+		[2, 1, 0]
+	];
+
+	it.each(orders)('stand in the answer’s order when taken %i, %i, %i', async (...order) => {
+		const doc = memo(['123 OG/CC']);
+		const answer = memo(['123 OG/CC', 'AFI 1', 'AFI 2', 'AFI 3']);
+		const { items, r } = await review(doc, answer);
+		expect(items).toHaveLength(3);
+		for (const k of order) {
+			answerOn(r.target, items[k].id, 'accept');
+			await settle();
+		}
+		expect(doc.toMarkdown()).toBe(answer.toMarkdown());
+	});
+
+	it('stand in the answer’s order on a list that held none', async () => {
+		const doc = memo([]);
+		const answer = memo(['AFI 1', 'AFI 2', 'AFI 3']);
+		const { items, r } = await review(doc, answer);
+		for (const k of [2, 0, 1]) {
+			answerOn(r.target, items[k].id, 'accept');
+			await settle();
+		}
+		expect(doc.toMarkdown()).toBe(answer.toMarkdown());
+	});
+
+	it('draw where they would stand after a later one is taken, and skip one dismissed', async () => {
+		const doc = memo(['123 OG/CC']);
+		const answer = memo(['123 OG/CC', 'AFI 1', 'AFI 2', 'AFI 3']);
+		const { items, r, group } = await review(doc, answer);
+		answerOn(r.target, items[2].id, 'accept');
+		await settle();
+		expect(rows(group, 'memo_for')).toEqual(['123 OG/CC', '+AFI 1', '+AFI 2', 'AFI 3']);
+		answerOn(r.target, items[0].id, 'dismiss');
+		answerOn(r.target, items[1].id, 'accept');
+		await settle();
+		expect(q.toAuthoring(doc).fields?.header).toMatchObject({
+			memo_for: ['123 OG/CC', 'AFI 2', 'AFI 3']
+		});
+	});
+
+	it('reorders a list as answered, whatever the order', async () => {
+		const doc = memo(['AFI 1', 'AFI 2']);
+		const answer = memo(['AFI 2', 'AFI 1', 'AFI 3']);
+		const { items, r } = await review(doc, answer);
+		for (const item of [...items].reverse()) {
+			answerOn(r.target, item.id, 'accept');
+			await settle();
+		}
+		expect(doc.toMarkdown()).toBe(answer.toMarkdown());
+	});
+});

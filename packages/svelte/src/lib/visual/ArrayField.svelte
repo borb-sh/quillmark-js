@@ -117,6 +117,7 @@
 	import {
 		numberProposal,
 		putsIn,
+		membersOf,
 		textsOf,
 		type TextProposal,
 		splitReview,
@@ -264,20 +265,18 @@
 		unrouted(routed, (step) => typeof step === 'number' && step >= 0 && step < arr.length)
 	);
 	const reviewed = $derived(splitReview(review));
-	/** An item on a row that adds members in front of it, which the row does not draw. */
-	const inserting = (e: DeepReview): boolean => !e.steps.length && putsIn(e.item);
+	/** An item on a row that adds members in front of it, which the row does not draw. Its
+	 *  steps are past the row's, which is a member's index. */
+	const inserting = (e: DeepReview): boolean => !e.steps.length && putsIn(e.item, [0]);
 	/** A row's review items: the member's own, and those inside it. */
 	const rowReview = (k: number): DeepReview[] =>
 		k < arr.length ? (reviewed.below.get(k) ?? []).filter((e) => !inserting(e)) : [];
 	/** The members a review would put in front of row `k`, each with the item that adds it. */
 	const insertedAt = (k: number): { item: FieldProposal; after: unknown }[] =>
 		k < arr.length
-			? (reviewed.below.get(k) ?? []).filter(inserting).flatMap(({ item }) =>
-					(Array.isArray(item.after) ? item.after : [item.after]).map((after) => ({
-						item,
-						after
-					}))
-				)
+			? (reviewed.below.get(k) ?? [])
+					.filter(inserting)
+					.flatMap(({ item }) => membersOf(item).map((after) => ({ item, after })))
 			: [];
 	const ownReview = (k: number): DeepReview[] => rowReview(k).filter((e) => !e.steps.length);
 	/** A row's own removal: the proposal that takes the member out, drawn on the whole row. */
@@ -354,7 +353,7 @@
 				e.steps.length === 1 &&
 				typeof e.steps[0] === 'number' &&
 				e.steps[0] >= arr.length &&
-				!putsIn(e.item) &&
+				!('ahead' in e.item) &&
 				e.item.after !== undefined
 		)
 	);

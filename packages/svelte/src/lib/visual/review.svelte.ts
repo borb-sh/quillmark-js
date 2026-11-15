@@ -81,6 +81,8 @@ export interface Review {
 		more?: readonly FieldProposal[];
 		nested?: readonly DeepReview[];
 	};
+	/** What the appends of item `id`'s run at higher indices add, in index order (`locate`). */
+	later(id: string): readonly unknown[];
 	/** Whether anything draws at leaf `key`: a field's own item, or a text item in its leaf. */
 	marks(key: string): boolean;
 	/** The leaf drawing item `id`, where one does. */
@@ -251,6 +253,31 @@ export function createReview(source: ReviewSource): Review {
 		const key = listed[item.after];
 		return key !== undefined && standing.has(key) ? key : 'end';
 	}
+	/** What the appends of each append's run at higher indices add, in index order, by its id:
+	 *  read off the host's whole list, answered items with it, since an accepted one's member
+	 *  is what a later-taken one lands in front of. */
+	const later = $derived.by(() => {
+		const runs = new Map<string, { at: number; id: string; after: unknown }[]>();
+		for (const item of source.items() ?? []) {
+			if (!onField(item) || source.exact(item.field)) continue;
+			const deep = source.nested(item.field);
+			const at = deep?.steps.at(-1);
+			if (!deep || typeof at !== 'number' || 'ahead' in item || !putsIn(item, deep.steps)) continue;
+			const run = `${deep.key} ${JSON.stringify(deep.steps.slice(0, -1))}`;
+			runs.set(run, [...(runs.get(run) ?? []), { at, id: item.id, after: item.after }]);
+		}
+		const out = new Map<string, unknown[]>();
+		for (const run of runs.values())
+			for (const { at, id } of run)
+				out.set(
+					id,
+					run
+						.filter((other) => other.at > at)
+						.sort((a, b) => a.at - b.at)
+						.map((other) => other.after)
+				);
+		return out;
+	});
 	const placed = $derived.by(() => {
 		const out = new Map<
 			string,
@@ -276,13 +303,12 @@ export function createReview(source: ReviewSource): Review {
 				const claimed = claims.get(deep.key) ?? new Set<string>();
 				claims.set(deep.key, claimed);
 				const held = out.get(deep.key) ?? {};
-				const { steps, found } = locate(deep.value, deep.steps, item, claimed);
+				const adds = putsIn(item, deep.steps);
+				const { steps, found } = locate(deep.value, deep.steps, item, claimed, later.get(item.id));
 				if (
+					!adds &&
 					(held.nested ?? []).some(
-						(e) =>
-							sameValue(e.steps, steps) &&
-							putsIn(e.item) === putsIn(item) &&
-							!runsOfOne(e.item, item)
+						(e) => sameValue(e.steps, steps) && !putsIn(e.item, e.steps) && !runsOfOne(e.item, item)
 					)
 				) {
 					undrawn.push({ id: item.id, reason: 'taken' });
@@ -475,6 +501,7 @@ export function createReview(source: ReviewSource): Review {
 			return place && valueIn(place.value, place.steps);
 		},
 		at: (key) => fields.get(key) ?? {},
+		later: (id) => later.get(id) ?? [],
 		marks: (key) => fields.has(key) || !!drawn.get(key)?.ids.length,
 		keyOf(id) {
 			const item = byId.get(id);
@@ -597,6 +624,7 @@ const NO_REVIEW: Review = {
 	cards: { adds: new Map(), removes: new Map() },
 	wrote() {},
 	at: () => ({}),
+	later: () => [],
 	marks: () => false,
 	keyOf: () => undefined,
 	drew() {},
