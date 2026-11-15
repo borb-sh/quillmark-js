@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A bullet a proposal adds lands at the depth it was written.** An item added under a bullet with no children nests under it, one added ahead of a bullet's children opens its sub-list, and one written back out of a nested list joins the outer one, both as drawn and on Accept. Before, the leaf read the Markdown the store spells a nested block in, indented two spaces per list, as a sibling at the top level, or as a code block two lists deep; a word edit of a bullet two lists deep was drawn as the bullet struck and a code block added.
+
 ## v0.38.0 - 2026-11-15
 
 **A body rewritten whole is the answer, whatever order its proposals are taken in.** The blocks a proposal adds take ids of their own, where they wore the ids of the answer they were read from, so one standing ahead of a kept block of the same id took that id: over a template, accepting a whole-body rewrite, or each of its items in turn, removed an added paragraph in place of a template bullet, which stayed.
