@@ -125,6 +125,21 @@ describe('the card items', () => {
 		expect(review.cards.adds.get('k0')?.map((a) => a.id)).toEqual(['add-b']);
 	});
 
+	it('outdate a removal by the reader writing in its card, until a list is set anew', () => {
+		const { review, list } = store(false, { listed: ['k0', 'k1'], live: ['k0', 'k1'] });
+		list(CARDS.slice(4, 5));
+		review.edited('k1');
+		expect([...review.fieldOutdated]).toEqual([]);
+		review.writing(true);
+		review.edited('k0');
+		review.writing(false);
+		expect([...review.fieldOutdated]).toEqual([]);
+		review.edited('k0');
+		expect([...review.fieldOutdated]).toEqual(['take']);
+		list(CARDS.slice(4, 5).map((item) => ({ ...item })));
+		expect([...review.fieldOutdated]).toEqual([]);
+	});
+
 	it('are the editor’s to name, by no leaf', () => {
 		const { review, list } = store(false, { listed: ['k0'], live: ['k0'] });
 		list(CARDS.slice(0, 1));
