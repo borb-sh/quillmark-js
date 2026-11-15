@@ -165,9 +165,9 @@ export function proposalsBetween(
 				...(now !== undefined && { after: now })
 			});
 		const text = f && textKind(f);
-		const words = text && text.shape !== 'blocks' ? [asContent(was), asContent(now)] : [];
-		if (words[0] && words[1] && now != null) {
-			const runs = lineRuns(words[0], words[1]);
+		const words = text ? [asContent(was), asContent(now)] : [];
+		if (text && words[0] && words[1] && now != null) {
+			const runs = lineRuns(words[0], words[1], text.shape === 'blocks' ? 'paragraph' : 'run');
 			if (runs.length > 1) {
 				for (const run of runs)
 					items.push({ id: mint(), field: pathAt(steps), before: was, after: run });
