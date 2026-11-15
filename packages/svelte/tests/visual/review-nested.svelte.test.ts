@@ -5,8 +5,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
+import { proposalsBetween } from '$lib/visual';
 import { groupLabel } from '$lib/visual/structure';
-import { quill, example } from '../helpers/fixtures.js';
+import { core, quill, example, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	answerOn,
 	mountEditor,
@@ -280,6 +281,51 @@ describe('a record in a table', () => {
 		expect(box.querySelector('.ProseMirror')?.textContent).toBe('Alan');
 		expect(box.querySelector('.qm-select')?.textContent?.trim()).toBe('reviewer');
 		expect(r.doc.getStored('contributors')).toHaveLength(1);
+	});
+});
+
+describe('a record’s cell of rich text lines', () => {
+	const yaml = `quill:
+  name: header
+  version: 1.0.0
+  backend: typst
+  description: A record holding a cell of rich text lines.
+typst:
+  plate_file: plate.typ
+main:
+  fields:
+    header:
+      type: object
+      properties:
+        recipient:
+          type: richtext
+          shape: lines
+`;
+	const memo = (recipient: string[]): Document =>
+		core.Document.parse(
+			['~~~', '$quill: header@1.0.0', 'header:', '  recipient: |-']
+				.concat(
+					recipient.map((line) => (line ? `    ${line}` : '')),
+					['~~~', '']
+				)
+				.join('\n')
+		);
+
+	it('draws its change as words in the cell, and is taken as the field', async () => {
+		const q = quillFromYaml(yaml);
+		const doc = memo(['ORG/SYM', '', '123 MXG/CC']);
+		const answer = memo(['ORG/SYM', '', '123 OG/CC']);
+		const { items } = proposalsBetween(q, doc, answer, () => 'recipient');
+		const drawn: ReviewDrawn[] = [];
+		const r = mountEditor(q, doc, { review: items, onReviewDrawn: (d) => drawn.push(d) });
+		await settle();
+		const cell = openField(r.target, q.schema.main, 'header').querySelector(
+			'[data-qm-prop="recipient"]'
+		)!;
+		expect(drawnOf(cell, 'recipient')).toEqual(['MXG', 'OG']);
+		expect(drawn.at(-1)?.open).toEqual(['recipient']);
+		answerOn(r.target, 'recipient', 'accept');
+		expect(doc.toMarkdown()).toBe(answer.toMarkdown());
 	});
 });
 

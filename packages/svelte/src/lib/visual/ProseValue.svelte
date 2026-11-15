@@ -164,7 +164,7 @@
 	let redraw: (() => void) | undefined;
 	$effect(() => {
 		drawnProposal =
-			proposed && (!block || plaintext)
+			proposed && (!block || plaintext || paragraphs)
 				? { ...proposed, lit: reviewing.lit === proposed.id }
 				: undefined;
 		redraw?.();
@@ -297,7 +297,7 @@
 								leaveStrings: () => t.strings,
 								cap,
 								afterHistory:
-									inline || plaintext
+									inline || plaintext || paragraphs
 										? [
 												valueDiffPlugin(
 													() => drawnProposal,
