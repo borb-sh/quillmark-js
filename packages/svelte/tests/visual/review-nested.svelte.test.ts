@@ -282,6 +282,21 @@ describe('a record in a table', () => {
 		expect(box.querySelector('.qm-select')?.textContent?.trim()).toBe('reviewer');
 		expect(r.doc.getStored('contributors')).toHaveLength(1);
 	});
+
+	it.each([
+		['a table', 'contributors', { name: 'Alan', role: 'reviewer' }],
+		['a list of records', 'revisions', { note: 'Fig. 3 relabelled', pages: 1 }]
+	])('draws a row it adds to %s that holds none', async (_, name, after) => {
+		const r = nested(
+			(doc) => [{ id: 'add', field: `${doc.pathFor(name)}[0]`, after }],
+			(doc) => void quill().writer(doc).set(name, [])
+		);
+		await settle();
+		const field = openField(r.target, main, name);
+		const rows = markOf(field, 'add')!.closest('.qm-array-rows')!;
+		expect(rows.classList.contains('empty')).toBe(false);
+		expect(r.drawn.at(-1)?.open).toContain('add');
+	});
 });
 
 describe('a record’s text cell, whatever its kind', () => {
