@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A body rewritten whole is the answer, whatever order its proposals are taken in.** The blocks a proposal adds take ids of their own, where they wore the ids of the answer they were read from, so one standing ahead of a kept block of the same id took that id: over a template, accepting a whole-body rewrite, or each of its items in turn, removed an added paragraph in place of a template bullet, which stayed.
+
 **A text field draws its proposal as words, whatever its kind and wherever it sits.** A `text` or `richtext` field of any shape strikes the words a whole-value proposal takes out and tints the ones it writes in its own leaf, inside a record or a list as at the top of a card: a memo's recipients or signature block as `richtext` lines, and a revision's rationale as `richtext` blocks, list items included, where each showed the proposed value under a tint with nothing struck.
 
 **`proposalsBetween` proposes a field of lines one run of changed lines at a time, wherever it sits.** A `text` or `richtext` field of one line or of lines takes one item per run of lines the answer changes, each the value read with that run alone written, runs at most two unchanged lines apart one item, and the leaf draws each run as words and takes it alone. A top-level `richtext` of `lines` took one item per paragraph, so an addressee added above the rest read as the first line rewritten plus that line added, and taking only the first dropped an addressee; a field inside a record took one item for every change at once.
