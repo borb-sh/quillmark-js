@@ -11,6 +11,7 @@ import type {
 	QuillFieldSchema
 } from '@quillmark/wasm';
 import { fieldPathForAddr } from '../core/address.js';
+import { asContent, lineRuns } from '../core/codec/value-plan.js';
 import { sameValue, type ReviewItem, type ReviewLabel } from './review.js';
 import { VARIANT_DISCRIMINANT, baseType, fieldValues, textKind } from './structure.js';
 
@@ -30,17 +31,20 @@ let minted = 0;
  * block ids. Each item carries `before`, what the writer read, so the editor keeps what the
  * reader has written since and reports a place both changed as outdated.
  *
- * Cards pair by id. Each paired card's body and block rich text fields take one `replace` item
- * per block the answer rewrote or took out, and one `insert` item per run of blocks it added.
- * Every other field takes an item per place that changed: a record's cell, and a list's member,
- * changed, taken out, or appended past the end, two appends to one list at successive indices.
- * A list that gains members anywhere but its end is compared member by member at each index, so
- * each place its controls draw says its own change; a record or a list written where none was is
- * compared with an empty one. A choice with variants is compared as a record, its discriminant a
- * cell of it, and a checklist member by member: one ticked or unticked is proposed whole, and one
- * held on both sides cell by cell. A one-line rich text field, a value of a type nothing nests in, a
- * field the answer clears, and a rich text value inside a record or a list are proposed whole. Values
- * are in the form the editor's controls are handed, a text cell as its `Content`.
+ * Cards pair by id. Each paired card's body and its rich text fields of `blocks` take one
+ * `replace` item per block the answer rewrote or took out, and one `insert` item per run of blocks
+ * it added. A text field of one line or of lines, at the top of a card or inside a record or a
+ * list, takes one item per run of lines the answer changed, lines paired by their words: each the
+ * value read with that run alone written, runs at most two unchanged lines apart one item, and a
+ * value that changes one run proposed whole. Every other field takes an item per place that
+ * changed: a record's cell, and a list's member, changed, taken out, or appended past the end, two
+ * appends to one list at successive indices. Members a list gains anywhere but its end are one
+ * item per run, `ahead` naming the member that follows them. A record or a list written where none
+ * was is compared with an empty one. A choice with variants is compared as a record, its
+ * discriminant a cell of it, and a checklist member by member: one ticked or unticked is proposed
+ * whole, and one held on both sides cell by cell. A value of a type nothing nests in, a field the
+ * answer clears, and a rich text value of `blocks` inside a record or a list are proposed whole.
+ * Values are in the form the editor's controls are handed, a text cell as its `Content`.
  *
  * A card the answer adds is an `add` item after the nearest card before it that the answer
  * keeps, so cards it adds in a run stand in list order; one it takes out is a `remove` item.
@@ -81,7 +85,7 @@ export function proposalsBetween(
 		for (const name of keysOf(fields, before, after)) {
 			const f = fields[name] as QuillFieldSchema | undefined;
 			const kind = f && textKind(f);
-			if (kind?.type === 'richtext' && kind.shape !== 'line') {
+			if (kind?.type === 'richtext' && kind.shape === 'blocks') {
 				blocks(pathOf(at, name), base, addrOf(at, name), answer, addrOf(answerAt, name));
 				continue;
 			}
@@ -160,6 +164,16 @@ export function proposalsBetween(
 				...(was !== undefined && { before: was }),
 				...(now !== undefined && { after: now })
 			});
+		const text = f && textKind(f);
+		const words = text && text.shape !== 'blocks' ? [asContent(was), asContent(now)] : [];
+		if (words[0] && words[1] && now != null) {
+			const runs = lineRuns(words[0], words[1]);
+			if (runs.length > 1) {
+				for (const run of runs)
+					items.push({ id: mint(), field: pathAt(steps), before: was, after: run });
+				return;
+			}
+		}
 		const kind = f && baseType(f);
 		const records = isRecord(now) && (was == null || isRecord(was));
 		const cells: Record<string, unknown> = isRecord(was) ? was : {};
@@ -205,11 +219,8 @@ export function proposalsBetween(
 		if (kind !== 'array' || !Array.isArray(now) || !(was == null || Array.isArray(was)))
 			return whole();
 		const held: readonly unknown[] = Array.isArray(was) ? was : [];
-		const runs = aligned(held, now) ?? [
-			{ from: 0, to: 0, removed: held.length, added: now.length }
-		];
 		let appended = held.length;
-		for (const { from, to, removed, added } of runs) {
+		for (const { from, to, removed, added } of aligned(held, now)) {
 			const paired = Math.min(removed, added);
 			for (let k = 0; k < paired; k++)
 				value(pathAt, f?.items, [...steps, from + k], held[from + k], now[to + k]);
@@ -220,13 +231,20 @@ export function proposalsBetween(
 					field: pathAt([...steps, from + k]),
 					before: held[from + k]
 				});
-			for (let k = paired; k < added; k++)
+			if (added > paired && from + removed < held.length)
 				items.push({
 					id: mint(),
-
-					field: pathAt([...steps, appended++]),
-					after: now[to + k]
+					field: pathAt([...steps, from + removed]),
+					ahead: held[from + removed],
+					after: now.slice(to + paired, to + added)
 				});
+			else
+				for (let k = paired; k < added; k++)
+					items.push({
+						id: mint(),
+						field: pathAt([...steps, appended++]),
+						after: now[to + k]
+					});
 		}
 	};
 
@@ -303,13 +321,12 @@ function keysOf(declared: Record<string, unknown>, ...values: unknown[]): string
 /**
  * The runs where two lists differ, members matched by value along their longest common run:
  * at each, `removed` members of `was` from `from` and `added` members of `now` from `to`. A run
- * pairs its members as changes, and takes out or appends the rest. `undefined` where a run adds
- * more members than it takes out anywhere but the end, which no index names.
+ * pairs its members as changes, and takes out, appends or puts in the rest.
  */
 function aligned(
 	was: readonly unknown[],
 	now: readonly unknown[]
-): { from: number; to: number; removed: number; added: number }[] | undefined {
+): { from: number; to: number; removed: number; added: number }[] {
 	const m = was.length;
 	const n = now.length;
 	const lcs = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
@@ -323,16 +340,14 @@ function aligned(
 	let j = 0;
 	let from = 0;
 	let to = 0;
-	const close = (): boolean => {
+	const close = (): void => {
 		const removed = i - from;
 		const added = j - to;
-		if (added > removed && i < m) return false;
 		if (removed || added) runs.push({ from, to, removed, added });
-		return true;
 	};
 	while (i < m && j < n) {
 		if (sameValue(was[i], now[j])) {
-			if (!close()) return undefined;
+			close();
 			i++;
 			j++;
 			from = i;
@@ -342,5 +357,6 @@ function aligned(
 	}
 	i = m;
 	j = n;
-	return close() ? runs : undefined;
+	close();
+	return runs;
 }

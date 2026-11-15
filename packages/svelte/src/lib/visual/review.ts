@@ -25,7 +25,8 @@ import { asContent, wordDiff, type BlockPlace, type ReviewAction } from '../core
  *   field's writer would take, an absent one proposing the field cleared, and `before` the value
  *   its writer read. A path to a place inside a record or a
  *   list names that place: a cell, or a member by its index, which `after` absent takes out
- *   and an index past the last appends.
+ *   and an index past the last appends. One with `ahead` puts the members `after` holds in
+ *   front of `ahead`, the member its writer read at that index.
  * - `add` or `remove`: a whole card, proposed new or proposed taken out (`CardProposal`).
  *
  * A `field` on a card names the card by its index, read against the cards as they stood when
@@ -161,7 +162,13 @@ export type FieldProposal = {
 	card?: string;
 	before?: unknown;
 	after?: unknown;
+	/** The member a run of members proposed new inside a list goes in front of, as its writer
+	 *  read the list at the path's index; `after` then holds the members, in order. */
+	ahead?: unknown;
 };
+
+/** Whether a field item puts new members into a list in front of one it holds. */
+export const putsIn = (item: FieldProposal): boolean => 'ahead' in item;
 
 /** A field item routed past its field: the steps from the rung it is handed to down to the
  *  value it names, a member of a list by its index, a cell of a record by its key. */
@@ -222,11 +229,31 @@ export function valueWith(value: unknown, steps: readonly PathStep[], to: unknow
 	return record;
 }
 
+/** `value` with `members` put into the list `steps` reach, in front of the member at its last
+ *  step, or at its end past the last. */
+export function valueInserting(
+	value: unknown,
+	steps: readonly PathStep[],
+	members: unknown
+): unknown {
+	const head = steps.slice(0, -1);
+	const held = valueIn(value, head);
+	const list = Array.isArray(held) ? [...held] : [];
+	const at = steps.at(-1);
+	list.splice(
+		typeof at === 'number' ? Math.min(at, list.length) : list.length,
+		0,
+		...(Array.isArray(members) ? members : [members])
+	);
+	return valueWith(value, head, list);
+}
+
 /**
  * Where a field proposal's steps land in `value` as it stands. A list's member is found by its
  * index where it holds `before`, else as the nearest member holding `before` that `claimed`
  * does not already hold, so one member taken out does not move another's proposal onto the
- * wrong row. `found` is false where the proposal has a `before` nothing holds.
+ * wrong row. An insert lands in front of the nearest member holding its `ahead`, and claims
+ * none. `found` is false where the proposal has a `before` or an `ahead` nothing holds.
  */
 export function locate(
 	value: unknown,
@@ -243,6 +270,14 @@ export function locate(
 		claimed.add(JSON.stringify(out));
 		return out;
 	};
+	if (putsIn(item)) {
+		if (typeof at !== 'number' || !Array.isArray(list)) return { steps, found: false };
+		for (let d = 0; d <= Math.max(at, list.length - 1 - at); d++)
+			for (const i of d ? [at - d, at + d] : [at])
+				if (i >= 0 && i < list.length && sameValue(list[i], item.ahead))
+					return { steps: [...head, i], found: true };
+		return { steps, found: false };
+	}
 	if (!read || before === undefined || typeof at !== 'number' || !Array.isArray(list)) {
 		const found = !read || sameValue(valueIn(value, steps), before);
 		return { steps: claim(steps), found };
@@ -431,6 +466,16 @@ export function textProposal(
 	const before = 'before' in item ? asContent(item.before) : undefined;
 	if (!after || ('before' in item && !before)) return undefined;
 	return { id: item.id, after, ...(before && { before }) };
+}
+
+/** A place's proposals over a leaf of words, each run of one answer, or `undefined` where any
+ *  of them is not words or there are none. */
+export function textsOf(
+	items: readonly FieldProposal[],
+	cleared?: Content
+): TextProposal[] | undefined {
+	const list = items.map((item) => textProposal(item, cleared));
+	return list.length && list.every((p) => p !== undefined) ? (list as TextProposal[]) : undefined;
 }
 
 /** A number's proposal, drawn over its input as the struck and the proposed figures; `undefined`

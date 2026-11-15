@@ -48,7 +48,11 @@ export interface Drawn {
 	/** The removal marking each card, by its key. */
 	removes: ReadonlyMap<string, { id: string }>;
 	/** The field items over the leaf at `key`. */
-	at(key: string): { proposed?: FieldProposal; nested?: readonly DeepReview[] };
+	at(key: string): {
+		proposed?: FieldProposal;
+		more?: readonly FieldProposal[];
+		nested?: readonly DeepReview[];
+	};
 	/** What each prose leaf draws, by leaf key, its ids in the leaf's order. */
 	reports: ReadonlyMap<string, ReviewReport>;
 	/** The field items no control draws. */
@@ -70,8 +74,9 @@ export function orderOf(drawn: Drawn): string[] {
 		out.push(id);
 	};
 	const leaf = ({ key, schema, value }: LeafLayout): void => {
-		const { proposed, nested } = drawn.at(key);
-		if (proposed && !drawn.undrawn.has(proposed.id)) take(proposed.id);
+		const { proposed, more, nested } = drawn.at(key);
+		for (const p of proposed ? [proposed, ...(more ?? [])] : [])
+			if (!drawn.undrawn.has(p.id)) take(p.id);
 		const inside = (nested ?? [])
 			.filter((e) => !drawn.undrawn.has(e.item.id))
 			.map((e) => ({ id: e.item.id, rank: schema ? rankAt(schema, e.steps, value) : [] }));

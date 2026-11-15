@@ -24,6 +24,7 @@ import {
 	byCard,
 	locate,
 	onField,
+	putsIn,
 	sameValue,
 	textProposal,
 	valueIn,
@@ -74,7 +75,11 @@ export interface Review {
 	wrote(id: string, key: string | undefined): void;
 	/** The items over the field at leaf `key`: its own, and those naming a place inside it,
 	 *  each with the steps to the value it names as the field holds it now. */
-	at(key: string): { proposed?: FieldProposal; nested?: readonly DeepReview[] };
+	at(key: string): {
+		proposed?: FieldProposal;
+		more?: readonly FieldProposal[];
+		nested?: readonly DeepReview[];
+	};
 	/** Whether anything draws at leaf `key`: a field's own item, or a text item in its leaf. */
 	marks(key: string): boolean;
 	/** The leaf drawing item `id`, where one does. */
@@ -113,6 +118,16 @@ export interface Review {
 	/** Make `id` current at once: a step, a reveal, or a click or tap on it. */
 	reveal(id: string): void;
 }
+
+/** Whether two proposals on one place are runs of one answer over its words: each reads the
+ *  value its writer read alike, and writes words. A place takes every such run. */
+const runsOfOne = (a: FieldProposal, b: FieldProposal): boolean =>
+	'before' in a &&
+	'before' in b &&
+	sameValue(a.before, b.before) &&
+	asContent(a.after) !== undefined &&
+	asContent(b.after) !== undefined &&
+	asContent(a.before) !== undefined;
 
 export interface ReviewSource {
 	items(): readonly ReviewItem[] | undefined;
@@ -233,7 +248,10 @@ export function createReview(source: ReviewSource): Review {
 		return key !== undefined && standing.has(key) ? key : 'end';
 	}
 	const placed = $derived.by(() => {
-		const out = new Map<string, { proposed?: FieldProposal; nested?: DeepReview[] }>();
+		const out = new Map<
+			string,
+			{ proposed?: FieldProposal; more?: FieldProposal[]; nested?: DeepReview[] }
+		>();
 		const undrawn: { id: string; reason: ReviewUndrawn }[] = [...cards.undrawn];
 		/** The nested proposals whose `before` the field no longer holds. */
 		const moved = new Set<string>();
@@ -255,7 +273,14 @@ export function createReview(source: ReviewSource): Review {
 				claims.set(deep.key, claimed);
 				const held = out.get(deep.key) ?? {};
 				const { steps, found } = locate(deep.value, deep.steps, item, claimed);
-				if ((held.nested ?? []).some((e) => sameValue(e.steps, steps))) {
+				if (
+					(held.nested ?? []).some(
+						(e) =>
+							sameValue(e.steps, steps) &&
+							putsIn(e.item) === putsIn(item) &&
+							!runsOfOne(e.item, item)
+					)
+				) {
 					undrawn.push({ id: item.id, reason: 'taken' });
 					continue;
 				}
@@ -271,7 +296,8 @@ export function createReview(source: ReviewSource): Review {
 			}
 			const held = out.get(key) ?? {};
 			if (held.proposed !== undefined) {
-				undrawn.push({ id: item.id, reason: 'taken' });
+				if (runsOfOne(held.proposed, item)) held.more = [...(held.more ?? []), item];
+				else undrawn.push({ id: item.id, reason: 'taken' });
 				continue;
 			}
 			held.proposed = item;
@@ -286,13 +312,9 @@ export function createReview(source: ReviewSource): Review {
 	// leaf of words carries is outdated only where the reader's writing meets it.
 	const outdated = $derived.by(() => {
 		const out = new Set<string>(placed.moved);
-		for (const { proposed } of fields.values())
-			if (
-				proposed &&
-				'before' in proposed &&
-				!sameValue(source.valueAt(proposed.field), proposed.before)
-			)
-				out.add(proposed.id);
+		for (const { proposed, more } of fields.values())
+			for (const p of proposed ? [proposed, ...(more ?? [])] : [])
+				if ('before' in p && !sameValue(source.valueAt(p.field), p.before)) out.add(p.id);
 		for (const [id, state] of carried)
 			if (state === 'outdated') out.add(id);
 			else out.delete(id);

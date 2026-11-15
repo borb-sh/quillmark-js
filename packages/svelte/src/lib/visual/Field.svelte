@@ -60,7 +60,7 @@
 	import ReviewProposal from './ReviewProposal.svelte';
 	import ReviewRows from './ReviewRows.svelte';
 	import { review } from './review.svelte.js';
-	import { numberProposal, shownValue, textProposal } from './review.js';
+	import { numberProposal, shownValue, textsOf } from './review.js';
 
 	interface Props {
 		field: FieldModel;
@@ -323,16 +323,16 @@
 	 * rather than counted twice.
 	 */
 	// ── Review: this field's own items (`review.svelte.ts`) ──────────────────────
-	/** A whole proposed value drawn as words over the control's own: a text field's as a word
-	 *  diff, whatever its kind, carried onto what the reader wrote since its writer read it, a
-	 *  number's as the struck and the proposed figures. */
+	/** A proposed value drawn as words over the control's own: a text field's as a word diff,
+	 *  whatever its kind, a whole value or each run of one answer, carried onto what the reader
+	 *  wrote since its writer read it; a number's as the struck and the proposed figures. */
 	const texted = $derived(
-		field.control === 'prose'
-			? textProposal(proposed, printed ? (ghost as Content) : undefined)
+		field.control === 'prose' && proposed
+			? textsOf([proposed, ...(reviewed.more ?? [])], printed ? (ghost as Content) : undefined)
 			: undefined
 	);
 	const numbered = $derived(field.control === 'number' ? numberProposal(proposed) : undefined);
-	const worded = $derived(texted ?? numbered);
+	const worded = $derived(texted?.[0] ?? numbered);
 	/** What a control that cannot draw a proposal as words shows while one stands: the value
 	 *  Accept would write, tinted (`ReviewProposal`), or its default or empty face where Accept
 	 *  clears it. */

@@ -58,7 +58,7 @@
 		numberProposal,
 		shownValue,
 		splitReview,
-		textProposal,
+		textsOf,
 		type DeepReview,
 		type FieldProposal
 	} from './review.js';
@@ -322,10 +322,13 @@
 			{@const deep = routed.below.get(key)}
 			{@const reviewHere = reviewed.below.get(key)}
 			{@const handsDown = isContainer(kind)}
-			{@const ownItem = handsDown ? undefined : reviewHere?.find((e) => !e.steps.length)?.item}
-			{@const textOwn = kind === 'prose' ? textProposal(ownItem, contentDefault(sub)) : undefined}
+			{@const ownItems = handsDown
+				? []
+				: (reviewHere ?? []).filter((e) => !e.steps.length).map((e) => e.item)}
+			{@const ownItem = ownItems[0]}
+			{@const textOwn = kind === 'prose' ? textsOf(ownItems, contentDefault(sub)) : undefined}
 			{@const numberOwn = kind === 'number' ? numberProposal(ownItem) : undefined}
-			{@const worded = textOwn ?? numberOwn}
+			{@const worded = textOwn?.[0] ?? numberOwn}
 			{@const shownItem = worded ? undefined : ownItem}
 			{@const shown = shownValue(shownItem, obj[key])}
 			{@const commitCell = (v: unknown) => answerOrCommit(shownItem, key, v)}
@@ -543,7 +546,7 @@
 					<DiagnosticList diagnostics={own} />
 					{#if !handsDown}
 						<ReviewRows
-							entries={worded ? reviewHere?.filter((e) => e.item !== ownItem) : reviewHere}
+							entries={worded ? reviewHere?.filter((e) => !ownItems.includes(e.item)) : reviewHere}
 						/>
 					{/if}
 				</div>

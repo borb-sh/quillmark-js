@@ -63,8 +63,9 @@
 		cap?: TextCap;
 		/** Registry identity, stamped on the DOM node so a remount is visible as one. */
 		leafKey: string;
-		/** A whole proposed value for a leaf of lines, drawn over its text as a word diff. */
-		proposed?: TextProposal;
+		/** Proposed values over the leaf's words, a whole one or each run of one answer, drawn
+		 *  over its text as a word diff. */
+		proposed?: readonly TextProposal[];
 		onFocus?: (addr: Addr) => void;
 		onCaretMove?: (addr: Addr, pos: number) => void;
 		/** A commit landed on this leaf: the prose change lane. */
@@ -197,12 +198,14 @@
 		controller?.setReview(reviewing.textAt(leafKey), reviewing.lit);
 	});
 	$effect(() => {
-		controller?.setValueProposal(proposed && { ...proposed, lit: reviewing.lit === proposed.id });
+		controller?.setValueProposals(
+			(proposed ?? []).map((p) => ({ ...p, lit: reviewing.lit === p.id }))
+		);
 	});
 	$effect(() => {
-		const id = proposed?.id;
+		const ids = (proposed ?? []).map((p) => p.id);
 		return () => {
-			if (id !== undefined) reviewing.planned(id, undefined);
+			for (const id of ids) reviewing.planned(id, undefined);
 		};
 	});
 

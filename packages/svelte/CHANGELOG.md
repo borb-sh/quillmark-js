@@ -6,6 +6,10 @@
 
 **A text field draws its proposal as words, whatever its kind and wherever it sits.** A `text` or `richtext` field of any shape strikes the words a whole-value proposal takes out and tints the ones it writes in its own leaf, inside a record or a list as at the top of a card: a memo's recipients or signature block as `richtext` lines, and a revision's rationale as `richtext` blocks, list items included, where each showed the proposed value under a tint with nothing struck.
 
+**`proposalsBetween` proposes a field of lines one run of changed lines at a time, wherever it sits.** A `text` or `richtext` field of one line or of lines takes one item per run of lines the answer changes, each the value read with that run alone written, runs at most two unchanged lines apart one item, and the leaf draws each run as words and takes it alone. A top-level `richtext` of `lines` took one item per paragraph, so an addressee added above the rest read as the first line rewritten plus that line added, and taking only the first dropped an addressee; a field inside a record took one item for every change at once.
+
+**A member a proposal puts into a list before its end is one item, drawn where it would stand.** `proposalsBetween` proposes members added anywhere but a list's end as one item, `FieldProposal.ahead` naming the member they go in front of, and the list draws them as new rows there. Before, every member below the insert was proposed rewritten, so adding an addressee above three recipients made four items and taking only the first dropped one.
+
 **`enumOptionAllowed` reaches an enum inside an object field.** The hook is asked for an enum property of a field's object subform, at any depth and as a plain enum or a variant, with a third argument `steps` naming the properties from the field down to it (`['level']` for `classification.level`), and `enumDisallowed` draws its refused options as it does a field's own. A field's own enum control is asked with `steps` absent. An enum inside a list or matrix cell is still offered whole.
 
 ## v0.37.1 - 2026-11-14
