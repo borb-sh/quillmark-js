@@ -200,12 +200,17 @@ function lineStarts(c: Content): number[] {
 
 /**
  * `after` as one proposal per run of lines it changes in `before`: each `before` with that run
- * alone written as `after` has it, in reading order. Runs at most two unchanged lines apart are
- * one. Lines pair by their words and formatting along their longest common run, so a line added
- * or taken out is one run, never every line below it. A value that holds more than lines of
- * words, or one that changes a single run, is `[after]`.
+ * alone written as `after` has it, in reading order. Lines pair by their words and formatting
+ * along their longest common run, so a line added or taken out is one run, never every line below
+ * it. By `'run'`, runs at most two unchanged lines apart are one; by `'paragraph'`, a run that
+ * rewrites as many lines as it reads is one proposal per line, as the body proposes paragraphs. A
+ * value that holds more than lines of words, or one that changes a single line or run, is `[after]`.
  */
-export function lineRuns(before: Content, after: Content): Content[] {
+export function lineRuns(
+	before: Content,
+	after: Content,
+	unit: 'run' | 'paragraph' = 'run'
+): Content[] {
 	if ([before, after].some(structured)) return [after];
 	const bs = lineStarts(before);
 	const as = lineStarts(after);
@@ -227,7 +232,7 @@ export function lineRuns(before: Content, after: Content): Content[] {
 	const close = (): void => {
 		if (!open) return;
 		const last = runs.at(-1);
-		if (last && open.b - last.be <= RUN_GAP) {
+		if (unit === 'run' && last && open.b - last.be <= RUN_GAP) {
 			last.be = i;
 			last.ae = j;
 		} else runs.push({ b: open.b, be: i, a: open.a, ae: j });
@@ -245,8 +250,21 @@ export function lineRuns(before: Content, after: Content): Content[] {
 		}
 	}
 	close();
-	if (runs.length < 2) return [after];
-	return runs.map((run) => {
+	const apart =
+		unit === 'paragraph'
+			? runs.flatMap((r) =>
+					r.be - r.b === r.ae - r.a && r.be - r.b > 1
+						? Array.from({ length: r.be - r.b }, (_, k) => ({
+								b: r.b + k,
+								be: r.b + k + 1,
+								a: r.a + k,
+								ae: r.a + k + 1
+							}))
+						: [r]
+				)
+			: runs;
+	if (apart.length < 2) return [after];
+	return apart.map((run) => {
 		const lines = [
 			...bs.slice(0, run.b).map((_, k) => lineOf(before, bs, k)),
 			...as.slice(run.a, run.ae).map((_, k) => lineOf(after, as, run.a + k)),
@@ -256,7 +274,7 @@ export function lineRuns(before: Content, after: Content): Content[] {
 			...before.blocks.slice(0, run.b),
 			...after.blocks.slice(run.a, run.ae),
 			...before.blocks.slice(run.be)
-		];
+		].map((b, k) => ({ ...b, id: `b${k}` }));
 		let at = 0;
 		const marks: ContentMark[] = [];
 		for (const line of lines) {

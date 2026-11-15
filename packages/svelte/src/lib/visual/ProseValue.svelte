@@ -45,7 +45,7 @@
  replacement reads, so a write moving the value takes it or releases it.
 -->
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { Fragment, Slice, type Node as PMNode } from 'prosemirror-model';
 	import { EditorState, Selection } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
@@ -167,11 +167,16 @@
 		drawnProposals = (proposed ?? []).map((p) => ({ ...p, lit: reviewing.lit === p.id }));
 		redraw?.();
 	});
+	/** A proposal's plan goes when it leaves the list or the leaf goes, not when another in the
+	 *  list is answered, which would leave its own Accept writing its value whole. */
+	let plannedIds: readonly string[] = [];
 	$effect(() => {
 		const ids = (proposed ?? []).map((p) => p.id);
-		return () => {
-			for (const id of ids) reviewing.planned(id, undefined);
-		};
+		for (const id of plannedIds) if (!ids.includes(id)) reviewing.planned(id, undefined);
+		plannedIds = ids;
+	});
+	onDestroy(() => {
+		for (const id of plannedIds) reviewing.planned(id, undefined);
 	});
 
 	const t = wording();

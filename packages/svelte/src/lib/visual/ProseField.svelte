@@ -5,7 +5,7 @@
  this leaf's commits with the caret riding the untouched view.
 -->
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import {
 		createField,
 		type FieldController,
@@ -202,11 +202,16 @@
 			(proposed ?? []).map((p) => ({ ...p, lit: reviewing.lit === p.id }))
 		);
 	});
+	/** A proposal's plan goes when it leaves the list or the leaf goes, not when another in the
+	 *  list is answered, which would leave its own Accept writing its value whole. */
+	let plannedIds: readonly string[] = [];
 	$effect(() => {
 		const ids = (proposed ?? []).map((p) => p.id);
-		return () => {
-			for (const id of ids) reviewing.planned(id, undefined);
-		};
+		for (const id of plannedIds) if (!ids.includes(id)) reviewing.planned(id, undefined);
+		plannedIds = ids;
+	});
+	onDestroy(() => {
+		for (const id of plannedIds) reviewing.planned(id, undefined);
 	});
 
 	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.
