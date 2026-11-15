@@ -7,8 +7,15 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Addr, Document, Quill } from '@quillmark/wasm';
 import type { VisualEditorProps } from '$lib/visual/props';
-import { quill } from '../helpers/fixtures.js';
-import { field, mountEditor, openList, pick, unmountAll } from '../helpers/surface.svelte.js';
+import { quill, quillFromYaml } from '../helpers/fixtures.js';
+import {
+	field,
+	mountEditor,
+	openGroup,
+	openList,
+	pick,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -123,5 +130,89 @@ describe('the hook is asked per option, at the field it draws', () => {
 		expect(asked.map((s) => s.value)).toEqual(
 			expect.arrayContaining(['draft', 'in_review', 'final'])
 		);
+	});
+});
+
+/** A marking inside a group, as a plain enum, a variant, and one object further in. */
+const grouped = () =>
+	quillFromYaml(`quill:
+  name: enum_policy
+  version: 1.0.0
+  backend: typst
+  description: Enums inside a top-level object.
+typst:
+  plate_file: plate.typ
+main:
+  fields:
+    classification:
+      type: object
+      properties:
+        level:
+          type: enum
+          values: [UNCLASSIFIED, CUI, SECRET]
+          variants:
+            CUI:
+              controlled_by:
+                type: text
+        dissemination:
+          type: text
+        handling:
+          type: object
+          properties:
+            caveat:
+              type: enum
+              values: [NONE, NOFORN]
+`);
+
+/** The enum a subform's property label names, by the label's `for`. */
+function property(target: HTMLElement, label: string): HTMLElement {
+	const named = [...target.querySelectorAll<HTMLLabelElement>('label')].find(
+		(l) => l.textContent?.trim() === label
+	);
+	const control = named?.htmlFor && document.getElementById(named.htmlFor);
+	if (!control) throw new Error(`no property labelled ${label}`);
+	return control;
+}
+
+describe('the policy reaches an enum inside an object', () => {
+	function mounted(allowed: VisualEditorProps['enumOptionAllowed']) {
+		const q = grouped();
+		const { target } = mountEditor(q, q.seedDocument(), {
+			enumOptionAllowed: allowed,
+			enumDisallowed: 'hide'
+		});
+		openGroup(target, 'Classification');
+		return target;
+	}
+
+	it('asks with the steps from the field down to the enum', () => {
+		const seen = new Set<string>();
+		const target = mounted((addr, _value, steps) => {
+			seen.add([addr.field, ...(steps ?? [])].join('.'));
+			return true;
+		});
+		openList(property(target, 'Level'));
+		openList(property(target, 'Caveat'));
+
+		expect(seen).toEqual(new Set(['classification.level', 'classification.handling.caveat']));
+	});
+
+	it('leaves a refused member out of a variant inside the object', () => {
+		const target = mounted(
+			(addr, value, steps) =>
+				!(addr.field === 'classification' && steps?.[0] === 'level' && value === 'SECRET')
+		);
+		openList(property(target, 'Level'));
+
+		expect(texts(target)).toEqual(['UNCLASSIFIED', 'CUI']);
+	});
+
+	it('leaves a refused option out of an enum two objects in', () => {
+		const target = mounted(
+			(_addr, value, steps) => !(steps?.at(-1) === 'caveat' && value === 'NOFORN')
+		);
+		openList(property(target, 'Caveat'));
+
+		expect(texts(target)).toEqual(['NONE']);
 	});
 });

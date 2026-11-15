@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`enumOptionAllowed` reaches an enum inside an object field.** The hook is asked for an enum property of a field's object subform, at any depth and as a plain enum or a variant, with a third argument `steps` naming the properties from the field down to it (`['level']` for `classification.level`), and `enumDisallowed` draws its refused options as it does a field's own. A field's own enum control is asked with `steps` absent. An enum inside a list or matrix cell is still offered whole.
+
 ## v0.37.1 - 2026-11-14
 
 **A checklist's held item rests as one line.** A ticked item with details shows its name, then the first line of words its details hold in the label ink, and a chevron that opens them in the item's own column, so no other item moves. Ticking or adding an item opens it, and so does a proposal or an error on one of its details.
