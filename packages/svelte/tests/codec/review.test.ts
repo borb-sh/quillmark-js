@@ -418,6 +418,57 @@ describe('a proposal by blocks', () => {
 		expect(accept(leaf)).toBe('Keep this.');
 	});
 
+	it('adds blocks that leave every block of the leaf its id', () => {
+		const leaf = leafOver('One.\n\nTwo.');
+		const [one, two] = ids(leaf);
+		leaf.field.setReview([
+			{ id: 'add', insert: { after: one }, after: 'Added.\n\nAdded too.' },
+			{ id: 'drop', replace: [two], after: '' }
+		]);
+		expect(leaf.field.answerReview('add', 'accept')).toBe(true);
+		expect(ids(leaf)).toContain(two);
+		expect(leaf.field.answerReview('drop', 'accept')).toBe(true);
+		expect(leaf.doc.main.body.text).toBe('One.\nAdded.\nAdded too.');
+	});
+
+	it('rewrites a block into more that leave every block of the leaf its id', () => {
+		const leaf = leafOver('One.\n\nTwo.');
+		const [one, two] = ids(leaf);
+		leaf.field.setReview([
+			{ id: 'split', replace: [one], after: 'One.\n\nMore.' },
+			{ id: 'drop', replace: [two], after: '' }
+		]);
+		expect(leaf.field.answerReview('split', 'accept')).toBe(true);
+		expect(ids(leaf)).toContain(two);
+		expect(leaf.field.answerReview('drop', 'accept')).toBe(true);
+		expect(leaf.doc.main.body.text).toBe('One.\nMore.');
+	});
+
+	it('rewrites a body whole to one text, whatever order its items are taken in', () => {
+		const body = 'Write here.\n\n- Use bullets.\n\n  - Indent deeper.\n\nYou can **bold**.';
+		const items = (leaf: Leaf): TextReview[] => {
+			const [first, ...rest] = ids(leaf);
+			return [
+				{ id: 'one', replace: [first], after: 'One.' },
+				...rest.map((id) => ({ id, replace: [id], after: '' })),
+				{ id: 'add', insert: { after: first }, after: 'Two.\n\nThree.' }
+			];
+		};
+		const orders = <T>(xs: readonly T[]): T[][] =>
+			xs.length < 2
+				? [[...xs]]
+				: xs.flatMap((x, i) => orders(xs.toSpliced(i, 1)).map((rest) => [x, ...rest]));
+		const probe = leafOver(body);
+		const all = items(probe).map((item) => item.id);
+		for (const order of orders(all)) {
+			const leaf = leafOver(body);
+			leaf.field.setReview(items(leaf));
+			for (const id of order) expect(leaf.field.answerReview(id, 'accept'), id).toBe(true);
+			expect(leaf.doc.main.body.text, order.join(' ')).toBe('One.\nTwo.\nThree.');
+			open.splice(open.indexOf(leaf.field), 1)[0].destroy();
+		}
+	});
+
 	it.each([
 		['after a block', (b: string[]) => ({ after: b[0] }), 'One.\nAdded.\nTwo.'],
 		['before a block', (b: string[]) => ({ before: b[1] }), 'One.\nAdded.\nTwo.'],
