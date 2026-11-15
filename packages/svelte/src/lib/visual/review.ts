@@ -26,7 +26,9 @@ import { asContent, wordDiff, type BlockPlace, type ReviewAction } from '../core
  *   its writer read. A path to a place inside a record or a
  *   list names that place: a cell, or a member by its index, which `after` absent takes out
  *   and an index past the last appends. One with `ahead` puts the members `after` holds in
- *   front of `ahead`, the member its writer read at that index.
+ *   front of `ahead`, the member its writer read at that index. A member named with no `before`
+ *   read nothing there, so it is new: it appends, and the appends of one list stand in their
+ *   indices' order whichever is taken first.
  * - `add` or `remove`: a whole card, proposed new or proposed taken out (`CardProposal`).
  *
  * A `field` on a card names the card by its index, read against the cards as they stood when
@@ -167,8 +169,15 @@ export type FieldProposal = {
 	ahead?: unknown;
 };
 
-/** Whether a field item puts new members into a list in front of one it holds. */
-export const putsIn = (item: FieldProposal): boolean => 'ahead' in item;
+/** Whether a field item at `steps` puts new members into a list: in front of one it holds
+ *  (`ahead`), or as a member it names by an index and read nothing at, which appends. */
+export const putsIn = (item: FieldProposal, steps: readonly PathStep[]): boolean =>
+	'ahead' in item ||
+	(typeof steps.at(-1) === 'number' && !('before' in item) && item.after !== undefined);
+
+/** The members an item that puts some into a list adds, in order. */
+export const membersOf = (item: FieldProposal): unknown[] =>
+	'ahead' in item && Array.isArray(item.after) ? item.after : [item.after];
 
 /** A field item routed past its field: the steps from the rung it is handed to down to the
  *  value it names, a member of a list by its index, a cell of a record by its key. */
@@ -234,17 +243,13 @@ export function valueWith(value: unknown, steps: readonly PathStep[], to: unknow
 export function valueInserting(
 	value: unknown,
 	steps: readonly PathStep[],
-	members: unknown
+	members: readonly unknown[]
 ): unknown {
 	const head = steps.slice(0, -1);
 	const held = valueIn(value, head);
 	const list = Array.isArray(held) ? [...held] : [];
 	const at = steps.at(-1);
-	list.splice(
-		typeof at === 'number' ? Math.min(at, list.length) : list.length,
-		0,
-		...(Array.isArray(members) ? members : [members])
-	);
+	list.splice(typeof at === 'number' ? Math.min(at, list.length) : list.length, 0, ...members);
 	return valueWith(value, head, list);
 }
 
@@ -254,12 +259,17 @@ export function valueInserting(
  * does not already hold, so one member taken out does not move another's proposal onto the
  * wrong row. An insert lands in front of the nearest member holding its `ahead`, and claims
  * none. `found` is false where the proposal has a `before` or an `ahead` nothing holds.
+ *
+ * An append lands at the list's end, in front of the members at its end that `later` holds in
+ * order: what the appends of its run at higher indices add, so appends taken in any order
+ * stand in their indices' order.
  */
 export function locate(
 	value: unknown,
 	steps: readonly PathStep[],
 	item: FieldProposal,
-	claimed: Set<string>
+	claimed: Set<string>,
+	later: readonly unknown[] = []
 ): { steps: readonly PathStep[]; found: boolean } {
 	const read = 'before' in item;
 	const before = read ? item.before : undefined;
@@ -270,7 +280,13 @@ export function locate(
 		claimed.add(JSON.stringify(out));
 		return out;
 	};
-	if (putsIn(item)) {
+	if (putsIn(item, steps) && !('ahead' in item)) {
+		const members: readonly unknown[] = Array.isArray(list) ? list : [];
+		let i = members.length;
+		for (const member of [...later].reverse()) if (i > 0 && sameValue(members[i - 1], member)) i--;
+		return { steps: [...head, i], found: true };
+	}
+	if ('ahead' in item) {
 		if (typeof at !== 'number' || !Array.isArray(list)) return { steps, found: false };
 		for (let d = 0; d <= Math.max(at, list.length - 1 - at); d++)
 			for (const i of d ? [at - d, at + d] : [at])
