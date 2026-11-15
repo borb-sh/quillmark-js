@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A bullet a proposal adds lands at the depth it was written.** An item added under a bullet with no children nests under it, one added ahead of a bullet's children opens its sub-list, and one written back out of a nested list joins the outer one, both as drawn and on Accept. Before, the leaf read the Markdown the store spells a nested block in, indented two spaces per list, as a sibling at the top level, or as a code block two lists deep; a word edit of a bullet two lists deep was drawn as the bullet struck and a code block added.
+
 **A row a proposal adds to an empty table or list of records is drawn.** A list of records or a table holding no rows hid its rows whole, so a member proposed into it, a memo's first additional signer or a showcase's first contributor, drew no row and no answer card while the review counted it and the preview showed it; only Accept All could take it.
 
 ## v0.38.0 - 2026-11-15
