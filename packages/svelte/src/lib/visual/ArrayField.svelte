@@ -116,6 +116,7 @@
 	} from './structure.js';
 	import {
 		numberProposal,
+		putsIn,
 		textProposal,
 		type TextProposal,
 		splitReview,
@@ -263,9 +264,21 @@
 		unrouted(routed, (step) => typeof step === 'number' && step >= 0 && step < arr.length)
 	);
 	const reviewed = $derived(splitReview(review));
+	/** An item on a row that adds members in front of it, which the row does not draw. */
+	const inserting = (e: DeepReview): boolean => !e.steps.length && putsIn(e.item);
 	/** A row's review items: the member's own, and those inside it. */
 	const rowReview = (k: number): DeepReview[] =>
-		k < arr.length ? (reviewed.below.get(k) ?? []) : [];
+		k < arr.length ? (reviewed.below.get(k) ?? []).filter((e) => !inserting(e)) : [];
+	/** The members a review would put in front of row `k`, each with the item that adds it. */
+	const insertedAt = (k: number): { item: FieldProposal; after: unknown }[] =>
+		k < arr.length
+			? (reviewed.below.get(k) ?? []).filter(inserting).flatMap(({ item }) =>
+					(Array.isArray(item.after) ? item.after : [item.after]).map((after) => ({
+						item,
+						after
+					}))
+				)
+			: [];
 	const ownReview = (k: number): DeepReview[] => rowReview(k).filter((e) => !e.steps.length);
 	/** A row's own removal: the proposal that takes the member out, drawn on the whole row. */
 	const removal = (k: number): FieldProposal | undefined =>
@@ -322,7 +335,9 @@
 		...[...reviewed.below].flatMap(([step, list]) => {
 			const held = typeof step === 'number' && step >= 0 && step < arr.length;
 			return list
-				.filter((e) => !held || (table && !e.steps.length && e.item.after !== undefined))
+				.filter(
+					(e) => !held || (table && !inserting(e) && !e.steps.length && e.item.after !== undefined)
+				)
 				.map((e) => ({ steps: [step, ...e.steps], item: e.item }));
 		})
 	]);
@@ -333,6 +348,7 @@
 				e.steps.length === 1 &&
 				typeof e.steps[0] === 'number' &&
 				e.steps[0] >= arr.length &&
+				!putsIn(e.item) &&
 				e.item.after !== undefined
 		)
 	);
@@ -1047,6 +1063,11 @@
 					<span class="qm-array-table-head-end"></span>
 				</div>
 				{#each ids as id, k (id)}
+					{#each insertedAt(k) as { item, after }, n (`${item.id}:${n}`)}{@render addedRow(
+							item,
+							after,
+							k
+						)}{/each}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class={['qm-array-row qm-array-table-row qm-wash', { lifted: drag.lifted(k) }]}
@@ -1073,7 +1094,11 @@
 						{@render removeButton(k, true)}
 					</div>
 				{/each}
-				{#each added as { item }, n (item.id)}{@render addedRow(item, arr.length + n)}{/each}
+				{#each added as { item }, n (item.id)}{@render addedRow(
+						item,
+						item.after,
+						arr.length + n
+					)}{/each}
 			</div>
 		</div>
 	{:else if control === 'object'}
@@ -1082,6 +1107,8 @@
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
+			<!-- A row animates its moves, so it is its keyed block's only child, and a member a review
+			     puts in front of it is drawn after the rows and set in place by its flex order. -->
 			{#each ids as id, k (id)}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<!-- The handler catches a key from the controls inside the row and adds no
@@ -1091,6 +1118,7 @@
 						'qm-array-row qm-element qm-wash',
 						{ open: open.has(id), lifted: drag.lifted(k) }
 					]}
+					style:order={2 * k + 1}
 					data-drop={drag.dropSide(k)}
 					data-qm-index={k}
 					bind:this={rowEls[id]}
@@ -1151,7 +1179,18 @@
 					{/if}
 				</div>
 			{/each}
-			{#each added as { item }, n (item.id)}{@render addedRow(item, arr.length + n)}{/each}
+			{#each ids as _, k (k)}{#each insertedAt(k) as { item, after }, n (`${item.id}:${n}`)}{@render addedRow(
+						item,
+						after,
+						k,
+						2 * k
+					)}{/each}{/each}
+			{#each added as { item }, n (item.id)}{@render addedRow(
+					item,
+					item.after,
+					arr.length + n,
+					2 * arr.length + 1
+				)}{/each}
 		</div>
 	{:else}
 		<div
@@ -1160,6 +1199,11 @@
 			bind:this={rowsEl}
 		>
 			{#each rowIds as id, k (id)}
+				{#each insertedAt(k) as { item, after }, n (`${item.id}:${n}`)}{@render addedRow(
+						item,
+						after,
+						k
+					)}{/each}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
 					class={['qm-array-row qm-wash', { standing: id === standingId, lifted: drag.lifted(k) }]}
@@ -1245,7 +1289,11 @@
 					<ReviewRows entries={rowMarks(k)} member />
 				</div>
 			{/each}
-			{#each added as { item }, n (item.id)}{@render addedRow(item, arr.length + n)}{/each}
+			{#each added as { item }, n (item.id)}{@render addedRow(
+					item,
+					item.after,
+					arr.length + n
+				)}{/each}
 		</div>
 	{/if}
 	<DiagnosticList diagnostics={foot} />
@@ -1256,8 +1304,7 @@
      the value, tinted and inert: a table's as a row of its cells under the same headers, a record
      list's collapsed to its summary. The row, not the control, hears the pointer and carries the
      item, so a press on it names the item and the answer card stands on it. -->
-{#snippet addedRow(item: FieldProposal, k: number)}
-	{@const after = item.after}
+{#snippet addedRow(item: FieldProposal, after: unknown, k: number, order?: number)}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class={[
@@ -1268,6 +1315,7 @@
 				'qm-review-lit': reviewing.lit === item.id
 			}
 		]}
+		style:order
 		data-qm-review={item.id}
 		role="group"
 		aria-label={t.strings.reviewNewItem}

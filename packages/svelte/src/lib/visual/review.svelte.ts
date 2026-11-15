@@ -24,6 +24,7 @@ import {
 	byCard,
 	locate,
 	onField,
+	putsIn,
 	sameValue,
 	textProposal,
 	valueIn,
@@ -255,7 +256,11 @@ export function createReview(source: ReviewSource): Review {
 				claims.set(deep.key, claimed);
 				const held = out.get(deep.key) ?? {};
 				const { steps, found } = locate(deep.value, deep.steps, item, claimed);
-				if ((held.nested ?? []).some((e) => sameValue(e.steps, steps))) {
+				if (
+					(held.nested ?? []).some(
+						(e) => sameValue(e.steps, steps) && putsIn(e.item) === putsIn(item)
+					)
+				) {
 					undrawn.push({ id: item.id, reason: 'taken' });
 					continue;
 				}

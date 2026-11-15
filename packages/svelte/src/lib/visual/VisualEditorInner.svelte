@@ -67,9 +67,11 @@
 		byBlocks,
 		byCard,
 		locate,
+		putsIn,
 		onField,
 		reviewText,
 		valueIn,
+		valueInserting,
 		valueWith,
 		NO_PROJECTION,
 		type CardProposal,
@@ -467,7 +469,9 @@
 				const steps = reviewing.at(leaf).nested?.find((e) => e.item.id === item.id)?.steps;
 				if (!steps) return undefined;
 				const value = current();
-				after = valueWith(value, steps, to(valueIn(value, steps)));
+				after = putsIn(item)
+					? valueInserting(value, steps, item.after)
+					: valueWith(value, steps, to(valueIn(value, steps)));
 			} else after = to(current());
 			if (!write(after)) return undefined;
 			return () => void write(before);
@@ -1848,11 +1852,9 @@
 					}
 				}
 				if (!found) continue;
-				held.value = valueWith(
-					held.value,
-					found,
-					reviewing.writes(item, valueIn(held.value, found))
-				);
+				held.value = putsIn(item as FieldProposal)
+					? valueInserting(held.value, found, (item as FieldProposal).after)
+					: valueWith(held.value, found, reviewing.writes(item, valueIn(held.value, found)));
 			}
 			held.ids.push(id);
 		}
