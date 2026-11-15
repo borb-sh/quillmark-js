@@ -3,7 +3,7 @@
 // `VisualEditorInner` (the editor, which mounts once per key). A component cannot
 // export a type without a module script, and a type imported across the two would
 // make the pair circular, so the shape lives beside them instead.
-import type { Document, Quill, Addr, Diagnostic, FontFace } from '@quillmark/wasm';
+import type { Document, Quill, Addr, Diagnostic, FontFace, PathStep } from '@quillmark/wasm';
 import type { Place } from '../core/address.js';
 import type { EditorErrorHandler } from '../core/errors.js';
 import type { ActiveLeaf, EditorChange } from './signals.js';
@@ -76,10 +76,12 @@ export interface VisualEditorProps {
 	 * return `false` to mark that option unavailable; `enumDisallowed` decides how
 	 * the control then draws it. The stored payload is untouched either way: the
 	 * schema is unchanged, this is runtime policy. Absent → every schema option is
-	 * offered. It reaches a field's own enum control; an enum inside an object
-	 * subform has no `Addr` to pass and is offered whole.
+	 * offered. It reaches a field's own enum control, where `steps` is absent, and an
+	 * enum inside the field's object subform, at any depth, where `steps` names the
+	 * properties from the field down to it (`['level']` for `classification.level`).
+	 * An enum inside a list or matrix cell is offered whole.
 	 */
-	enumOptionAllowed?: (addr: Addr, value: string) => boolean;
+	enumOptionAllowed?: (addr: Addr, value: string, steps?: readonly PathStep[]) => boolean;
 	/**
 	 * How an `enumOptionAllowed: false` option draws: `'disable'` (the default) greys
 	 * it in place, `'hide'` leaves it out of the list. One policy for the surface, not

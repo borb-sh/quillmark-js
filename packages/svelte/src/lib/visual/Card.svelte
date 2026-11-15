@@ -38,8 +38,9 @@
 		retype: (kind: string) => void;
 		rename: (title: string) => void;
 		diagFor: (field?: string) => Diagnostic[] | undefined;
-		/** Consumer enum-option policy for a field; true when no hook set. */
-		enumAllowed: (field: string, value: string) => boolean;
+		/** Consumer enum-option policy for a field, or for an enum `steps` down inside it;
+		 *  true when no hook set. */
+		enumAllowed: (field: string, value: string, steps?: readonly PathStep[]) => boolean;
 	}
 
 	interface Props {
@@ -400,7 +401,7 @@
 				leafKey={ops.leafKey(f.name)}
 				domIds={ops.domIds(f.name)}
 				onCommitScalar={(v) => ops.commit(f.name, v)}
-				optionAllowed={(v) => ops.enumAllowed(f.name, v)}
+				optionAllowed={(v, steps) => ops.enumAllowed(f.name, v, steps)}
 				{enumDisallowed}
 				{onFocus}
 				{onCaretMove}
