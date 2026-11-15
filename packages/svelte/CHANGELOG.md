@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A row a proposal adds to an empty table or list of records is drawn.** A list of records or a table holding no rows hid its rows whole, so a member proposed into it, a memo's first additional signer or a showcase's first contributor, drew no row and no answer card while the review counted it and the preview showed it; only Accept All could take it.
+
 ## v0.38.0 - 2026-11-15
 
 **A body rewritten whole is the answer, whatever order its proposals are taken in.** The blocks a proposal adds take ids of their own, where they wore the ids of the answer they were read from, so one standing ahead of a kept block of the same id took that id: over a template, accepting a whole-body rewrite, or each of its items in turn, removed an added paragraph in place of a template bullet, which stayed.

@@ -383,6 +383,8 @@
 	let adding = $state(false);
 	const pending = $derived(adding && control === 'number' && ids.length > 0 && !atCap);
 	const rowIds = $derived(onStanding ? [standingId] : pending ? [...ids, standingId] : ids);
+	/** Whether the rows draw nothing: no row, standing or held, and no member a review adds. */
+	const rowless = $derived(rowIds.length === 0 && !added.length);
 	/** Whether the element's keys are its control's own, the row wiring none. */
 	const scalar = $derived(
 		control === 'number' || control === 'enum' || control === 'boolean' || control === 'date'
@@ -1033,7 +1035,7 @@
 	     each block's one child: a branch inside the block would stand between them. -->
 	{#if table}
 		<div
-			class={['qm-array-rows qm-array-table qm-wash', { empty: ids.length === 0 }]}
+			class={['qm-array-rows qm-array-table qm-wash', { empty: rowless }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
@@ -1108,7 +1110,7 @@
 		</div>
 	{:else if control === 'object'}
 		<div
-			class={['qm-array-rows qm-wash', { empty: ids.length === 0 }]}
+			class={['qm-array-rows qm-wash', { empty: rowless }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
@@ -1199,7 +1201,7 @@
 		</div>
 	{:else}
 		<div
-			class={['qm-array-rows qm-wash', { empty: rowIds.length === 0 && !added.length }]}
+			class={['qm-array-rows qm-wash', { empty: rowless }]}
 			data-default={defaulted ? '' : undefined}
 			bind:this={rowsEl}
 		>
