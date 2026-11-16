@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`quillkit render <quill>` renders one quill's document to files.** The document is the quill's example where it declares one, else its seed; `--seed` or `--example` names one, and a markdown path after the quill renders that file. It writes one PDF, or one PNG per page under `--png`, into `--out` or the working directory, through the engine and fonts `check` renders through, and prints the files it wrote.
+
 ## v0.25.0 - 2026-11-14
 
 **The carried `@quillmark/wasm` is 0.138.0.** A newline inside a paragraph prints as a line break, so a body wrapped across source lines prints its wraps, and a `text` or `richtext` field declares `shape: line | lines | blocks` where it declared `multiline`, which `check` reports as `quill::deprecated_multiline` (Quillmark's 0.137 → 0.138 migration).

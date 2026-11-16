@@ -234,6 +234,73 @@ describe('quillkit init', () => {
 	});
 });
 
+describe('quillkit render', () => {
+	const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+	/** The paths a render printed, one per indented line under its head. */
+	const written = (stdout: string): string[] =>
+		stdout
+			.split('\n')
+			.filter((line) => line.startsWith('  '))
+			.map((line) => line.trim());
+
+	it(
+		"writes the quill's example as one PNG per page under --png, into --out",
+		async () => {
+			const source = await temp.collection();
+			const out = join(await temp.dir(), 'pages');
+			const { stdout } = await run(
+				process.execPath,
+				[BIN, 'render', 'showcase', '--png', '-o', out],
+				{ cwd: source }
+			);
+
+			expect(stdout).toContain('quillkit render showcase (example):');
+			const files = written(stdout);
+			expect(files.length).toBeGreaterThan(0);
+			expect((await readdir(out)).sort()).toEqual(files.map((f) => f.slice(out.length + 1)).sort());
+			for (const file of files) expect((await readFile(file)).subarray(0, 4)).toEqual(PNG);
+		},
+		RENDER_MS
+	);
+
+	it(
+		'writes the seed, or a markdown document, as one PDF in the working directory',
+		async () => {
+			const source = await temp.collection();
+			const seed = await run(process.execPath, [BIN, 'render', 'usaf_memo', '--seed'], {
+				cwd: source
+			});
+			expect(seed.stdout).toContain('quillkit render usaf_memo (seed):');
+
+			await writeFile(join(source, 'memo.md'), '~~~\n$quill: usaf_memo\n~~~\n\nBody text.\n');
+			const doc = await run(process.execPath, [BIN, 'render', 'usaf_memo', 'memo.md'], {
+				cwd: source
+			});
+
+			for (const { stdout } of [seed, doc]) {
+				const [file, ...rest] = written(stdout);
+				expect(rest).toEqual([]);
+				expect(file!.startsWith(source)).toBe(true);
+				expect((await readFile(file!, 'latin1')).startsWith('%PDF')).toBe(true);
+			}
+		},
+		RENDER_MS
+	);
+
+	it('refuses two documents, and a render with no quill, before writing anything', async () => {
+		const source = await temp.collection();
+		const before = await readdir(source);
+		for (const args of [
+			['render', 'showcase', '--seed', '--example'],
+			['render', 'showcase', 'doc.md', '--seed'],
+			['render', '--png']
+		])
+			expect((await refused(args, source)).message, args.join(' ')).toMatch(/Usage:/);
+		expect(await readdir(source)).toEqual(before);
+	});
+});
+
 describe('quillkit build', () => {
 	it('lays studio into dist/ where no target is named, and each target where -o points', async () => {
 		const source = await temp.collection();
