@@ -609,7 +609,10 @@
 			const report = reviewing.report;
 			drewOrder = report.open;
 			drewOutdated = report.outdated;
-			if (reviewing.lit === undefined && report.open.length) reviewing.reveal(report.open[0]);
+			if (reviewing.lit === undefined && report.open.length) {
+				reviewing.reveal(report.open[0]);
+				void reveal(report.open[0], false, true);
+			}
 			const joined = JSON.stringify(report);
 			if (joined === drewReport) return;
 			drewReport = joined;
@@ -2537,13 +2540,8 @@
 	}
 	.qm-review-card-add-text {
 		margin: 0;
-		color: var(--_qm-ink-label);
 		white-space: pre-line;
-		display: -webkit-box;
-		-webkit-line-clamp: 3;
-		line-clamp: 3;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
+		overflow-wrap: anywhere;
 	}
 	@media (forced-colors: active) {
 		.qm-review-card-add {

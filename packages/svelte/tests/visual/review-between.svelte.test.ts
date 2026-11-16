@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
-import { proposalsBetween } from '$lib/visual/proposals';
+import { proposalsBetween, reviewRevised } from '$lib/visual/proposals';
 import { sameValue } from '$lib/visual/review';
 import { fieldValues } from '$lib/visual/structure';
 import { core, quill, example } from '../helpers/fixtures.js';
@@ -277,5 +277,46 @@ describe('a body the answer adds to above its first block', () => {
 		expect(drawn.at(-1)).toMatchObject({ open: ['p1'], undrawn: [] });
 		expect(editor.answerReview(['p1'], 'accept')).toEqual(['p1']);
 		expect(bodyOf(doc).slice(0, 2)).toEqual(['## Purpose', first.markdown]);
+	});
+});
+
+describe('a list held through a revise that writes above the first block', () => {
+	const bodyOf = (d: Document): string[] => d.blocks({}).map((b) => b.markdown);
+	const held = (rewrite: (md: string) => string) => {
+		const doc = example();
+		const [first, second] = doc.blocks({});
+		const answer = doc.clone();
+		answer.applyBlocks({}, [
+			{ op: 'replace', id: first.id, markdown: rewrite(first.markdown) },
+			{ op: 'insertAfter', id: first.id, markdown: 'A paragraph the writer adds.' }
+		]);
+		let n = 0;
+		const { items } = proposalsBetween(quill(), doc, answer, () => `p${n++}`);
+		const was = doc.clone();
+		const added = 'A paragraph the reader adds.';
+		const md = doc.toMarkdown();
+		quill()
+			.writer(doc)
+			.reviseDocument(md.replace(first.markdown, `${added}\n\n${first.markdown}`));
+		return { doc, items: reviewRevised(items, was, doc), added, first, second };
+	};
+
+	it('draws over the paragraph it read, and accepted keeps what the reader wrote', async () => {
+		const { doc, items, added, first, second } = held((md) => md.replace('full', 'whole'));
+		const drawn: ReviewDrawn[] = [];
+		const { editor } = mountEditor(quill(), doc, {
+			review: items,
+			onReviewDrawn: (d) => drawn.push(d)
+		});
+		await settle();
+		expect(drawn.at(-1)).toMatchObject({ outdated: [], undrawn: [] });
+		expect(editor.answerReview('all', 'accept')).toHaveLength(items.length);
+		await settle();
+		expect(bodyOf(doc).slice(0, 4)).toEqual([
+			added,
+			first.markdown.replace('full', 'whole'),
+			'A paragraph the writer adds.',
+			second.markdown
+		]);
 	});
 });
