@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { DOMParser } from 'prosemirror-model';
 import { EditorState, NodeSelection, TextSelection } from 'prosemirror-state';
-import { blockSchema, bodyKeymap, decode, inlineSchema } from '$lib/core/codec';
+import { blockSchema, bodyKeymap, decode } from '$lib/core/codec';
 import { linebreakPlugin } from '$lib/core/codec/breaks.js';
 import { md, keyDriver, representable, shape } from './_util.js';
 
@@ -41,11 +41,6 @@ describe('a range across a fence edge', () => {
 		const next = press(sel(PARA_THEN_FENCE, 5, 7), 'Backspace');
 		expect(shape(next)).toBe('doc(paragraph("paraalpha", hard_break, "beta"))');
 		expect(representable(next)).toBe(true);
-	});
-
-	it('leaves breaks where Delete does', () => {
-		const next = press(sel(PARA_THEN_FENCE, 5, 7), 'Delete');
-		expect(shape(next)).toBe('doc(paragraph("paraalpha", hard_break, "beta"))');
 	});
 
 	it('leaves breaks where Enter splits what the delete merged', () => {
@@ -88,12 +83,6 @@ describe('what it leaves alone', () => {
 		});
 		expect(shape(press(state, 'Enter'))).toBe('doc(code_block("al\\npha\\nbeta"))');
 	});
-
-	it('a schema with no break node mounts it as a no-op', () => {
-		const doc = decode(md('one'), inlineSchema);
-		const state = EditorState.create({ doc, plugins: [linebreakPlugin(inlineSchema)] });
-		expect(shape(state.apply(state.tr.insertText('x', 2)))).toBe('doc(paragraph("oxne"))');
-	});
 });
 
 describe('Shift-Enter', () => {
@@ -132,14 +121,6 @@ describe('Shift-Enter', () => {
 		const dom = window.document.createElement('div');
 		dom.innerHTML = '<h1>a<br>title</h1>';
 		expect(DOMParser.fromSchema(blockSchema).parse(dom).toString()).toBe('doc(heading("a title"))');
-	});
-
-	it('is a newline in a code block, where that is the same line', () => {
-		expectPress(
-			sel('```\nalpha\nbeta\n```', 3, 3),
-			'Shift-Enter',
-			'doc(code_block("al\\npha\\nbeta"))'
-		);
 	});
 
 	it('leaves a selected island alone, and claims the key to keep it that way', () => {

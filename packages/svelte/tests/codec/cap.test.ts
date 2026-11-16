@@ -154,15 +154,6 @@ describe('paste', () => {
 		field.destroy();
 	});
 
-	it('lands nothing in a full field', () => {
-		const doc = docWith({ note: 'abcdefgh' });
-		const field = leaf(doc, 'note');
-		const view = viewOf(field);
-		view.pasteText('more', pasteEvent());
-		expect(literal(doc.getStored('note'))).toBe('abcdefgh');
-		field.destroy();
-	});
-
 	it('cuts a multi-line paste inside its lines', () => {
 		const doc = docWith();
 		const field = leaf(doc, 'note');

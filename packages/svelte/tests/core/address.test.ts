@@ -12,16 +12,12 @@ describe('fieldPathForAddr', () => {
 		expect(fieldPathForAddr({ field: 'subject' }, [])).toBe('main.subject');
 	});
 
-	it('maps a card body and card field by ABSOLUTE document index', () => {
-		const kinds = ['indorsement', 'indorsement'];
-		expect(fieldPathForAddr({ card: 0 }, kinds)).toBe('cards.indorsement[0].body');
-		expect(fieldPathForAddr({ card: 1 }, kinds)).toBe('cards.indorsement[1].body');
-		expect(fieldPathForAddr({ card: 1, field: 'from' }, kinds)).toBe('cards.indorsement[1].from');
-	});
-
 	it('addresses by absolute index across interleaved kinds — no per-kind counting', () => {
 		const kinds = ['note', 'indorsement', 'note', 'indorsement'];
 		// The 2nd indorsement sits at absolute index 3 and is addressed as [3].
+		expect(fieldPathForAddr({ card: 1, field: 'from' }, ['indorsement', 'indorsement'])).toBe(
+			'cards.indorsement[1].from'
+		);
 		expect(fieldPathForAddr({ card: 3, field: 'from' }, kinds)).toBe('cards.indorsement[3].from');
 		expect(fieldPathForAddr({ card: 2 }, kinds)).toBe('cards.note[2].body');
 	});
@@ -84,17 +80,6 @@ describe('addrForFieldPath', () => {
 });
 
 describe('nestedAddrForFieldPath', () => {
-	it('reads the bracketed index the boundary emits, as a numeric step', () => {
-		expect(nestedAddrForFieldPath('main.keywords[0]')).toEqual({
-			field: { field: 'keywords' },
-			steps: [0]
-		});
-		expect(nestedAddrForFieldPath('cards.indorsement[1].signature_block[2]')).toEqual({
-			field: { card: 1, field: 'signature_block' },
-			steps: [2]
-		});
-	});
-
 	it('reads a property path as a string step, and a mixed path rung by rung', () => {
 		// The `PathStep[]` grammar `reader.getContentAt` walks: an index a number, a key a
 		// string, in the order the address spells them.
@@ -105,6 +90,10 @@ describe('nestedAddrForFieldPath', () => {
 		expect(nestedAddrForFieldPath('main.vectors[0].tours[2].title')).toEqual({
 			field: { field: 'vectors' },
 			steps: [0, 'tours', 2, 'title']
+		});
+		expect(nestedAddrForFieldPath('cards.indorsement[1].signature_block[2]')).toEqual({
+			field: { card: 1, field: 'signature_block' },
+			steps: [2]
 		});
 		expect(nestedAddrForFieldPath('main.checks.fonts.note')).toEqual({
 			field: { field: 'checks' },

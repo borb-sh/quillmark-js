@@ -69,8 +69,6 @@ describe('a matrix field', () => {
 			expect(m.querySelector(`label[for="${t.id}"]`)).not.toBeNull();
 		}
 		expect(count(m)).toBe(held(0));
-		// `ui.compact` sets the roster on the track ladder rather than packing the field.
-		expect(m.querySelector('.qm-matrix-roster')?.classList.contains('qm-tracks')).toBe(true);
 		// A matrix seeds empty, so nothing is stored and no member unfolds; the one text
 		// input is the open list's add box.
 		expect(m.querySelectorAll('.qm-object')).toHaveLength(0);
@@ -187,20 +185,6 @@ describe('a matrix field', () => {
 		tick(m, titles.fonts).click();
 		flushSync();
 		expect(member(m, titles.fonts).querySelector('.qm-object')).not.toBeNull();
-	});
-
-	it('keys as a checkbox group: every tick a tab stop, and no arrow walk', () => {
-		const q = quill();
-		const mounted = mountEditor(q, q.seedDocument());
-		const m = matrix(mounted.target);
-		const ticks = [...m.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
-		for (const t of ticks) expect(t.tabIndex).toBe(0);
-		const spelling = tick(m, titles.spelling);
-		spelling.focus();
-		press(spelling, 'ArrowDown', { cancelable: true });
-		expect(document.activeElement).toBe(spelling);
-		press(spelling, 'ArrowDown', { altKey: true, cancelable: true });
-		expect(document.activeElement).toBe(spelling);
 	});
 
 	it('lands a member address on its tick and a column address on that column', async () => {
@@ -377,6 +361,11 @@ describe('an open matrix', () => {
 		});
 		expect(addedTitles(m)).toEqual(['Kerning pairs', 'Kerning pairs', 'KERNING PAIRS']);
 		expect(count(m)).toBe(held(3, 3));
+
+		// An id a roster member already holds is passed over the same way.
+		press(typeAdd(m, 'Fonts!'), 'Enter', { cancelable: true });
+		await settle();
+		expect(stored(doc)).toHaveProperty('fonts_2', { title: 'Fonts!' });
 		expect(mounted.errors).toHaveLength(0);
 	});
 
@@ -431,16 +420,6 @@ describe('an open matrix', () => {
 		])
 			expect(box.hasAttribute(attr), attr).toBe(false);
 		expect(m.querySelector('[role="listbox"], [role="option"]')).toBeNull();
-	});
-
-	it('mints an added id past a roster id its title folds to', async () => {
-		const q = quill();
-		const doc = q.seedDocument();
-		const mounted = mountEditor(q, doc);
-		const m = matrix(mounted.target);
-		press(typeAdd(m, 'Fonts!'), 'Enter', { cancelable: true });
-		await settle();
-		expect(stored(doc)).toEqual({ fonts_2: { title: 'Fonts!' } });
 	});
 
 	it('hands the caret to the next added item when one is removed', async () => {

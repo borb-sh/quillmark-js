@@ -1,6 +1,6 @@
 quill:
   name: memo
-  version: "1.0.0"
+  version: '1.0.0'
   backend: typst
   description: Render fixture (memo)
 main:

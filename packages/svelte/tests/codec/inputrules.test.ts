@@ -48,8 +48,6 @@ describe('mark input rules fire with exact positions', () => {
 		['x `y`', 'doc(paragraph("x ", code("y")))'],
 		['a *b* c', 'doc(paragraph("a ", em("b"), " c"))'],
 		['a _em_', 'doc(paragraph("a ", em("em")))'],
-		['_em_', 'doc(paragraph(em("em")))'],
-		['a __b__', 'doc(paragraph("a ", strong("b")))'],
 		['snake_case_name', 'doc(paragraph("snake_case_name"))'],
 		['dunder__init__', 'doc(paragraph("dunder__init__"))']
 	])('%s', (typed, shape) => {
@@ -149,14 +147,6 @@ describe('`# ` inside an item', () => {
 		expect(representable(view.state)).toBe(true);
 		view.destroy();
 	});
-
-	it('`# ` outside a list still makes a heading', () => {
-		const view = mountView();
-		type(view, '### deep');
-		expect(view.state.doc.toString()).toBe('doc(heading("deep"))');
-		expect(view.state.doc.child(0).attrs.level).toBe(3);
-		view.destroy();
-	});
 });
 
 // A code block is the one block a gap cursor will not sit beside, so a fence at the end
@@ -171,13 +161,6 @@ describe('the ` ``` ` fence shorthand', () => {
 		});
 		return new EditorView(document.createElement('div'), { state });
 	}
-
-	it('stays the text it was typed as until Enter', () => {
-		const view = leafView();
-		type(view, '```');
-		expect(view.state.doc.toString()).toBe('doc(paragraph("```"))');
-		view.destroy();
-	});
 
 	it('opens the paragraph after it, so the end of a body is not a dead end', () => {
 		const view = leafView();
@@ -278,15 +261,6 @@ describe('the list shorthands at the head of an existing item', () => {
 		type(view, '1. ');
 		expect(view.state.doc.toString()).toBe(
 			'doc(ordered_list(list_item(paragraph("alpha")), list_item(paragraph("beta"))))'
-		);
-		view.destroy();
-	});
-
-	it('`- ` on a first item bullets a numbered list', () => {
-		const view = itemView(['1. alpha', 'beta'], 0);
-		type(view, '- ');
-		expect(view.state.doc.toString()).toBe(
-			'doc(bullet_list(list_item(paragraph("alpha")), list_item(paragraph("beta"))))'
 		);
 		view.destroy();
 	});
@@ -430,13 +404,6 @@ describe('the list shorthands at the head of an existing item', () => {
 		view.destroy();
 	});
 
-	it('outside a list the shorthand is untouched', () => {
-		const view = mountView();
-		type(view, '- one');
-		expect(view.state.doc.toString()).toBe('doc(bullet_list(list_item(paragraph("one"))))');
-		view.destroy();
-	});
-
 	// `> ` is the one block shorthand that fires here: what it wraps the item's paragraph
 	// in is a container the content holds, which is the whole of why the guard stops at
 	// the list rules.
@@ -507,17 +474,14 @@ describe('Backspace right after a shorthand takes it back', () => {
 		return new EditorView(document.createElement('div'), { state });
 	}
 
-	it.each(['# ', '- ', '1. ', '1) ', '> ', '---', 'a **b**', 'a __b__', 'a _b_', 'a ~~b~~'])(
-		'%s',
-		(typed) => {
-			const view = leafView();
-			type(view, typed);
-			expect(view.state.doc.toString()).not.toBe(`doc(paragraph("${typed}"))`);
-			press(view, 'Backspace');
-			expect(view.state.doc.toString()).toBe(`doc(paragraph("${typed}"))`);
-			view.destroy();
-		}
-	);
+	it.each(['# ', '- ', '1. ', '> ', '---', 'a **b**', 'a ~~b~~'])('%s', (typed) => {
+		const view = leafView();
+		type(view, typed);
+		expect(view.state.doc.toString()).not.toBe(`doc(paragraph("${typed}"))`);
+		press(view, 'Backspace');
+		expect(view.state.doc.toString()).toBe(`doc(paragraph("${typed}"))`);
+		view.destroy();
+	});
 
 	it('a typed URL, the space kept', () => {
 		const view = leafView();

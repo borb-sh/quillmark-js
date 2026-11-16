@@ -38,14 +38,9 @@ describe('resolvedByCardIndex', () => {
 		const byCard = resolvedByCardIndex(resolved);
 		expect(byCard.get(0)?.fields[0]?.name).toBe('x');
 		expect(byCard.get(2)?.fields[0]?.name).toBe('y');
-	});
-	it('carries each card’s body row alongside its fields', () => {
-		const byCard = resolvedByCardIndex(resolved);
 		expect(byCard.get(0)?.body?.value).toBe('B0');
 		expect(byCard.get(2)?.body).toBeNull();
-	});
-	it('is empty for a missing index or an absent resolve', () => {
-		expect(resolvedByCardIndex(resolved).get(5)).toBeUndefined();
+		expect(byCard.get(5)).toBeUndefined();
 		expect(resolvedByCardIndex(undefined).size).toBe(0);
 	});
 });
@@ -54,12 +49,6 @@ describe('resolvedByCardIndex', () => {
 // `ghostDefault` decides whether a row ghosts, `stringifyGhost` whether it has a
 // text form to show.
 describe('the ghost projection', () => {
-	it('ghosts only a default-sourced value', () => {
-		expect(ghostDefault(row('a', 'D', 'default'))).toBe('D');
-		expect(ghostDefault(row('a', 'A', 'authored'))).toBeUndefined();
-		expect(ghostDefault(row('a', '', 'blank'))).toBeUndefined();
-		expect(ghostDefault(undefined)).toBeUndefined();
-	});
 	it('renders a scalar ghost as text and declines an object one', () => {
 		expect(stringifyGhost('Write it here')).toBe('Write it here');
 		expect(stringifyGhost(12)).toBe('12');

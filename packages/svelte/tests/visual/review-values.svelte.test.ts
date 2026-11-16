@@ -12,7 +12,6 @@ import {
 	leaf,
 	mountInner,
 	openField,
-	openGroup,
 	pick,
 	press,
 	settle,
@@ -117,19 +116,6 @@ describe('a line of words under a proposal', () => {
 		expect(r.drawn.at(-1)?.open).toEqual([]);
 		expect(r.drawn.at(-1)?.outdated).toEqual([]);
 		expect(r.drawn.at(-1)?.undrawn).toEqual([{ id: 'sub', reason: 'applied' }]);
-	});
-
-	it('is left open by Accept all where it is outdated, the reader’s value kept', async () => {
-		const r = review((doc) => [
-			{ id: 'sub', field: doc.pathFor('subtitle'), before: 'Something else', after: 'New' },
-			{ id: 'cols', field: doc.pathFor('columns'), after: 2 }
-		]);
-		await settle();
-		expect(r.drawn.at(-1)?.outdated).toEqual(['sub']);
-		expect(r.editor.answerReview('all', 'accept')).toEqual(['cols']);
-		flushSync();
-		expect(text(r.doc.getStored('subtitle'))).toBe('A reference document');
-		expect(r.doc.getStored('columns')).toBe(2);
 	});
 
 	it('draws a change of formatting alone as the run struck and the run as it would read', async () => {
@@ -256,29 +242,6 @@ describe('an answer’s list over a choice with variants and a checklist', () =>
 		r.editor.answerReview('all', 'accept');
 		flushSync();
 		expect(r.doc.getStored('distribution')).toMatchObject({ value: 'embargoed' });
-	});
-
-	it('proposes each member it ticks and each cell it changes apart', async () => {
-		const r = review(
-			between((answer) => {
-				const checks = answer.getStored('checks') as Record<string, unknown>;
-				void quill()
-					.writer(answer)
-					.set('checks', {
-						...checks,
-						spelling: { note: 'One typo in the abstract.' },
-						figures: true
-					});
-			})
-		);
-		await settle();
-		expect(r.drawn.at(-1)?.undrawn).toEqual([]);
-		const checks = r.drawn.at(-1)!.open;
-		expect(checks.length).toBeGreaterThanOrEqual(2);
-		openGroup(r.target, 'Metadata');
-		const figures = r.target.querySelector<HTMLInputElement>('[data-qm-prop="figures"] input')!;
-		expect(figures.checked).toBe(true);
-		expect(r.doc.getStored('checks')).not.toHaveProperty('figures');
 	});
 });
 

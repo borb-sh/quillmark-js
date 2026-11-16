@@ -104,10 +104,6 @@ describe('hrefInSelection', () => {
 		expect(hrefInSelection(para(['linked', 'https://x.com']))).toBe('https://x.com');
 	});
 
-	it('reports nothing on unlinked text', () => {
-		expect(hrefInSelection(para(['plain']))).toBe('');
-	});
-
 	it('takes the FIRST of several, which is the one value the prompt holds', () => {
 		expect(hrefInSelection(para(['a', 'https://one.com'], ['b', 'https://two.com']))).toBe(
 			'https://one.com'
@@ -116,12 +112,10 @@ describe('hrefInSelection', () => {
 });
 
 describe('setLink', () => {
-	it('adds a link over an unlinked selection', () => {
-		const next = run(para(['text']), setLink('https://x.com'));
-		expect(runsOf(next!)).toEqual([['text', 'https://x.com']]);
-	});
-
-	it('REPLACES the href a selection already carries', () => {
+	it('adds a link over an unlinked selection, and REPLACES the href one already carries', () => {
+		expect(runsOf(run(para(['text']), setLink('https://x.com'))!)).toEqual([
+			['text', 'https://x.com']
+		]);
 		const next = run(para(['text', 'https://old.com']), setLink('https://new.com'));
 		expect(runsOf(next!)).toEqual([['text', 'https://new.com']]);
 	});

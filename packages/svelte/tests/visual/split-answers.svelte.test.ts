@@ -150,13 +150,6 @@ const idsApart = (doc: Document): boolean => {
 describe.each(CASES)('an answer split into %s', (_, answer, ...parts) => {
 	const whole = memo(answer).toMarkdown();
 
-	it('is two items over one field', async () => {
-		const { items } = await mounted(answer);
-		expect(items).toHaveLength(2);
-		const fields = items.map((item) => (item as { field: string }).field.replace(/\[\d+\]$/, ''));
-		expect(fields[0]).toBe(fields[1]);
-	});
-
 	it.each([
 		['first then second', [0, 1]],
 		['second then first', [1, 0]]

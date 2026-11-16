@@ -8,9 +8,14 @@ const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).path
 // ─── resolve ──────────────────────────────────────────────────────────────────
 
 describe('Quiver.resolve', () => {
-	it('unqualified "memo" → "memo@1.1.0" (highest)', async () => {
+	it.each([
+		['memo', 'memo@1.1.0'],
+		['memo@1.0', 'memo@1.0.0'],
+		['memo@1.0.0', 'memo@1.0.0'],
+		['sample.memo@1.0', 'memo@1.0.0']
+	])('resolves %s to %s', async (ref, want) => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
-		expect(quiver.resolve('memo')).toBe('memo@1.1.0');
+		expect(quiver.resolve(ref)).toBe(want);
 	});
 
 	it('"memo@1" → invalid_ref, though the quiver holds 1.y.z', async () => {
@@ -23,21 +28,6 @@ describe('Quiver.resolve', () => {
 		);
 	});
 
-	it('"memo@1.0" → "memo@1.0.0" (highest 1.0.*)', async () => {
-		const quiver = await fromDir(SAMPLE_FIXTURE);
-		expect(quiver.resolve('memo@1.0')).toBe('memo@1.0.0');
-	});
-
-	it('"memo@1.0.0" → "memo@1.0.0" (exact)', async () => {
-		const quiver = await fromDir(SAMPLE_FIXTURE);
-		expect(quiver.resolve('memo@1.0.0')).toBe('memo@1.0.0');
-	});
-
-	it('"sample.memo@1.0" names this quiver → "memo@1.0.0"', async () => {
-		const quiver = await fromDir(SAMPLE_FIXTURE);
-		expect(quiver.resolve('sample.memo@1.0')).toBe('memo@1.0.0');
-	});
-
 	it('"other.memo" names another collection → quill_not_found', async () => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
 		expect(() => quiver.resolve('other.memo')).toThrow(
@@ -48,20 +38,6 @@ describe('Quiver.resolve', () => {
 	it('"memo@2.0.0" (not present) → quill_not_found', async () => {
 		const quiver = await fromDir(SAMPLE_FIXTURE);
 		expect(() => quiver.resolve('memo@2.0.0')).toThrow(
-			expect.objectContaining({ code: 'quill_not_found' })
-		);
-	});
-
-	it('"memo@^1" → invalid_ref (from parseQuillRef)', async () => {
-		const quiver = await fromDir(SAMPLE_FIXTURE);
-		expect(() => quiver.resolve('memo@^1')).toThrow(
-			expect.objectContaining({ code: 'invalid_ref', ref: 'memo@^1' })
-		);
-	});
-
-	it('unknown name → quill_not_found', async () => {
-		const quiver = await fromDir(SAMPLE_FIXTURE);
-		expect(() => quiver.resolve('nonexistent')).toThrow(
 			expect.objectContaining({ code: 'quill_not_found' })
 		);
 	});

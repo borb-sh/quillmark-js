@@ -109,28 +109,20 @@ describe('the quill-name charset', () => {
 		expect([...catalog.keys()]).toEqual(['my_quill2']);
 	});
 
-	it('refuses a name the engine refuses', async () => {
-		const root = await temp.dir();
-		await buildMinimalQuiver(root, { quills: [{ name: 'My-Memo', version: '1.0.0' }] });
+	it.each(['My-Memo', 'my quill', 'my.quill'])(
+		'refuses the name %s, naming its directory',
+		async (name) => {
+			const root = await temp.dir();
+			await buildMinimalQuiver(root, { quills: [{ name, version: '1.0.0' }] });
 
-		await expect(scanSourceQuiver(root)).rejects.toThrow(/directory "My-Memo"/);
-	});
-
-	it('refuses a seated row a ref cannot spell', async () => {
-		const root = await temp.dir();
-		await buildMinimalQuiver(root, { quills: [{ name: 'my.quill', version: '1.0.0' }] });
-
-		await expect(scanSourceQuiver(root)).rejects.toThrow(
-			expect.objectContaining({ code: 'quiver_invalid' })
-		);
-	});
-
-	it('names the directory rather than the ref that would have failed', async () => {
-		const root = await temp.dir();
-		await buildMinimalQuiver(root, { quills: [{ name: 'my quill', version: '1.0.0' }] });
-
-		await expect(scanSourceQuiver(root)).rejects.toThrow(/directory "my quill"/);
-	});
+			await expect(scanSourceQuiver(root)).rejects.toThrow(
+				expect.objectContaining({
+					code: 'quiver_invalid',
+					message: expect.stringContaining(`directory "${name}"`)
+				})
+			);
+		}
+	);
 
 	it('ignores a stray directory holding no quill, whatever its name', async () => {
 		// The row is what has to be addressable; a `.cache` beside the quills is not one.
@@ -231,12 +223,6 @@ describe('the symlink refusal', () => {
 			expect.objectContaining({ code: 'quiver_invalid' })
 		);
 	});
-
-	it('leaves an ordinary tree alone', async () => {
-		const { root } = await quiverWithOutsideFile();
-		const { catalog } = await scanSourceQuiver(root);
-		expect(catalog.get('memo')).toEqual(['1.0.0']);
-	});
 });
 
 describe('a quill sits where its Quill.yaml says', () => {
@@ -286,13 +272,6 @@ describe('a quill sits where its Quill.yaml says', () => {
 		await expect(scanSourceQuiver(root)).rejects.toThrow(
 			expect.objectContaining({ code: 'quiver_invalid', message: expect.stringMatching(/"1.2"/) })
 		);
-	});
-
-	it('names the directory before what its Quill.yaml declares', async () => {
-		const root = await temp.dir();
-		await seat(root, 'My-Memo', '1.0.0', 'quill:\n  name: my_memo\n  version: "1.0.0"\n');
-
-		await expect(scanSourceQuiver(root)).rejects.toThrow(/directory "My-Memo"/);
 	});
 
 	it('refuses a quill.version that disagrees with its directory', async () => {

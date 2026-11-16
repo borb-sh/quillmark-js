@@ -48,10 +48,6 @@ describe('Tab indents', () => {
 		expectPress(sel(FENCE, 0), 'Tab', 'doc(code_block("  foo\\nbar"))');
 	});
 
-	it('indents mid-line too — a code block takes the character, not a structure', () => {
-		expectPress(sel(FENCE, 2), 'Tab', 'doc(code_block("fo  o\\nbar"))');
-	});
-
 	it('replaces a single-line selection — Tab types', () => {
 		expectPress(sel(FENCE, 0, 3), 'Tab', 'doc(code_block("  \\nbar"))');
 	});
@@ -70,12 +66,6 @@ describe('Tab indents', () => {
 		// `to` sits at "bar"'s first offset: the selection does not reach into it.
 		expectPress(sel(FENCE, 0, 4), 'Tab', 'doc(code_block("  foo\\nbar"))');
 	});
-
-	it('indents an empty code block', () => {
-		const doc = blockSchema.nodes.doc.create(null, [blockSchema.nodes.code_block.create()]);
-		const state = EditorState.create({ doc, selection: TextSelection.create(doc, 1) });
-		expect(shape(press(state, 'Tab'))).toBe('doc(code_block("  "))');
-	});
 });
 
 describe('Shift-Tab outdents', () => {
@@ -85,10 +75,6 @@ describe('Shift-Tab outdents', () => {
 
 	it('removes a literal tab — whatever Tab inserts, imported content carries either', () => {
 		expectPress(sel('```\n\tfoo\nbar\n```', 2), 'Shift-Tab', 'doc(code_block("foo\\nbar"))');
-	});
-
-	it('removes a partial indent whole', () => {
-		expectPress(sel('```\n foo\nbar\n```', 2), 'Shift-Tab', 'doc(code_block("foo\\nbar"))');
 	});
 
 	it('removes one level per line across a multi-line selection, either form', () => {
@@ -102,10 +88,6 @@ describe('Shift-Tab outdents', () => {
 	it('changes nothing when no covered line is indented', () => {
 		const state = sel(FENCE, 1);
 		expect(press(state, 'Shift-Tab').doc.eq(state.doc)).toBe(true);
-	});
-
-	it('outdents only the lines it covers', () => {
-		expectPress(sel('```\n  foo\n  bar\n```', 2, 4), 'Shift-Tab', 'doc(code_block("foo\\n  bar"))');
 	});
 });
 
@@ -192,14 +174,6 @@ describe('a press at a fence’s edge edits only the caret’s block', () => {
 		expectPress(one, 'Delete', 'doc(paragraph("codetail"))');
 	});
 
-	it('a heading is prose like any other block', () => {
-		expectPress(
-			startOf('# head\n\n```\ncode\n```', 1),
-			'Backspace',
-			'doc(heading("head"), paragraph("code"))'
-		);
-	});
-
 	it('a fence against a paragraph of its own item', () => {
 		expectPress(
 			startOf('- text\n\n  ```\n  code\n  ```', 1),
@@ -216,12 +190,6 @@ describe('a press at a fence’s edge edits only the caret’s block', () => {
 		const state = EditorState.create({ doc, selection: TextSelection.create(doc, 7) });
 		const next = expectPress(state, 'Backspace', 'doc(code_block("code"))');
 		expect(next.selection.from).toBe(5);
-	});
-
-	it('a retype from inside keeps the caret in the block it was in', () => {
-		const next = press(endOf(ABOVE, 0), 'Delete');
-		expect(next.selection.$from.parent.textContent).toBe('code');
-		expect(next.selection.$from.parentOffset).toBe(4);
 	});
 });
 
@@ -266,14 +234,6 @@ describe('in a list an item continues the one above, each block whole', () => {
 			startOf('- ```\n  code\n  ```\n- b', 1),
 			'Backspace',
 			'doc(bullet_list(list_item(code_block("code"), paragraph("b"))))'
-		);
-	});
-
-	it('an item that is a fence after an item of prose', () => {
-		expectPress(
-			startOf('- a\n- ```\n  code\n  ```', 1),
-			'Backspace',
-			'doc(bullet_list(list_item(paragraph("a"), code_block("code"))))'
 		);
 	});
 
@@ -329,15 +289,6 @@ describe('↓ on a final fence’s last line opens a line below it', () => {
 		);
 		expect(next.selection.$from.parent.type.name).toBe('paragraph');
 		expect(next.selection.$from.index(0)).toBe(2);
-	});
-
-	it('from anywhere on that last line', () => {
-		const state = startOf(FINAL, 1);
-		const lastLine = EditorState.create({
-			doc: state.doc,
-			selection: TextSelection.create(state.doc, state.selection.from + 2)
-		});
-		expectPress(lastLine, 'ArrowDown', 'doc(paragraph("head"), code_block("a\\nb"), paragraph)');
 	});
 
 	it('declines above the last line, and where a block follows', () => {

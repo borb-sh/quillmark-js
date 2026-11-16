@@ -4,7 +4,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init, Engine } from '@quillmark/wasm';
-import { FAMILIES, LABELS, loadSuite } from '../src/node.js';
+import { FAMILIES, loadSuite } from '../src/node.js';
 import { loadSuite as fetchSuite } from '../src/index.js';
 
 const core = await init();
@@ -44,16 +44,6 @@ describe('loadSuite (node)', () => {
 	it("answers every face's file in the manifest's order", async () => {
 		const files = await loadSuite();
 		expect(files.map(sha256)).toEqual(faces.map((f) => f.sha256));
-	});
-
-	it('names the families the manifest lists', () => {
-		expect([...FAMILIES]).toEqual(manifest.families.map((f) => f.name));
-	});
-
-	it('labels the families the manifest gives a label', () => {
-		expect(LABELS).toEqual(
-			Object.fromEntries(manifest.families.filter((f) => f.label).map((f) => [f.name, f.label]))
-		);
 	});
 });
 

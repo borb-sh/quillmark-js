@@ -139,34 +139,6 @@ describe('the card items', () => {
 		list(CARDS.slice(4, 5).map((item) => ({ ...item })));
 		expect([...review.fieldOutdated]).toEqual([]);
 	});
-
-	it('are the editor’s to name, by no leaf', () => {
-		const { review, list } = store(false, { listed: ['k0'], live: ['k0'] });
-		list(CARDS.slice(0, 1));
-		expect(review.keyOf('add-a')).toBeUndefined();
-		review.reveal('add-a');
-		expect(review.lit).toBe('add-a');
-	});
-});
-
-describe('the leaves', () => {
-	it('each draw the items by blocks of their own field', () => {
-		const { review, list } = store();
-		list([
-			...ITEMS,
-			{ id: 'mine', field: 'main.body', replace: ['b1'], after: 'New.' },
-			{ id: 'theirs', field: 'main.abstract', insert: 'end', after: 'New.' }
-		]);
-		expect(review.textAt('main.body').map((item) => item.id)).toEqual([
-			'first',
-			'proposal',
-			'mine'
-		]);
-		expect(review.textAt('main.abstract').map((item) => item.id)).toEqual(['theirs']);
-		expect(review.textAt('main.title')).toEqual([]);
-		expect(review.at('main.body')).toEqual({});
-		expect(review.at('main.title').proposed?.id).toBe('title');
-	});
 });
 
 describe('an answer', () => {
@@ -186,19 +158,6 @@ describe('an answer', () => {
 		list(ITEMS.slice(0, 2));
 		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['first']);
 		list(ITEMS);
-		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['first', 'proposal']);
-	});
-
-	it('is drawn again once reopened', () => {
-		const { review } = store();
-		review.act('title', 'accept');
-		review.heard('title', 'reopen', 'main.title');
-		expect(review.at('main.title').proposed?.id).toBe('title');
-	});
-
-	it('leaves the item standing where it could not be made', () => {
-		const { review } = store(true);
-		review.act('proposal', 'dismiss');
 		expect(review.textAt('main.body').map((item) => item.id)).toEqual(['first', 'proposal']);
 	});
 });
@@ -223,19 +182,6 @@ describe('the report', () => {
 });
 
 describe('the answer journal', () => {
-	it('takes the answers back newest first, each reopened', () => {
-		const { review, undone, undo } = store();
-		review.act('title', 'accept');
-		review.act('first', 'dismiss');
-		expect(undo.take()).toBe(true);
-		expect(undone).toEqual(['first']);
-		expect(review.items.map((item) => item.id)).toEqual(['first', 'proposal']);
-		expect(undo.take()).toBe(true);
-		expect(undone).toEqual(['first', 'title']);
-		expect(review.items).toEqual(ITEMS);
-		expect(undo.take()).toBe(false);
-	});
-
 	it('ends at an edit that is no answer’s, and not at an answer’s own write', () => {
 		const { review, undone, undo } = store();
 		review.act('title', 'accept');

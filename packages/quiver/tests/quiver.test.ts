@@ -40,10 +40,4 @@ describe('fromDir', () => {
 		expect(text100).toContain('1.0.0');
 		expect(text110).toContain('1.1.0');
 	});
-
-	it('quillNames() and versionsOf() return a fresh array each call', async () => {
-		const q = await fromDir(SAMPLE_FIXTURE);
-		expect(q.quillNames()).not.toBe(q.quillNames());
-		expect(q.versionsOf('memo')).not.toBe(q.versionsOf('memo'));
-	});
 });

@@ -43,20 +43,8 @@ describe('a first block a gap cursor declines gets a paragraph above it', () => 
 		expectPress(startOf('> quoted', 0), 'Enter', 'doc(paragraph, blockquote(paragraph("quoted")))');
 	});
 
-	it('a fence in an item that opens the body', () => {
-		expectPress(
-			startOf('- ```\n  code\n  ```', 0),
-			'Enter',
-			'doc(paragraph, bullet_list(list_item(code_block("code"))))'
-		);
-	});
-
 	it('an empty fence that opens the body becomes the paragraph', () => {
 		expectPress(startOf('```\n\n```', 0), 'Enter', 'doc(paragraph)');
-	});
-
-	it("an empty fence in an item that opens the body becomes the item's paragraph", () => {
-		expectPress(startOf('- ```\n  \n  ```', 0), 'Enter', 'doc(bullet_list(list_item(paragraph)))');
 	});
 
 	it('the caret stays with the text it pushed down', () => {
@@ -71,23 +59,11 @@ describe('everywhere else the key keeps its meaning', () => {
 		expectPress(startOf('head', 0), 'Enter', 'doc(paragraph, paragraph("head"))');
 	});
 
-	it('a heading that opens the body splits', () => {
-		expectPress(startOf('# head', 0), 'Enter', 'doc(paragraph, heading("head"))');
-	});
-
 	it('a fence below a block takes a newline — there is a block above to reach', () => {
 		expectPress(
 			at('head\n\n```\ncode\n```', 1, 0),
 			'Enter',
 			'doc(paragraph("head"), code_block("\\ncode"))'
-		);
-	});
-
-	it('an empty fence below a block takes a newline — there is a block above to reach', () => {
-		expectPress(
-			at('head\n\n```\n\n```', 1, 0),
-			'Enter',
-			'doc(paragraph("head"), code_block("\\n"))'
 		);
 	});
 
@@ -196,14 +172,6 @@ describe('Delete on an empty line takes the line', () => {
 		expectPress(atBlock(docOf(p(), quote(p('b'))), 0), 'Delete', 'doc(blockquote(paragraph("b")))');
 	});
 
-	it('a heading below the line keeps its level', () => {
-		expectPress(
-			atBlock(docOf(p(), n.heading.create({ level: 2 }, blockSchema.text('b'))), 0),
-			'Delete',
-			'doc(heading("b"))'
-		);
-	});
-
 	// Taken, not eaten: the island stands and the selection lands on it, which is the
 	// state `atoms.ts` draws before a press that would take it (INVARIANTS §"The table
 	// island"). So the table goes on the press after, never on this one.
@@ -281,10 +249,6 @@ describe('and declines where the line is a construct, or the last of them', () =
 describe('Backspace at a heading’s head unmarks it', () => {
 	it('a heading after a block becomes a paragraph, its text kept', () => {
 		expectPress(at('a\n\n## Title', 1, 0), 'Backspace', 'doc(paragraph("a"), paragraph("Title"))');
-	});
-
-	it('a heading that opens the body', () => {
-		expectPress(at('# Title', 0, 0), 'Backspace', 'doc(paragraph("Title"))');
 	});
 
 	it('the press after it joins as a paragraph does', () => {

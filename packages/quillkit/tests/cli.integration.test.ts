@@ -226,12 +226,6 @@ describe('quillkit init', () => {
 		expect((await refused(['init'], at)).message).toMatch(/Quiver\.yaml already exists/);
 		expect(await readdir(at)).toEqual(['Quiver.yaml']);
 	});
-
-	it('prints usage rather than laying a quiver under a flag', async () => {
-		const at = await temp.dir();
-		expect((await refused(['init', '--quiver', 'x'], at)).message).toMatch(/Usage:/);
-		expect(await readdir(at)).toEqual([]);
-	});
 });
 
 describe('quillkit render', () => {

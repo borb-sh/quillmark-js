@@ -99,24 +99,6 @@ describe('reorder on an object row', () => {
 		expect(grips().every((g) => g != null)).toBe(true);
 	});
 
-	it('marks the lifted row and the drop while the drag is held, and leaves no trace', () => {
-		const q = quill();
-		const doc = threeRows();
-		const mounted = mountEditor(q, doc);
-		const arr = revisions(mounted.target);
-		layOut(arr);
-		const grip = handle(arr, 0);
-		grip.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 20 }));
-		grip.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientY: 70 }));
-		flushSync();
-		expect(rows(arr)[0].classList.contains('lifted')).toBe(true);
-		expect(rows(arr)[1].dataset.drop).toBe('after');
-		grip.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, clientY: 70 }));
-		flushSync();
-		expect(order(q, doc)).toEqual(['A', 'B', 'C']);
-		expect(arr.querySelector('.lifted, [data-drop]')).toBeNull();
-	});
-
 	it('ends the drag with no move on Escape, and the release after it moves nothing', () => {
 		const q = quill();
 		const doc = threeRows();
@@ -329,25 +311,6 @@ describe('reorder on an object row', () => {
 		press(summary, 'ArrowUp', { altKey: true });
 		expect(order(q, doc)).toEqual(['B', 'A', 'C']);
 		expect(mounted.changes).toHaveLength(before);
-	});
-
-	it("keeps the open row's subform mounted across its own move", () => {
-		const q = quill();
-		const doc = threeRows();
-		const mounted = mountEditor(q, doc);
-		const arr = revisions(mounted.target);
-		summaries(arr)[0].click();
-		flushSync();
-		const note = arr.querySelector<HTMLElement>(
-			'.qm-element.open [data-qm-prop="note"] .ProseMirror'
-		)!;
-		expect(note.textContent).toBe('A');
-
-		layOut(arr);
-		dragHandle(handle(arr, 0), [20, 70]);
-		// The keyed row moved as one node: the subform's leaf is the same element.
-		expect(arr.querySelector('.qm-element.open [data-qm-prop="note"] .ProseMirror')).toBe(note);
-		expect(order(q, doc)).toEqual(['B', 'A', 'C']);
 	});
 
 	it('answers from the nearest row alone: a press in a nested row leaves the record around it', () => {

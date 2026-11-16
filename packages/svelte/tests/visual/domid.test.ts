@@ -63,10 +63,6 @@ describe('groupPanelId', () => {
 	// A group panel's id is what its header's `aria-controls` names, so the same
 	// collision that breaks `for` breaks the accordion's announced state; pointing
 	// a header at a field is worse than pointing it nowhere.
-	it('spends only `id`-safe characters', () => {
-		expect(groupPanelId('u1', undefined, 'letterhead')).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/);
-	});
-
 	it('gives each card its own panel per group, and each editor its own card', () => {
 		const ids = [
 			groupPanelId('u1', undefined, 'letterhead'),

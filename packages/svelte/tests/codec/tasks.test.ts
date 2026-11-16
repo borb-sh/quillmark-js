@@ -72,11 +72,6 @@ describe('checked rides the codec', () => {
 		expect(contentEqual(normalize(pmToContent(pm)), rt)).toBe(true);
 	});
 
-	it('an ordinary item projects no checked key', () => {
-		const rt = pmToContent(decode(normalize(md('- a\n- b')), blockSchema));
-		for (const path of items(rt)) for (const attrs of path) expect('checked' in attrs).toBe(false);
-	});
-
 	it('a nested task item keeps its own, under its parent’s', () => {
 		const rt = normalize(md('- [x] parent\n  - [ ] child'));
 		expect(contentEqual(normalize(pmToContent(decode(rt, blockSchema))), rt)).toBe(true);

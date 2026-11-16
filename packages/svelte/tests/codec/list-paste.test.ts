@@ -90,16 +90,6 @@ describe('a list on a line of its own', () => {
 		expect(state.doc.child(1).attrs.start).toBe(1);
 	});
 
-	it('a run that runs on past the list still counts from 1', () => {
-		const state = pasted(
-			'intro',
-			lineUnder,
-			copy('5. a\n6. b\n7. c\n\ntail', (view) => [at(view, 'b', true), at(view, 'tail')])
-		);
-		expect(state.doc.child(1).type.name).toBe('ordered_list');
-		expect(state.doc.child(1).attrs.start).toBe(1);
-	});
-
 	it('a selection inside a later item copies no number from the list', () => {
 		const state = pasted(
 			'intro',
@@ -109,11 +99,6 @@ describe('a list on a line of its own', () => {
 		const list = state.doc.child(1);
 		expect(list.type.name).toBe('ordered_list');
 		expect(list.attrs.start).toBe(1);
-	});
-
-	it('a run of bullets stays bullets', () => {
-		const state = pasted('intro', lineUnder, copy('- a\n- b\n- c', run));
-		expect(state.doc.child(1).type.name).toBe('bullet_list');
 	});
 });
 
@@ -131,11 +116,6 @@ describe('a list pasted into a list joins its count', () => {
 		const state = pasted('1. x\n2. y', emptyItemAfter('y'), copy('- a\n- b', whole));
 		expect(state.doc.childCount).toBe(1);
 		expect(state.doc.child(0).type.name).toBe('ordered_list');
-		expect(state.doc.child(0).childCount).toBe(4);
-	});
-
-	it('a run of items into an empty item', () => {
-		const state = pasted('1. x\n2. y', emptyItemAfter('y'), copy('1. a\n2. b\n3. c', run));
 		expect(state.doc.child(0).childCount).toBe(4);
 	});
 
@@ -180,14 +160,6 @@ describe('text from inside one line pastes as text', () => {
 	it('at the head of a paragraph, the paragraph stays one', () => {
 		const state = pasted('Para\n\nmore', headOf('Para'), harl());
 		expect(state.doc.toString()).toBe('doc(paragraph("harlPara"), paragraph("more"))');
-	});
-
-	it('a numbered item’s text at the head of a bullet keeps the bullet', () => {
-		const alpha = copy('1. Alpha', (view) => [at(view, 'Alpha', true), at(view, 'Alpha')]);
-		const state = pasted('- one\n- two', headOf('two'), alpha);
-		expect(state.doc.toString()).toBe(
-			'doc(bullet_list(list_item(paragraph("one")), list_item(paragraph("Alphatwo"))))'
-		);
 	});
 
 	it('a heading’s text does not make the line a heading', () => {

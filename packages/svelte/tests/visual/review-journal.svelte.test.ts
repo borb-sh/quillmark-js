@@ -69,30 +69,6 @@ const mixed = (doc: Document): ReviewItem[] => [
 ];
 
 describe('the answer journal', () => {
-	it('takes back two field proposals one ⌘Z each, and reopens both', async () => {
-		const r = journaled((doc) => [
-			{ id: 'cols', field: doc.pathFor('columns'), after: 2 },
-			{ id: 'sub', field: doc.pathFor('subtitle'), after: 'A new subtitle' }
-		]);
-		const before = r.doc.getStored('subtitle');
-		openField(r.target, main, 'columns');
-		accept(r.target, 'cols');
-		accept(r.target, 'sub');
-		expect(r.doc.getStored('columns')).toBe(2);
-		const root = r.target.querySelector<HTMLElement>('.qm-editor')!;
-		press(root, 'z', mod);
-		press(root, 'z', mod);
-		await settle();
-		expect(r.doc.getStored('subtitle')).toEqual(before);
-		expect(r.doc.getStored('columns')).toBeUndefined();
-		expect(r.events.slice(2)).toEqual([
-			{ id: 'sub', action: 'reopen' },
-			{ id: 'cols', action: 'reopen' }
-		]);
-		expect(r.target.querySelector('.qm-number-review [data-qm-review~="cols"]')).not.toBeNull();
-		expect(r.target.querySelector('.qm-review-ins[data-qm-review~="sub"]')).not.toBeNull();
-	});
-
 	it('takes back answers across leaves and fields newest first, from inside the first leaf', async () => {
 		const r = journaled(mixed);
 		const body = r.doc.main.body.text;

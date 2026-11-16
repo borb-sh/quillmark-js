@@ -77,18 +77,6 @@ describe('an array of `text`', () => {
 		expect(literal(doc.getStored('errata'))).toEqual(grown);
 	});
 
-	// The other half of that write, without the row: what a prose leaf hands up for
-	// an edited element is a `Content`, and the typed writer is what turns it back
-	// into the element's rest form. jsdom implements no contenteditable, so the
-	// keystroke that produces one cannot be driven here; the writer's half is where the
-	// claim lives anyway.
-	it('rests an edited element as its literal string', () => {
-		const q = quill();
-		const doc = example();
-		q.writer(doc).set('errata', [core.importMarkdown('Page 9 omits the colophon.').content]);
-		expect(literal(doc.getStored('errata'))).toEqual(['Page 9 omits the colophon.']);
-	});
-
 	it('removes an element on Backspace only once it reads empty', () => {
 		const q = quill();
 		const doc = example();

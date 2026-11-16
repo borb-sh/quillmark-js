@@ -48,61 +48,57 @@ const seed = (doc: Document): void => {
 	w.set('tab_stops', [1, 2, 3]);
 };
 
-it('fields, cells and rows listed in reverse', async () => {
-	const { last, page, listed } = await run((doc) => {
-		const p = (name: string) => doc.pathFor(name);
-		const items: ReviewItem[] = [
-			{ id: 'copies', field: `${p('imprint')}.copies`, after: 9 },
-			{ id: 'tracking', field: p('tracking_id'), after: 'T-9' },
-			{ id: 'tab2', field: `${p('tab_stops')}[2]`, before: 3, after: 30 },
-			{ id: 'tab0', field: `${p('tab_stops')}[0]`, before: 1, after: 10 },
-			{ id: 'columns', field: p('columns'), after: 3 },
-			{ id: 'role1', field: `${p('contributors')}[1].role`, before: 'Writer', after: 'Poet' },
-			{ id: 'role0', field: `${p('contributors')}[0].role`, before: 'Editor', after: 'Chief' },
-			{ id: 'name0', field: `${p('contributors')}[0].name`, before: 'Ada', after: 'Grace' },
-			{ id: 'note', field: `${p('contact')}.note`, after: 'm' },
-			{ id: 'email', field: `${p('contact')}.email`, after: 'g@example.org' },
-			{ id: 'cname', field: `${p('contact')}.name`, before: 'Ada', after: 'Grace' },
-			{ id: 'auth2', field: `${p('authors')}[2]`, before: 'C', after: 'Cy' },
-			{ id: 'auth0', field: `${p('authors')}[0]`, before: 'A', after: 'Al' },
-			{ id: 'subtitle', field: p('subtitle'), after: 'Sub' }
-		];
-		return items;
-	}, seed);
-	expect(last.undrawn).toEqual([]);
-	expect(last.open).toEqual(page);
-	expect(last.open).not.toEqual(listed);
-});
-
-it('blocks and cards listed in reverse', async () => {
-	const { last, page, listed } = await run((doc) => {
-		const blocks = doc.blocks({});
-		const field = doc.pathFor({})!;
-		const card = (i: number) => doc.pathFor({ card: i })!;
-		const cb = (i: number) => doc.blocks({ card: i });
-		const items: ReviewItem[] = [
-			{ id: 'end', field, insert: 'end', after: 'A last paragraph.' },
-			{ id: 'c3', field: card(3), replace: [cb(3)[0].id], after: 'Figure note, rewritten.' },
-			{ id: 'rm1', remove: 1 },
-			{ id: 'addEnd', add: { kind: 'note', payloadItems: [] } as never, after: 4 },
-			{ id: 'c0', field: card(0), replace: [cb(0)[0].id], after: 'Section body, rewritten.' },
-			{ id: 'add0b', add: { kind: 'note', payloadItems: [] } as never, after: 0 },
-			{ id: 'addHead', add: { kind: 'note', payloadItems: [] } as never },
-			{ id: 'b3', field, replace: [blocks.at(-1)!.id], after: 'A closing paragraph, shorter.' },
-			{ id: 'after0', field, insert: { after: blocks[0].id }, after: 'A new second paragraph.' },
-			{ id: 'b1', field, replace: [blocks[1].id], after: 'A bullet, rewritten.' },
-			{ id: 'before0', field, insert: { before: blocks[0].id }, after: 'A new first paragraph.' },
-			{ id: 'b0', field, replace: [blocks[0].id], after: 'The body, rewritten.' }
-		];
-		return items;
-	});
-	expect(last.undrawn).toEqual([]);
-	expect(last.open).toEqual(page);
-	expect(last.open).not.toEqual(listed);
-});
-
-it("a matrix's cells and a list's members listed in reverse", async () => {
-	const { last, page, listed } = await run(
+const cases: [string, (doc: Document) => ReviewItem[], ((doc: Document) => void)?][] = [
+	[
+		'fields, cells and rows',
+		(doc) => {
+			const p = (name: string) => doc.pathFor(name);
+			const items: ReviewItem[] = [
+				{ id: 'copies', field: `${p('imprint')}.copies`, after: 9 },
+				{ id: 'tracking', field: p('tracking_id'), after: 'T-9' },
+				{ id: 'tab2', field: `${p('tab_stops')}[2]`, before: 3, after: 30 },
+				{ id: 'tab0', field: `${p('tab_stops')}[0]`, before: 1, after: 10 },
+				{ id: 'columns', field: p('columns'), after: 3 },
+				{ id: 'role1', field: `${p('contributors')}[1].role`, before: 'Writer', after: 'Poet' },
+				{ id: 'role0', field: `${p('contributors')}[0].role`, before: 'Editor', after: 'Chief' },
+				{ id: 'name0', field: `${p('contributors')}[0].name`, before: 'Ada', after: 'Grace' },
+				{ id: 'note', field: `${p('contact')}.note`, after: 'm' },
+				{ id: 'email', field: `${p('contact')}.email`, after: 'g@example.org' },
+				{ id: 'cname', field: `${p('contact')}.name`, before: 'Ada', after: 'Grace' },
+				{ id: 'auth2', field: `${p('authors')}[2]`, before: 'C', after: 'Cy' },
+				{ id: 'auth0', field: `${p('authors')}[0]`, before: 'A', after: 'Al' },
+				{ id: 'subtitle', field: p('subtitle'), after: 'Sub' }
+			];
+			return items;
+		},
+		seed
+	],
+	[
+		'blocks and cards',
+		(doc) => {
+			const blocks = doc.blocks({});
+			const field = doc.pathFor({})!;
+			const card = (i: number) => doc.pathFor({ card: i })!;
+			const cb = (i: number) => doc.blocks({ card: i });
+			const items: ReviewItem[] = [
+				{ id: 'end', field, insert: 'end', after: 'A last paragraph.' },
+				{ id: 'c3', field: card(3), replace: [cb(3)[0].id], after: 'Figure note, rewritten.' },
+				{ id: 'rm1', remove: 1 },
+				{ id: 'addEnd', add: { kind: 'note', payloadItems: [] } as never, after: 4 },
+				{ id: 'c0', field: card(0), replace: [cb(0)[0].id], after: 'Section body, rewritten.' },
+				{ id: 'add0b', add: { kind: 'note', payloadItems: [] } as never, after: 0 },
+				{ id: 'addHead', add: { kind: 'note', payloadItems: [] } as never },
+				{ id: 'b3', field, replace: [blocks.at(-1)!.id], after: 'A closing paragraph, shorter.' },
+				{ id: 'after0', field, insert: { after: blocks[0].id }, after: 'A new second paragraph.' },
+				{ id: 'b1', field, replace: [blocks[1].id], after: 'A bullet, rewritten.' },
+				{ id: 'before0', field, insert: { before: blocks[0].id }, after: 'A new first paragraph.' },
+				{ id: 'b0', field, replace: [blocks[0].id], after: 'The body, rewritten.' }
+			];
+			return items;
+		}
+	],
+	[
+		"a matrix's cells and a list's members",
 		(doc) => {
 			const p = (name: string) => doc.pathFor(name);
 			const items: ReviewItem[] = [
@@ -122,7 +118,11 @@ it("a matrix's cells and a list's members listed in reverse", async () => {
 				.writer(doc)
 				.set('checks', { widows: { title: 'Widows' }, ...checks });
 		}
-	);
+	]
+];
+
+it.each(cases)('%s listed in reverse', async (_, items, seeded) => {
+	const { last, page, listed } = await run(items, seeded);
 	expect(last.undrawn).toEqual([]);
 	expect(last.open).toEqual(page);
 	expect(last.open).not.toEqual(listed);

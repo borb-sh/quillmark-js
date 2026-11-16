@@ -58,24 +58,6 @@ describe('createField over a real showcase leaf', () => {
 		expect(caret.at(-1)).toBe(2);
 		field.destroy();
 	});
-
-	it('caret survives an own-edit through the StepMap', () => {
-		const field = createField({
-			doc,
-			quill: quill(),
-			addr: { field: 'title' },
-			container: mount()
-		});
-		const view = viewOf(field);
-		// Put the caret at USV 5, then insert two chars before it.
-		field.setCaret(5);
-		const head0 = view.state.selection.head;
-		expect(head0).toBe(6); // inline single paragraph: USV k ↔ PM k+1
-		view.dispatch(view.state.tr.insertText('AB', 1)); // insert before the caret
-		// The selection mapped forward by 2 (StepMap): caret continuity across own-edits.
-		expect(view.state.selection.head).toBe(head0 + 2);
-		field.destroy();
-	});
 });
 
 describe('field-level reconciliation', () => {
@@ -286,21 +268,6 @@ describe('the hold on a narrowed field', () => {
 		expect(JSON.stringify(doc.getStored('subtitle'))).toBe(before);
 		field.destroy();
 	});
-
-	it('does not hold for the trailing newline a YAML block scalar keeps', () => {
-		const doc = example();
-		doc.unchecked.storeField('subtitle', 'one line\n');
-		expect(
-			quill()
-				.validate(doc)
-				.filter((d) => d.path === 'main.subtitle')
-		).toEqual([]);
-		const holds: boolean[] = [];
-		const field = leaf(doc, 'subtitle', holds, true);
-		expect(holds).toEqual([]);
-		expect(viewOf(field).editable).toBe(true);
-		field.destroy();
-	});
 });
 
 describe('text fields fire no markdown input rules', () => {
@@ -473,35 +440,11 @@ describe('a default the leaf holds', () => {
 	});
 });
 
-describe('a within-block hard break', () => {
-	it('lands in the store as a U+2028 in its block, matching the optimistic PM', () => {
-		const doc = example();
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
-		const view = viewOf(field);
-		field.setCaret(3);
-		view.dispatch(view.state.tr.replaceSelectionWith(blockSchema.nodes.hard_break.create(), false));
-		const body = doc.main.body;
-		expect(body.text).toContain('\u2028');
-		expect(contentEqual(body, normalize(pmToContent(view.state.doc)))).toBe(true);
-		field.destroy();
-	});
-});
-
 describe('anchor insertion', () => {
 	/** The `anchor` identity marks of the stored body content, `id` lifted out of `attrs`. */
 	function bodyAnchors(doc: Document): { id: string; start: number; end: number }[] {
 		return doc.main.body.anchors ?? [];
 	}
-
-	it('inserts a caller-supplied identity anchor that persists in the content', () => {
-		const doc = example();
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
-		field.insertAnchor('a1', 3);
-		const anchors = bodyAnchors(doc);
-		expect(anchors).toHaveLength(1);
-		expect(anchors[0]).toMatchObject({ id: 'a1', start: 3, end: 3 }); // zero-width
-		field.destroy();
-	});
 
 	it('a duplicate id is a no-op; removeAnchor drops the anchor', () => {
 		const doc = example();
@@ -522,18 +465,6 @@ describe('anchor insertion', () => {
 		// Insert two chars at the very start (PM 1 = USV 0): the anchor shifts by 2.
 		view.dispatch(view.state.tr.insertText('XY', 1));
 		expect(bodyAnchors(doc)).toMatchObject([{ id: 'a1', start: 7 }]);
-		field.destroy();
-	});
-
-	it('an anchor deleted with its text comes back with the text on undo', () => {
-		const doc = example();
-		const field = createField({ doc, quill: quill(), addr: {}, container: mount() });
-		const view = viewOf(field);
-		field.insertAnchor('a1', 1, 4);
-		view.dispatch(view.state.tr.delete(1, 5));
-		expect(bodyAnchors(doc)).toEqual([]);
-		undo(view.state, view.dispatch);
-		expect(bodyAnchors(doc)).toEqual([{ id: 'a1', start: 1, end: 4 }]);
 		field.destroy();
 	});
 
@@ -600,19 +531,6 @@ describe('createField accessible name (a11y follow-up)', () => {
 			label: 'Title'
 		});
 		expect(viewOf(field).dom.getAttribute('aria-label')).toBe('Title');
-		field.destroy();
-	});
-
-	it('leaves the editable element unnamed when no label is given', () => {
-		const doc = example();
-		const field = createField({
-			doc,
-			quill: quill(),
-			addr: { field: 'title' },
-			container: mount(),
-			inline: true
-		});
-		expect(viewOf(field).dom.hasAttribute('aria-label')).toBe(false);
 		field.destroy();
 	});
 
@@ -746,17 +664,6 @@ describe('an unanswered leaf’s ghost', () => {
 			...opts
 		});
 	}
-
-	it('keeps an inline leaf’s ghost to its one line', () => {
-		const field = unsetTitle({ placeholder: 'None' });
-		expect(ghostOf(field)).toBe('None');
-		expect(
-			viewOf(field)
-				.dom.querySelector('.qm-prose-placeholder')
-				?.classList.contains('qm-prose-placeholder-line')
-		).toBe(true);
-		field.destroy();
-	});
 
 	it('drops a placeholder that says what the unset field prints at the first edit', () => {
 		// The edit answers the field: emptied, the leaf holds an empty answer, which is

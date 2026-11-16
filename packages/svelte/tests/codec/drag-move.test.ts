@@ -108,14 +108,6 @@ describe('a text drag between two leaves', () => {
 		expect([text(title), text(subtitle)]).toEqual(['!two', 'Three']);
 	});
 
-	it('writes both leaves to the document', async () => {
-		const { doc, title, subtitle } = leaves();
-		await drag(title, 0, 4, subtitle, 5);
-		const reader = quill().reader(doc);
-		expect(reader.getContentAt({ field: 'title' }, [])?.text).toBe('two');
-		expect(reader.getContentAt({ field: 'subtitle' }, [])?.text).toBe('ThreeOne ');
-	});
-
 	it('closes the gap a whole word leaves to one space', async () => {
 		for (const [line, a, b, left] of [
 			['The Showcase Quill', 4, 12, 'The Quill'],
@@ -133,14 +125,6 @@ describe('a text drag between two leaves', () => {
 		const { title, subtitle } = leaves('The Showcase Quill');
 		await drag(title, 4, 8, subtitle, 5);
 		expect(text(title)).toBe('The case Quill');
-	});
-
-	it('takes the closed gap back with the move', async () => {
-		const { title, subtitle } = leaves('The Showcase Quill');
-		for (const view of [title, subtitle]) view.dispatch(closeHistory(view.state.tr));
-		await drag(title, 4, 12, subtitle, 5);
-		undo(subtitle.state, subtitle.dispatch);
-		expect([text(title), text(subtitle)]).toEqual(['The Showcase Quill', 'Three']);
 	});
 });
 

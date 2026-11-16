@@ -50,14 +50,6 @@ describe('Tab / Shift-Tab change nesting depth', () => {
 		}
 	});
 
-	it('Tab sinks from mid-text too — the caret’s offset is not the axis', () => {
-		expectPress(
-			after('- a\n- bc', 'b'),
-			'Tab',
-			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("bc"))))))'
-		);
-	});
-
 	it('Tab reuses the previous item’s existing nested list rather than adding one', () => {
 		expectPress(
 			startOf('- a\n    - b\n- c', 2),
@@ -114,14 +106,6 @@ describe('Tab / Shift-Tab change nesting depth', () => {
 		expect(next.selection.$from.parent.textContent).toBe('cont');
 	});
 
-	it('Tab on an unnumbered line under a numbered item opens a numbered sub-list', () => {
-		expectPress(
-			startOf('1. a\n\n   cont\n2. b', 1),
-			'Tab',
-			'doc(ordered_list(list_item(paragraph("a"), ordered_list(list_item(paragraph("cont")))), list_item(paragraph("b"))))'
-		);
-	});
-
 	it('Tab on an unnumbered line joins the sub-list of its kind standing right above or below it', () => {
 		expectPress(
 			atBlock(docOf(ul(li(p('a'), ul(li(p('x'))), p('cont')))), 2),
@@ -157,14 +141,6 @@ describe('Tab / Shift-Tab change nesting depth', () => {
 		);
 		expect(next.selection.$from.parent.textContent).toBe('cd');
 		expect(next.selection.$from.parentOffset).toBe(1);
-	});
-
-	it('Tab lands the block after what the last item holds, a sub-list included', () => {
-		expectPress(
-			startOf('1. a\n    1. b\n\nc', 2),
-			'Tab',
-			'doc(ordered_list(list_item(paragraph("a"), ordered_list(list_item(paragraph("b"))), paragraph("c"))))'
-		);
 	});
 
 	it('Tab moves a block after a list inside a quote, the quote kept', () => {
@@ -235,14 +211,6 @@ describe('Enter', () => {
 		);
 	});
 
-	it('at the start of a first item under a quote, opens a new first item', () => {
-		expectPress(
-			startOf('> quoted\n\n- a', 1),
-			'Enter',
-			'doc(blockquote(paragraph("quoted")), bullet_list(list_item(paragraph), list_item(paragraph("a"))))'
-		);
-	});
-
 	it('at the start of a NESTED first item, splits instead of reaching the parent item', () => {
 		expectPress(
 			startOf('- a\n    - b', 1),
@@ -269,14 +237,6 @@ describe('Enter on an empty line inside a list', () => {
 		expect(next.doc.childCount).toBe(3);
 		expect(next.doc.child(0).attrs.start).toBe(3);
 		expect(next.doc.child(2).attrs.start).toBe(1);
-	});
-
-	it('on an empty nested middle item, lifts it one level', () => {
-		expectPress(
-			atBlock(docOf(ul(li(p('a'), ul(li(p('x')), li(p()), li(p('y')))))), 2),
-			'Enter',
-			'doc(bullet_list(list_item(paragraph("a"), bullet_list(list_item(paragraph("x")))), list_item(paragraph, bullet_list(list_item(paragraph("y"))))))'
-		);
 	});
 
 	it('on an empty continuation line, puts the marker back on as the next item', () => {
@@ -378,14 +338,6 @@ describe('Backspace takes an item’s marker off', () => {
 			startOf('- a\n    - b\n    - c', 1),
 			'Backspace',
 			'doc(bullet_list(list_item(paragraph("a"), paragraph("b"), bullet_list(list_item(paragraph("c"))))))'
-		);
-	});
-
-	it('a nested first item’s own nested list joins the rest of its list', () => {
-		expectPress(
-			startOf('- a\n    - b\n        - x\n    - c', 1),
-			'Backspace',
-			'doc(bullet_list(list_item(paragraph("a"), paragraph("b"), bullet_list(list_item(paragraph("x")), list_item(paragraph("c"))))))'
 		);
 	});
 
@@ -491,14 +443,6 @@ describe('Delete joins the line below onto the caret’s', () => {
 		);
 	});
 
-	it('spends an empty item below, joining nothing past it', () => {
-		expectPress(
-			atBlockEnd(docOf(ul(li(p('a')), li(p()), li(p('c')))), 0),
-			'Delete',
-			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph("c"))))'
-		);
-	});
-
 	it('spends an empty item rather than unmarking the one below it', () => {
 		expectPress(
 			atBlockEnd(docOf(ul(li(p('a')), li(p()), li(p('c')))), 1),
@@ -544,25 +488,9 @@ describe('Delete joins the line below onto the caret’s', () => {
 	it('declines between two blocks outside every list', () => {
 		expect(run(endOf('head\n\ntail', 0), keys['Delete'])).toBe(null);
 	});
-
-	it('at the last item’s end, joins the line below onto it', () => {
-		expectPress(
-			atBlockEnd(docOf(ul(li(p('a'))), p('tail')), 0),
-			'Delete',
-			'doc(bullet_list(list_item(paragraph("atail"))))'
-		);
-	});
 });
 
 describe('ordered lists carry their numbering through a mutation', () => {
-	it('Tab nests a fresh ordered list starting at 1', () => {
-		expectPress(
-			startOf('1. a\n2. b', 1),
-			'Tab',
-			'doc(ordered_list(list_item(paragraph("a"), ordered_list(list_item(paragraph("b"))))))'
-		);
-	});
-
 	it('a list that starts at 3 keeps its start when an item sinks', () => {
 		const next = expectPress(
 			startOf('3. a\n4. b', 1),

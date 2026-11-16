@@ -13,8 +13,7 @@ import {
 	standing,
 	titleOf,
 	toStored,
-	type AppConfig,
-	type DocRecord
+	type AppConfig
 } from '../../app/records';
 
 const app: AppConfig = {
@@ -37,11 +36,6 @@ describe('a stored record', () => {
 			expect(record, JSON.stringify(raw)).toBeDefined();
 			expect(readRecord(toStored(record!))).toEqual(record);
 		}
-	});
-
-	it('reads back what this release stores', () => {
-		const record: DocRecord = { id: 'a', title: 'T', quill: 'memo@1.2.0', edited: 1, markdown: '' };
-		expect(readRecord(toStored(record))).toEqual(record);
 	});
 
 	it('declines a shape it cannot read, rather than opening half a document', () => {

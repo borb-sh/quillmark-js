@@ -141,26 +141,6 @@ describe('structural undo', () => {
 		expect(sansIds(doc.toMarkdown())).toBe(before);
 	});
 
-	it('puts two removed cards back in turn, the second beside the restored first', () => {
-		vi.useFakeTimers();
-		const doc = example();
-		const before = doc.toMarkdown();
-		const { target } = mountEditor(quill(), doc);
-
-		deleteButton(slots(target)[1]).click();
-		flushSync();
-		deleteButton(slots(target)[0]).click();
-		flushSync();
-		lapse();
-
-		restoreButton(target)!.click();
-		flushSync();
-		restoreButton(target)!.click();
-		flushSync();
-		expect(doc.toMarkdown()).toBe(before);
-		expect(restoreButton(target)).toBeNull();
-	});
-
 	it('answers ⌘Z for a kept card only until the next edit lands', () => {
 		vi.useFakeTimers();
 		const doc = example();

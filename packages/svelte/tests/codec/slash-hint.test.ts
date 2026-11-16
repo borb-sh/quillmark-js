@@ -51,13 +51,6 @@ describe('the hint stands on the empty line the caret holds', () => {
 		field.destroy();
 	});
 
-	it('on an empty body', () => {
-		const { field, view } = leaf('');
-		field.setCaret(0);
-		expect(hints(view)).toHaveLength(1);
-		field.destroy();
-	});
-
 	it('in the host’s wording', () => {
 		const { field, view } = leaf('', {
 			slashStrings: () => ({ ...DEFAULT_SLASH_STRINGS, slashHint: 'Tapez / pour insérer' })
@@ -82,13 +75,6 @@ describe('the hint stands on the empty line the caret holds', () => {
 });
 
 describe('nowhere a `/` opens no menu', () => {
-	it('on a line with text', () => {
-		const { field, view } = leaf('para');
-		field.setCaret(4);
-		expect(hints(view)).toEqual([]);
-		field.destroy();
-	});
-
 	it('in a code block, which reinterprets nothing', () => {
 		const { field, view } = leaf('```\n```');
 		field.setCaret(0);

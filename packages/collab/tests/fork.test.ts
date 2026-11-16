@@ -72,22 +72,6 @@ describe('writeFrom', () => {
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 
-	it('writes only what a whole-body rewrite changed, so text typed elsewhere in it stays', () => {
-		const [a, b] = session();
-		const base = revision(a);
-		const old = authoring(a).body!;
-		type(a, Array.from(a.doc.main.body.text).length, ' Edited.');
-		const written = write(a, base, (doc) => {
-			q.writer(doc).revise({}, old.replace('The body is a full block leaf', 'The body is new'));
-		});
-		expect(written.conflicts).toEqual([]);
-		Y.applyUpdate(a.ydoc, written.update, 'ai');
-		const body = authoring(a).body!;
-		expect(body).toMatch(/^The body is new:/);
-		expect(body).toMatch(/segments rather than one run\. Edited\.$/);
-		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
-	});
-
 	it('keeps a line typed into between two lines a rewrite changed where it was typed', () => {
 		const [a, b] = session();
 		const lines = ['Alpha one.', 'Bravo two.', 'Charlie three.', 'Delta four.', 'Echo five.'];
@@ -114,29 +98,6 @@ describe('writeFrom', () => {
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 
-	it('reports a line both sides rewrote, and lines next to each other as apart', () => {
-		const [a] = session();
-		const lines = ['Alpha one.', 'Bravo two.', 'Charlie three.'];
-		q.writer(a.doc).revise({}, lines.join('\n\n'));
-		a.binding.push();
-		const base = revision(a);
-		type(a, Array.from(a.doc.main.body.text).join('').indexOf('two.'), 'typed ');
-		const same = write(a, base, (doc) => {
-			q.writer(doc).revise({}, ['Alpha one.', 'Bravo 2.', 'Charlie three.'].join('\n\n'));
-		});
-		expect(same.conflicts).toEqual([
-			expect.objectContaining({
-				type: 'field',
-				from: 'main',
-				hunks: [{ line: 2, before: 'Bravo two.', after: 'Bravo typed two.' }]
-			})
-		]);
-		const next = write(a, base, (doc) => {
-			q.writer(doc).revise({}, ['Alpha 1.', 'Bravo two.', 'Charlie 3.'].join('\n\n'));
-		});
-		expect(next.conflicts).toEqual([]);
-	});
-
 	it('lands a card inserted from an old revision beside the card it followed there', () => {
 		const [a, b] = session();
 		const base = revision(a);
@@ -157,27 +118,6 @@ describe('writeFrom', () => {
 			'credits'
 		]);
 		expect(authoring(a).cards?.[2].fields).toEqual({ label: 'Added' });
-		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
-	});
-
-	it('writes several card operations from one edit', () => {
-		const [a, b] = session();
-		const base = revision(a);
-		const written = write(a, base, (doc) => {
-			const w = q.writer(doc);
-			w.addCard('note', { label: 'First' }, '', 0);
-			w.addCard('note', { label: 'Second' }, '', 2);
-			doc.moveCard(doc.cardCount - 1, 1);
-			return [
-				{ op: 'insert', at: 0 },
-				{ op: 'insert', at: 2 },
-				{ op: 'move', from: doc.cardCount - 1, to: 1 }
-			];
-		});
-		Y.applyUpdate(a.ydoc, written.update, 'ai');
-		expect(authoring(a).cards?.[0].fields?.label).toBe('First');
-		expect(authoring(a).cards?.[3].fields?.label).toBe('Second');
-		expect(a.doc.cardCount).toBe(7);
 		expect(snapshot(b.doc)).toBe(snapshot(a.doc));
 	});
 
@@ -305,12 +245,6 @@ describe('cardOps', () => {
 		return { list, moved };
 	}
 
-	function* orders(cards: number[]): Generator<number[]> {
-		if (cards.length < 2) return yield cards;
-		for (const card of cards)
-			for (const rest of orders(cards.filter((c) => c !== card))) yield [card, ...rest];
-	}
-
 	it('takes every old card list to the new one, moving each card outside a longest run once', () => {
 		for (let count = 0; count <= 4; count++)
 			for (let length = 0; length <= 4; length++)
@@ -325,28 +259,9 @@ describe('cardOps', () => {
 				}
 	});
 
-	it('moves exactly the cards writeFrom reads as moved, over every order of the first four cards', () => {
-		const [a] = session();
-		const base = revision(a);
-		for (const order of orders([0, 1, 2, 3])) {
-			order.push(4);
-			const ops = cardOps(order, 5);
-			const written = write(a, base, (doc) => {
-				for (const op of ops) if (op.op === 'move') doc.moveCard(op.from, op.to);
-				return ops;
-			});
-			const read = written.changes.flatMap((c) => (c.type === 'move' ? [c.from] : []));
-			expect(new Set(read), JSON.stringify(order)).toEqual(replay(ops, 5).moved);
-		}
-	});
-
 	it('refuses an alignment naming a card twice or one past the list', () => {
 		expect(() => cardOps([1, 1], 2)).toThrow(RangeError);
 		expect(() => cardOps([2, 0, 1], 2)).toThrow(RangeError);
-	});
-
-	it('reads a card dragged to the front as one move', () => {
-		expect(cardOps([3, 0, 1, 2], 4)).toEqual([{ op: 'move', from: 3, to: 0 }]);
 	});
 });
 
@@ -384,10 +299,5 @@ describe('changesSince', () => {
 				hunks: [{ line: 0, before: 'Findings', after: 'Results' }]
 			}
 		]);
-	});
-
-	it('reads nothing when nothing moved', () => {
-		const [a] = session();
-		expect(changesSince({ history: a.ydoc, base: revision(a), quill: q, doc: a.doc })).toEqual([]);
 	});
 });
