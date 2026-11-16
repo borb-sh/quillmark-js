@@ -12,6 +12,8 @@ The rules a change to `quillkit` must keep, the reason behind each, and the desi
 
 **Every verb's default target is studio**, the client a quiver's own authors judge it in; a pipeline deploying the app names `app`.
 
+**`render` takes a quill, not a target**, and renders through the engine and font suite `check` builds, so a page it writes is a page the gate rendered.
+
 **`serve` shows the source, `preview` the build.** A deploy records which target it was built for, so `preview` takes no target.
 
 **No base path is configured.** Each client resolves everything relative to `document.baseURI`, so one build serves a root, a subpath and a preview URL unchanged.
