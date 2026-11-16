@@ -14,6 +14,7 @@ import { APP_JSON, prepareApp, writeApp } from '../app-files.js';
 import { CLIENTS, assertClient, layOut, targetOf, type Target } from '../deploy.js';
 import { gate, message } from '../gate.js';
 import { layStarter } from '../init.js';
+import { render as renderQuill, type Source } from '../render.js';
 import { EventStream, createStaticServer, listen, type Mount } from '../serve.js';
 import { serialize, watchCollection } from '../watch.js';
 
@@ -210,6 +211,41 @@ async function serve(args: string[]): Promise<void> {
 	if (parsed.switches.has('--open')) openBrowser(url);
 }
 
+/** One quill's document rendered to files: the look step, outside a browser. The document
+ *  is the second word, else `--seed` or `--example`, else the example where the quill
+ *  declares one. */
+async function render(args: string[]): Promise<void> {
+	const parsed = parse('render', args, {
+		values: ['--out'],
+		switches: ['--seed', '--example', '--png'],
+		words: 2
+	});
+	const [ref, path] = parsed.words;
+	if (ref === undefined) throw new Usage('quillkit render takes a quill');
+	const named = [
+		...(['--seed', '--example'] as const).filter((s) => parsed.switches.has(s)),
+		...(path === undefined ? [] : [path])
+	];
+	if (named.length > 1)
+		throw new Usage(`quillkit render takes one document, got ${named.join(' and ')}`);
+	const source: Source | undefined =
+		path !== undefined
+			? { kind: 'file', path: resolve(path) }
+			: parsed.switches.has('--seed')
+				? { kind: 'seed' }
+				: parsed.switches.has('--example')
+					? { kind: 'example' }
+					: undefined;
+	const { files, warnings, what } = await renderQuill(resolve('.'), ref, {
+		source,
+		png: parsed.switches.has('--png'),
+		out: parsed.values.get('--out') ?? '.'
+	});
+	for (const said of warnings) console.error(said);
+	console.log(`quillkit render ${ref} (${what}):`);
+	for (const file of files) console.log(`  ${file}`);
+}
+
 /** The target a deploy was built for, read off what its build left at the root. */
 function builtTarget(dir: string): Target {
 	if (existsSync(join(dir, APP_JSON))) return 'app';
@@ -246,13 +282,15 @@ function usage(print: (text: string) => void = console.error): void {
 			'Usage:',
 			'  quillkit init  [<dir>]',
 			'  quillkit check [-D|--drafts] [--strict]',
+			'  quillkit render <quill> [--seed|--example|<doc.md>] [--png] [-o|--out <dir>]',
 			'  quillkit build [quiver|studio|app] [-o|--out <dir>] [-D|--drafts]',
 			'  quillkit serve [quiver|studio|app] [-p|--port <n>] [--open]',
 			'  quillkit preview [-o|--out <dir>] [-p|--port <n>] [--open]',
 			'',
 			'The target is studio where none is named; preview serves whichever build is in --out.',
 			'check renders every version; --drafts admits drafts to the app it resolves and to a build.',
-			'check prints the warnings a pass carries, and fails on them under --strict.'
+			'check prints the warnings a pass carries, and fails on them under --strict.',
+			'render writes a PDF, or one PNG per page under --png, into --out, the working directory by default.'
 		].join('\n')
 	);
 }
@@ -260,6 +298,7 @@ function usage(print: (text: string) => void = console.error): void {
 const VERBS: Record<string, (args: string[]) => Promise<void>> = {
 	init,
 	check,
+	render,
 	build,
 	serve,
 	preview

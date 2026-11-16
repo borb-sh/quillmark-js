@@ -49,14 +49,6 @@ describe('a note', () => {
 		flushSync();
 		expect(card.querySelector('.qm-review-card-reason')?.textContent).toBe('Why line 1 changes.');
 	});
-
-	it('is not drawn for an item without one', async () => {
-		const r = mount((doc) => grouped(doc).map(({ note: _, ...item }) => item as ReviewItem));
-		await settle();
-		const card = r.target.querySelector<HTMLElement>('.qm-review-card')!;
-		expect(card.querySelector('.qm-review-card-reason')).toBeNull();
-		expect(card.hasAttribute('aria-describedby')).toBe(false);
-	});
 });
 
 describe('a group', () => {

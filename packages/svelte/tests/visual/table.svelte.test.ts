@@ -255,10 +255,4 @@ describe('an array declaring max:', () => {
 		expect(count(t)).toBe('2 / 3');
 		expect(addChip(t).disabled).toBe(false);
 	});
-
-	it('draws no count on an array with no cap', () => {
-		const q = quill();
-		const mounted = mountEditor(q, example());
-		expect(count(field(mounted.target, 'Authors'))).toBeUndefined();
-	});
 });

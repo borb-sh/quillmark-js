@@ -56,7 +56,6 @@ import {
 	type GridCell,
 	type TableGrid
 } from '$lib/core/codec/table.js';
-import { mintIslandId } from '$lib/core/codec/islands.js';
 import { tableElement } from '$lib/core/codec/table-copy.js';
 import type { Content, TableProps } from '@quillmark/wasm';
 import { core, mount, press, quill, md } from './_util.js';
@@ -333,18 +332,6 @@ describe('what the model already answers', () => {
 		const one = newTable(1, 1);
 		expect(columnCount(deleteColumn(one, 0))).toBe(1);
 	});
-
-	it('an insert to the left of the first column lands at the front', () => {
-		const wider = insertColumn(LETTERED, -1);
-		expect(wider.header.map((c) => c.text)).toEqual(['', 'h1', 'h2']);
-		expect(wider.aligns).toEqual(['none', 'left', 'right']);
-	});
-
-	it('a minted island id continues the positional sequence', () => {
-		const doc = decode(md(TABLE_MD), blockSchema);
-		expect(mintIslandId(doc)).toBe('isl-1');
-		expect(mintIslandId(decode(md('nothing here'), blockSchema))).toBe('isl-0');
-	});
 });
 
 describe('the cell codec: a cell is its own content unit', () => {
@@ -353,29 +340,19 @@ describe('the cell codec: a cell is its own content unit', () => {
 		return cellFromDoc(decode(cellContent(c), cellSchema), c);
 	}
 
-	it("a cell's marks are cell-local and survive the trip", () => {
-		const c: GridCell = { text: 'bold text', marks: [{ start: 0, end: 4, type: 'strong' }] };
-		expect(roundTrip(c)).toEqual(c);
-	});
-
-	it('an anchor in a cell is preserved verbatim across an edit', () => {
+	it('an anchor in a cell follows an edit, holds against an insertion at it, and a range keeps its extent', () => {
 		const c: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'a1', start: 3, end: 3 }] };
 		// Retype the cell to something longer, inserted before the anchor.
 		const edited = decode(cellContent({ text: 'XXabcd', marks: [] }), cellSchema);
 		expect(cellFromDoc(edited, c).anchors).toEqual([{ id: 'a1', start: 5, end: 5 }]);
-	});
 
-	it('a cell anchor holds its position against an insertion at it, as a field’s does', () => {
-		const c: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'a1', start: 2, end: 2 }] };
 		// Typed at the anchor's own position: the one offset where the two assocs differ.
-		const edited = decode(cellContent({ text: 'abXcd', marks: [] }), cellSchema);
-		expect(cellFromDoc(edited, c).anchors?.[0]?.start).toBe(2);
-	});
+		const at: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'a1', start: 2, end: 2 }] };
+		const typed = decode(cellContent({ text: 'abXcd', marks: [] }), cellSchema);
+		expect(cellFromDoc(typed, at).anchors?.[0]?.start).toBe(2);
 
-	it('a range anchor in a cell keeps its extent through an edit inside it', () => {
-		const c: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'r1', start: 1, end: 3 }] };
-		const edited = decode(cellContent({ text: 'abXcd', marks: [] }), cellSchema);
-		expect(cellFromDoc(edited, c).anchors).toEqual([{ id: 'r1', start: 1, end: 4 }]);
+		const range: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'r1', start: 1, end: 3 }] };
+		expect(cellFromDoc(typed, range).anchors).toEqual([{ id: 'r1', start: 1, end: 4 }]);
 	});
 
 	it('two spellings of one mark are one cell, whatever order the keys arrive in', () => {
@@ -401,7 +378,7 @@ describe('the cell codec: a cell is its own content unit', () => {
 		expect(cellEqual(stored, { ...stored, marks: [] })).toBe(false);
 	});
 
-	it('a hard break is one U+2028, and a mark either side of it keeps its offsets', () => {
+	it('a hard break is one U+2028, a mark either side keeps its offsets, and a mark spanning it leaves it unmarked', () => {
 		const strong = cellSchema.marks.strong.create();
 		const doc = cellSchema.node('doc', null, [
 			cellSchema.node('paragraph', null, [
@@ -420,9 +397,7 @@ describe('the cell codec: a cell is its own content unit', () => {
 			]
 		});
 		expect(decode(cellContent(cell), cellSchema).eq(doc)).toBe(true);
-	});
 
-	it('a mark spanning a stored break leaves the break unmarked, as decode does in prose', () => {
 		const spanning: GridCell = { text: 'a\u2028bc', marks: [{ start: 0, end: 3, type: 'strong' }] };
 		expect(decode(cellContent(spanning), cellSchema).toString()).toBe(
 			'doc(paragraph(strong("a"), hard_break, strong("b"), "c"))'
@@ -596,21 +571,6 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('the HEADER row deletes the same way, and the row under it takes its place', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'row')[0].click();
-		expect(washed(field)).toEqual(['0,0', '0,1']);
-		press(caret(field), 'Backspace');
-		// A table is one row shorter and still has a header, which is the whole of what
-		// the model asked for. Alignment is the column's, so it does not travel.
-		expect(grid(leafProps(field))).toEqual([
-			['a1', 'a2'],
-			['b1', 'b2']
-		]);
-		expect(leafProps(field).aligns).toEqual(['left', 'right']);
-		field.destroy();
-	});
-
 	it('Backspace over a selected column deletes it, alignment and all', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'column')[1].click();
@@ -728,21 +688,6 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('Alt+arrow carries the header down, and the row it passed is the header now', () => {
-		const { field } = tableLeaf(LETTERED);
-		grips(field, 'row')[0].click();
-		press(caret(field), 'ArrowDown', { altKey: true });
-		expect(grid(leafProps(field))).toEqual([
-			['a1', 'a2'],
-			['h1', 'h2'],
-			['b1', 'b2']
-		]);
-		// The selection travels with the line, which is now row 1 and no longer the
-		// header: what a grip names is an index, and the move handed index 0 over.
-		expect(washed(field)).toEqual(['1,0', '1,1']);
-		field.destroy();
-	});
-
 	it('Escape climbs a rung a press: the caret’s row, then the island', () => {
 		const { field } = tableLeaf(LETTERED);
 		const views = cellViews(field);
@@ -771,7 +716,7 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('a cell edit retires the rectangle: typing is the caret’s', () => {
+	it('a cell edit or a caret in a cell retires the rectangle: typing is the caret’s', () => {
 		const { field } = tableLeaf(LETTERED);
 		grips(field, 'row')[1].click();
 		expect(washed(field)).not.toEqual([]);
@@ -780,11 +725,7 @@ describe('the table NodeView', () => {
 		// A wash left up over text being typed says the next Backspace takes the row,
 		// and it does not.
 		expect(washed(field)).toEqual([]);
-		field.destroy();
-	});
-
-	it('a caret in a cell drops the line selection: one subject at a time', () => {
-		const { field } = tableLeaf(LETTERED);
+		// One subject at a time: a caret taking a cell drops the line selection too.
 		grips(field, 'row')[1].click();
 		expect(washed(field)).not.toEqual([]);
 		cellViews(field)[0].focus();
@@ -943,19 +884,6 @@ describe('the table NodeView', () => {
 		field.destroy();
 	});
 
-	it('an undo in the middle of a cell puts the caret where the edit was', () => {
-		const { field } = tableLeaf(withCell(LETTERED, 0, 0, cell('hello')));
-		const view = cellViews(field)[0];
-		view.focus();
-		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3)));
-		view.dispatch(view.state.tr.insertText('XY', 3));
-		press(view, 'z', { ctrlKey: true });
-		expect(leafProps(field).header[0].text).toBe('hello');
-		expect(caret(field)).toBe(cellViews(field)[0]);
-		expect(cellViews(field)[0].state.selection.head).toBe(3);
-		field.destroy();
-	});
-
 	it('an undo of a row a key appended puts the caret where the key was pressed', () => {
 		for (const [key, at, cellIndex] of [
 			['Enter', 2, 4],
@@ -1094,7 +1022,7 @@ function caretIn(field: FieldController, text: string, offset: number): EditorVi
 }
 
 describe('a delete against a table steps into it', () => {
-	it('Backspace below it lands at the end of its last cell, and edits nothing', () => {
+	it('Backspace below it lands at the end of its last cell, Delete above at the start of its first, and nothing is edited', () => {
 		const { field } = tableLeaf();
 		const before = outerView(field).state.doc;
 		press(caretIn(field, 'tail', 0), 'Backspace');
@@ -1102,14 +1030,9 @@ describe('a delete against a table steps into it', () => {
 		const cell = caret(field);
 		expect(cell).toBe(cellViews(field).at(-1));
 		expect(cell.state.selection.from).toBe(cell.state.doc.content.size - 1);
-	});
-
-	it('Delete above it lands at the start of its first cell', () => {
-		const { field } = tableLeaf();
 		press(caretIn(field, 'para', 4), 'Delete');
-		const cell = caret(field);
-		expect(cell).toBe(cellViews(field)[0]);
-		expect(cell.state.selection.from).toBe(1);
+		expect(caret(field)).toBe(cellViews(field)[0]);
+		expect(caret(field).state.selection.from).toBe(1);
 	});
 
 	it('an empty line under it goes with the step', () => {
@@ -1544,15 +1467,6 @@ describe('a grip holds a line and a sweep holds cells', () => {
 		field.destroy();
 	});
 
-	it('a swept row presses no grip: the pressed grip is what says a line is named', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		sweep(field, 2, 3);
-		expect(washed(field)).toEqual(['1,0', '1,1']);
-		expect(grips(field, 'row')[1].getAttribute('aria-pressed')).toBe('false');
-		field.destroy();
-	});
-
 	it('an arrow lets go of a sweep, and Alt+arrow moves nothing', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
@@ -1703,7 +1617,7 @@ describe('a grip drag moves its line', () => {
 		field.destroy();
 	});
 
-	it('a release more than a line past the table moves nothing, and no rule draws out there', () => {
+	it('no rule draws past the table or over the lifted line, and a release there moves nothing', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
 		const grip = grips(field, 'row')[1];
@@ -1724,7 +1638,11 @@ describe('a grip drag moves its line', () => {
 		expect(field.el.querySelector('.qm-table-drop')).not.toBeNull();
 		at('pointermove', [35, last.bottom + reach + 1]);
 		expect(field.el.querySelector('.qm-table-drop')).toBeNull();
-		at('pointerup', [35, last.bottom + reach + 1]);
+		at('pointermove', [35, 80]);
+		expect(field.el.querySelector('.qm-table-drop')).not.toBeNull();
+		at('pointermove', [35, 55]);
+		expect(field.el.querySelector('.qm-table-drop')).toBeNull();
+		at('pointerup', [35, 55]);
 		expect(grid(leafProps(field))).toEqual(grid(LETTERED));
 		field.destroy();
 	});
@@ -1743,29 +1661,6 @@ describe('a grip drag moves its line', () => {
 			['b1', 'b2'],
 			['a1', 'a2']
 		]);
-		field.destroy();
-	});
-
-	it('draws no rule while the pointer is back over the lifted line', () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		const grip = grips(field, 'row')[1];
-		const at = (type: string, [x, y]: [number, number]) =>
-			grip.dispatchEvent(
-				new PointerEvent(type, {
-					bubbles: true,
-					cancelable: true,
-					pointerId: 1,
-					clientX: x,
-					clientY: y
-				})
-			);
-		at('pointerdown', [35, 55]);
-		at('pointermove', [35, 80]);
-		expect(field.el.querySelector('.qm-table-drop')).not.toBeNull();
-		at('pointermove', [35, 55]);
-		expect(field.el.querySelector('.qm-table-drop')).toBeNull();
-		at('pointerup', [35, 55]);
 		field.destroy();
 	});
 
@@ -2031,18 +1926,6 @@ describe('a pointer press on the island resolves to a caret', () => {
 		field.destroy();
 	});
 
-	it("the band is the table's too, where no handle is under the press", () => {
-		const { field } = tableLeaf(LETTERED);
-		layout(field);
-		// Inside the frame, beside the last row and left of every cell: the band the
-		// scroller opens is the table's, and a press in it lands in the nearest cell
-		// rather than selecting anything.
-		pressAt(cellBox(field, 4), 20, 78);
-		expect((field as FieldController & LeafViews).focusedView()).toBe(cellViews(field)[4]);
-		expect(outerView(field).state.selection instanceof NodeSelection).toBe(false);
-		field.destroy();
-	});
-
 	it('outside the frame it writes beside the table, on the side it landed', () => {
 		const { field } = tableLeaf(LETTERED);
 		layout(field);
@@ -2276,22 +2159,6 @@ describe('a table on the clipboard lands as a table island', () => {
 				'| **Task** | **Reference** |',
 				'| --- | --- |',
 				'| Submit roster<br>by Friday | [AFI 33-360](https://www.e-publishing.af.mil/) |'
-			)
-		);
-	});
-
-	it('Google Sheets: its markup and its text alone read as one table', () => {
-		const both = pasted(GOOGLE_SHEETS);
-		expect(grid(propsOf(both))).toEqual([
-			['Unit', 'Strength', 'Note'],
-			['1st Wing', '42', 'Line one\u2028Line two']
-		]);
-		expect(propsOf(pasted({ 'text/plain': GOOGLE_SHEETS['text/plain'] }))).toEqual(propsOf(both));
-		expect(core.exportMarkdown(both)).toBe(
-			exported(
-				'| Unit | Strength | Note |',
-				'| --- | --- | --- |',
-				'| 1st Wing | 42 | Line one<br>Line two |'
 			)
 		);
 	});

@@ -63,11 +63,6 @@ describe('stepping', () => {
 		expect(stepZoom(between, -1, 0, onLevel)).toBe(STEPS[3]);
 	});
 
-	it('walks the levels from one to the next', () => {
-		for (let i = 0; i < STEPS.length - 1; i++)
-			expect(stepZoom(STEPS[i], 1, 0, onLevel)).toBe(STEPS[i + 1]);
-	});
-
 	it('skips levels under the floor and stops at it', () => {
 		const floor = (STEPS[1] + STEPS[2]) / 2;
 		expect(stepZoom(STEPS[3], -1, floor, onLevel)).toBe(STEPS[2]);

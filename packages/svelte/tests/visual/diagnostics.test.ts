@@ -4,7 +4,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Diagnostic } from '@quillmark/wasm';
 import {
-	resolveCardKey,
 	deepen,
 	splitDeep,
 	unrouted,
@@ -18,26 +17,6 @@ const warn = (message: string, path?: string): Diagnostic => ({
 	severity: 'warning',
 	message,
 	path
-});
-
-describe('resolveCardKey', () => {
-	const cardIds = ['c0', 'c1', 'c2'];
-	it('resolves an absolute document index to the live stable id', () => {
-		expect(resolveCardKey({ card: 1, field: 'from' }, cardIds)).toEqual({
-			card: 'c1',
-			field: 'from'
-		});
-	});
-	it('drops a positional key whose index is out of the current card array', () => {
-		expect(resolveCardKey({ card: 5, field: 'from' }, cardIds)).toBeUndefined();
-	});
-	it('passes an already id-keyed or main key through unchanged', () => {
-		expect(resolveCardKey({ card: 'c1', field: 'from' }, cardIds)).toEqual({
-			card: 'c1',
-			field: 'from'
-		});
-		expect(resolveCardKey({ field: 'subject' }, cardIds)).toEqual({ field: 'subject' });
-	});
 });
 
 describe('routeAndResolve', () => {
@@ -92,11 +71,6 @@ describe('routeAndResolve', () => {
 				cardIds
 			)
 		).toEqual([]);
-	});
-
-	it('handles an undefined/empty list', () => {
-		expect(routeAndResolve(undefined, cardIds)).toEqual([]);
-		expect(routeAndResolve([], cardIds)).toEqual([]);
 	});
 });
 

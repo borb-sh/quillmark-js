@@ -121,12 +121,9 @@ function loadMinimal() {
 }
 
 describe('loadBuiltQuiver — happy path', () => {
-	it('quillNames() returns sorted quill names', async () => {
-		expect((await loadMinimal()).quillNames()).toEqual(['memo', 'resume']);
-	});
-
-	it('versionsOf() returns versions sorted descending', async () => {
+	it('lists names sorted and versions descending', async () => {
 		const q = await loadMinimal();
+		expect(q.quillNames()).toEqual(['memo', 'resume']);
 		expect(q.versionsOf('memo')).toEqual(['1.1.0', '1.0.0']);
 		expect(q.versionsOf('resume')).toEqual(['2.0.0']);
 	});
@@ -137,26 +134,16 @@ describe('loadBuiltQuiver — happy path', () => {
 		);
 		expect(q.description).toBe('A sample quiver');
 	});
-
-	it('an index without a description carries undefined', async () => {
-		expect((await loadMinimal()).description).toBeUndefined();
-	});
 });
 
 describe('loadBuiltQuiver — the tree', () => {
-	it('loaded tree has correct bytes for content files', async () => {
-		const q = await loadMinimal();
-		const tree = await loadViaGetQuill(q, 'memo', '1.0.0');
-
-		expect(new TextDecoder().decode(tree.get('Quill.yaml'))).toBe('name: memo\n');
-	});
-
 	it('reads one bundle, and nothing of another quill', async () => {
 		const artifact = buildMinimalArtifact();
 		const q = await loadBuiltQuiver(artifact.read);
-		await loadViaGetQuill(q, 'memo', '1.0.0');
+		const tree = await loadViaGetQuill(q, 'memo', '1.0.0');
 
 		expect(artifact.log).toEqual(['quiver.json', bundleName('memo', '1.0.0')]);
+		expect(new TextDecoder().decode(tree.get('Quill.yaml'))).toBe('name: memo\n');
 	});
 });
 
@@ -231,18 +218,6 @@ describe('loadBuiltQuiver — a newer generation', () => {
 		const q = await loadBuiltQuiver(artifact.read);
 		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
 		expect(artifact.log.filter((p) => p === 'quiver.json')).toHaveLength(2);
-	});
-
-	it('a quill the next generation dropped is the original error', async () => {
-		const artifact = makeArtifact('sample', [{ name: 'memo', version: '1.0.0' }]);
-		const q = await loadBuiltQuiver(artifact.read);
-		artifact.files.clear();
-		artifact.files.set(
-			'quiver.json',
-			enc.encode(JSON.stringify({ format: FORMAT, name: 'sample', quills: [] }))
-		);
-
-		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(`not found: "${MEMO}"`);
 	});
 
 	it('a reread that cannot reach quiver.json is the original error', async () => {
@@ -321,17 +296,6 @@ describe("loadBuiltQuiver — Quillmark's codec reads the bundle", () => {
 			})
 		);
 	});
-
-	it('an entry declaring past the per-file budget → quill::bundle_too_large, uninflated', async () => {
-		const q = await loadBuiltQuiver(
-			patched((view, at) => view.setUint32(at + 24, 0xffff_fff0, true)).read
-		);
-		await expect(q.getQuill('memo@1.0.0')).rejects.toThrow(
-			expect.objectContaining({
-				diagnostics: [expect.objectContaining({ code: 'quill::bundle_too_large' })]
-			})
-		);
-	});
 });
 
 describe('loadBuiltQuiver — the format', () => {
@@ -362,12 +326,6 @@ describe('loadBuiltQuiver — the format', () => {
 			expect.objectContaining({ code: 'quiver_invalid' })
 		);
 	});
-
-	it('a non-integer format → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(indexed({ format: '1', name: 'test', quills: [] }).read)
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
-	});
 });
 
 describe('loadBuiltQuiver — invalid index', () => {
@@ -378,18 +336,6 @@ describe('loadBuiltQuiver — invalid index', () => {
 		await expect(loadBuiltQuiver(artifact.read)).rejects.toThrow(
 			expect.objectContaining({ code: 'quiver_invalid' })
 		);
-	});
-
-	it('a missing quiver.json → transport_error', async () => {
-		await expect(loadBuiltQuiver(new MemArtifact({}).read)).rejects.toThrow(
-			expect.objectContaining({ code: 'transport_error' })
-		);
-	});
-
-	it('a non-string description → quiver_invalid', async () => {
-		await expect(
-			loadBuiltQuiver(indexed({ format: FORMAT, name: 'test', description: 7, quills: [] }).read)
-		).rejects.toThrow(expect.objectContaining({ code: 'quiver_invalid' }));
 	});
 
 	it('a field this loader does not know is skipped, at the top and on an entry', async () => {

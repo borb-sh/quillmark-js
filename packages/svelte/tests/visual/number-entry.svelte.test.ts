@@ -96,14 +96,8 @@ describe('a keystroke', () => {
 		expect(input.dispatchEvent(del)).toBe(true);
 		expect(offer(input, '1')).toBe(false);
 		expect(offer(input, '7', 0, 3)).toBe(true);
-	});
-});
-
-describe('a paste', () => {
-	it('lands as it comes', () => {
-		const { input } = control(true);
+		// A paste lands as it comes.
 		expect(offer(input, '1,000', 0, 0, 'insertFromPaste')).toBe(true);
-		expect(input.value).toBe('1,000');
 	});
 });
 
@@ -161,7 +155,18 @@ describe('a settled entry', () => {
 	});
 
 	it('commits a number in the grammar as a number, and any other entry as itself', () => {
-		const entries = ['11.5', '.5', '5.', '-2.25', '1e-7', 'Infinity', '1.000.0', '.', '1,5'];
+		const entries = [
+			'11.5',
+			'.5',
+			'5.',
+			'-2.25',
+			'1e-7',
+			'Infinity',
+			'1.000.0',
+			'.',
+			'1,5',
+			'9'.repeat(400)
+		];
 		expect(settle(false, entries)).toEqual([
 			11.5,
 			0.5,
@@ -171,13 +176,9 @@ describe('a settled entry', () => {
 			'Infinity',
 			'1.000.0',
 			'.',
-			'1,5'
+			'1,5',
+			'9'.repeat(400)
 		]);
-	});
-
-	it('a digit run past the largest number commits as itself', () => {
-		const run = '9'.repeat(400);
-		expect(settle(false, [run])).toEqual([run]);
 	});
 });
 

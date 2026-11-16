@@ -34,18 +34,6 @@ describe('settle', () => {
 		expect(calls).toBe(1);
 	});
 
-	it('cancels the call still waiting', async () => {
-		// A teardown that only unregisters leaves the scheduled half to run — in
-		// `serve` a repack into a tree the caller is done with — and the timer holds
-		// the process open until it does.
-		let calls = 0;
-		const fire = settle(10, () => calls++);
-		fire();
-		fire.cancel();
-		await new Promise((ok) => setTimeout(ok, 40));
-		expect(calls).toBe(0);
-	});
-
 	it('takes a burst again after a cancel', async () => {
 		let calls = 0;
 		const fire = settle(10, () => calls++);

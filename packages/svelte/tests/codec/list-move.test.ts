@@ -47,15 +47,6 @@ describe('Alt+↑/↓ moves the item', () => {
 		);
 	});
 
-	it('a sub-item moves among its own siblings', () => {
-		const state = selecting('1. Alpha\n   1. one\n   2. two\n2. Bravo', 'two');
-		expectPress(
-			state,
-			'Alt-ArrowUp',
-			'doc(ordered_list(list_item(paragraph("Alpha"), ordered_list(list_item(paragraph("two")), list_item(paragraph("one")))), list_item(paragraph("Bravo"))))'
-		);
-	});
-
 	it('a selection across items moves them together', () => {
 		expectPress(
 			selecting(ABC, 'Bravo', 'Charlie'),

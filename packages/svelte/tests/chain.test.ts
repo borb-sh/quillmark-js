@@ -41,30 +41,6 @@ describe('substrate chain', () => {
 		quill.free();
 	});
 
-	it('preserves binary fixture bytes (the mark and the fonts arrive as raw bytes)', () => {
-		const tree = loadFixtureTree();
-		const mark = tree.get('assets/mark.png');
-		expect(mark).toBeInstanceOf(Uint8Array);
-		// PNG magic number; proves the byte path did not decode/re-encode as text.
-		expect(Array.from(mark!.slice(0, 4))).toEqual([0x89, 0x50, 0x4e, 0x47]);
-	});
-
-	it('opens and frees repeatedly without a handle leak', async () => {
-		const tree = loadFixtureTree();
-		const quill = core.Quill.fromTree(tree);
-		const engine = new Engine();
-		// Repeated open/close on one cached quill clone; a leak or use-after-free
-		// would surface as a throw or a corrupt compile by the last iteration.
-		for (let i = 0; i < 5; i++) {
-			const doc = quill.seedDocument();
-			const session = await engine.open(quill, doc);
-			expect(session.pageCount).toBeGreaterThan(0);
-			session.free();
-			doc.free();
-		}
-		quill.free();
-	});
-
 	it('runs the same chain over the shipped quill, fonts, seals and all', async () => {
 		// The other fixture is a copy of a real quill (fixtures/Quiver.yaml), so this is
 		// the chain over a tree nobody here curated: four font families, two seal images

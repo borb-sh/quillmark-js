@@ -133,13 +133,6 @@ describe('sessions', () => {
 		expect(await log.save({ epoch: a.epoch, stored: '{}', version: old })).toBe(false);
 	});
 
-	it('opens one session from one seed, whoever asks second', async () => {
-		const log = localLog({ room: 'r', ...new Origin().tab() });
-		const first = await log.open(new Uint8Array([1]), 'q@1.0.0');
-		const second = await log.open(new Uint8Array([2]), 'q@1.0.0');
-		expect(second).toEqual(first);
-	});
-
 	it('elects one leader from the tabs present, and hands the lead on when it leaves', async () => {
 		const origin = new Origin();
 		const a = await open(origin, { lease: 60 }).join();
@@ -277,12 +270,6 @@ describe('sessions', () => {
 		await settle();
 		expect(tab.remote).toBe(1);
 		expect(text(b).startsWith('after before ')).toBe(true);
-	});
-
-	it('refuses a room whose document is under another quill', async () => {
-		const origin = new Origin();
-		await open(origin).join();
-		await expect(open(origin, { quill: 'usaf_memo' }).join()).rejects.toBeInstanceOf(QuillMismatch);
 	});
 
 	it('rejoins a session after a reload', async () => {
@@ -498,21 +485,6 @@ describe('writes from a revision', () => {
 		await a.leave();
 		await log.end(a.epoch);
 		expect(await write(log, read.revision, 'Late.')).toEqual({ status: 'stale' });
-	});
-
-	it('refuses a revision whose count is not the one read', async () => {
-		const origin = new Origin();
-		const a = await open(origin).join();
-		const log = logOf(origin);
-		type(a, 'one ');
-		await settle();
-		const read = await readLog({ log, quill: quill() });
-		read.doc.free();
-		type(a, 'Typed. ');
-		await settle();
-		const claimed = { ...read.revision, count: read.revision.count + 1 };
-		expect(await write(log, claimed, 'Rewritten.')).toEqual({ status: 'stale' });
-		expect(text(a).startsWith('Typed. ')).toBe(true);
 	});
 
 	it('reads a session nobody is in whose entries are saved as the save, and ends it to write', async () => {

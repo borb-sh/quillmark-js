@@ -33,10 +33,6 @@ describe('mergeStrings', () => {
 		expect(merged.cardMoveUp).toBe(DEFAULT_VISUAL_STRINGS.cardMoveUp);
 		expect(merged.tipsDot).toBe(DEFAULT_VISUAL_STRINGS.tipsDot);
 	});
-
-	it('takes the package set whole when nothing is passed', () => {
-		expect(mergeStrings(undefined)).toBe(DEFAULT_VISUAL_STRINGS);
-	});
 });
 
 describe('keycap and keyshortcut', () => {

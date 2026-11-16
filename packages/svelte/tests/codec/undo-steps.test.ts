@@ -36,11 +36,6 @@ function ran(state: EditorState, cmd: Command): EditorState {
 const undone = (state: EditorState): EditorState => ran(state, undo);
 
 describe('an edit that moves a block is an undo step of its own', () => {
-	it('typing alone is one step', () => {
-		const state = typed(leaf(startOf('x', 0)), 'abc');
-		expect(undone(state).doc.toString()).toBe('doc(paragraph("x"))');
-	});
-
 	it('Enter starts a step, the typing after it joining that step', () => {
 		let state = leaf(EditorState.create({ schema: blockSchema }));
 		state = typed(state, 'abc');

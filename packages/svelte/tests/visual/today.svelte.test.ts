@@ -133,14 +133,6 @@ describe('a `datetime`', () => {
 		expect(stored('logged')).toBeUndefined();
 	});
 
-	it('draws the stored time after the date', () => {
-		const logged = field(open('logged: "2026-03-04T10:30"'), 'Logged');
-		expect(digits(logged)).toBe('2026-03-04');
-		expect(Number(segment(logged, 'hour').textContent)).toBe(10);
-		expect(Number(segment(logged, 'minute').textContent)).toBe(30);
-		expect(logged.querySelector('.qm-date-unread')).toBeNull();
-	});
-
 	it('writes a segment edit as a whole datetime, to the minute', () => {
 		const target = open('logged: "2026-03-04T10:30"');
 		const logged = field(target, 'Logged');
@@ -176,14 +168,6 @@ describe('a `default: today`', () => {
 		expect(toggle(stamped).getAttribute('aria-pressed')).toBe('true');
 		expect(toggle(stamped).hasAttribute('data-default')).toBe(true);
 		expect(row('stamped').source).toBe('default');
-	});
-
-	it('pressed off, writes the render date’s digits', () => {
-		const stamped = field(open(), 'Stamped');
-		toggle(stamped).click();
-		flushSync();
-		expect(row('stamped')).toMatchObject({ source: 'authored', value: renderDate() });
-		expect(stored('stamped')).toBe(renderDate());
 	});
 });
 

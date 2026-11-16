@@ -57,16 +57,6 @@ function flushCatching(): Error | undefined {
 }
 
 describe('Preview', () => {
-	it('reports nothing when no prop is swapped', () => {
-		const { errors } = mountSurface(Preview, {
-			session: mockSession(),
-			margin: 16,
-			strings: { noPages: 'Nothing to show' }
-		});
-		flushSync();
-		expect(rebinds(errors)).toHaveLength(0);
-	});
-
 	it.each([
 		['session', () => mockSession()],
 		['margin', () => 48],

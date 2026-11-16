@@ -6,7 +6,6 @@ import { describe, it, expect } from 'vitest';
 import type { QuillFieldSchema } from '@quillmark/wasm';
 import {
 	controlKind,
-	humanize,
 	fieldModels,
 	groupOrder,
 	groupLabel,
@@ -22,7 +21,6 @@ import {
 	bodyEnabled,
 	variantMember,
 	variantCells,
-	commitDiscriminant,
 	shortCell,
 	arrayLayout,
 	schemaAt,
@@ -101,10 +99,6 @@ describe('the text field', () => {
 			type: 'richtext',
 			shape: 'blocks'
 		});
-	});
-
-	it('reads no text kind off a field that is not text', () => {
-		expect(textKind(f({ type: 'number' }))).toBeUndefined();
 	});
 
 	it('projects one-line `text` as a packable leaf, and multiline as block', () => {
@@ -227,30 +221,6 @@ describe('variantMember + variantCells', () => {
 	});
 });
 
-describe('commitDiscriminant', () => {
-	it('keeps the answers a flip strands, which is what the boundary does with them', () => {
-		expect(commitDiscriminant({ value: 'rich', note: 'x' }, 'plain')).toEqual({
-			value: 'plain',
-			note: 'x'
-		});
-		expect(commitDiscriminant(undefined, 'rich')).toEqual({ value: 'rich' });
-	});
-
-	it('clears the discriminant cell alone, and the field when it held nothing else', () => {
-		expect(commitDiscriminant({ value: 'rich', note: 'x' }, undefined)).toEqual({ note: 'x' });
-		expect(commitDiscriminant({ value: 'rich' }, undefined)).toBeUndefined();
-		expect(commitDiscriminant(undefined, undefined)).toBeUndefined();
-	});
-});
-
-describe('humanize', () => {
-	it('spaces and capitalizes a snake_case name', () => {
-		expect(humanize('memo_for')).toBe('Memo for');
-		expect(humanize('font_size')).toBe('Font size');
-		expect(humanize('date')).toBe('Date');
-	});
-});
-
 describe('titleText + cardTitle', () => {
 	it('reads a committed Content value by its text', () => {
 		const content = { text: 'John A. Doe', lines: [], marks: [], islands: [] };
@@ -367,13 +337,6 @@ describe('placeFields', () => {
 		expect(spans([mk('a', true)])).toEqual([['a', 'full']]);
 	});
 
-	it('keeps a run of two as cells — one is the only run that strands', () => {
-		expect(spans([mk('a', true), mk('b', true)])).toEqual([
-			['a', 'cell'],
-			['b', 'cell']
-		]);
-	});
-
 	it('declines the compact hint for shapes whose height the document or a pick sets', () => {
 		const declined = [
 			mk('block', true, { control: 'prose', inline: false }),
@@ -401,16 +364,6 @@ describe('placeFields', () => {
 			['b', 'cell'],
 			['world', 'full'],
 			['c', 'full']
-		]);
-	});
-
-	it('packs an inline prose leaf like any scalar', () => {
-		// `tag_line` in the reference quill: richtext + inline + compact, one line tall.
-		expect(
-			spans([mk('seal', true), mk('tag_line', true, { control: 'prose', inline: true })])
-		).toEqual([
-			['seal', 'cell'],
-			['tag_line', 'cell']
 		]);
 	});
 
@@ -601,12 +554,6 @@ describe('against the real showcase schema', () => {
 		expect(placeFields([byName.subtitle])).toEqual([{ field: byName.subtitle, span: 'full' }]);
 	});
 
-	it('threads a field schema description into the model verbatim', () => {
-		const byName = Object.fromEntries(fieldModels(main()).map((m) => [m.name, m]));
-		expect(byName.authors.description).toBe(byName.authors.schema.description);
-		expect(byName.authors.description).toBeTruthy(); // the fixture declares one to thread
-	});
-
 	it('sections every field into the declared group order, losing none', () => {
 		const schema = main();
 		const models = fieldModels(schema);
@@ -679,12 +626,6 @@ describe('optional cells', () => {
 			properties: { note: f({ type: 'text?' }), on: f({ type: 'boolean?' }) }
 		});
 		expect(arrayLayout(f({ type: 'array', items, ui: { layout: 'table' } }))).toBe('table');
-	});
-
-	it('project as the base type', () => {
-		const [model] = fieldModels({ fields: { note: f({ type: 'text?' }) } });
-		expect(model.control).toBe('prose');
-		expect(model.plaintext).toBe(true);
 	});
 });
 

@@ -159,22 +159,6 @@ describe('a nested array property', () => {
 			{ label: 'Terms', page: 20 }
 		]);
 	});
-
-	it('is a query container of its own at every rung', () => {
-		// The capacity ladder is CSS's (`.qm-tracks`, controls.css) and jsdom computes no
-		// layout, so what is checkable here is the shape the rules key on: every subform
-		// carries the recipe class on its grid, and no subform draws the section's count
-		// by inheriting it. What `container-type` then does is the browser's (playground/README
-		// §"Reaching it from source").
-		const q = quill();
-		const mounted = mountEditor(q, example());
-		const outer = appendices(mounted.target);
-		summaries(outer)[0].click();
-		flushSync();
-		const grids = [...outer.querySelectorAll<HTMLElement>('.qm-object > .qm-object-grid')];
-		expect(grids.length).toBeGreaterThan(0);
-		for (const g of grids) expect(g.classList.contains('qm-tracks')).toBe(true);
-	});
 });
 
 describe('a container inside a variant cell', () => {

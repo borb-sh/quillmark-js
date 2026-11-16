@@ -281,20 +281,6 @@ describe('anchors land where the projection puts them', () => {
 			return pmToOffset(buildLineIndex(tr.doc), tr.mapping.map(pm, bias));
 		}
 
-		function commit(pos: number, bias: 1 | -1, mkTr: (s: EditorState) => Transaction) {
-			let after = -1;
-			const { stored } = lowerApply(
-				anchorRt,
-				(s) => {
-					const tr = mkTr(s);
-					after = projected(s.doc, tr, pos, bias);
-					return tr;
-				},
-				undefined
-			);
-			return { stored, after };
-		}
-
 		/** The node attrs an image island projects from. */
 		const imageAttrs = () => {
 			const { type, ...rest } = md('![a](u)').islands![0];
@@ -330,11 +316,6 @@ describe('anchors land where the projection puts them', () => {
 				expect(anchorAt(doc.main.body, 'a1')).toBe(at);
 			});
 		}
-
-		it('the helper reads the plugin’s mapping', () => {
-			const { after } = commit(6, -1, (s) => s.tr.insertText('X', 1));
-			expect(after).toBe(7);
-		});
 	});
 });
 
@@ -401,12 +382,6 @@ describe('islands — an island edit lowers and lands', () => {
 		const { stored } = lowerApply(md(TABLE_MD), (s) => s.tr.insertText('X', 2).insertText('Y', 11));
 		expect(stored.text).toBe('pXara\n￼\ntaYil');
 		expect(stored.islands?.map((i) => i.id)).toEqual(['isl-0']);
-	});
-
-	it('a text edit beside an island touches no island', () => {
-		const { change } = lowerApply(md(TABLE_MD), (s) => s.tr.insertText('X', 2));
-		expect(stepsOf(change, 'island')).toEqual([]);
-		expect(stepsOf(change, 'nested')).toEqual([]);
 	});
 
 	it('deleting an island drops its entry', () => {

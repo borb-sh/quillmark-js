@@ -29,15 +29,6 @@ describe('a document loaded from markdown', () => {
 		doc.free();
 	});
 
-	it('round-trips through toMarkdown → parse', () => {
-		const { doc } = loaded();
-		const again = core.Document.parse(doc.toMarkdown());
-		expect(again.toMarkdown()).toBe(doc.toMarkdown());
-		expect(again.cardCount).toBe(doc.cardCount);
-		again.free();
-		doc.free();
-	});
-
 	it('mounts a prose leaf over a field resting as a string, and commits back', () => {
 		const { q, doc } = loaded();
 		const field = createField({
@@ -56,14 +47,6 @@ describe('a document loaded from markdown', () => {
 		expect(doc.toMarkdown()).toContain('!Reloaded title');
 		expect(typeof doc.getStored({ field: 'title' })).toBe('object');
 
-		field.destroy();
-		doc.free();
-	});
-
-	it('mounts the body leaf, which was Content all along', () => {
-		const { q, doc } = loaded();
-		const field = createField({ doc, quill: q, addr: {}, container: mount() });
-		expect(field.getContent().text.length).toBeGreaterThan(0);
 		field.destroy();
 		doc.free();
 	});

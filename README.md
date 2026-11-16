@@ -43,3 +43,7 @@ Everything runs against the reference quill, [`fixtures/quills/showcase/1.0.0`](
 ## Invariants
 
 The rules each published package keeps, with the reason for each and the designs already rejected: [`svelte`'s](packages/svelte/prose/INVARIANTS.md), [`quiver`'s](packages/quiver/prose/INVARIANTS.md), [`fonts`'](packages/fonts/prose/INVARIANTS.md), [`collab`'s](packages/collab/prose/INVARIANTS.md), [`quillkit`'s](packages/quillkit/prose/INVARIANTS.md) (the tool and both clients). Work that is not settled lives in GitHub issues.
+
+## License
+
+Apache-2.0: [LICENSE](LICENSE) and [NOTICE](NOTICE). The font files `@quillmark/fonts` bundles keep their upstream licences: [its README](packages/fonts/README.md#licences-and-provenance).

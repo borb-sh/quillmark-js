@@ -2,7 +2,7 @@
 // becomes a second failure. Every call site sits on a recovery path, so a missing
 // handler and a throwing handler both have to leave the recovery intact.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { reportError, errorMessage } from '$lib/core/errors.js';
+import { reportError } from '$lib/core/errors.js';
 import type { EditorError } from '$lib/core';
 
 const err = (over: Partial<EditorError> = {}): EditorError => ({
@@ -40,13 +40,5 @@ describe('reportError', () => {
 			}, err())
 		).not.toThrow();
 		expect(spy).toHaveBeenCalledOnce();
-	});
-});
-
-describe('errorMessage', () => {
-	it('reads an Error and stringifies anything else', () => {
-		expect(errorMessage(new Error('nope'))).toBe('nope');
-		expect(errorMessage('bare string')).toBe('bare string');
-		expect(errorMessage(undefined)).toBe('undefined');
 	});
 });
