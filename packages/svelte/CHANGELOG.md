@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A click, a tap or a Tab into a field makes that field's change current.** Before, only a press on the struck or tinted words did, or the focus entering a text field with one proposal, which named its first run wherever the caret landed, so clicking into a paragraph of the body or a long field, or onto a list's unchanged row, left the answer card on another field. Arriving in a field now names the change on the line or row arrived at, else the nearest change in the field, unless the card is already on one of the field's; moving the caret by key names a change on entering its line.
+
 **`reviewRevised` keeps a held review on the paragraphs it read across a whole-document revise.** A revise keeps a field's first block id on whichever block it puts first, so a paragraph written above the first one, in Markdown or another source view, took the id a proposal named: the proposal drew over the new paragraph as outdated, and accepting it removed that paragraph and left the rewrite beside the one it read. A host that holds a review through a revise hands the items, the document as it was and the document revised to `reviewRevised`, and draws what it returns: an item naming the first block names the block that now holds it, as `proposalsBetween` reads one.
 
 ## v0.38.1 - 2026-11-16

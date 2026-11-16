@@ -34,7 +34,7 @@ import {
 import { Mapping, Step, StepResult } from 'prosemirror-transform';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { arriving, HARD_BREAK, ISLAND_SLOT } from './islands.js';
-import { remoteKey } from './remote.js';
+import type { CaretSpan } from './review-caret.js';
 import { wordDiff, type DiffHunk } from './review-diff.js';
 
 /**
@@ -77,8 +77,6 @@ export interface ReviewChannel {
 	act(id: string, action: ReviewAction): void;
 	/** The leaf is writing a taken proposal, and is done. */
 	writing?(on: boolean): void;
-	/** The item the caret is in, `undefined` once it has left. */
-	point(id: string | undefined): void;
 	/** What the leaf draws and what it holds and does not draw, on each change of either. */
 	drew(report: ReviewReport): void;
 }
@@ -104,11 +102,9 @@ export interface ReviewReport {
 /** An answer the leaf holds: a proposal taken or turned down here, drawn no more. */
 type Answer = 'accept' | 'dismiss';
 
-/** The leaf's review state: the count of its own edits, so the caret's report can tell typing
- *  from arriving, the items answered here, and the item the caret was put into by its id, which
- *  the caret names while it stays where it was put. */
+/** The leaf's review state: the items answered here, and the item the caret was put into by its
+ *  id, which the caret names while it stays where it was put. */
 interface ReviewState {
-	edits: number;
 	answered: ReadonlyMap<string, Answer>;
 	entered: string | undefined;
 	/** The accepts an undo or a redo took back or gave again, for the plugin view to report. */
@@ -184,7 +180,6 @@ function answering(state: ReviewState, id: string, to: Answer | undefined): Revi
 
 function applyReview(tr: Transaction, state: ReviewState): ReviewState {
 	let next = state.replayed.length ? { ...state, replayed: [] } : state;
-	if (tr.docChanged && !tr.getMeta(remoteKey)) next = { ...next, edits: next.edits + 1 };
 	const history = isHistoryTransaction(tr);
 	tr.steps.forEach((step) => {
 		if (!(step instanceof ReviewAnswer)) return;
@@ -912,25 +907,6 @@ function listPlace(
 	return $last.node(item - 1).type === list.type ? { at: $last.after(item) } : undefined;
 }
 
-/** The item the caret is in: the one it was put into by its id while it holds the caret, else
- *  the one that holds it closest, so of a proposal that rewrites a paragraph and one that adds
- *  after it, the one that rewrites. */
-function spanAt(
-	spans: readonly Span[],
-	pos: number,
-	entered: string | undefined
-): Span | undefined {
-	let best: Span | undefined;
-	for (const s of spans) {
-		if (s.from > pos || pos > s.to) continue;
-		if (s.id === entered) return s;
-		const size = s.to - s.from;
-		const held = best && best.to - best.from;
-		if (!best || size < held! || (size === held && best.adds && !s.adds)) best = s;
-	}
-	return best;
-}
-
 /** The handle the leaf keeps on its review layer. */
 export interface ReviewLayer {
 	plugin: Plugin;
@@ -938,6 +914,10 @@ export interface ReviewLayer {
 	refresh(view: EditorView): void;
 	/** The elements item `id` draws, in document order. */
 	elements(view: EditorView, id: string): HTMLElement[];
+	/** What each item drawn stands on, where the caret names it from (`review-caret.ts`). */
+	spans(state: EditorState): readonly CaretSpan[];
+	/** The item the caret was put into by its id, while it stays where it was put. */
+	entered(state: EditorState): string | undefined;
 	/** Put the caret in item `id` and take the focus. False for an item the leaf does not
 	 *  draw. */
 	enter(view: EditorView, id: string): boolean;
@@ -956,8 +936,7 @@ export interface ReviewLayer {
 
 /**
  * The leaf's review layer. The decorations are a function of the document and the channel's
- * items, kept until one of them moves. The caret's report holds off while the reader
- * types inside an item: an item is news on arriving in it, and noise under every keystroke.
+ * items, kept until one of them moves.
  */
 export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 	let memo:
@@ -1040,29 +1019,10 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 		channel.drew(next);
 	};
 
-	let caret: string | undefined;
-	/** The item the reader typed in, quiet until the caret has left it. */
-	let muted: string | undefined;
-	const follow = (view: EditorView, typed: boolean): void => {
-		const { selection } = view.state;
-		const at =
-			view.hasFocus() && selection.empty
-				? spanAt(drawn(view.state).spans, selection.head, reviewKey.getState(view.state)?.entered)
-						?.id
-				: undefined;
-		if (at !== muted) muted = undefined;
-		if (typed && at) muted = at;
-		const next = at === muted ? undefined : at;
-		if (next === caret) return;
-		caret = next;
-		channel.point(next);
-	};
-
 	const plugin = new Plugin<ReviewState>({
 		key: reviewKey,
 		state: {
 			init: () => ({
-				edits: 0,
 				answered: new Map(),
 				entered: undefined,
 				replayed: [],
@@ -1071,20 +1031,7 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			apply: applyReview
 		},
 		props: {
-			decorations,
-			handleDOMEvents: {
-				focus: (view) => {
-					follow(view, false);
-					return false;
-				},
-				blur: (view) => {
-					// The focus has not left yet when a blur fires.
-					queueMicrotask(() => {
-						if (!view.isDestroyed) follow(view, false);
-					});
-					return false;
-				}
-			}
+			decorations
 		},
 		view: (view) => {
 			host = view;
@@ -1095,10 +1042,8 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 					if (review && review !== reviewKey.getState(prev))
 						for (const { id, to } of review.replayed) channel.act(id, to ?? 'reopen');
 					report(view.state);
-					follow(view, reviewKey.getState(prev)?.edits !== reviewKey.getState(view.state)?.edits);
 				},
 				destroy() {
-					if (caret !== undefined) channel.point(undefined);
 					if (reported !== NOTHING) channel.drew({ ids: [], outdated: [], undrawn: [] });
 					host = undefined;
 				}
@@ -1146,6 +1091,8 @@ export function reviewLayer(channel: ReviewChannel): ReviewLayer {
 			projecting(state, drawn(state), (at) =>
 				at === state ? drawn(state) : draw(at, channel, new Map(bases))
 			),
+		spans: (state) => drawn(state).spans,
+		entered: (state) => reviewKey.getState(state)?.entered,
 		enter(view, id) {
 			const span = drawn(view.state).spans.find((s) => s.id === id);
 			if (!span) return false;
