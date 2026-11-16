@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A jump to a field shows its label.** `focusField`, `revealField`, a landing in a card just added, a preview pick that lands no caret, and each review step and reveal scroll the field's label into the pane with its target wherever the two fit, the target alone where they do not, and stop clear of the pane's edges. Before, a jump up the pane stopped with the field's box at the top edge and its label just above it, out of view. A caret placed in prose scrolls as it did.
+
 **A review opens on its first change in view.** The editor made the first change current without scrolling to it, so on a phone it could stand behind the host's panel and under a desktop's review bar, and Next went on past it; it now scrolls the first change clear of the host's chrome, as a step does.
 
 **A card a proposal adds reads in full, at AA contrast.** Its body is at the ink and no longer cut at three lines, and its tag and field names step toward the ink over the review tint, so each holds 4.5:1 at rest and under attention in both themes, where they stood at the label ink near 2.4:1 over the dark theme's lit tint.

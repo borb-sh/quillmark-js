@@ -261,20 +261,23 @@ describe('the landing verbs over a form control', () => {
 		const header = [...target.querySelectorAll<HTMLElement>('.qm-group-header')].find((h) =>
 			h.textContent?.includes('Metadata')
 		);
-		const trips: (ScrollIntoViewOptions | undefined)[] = [];
-		const scroll = Element.prototype.scrollIntoView;
-		Element.prototype.scrollIntoView = function (arg?: boolean | ScrollIntoViewOptions) {
-			trips.push(arg as ScrollIntoViewOptions);
-		};
+		// jsdom lays nothing out: every box stands below the window, so a reveal has to scroll down.
+		const below = new DOMRect(0, window.innerHeight * 2, 100, 20);
+		const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(below);
+		const trips: ScrollToOptions[] = [];
+		const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(((o: ScrollToOptions) => {
+			trips.push(o);
+		}) as typeof window.scrollBy);
 		const before = document.activeElement;
 
 		await editor.revealField('main.tracking_id');
 		await tick();
-		Element.prototype.scrollIntoView = scroll;
+		rect.mockRestore();
+		scroll.mockRestore();
 
 		expect(header?.getAttribute('aria-expanded')).toBe('true');
 		expect(document.activeElement).toBe(before);
-		expect(trips.map((t) => t?.block)).toContain('nearest');
+		expect(trips.some((t) => (t.top ?? 0) > 0)).toBe(true);
 		expect(errors).toHaveLength(0);
 	});
 
