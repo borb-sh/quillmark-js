@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.139.0.** The typed writer refuses a member a group's `properties`, or every world of a variant-bearing enum, leaves undeclared, as `edit::unknown_field` at the member, where it stored a value nothing drew or rendered (Quillmark's 0.138 → 0.139 migration).
+
 ## v0.25.0 - 2026-11-14
 
 **The carried `@quillmark/wasm` is 0.138.0.** A newline inside a paragraph prints as a line break, so a body wrapped across source lines prints its wraps, and a `text` or `richtext` field declares `shape: line | lines | blocks` where it declared `multiline`, which `check` reports as `quill::deprecated_multiline` (Quillmark's 0.137 → 0.138 migration).
