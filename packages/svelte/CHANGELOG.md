@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.38.1 - 2026-11-16
+
 **Blocks an answer adds above the body's first block are one insert ahead of it.** `proposalsBetween` proposes them as an `insert` before the first block, which stays as the reader has it, where the store's rewrite keeps the first block's id on whatever block it puts first and they read as the first block rewritten plus that block added back after it: a heading added at the top drew the first paragraph struck and, accepted alone or by `answerReview('all', 'accept')`, removed it. A block the editor writes above the first now hands the first block's id on to the block that held it, and a rewrite that changes a block's kind, a paragraph into a heading, keeps the block's id in the editor as the store does, so a proposal naming that block still draws after either is taken.
 
 **A bullet a proposal adds lands at the depth it was written.** An item added under a bullet with no children nests under it, one added ahead of a bullet's children opens its sub-list, and one written back out of a nested list joins the outer one, both as drawn and on Accept. Before, the leaf read the Markdown the store spells a nested block in, indented two spaces per list, as a sibling at the top level, or as a code block two lists deep; a word edit of a bullet two lists deep was drawn as the bullet struck and a code block added.
