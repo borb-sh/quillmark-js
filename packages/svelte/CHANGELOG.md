@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A jump to a field shows its label.** `focusField`, `revealField`, a landing in a card just added, a preview pick that lands no caret, and each review step and reveal scroll the field's label into the pane with its target wherever the two fit, the target alone where they do not, and stop clear of the pane's edges. Before, a jump up the pane stopped with the field's box at the top edge and its label just above it, out of view. A caret placed in prose scrolls as it did.
+
 ## v0.38.1 - 2026-11-16
 
 **Blocks an answer adds above the body's first block are one insert ahead of it.** `proposalsBetween` proposes them as an `insert` before the first block, which stays as the reader has it, where the store's rewrite keeps the first block's id on whatever block it puts first and they read as the first block rewritten plus that block added back after it: a heading added at the top drew the first paragraph struck and, accepted alone or by `answerReview('all', 'accept')`, removed it. A block the editor writes above the first now hands the first block's id on to the block that held it, and a rewrite that changes a block's kind, a paragraph into a heading, keeps the block's id in the editor as the store does, so a proposal naming that block still draws after either is taken.

@@ -42,6 +42,7 @@
 	} from '../core/address.js';
 	import { errorMessage, reportError } from '../core/errors.js';
 	import { bloom } from '../core/bloom.js';
+	import { frame, framedTop } from '../core/frame.js';
 	import { createLifespan } from '../core/teardown.js';
 	import { spacePx } from '../core/rungs.js';
 	import { tooltips } from '../core/tooltip.js';
@@ -1477,7 +1478,9 @@
 	 */
 	async function land(found: Landed, pos: number | undefined): Promise<HTMLElement> {
 		if (found.steps && found.control.focusPath) {
-			return (await found.control.focusPath(found.steps, pos)) ?? found.control.el;
+			const box = (await found.control.focusPath(found.steps, pos)) ?? found.control.el;
+			if (pos == null) frame(box, { block: 'nearest' });
+			return box;
 		}
 		if (pos != null) {
 			const prose = leaves.prose(found.key);
@@ -1487,6 +1490,7 @@
 			}
 		}
 		found.control.focus();
+		frame(found.control.el, { block: 'nearest' });
 		return found.control.el;
 	}
 
@@ -1516,7 +1520,7 @@
 	export async function revealField(field: DocPath): Promise<void> {
 		const found = await revealLeaf(field);
 		if (!found) return missed(`no mounted field at ${field}`, field);
-		found.control.el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+		frame(found.control.el, { block: 'nearest' });
 		bloom(found.control.el);
 	}
 	/** Play the arrival wash over the field at `field` and touch nothing else: no focus,
@@ -1624,7 +1628,7 @@
 			(key !== undefined ? leaves.control(key)?.el : undefined);
 		if (!at || (stepping && comfortable(els.length ? els : [at]))) return true;
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-		at.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+		frame(at, { block: 'center', foot: reviewInset, behavior: reduce ? 'instant' : 'smooth' });
 		return true;
 	}
 	/** Whether the open card item `id` is drawn. */
@@ -1659,9 +1663,9 @@
 		if (!rects.length) return false;
 		const { top, bottom } = pane();
 		const room = (spacePx(rootEl, 1) ?? 0) * CARD_ROOM;
+		const band = { top, bottom: bottom - reviewInset - room };
 		return (
-			Math.min(...rects.map((r) => r.top)) >= top &&
-			Math.max(...rects.map((r) => r.bottom)) <= bottom - reviewInset - room
+			(framedTop(els, band) ?? top) >= top && Math.max(...rects.map((r) => r.bottom)) <= band.bottom
 		);
 	}
 	/** Whether any of the item `id` shows in that view, which is where its answer card stands.

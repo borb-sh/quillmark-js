@@ -120,7 +120,7 @@ Under `forced-colors: active` a fill is dropped, so there a card draws a `Canvas
 
 **Every mounted field is a landing target**, a scalar as much as a prose leaf, since on a memo the scalar front matter is half of what the preview can name.
 
-**A landing reveals first, with the minimum scroll**: a line clear of the fold and never a centring, since its commonest target is the leaf already focused.
+**A landing reveals first, with the minimum scroll**: a line clear of the fold and never a centring, since its commonest target is the leaf already focused. **A field-level landing frames the field's label with its target** wherever the two fit in the pane, the target alone where they do not, so a jump to a field names the field it reached (`core/frame.ts`); a review step frames the same span. A caret placed in prose frames the caret only, since there the caret is the point and the page must not move under a reader typing. Rejected: scrolling to the field's whole box, which over a long body moves the change being landed on off screen to show a label.
 
 **A landing's mark decays.** Resting ink would outlive the hop.
 
