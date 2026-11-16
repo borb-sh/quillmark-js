@@ -13,6 +13,7 @@ import { lineIndexOf, offsetToPM } from './positions.js';
 import { decode } from './decode.js';
 import { hasMarks } from './schema.js';
 import { planValue, valueChanges } from './value-plan.js';
+import type { CaretSpan } from './review-caret.js';
 
 /** A field's proposed value as the leaf draws it. */
 export interface ValueProposal {
@@ -64,6 +65,21 @@ function draw(
 		state.doc,
 		proposals.flatMap((p) => decorations(state, live, at, p, planned))
 	);
+}
+
+/** What each proposal that changes the leaf stands on: from its first change to its last. */
+export function valueSpans(state: EditorState, proposals: readonly ValueProposal[]): CaretSpan[] {
+	if (!proposals.length) return [];
+	const scan = scanDoc(state.doc);
+	const live = scanContent(scan);
+	const index = lineIndexOf(scan);
+	return proposals.flatMap((p) => {
+		const changes = valueChanges(live, planValue(p.before, live, p.after).merged);
+		if (!changes.length) return [];
+		const from = offsetToPM(index, Math.min(...changes.map((c) => c.at)));
+		const to = offsetToPM(index, Math.max(...changes.map((c) => c.end)));
+		return [{ id: p.id, from, to }];
+	});
 }
 
 /** One proposal's marks over the leaf as it reads, `live`. */

@@ -15,6 +15,8 @@ import type {
 	TextReview
 } from '$lib/core/codec';
 import type { Document } from '@quillmark/wasm';
+import type { Node as PMNode } from 'prosemirror-model';
+import { changeAt, nearestChange, widened, type CaretSpan } from '$lib/core/codec/review-caret.js';
 import { core, example, md, mount, press, quill, viewOf } from './_util.js';
 
 Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
@@ -582,6 +584,97 @@ describe('answering', () => {
 		caretIn(leaf, 'later');
 		caretIn(leaf, 'quick');
 		expect(leaf.points.at(-1)).toBe('r1');
+	});
+});
+
+describe('the caret arriving in a leaf', () => {
+	const ITEMS = (leaf: Leaf): TextReview[] => [
+		{ id: 'first', ...over(leaf, 'First'), after: 'First, rewritten.' },
+		{ id: 'last', ...over(leaf, 'Fourth'), after: 'Fourth, rewritten.' }
+	];
+	const BODY = 'First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\nFourth paragraph.';
+
+	/** The caret moved to the first `text` of a focused leaf, the focus landing there first. */
+	function moveTo(leaf: Leaf, text: string): void {
+		const view = viewOf(leaf.field);
+		let at = -1;
+		view.state.doc.descendants((n, pos) => {
+			if (at < 0 && n.isText && n.text!.includes(text)) at = pos + n.text!.indexOf(text) + 1;
+		});
+		view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
+		view.focus();
+	}
+	/** The caret at the first `text`, then the focus arriving from a control outside the leaf. */
+	function arriveAt(leaf: Leaf, text: string): void {
+		viewOf(leaf.field).dom.blur();
+		moveTo(leaf, text);
+		leaf.points.length = 0;
+		const from = document.createElement('button');
+		document.body.append(from);
+		viewOf(leaf.field).dom.dispatchEvent(new FocusEvent('focus', { relatedTarget: from }));
+		from.remove();
+	}
+
+	it('names the nearest change in the leaf while the current item is elsewhere', () => {
+		const leaf = leafOver(BODY);
+		leaf.field.setReview(ITEMS(leaf), 'elsewhere');
+		arriveAt(leaf, 'Third');
+		expect(leaf.points).toEqual(['last']);
+		arriveAt(leaf, 'Second');
+		expect(leaf.points).toEqual(['first']);
+	});
+
+	it('leaves the current item alone where it is already one of the leaf’s', () => {
+		const leaf = leafOver(BODY);
+		leaf.field.setReview(ITEMS(leaf), 'last');
+		arriveAt(leaf, 'Second');
+		expect(leaf.points).toEqual([]);
+		arriveAt(leaf, 'First');
+		expect(leaf.points).toEqual(['first']);
+	});
+
+	it('names a change on moving into its paragraph, and nothing on moving out of one', () => {
+		const leaf = leafOver(BODY);
+		leaf.field.setReview(ITEMS(leaf), 'elsewhere');
+		moveTo(leaf, 'Second');
+		expect(leaf.points.filter(Boolean)).toEqual([]);
+		moveTo(leaf, 'Fourth');
+		expect(leaf.points.at(-1)).toBe('last');
+	});
+});
+
+describe('the nearest change', () => {
+	const doc = (markdown: string): PMNode => viewOf(leafOver(markdown).field).state.doc;
+	/** The span of the first `text` in `node`. */
+	const spanOf = (node: PMNode, id: string, text: string, adds?: boolean): CaretSpan => {
+		let from = -1;
+		node.descendants((n, pos) => {
+			if (from < 0 && n.isText && n.text!.includes(text)) from = pos + n.text!.indexOf(text);
+		});
+		return { id, from, to: from + text.length, adds };
+	};
+	const posOf = (node: PMNode, text: string): number => spanOf(node, '', text).from;
+
+	it('is the fewest lines away, a hard break ending a line, and above on a tie', () => {
+		const node = doc('One\\\nTwo\\\nThree\\\nFour\\\nFive');
+		const spans = [spanOf(node, 'a', 'One'), spanOf(node, 'b', 'Four')];
+		expect(nearestChange(node, spans, posOf(node, 'Three'))?.id).toBe('b');
+		expect(nearestChange(node, spans, posOf(node, 'Two'))?.id).toBe('a');
+		const tied = [spanOf(node, 'a', 'Two'), spanOf(node, 'b', 'Four')];
+		expect(nearestChange(node, tied, posOf(node, 'Three'))?.id).toBe('a');
+	});
+
+	it('is a rewrite before what only adds after the same line', () => {
+		const node = doc('Only paragraph here.');
+		const spans = [spanOf(node, 'add', 'here', true), spanOf(node, 'rewrite', 'Only')];
+		expect(nearestChange(node, spans, posOf(node, 'here'))?.id).toBe('rewrite');
+	});
+
+	it('holds a caret anywhere on a changed line, and no further', () => {
+		const node = doc('Alpha beta\\\nGamma delta');
+		const [span] = widened(node, [spanOf(node, 'a', 'beta')]);
+		expect(changeAt([span], posOf(node, 'Alpha'))?.id).toBe('a');
+		expect(changeAt([span], posOf(node, 'Gamma'))).toBeUndefined();
 	});
 });
 

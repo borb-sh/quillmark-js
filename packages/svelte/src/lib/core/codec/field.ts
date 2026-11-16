@@ -65,7 +65,8 @@ import {
 	type ReviewReport,
 	type TextReview
 } from './review.js';
-import { valueDiffPlugin, type ValueProposal, type ValueState } from './value-diff.js';
+import { valueDiffPlugin, valueSpans, type ValueProposal, type ValueState } from './value-diff.js';
+import { reviewCaretPlugin } from './review-caret.js';
 import {
 	blockSchema,
 	isBlockSchema,
@@ -180,8 +181,7 @@ export interface CreateFieldOpts {
 	onReview?(id: string, action: ReviewAction): void;
 	/** The leaf is writing a taken proposal, and is done: the commit between is the answer's. */
 	onReviewWriting?(on: boolean): void;
-	/** The review item holding the caret, `undefined` once it has left. The report holds off
-	 *  while the reader types inside the item. */
+	/** The review item the caret names, `undefined` once it has left one (`review-caret.ts`). */
 	onReviewPoint?(id: string | undefined): void;
 	/** What the leaf draws of the review items, on each change: the ids drawn, and the items
 	 *  whose anchor the leaf holds that it does not draw, each with why. An item whose anchor
@@ -604,7 +604,6 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				},
 				act: (id, action) => opts.onReview?.(id, action),
 				writing: (on) => opts.onReviewWriting?.(on),
-				point: (id) => opts.onReviewPoint?.(id),
 				drew: (report) => opts.onReviewDrawn?.(report)
 			});
 
@@ -613,6 +612,14 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		() => valueProposals,
 		(id, state) => opts.onValuePlanned?.(id, state)
 	);
+	const reviewCaret = reviewCaretPlugin({
+		spans: (state) => [...(review?.spans(state) ?? []), ...valueSpans(state, valueProposals)],
+		entered: (state) => review?.entered(state),
+		litHere: () =>
+			valueProposals.some((p) => p.lit) ||
+			(reviewLit !== undefined && reviewItems.some((item) => item.id === reviewLit)),
+		point: (id) => opts.onReviewPoint?.(id)
+	});
 
 	// The menu's report channel; the vocabulary is the codec's own constant (`slash.ts`).
 	const slash = block ? opts.onSlash : undefined;
@@ -746,7 +753,12 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				placeholder: () => placeholderText,
 				placeholderUntilEdit: opts.placeholderUntilEdit,
 				cap: opts.cap,
-				afterHistory: [anchorPlugin(seededAnchors), ...(review ? [review.plugin] : []), valueDiff]
+				afterHistory: [
+					anchorPlugin(seededAnchors),
+					...(review ? [review.plugin] : []),
+					valueDiff,
+					reviewCaret
+				]
 			})
 		});
 		return { state: built, index: seedIndex };

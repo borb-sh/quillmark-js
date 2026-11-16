@@ -738,14 +738,60 @@
 	function reviewIds(el: Element | null | undefined): string[] {
 		return el?.getAttribute('data-qm-review')?.split(' ').filter(Boolean) ?? [];
 	}
-	/** A press on a change makes it current at once. */
+	/** A press on a change makes it current at once, and a press elsewhere in a field the
+	 *  nearest change in it, the current item being another field's. */
 	function onPick(e: PointerEvent): void {
-		const ids = reviewIds((e.target as Element | null)?.closest?.('[data-qm-review]'));
+		const target = e.target instanceof Element ? e.target : null;
+		const ids = reviewIds(target?.closest('[data-qm-review]'));
 		const id = ids.includes(reviewing.lit ?? '') ? reviewing.lit : ids[0];
 		if (id && reviewing.items.some((item) => item.id === id)) {
 			typing = false;
 			reviewing.reveal(id);
+		} else if (target) pickNear(target);
+	}
+	/** The reader arrived at `target` from outside its field, not handed back from a surface
+	 *  floating over it: the nearest change in the field becomes current. */
+	function onArrive(e: FocusEvent): void {
+		const target = e.target instanceof Element ? e.target : null;
+		const from = e.relatedTarget instanceof Element ? e.relatedTarget : null;
+		if (!target || !from || from.closest('.qm-popover-surface')) return;
+		const field = outerField(target);
+		if (field && !field.contains(from) && !target.closest('[data-qm-review]')) pickNear(target);
+	}
+	/** The outermost field holding `el`: the one a list's rows and a record's cells are of. */
+	function outerField(el: Element): Element | undefined {
+		let field: Element | undefined;
+		for (let at = el.closest('.qm-field'); at; at = at.parentElement?.closest('.qm-field') ?? null)
+			field = at;
+		return field;
+	}
+	/** Make the change in `target`'s field nearest it current, the fewest rows away and then the
+	 *  fewest pixels across, the current item being another field's. A leaf of words that draws
+	 *  changes of its own names them from its caret (`review-caret.ts`). */
+	function pickNear(target: Element): void {
+		if (target.closest('.ProseMirror')?.querySelector('[data-qm-review]')) return;
+		const field = outerField(target);
+		if (!field) return;
+		const open = new Set(reviewing.order);
+		const marks = [...field.querySelectorAll('[data-qm-review]')].filter((el) =>
+			reviewIds(el).some((id) => open.has(id))
+		);
+		if (!marks.length) return;
+		if (reviewing.lit !== undefined && marks.some((el) => reviewIds(el).includes(reviewing.lit!)))
+			return;
+		const at = target.getBoundingClientRect();
+		const gap = (a: number, b: number, c: number, d: number): number =>
+			b < c ? c - b : d < a ? a - d : 0;
+		let best: { el: Element; down: number; across: number } | undefined;
+		for (const el of marks) {
+			const r = el.getBoundingClientRect();
+			const down = gap(at.top, at.bottom, r.top, r.bottom);
+			const across = gap(at.left, at.right, r.left, r.right);
+			if (!best || down < best.down || (down === best.down && across < best.across))
+				best = { el, down, across };
 		}
+		const id = best && reviewIds(best.el).find((id) => open.has(id));
+		if (id) reviewing.reveal(id);
 	}
 	/** What the change `id` is to: the field it is drawn in, the body, or the card it adds or
 	 *  takes out. */
@@ -1986,6 +2032,7 @@
 	{@attach tooltips}
 	onkeydowncapture={onTyped}
 	onpointerdowncapture={onPick}
+	onfocusin={onArrive}
 	onkeydown={raiseGuidance}
 	ondragover={refuseFiles}
 	ondrop={refuseFiles}

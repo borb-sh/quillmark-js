@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A click, a tap or a Tab into a field makes that field's change current.** Before, only a press on the struck or tinted words did, or the focus entering a text field with one proposal, which named its first run wherever the caret landed, so clicking into a paragraph of the body or a long field, or onto a list's unchanged row, left the answer card on another field. Arriving in a field now names the change on the line or row arrived at, else the nearest change in the field, unless the card is already on one of the field's; moving the caret by key names a change on entering its line.
+
 **A jump to a field shows its label.** `focusField`, `revealField`, a landing in a card just added, a preview pick that lands no caret, and each review step and reveal scroll the field's label into the pane with its target wherever the two fit, the target alone where they do not, and stop clear of the pane's edges. Before, a jump up the pane stopped with the field's box at the top edge and its label just above it, out of view. A caret placed in prose scrolls as it did.
 
 **A review opens on its first change in view.** The editor made the first change current without scrolling to it, so on a phone it could stand behind the host's panel and under a desktop's review bar, and Next went on past it; it now scrolls the first change clear of the host's chrome, as a step does.

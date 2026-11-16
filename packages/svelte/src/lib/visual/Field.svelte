@@ -382,7 +382,7 @@
 			{@attach registerControl}
 			onfocusin={(e) => {
 				reportFocus?.(e);
-				if (proposed) reviewing.point(proposed.id);
+				if (proposed && field.control !== 'prose') reviewing.point(proposed.id);
 			}}
 		>
 			{#if field.control === 'prose'}
