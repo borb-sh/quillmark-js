@@ -2,6 +2,8 @@
 
 The font suite every Quillmark client hands its engine: openly licensed families a stored document can name and find again in any client that loads the suite.
 
+Quillmark is pre-1.0. Its [stability statement](https://github.com/borb-sh/quillmark#status) says what any release can change and what every release keeps.
+
 | Family           | Role                                          |
 | ---------------- | --------------------------------------------- |
 | TeXGyreTermes    | Times New Roman metrics, shown as "Termes"    |
