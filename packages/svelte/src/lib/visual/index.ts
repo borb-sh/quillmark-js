@@ -50,7 +50,7 @@ export type {
 	ReviewUndrawn
 } from './review.js';
 export type { BlockPlace } from '../core/codec/index.js';
-export { proposalsBetween } from './proposals.js';
+export { proposalsBetween, reviewRevised } from './proposals.js';
 export type { Proposed, ProposalsOpts } from './proposals.js';
 export type { ReviewAction } from '../core/codec/index.js';
 export { REVIEW_KEYS } from '../core/codec/index.js';

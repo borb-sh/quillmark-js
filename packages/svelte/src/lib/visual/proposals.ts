@@ -10,9 +10,15 @@ import type {
 	QuillCardSchema,
 	QuillFieldSchema
 } from '@quillmark/wasm';
-import { fieldPathForAddr } from '../core/address.js';
+import { addrForFieldPath, fieldPathForAddr } from '../core/address.js';
 import { asContent, lineRuns } from '../core/codec/value-plan.js';
-import { sameValue, type ReviewItem, type ReviewLabel } from './review.js';
+import {
+	byBlocks,
+	sameValue,
+	type BlockProposal,
+	type ReviewItem,
+	type ReviewLabel
+} from './review.js';
 import { VARIANT_DISCRIMINANT, baseType, fieldValues, textKind } from './structure.js';
 
 /** The review an answer makes: the items the editor draws, the cards it adds or takes out
@@ -301,27 +307,82 @@ const addrOf = (card?: number, field?: string): Addr => ({
 
 /**
  * `now` with the first block's id on the block that is the first block read: a rewrite keeps that
- * id on whichever block it puts first, so blocks added above the first read as its rewrite.
- *
- * Of the blocks ahead of the next one `now` keeps, the first reading as the first block did is it,
- * or, where the block put first is of another kind, the first of the first block's kind. The block
- * put first then takes an id `was` does not hold, so it and those after it up to that block are
- * added before it.
+ * id on whichever block it puts first, so blocks added above the first read as its rewrite. The
+ * block put first then takes an id `was` does not hold, so it and those after it up to that block
+ * are added before it.
  */
 function leading(was: readonly BlockRead[], now: BlockRead[]): BlockRead[] {
+	const at = heir(was, now);
+	if (!at) return now;
+	const first = was[0].id;
+	const held = new Set(was.map((b) => b.id));
+	let added = `${first}+`;
+	while (held.has(added)) added += '+';
+	return now.map((b, i) => (i === 0 ? { ...b, id: added } : i === at ? { ...b, id: first } : b));
+}
+
+/**
+ * The index in `now` of the block that is `was`'s first block where a rewrite put others above it,
+ * `0` where it stands first. Of the blocks ahead of the next one `now` keeps, the first reading as
+ * the first block did is it, or, where the block put first is of another kind, the first of the
+ * first block's kind.
+ */
+function heir(was: readonly BlockRead[], now: readonly BlockRead[]): number {
 	const first = was[0];
-	if (!first || now[0]?.id !== first.id || now[0].markdown === first.markdown) return now;
+	if (!first || now[0]?.id !== first.id || now[0].markdown === first.markdown) return 0;
 	const held = new Set(was.map((b) => b.id));
 	let end = 1;
 	while (end < now.length && !held.has(now[end].id)) end++;
 	const ahead = now.slice(1, end);
-	const at =
+	return (
 		ahead.findIndex((b) => b.markdown === first.markdown) + 1 ||
-		(now[0].kind !== first.kind && ahead.findIndex((b) => b.kind === first.kind) + 1);
-	if (!at) return now;
-	let added = `${first.id}+`;
-	while (held.has(added)) added += '+';
-	return now.map((b, i) => (i === 0 ? { ...b, id: added } : i === at ? { ...b, id: first.id } : b));
+		(now[0].kind !== first.kind && ahead.findIndex((b) => b.kind === first.kind) + 1) ||
+		0
+	);
+}
+
+/**
+ * `items` naming the blocks of `now`, a whole-document revise of `was`, such as a return from
+ * editing the document as Markdown. A revise keeps a field's first id on whichever block it puts
+ * first, so a block written above the first takes its id and the first block moves under a new
+ * one. An item naming that id, to rewrite the block or to add beside it, names the new one, where
+ * the first block stands as {@link proposalsBetween} reads a block put above it. Every other item
+ * is as it was, and so is every id a revise keeps on its block.
+ */
+export function reviewRevised(
+	items: readonly ReviewItem[],
+	was: Document,
+	now: Document
+): ReviewItem[] {
+	const moves = new Map<string, readonly [string, string] | undefined>();
+	const moveOf = (item: BlockProposal): readonly [string, string] | undefined => {
+		const key = `${item.card ?? ''} ${item.field}`;
+		if (moves.has(key)) return moves.get(key);
+		let move: readonly [string, string] | undefined;
+		const addr = addrForFieldPath(item.field);
+		if (addr) {
+			const at: Addr = item.card === undefined ? addr : { ...addr, card: item.card };
+			const before = blocksOf(was, at);
+			const after = blocksOf(now, at);
+			const k = heir(before, after);
+			if (k) move = [before[0].id, after[k].id];
+		}
+		moves.set(key, move);
+		return move;
+	};
+	return items.map((item) => {
+		if (!byBlocks(item)) return item;
+		const move = moveOf(item);
+		if (!move) return item;
+		const moved = (id: string): string => (id === move[0] ? move[1] : id);
+		if ('replace' in item) return { ...item, replace: item.replace.map(moved) };
+		const at = item.insert;
+		if (at === 'end') return item;
+		return {
+			...item,
+			insert: 'after' in at ? { after: moved(at.after) } : { before: moved(at.before) }
+		};
+	});
 }
 
 /** The blocks of the value at `addr`, none where it holds none. */
