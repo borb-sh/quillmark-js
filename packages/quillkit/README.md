@@ -2,6 +2,8 @@
 
 The quill author's toolchain: one command over a quiver's whole life. Start one, gate it, look at it, and build it into a studio for its authors or a standalone app for the people filling its forms in.
 
+Quillmark is pre-1.0. Its [stability statement](https://github.com/borb-sh/quillmark#status) says what any release can change and what every release keeps.
+
 A quiver is a collection of quills, and a quill is a document format: the fields a document fills in and the Typst plate that prints them. [Creating Quills](https://quillmark.dev/quills/creating-quills/) walks through the quiver `init` writes, one file at a time, and the [Glossary](https://quillmark.dev/getting-started/glossary/) defines the rest of the terms.
 
 ## Start
