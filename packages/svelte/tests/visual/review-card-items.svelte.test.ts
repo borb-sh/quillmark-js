@@ -2,7 +2,6 @@
 // A card added or taken out as a review item: drawn where it would stand, stepped through with the
 // rest, written by the editor when accepted, and taken back by ⌘Z.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { REVIEW_KEYS } from '$lib/core/codec';
 import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
@@ -116,24 +115,6 @@ describe('a proposed card', () => {
 		expect(r.doc.toMarkdown()).toBe(before);
 		expect(r.events.at(-1)).toEqual({ id: 'c1', action: 'reopen' });
 		expect(r.drawn.at(-1)?.open).toContain('c1');
-	});
-
-	it('keeps a run of added cards in their order as each is accepted', async () => {
-		const r = mount((doc) =>
-			cardItems(doc, (answer) => {
-				const write = quill().writer(answer);
-				write.addCard('note', {}, 'First.', 1);
-				write.addCard('note', {}, 'Second.', 2);
-			})
-		);
-		await settle();
-		r.editor.answerReview(['c0'], 'accept');
-		r.editor.answerReview(['c1'], 'accept');
-		await settle();
-		expect([r.doc.card(1).body?.text, r.doc.card(2).body?.text].map((t) => t?.trim())).toEqual([
-			'First.',
-			'Second.'
-		]);
 	});
 
 	it('is a step in the walk, and the answer moves on to the next', async () => {

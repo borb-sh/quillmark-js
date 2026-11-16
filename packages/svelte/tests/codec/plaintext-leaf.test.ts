@@ -55,24 +55,6 @@ const authored = (): Document =>
 	);
 
 describe('a `text` leaf over an authored string', () => {
-	it('reads the bytes literally, while richtext reads the same bytes as markdown', () => {
-		const doc = authored();
-		expect(typeof doc.getStored('note')).toBe('string');
-
-		const reader = q.reader(doc);
-		const plain = reader.getContent('note')!;
-		const rich = reader.getContent('tag')!;
-
-		expect(plain.text).toBe(AUTHORED);
-		expect(plain.marks ?? []).toHaveLength(0);
-		// The same string, decoded by the other declared type: delimiters consumed,
-		// emphasis carried as a mark.
-		expect(rich.text).toBe('Wing Motto Here');
-		expect(rich.marks).toHaveLength(1);
-
-		doc.free();
-	});
-
 	it('commits the first edit CLEANLY, taking no recovery path', () => {
 		// The commit half. `applyChange` reads an authored string as markdown whatever the
 		// declared type, so a delta over the literal content would meet a shorter

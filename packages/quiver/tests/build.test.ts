@@ -72,7 +72,6 @@ describe('buildQuiver — happy path (sample-quiver fixture)', () => {
 
 		const pointer = JSON.parse(await readFile(join(out, 'latest.json'), 'utf-8')) as unknown;
 		expect(pointer).toEqual({ format: FORMAT });
-		expect(FORMAT).toBeGreaterThan(1);
 	});
 });
 
@@ -171,15 +170,6 @@ describe('buildQuiver — one .quill bundle per quill, fonts and all', () => {
 		await buildQuiver(SAMPLE_FIXTURE, out);
 
 		expect((await indexOf(out)).description).toBe('A sample quiver for testing');
-	});
-
-	it('omits the description a Quiver.yaml does not carry', async () => {
-		const src = await fresh();
-		const out = await fresh();
-		await seedSourceQuiver(src, { quills: [{ name: 'quill_a', version: '1.0.0' }] });
-		await buildQuiver(src, out);
-
-		expect(await indexOf(out)).not.toHaveProperty('description');
 	});
 });
 

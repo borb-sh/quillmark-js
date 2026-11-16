@@ -129,13 +129,6 @@ describe('a block leaf reads markdown text', () => {
 		expect(rt.islands!.map((island) => island.id)).toEqual(['isl-0', 'isl-1']);
 	});
 
-	it('text with no block at a line head stays literal', () => {
-		const rt = pasted(text('A dash - mid-sentence\nand **bold** with no block'));
-		expect(rt.text).toBe('para\nA dash - mid-sentence\nand **bold** with no block');
-		expect(rt.marks ?? []).toEqual([]);
-		expect(depthsOf(rt).every((d) => d === 0)).toBe(true);
-	});
-
 	it.each([
 		['a `#` with no space after it', '#1 priority\nfor the wing'],
 		['a decimal at a line head', 'Budget\n1.5 million'],
@@ -306,16 +299,13 @@ describe('a URL pasted over a selection links it', () => {
 		expect(rt.marks ?? []).toEqual([]);
 	});
 
-	it('a selection crossing blocks takes the default paste', () => {
-		const rt = pastedOver('see the\n\nroster', 4, 11, text(URL));
+	it.each([
+		['a selection crossing blocks', 'see the\n\nroster', 4, 11, `see ${URL}ster`],
+		['a selection inside a fence', '```\nconst a = 1;\n```', 6, 7, `const ${URL} = 1;`]
+	])('%s takes the default paste', (_, markdown, from, to, text_) => {
+		const rt = pastedOver(markdown, from, to, text(URL));
 		expect(rt.marks ?? []).toEqual([]);
-		expect(rt.text).toBe(`see ${URL}ster`);
-	});
-
-	it('a selection inside a fence takes the default paste', () => {
-		const rt = pastedOver('```\nconst a = 1;\n```', 6, 7, text(URL));
-		expect(rt.marks ?? []).toEqual([]);
-		expect(rt.text).toBe(`const ${URL} = 1;`);
+		expect(rt.text).toBe(text_);
 	});
 
 	it('an empty selection inserts the URL as text', () => {

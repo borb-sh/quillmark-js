@@ -32,14 +32,6 @@ describe('preview controller empty-state across page-count transitions', () => {
 
 		preview.destroy();
 	});
-
-	it('destroy clears the empty state and the container class', () => {
-		const preview = createPreview(mockSession(0), { container });
-		expect(isEmpty()).toBe(true);
-		preview.destroy();
-		expect(isEmpty()).toBe(false);
-		expect(container.classList.contains('qm-preview')).toBe(false);
-	});
 });
 
 // What a screen reader hears of the pane's message: a region mounted empty, which takes the

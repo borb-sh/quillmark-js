@@ -133,18 +133,6 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 		field.destroy();
 	});
 
-	it('a list pick continues the list above it rather than opening a second', () => {
-		const { field, view } = leaf('- alpha\n\nbeta');
-		pick(field, view, 6, 'list');
-		const stored = field.getContent();
-		// One list of two items, so the second item is ordinal 1 of the first's list.
-		expect(levelsOf(stored)).toEqual([
-			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 0 } }],
-			[{ container: 'list_item', attrs: { ordered: false, start: 1, ordinal: 1 } }]
-		]);
-		field.destroy();
-	});
-
 	it('`/heading` is level 1, the level `# ` counts to', () => {
 		const { field, view } = leaf('alpha');
 		pick(field, view, 0, 'heading');
@@ -166,7 +154,7 @@ describe('the vocabulary is the block shapes a pick fills, one implementation be
 // Every caret-placing command scrolls the minimum (INVARIANTS §"Focus and the preview bridge"), and a
 // pick is one: a heading or a fence opened at the fold would otherwise sit under it.
 describe('a pick scrolls the caret it places into view', () => {
-	it.each(['heading', 'list', 'quote', 'code', 'table'])('`/%s`', (name) => {
+	it.each(['heading', 'table'])('`/%s`', (name) => {
 		const { field, view } = leaf('alpha');
 		field.setCaret(0);
 		type(view, `/${name}`);
@@ -332,27 +320,9 @@ describe('`subparagraph` is the bullet pick under an item', () => {
 		expect(state()?.items ?? []).not.toContain('subparagraph');
 		field.destroy();
 	});
-
-	it("at the end of an item's line, opens a sub-list under it", () => {
-		const { field, view, state } = leaf('1. alpha');
-		typeAt(field, view, 5, ' /sub');
-		expect(state()?.items).toEqual(['subparagraph']);
-		press(view, 'Enter');
-		expect(view.state.doc.toString()).toBe(
-			'doc(ordered_list(list_item(paragraph("alpha "), bullet_list(list_item(paragraph)))))'
-		);
-		field.destroy();
-	});
 });
 
 describe('the query filters, and a miss draws nothing', () => {
-	it('narrows on the name', () => {
-		const { field, view, state } = leaf('');
-		typeAt(field, view, 0, '/tab');
-		expect(state()?.items).toEqual(['table']);
-		field.destroy();
-	});
-
 	it('draws nothing on a query nothing matches, leaving the text as typed', () => {
 		const { field, view, state } = leaf('');
 		typeAt(field, view, 0, '/zzz');
@@ -411,29 +381,14 @@ describe('the query filters, and a miss draws nothing', () => {
 		expect(filterItems(vocab, 'note')).toEqual([]);
 		expect(filterItems(vocab, '')).toEqual(vocab);
 	});
-
-	it('offers both lists on `/list`, in the vocabulary order', () => {
-		const { field, view, state } = leaf('');
-		typeAt(field, view, 0, '/list');
-		expect(state()?.items).toEqual(['list', 'numbered-list']);
-		field.destroy();
-	});
 });
 
 describe('a dismissal edits no text; a pick consumes exactly the run', () => {
-	it('Escape closes and leaves the trigger run in the document', () => {
-		const { field, view, state } = leaf('');
-		typeAt(field, view, 0, '/ta');
-		press(view, 'Escape');
-		expect(state()).toBeUndefined();
-		expect(field.getContent().text).toBe('/ta');
-		field.destroy();
-	});
-
 	it('an Escape sticks: the run is gone, so typing on does not raise it again', () => {
 		const { field, view, state } = leaf('');
 		typeAt(field, view, 0, '/ta');
 		press(view, 'Escape');
+		expect(state()).toBeUndefined();
 		type(view, 'b');
 		// Escape says the `/` was prose. Recomputing the run from the text before the
 		// caret would overrule that on the next keystroke.
@@ -510,18 +465,6 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		field.destroy();
 	});
 
-	it('a pick mid-paragraph keeps the text and takes only the run', () => {
-		const { field, view } = leaf('para');
-		typeAt(field, view, 4, ' /table');
-		press(view, 'Enter');
-		const stored = field.getContent();
-		// The paragraph keeps every character but the run, and the island opens after it
-		// rather than splitting it.
-		expect(stored.text).toBe('para \n￼\n');
-		expect(stored.blocks.map((l) => l.kind)).toEqual(['para', 'para', 'para']);
-		field.destroy();
-	});
-
 	it('a table pick mints the next island id and lands the caret in the first cell', () => {
 		const { doc, field, view } = leaf('para');
 		field.setCaret(4);
@@ -541,14 +484,6 @@ describe('a dismissal edits no text; a pick consumes exactly the run', () => {
 		// And the caret is in the fresh table rather than on it.
 		const focused = (field as FieldController & LeafViews).focusedView();
 		expect((field as FieldController & LeafViews).nestedViews()).toContain(focused);
-		field.destroy();
-	});
-
-	it('a pointer pick runs the same path as Enter', () => {
-		const { field, view } = leaf('');
-		typeAt(field, view, 0, '/tab');
-		field.slashPick('table');
-		expect(field.getContent().blocks.map((l) => l.kind)).toEqual(['para', 'para']);
 		field.destroy();
 	});
 

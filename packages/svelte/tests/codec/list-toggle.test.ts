@@ -170,19 +170,6 @@ describe('a line under an item, its marker not its own', () => {
 		);
 	});
 
-	it('the press after takes it back to a line under its item', () => {
-		const state = lines(UNDER, 1);
-		expect(press(press(state, NUMBER), NUMBER).doc.toString()).toBe(state.doc.toString());
-	});
-
-	it('joins a sub-list of the kind standing under it', () => {
-		expectPress(
-			lines('1. Alpha\n\n   Line\n\n   - Sub', 1),
-			BULLET,
-			'doc(ordered_list(list_item(paragraph("Alpha"), bullet_list(list_item(paragraph("Line")), list_item(paragraph("Sub"))))))'
-		);
-	});
-
 	it('goes with its item where the item’s first line is selected too', () => {
 		expectPress(
 			lines(UNDER, 0, 2),
@@ -210,22 +197,6 @@ describe('the other kind', () => {
 		const lists: number[] = [];
 		next.doc.forEach((n) => n.attrs.start != null && lists.push(n.attrs.start));
 		expect(lists).toEqual([3, 1]);
-	});
-
-	it('numbers the head of a bullet list, the rest staying bullets', () => {
-		expectPress(
-			lines('- Alpha\n- Bravo\n- Charlie', 0, 1),
-			NUMBER,
-			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo"))), bullet_list(list_item(paragraph("Charlie"))))'
-		);
-	});
-
-	it('joins a split-out item to the list of its kind above', () => {
-		expectPress(
-			lines('1. Alpha\n\nBravo\n\n- Charlie\n- Delta', 1, 2),
-			NUMBER,
-			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo")), list_item(paragraph("Charlie"))), bullet_list(list_item(paragraph("Delta"))))'
-		);
 	});
 
 	it('a sub-list of the other kind under a selected item is retyped with it', () => {

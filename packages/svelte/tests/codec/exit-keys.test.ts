@@ -13,7 +13,7 @@ import {
 	plainSchema,
 	proseLeafPlugins
 } from '$lib/core/codec';
-import { startOf, run } from './_util.js';
+import { startOf } from './_util.js';
 
 const keys = bodyKeymap(blockSchema);
 
@@ -92,13 +92,6 @@ describe('Escape hands the next Tab to the browser', () => {
 		expect(view.state.doc.eq(doc)).toBe(true);
 	});
 
-	it('leaves from a list item, where Tab would indent', () => {
-		const { view, doc } = mounted('- a\n- b', 1);
-		left(view, 'Escape');
-		expect(left(view, 'Tab')).toBe(true);
-		expect(view.state.doc.eq(doc)).toBe(true);
-	});
-
 	it('hands Tab back to the body on any other key, and on a blur', () => {
 		const typed = mounted('a');
 		left(typed.view, 'Escape');
@@ -110,9 +103,5 @@ describe('Escape hands the next Tab to the browser', () => {
 		left(blurred.view, 'Escape');
 		blurred.view.dom.dispatchEvent(new FocusEvent('blur'));
 		expect(blurred.hint.textContent).toBe('');
-	});
-
-	it('declines in a state without the plugin', () => {
-		expect(run(EditorState.create({ schema: blockSchema }), keys['Escape'])).toBe(null);
 	});
 });

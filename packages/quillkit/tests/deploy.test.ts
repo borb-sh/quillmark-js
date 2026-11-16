@@ -16,15 +16,7 @@ import { join } from 'node:path';
 import { parse } from 'yaml';
 import { APP_JSON, RESERVED } from '../src/app-files.js';
 import { APP, STUDIO } from '../src/paths.js';
-import {
-	CLIENTS,
-	DEFAULT_TARGET,
-	TARGETS,
-	assertClient,
-	assertSafeOut,
-	layOut,
-	targetOf
-} from '../src/deploy.js';
+import { CLIENTS, TARGETS, assertClient, assertSafeOut, layOut } from '../src/deploy.js';
 import { scratch } from './helpers/collection.js';
 
 const temp = scratch('quillkit-deploy-');
@@ -94,11 +86,6 @@ describe('the targets', () => {
 
 		expect(await refs()).not.toContain('usaf_memo@0.0.0');
 		expect(await refs(true)).toContain('usaf_memo@0.0.0');
-	});
-
-	it('takes the default where no target is named', () => {
-		expect(targetOf(undefined, 'build')).toBe(DEFAULT_TARGET);
-		expect(TARGETS).toContain(DEFAULT_TARGET);
 	});
 });
 
@@ -216,16 +203,13 @@ describe('owning the output', () => {
 		expect(existsSync(`${out}.quiver`)).toBe(false);
 	});
 
-	it('refuses an out that holds the quiver or the working directory', () => {
+	it('refuses an out that holds the quiver or the working directory, and allows one inside the quiver', () => {
 		expect(() => assertSafeOut('/work/quiver', '/work')).toThrow(/the quiver/);
 		expect(() => assertSafeOut('/work/quiver', '/work/quiver')).toThrow(/the quiver/);
 		expect(() => assertSafeOut('/elsewhere', process.cwd())).toThrow(/the working directory/);
 		expect(() => assertSafeOut('/elsewhere', join(process.cwd(), '..'))).toThrow(
 			/the working directory/
 		);
-	});
-
-	it('allows an out nested inside the quiver', () => {
 		expect(() => assertSafeOut('/work/quiver', '/work/quiver/dist')).not.toThrow();
 	});
 

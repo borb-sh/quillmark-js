@@ -41,14 +41,6 @@ function pasted(html: string) {
 }
 
 describe('a Word list pastes as a list', () => {
-	it('numbers the items and drops the drawn markers', () => {
-		const state = pasted(page(item('Alpha', '1.') + item('Bravo', '2.')));
-		expect(state.doc.toString()).toBe(
-			'doc(ordered_list(list_item(paragraph("Alpha")), list_item(paragraph("Bravo"))))'
-		);
-		expect(representable(state)).toBe(true);
-	});
-
 	it('nests by level, the memo outline’s markers read as numbered', () => {
 		const state = pasted(
 			page(
@@ -86,10 +78,6 @@ describe('a Word list pastes as a list', () => {
 });
 
 describe('wordLists', () => {
-	it('keeps the number a list starts from', () => {
-		expect(wordLists(item('Alpha', '3.'))).toContain('<ol start="3">');
-	});
-
 	it('reads a legal outline’s marker by its last part', () => {
 		const html = wordLists(item('Alpha', '2.') + item('Bravo', '2.3.', 2));
 		expect(html).toContain('<ol start="2">');

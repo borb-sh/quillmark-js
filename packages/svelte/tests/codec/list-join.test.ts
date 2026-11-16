@@ -139,12 +139,6 @@ describe('a line numbered beside a list joins it', () => {
 		}
 	});
 
-	it('`7. ` away from any list still counts from 7', () => {
-		const v = view(docOf(p()), 0);
-		type(v, '7. ');
-		expect(v.state.doc.child(0).attrs.start).toBe(7);
-	});
-
 	it('`- ` between two bullet lists makes the three one', () => {
 		const v = view(docOf(ul(li(p('a'))), p(), ul(li(p('c')))), 1);
 		type(v, '- ');

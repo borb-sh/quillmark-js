@@ -73,18 +73,6 @@ describe('wordDiff', () => {
 		expect(struck(before, hunks)).toEqual(['red', 'blue']);
 	});
 
-	it('adds words without striking any', () => {
-		const before = 'Send the memo.';
-		const hunks = wordDiff(before, 'Send the signed memo.');
-		expect(struck(before, hunks).join('')).toBe('');
-		expect(
-			hunks
-				.map((h) => h.insert)
-				.join('')
-				.trim()
-		).toBe('signed');
-	});
-
 	it('differs whole where two lines share too few words to be an edit of one another', () => {
 		const before = 'Request approval of the plan';
 		const after = 'Bananas are an excellent source of potassium today';

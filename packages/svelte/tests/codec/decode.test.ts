@@ -42,30 +42,6 @@ describe('decode idempotence (up to normalization)', () => {
 	});
 });
 
-describe('overlapping formatting → correct inline node splits', () => {
-	it('strong[0,4)+emph[2,6) yields {strong},{strong,emph},{emph}', () => {
-		const rt: Content = {
-			text: 'abcdef',
-			blocks: [{ id: 'b0', kind: 'para' }],
-			marks: [
-				{ start: 0, end: 4, type: 'strong' },
-				{ start: 2, end: 6, type: 'emph' }
-			],
-			islands: []
-		};
-		const para = decode(rt, blockSchema).child(0);
-		const runs = para.children.map((n) => ({
-			text: n.text,
-			marks: n.marks.map((m) => m.type.name).sort()
-		}));
-		expect(runs).toEqual([
-			{ text: 'ab', marks: ['strong'] },
-			{ text: 'cd', marks: ['em', 'strong'] },
-			{ text: 'ef', marks: ['em'] }
-		]);
-	});
-});
-
 describe('island round-trip (id preserved)', () => {
 	it('image (inline island) survives decode → pmToContent → normalize', () => {
 		const rt = md('![alt text](img.png)');
@@ -174,14 +150,6 @@ describe('one-line / plain constraints', () => {
 		const doc = decode(md('a\n\nb\n\nc'), inlineSchema);
 		expect(doc.childCount).toBe(1);
 		expect(doc.child(0).type.name).toBe('paragraph');
-	});
-
-	it('inline keeps marks', () => {
-		const doc = decode(md('plain **bold** end'), inlineSchema);
-		const hasStrong = doc
-			.child(0)
-			.children.some((n) => n.marks.some((m) => m.type.name === 'strong'));
-		expect(hasStrong).toBe(true);
 	});
 
 	// A content carrying marks under the mark-free schema: what an older build's

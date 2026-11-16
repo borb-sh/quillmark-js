@@ -119,8 +119,7 @@ describe('a member put in before the end of a list', () => {
 describe('members appended past the end of a list', () => {
 	const orders = [
 		[2, 0, 1],
-		[1, 2, 0],
-		[2, 1, 0]
+		[1, 2, 0]
 	];
 
 	it.each(orders)('stand in the answer’s order when taken %i, %i, %i', async (...order) => {

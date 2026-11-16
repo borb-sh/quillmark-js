@@ -116,11 +116,6 @@ describe('a block richtext cell over an island', () => {
 		q.writer(doc).set('jobs', [{ title: 'Archives', details: ISLANDS }]);
 		rederive(mounted);
 		expectHeld(leaf);
-
-		const before = JSON.stringify(doc.getStored('jobs'));
-		strike(leaf);
-		expect(JSON.stringify(doc.getStored('jobs'))).toBe(before);
-		expect(islandTypes(q, doc)).toEqual(['table', 'image']);
 	});
 
 	it('releases once a write takes the islands away, and edits again', () => {

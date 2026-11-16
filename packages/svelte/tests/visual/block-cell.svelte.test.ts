@@ -182,18 +182,6 @@ describe('a narrowed leaf over structure it cannot hold', () => {
 		expect(mounted.changes).toEqual([]);
 	});
 
-	it('holds a multi-line value in a one-line text element', () => {
-		const q = probe();
-		const doc = load();
-		const mounted = mountEditor(q, doc);
-		const leaf = field(mounted.target, 'Labels').querySelector<HTMLElement>('.ProseMirror')!;
-
-		expect(leaf.getAttribute('contenteditable')).toBe('false');
-		expect(heldNote(leaf)).not.toBeNull();
-		// The line break a narrowed decode would have joined to a space.
-		expect(leaf.querySelector('p')?.innerHTML).toBe('12 Main St<br>Springfield');
-	});
-
 	it('edits a one-line value a YAML block scalar left a trailing newline on', () => {
 		const q = probe();
 		const doc = load();

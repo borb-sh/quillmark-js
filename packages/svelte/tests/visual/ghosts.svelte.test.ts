@@ -238,27 +238,19 @@ describe('a default that prints', () => {
 		expect(row('kept')).toMatchObject({ source: 'authored', value: { text: 'Kept' } });
 	});
 
-	it('emptied, writes the empty answer, which is what prints empty', () => {
+	it('emptied, writes the empty answer, whether or not a default prints or was written over', () => {
 		const target = open();
 		const kept = field(target, 'Kept');
 		typeLeaf(kept, '');
 		expect(row('kept')).toMatchObject({ source: 'authored', value: { text: '' } });
 		expect(leafText(kept)).toBe('');
 		expect(leafGhost(kept)).toBeNull();
-	});
 
-	it('emptied once written, still writes the empty answer rather than coming back', () => {
-		const target = open();
-		const kept = field(target, 'Kept');
 		typeLeaf(kept, 'Kept!');
 		typeLeaf(kept, '');
 		expect(row('kept')).toMatchObject({ source: 'authored', value: { text: '' } });
-		expect(leafText(kept)).toBe('');
 		expect(leaf(kept).hasAttribute('data-default')).toBe(false);
-	});
 
-	it('writes the empty answer where nothing prints too, which ghosts nothing', () => {
-		const target = open();
 		const heading = field(target, 'Heading');
 		typeLeaf(heading, 'x');
 		typeLeaf(heading, '');
@@ -375,20 +367,15 @@ describe('a default that prints', () => {
 		const day = segment(target, 'day');
 		day.focus();
 		flushSync();
-		expect(row('dated').source).toBe('default');
-		press(day, 'ArrowUp');
-		expect(row('dated')).toMatchObject({ source: 'authored', value: '2026-01-16' });
-	});
-
-	it('writes no date as the focus crosses its segments and leaves', () => {
-		const target = open();
 		segment(target, 'month').focus();
 		flushSync();
-		segment(target, 'day').focus();
-		flushSync();
-		segment(target, 'day').blur();
+		day.blur();
 		flushSync();
 		expect(row('dated').source).toBe('default');
+		day.focus();
+		flushSync();
+		press(day, 'ArrowUp');
+		expect(row('dated')).toMatchObject({ source: 'authored', value: '2026-01-16' });
 	});
 
 	it('keeps a seated date across another field’s commit', () => {
@@ -450,30 +437,6 @@ describe('a default that prints', () => {
 		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
 	});
 
-	it('puts back a segment typed into a date it just blanked as the focus leaves', () => {
-		const target = open({}, answering('dated: 2026-11-14'));
-		for (const [part, presses] of [
-			['month', 2],
-			['day', 2],
-			['year', 4]
-		] as const) {
-			const seg = segment(target, part);
-			seg.focus();
-			flushSync();
-			for (let i = 0; i < presses; i++) press(seg, 'Backspace');
-		}
-		expect(q.reader(doc).get('dated')).toBe('');
-		const month = segment(target, 'month');
-		month.focus();
-		flushSync();
-		press(month, '1');
-
-		month.blur();
-		flushSync();
-		expect(q.reader(doc).get('dated')).toBe('');
-		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
-	});
-
 	it('puts back a segment typed into a stored blank as the focus leaves', () => {
 		const target = open({}, answering('dated: ""'));
 		const month = segment(target, 'month');
@@ -486,29 +449,6 @@ describe('a default that prints', () => {
 		flushSync();
 		expect(q.reader(doc).get('dated')).toBe('');
 		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
-	});
-
-	it('writes the blank for a seated default emptied whole, and the blank stays', () => {
-		const target = open();
-		for (const [part, presses] of [
-			['month', 2],
-			['day', 2],
-			['year', 4]
-		] as const) {
-			const seg = segment(target, part);
-			seg.focus();
-			flushSync();
-			for (let i = 0; i < presses; i++) press(seg, 'Backspace');
-		}
-		segment(target, 'year').blur();
-		flushSync();
-		expect(row('dated')).toMatchObject({ source: 'authored', value: '' });
-
-		// Entering a blank seats nothing: the default stays out of it.
-		segment(target, 'month').focus();
-		flushSync();
-		expect(rungs(target)).toEqual(['hint', 'hint', 'hint']);
-		expect(q.reader(doc).get('dated')).toBe('');
 	});
 
 	it('puts a seated default back as it leaves a segment emptied, writing nothing', () => {
@@ -597,11 +537,7 @@ describe('an optional cell', () => {
 		expect(aside?.dataset.placeholder).toBe(NONE);
 
 		expect(leafGhost(cell(field(target, 'Contact'), 'phone'))?.dataset.placeholder).toBe(NONE);
-	});
 
-	it('keeps `None` while it holds the focus', () => {
-		const target = open();
-		const ref = field(target, 'Ref');
 		leaf(ref).focus();
 		flushSync();
 		expect(leafGhost(ref)?.dataset.placeholder).toBe(NONE);

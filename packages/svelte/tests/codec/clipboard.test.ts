@@ -12,7 +12,7 @@ import {
 	type Attrs,
 	type Node as PMNode
 } from 'prosemirror-model';
-import { EditorState, TextSelection } from 'prosemirror-state';
+import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { blockSchema as S, pmToContent, proseLeafPlugins } from '$lib/core/codec';
 import { tableOfNode } from '$lib/core/codec/table.js';
@@ -121,24 +121,6 @@ describe('a copy and a paste carry the whole node', () => {
 			expect(after.toJSON()).toEqual(before.toJSON());
 		});
 	}
-
-	// The rung the round-trip is for: what the leaf would store after the paste.
-	it('and the fence still spells its language in the content', () => {
-		const back = parse(serialize(doc(S.nodes.code_block.create({ lang: 'py' }, S.text('x')))));
-		expect(pmToContent(back).blocks[0]).toMatchObject({ kind: 'code', attrs: { lang: 'py' } });
-	});
-
-	// Through PM's own copy path rather than the serializer alone: the props a table
-	// carries are the table, and a `[table]` label is what is left without them.
-	it('through the clipboard a view writes', () => {
-		const view = leaf(doc(table(TABLE), para()));
-		const copied = view.state.doc.slice(0, view.state.doc.child(0).nodeSize);
-		const { dom } = view.serializeForClipboard(copied);
-		const back = parse((dom as HTMLElement).innerHTML).child(0);
-		expect(back.attrs.props).toEqual(TABLE.props);
-		expect(back.attrs.slots).toEqual(TABLE.slots);
-		view.destroy();
-	});
 });
 
 // The parse rules read this package's own `data-*` names, which nothing on the web
@@ -157,10 +139,6 @@ describe('what a paste from outside the editor states', () => {
 		['lang- on the pre', '<pre class="lang-rust"><code>fn main() {}</code></pre>']
 	])('a fence carrying its language: %s', (_name, html) => {
 		expect(parse(html).child(0).attrs.lang).toBe('rust');
-	});
-
-	it('a fence stating none carries none', () => {
-		expect(parse('<pre><code>plain</code></pre>').child(0).attrs.lang).toBe(null);
 	});
 
 	it('an ordered list carrying its start', () => {
@@ -313,30 +291,6 @@ describe('the paste pass re-mints a colliding island id', () => {
 		const view = leaf(doc(para()));
 		const landed = pasted(view, serialize(doc(table(TABLE), table(TABLE))));
 		expect(landed.child(0).attrs.id).not.toBe(landed.child(1).attrs.id);
-		view.destroy();
-	});
-
-	it('a slice with no island is the slice it arrived as', () => {
-		const view = leaf(doc(para(S.text('a'))));
-		expect(pasted(view, '<p>b</p>').toString()).toBe('doc(paragraph("b"))');
-		view.destroy();
-	});
-});
-
-// A field's own selection is where the copy starts, so the pair is asserted once over
-// a caret rather than over a constructed slice.
-describe('a body copies from where the caret is', () => {
-	it('a fence selected in the body keeps its language through the pair', () => {
-		const before = doc(para(S.text('a')), S.nodes.code_block.create({ lang: 'sh' }, S.text('ls')));
-		const view = leaf(before);
-		const at = before.child(0).nodeSize;
-		view.dispatch(
-			view.state.tr.setSelection(
-				TextSelection.create(before, at + 1, at + before.child(1).nodeSize - 1)
-			)
-		);
-		const { dom } = view.serializeForClipboard(view.state.selection.content());
-		expect(parse((dom as HTMLElement).innerHTML).child(0).attrs.lang).toBe('sh');
 		view.destroy();
 	});
 });

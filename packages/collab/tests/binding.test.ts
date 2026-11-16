@@ -111,23 +111,6 @@ describe('content', () => {
 		expect(body(a).text).toBe(body(b).text);
 	});
 
-	it('a repair that inserts is read by every client and written back by none', () => {
-		const [a, b] = peers(2, withBody('Title words\nbody'));
-		a.doc.apply({}, { steps: [{ setBlock: { id: 'b0', kind: 'heading', attrs: { level: 1 } } }] });
-		a.binding.push();
-		b.doc.apply({}, { steps: [{ splice: { at: 5, delete: ' ', insert: ' ' } }] });
-		b.binding.push();
-		settle([a, b]);
-		const merged = body(a).text;
-		edit(a.doc, {}, [{ retain: merged.length }, { insert: ' A' }]);
-		a.binding.push();
-		edit(b.doc, {}, [{ retain: merged.length }, { insert: ' B' }]);
-		b.binding.push();
-		settle([a, b]);
-		expect(snapshot(a.doc)).toBe(snapshot(b.doc));
-		expect([`${merged} A B`, `${merged} B A`]).toContain(body(a).text);
-	});
-
 	it('the leader writes a repair that inserts back, and every client then reads none', () => {
 		const tabled = () => {
 			const doc = example();

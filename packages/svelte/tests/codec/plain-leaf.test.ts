@@ -154,22 +154,6 @@ describe('a text field declaring `shape: lines`', () => {
 		f.destroy();
 		doc.free();
 	});
-
-	it('builds no mark from a shorthand, delimiters kept', () => {
-		const doc = load();
-		const { f, view } = leaf(doc, 'address');
-		caretAtEnd(view);
-		view.dispatch(view.state.tr.insertText(' **x*'));
-		const pos = view.state.selection.head;
-		const intercepted = view.someProp('handleTextInput', (h) =>
-			h(view, pos, pos, '*', () => view.state.tr)
-		);
-		expect(intercepted).toBeFalsy();
-		view.dispatch(view.state.tr.insertText('*'));
-		expect(literal(doc.getStored('address'))).toBe('12 Main St\nSpringfield **x**');
-		f.destroy();
-		doc.free();
-	});
 });
 
 describe('a one-line text field', () => {

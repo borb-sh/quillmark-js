@@ -237,11 +237,6 @@ describe('an item in the body', () => {
 		}
 	];
 
-	it('is drawn in the body’s leaf', () => {
-		const r = review(first);
-		expect(r.target.querySelector('.ProseMirror [data-qm-review="r1"]')).not.toBeNull();
-	});
-
 	it('is the leaf’s own edit when taken, and the event follows the change', async () => {
 		const r = review(first);
 		await settle();

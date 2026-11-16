@@ -123,23 +123,6 @@ describe('a record’s cell', () => {
 		const cell = openField(r.target, main, 'contact').querySelector('[data-qm-prop="email"]')!;
 		expect(cell.contains(document.activeElement)).toBe(true);
 	});
-
-	it('is outdated where the cell no longer holds what was read', async () => {
-		const r = nested(
-			(doc) => [
-				{
-					id: 'name',
-
-					field: `${doc.pathFor('contact')}.name`,
-					before: 'Someone',
-					after: 'Grace'
-				}
-			],
-			seed
-		);
-		await settle();
-		expect(r.drawn.at(-1)?.outdated).toEqual(['name']);
-	});
 });
 
 describe('a list’s member', () => {
@@ -211,21 +194,19 @@ describe('a list’s member', () => {
 		undoKey(r);
 		expect(texts(r.doc.getStored('signature_block'))).toEqual(five);
 	});
+});
 
-	it('is outdated where no member holds what it read', async () => {
+describe('a place that holds nothing it read', () => {
+	it.each([
+		['a cell', 'contact', '.name', 'Someone', { name: 'Ada', email: 'a@example.org' }],
+		['a member', 'signature_block', '[1]', 'Editor', ['A. LOVELACE', 'Author', 'Analyst']]
+	])('is outdated where %s no longer holds what was read', async (_, name, at, before, value) => {
 		const r = nested(
-			(doc) => [
-				{
-					id: 'drop',
-
-					field: `${doc.pathFor('signature_block')}[1]`,
-					before: 'Editor'
-				}
-			],
-			seed
+			(doc) => [{ id: 'p', field: `${doc.pathFor(name)}${at}`, before }],
+			(doc) => void quill().writer(doc).set(name, value)
 		);
 		await settle();
-		expect(r.drawn.at(-1)?.outdated).toEqual(['drop']);
+		expect(r.drawn.at(-1)?.outdated).toEqual(['p']);
 	});
 });
 

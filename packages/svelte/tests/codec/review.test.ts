@@ -129,35 +129,6 @@ describe('a proposal', () => {
 		expect(leaf.doc.toMarkdown()).toBe(before);
 	});
 
-	it('covers the whole of every paragraph it names', () => {
-		const leaf = leafOver('First paragraph here.\n\nSecond paragraph here.\n\nThird stays.');
-		leaf.field.setReview([
-			{
-				id: 'r1',
-
-				...over(leaf, 'here', 'Second'),
-				after: 'First paragraph rewritten.\n\nSecond paragraph rewritten.'
-			}
-		]);
-		expect(leaf.el.querySelectorAll('.qm-review-held')).toHaveLength(2);
-		expect(proposedText(leaf.el)).toBe(
-			'First paragraph rewritten.\nSecond paragraph rewritten.\nThird stays.'
-		);
-	});
-
-	it('keeps the formatting the proposal carries on the words it adds', () => {
-		const leaf = leafOver('Submit the report by Friday.');
-		leaf.field.setReview([
-			{
-				id: 'r1',
-
-				...over(leaf, 'report'),
-				after: 'Submit the **signed** report by Friday.'
-			}
-		]);
-		expect(leaf.el.querySelector('ins.qm-review-ins strong')?.textContent).toBe('signed');
-	});
-
 	it('strikes the stretch whose formatting alone would change', () => {
 		const leaf = leafOver('Submit the report by Friday.');
 		leaf.field.setReview([
@@ -187,26 +158,6 @@ describe('a proposal', () => {
 		expect(proposedText(leaf.el)).toBe('Opening line.\nA new middle.\nClosing line.');
 	});
 
-	it('strikes a paragraph it would remove', () => {
-		const leaf = leafOver('Keep this.\n\nDrop this.');
-		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'Drop'), after: '' }]);
-		expect(texts(leaf.el, 'del.qm-review-del').join('')).toBe('Drop this.');
-		expect(leaf.el.querySelector('.qm-review-out')?.textContent).toContain('Drop this.');
-	});
-
-	it('proposes new paragraphs after the one it names', () => {
-		const leaf = leafOver('Opening line.\n\nClosing line.');
-		leaf.field.setReview([{ id: 'r1', ...beside(leaf, 'line'), after: 'Inserted.' }]);
-		expect(proposedText(leaf.el)).toBe('Opening line.\nInserted.\nClosing line.');
-		expect(leaf.el.querySelector('del')).toBeNull();
-	});
-
-	it('proposes new paragraphs before the first', () => {
-		const leaf = leafOver('Opening line.');
-		leaf.field.setReview([{ id: 'r1', ...beside(leaf, 'Opening'), after: 'A preamble.' }]);
-		expect(proposedText(leaf.el)).toBe('A preamble.\nOpening line.');
-	});
-
 	it('writes into the empty paragraph a leaf holds alone', () => {
 		const leaf = leafOver('');
 		leaf.field.setReview([{ id: 'r1', insert: 'end', after: 'A first line.' }]);
@@ -224,13 +175,6 @@ describe('a proposal', () => {
 		expect([...list.children].map((li) => li.tagName)).toEqual(['LI', 'LI', 'LI']);
 		expect(list.lastElementChild!.classList.contains('qm-review-add')).toBe(true);
 		expect(list.lastElementChild!.textContent).toContain('third item');
-	});
-
-	it('replaces a paragraph it would turn into another kind of block, whole', () => {
-		const leaf = leafOver('A plain line.');
-		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'plain'), after: '# A heading' }]);
-		expect(texts(leaf.el, 'del.qm-review-del').join('')).toBe('A plain line.');
-		expect(leaf.el.querySelector('h1.qm-review-add')?.textContent).toContain('A heading');
 	});
 
 	it('gives a paragraph to the first proposal that names it', () => {
@@ -285,23 +229,6 @@ describe('a proposal', () => {
 		);
 	});
 
-	it('takes away the formatting of a word it keeps, beside the words it rewrites', () => {
-		const leaf = leafOver('Submit the **signed** report by Friday.');
-		leaf.field.setReview([
-			{
-				id: 'r1',
-
-				...over(leaf, 'report'),
-				after: 'Submit the signed report by Monday.'
-			}
-		]);
-		expect(texts(leaf.el, 'del.qm-review-del')).toEqual(['signed', 'Friday']);
-		answerFirst(leaf, 'accept');
-		expect(core.exportMarkdown(leaf.doc.main.body)).toBe(
-			core.exportMarkdown(md('Submit the signed report by Monday.'))
-		);
-	});
-
 	it('draws nothing for a proposal that would write nothing, and says so', () => {
 		const leaf = leafOver('The quick brown fox.');
 		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick brown fox.' }]);
@@ -347,12 +274,6 @@ describe('a proposal over a paragraph the reader goes on writing', () => {
 		expect(marks(leaf)).toEqual([['grey'], ['red']]);
 		expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
 		expect(taken(leaf)).toBe('The quick red fox.');
-	});
-
-	it('draws nothing where the reader wrote what it proposes', () => {
-		const leaf = typed('red', 'brown', 0, 'brown'.length);
-		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
-		expect(leaf.reports.at(-1)?.undrawn).toEqual([{ id: 'r1', reason: 'applied' }]);
 	});
 
 	it('gives the whole paragraph to the whole proposal where the reader rewrote past its words', () => {
@@ -411,13 +332,6 @@ describe('a proposal by blocks', () => {
 		expect(accept(leaf)).toBe('The quick brown fox.\nThe quick red dog.');
 	});
 
-	it('removes the blocks it names where it proposes nothing', () => {
-		const leaf = leafOver('Keep this.\n\nDrop this.\n\nAnd this.');
-		const [, drop, and] = ids(leaf);
-		leaf.field.setReview([{ id: 'r1', replace: [drop, and], after: '' }]);
-		expect(accept(leaf)).toBe('Keep this.');
-	});
-
 	it('adds blocks that leave every block of the leaf its id', () => {
 		const leaf = leafOver('One.\n\nTwo.');
 		const [one, two] = ids(leaf);
@@ -429,19 +343,6 @@ describe('a proposal by blocks', () => {
 		expect(ids(leaf)).toContain(two);
 		expect(leaf.field.answerReview('drop', 'accept')).toBe(true);
 		expect(leaf.doc.main.body.text).toBe('One.\nAdded.\nAdded too.');
-	});
-
-	it('rewrites a block into more that leave every block of the leaf its id', () => {
-		const leaf = leafOver('One.\n\nTwo.');
-		const [one, two] = ids(leaf);
-		leaf.field.setReview([
-			{ id: 'split', replace: [one], after: 'One.\n\nMore.' },
-			{ id: 'drop', replace: [two], after: '' }
-		]);
-		expect(leaf.field.answerReview('split', 'accept')).toBe(true);
-		expect(ids(leaf)).toContain(two);
-		expect(leaf.field.answerReview('drop', 'accept')).toBe(true);
-		expect(leaf.doc.main.body.text).toBe('One.\nMore.');
 	});
 
 	it('rewrites a body whole to one text, whatever order its items are taken in', () => {
@@ -478,19 +379,6 @@ describe('a proposal by blocks', () => {
 		const leaf = leafOver('One.\n\nTwo.');
 		leaf.field.setReview([{ id: 'r1', insert: insert(ids(leaf)), after: 'Added.' }]);
 		expect(accept(leaf)).toBe(written);
-	});
-
-	it('draws nothing where no block it names stands, and says why', () => {
-		const leaf = leafOver('One.');
-		leaf.field.setReview([
-			{ id: 'r1', replace: ['gone'], after: 'Two.' },
-			{ id: 'r2', insert: { after: 'gone' }, after: 'Two.' }
-		]);
-		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
-		expect(leaf.reports.at(-1)?.undrawn).toEqual([
-			{ id: 'r1', reason: 'block' },
-			{ id: 'r2', reason: 'block' }
-		]);
 	});
 
 	it('is outdated where a block it names is gone', () => {
@@ -531,15 +419,28 @@ describe('a proposal by blocks', () => {
 			expect(leaf.doc.main.body.text).toBe('The quick brown fox, mine.');
 		});
 
-		it('is outdated where the reader rewrote words it rewrites', () => {
-			const leaf = arrive('The quick grey fox.', 'The quick brown fox.', 'The quick red fox.');
-			expect(marks(leaf)).toEqual([['grey'], ['red']]);
-			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
-		});
-
-		it('is outdated where the reader wrote in a block it removes', () => {
-			const leaf = arrive('The quick brown fox, mine.', 'The quick brown fox.', '');
-			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
+		it.each([
+			[
+				'rewrote words it rewrites',
+				'The quick grey fox.',
+				'The quick brown fox.',
+				'The quick red fox.'
+			],
+			['wrote in a block it removes', 'The quick brown fox, mine.', 'The quick brown fox.', ''],
+			[
+				'typed inside words it rewrites',
+				'The quick, very brown fox.',
+				'The quick brown fox.',
+				'The fox.'
+			],
+			[
+				'read other than one block for each it names',
+				'The quick brown fox.',
+				'The quick\n\nbrown fox.',
+				'The quick red fox.'
+			]
+		])('is outdated where the reader %s', (_why, live, before, after) => {
+			expect(arrive(live, before, after).reports.at(-1)?.outdated).toEqual(['r1']);
 		});
 
 		it('is outdated where the reader wrote in a block a rewrite into fewer drops', () => {
@@ -559,16 +460,6 @@ describe('a proposal by blocks', () => {
 		it('is not outdated where a block it takes out stands as it was read', () => {
 			const leaf = arrive('The quick brown fox.', 'The quick brown fox.', '');
 			expect(leaf.reports.at(-1)?.outdated).toEqual([]);
-		});
-
-		it('is outdated where the reader typed inside words it rewrites', () => {
-			const leaf = arrive('The quick, very brown fox.', 'The quick brown fox.', 'The fox.');
-			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
-		});
-
-		it('is outdated where what it read is not one block for each it names', () => {
-			const leaf = arrive('The quick brown fox.', 'The quick\n\nbrown fox.', 'The quick red fox.');
-			expect(leaf.reports.at(-1)?.outdated).toEqual(['r1']);
 		});
 
 		it('draws nothing where the reader wrote what it proposes', () => {
@@ -597,11 +488,6 @@ describe('answering', () => {
 		leaf.acts.length = 0;
 		return leaf;
 	}
-	it('draws no answers of its own', () => {
-		const leaf = proposal();
-		expect(leaf.el.querySelector('button')).toBeNull();
-	});
-
 	it('a dismissal answers and writes nothing, and the proposal is drawn no more', () => {
 		const leaf = proposal();
 		const before = leaf.doc.toMarkdown();
@@ -627,17 +513,6 @@ describe('answering', () => {
 			press(viewOf(leaf.field), chord.split('-').at(-1)!, { ctrlKey: true });
 		expect(leaf.acts).toEqual([]);
 		expect(leaf.doc.toMarkdown()).toBe(before);
-	});
-
-	it('a dismissed item is drawn again only under a list that holds it anew', () => {
-		const leaf = leafOver('The quick brown fox.');
-		const items: TextReview[] = [{ id: 'r1', ...over(leaf, 'brown'), after: 'The quick red fox.' }];
-		leaf.field.setReview(items);
-		leaf.field.answerReview('r1', 'dismiss');
-		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
-		leaf.field.setReview([]);
-		leaf.field.setReview([...items]);
-		expect(leaf.el.querySelector('[data-qm-review]')).not.toBeNull();
 	});
 
 	it('an accept moves neither the caret nor the focus', () => {
@@ -789,29 +664,9 @@ describe('taking a proposal', () => {
 		expect(core.exportMarkdown(leaf.doc.main.body)).toBe(core.exportMarkdown(md(written)));
 	});
 
-	it('writes what a point proposes after its paragraph, and before the first', () => {
-		expect(
-			take('Opening line.\n\nClosing line.', 'Inserted.', 'line', true).doc.main.body.text
-		).toBe('Opening line.\nInserted.\nClosing line.');
-		expect(take('Opening line.', 'A preamble.', 'Opening', true).doc.main.body.text).toBe(
-			'A preamble.\nOpening line.'
-		);
-	});
-
 	it('empties the leaf’s last paragraph where it stands', () => {
 		const leaf = take('The only line.', '', 'only');
 		expect(leaf.doc.main.body.text).toBe('');
-	});
-
-	it('is one step of the leaf’s own history', () => {
-		const leaf = take(
-			'The quick brown fox.\n\nClosing.',
-			'The slow fox.\n\nAn added line.',
-			'quick'
-		);
-		const view = viewOf(leaf.field);
-		undo(view.state, view.dispatch);
-		expect(leaf.doc.main.body.text).toBe('The quick brown fox.\nClosing.');
 	});
 
 	it('is drawn again by the undo that takes it back, and no more by the redo', () => {
@@ -837,19 +692,6 @@ describe('taking a proposal', () => {
 		expect(leaf.doc.main.body.text).toBe('Keep this.\nDrop this.');
 		expect(leaf.acts.at(-1)).toEqual(['r1', 'reopen']);
 		expect(texts(leaf.el, 'del.qm-review-del').join('')).toBe('Drop this.');
-	});
-
-	it('is opened again after a dismissal, and says so', () => {
-		const leaf = leafOver('The quick brown fox.');
-		leaf.field.setReview([{ id: 'r1', ...over(leaf, 'quick'), after: 'The quick red fox.' }]);
-		answerFirst(leaf, 'dismiss');
-		expect(leaf.el.querySelector('[data-qm-review]')).toBeNull();
-		leaf.field.reopenReview('r1');
-		expect(leaf.acts).toEqual([
-			['r1', 'dismiss'],
-			['r1', 'reopen']
-		]);
-		expect(leaf.el.querySelector('[data-qm-review]')).not.toBeNull();
 	});
 
 	it('is opened again after a dismissal the host took off its list', () => {

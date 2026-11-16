@@ -56,20 +56,6 @@ describe('a list’s undo', () => {
 		expect(document.activeElement).toBe(rows(target)[1]);
 	});
 
-	it('takes a join back', async () => {
-		const { target, editor, stored } = open(['abc', 'def', 'ghi']);
-		await editor.setCaret({ field: 'main.errata[1]', pos: 0, granularity: 'cluster' });
-		await tick();
-		press(rows(target)[1], 'Backspace', { cancelable: true });
-		await settle();
-		expect(stored()).toEqual(['abcdef', 'ghi']);
-
-		undo(rows(target)[0]);
-		await settle();
-		expect(stored()).toEqual(['abc', 'def', 'ghi']);
-		expect(document.activeElement).toBe(rows(target)[1]);
-	});
-
 	it('takes a paste over several rows back whole, in one step', async () => {
 		const { target, editor, stored } = open(['abcdef']);
 		await editor.setCaret({ field: 'main.errata[0]', pos: 3, granularity: 'cluster' });

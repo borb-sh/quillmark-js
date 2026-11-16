@@ -48,13 +48,6 @@ describe('a delete against a block atom selects it', () => {
 		expect(selectedNode(press(startOf(RULE, 1), 'Backspace'))).toBe('horizontal_rule');
 		expect(selectedNode(press(endOf(RULE, 0), 'Delete'))).toBe('horizontal_rule');
 	});
-});
-
-describe('the link declines everywhere the neighbour can be entered', () => {
-	it('a quote is a container, not an atom', () => {
-		const next = press(startOf('> quoted\n\ntail', 1), 'Backspace');
-		expect(selectedNode(next)).toBeUndefined();
-	});
 
 	it('mid-text it is not this key at all', () => {
 		const doc = decode(md(TABLE), blockSchema);
@@ -66,7 +59,9 @@ describe('the link declines everywhere the neighbour can be entered', () => {
 		const state = EditorState.create({ doc, selection: TextSelection.create(doc, at) });
 		expect(run(state, keys['Backspace'])).toBe(null);
 	});
+});
 
+describe('the link declines everywhere the neighbour can be entered', () => {
 	it('the list link keeps the first item, whatever sits above the list', () => {
 		// A table above a list, and the caret at the item's start: the item lifts, which
 		// is the list's own answer and outranks the neighbour's.

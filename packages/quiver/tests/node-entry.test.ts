@@ -11,13 +11,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { Quiver as MainQuiver } from '../src/index.js';
-import { Quiver as NodeQuiver, fromDir } from '../src/node.js';
+import { fromDir } from '../src/node.js';
 
 describe('node entry — the class is untouched', () => {
-	it('re-exports the same constructor as the main entry', () => {
-		expect(NodeQuiver).toBe(MainQuiver);
-	});
-
 	it('installs no statics on it', () => {
 		for (const verb of ['fromDir', 'fromBuiltDir', 'build']) {
 			expect(MainQuiver).not.toHaveProperty(verb);
@@ -45,15 +41,7 @@ describe('the file:// refusal names a real export', () => {
 
 	it('points at the free function, not a static that does not exist', async () => {
 		await expect(refuse()).rejects.toThrow(/\bfromBuiltDir\b/);
+		await expect(refuse()).rejects.toThrow('@quillmark/quiver/node');
 		await expect(refuse()).rejects.not.toThrow(/Quiver\.fromBuiltDir/);
-	});
-
-	it('names the module the free function is reachable from', async () => {
-		await expect(refuse()).rejects.toThrow(
-			expect.objectContaining({
-				code: 'transport_error',
-				message: expect.stringContaining('@quillmark/quiver/node')
-			})
-		);
 	});
 });

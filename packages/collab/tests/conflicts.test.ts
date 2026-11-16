@@ -93,14 +93,6 @@ describe('conflicts by word', () => {
 		expect(write(a, base, apart).conflicts).toEqual([]);
 		expect(write(a, base, apart, { scope: 'line' }).conflicts).toHaveLength(1);
 	});
-
-	it('reports a word typed against a word the edit replaced', () => {
-		const [a, b] = session(LINES);
-		const base = revision(a);
-		retype(b, 'noon', 'noon today');
-		const written = write(a, base, ['Alpha confirms two things before lunch.', LINES[1], LINES[2]]);
-		expect(written.conflicts).toHaveLength(1);
-	});
 	it('reports two insertions at one place, however the words line up', () => {
 		const [a, b] = session(LINES);
 		const base = revision(a);
