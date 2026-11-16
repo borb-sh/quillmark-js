@@ -6,6 +6,12 @@
 
 **A click, a tap or a Tab into a field makes that field's change current.** Before, only a press on the struck or tinted words did, or the focus entering a text field with one proposal, which named its first run wherever the caret landed, so clicking into a paragraph of the body or a long field, or onto a list's unchanged row, left the answer card on another field. Arriving in a field now names the change on the line or row arrived at, else the nearest change in the field, unless the card is already on one of the field's; moving the caret by key names a change on entering its line.
 
+**A jump to a field shows its label.** `focusField`, `revealField`, a landing in a card just added, a preview pick that lands no caret, and each review step and reveal scroll the field's label into the pane with its target wherever the two fit, the target alone where they do not, and stop clear of the pane's edges. Before, a jump up the pane stopped with the field's box at the top edge and its label just above it, out of view. A caret placed in prose scrolls as it did.
+
+**A review opens on its first change in view.** The editor made the first change current without scrolling to it, so on a phone it could stand behind the host's panel and under a desktop's review bar, and Next went on past it; it now scrolls the first change clear of the host's chrome, as a step does.
+
+**A card a proposal adds reads in full, at AA contrast.** Its body is at the ink and no longer cut at three lines, and its tag and field names step toward the ink over the review tint, so each holds 4.5:1 at rest and under attention in both themes, where they stood at the label ink near 2.4:1 over the dark theme's lit tint.
+
 **`reviewRevised` keeps a held review on the paragraphs it read across a whole-document revise.** A revise keeps a field's first block id on whichever block it puts first, so a paragraph written above the first one, in Markdown or another source view, took the id a proposal named: the proposal drew over the new paragraph as outdated, and accepting it removed that paragraph and left the rewrite beside the one it read. A host that holds a review through a revise hands the items, the document as it was and the document revised to `reviewRevised`, and draws what it returns: an item naming the first block names the block that now holds it, as `proposalsBetween` reads one.
 
 ## v0.38.1 - 2026-11-16

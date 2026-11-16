@@ -539,6 +539,16 @@
 	--_qm-ink-label: var(--_qm-ink);
 }
 
+/* A card a proposal adds is filled with the review tint, which takes back that distance too, so
+   over it the rung steps to `default`, and over the lit tint to the ink: each holds 4.5:1 at
+   both poles, where the label rung over the dark pole's lit tint stands near 2.4:1. */
+:where(.qm-review-card-add) {
+	--_qm-ink-label: var(--_qm-ink-default);
+}
+:where(.qm-review-card-add.qm-review-lit) {
+	--_qm-ink-label: var(--_qm-ink);
+}
+
 /* More contrast steps the two rungs that identify a control rather than a list of
    selectors: the well's edge to 3:1 against the card at both poles (WCAG 1.4.11),
    which half the ink over the well clears, and the ring a pixel wider. */
