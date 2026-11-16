@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A review opens on its first change in view.** The editor made the first change current without scrolling to it, so on a phone it could stand behind the host's panel and under a desktop's review bar, and Next went on past it; it now scrolls the first change clear of the host's chrome, as a step does.
+
+**A card a proposal adds reads in full, at AA contrast.** Its body is at the ink and no longer cut at three lines, and its tag and field names step toward the ink over the review tint, so each holds 4.5:1 at rest and under attention in both themes, where they stood at the label ink near 2.4:1 over the dark theme's lit tint.
+
 ## v0.38.1 - 2026-11-16
 
 **Blocks an answer adds above the body's first block are one insert ahead of it.** `proposalsBetween` proposes them as an `insert` before the first block, which stays as the reader has it, where the store's rewrite keeps the first block's id on whatever block it puts first and they read as the first block rewritten plus that block added back after it: a heading added at the top drew the first paragraph struck and, accepted alone or by `answerReview('all', 'accept')`, removed it. A block the editor writes above the first now hands the first block's id on to the block that held it, and a rewrite that changes a block's kind, a paragraph into a heading, keeps the block's id in the editor as the store does, so a proposal naming that block still draws after either is taken.
