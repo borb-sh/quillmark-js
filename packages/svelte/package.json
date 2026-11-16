@@ -1,6 +1,6 @@
 {
 	"name": "@quillmark/svelte",
-	"version": "0.38.1",
+	"version": "0.39.0",
 	"description": "Editor, live-preview and source surfaces over a Quillmark WASM session.",
 	"repository": {
 		"type": "git",
