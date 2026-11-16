@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+**A review opens on its first change in view.** The editor made the first change current without scrolling to it, so on a phone it could stand behind the host's panel and under a desktop's review bar, and Next went on past it; it now scrolls the first change clear of the host's chrome, as a step does.
+
+**A card a proposal adds reads in full, at AA contrast.** Its body is at the ink and no longer cut at three lines, and its tag and field names step toward the ink over the review tint, so each holds 4.5:1 at rest and under attention in both themes, where they stood at the label ink near 2.4:1 over the dark theme's lit tint.
+
 **`reviewRevised` keeps a held review on the paragraphs it read across a whole-document revise.** A revise keeps a field's first block id on whichever block it puts first, so a paragraph written above the first one, in Markdown or another source view, took the id a proposal named: the proposal drew over the new paragraph as outdated, and accepting it removed that paragraph and left the rewrite beside the one it read. A host that holds a review through a revise hands the items, the document as it was and the document revised to `reviewRevised`, and draws what it returns: an item naming the first block names the block that now holds it, as `proposalsBetween` reads one.
 
 ## v0.38.1 - 2026-11-16
