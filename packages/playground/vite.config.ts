@@ -24,9 +24,9 @@ export default defineConfig({
 			// A static SPA: `+layout.ts` sets ssr=false/prerender=false, so the fallback
 			// is the whole app, with no per-route prerender and no server.
 			adapter: adapter({ fallback: 'index.html' }),
-			// Root-relative unless BASE_PATH is set. The Pages workflow sets it to the
-			// project subpath (`/quillmark-js`) at build time, so assets and links resolve
-			// under it; dev and `preview` leave it unset.
+			// Root-relative unless BASE_PATH is set. The Pages workflow passes the base
+			// path Pages reports, empty under the site's custom domain; dev and
+			// `preview` leave it unset.
 			paths: {
 				base: (process.env.BASE_PATH ?? '') as '' | `/${string}`
 			}
