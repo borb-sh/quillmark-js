@@ -245,6 +245,8 @@ The bidirectional codec between one content field and one ProseMirror document. 
 
 **The content is truth, PM is its projection, and edits are ops.** Encode projects the new PM doc back to content and asks the store's own `diff` for the `Change`. Ops rather than a replace, because a `Change` moves each anchor exactly as it moves its text. A whole-field diff rather than a step replay, because the codec then restates none of the store's rules about where a mark or an anchor lands.
 
+**A text edit inside one block commits as the splice it is, against the hash the leaf's last write left.** The codec names that splice itself (`spliceOf`), commits it with that hash as `base`, and holds the value it sent rather than reading the field back, because the diff and the read each cross the whole field, so on a long body every keystroke cost what the field holds. It restates one store rule, that a splice cuts the marks it lands in and the insert carries only its own, and takes the splice only where the value that rule leaves is the projection, no anchor's edge sits in the edited range, and the receipt's normalized splice is the one sent. Anything else, and a field another writer moved past the base, takes the diff. Rejected: holding the projection without a base, which a write the leaf never heard of would leave diverged for the session.
+
 **`replace` is the exception**: a field not yet at content rest, and an `apply` that throws.
 
 ### Decode

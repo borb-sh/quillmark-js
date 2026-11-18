@@ -1,10 +1,10 @@
 // The prose leaf: `createField` (INVARIANTS §Surface). One content field, one PM view wired to
 // the WASM edit surface.
 //
-// `dispatchTransaction` applies the transaction optimistically, lowers it to a `Change` (or
-// `replace` for a field not yet at content rest, which has nothing to change), commits via
-// `doc.apply` (a `text` leaf's whole text through the typed writer), then fires `onChange` if it
-// committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through `onError`.
+// `dispatchTransaction` applies the transaction optimistically, lowers it to a `Change` (one
+// splice against the last write's hash for a text edit inside one block, or `replace` for a field
+// not yet at content rest, which has nothing to change), commits via `doc.apply` (a `text` leaf's
+// whole text through the typed writer), then fires `onChange` if it committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through `onError`.
 // An external change re-hydrates through `applyExternal`, gated by `reconcile` except where the
 // hold it re-evaluates flips.
 import { baseKeymap } from 'prosemirror-commands';
@@ -31,7 +31,8 @@ import type {
 	Change,
 	Content,
 	Addr,
-	Quill
+	Quill,
+	Receipt
 } from '@quillmark/wasm';
 import { core } from '../lifecycle.js';
 import { tooltips } from '../tooltip.js';
@@ -47,7 +48,7 @@ import {
 	type Delta,
 	type LineIndex
 } from './positions.js';
-import { lower, pmToContent, scanContent, scanDoc } from './encode.js';
+import { landedAsSent, lower, pmToContent, scanContent, scanDoc, spliceOf } from './encode.js';
 import { capPlugin, type TextCap } from './cap.js';
 import { islandPastePlugin } from './islands.js';
 import { anchorsFromContent, type AnchorPos } from './marks.js';
@@ -569,6 +570,9 @@ export function createField(opts: CreateFieldOpts): FieldController {
 	// `known` is the codec's view of what the leaf holds: kept in sync after every
 	// own-edit so `reconcile` can tell an external change from the field's own.
 	const reconciler: Reconciler = createReconciler(shown());
+	/** The hash the leaf's own last write left on the field, while `reconciler.last` is that value:
+	 *  the base a splice commits against. */
+	let base: string | undefined;
 
 	let index: LineIndex; // rebuilt on every structural change
 	let view: EditorView;
@@ -801,15 +805,17 @@ export function createField(opts: CreateFieldOpts): FieldController {
 		if (opts.emptyUnsets && heldAnchors().length === 0 && isEmptyContent(newRt))
 			return commitUnset();
 		if (plaintext) return commitPlain(literalOf(newRt));
+		if (commitSplice(at, oldRt, newRt)) return true;
+		base = undefined;
 		try {
 			// Only a field not yet at content rest replaces by choice: neither an absent declared
 			// field nor an authored string has anchors to lose (`changeCommittable`).
-			if (!changeCommittable(doc, addr)) doc.replace(at, newRt);
+			if (!changeCommittable(doc, addr)) base = doc.replace(at, newRt).hash;
 			else {
 				const change = lower(oldRt, newRt);
 				if (change) {
 					const asked = askCore(oldRt, change);
-					doc.apply(at, change);
+					base = doc.apply(at, change).hash;
 					if (asked.size || change.steps.some((step) => 'setBlock' in step)) adopt();
 				}
 			}
@@ -840,6 +846,26 @@ export function createField(opts: CreateFieldOpts): FieldController {
 				return false;
 			}
 		}
+	}
+
+	/**
+	 * A text edit inside one block, committed as the one splice it is and against the hash of the
+	 * value the reconciler holds, so neither side is read or sent whole. A store written since that
+	 * hash refuses the base, and the commit takes the diff path. Whether it landed.
+	 */
+	function commitSplice(at: Addr, oldRt: Content, newRt: Content): boolean {
+		if (base === undefined) return false;
+		const change = spliceOf(oldRt, newRt);
+		if (!change) return false;
+		let receipt: Receipt;
+		try {
+			receipt = doc.apply(at, change, { base });
+		} catch {
+			return false;
+		}
+		base = receipt.hash;
+		reconciler.commit(landedAsSent(receipt.applied, change) ? newRt : readLeaf(reader, addr));
+		return true;
 	}
 
 	/**

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Typing in a long body no longer costs what the body holds.** A text edit inside one block commits as one splice against the hash of the field's last write, and the leaf holds the value it sent, where each keystroke diffed the whole field in the core and read it back twice. On a 48,000-character body a keystroke's commit falls from 23 ms to 6.6 ms in node; the rest is the core's own write. Structural edits, and a field another writer changed, commit as before.
+
 ## v0.39.0 - 2026-11-16
 
 **A click, a tap or a Tab into a field makes that field's change current.** Before, only a press on the struck or tinted words did, or the focus entering a text field with one proposal, which named its first run wherever the caret landed, so clicking into a paragraph of the body or a long field, or onto a list's unchanged row, left the answer card on another field. Arriving in a field now names the change on the line or row arrived at, else the nearest change in the field, unless the card is already on one of the field's; moving the caret by key names a change on entering its line.
