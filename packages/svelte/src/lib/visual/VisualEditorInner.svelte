@@ -661,15 +661,15 @@
 		const id = reviewing.lit;
 		return id !== undefined && answerReview([id], action).length > 0;
 	}
-	/** An answer key: the card's, so it answers only a change the card stands on in view. A
-	 *  press while the reader types in the editor is the leaf's own key, and any other press
-	 *  with the change out of view or the card out of the way brings both back. */
+	/** An answer key: the card's, so it answers only a change whose card stands whole in view.
+	 *  A press while the reader types in the editor is the leaf's own key, and any other press
+	 *  with the change or its card out of view, or the card out of the way, brings both back. */
 	function answerByKey(action: 'accept' | 'dismiss'): boolean {
 		const id = reviewing.lit;
 		if (id === undefined || (typing && inside)) return false;
-		if (!typing && inView(id)) return answerCurrent(action);
+		if (!typing && inView(id) && (answerCard?.standsInView() ?? true)) return answerCurrent(action);
 		typing = false;
-		void reveal(id, false, true);
+		void reveal(id, false, false);
 		return true;
 	}
 	/** Whether a key at `target` is the review's: anywhere but a text control outside the editor,
