@@ -9,16 +9,17 @@
  It sits under the block the change flows in, so it covers no line of its paragraph, or beside
  that block's last line where the line ends short of it, centred on a block of one line such as a
  one-line field's, right-aligned to the column the
- change stands in, and flips above that block where there is no room below, keeping clear of the
- host's chrome at the pane's foot (`inset`). The column is the card's body or its form whole,
- never the one field, so Accept stands at one edge from change to change and a pointer answering
- a run of them does not hunt for it. A field or a property sharing its row with others takes the
- card beside its line only where the card stands within its own slot, and under the row
- otherwise: beside the line of one that ends short of the column's edge the card covers the
- value of the next. Over a change taller than the pane it stays pinned
- at the foot while any of the change shows. A change out of the pane keeps its card where it
- would stand beside it, so the card scrolls out with the text and the pane's edge clips it as it
- clips the text.
+ change stands in, and never above it: a card that turns over the text as a scroll runs short
+ of room moves under the pointer about to answer. Its room under the change is what a step
+ scrolls for, and the host's chrome at the pane's foot (`inset`) is kept clear. The column is
+ the card's body or its form whole, never the one field, so Accept stands at one edge from
+ change to change and a pointer answering a run of them does not hunt for it. A field or a
+ property sharing its row with others takes the card beside its line only where the card
+ stands within its own slot, and under the row otherwise: beside the line of one that ends
+ short of the column's edge the card covers the value of the next. Over a change too tall for
+ the pane to show with its card it stays pinned at the foot while any of the change shows. A
+ change out of the pane keeps its card where it would stand beside it, so the card scrolls out
+ with the text and the pane's edge clips it as it clips the text.
  A change is several elements (struck runs, tinted widgets, added blocks, a row
  under a control, a card's mark), so the box is their union, read anew on each measure: a leaf
  redraws its decorations as it likes, and a box measured once parts from the text it stood on.
@@ -59,6 +60,8 @@
 	let left = $state(0);
 	/** Pinned at the pane's foot, where every scroll moves it, so it follows without a glide. */
 	let pinned = $state(false);
+	/** The whole card stands in the pane, clear of the host's chrome at its foot. */
+	let stands = false;
 	/** The change is drawn, so the card has somewhere to stand. */
 	let placed = $state(false);
 	/** Where the focus was when the keyboard entered the card, to hand it back. */
@@ -124,21 +127,12 @@
 		const slot = last?.closest('.qm-object-prop, .qm-field')?.getBoundingClientRect();
 		const beside = tuck && tuck.right + gap <= left && (!slot || left + w <= slot.right + 1);
 		const below = beside ? tuck.top : lower + gap;
-		const above = upper - gap - h;
-		const fits = below + h <= floor || above >= ceil;
-		const y =
-			below + h <= floor
-				? below
-				: above >= ceil
-					? above
-					: !shows
-						? upper > floor
-							? above
-							: below
-						: Math.max(ceil, Math.min(floor - h, below));
+		const tall = lower - upper + gap + h > floor - ceil;
+		pinned = shows && tall && below + h > floor;
+		const y = pinned ? Math.max(ceil, floor - h) : below;
+		stands = shows && y >= ceil && y + h <= floor;
 		top = y - at.top + (root?.scrollTop ?? 0);
 		left = left - at.left + (root?.scrollLeft ?? 0);
-		pinned = shows && !fits;
 		placed = true;
 	}
 
@@ -220,6 +214,14 @@
 		attributes: true,
 		attributeFilter: ['data-qm-review', 'class', 'open', 'hidden']
 	};
+
+	/** Whether the card stands whole in the pane where the change now is: an answer key answers
+	 *  only a change whose card the reader can see. A change with no box measures nothing, and
+	 *  counts as shown. */
+	export function standsInView(): boolean {
+		place();
+		return !placed || stands;
+	}
 
 	/** Put the focus on Accept, handing it back to where it was on Escape or an answer. False
 	 *  with no card on show. */
