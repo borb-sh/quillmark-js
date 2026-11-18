@@ -123,6 +123,28 @@ describe('a record’s cell', () => {
 		const cell = openField(r.target, main, 'contact').querySelector('[data-qm-prop="email"]')!;
 		expect(cell.contains(document.activeElement)).toBe(true);
 	});
+	it('is made current by the focus arriving anywhere in its cell', async () => {
+		const lit: (string | undefined)[] = [];
+		const doc = example();
+		seed(doc);
+		const r = mountEditor(quill(), doc, {
+			review: contact(doc),
+			onReviewFocus: (id) => lit.push(id)
+		});
+		await settle();
+		expect(await r.editor.revealReview('name')).toBe(true);
+		flushSync();
+		const cell = openField(r.target, main, 'contact').querySelector<HTMLElement>(
+			'[data-qm-prop="email"] .ProseMirror'
+		)!;
+		const from = document.createElement('button');
+		document.body.append(from);
+		cell.focus();
+		cell.dispatchEvent(new FocusEvent('focus', { relatedTarget: from }));
+		from.remove();
+		flushSync();
+		expect(lit.at(-1)).toBe('email');
+	});
 });
 
 describe('a list’s member', () => {

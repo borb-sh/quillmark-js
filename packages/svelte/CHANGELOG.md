@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**A click, a tap or a Tab into a list's row or a record's text cell makes its change current.** The rule v0.39.0 brought to a field's own text reached only a top-level leaf: a row or cell drawing a change of its own named it only on a press on its struck or tinted words, so a click on the rest of a one-line row, such as a memo's From line, left the answer card on another field.
+**A click, a tap or a Tab into a list's row or a record's text cell makes its change current.** The rule v0.39.0 brought to a field's own text reached only a top-level leaf: a row or cell drawing a change of its own named it only on a press on its struck or tinted words, so a click on the rest of a row or cell, such as the empty space in a memo's Memo from, left the answer card on another field.
 
 ## v0.39.0 - 2026-11-16
 
