@@ -194,6 +194,32 @@ describe('a list’s member', () => {
 		undoKey(r);
 		expect(texts(r.doc.getStored('signature_block'))).toEqual(five);
 	});
+	it('is made current by the focus arriving anywhere in its row', async () => {
+		const lit: (string | undefined)[] = [];
+		const doc = example();
+		seed(doc);
+		const path = doc.pathFor('signature_block');
+		const r = mountEditor(quill(), doc, {
+			review: [
+				{ id: 'first', field: `${path}[0]`, before: 'A. LOVELACE', after: 'ADA LOVELACE' },
+				{ id: 'last', field: `${path}[2]`, before: 'Analyst', after: 'Engineer' }
+			],
+			onReviewFocus: (id) => lit.push(id)
+		});
+		await settle();
+		expect(await r.editor.revealReview('first')).toBe(true);
+		flushSync();
+		const row = openField(r.target, main, 'signature_block').querySelector<HTMLElement>(
+			'[data-qm-index="2"] .ProseMirror'
+		)!;
+		const from = document.createElement('button');
+		document.body.append(from);
+		row.focus();
+		row.dispatchEvent(new FocusEvent('focus', { relatedTarget: from }));
+		from.remove();
+		flushSync();
+		expect(lit.at(-1)).toBe('last');
+	});
 });
 
 describe('a place that holds nothing it read', () => {

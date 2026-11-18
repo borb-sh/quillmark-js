@@ -49,7 +49,8 @@ export type { LeaveStrings } from './leave.js';
 // leaf's own.
 export type { BlockPlace, LeafUndrawn, ReviewAction, ReviewReport, TextReview } from './review.js';
 export { wordDiff } from './review-diff.js';
-export { valueDiffPlugin } from './value-diff.js';
+export { valueDiffPlugin, valueSpans } from './value-diff.js';
+export { reviewCaretPlugin } from './review-caret.js';
 export type { ValueProposal, ValueState } from './value-diff.js';
 export { asContent, planValue, valueChanges } from './value-plan.js';
 export type { ValuePlan, ValueChange } from './value-plan.js';
