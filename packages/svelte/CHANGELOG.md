@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**A click, a tap or a Tab into a list's row or a record's text cell makes its change current.** The rule v0.39.0 brought to a field's own text reached only a top-level leaf: a row or cell drawing a change of its own named it only on a press on its struck or tinted words, so a click on the rest of a row or cell, such as the empty space in a memo's Memo from, left the answer card on another field.
+
 **Typing in a long body no longer costs what the body holds.** A text edit inside one block commits as one splice against the hash of the field's last write, and the leaf holds the value it sent, where each keystroke diffed the whole field in the core and read it back twice. On a 48,000-character body a keystroke's commit falls from 23 ms to 6.6 ms in node; the rest is the core's own write. Structural edits, and a field another writer changed, commit as before.
 
 ## v0.39.0 - 2026-11-16
