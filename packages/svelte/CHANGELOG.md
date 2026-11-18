@@ -8,7 +8,7 @@
 
 **An answer key is not heard under a modal.** With the focus on a dialog's button, ⌘/Ctrl+Enter accepted the change behind the dialog. A key inside `[aria-modal="true"]` or a modal `<dialog>` that does not hold the editor is now the dialog's, as one in a text box is.
 
-**A text box the host marks `data-qm-review-keys` hands the review its keys.** A host's prompt that has no use for the chords, such as an empty chat box, sets the attribute while it holds nothing, and accept, dismiss, the steps and ⌘Z for an answer then work from it. `reviewKeysHeard(target, root?)` is exported, so a host's own review chord, such as an Accept All key, is heard where the editor's are. Any editable counts as a text box, `contenteditable=""` and `plaintext-only` included.
+**A text box the host marks `data-qm-review-keys` hands the review its keys.** Left empty it hands over every key: accept, dismiss, the steps and ⌘Z for an answer. Set to names (`accept dismiss next previous undo`) it hands over those alone, so a chat box holding a draft can hand over accept and keep ⌘/Ctrl+Backspace as its own delete. `reviewKeysHeard(target, root?)` is exported, so a host's own review chord, such as an Accept All key, is heard where the editor's are. Any editable counts as a text box, `contenteditable=""` and `plaintext-only` included.
 
 **An answer key at a showing card is always the card's.** A proposal that could not be written left the key to the leaf, so accept could tick a task item instead. The key now does what the card's button does, and goes no further.
 

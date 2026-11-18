@@ -394,7 +394,7 @@ describe('the answer keys at their edges', () => {
 		return el;
 	}
 
-	it('hears a text box the host marks as yielding, and neither any other editable nor a modal', async () => {
+	it('hears a text box the host marks as yielding the keys it names, and neither any other editable nor a modal', async () => {
 		const r = batch(spread);
 		await settle();
 		const order = r.drawn.at(-1)!.open;
@@ -414,6 +414,13 @@ describe('the answer keys at their edges', () => {
 		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);
 		expect(document.activeElement).toBe(prompt);
 		prompt.remove();
+
+		const draft = outside('textarea', (el) => el.setAttribute('data-qm-review-keys', 'accept'));
+		press(draft, keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toHaveLength(1);
+		press(draft, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events.at(-1)).toEqual({ id: order[1], action: 'accept' });
+		draft.remove();
 	});
 
 	it('answers once for a held accept, and lets no repeat through to a task item’s tick', async () => {

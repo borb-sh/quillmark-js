@@ -61,7 +61,7 @@
 	import type { Delta } from '../core/codec/positions.js';
 	import { diagnosticText, mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
-	import { reviewKeysHeard } from './hears.js';
+	import { reviewKeysHeard, type ReviewKeyName } from './hears.js';
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview, type CardAdd } from './review.svelte.js';
@@ -743,6 +743,19 @@
 			return true;
 		}
 	});
+	/** The review key being matched, by the name a host's text box hands it over by. */
+	let named: ReviewKeyName | undefined;
+	const reviewKeyName = keydownHandler(
+		Object.fromEntries(
+			(['accept', 'dismiss', 'next', 'previous'] as const).map((name) => [
+				REVIEW_KEYS[name],
+				() => {
+					named = name;
+					return true;
+				}
+			])
+		)
+	);
 	/** Alt-F10: the card brought back from wherever typing or a scroll put it, then entered. */
 	async function enterCard(id: string): Promise<void> {
 		typing = false;
@@ -767,7 +780,10 @@
 			return;
 		}
 		if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
-		if (reviewing.lit === undefined || !rootEl || !reviewKeysHeard(e.target, rootEl)) return;
+		if (reviewing.lit === undefined || !rootEl) return;
+		named = undefined;
+		reviewKeyName({} as never, e);
+		if (!reviewKeysHeard(e.target, rootEl, named)) return;
 		inside = rootEl.contains(e.target as Node);
 		repeat = e.repeat;
 		answered = false;

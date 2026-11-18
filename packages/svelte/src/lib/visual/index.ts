@@ -55,6 +55,7 @@ export type { Proposed, ProposalsOpts } from './proposals.js';
 export type { ReviewAction } from '../core/codec/index.js';
 export { REVIEW_KEYS } from '../core/codec/index.js';
 export { reviewKeysHeard } from './hears.js';
+export type { ReviewKeyName } from './hears.js';
 
 // The `$ext.editor` write unit. A consumer seeding editor-side chrome
 // state (a card title, the tips channel) goes through this rather than `storeExt`,

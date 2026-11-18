@@ -32,7 +32,7 @@
 // editor included, so the answers' step is the key's from anywhere on the page but a text
 // control outside the editor, which keeps its own.
 import { getContext, setContext } from 'svelte';
-import { textBox } from './hears.js';
+import { reviewKeysHeard, textBox } from './hears.js';
 
 /** How long an offer stands, in ms. Long enough to read the toast and reach its button;
  *  short enough that the toast is gone before the user has moved on to something else. */
@@ -192,7 +192,7 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 				!!last?.answer &&
 				last.offer === live() &&
 				latest === self &&
-				(!textBox(target) || !!target.closest('[data-qm-review-keys]'))
+				reviewKeysHeard(target, root, 'undo')
 			);
 		},
 		pause() {
