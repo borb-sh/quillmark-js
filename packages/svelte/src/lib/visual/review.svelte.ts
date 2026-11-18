@@ -92,6 +92,8 @@ export interface Review {
 	/** The item the caret is in, `undefined` where it left one: arriving names it at once, and
 	 *  leaving names nothing. */
 	point(id: string | undefined): void;
+	/** A count that moves each time the caret lands on a change, the current one included. */
+	readonly landed: number;
 	/** A reader's answer. False where it could not be made. */
 	act(id: string, action: ReviewAction): boolean;
 	/** Answer items as the answer card would, in the page's order: `'all'` is every item drawn,
@@ -410,6 +412,7 @@ export function createReview(source: ReviewSource): Review {
 	});
 
 	let current = $state<string | undefined>();
+	let landed = $state(0);
 	const lit = $derived(current !== undefined && byId.has(current) ? current : undefined);
 	const name = (id: string): void => {
 		current = id;
@@ -519,7 +522,12 @@ export function createReview(source: ReviewSource): Review {
 			else drawn.delete(key);
 		},
 		point(id) {
-			if (id !== undefined) name(id);
+			if (id === undefined) return;
+			name(id);
+			landed++;
+		},
+		get landed() {
+			return landed;
 		},
 		act(id, action) {
 			const item = byId.get(id);
@@ -629,6 +637,7 @@ const NO_REVIEW: Review = {
 	keyOf: () => undefined,
 	drew() {},
 	point() {},
+	landed: 0,
 	act: () => false,
 	answer: () => [],
 	settled() {},

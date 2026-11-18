@@ -130,6 +130,16 @@ describe('a proposed card', () => {
 		expect(r.events).toEqual([{ id: 'c1', action: 'dismiss' }]);
 		expect(lit()).toBe('c0');
 	});
+
+	it('takes the focus as one stop when a step brings it with the focus, its removal too', async () => {
+		const r = mount((doc) => cardItems(doc));
+		await settle();
+		for (const id of ['c0', 'c1']) {
+			expect(await r.editor.revealReview(id, { focus: true })).toBe(true);
+			expect(document.activeElement?.getAttribute('data-qm-review')).toBe(id);
+			expect(document.activeElement?.getAttribute('tabindex')).toBe('-1');
+		}
+	});
 });
 
 describe('a removal of a card the reader writes in', () => {

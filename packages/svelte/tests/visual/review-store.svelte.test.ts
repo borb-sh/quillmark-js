@@ -79,6 +79,16 @@ describe('the current item', () => {
 		expect(review.lit).toBe('title');
 	});
 
+	it('counts each landing of the caret on a change, the current one again included', () => {
+		const { review } = store();
+		const at = review.landed;
+		review.point('proposal');
+		review.point(undefined);
+		review.point('proposal');
+		review.reveal('title');
+		expect(review.landed - at).toBe(2);
+	});
+
 	it('lights nothing once answered, says it was current, and is the item an undo reopens', () => {
 		const { review, answered } = store();
 		review.reveal('title');

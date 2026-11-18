@@ -147,6 +147,54 @@ describe('a record’s cell', () => {
 	});
 });
 
+describe('a record’s property beside a change', () => {
+	const seed = (doc: Document): void =>
+		void quill().writer(doc).set('contact', { name: 'Ada', email: 'a@example.org' });
+	const items = (doc: Document): ReviewItem[] => [
+		{ id: 'cols', field: doc.pathFor('columns'), after: 2 },
+		{ id: 'name', field: `${doc.pathFor('contact')}.name`, before: 'Ada', after: 'Grace' },
+		{ id: 'reply', field: `${doc.pathFor('contact')}.reply_by`, after: '2026-02-01' }
+	];
+	async function mounted() {
+		const lit: (string | undefined)[] = [];
+		const doc = example();
+		seed(doc);
+		const r = mountEditor(quill(), doc, {
+			review: items(doc),
+			onReviewFocus: (id) => lit.push(id)
+		});
+		await settle();
+		expect(await r.editor.revealReview('cols')).toBe(true);
+		flushSync();
+		const from = document.createElement('button');
+		document.body.append(from);
+		const arrive = (el: Element): void => {
+			el.dispatchEvent(new FocusEvent('focusin', { bubbles: true, relatedTarget: from }));
+			flushSync();
+		};
+		const cell = (prop: string) =>
+			openField(r.target, main, 'contact').querySelector<HTMLElement>(`[data-qm-prop="${prop}"]`)!;
+		return { r, lit, arrive, cell, done: () => from.remove() };
+	}
+
+	it('leaves the card where it is when a press or the focus lands on it', async () => {
+		const { lit, arrive, cell, done } = await mounted();
+		const email = cell('email').querySelector('.ProseMirror')!;
+		email.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+		arrive(email);
+		done();
+		expect(lit.at(-1)).toBe('cols');
+	});
+
+	it('is a control the focus names the change of, as a press does', async () => {
+		const { lit, arrive, cell, done } = await mounted();
+		const date = cell('reply_by').querySelector<HTMLElement>('[data-qm-review~="reply"]')!;
+		arrive(date.querySelector('[tabindex]') ?? date);
+		done();
+		expect(lit.at(-1)).toBe('reply');
+	});
+});
+
 describe('a list’s member', () => {
 	const seed = (doc: Document): void =>
 		void quill().writer(doc).set('signature_block', ['A. LOVELACE', 'Author', 'Analyst']);
@@ -179,6 +227,18 @@ describe('a list’s member', () => {
 		expect(added.querySelector('.qm-review-added-box')?.hasAttribute('inert')).toBe(true);
 		expect(added.querySelector('.ProseMirror')?.textContent).toBe('Countess');
 		expect(r.doc.getStored('signature_block')).toHaveLength(3);
+	});
+
+	it('takes the focus as one stop where it adds a row, and the caret into the row it changes', async () => {
+		const r = nested(members, seed);
+		await settle();
+		const field = openField(r.target, main, 'signature_block');
+		expect(await r.editor.revealReview('add', { focus: true })).toBe(true);
+		expect(document.activeElement).toBe(markOf(field, 'add'));
+		expect(await r.editor.revealReview('change', { focus: true })).toBe(true);
+		expect(
+			markOf(field, 'change')?.closest('.qm-array-row')?.contains(document.activeElement)
+		).toBe(true);
 	});
 
 	it('is taken on the member it read, though another taken first moved it', async () => {
