@@ -4,7 +4,8 @@
 // `dispatchTransaction` applies the transaction optimistically, lowers it to a `Change` (one
 // splice against the last write's hash for a text edit inside one block, or `replace` for a field
 // not yet at content rest, which has nothing to change), commits via `doc.apply` (a `text` leaf's
-// whole text through the typed writer), then fires `onChange` if it committed and `onCaretMove`. A throw keeps the optimistic PM state and reports through `onError`.
+// whole text through the typed writer), then fires `onChange` if it committed and `onCaretMove`.
+// A throw keeps the optimistic PM state and reports through `onError`.
 // An external change re-hydrates through `applyExternal`, gated by `reconcile` except where the
 // hold it re-evaluates flips.
 import { baseKeymap } from 'prosemirror-commands';
