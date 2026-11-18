@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.39.1 - 2026-11-18
+
 **The answer card stays below its change.** It turned above the change whenever a scroll left no room under it, so scrolling moved it across the text, under a pointer about to answer, for room the next scroll took away. It now stands below, or beside a short last line, and scrolls out with its change; only a change too tall for the pane to show with its card still pins it at the pane's foot. An answer key now answers only while the whole card shows, the first press otherwise scrolling the change and its card back.
 
 **A click, a tap or a Tab into a list's row or a record's text cell makes its change current.** The rule v0.39.0 brought to a field's own text reached only a top-level leaf: a row or cell drawing a change of its own named it only on a press on its struck or tinted words, so a click on the rest of a row or cell, such as the empty space in a memo's Memo from, left the answer card on another field.
