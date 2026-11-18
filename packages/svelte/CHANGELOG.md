@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The answer card stands under the field it answers in a shared row.** A change in a field or a property sharing its row with others put the card at the form's right edge, under the row's last field, so it read as that field's even when the change was in the first, and ⌘/Ctrl+Enter answers the change the card is on. The card now keeps to the right edge of the change's own field, reaching past it only as far as the card is wide; a field on a row of its own keeps the card at the form's edge as before.
+
 ## v0.39.1 - 2026-11-18
 
 **The answer card stays below its change.** It turned above the change whenever a scroll left no room under it, so scrolling moved it across the text, under a pointer about to answer, for room the next scroll took away. It now stands below, or beside a short last line, and scrolls out with its change; only a change too tall for the pane to show with its card still pins it at the pane's foot. An answer key now answers only while the whole card shows, the first press otherwise scrolling the change and its card back.

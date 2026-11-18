@@ -12,8 +12,11 @@
  change stands in, and never above it: a card that turns over the text as a scroll runs short
  of room moves under the pointer about to answer. Its room under the change is what a step
  scrolls for, and the host's chrome at the pane's foot (`inset`) is kept clear. The column is
- the card's body or its form whole, never the one field, so Accept stands at one edge from
- change to change and a pointer answering a run of them does not hunt for it. A field or a
+ the card's body or its form whole, so Accept stands at one edge from change to change and a
+ pointer answering a run of them does not hunt for it. A field or a property sharing its row
+ takes its own right edge instead, reaching past it only as far as the card is wide and never
+ past the column's: a card at the column's edge stands under the row's last field, which reads
+ as the change it answers whatever field the change is in. A field or a
  property sharing its row with others takes the card beside its line only where the card
  stands within its own slot, and under the row otherwise: beside the line of one that ends
  short of the column's edge the card covers the value of the next. Over a change too tall for
@@ -120,7 +123,11 @@
 		const column = (els[0].closest(
 			'.qm-fields, .qm-card, .qm-review-card-add, .qm-review-card-remove'
 		) ?? root)!;
-		left = Math.max(view.left + gap, column.getBoundingClientRect().right - w);
+		const edge = column.getBoundingClientRect().right;
+		const home = els[0].closest('.qm-object-prop, .qm-field')?.getBoundingClientRect();
+		const right =
+			home && home.right < edge ? Math.min(edge, Math.max(home.right, home.left + w)) : edge;
+		left = Math.max(view.left + gap, right - w);
 		const at = (root ?? el).getBoundingClientRect();
 		const last = blocks.find((b, i) => b !== els[i] && b.getBoundingClientRect().bottom === lower);
 		const tuck = last && lastLine(last, h);
