@@ -3,6 +3,7 @@
 // `pmToContent` is decode's pure inverse, and `lower` asks the store's own word-aligned `diff` for
 // the change between the two. The projection carries every id the doc's nodes do and the anchors
 // the leaf holds, so the change lands the projection exactly and moves nothing it does not name.
+// A text edit inside one block is the exception: `spliceOf` names its one splice here.
 import type { Mark, Node as PMNode } from 'prosemirror-model';
 import type {
 	Change,
@@ -19,6 +20,7 @@ import type {
 import { core } from '../lifecycle.js';
 import { HARD_BREAK, ISLAND_SLOT, islandEntryFromNode, type IslandNodeAttrs } from './islands.js';
 import { contentDescriptorFromPM, markKey } from './marks.js';
+import { valueEqual } from './reconcile.js';
 
 // ── Position-map runs (consumed by positions.ts) ────────────────────────────
 // A run is one segment of exact PM↔content correspondence, in document order. Offsets are UTF-16
@@ -333,4 +335,106 @@ function mergeMarks(raw: ContentMark[]): ContentMark[] {
 export function lower(oldRt: Content, newRt: Content): Change | null {
 	const change = core().diff(oldRt, newRt);
 	return change.steps.length ? change : null;
+}
+
+/**
+ * The one splice taking `oldRt` to `newRt` where the two differ only in the text of one block
+ * and the formatting of what it inserts, or `null`: built here rather than by the store's `diff`,
+ * which reads both values whole across the boundary. Exact or absent, never a guess: the value the
+ * splice leaves, the store's marks cut at the edit and the insert's own merged back, is checked
+ * equal to `newRt`, so a caller that holds `newRt` as the stored value after the write holds it.
+ */
+export function spliceOf(oldRt: Content, newRt: Content): Change | null {
+	const a = oldRt.text;
+	const b = newRt.text;
+	if (a === b) return null;
+	if (
+		oldRt.codec !== newRt.codec ||
+		!valueEqual(oldRt.blocks, newRt.blocks) ||
+		!valueEqual(oldRt.containers ?? [], newRt.containers ?? []) ||
+		!valueEqual(oldRt.islands ?? [], newRt.islands ?? [])
+	)
+		return null;
+	const short = Math.min(a.length, b.length);
+	let at = 0;
+	while (at < short && a.charCodeAt(at) === b.charCodeAt(at)) at++;
+	let tail = 0;
+	while (
+		tail < short - at &&
+		a.charCodeAt(a.length - 1 - tail) === b.charCodeAt(b.length - 1 - tail)
+	)
+		tail++;
+	if (splitsPair(a, at) || splitsPair(a, a.length - tail)) return null;
+	const del = a.slice(at, a.length - tail);
+	const insert = b.slice(at, b.length - tail);
+	if (breaksText(del) || breaksText(insert)) return null;
+	const end = at + del.length;
+	const shift = insert.length - del.length;
+
+	const before = oldRt.marks ?? [];
+	const after = newRt.marks ?? [];
+	if (before.some(isExtMark) || after.some(isExtMark)) return null;
+	const carried: ContentMark[] = [];
+	for (const m of before) {
+		if (m.start < at) carried.push({ ...m, end: Math.min(m.end, at) });
+		if (m.end > end)
+			carried.push({ ...m, start: Math.max(m.start, end) + shift, end: m.end + shift });
+	}
+	const own: ContentMark[] = [];
+	for (const m of after) {
+		const lo = Math.max(m.start, at);
+		const hi = Math.min(m.end, at + insert.length);
+		if (lo < hi) own.push({ ...m, start: lo, end: hi });
+	}
+	if (!valueEqual(mergeMarks([...carried, ...own]), after)) return null;
+
+	const anchors: ContentAnchor[] = [];
+	for (const x of oldRt.anchors ?? []) {
+		if ((x.start >= at && x.start <= end) || (x.end >= at && x.end <= end)) return null;
+		anchors.push(
+			x.start > end
+				? { ...x, start: x.start + shift, end: x.end + shift }
+				: x.end > end
+					? { ...x, end: x.end + shift }
+					: x
+		);
+	}
+	if (!valueEqual(anchors, newRt.anchors ?? [])) return null;
+
+	const marks = own.map((m) => ({ ...m, start: m.start - at, end: m.end - at }));
+	const step: Extract<Step, { splice: unknown }>['splice'] = { at, insert };
+	if (del) step.delete = del;
+	if (marks.length) step.marks = marks;
+	return { steps: [{ splice: step }] };
+}
+
+/** Whether `receipt`'s normalized change is `change`, a {@link spliceOf}, as it was sent. */
+export function landedAsSent(applied: Change, change: Change): boolean {
+	const [sent] = change.steps;
+	const [got] = applied.steps;
+	if (applied.steps.length !== 1 || !('splice' in got) || !('splice' in sent)) return false;
+	const s = sent.splice;
+	const g = got.splice;
+	return (
+		g.at === s.at &&
+		(g.delete ?? '') === (s.delete ?? '') &&
+		g.insert === s.insert &&
+		valueEqual(g.marks ?? [], s.marks ?? [])
+	);
+}
+
+/** Whether offset `i` of `s` falls between the halves of a surrogate pair. */
+function splitsPair(s: string, i: number): boolean {
+	if (i <= 0 || i >= s.length) return false;
+	const lo = s.charCodeAt(i);
+	return lo >= 0xdc00 && lo <= 0xdfff;
+}
+
+/** Whether `s` holds a character that ends a block or a line, or stands for an island. */
+function breaksText(s: string): boolean {
+	return s.includes('\n') || s.includes(HARD_BREAK) || s.includes(ISLAND_SLOT);
+}
+
+function isExtMark(m: ContentMark): boolean {
+	return m.type.startsWith('x-');
 }
