@@ -124,6 +124,28 @@ describe('the answer journal', () => {
 		expect(r.target.querySelector('.ProseMirror [data-qm-review="A"]')).not.toBeNull();
 	});
 
+	it('takes back an answer from a text box outside only where the host marks it as yielding', async () => {
+		const r = journaled(mixed);
+		await settle();
+		accept(r.target, 'A');
+		const box = (yielding: boolean): HTMLTextAreaElement => {
+			const el = document.createElement('textarea');
+			if (yielding) el.setAttribute('data-qm-review-keys', '');
+			document.body.append(el);
+			el.focus();
+			return el;
+		};
+		const plain = box(false);
+		press(plain, 'z', mod);
+		expect(r.events).toEqual([{ id: 'A', action: 'accept' }]);
+		plain.remove();
+		const prompt = box(true);
+		press(prompt, 'z', mod);
+		expect(r.events.at(-1)).toEqual({ id: 'A', action: 'reopen' });
+		prompt.remove();
+		await settle();
+	});
+
 	it('takes back a whole batch with one ⌘Z, raising no toast', async () => {
 		const r = journaled(mixed);
 		const body = r.doc.main.body.text;

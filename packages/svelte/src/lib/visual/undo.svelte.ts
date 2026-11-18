@@ -32,6 +32,7 @@
 // editor included, so the answers' step is the key's from anywhere on the page but a text
 // control outside the editor, which keeps its own.
 import { getContext, setContext } from 'svelte';
+import { textBox } from './hears.js';
 
 /** How long an offer stands, in ms. Long enough to read the toast and reach its button;
  *  short enough that the toast is gone before the user has moved on to something else. */
@@ -102,8 +103,6 @@ export interface StructuralUndo {
 	/** Drop the standing offer or the held step without running it, unless it is kept. */
 	withdraw(): void;
 }
-
-const EDITABLE = 'input, textarea, select, [contenteditable="true"]';
 
 /** A step held past its toast, and an answer's, the card's step it was offered over. */
 interface Held {
@@ -188,9 +187,12 @@ export function createStructuralUndo(): StructuralUndo & { dispose(): void } {
 			if (!live() || !(target instanceof Element)) return false;
 			if (target === document.body) return latest === self;
 			if (target === handed) return true;
-			if (root?.contains(target)) return !!last?.standing || !target.closest(EDITABLE);
+			if (root?.contains(target)) return !!last?.standing || !textBox(target);
 			return (
-				!!last?.answer && last.offer === live() && latest === self && !target.closest(EDITABLE)
+				!!last?.answer &&
+				last.offer === live() &&
+				latest === self &&
+				(!textBox(target) || !!target.closest('[data-qm-review-keys]'))
 			);
 		},
 		pause() {

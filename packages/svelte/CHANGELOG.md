@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+**A held answer key answers once.** Holding ⌘/Ctrl+Enter or ⌘/Ctrl+Backspace answered the current change, then each next one as the key repeated, through every change in view. A repeat now does nothing where the press answered or brought the card back, even once the last change is answered, and stays the leaf's where the leaf took the press, so holding ⌘/Ctrl+Backspace while typing still deletes.
+
+**An answer key is not heard under a modal.** With the focus on a dialog's button, ⌘/Ctrl+Enter accepted the change behind the dialog. A key inside `[aria-modal="true"]` or a modal `<dialog>` that does not hold the editor is now the dialog's, as one in a text box is.
+
+**A text box the host marks `data-qm-review-keys` hands the review its keys.** A host's prompt that has no use for the chords, such as an empty chat box, sets the attribute while it holds nothing, and accept, dismiss, the steps and ⌘Z for an answer then work from it. `reviewKeysHeard(target, root?)` is exported, so a host's own review chord, such as an Accept All key, is heard where the editor's are. Any editable counts as a text box, `contenteditable=""` and `plaintext-only` included.
+
+**An answer key at a showing card is always the card's.** A proposal that could not be written left the key to the leaf, so accept could tick a task item instead. The key now does what the card's button does, and goes no further.
+
+**Alt-F10 reaches the card while you type.** It did nothing while typing had the card stepped aside; it now brings the card back, scrolling it into view if needed, and puts the focus on Accept. A press that only brings the card back rings its key's hint on the card, so the next press reads as the answer.
+
 ## v0.39.1 - 2026-11-18
 
 **The answer card stays below its change.** It turned above the change whenever a scroll left no room under it, so scrolling moved it across the text, under a pointer about to answer, for room the next scroll took away. It now stands below, or beside a short last line, and scrolls out with its change; only a change too tall for the pane to show with its card still pins it at the pane's foot. An answer key now answers only while the whole card shows, the first press otherwise scrolling the change and its card back.

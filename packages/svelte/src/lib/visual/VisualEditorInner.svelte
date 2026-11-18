@@ -61,6 +61,7 @@
 	import type { Delta } from '../core/codec/positions.js';
 	import { diagnosticText, mergeStrings, setWording } from './strings.js';
 	import { createStructuralUndo, setStructuralUndo } from './undo.svelte.js';
+	import { reviewKeysHeard } from './hears.js';
 	import { undoChord } from './listhistory.js';
 	import { removedCards, type RemovedCard } from './removed.js';
 	import { createReview, setReview, type CardAdd } from './review.svelte.js';
@@ -687,29 +688,45 @@
 		const id = reviewing.lit;
 		if (id === undefined) return false;
 		if (typing && inside && (action === 'dismiss' || inTask())) return false;
-		if (!typing && inView(id) && (answerCard?.standsInView() ?? true)) return answerCurrent(action);
+		if (!typing && inView(id) && (answerCard?.standsInView() ?? true)) {
+			answerCurrent(action);
+			return true;
+		}
 		typing = false;
+		asked = action;
 		void reveal(id, false, false);
 		return true;
 	}
+	/** The answer key whose press only brought the card, which the card's hint for it shows. */
+	let asked = $state<'accept' | 'dismiss' | undefined>();
+	$effect(() => {
+		void reviewing.lit;
+		asked = undefined;
+	});
+	/** An answer key's fresh press. Its repeats are never an answer: a held key answers once, and
+	 *  a press the leaf took stays the leaf's. */
+	function answerKey(action: 'accept' | 'dismiss'): boolean {
+		if (repeat) return false;
+		answered = answerByKey(action);
+		return answered;
+	}
+	/** The review took the press being matched as an answer key's. */
+	let answered = false;
+	/** The chord of the answer key the review took and the keyboard may still repeat, whose
+	 *  repeats it swallows even once no change is left, so none falls through to a leaf. */
+	let heldChord: string | undefined;
+	const chordOf = (e: KeyboardEvent): string =>
+		`${e.key}:${+e.metaKey}${+e.ctrlKey}${+e.altKey}${+e.shiftKey}`;
 	/** Whether the caret stands in a task item, where accept's key ticks it. */
 	function inTask(): boolean {
 		const at = document.getSelection()?.anchorNode;
 		const el = at instanceof Element ? at : at?.parentElement;
 		return !!el?.closest('li[data-qm-checked]');
 	}
-	/** Whether a key at `target` is the review's: anywhere but a text control outside the editor,
-	 *  which keeps its own keys, or another editor. */
-	function reviewHears(target: EventTarget | null): boolean {
-		if (!(target instanceof Element) || !rootEl) return false;
-		if (rootEl.contains(target)) return true;
-		if (target.closest('.qm-editor')) return false;
-		return !target.closest('input, textarea, select, [contenteditable="true"]');
-	}
 	let answerCard = $state<ReviewCard | undefined>();
 	const reviewKeys = keydownHandler({
-		[REVIEW_KEYS.accept]: () => answerByKey('accept'),
-		[REVIEW_KEYS.dismiss]: () => answerByKey('dismiss'),
+		[REVIEW_KEYS.accept]: () => answerKey('accept'),
+		[REVIEW_KEYS.dismiss]: () => answerKey('dismiss'),
 		[REVIEW_KEYS.next]: () => {
 			void step(1, inside);
 			return true;
@@ -719,21 +736,44 @@
 			return true;
 		},
 		'Alt-F10': () => {
-			if (!answerCard || document.getSelection()?.isCollapsed === false) return false;
-			void answerCard.enter();
+			const id = reviewing.lit;
+			if (!answerCard || id === undefined || document.getSelection()?.isCollapsed === false)
+				return false;
+			void enterCard(id);
 			return true;
 		}
 	});
+	/** Alt-F10: the card brought back from wherever typing or a scroll put it, then entered. */
+	async function enterCard(id: string): Promise<void> {
+		typing = false;
+		if (!inView(id) || !(answerCard?.standsInView() ?? true)) await reveal(id, false, false);
+		await tick();
+		await answerCard?.enter();
+	}
 	/** Whether the key being matched was pressed inside the editor, where a step takes the caret
 	 *  with it. */
 	let inside = false;
+	/** Whether the key being matched is the keyboard's repeat of a held one. */
+	let repeat = false;
 	/** The review keys, captured on the document ahead of every other binding of them: a task
 	 *  item's tick, a leaf's arrows, a host's own. */
 	function onReviewKey(e: KeyboardEvent): void {
-		if (e.isComposing || reviewing.lit === undefined || !reviewHears(e.target)) return;
-		inside = !!rootEl?.contains(e.target as Node);
+		if (!e.repeat) {
+			asked = undefined;
+			heldChord = undefined;
+		} else if (heldChord === chordOf(e)) {
+			e.preventDefault();
+			e.stopPropagation();
+			return;
+		}
+		if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+		if (reviewing.lit === undefined || !rootEl || !reviewKeysHeard(e.target, rootEl)) return;
+		inside = rootEl.contains(e.target as Node);
+		repeat = e.repeat;
+		answered = false;
 		// The bindings read no view: this is `prosemirror-keymap`'s chord matcher alone.
 		if (!reviewKeys({} as never, e)) return;
+		if (answered) heldChord = chordOf(e);
 		e.preventDefault();
 		e.stopPropagation();
 	}
@@ -748,6 +788,7 @@
 			typing = true;
 	}
 	function onPointerMove(e: PointerEvent): void {
+		asked = undefined;
 		if (!typing) {
 			pointerAt = { x: e.clientX, y: e.clientY };
 			return;
@@ -2201,6 +2242,7 @@
 		root={rootEl}
 		inset={reviewInset}
 		hidden={typing}
+		{asked}
 		outdated={reviewing.lit !== undefined && drewOutdated.includes(reviewing.lit)}
 		note={reviewing.lit === undefined
 			? undefined
