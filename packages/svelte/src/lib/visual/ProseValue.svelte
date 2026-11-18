@@ -69,6 +69,8 @@
 		offsetToPM,
 		valueEqual,
 		valueDiffPlugin,
+		valueSpans,
+		reviewCaretPlugin,
 		type ValueProposal,
 		type LeafViews,
 		type TextCap
@@ -166,6 +168,13 @@
 	$effect(() => {
 		drawnProposals = (proposed ?? []).map((p) => ({ ...p, lit: reviewing.lit === p.id }));
 		redraw?.();
+	});
+	/** The caret names a proposal it arrives at, as a field's own leaf's does (`review-caret.ts`). */
+	const reviewCaret = reviewCaretPlugin({
+		spans: (state) => valueSpans(state, drawnProposals),
+		entered: () => undefined,
+		litHere: () => drawnProposals.some((p) => p.lit),
+		point: (id) => reviewing.point(id)
 	});
 	/** A proposal's plan goes when it leaves the list or the leaf goes, not when another in the
 	 *  list is answered, which would leave its own Accept writing its value whole. */
@@ -303,7 +312,8 @@
 									valueDiffPlugin(
 										() => drawnProposals,
 										(id, state) => reviewing.planned(id, state)
-									)
+									),
+									reviewCaret
 								]
 							})
 				});

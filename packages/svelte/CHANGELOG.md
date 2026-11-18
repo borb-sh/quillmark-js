@@ -6,6 +6,8 @@
 
 **The answer card stays below its change.** It turned above the change whenever a scroll left no room under it, so scrolling moved it across the text, under a pointer about to answer, for room the next scroll took away. It now stands below, or beside a short last line, and scrolls out with its change; only a change too tall for the pane to show with its card still pins it at the pane's foot. An answer key now answers only while the whole card shows, the first press otherwise scrolling the change and its card back.
 
+**A click, a tap or a Tab into a list's row or a record's text cell makes its change current.** The rule v0.39.0 brought to a field's own text reached only a top-level leaf: a row or cell drawing a change of its own named it only on a press on its struck or tinted words, so a click on the rest of a row or cell, such as the empty space in a memo's Memo from, left the answer card on another field.
+
 ## v0.39.0 - 2026-11-16
 
 **A click, a tap or a Tab into a field makes that field's change current.** Before, only a press on the struck or tinted words did, or the focus entering a text field with one proposal, which named its first run wherever the caret landed, so clicking into a paragraph of the body or a long field, or onto a list's unchanged row, left the answer card on another field. Arriving in a field now names the change on the line or row arrived at, else the nearest change in the field, unless the card is already on one of the field's; moving the caret by key names a change on entering its line.
