@@ -1315,7 +1315,7 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class={[
-			'qm-array-row qm-review-added',
+			'qm-array-row qm-review-added qm-focus-ring',
 			{
 				'qm-array-table-row': table,
 				'qm-element': control === 'object' && !table,
@@ -1324,6 +1324,7 @@
 		]}
 		style:order
 		data-qm-review={item.id}
+		tabindex="-1"
 		role="group"
 		aria-label={t.strings.reviewNewItem}
 	>

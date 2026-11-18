@@ -307,14 +307,13 @@ describe('the current change', () => {
 		input.remove();
 	});
 
-	it('leaves the answer keys to a leaf the reader types in, and the first press elsewhere brings the card back', async () => {
+	it('leaves dismiss to a leaf the reader types in, and the first press elsewhere brings the card back', async () => {
 		const r = batch(spread);
 		await settle();
 		const order = r.drawn.at(-1)!.open;
 		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
 		press(body, 'a');
 		press(body, keyOf(REVIEW_KEYS.dismiss), mod);
-		press(body, keyOf(REVIEW_KEYS.accept), mod);
 		expect(r.events).toEqual([]);
 
 		const button = outside('button');
@@ -323,6 +322,18 @@ describe('the current change', () => {
 		press(button, keyOf(REVIEW_KEYS.dismiss), mod);
 		expect(r.events).toEqual([{ id: order[0], action: 'dismiss' }]);
 		button.remove();
+	});
+
+	it('brings the card typing put aside back on the first accept in the leaf, and answers on the next', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		press(body, 'a');
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([]);
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);
 	});
 
 	it('brings a change out of view back on the first answer key, and answers it on the next', async () => {

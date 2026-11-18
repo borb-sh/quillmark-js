@@ -593,6 +593,12 @@
 		typing = false;
 		onReviewFocus?.(id);
 	});
+	// The caret landing on a change brings back the card typing put aside, the same change
+	// included once the caret has left it and come back.
+	$effect(() => {
+		void reviewing.landed;
+		typing = false;
+	});
 	// The report, to a host counting its own list: each change, read once the leaves the change
 	// mounted have drawn, so a list just handed over is not reported as anchored nowhere. A
 	// review starts on its first change, and goes on to the first open one wherever the current
@@ -659,18 +665,38 @@
 	/** Answer the current change, as its card would. False with none open. */
 	function answerCurrent(action: 'accept' | 'dismiss'): boolean {
 		const id = reviewing.lit;
-		return id !== undefined && answerReview([id], action).length > 0;
+		if (id === undefined) return false;
+		const at = document.activeElement;
+		const held = at instanceof Element && reviewIds(at.closest(THING)).includes(id);
+		if (!answerReview([id], action).length) return false;
+		// A change that is a thing goes with its answer, and the focus it held with it: the focus
+		// goes on to the next change, as a step would take it.
+		if (held)
+			void tick().then(() => {
+				const next = reviewing.lit;
+				if (next !== undefined && !rootEl?.contains(document.activeElement))
+					void reveal(next, true, true);
+			});
+		return true;
 	}
 	/** An answer key: the card's, so it answers only a change whose card stands whole in view.
-	 *  A press while the reader types in the editor is the leaf's own key, and any other press
-	 *  with the change or its card out of view, or the card out of the way, brings both back. */
+	 *  While the reader types in the editor, dismiss is the leaf's own delete and accept in a task
+	 *  item its tick; any other press with the change or its card out of view, or the card out of
+	 *  the way, brings both back, and the next answers. */
 	function answerByKey(action: 'accept' | 'dismiss'): boolean {
 		const id = reviewing.lit;
-		if (id === undefined || (typing && inside)) return false;
+		if (id === undefined) return false;
+		if (typing && inside && (action === 'dismiss' || inTask())) return false;
 		if (!typing && inView(id) && (answerCard?.standsInView() ?? true)) return answerCurrent(action);
 		typing = false;
 		void reveal(id, false, false);
 		return true;
+	}
+	/** Whether the caret stands in a task item, where accept's key ticks it. */
+	function inTask(): boolean {
+		const at = document.getSelection()?.anchorNode;
+		const el = at instanceof Element ? at : at?.parentElement;
+		return !!el?.closest('li[data-qm-checked]');
 	}
 	/** Whether a key at `target` is the review's: anywhere but a text control outside the editor,
 	 *  which keeps its own keys, or another editor. */
@@ -712,8 +738,8 @@
 		e.stopPropagation();
 	}
 
-	/** The reader is typing: the card keeps out of the way until the pointer moves or the
-	 *  current change does. */
+	/** The reader is typing: the card keeps out of the way until the pointer moves, the caret
+	 *  lands on a change, the focus moves to another leaf or place, or the accept key asks for it. */
 	let typing = $state(false);
 	let pointerAt = { x: NaN, y: NaN };
 	function onTyped(e: KeyboardEvent): void {
@@ -738,42 +764,73 @@
 	function reviewIds(el: Element | null | undefined): string[] {
 		return el?.getAttribute('data-qm-review')?.split(' ').filter(Boolean) ?? [];
 	}
-	/** A press on a change makes it current at once, and a press elsewhere in a field the
-	 *  nearest change in it, the current item being another field's. */
+	/** A press on a change makes it current at once, and a press elsewhere the change nearest it
+	 *  in its place (`placeOf`). */
 	function onPick(e: PointerEvent): void {
 		const target = e.target instanceof Element ? e.target : null;
-		const ids = reviewIds(target?.closest('[data-qm-review]'));
-		const id = ids.includes(reviewing.lit ?? '') ? reviewing.lit : ids[0];
-		if (id && reviewing.items.some((item) => item.id === id)) {
-			typing = false;
-			reviewing.reveal(id);
-		} else if (target) pickNear(target);
+		if (target && !nameAt(target)) pickNear(target);
 	}
-	/** The reader arrived at `target` from outside its field, not handed back from a surface
-	 *  floating over it: the nearest change in the field becomes current. */
+	/** The focus arriving from elsewhere on the page, not handed back from a surface floating over
+	 *  the editor, is a press by another hand: on a change it names it, and elsewhere the change
+	 *  nearest it in its place. Moving from one leaf or place to another ends the writing the
+	 *  card stood aside for. A leaf of words that draws changes of its own names them from its
+	 *  caret (`review-caret.ts`). */
 	function onArrive(e: FocusEvent): void {
 		const target = e.target instanceof Element ? e.target : null;
 		const from = e.relatedTarget instanceof Element ? e.relatedTarget : null;
 		if (!target || !from || from.closest('.qm-popover-surface')) return;
-		const field = outerField(target);
-		if (field && !field.contains(from) && !target.closest('[data-qm-review]')) pickNear(target);
+		if (
+			from.closest('.ProseMirror') !== target.closest('.ProseMirror') ||
+			placeOf(from) !== placeOf(target)
+		)
+			typing = false;
+		if (target.closest('.ProseMirror')?.querySelector('[data-qm-review]')) return;
+		const marked = target.closest('[data-qm-review]');
+		if (marked && openIds(marked).length) {
+			if (!marked.contains(from)) nameAt(target);
+			return;
+		}
+		const place = placeOf(target);
+		if (place && !place.contains(from)) pickNear(target);
 	}
-	/** The outermost field holding `el`: the one a list's rows and a record's cells are of. */
-	function outerField(el: Element): Element | undefined {
-		let field: Element | undefined;
-		for (let at = el.closest('.qm-field'); at; at = at.parentElement?.closest('.qm-field') ?? null)
-			field = at;
-		return field;
+	/** The focus left the editor: the reader is no longer writing in it. */
+	function onLeave(e: FocusEvent): void {
+		if (!(e.relatedTarget instanceof Node && rootEl?.contains(e.relatedTarget))) typing = false;
 	}
-	/** Make the change in `target`'s field nearest it current, the fewest rows away and then the
-	 *  fewest pixels across, the current item being another field's. A leaf of words that draws
+	/** The open items `el` draws. */
+	function openIds(el: Element): string[] {
+		return reviewIds(el).filter((id) => reviewing.items.some((item) => item.id === id));
+	}
+	/** Make current the open change `el` stands in, the current one where it stands in several.
+	 *  False where it stands in none. */
+	function nameAt(el: Element): boolean {
+		const ids = openIds(el.closest('[data-qm-review]') ?? el);
+		if (!ids.length) return false;
+		typing = false;
+		reviewing.reveal(ids.includes(reviewing.lit ?? '') ? reviewing.lit! : ids[0]);
+		return true;
+	}
+	/** Where a reader arriving at `el` means to work: the list it is a row of, else the control it
+	 *  is in, a record's property as much as a field. A group or a record holding properties is
+	 *  no place, so its header and the gaps between its properties name nothing. */
+	function placeOf(el: Element): Element | undefined {
+		const row = el.closest('.qm-array-row');
+		if (row?.parentElement)
+			return row.parentElement.closest('.qm-object-prop, .qm-field') ?? undefined;
+		const place = el.closest('.qm-object-prop, .qm-field');
+		return place?.matches('.qm-field') && place.querySelector('.qm-object-prop')
+			? undefined
+			: (place ?? undefined);
+	}
+	/** Make the change in `target`'s place nearest it current, the fewest rows away and then the
+	 *  fewest pixels across, the current item being another place's. A leaf of words that draws
 	 *  changes of its own names them from its caret (`review-caret.ts`). */
 	function pickNear(target: Element): void {
 		if (target.closest('.ProseMirror')?.querySelector('[data-qm-review]')) return;
-		const field = outerField(target);
-		if (!field) return;
+		const place = placeOf(target);
+		if (!place) return;
 		const open = new Set(reviewing.order);
-		const marks = [...field.querySelectorAll('[data-qm-review]')].filter((el) =>
+		const marks = [...place.querySelectorAll('[data-qm-review]')].filter((el) =>
 			reviewIds(el).some((id) => open.has(id))
 		);
 		if (!marks.length) return;
@@ -1662,11 +1719,15 @@
 		}
 		if (!(await span.resumes(tick()))) return false;
 		reviewing.reveal(id);
-		if (focus && key !== undefined && !leaves.prose(key)?.enterReview(id)) {
+		const thing = focus ? reviewEls(id).find((el) => el.matches(THING)) : undefined;
+		if (thing) thing.focus({ preventScroll: true });
+		else if (focus && key !== undefined && !leaves.prose(key)?.enterReview(id)) {
 			const control = leaves.control(key);
 			const steps = reviewing.at(key).nested?.find((e) => e.item.id === id)?.steps;
-			if (steps && control?.focusPath) control.focusPath(steps);
+			if (steps && control?.focusPath) await control.focusPath(steps);
 			else control?.focus();
+			if (!span.alive) return false;
+			caretToEnd(id);
 		}
 		// The current item is drawn again, so its element is read once it has been.
 		if (!(await span.resumes(tick()))) return false;
@@ -1679,6 +1740,27 @@
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 		frame(at, { block: 'center', foot: reviewInset, behavior: reduce ? 'instant' : 'smooth' });
 		return true;
+	}
+	/** What a change that is a thing draws, which takes the focus as one stop: a row or a card
+	 *  proposed new, and a card proposed for removal. */
+	const THING = '.qm-review-added, .qm-review-card-add, .qm-review-card-remove.qm-review-on';
+	/** Put the caret at the end of the words of `id` in the leaf holding the focus: past its last
+	 *  run, or ahead of a piece it adds, which stands at the end of the line it follows. */
+	function caretToEnd(id: string): void {
+		const leaf = document.activeElement?.closest('.ProseMirror');
+		const last = leaf
+			? [...leaf.querySelectorAll('[data-qm-review]')]
+					.filter((el) => reviewIds(el).includes(id))
+					.at(-1)
+			: undefined;
+		const selection = document.getSelection();
+		if (!last || !selection) return;
+		const range = document.createRange();
+		if (last.getAttribute('contenteditable') === 'false') range.setStartBefore(last);
+		else range.selectNodeContents(last);
+		range.collapse(last.getAttribute('contenteditable') === 'false');
+		selection.removeAllRanges();
+		selection.addRange(range);
 	}
 	/** Whether the open card item `id` is drawn. */
 	function byCardId(id: string): boolean {
@@ -2033,6 +2115,7 @@
 	onkeydowncapture={onTyped}
 	onpointerdowncapture={onPick}
 	onfocusin={onArrive}
+	onfocusout={onLeave}
 	onkeydown={raiseGuidance}
 	ondragover={refuseFiles}
 	ondrop={refuseFiles}
@@ -2076,13 +2159,16 @@
 		{@const removal = reviewing.cards.removes.get(c.id)}
 		<div class="qm-card-slot" bind:this={slotEls[i]} animate:reorder={arm.armed} in:slot out:slot>
 			<!-- A removal's mark wraps the whole card it would take out, so the answer card
-			 stands under the card and not on it. -->
+			 stands under the card and not on it. A step lands the focus on it, out of the Tab
+			 walk. -->
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 			<div
 				class={[
-					'qm-review-card-remove',
+					'qm-review-card-remove qm-focus-ring',
 					{ 'qm-review-on': !!removal, 'qm-review-lit': !!removal && reviewing.lit === removal.id }
 				]}
 				data-qm-review={removal?.id}
+				tabindex={removal ? -1 : undefined}
 				role={removal ? 'group' : undefined}
 				aria-label={removal ? merged.reviewRemoveCard : undefined}
 			>
@@ -2179,8 +2265,12 @@
 				{@const preview = previewOf(item)}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
-					class={['qm-review-card-add', { 'qm-review-lit': reviewing.lit === item.id }]}
+					class={[
+						'qm-review-card-add qm-focus-ring',
+						{ 'qm-review-lit': reviewing.lit === item.id }
+					]}
 					data-qm-review={item.id}
+					tabindex="-1"
 					role="group"
 					aria-label={`${merged.reviewNewCard}, ${preview.title}`}
 				>
