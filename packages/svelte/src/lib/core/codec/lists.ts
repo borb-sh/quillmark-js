@@ -465,7 +465,7 @@ function sinkIntoList(itemType: NodeType): Command {
  * prepend a link in `keymap.ts` (INVARIANTS §Chrome). `Tab` sinks an unnumbered
  * line alone into a sub-list, any other line its whole item, and a block right after a list into
  * the list's last item. `Mod-Shift-7` / `Mod-Shift-8` are the list toggle (`list-toggle.ts`).
- * `Mod-Enter` ticks the task item around the caret (`toggleTask`).
+ * `LIST_KEYS.task` ticks the task item around the caret (`toggleTask`).
  *
  * `Enter` is a chain in precedence order: the empty line above an unnumbered one, an empty top-level
  * middle item out of the list, the marker back on an empty continuation line, `splitListItem` (`splitTaskItem` for

@@ -169,7 +169,7 @@ describe('generative decode → lower round-trip', () => {
 
 const { press } = keyDriver(bodyKeymap(blockSchema));
 const rules = inputRulesPlugin(blockSchema);
-const KEYS = ['Enter', 'Backspace', 'Delete', 'Tab', 'Shift-Tab', 'Mod-Enter'];
+const KEYS = ['Enter', 'Backspace', 'Delete', 'Tab', 'Shift-Tab', 'Mod-Enter', 'Alt-Enter'];
 const SHORTHANDS = ['# ', '> ', '- ', '2. ', '```', '---', '**w** '];
 
 /** Type `text` a character at a time through the input-rule plugin, falling back to

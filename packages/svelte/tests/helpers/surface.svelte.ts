@@ -307,3 +307,22 @@ export function washHost(target: HTMLElement): HTMLElement | undefined {
 	if (hosts.length !== 1) throw new Error(`${hosts.length} washes on the surface`);
 	return hosts[0];
 }
+
+/** The `KeyboardEventInit` of a binding in `prosemirror-keymap` notation, `Mod` as Ctrl: the
+ *  suite runs off Apple's platforms. */
+export function chordInit(binding: string): KeyboardEventInit & { key: string } {
+	const parts = binding.split('-');
+	const key = parts.pop()!;
+	return {
+		key,
+		ctrlKey: parts.includes('Mod'),
+		altKey: parts.includes('Alt'),
+		shiftKey: parts.includes('Shift')
+	};
+}
+
+/** Press a whole binding on `el`. */
+export function chord(el: HTMLElement, binding: string, init: KeyboardEventInit = {}): void {
+	const { key, ...mods } = chordInit(binding);
+	press(el, key, { ...mods, ...init });
+}

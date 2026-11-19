@@ -30,7 +30,9 @@
  anywhere, a resize of the editor.
 
  It never takes the focus. A press on it keeps the focus where it is, and the keyboard reaches
- it only by `enter`, from which Escape and every answer hand the focus back.
+ it only by `enter`. There its keys are bare: Enter on a button, Backspace or Delete to dismiss,
+ the arrows up and down to step. The focus rides the card from change to change, and Escape or
+ the last answer hands it back.
 -->
 <script lang="ts">
 	import { tick } from 'svelte';
@@ -54,8 +56,10 @@
 		/** The answer key whose press only brought the card, whose hint says to press it again. */
 		asked?: 'accept' | 'dismiss';
 		onAnswer(action: 'accept' | 'dismiss'): void;
+		/** Go to the next change, or the previous. */
+		onStep(dir: 1 | -1): void;
 	}
-	let { id, root, inset, hidden, outdated, note, asked, onAnswer }: Props = $props();
+	let { id, root, inset, hidden, outdated, note, asked, onAnswer, onStep }: Props = $props();
 	const noteId = $props.id();
 
 	const t = wording();
@@ -71,6 +75,9 @@
 	let placed = $state(false);
 	/** Where the focus was when the keyboard entered the card, to hand it back. */
 	let from: HTMLElement | undefined;
+	/** The focus was on the card when it answered or stepped, and goes with it to the change it
+	 *  moves to: the card is inert between two changes, which drops the focus it held. */
+	let riding = false;
 
 	const shown = $derived(placed && !hidden && id !== undefined);
 
@@ -245,19 +252,40 @@
 	function leave(): void {
 		const back = from;
 		from = undefined;
+		riding = false;
 		if (back?.isConnected) back.focus({ preventScroll: true });
 	}
 
 	function answer(action: 'accept' | 'dismiss'): void {
-		const held = !!el?.contains(document.activeElement);
+		riding = !!el?.contains(document.activeElement);
 		onAnswer(action);
-		if (held) leave();
 	}
 
+	$effect(() => {
+		if (!riding) return;
+		if (id === undefined) leave();
+		else if (shown && !el?.contains(document.activeElement)) {
+			riding = false;
+			el?.querySelector<HTMLElement>('.qm-review-card-accept')?.focus({ preventScroll: true });
+		}
+	});
+
 	function onkeydown(e: KeyboardEvent): void {
+		if (e.ctrlKey || e.metaKey || e.altKey) return;
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			leave();
+			return;
+		}
+		if (e.key === 'Backspace' || e.key === 'Delete') {
+			e.preventDefault();
+			if (!e.repeat) answer('dismiss');
+			return;
+		}
+		if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+			e.preventDefault();
+			riding = true;
+			onStep(e.key === 'ArrowUp' ? -1 : 1);
 			return;
 		}
 		if (e.key !== 'Tab' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -290,7 +318,7 @@
 	onmousedown={(e) => e.preventDefault()}
 	{onkeydown}
 	onfocusout={(e) => {
-		if (!el?.contains(e.relatedTarget as Node | null)) from = undefined;
+		if (!riding && !el?.contains(e.relatedTarget as Node | null)) from = undefined;
 	}}
 >
 	{#if note}<p id={noteId} class="qm-review-card-reason" title={note}>{note}</p>{/if}

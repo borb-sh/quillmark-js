@@ -8,7 +8,6 @@
 // A throw keeps the optimistic PM state and reports through `onError`.
 // An external change re-hydrates through `applyExternal`, gated by `reconcile` except where the
 // hold it re-evaluates flips.
-import { baseKeymap } from 'prosemirror-commands';
 import { gapCursor } from 'prosemirror-gapcursor';
 import { history, isHistoryTransaction, redo, undo } from 'prosemirror-history';
 import type { StepMap } from 'prosemirror-transform';
@@ -58,7 +57,7 @@ import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linebreakPlugin } from './breaks.js';
 import { bodyKeymap, holdsTab } from './keymap.js';
 import { DEFAULT_LEAVE_STRINGS, leavePlugin, type LeaveStrings } from './leave.js';
-import { FIELD_KEYS, markKeymap } from './shortcuts.js';
+import { FIELD_KEYS, leafBaseKeymap, markKeymap } from './shortcuts.js';
 import { remoteKey } from './remote.js';
 import {
 	renameBlocks,
@@ -1235,7 +1234,7 @@ export function proseLeafPlugins(
 		list.push(leavePlugin(opts.leaveStrings ?? (() => DEFAULT_LEAVE_STRINGS)));
 	if (!opts.noInputRules) list.push(inputRulesPlugin(schema), undoRuleKeymap());
 	list.push(keymap(editorKeymap(schema, opts.inline, !!opts.slash)));
-	list.push(keymap(baseKeymap));
+	list.push(keymap(leafBaseKeymap));
 	if (schema.marks.link) list.push(linkPastePlugin(schema.marks.link));
 	list.push(dragMovePlugin());
 	// Each answers to something only the block schema holds.
