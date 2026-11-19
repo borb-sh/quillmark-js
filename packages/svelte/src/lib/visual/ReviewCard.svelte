@@ -75,9 +75,10 @@
 	let placed = $state(false);
 	/** Where the focus was when the keyboard entered the card, to hand it back. */
 	let from: HTMLElement | undefined;
-	/** The focus was on the card when it answered or stepped, and goes with it to the change it
-	 *  moves to: the card is inert between two changes, which drops the focus it held. */
-	let riding = false;
+	/** The keyboard is on the card, from `enter` until the reader takes the focus off it. The
+	 *  card is inert between two changes, which drops the focus to the body: that is no move of
+	 *  the reader's, and the focus is put back as the card shows again. */
+	let riding = $state(false);
 
 	const shown = $derived(placed && !hidden && id !== undefined);
 
@@ -244,6 +245,7 @@
 	export async function enter(): Promise<boolean> {
 		if (!shown || !el || !inView(el)) return false;
 		from = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+		riding = true;
 		await tick();
 		el.querySelector<HTMLElement>('.qm-review-card-accept')?.focus({ preventScroll: true });
 		return true;
@@ -257,18 +259,22 @@
 	}
 
 	function answer(action: 'accept' | 'dismiss'): void {
-		riding = !!el?.contains(document.activeElement);
 		onAnswer(action);
 	}
 
 	$effect(() => {
 		if (!riding) return;
 		if (id === undefined) leave();
-		else if (shown && !el?.contains(document.activeElement)) {
-			riding = false;
+		else if (shown && document.activeElement === document.body)
 			el?.querySelector<HTMLElement>('.qm-review-card-accept')?.focus({ preventScroll: true });
-		}
 	});
+
+	/** The reader took the focus off the card: to `to`, or by a press outside it. */
+	function tookOff(to: EventTarget | null): void {
+		if (to instanceof Node && el?.contains(to)) return;
+		riding = false;
+		from = undefined;
+	}
 
 	function onkeydown(e: KeyboardEvent): void {
 		if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -284,8 +290,12 @@
 		}
 		if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
 			e.preventDefault();
-			riding = true;
 			onStep(e.key === 'ArrowUp' ? -1 : 1);
+			return;
+		}
+		// A held Enter clicks its button on every repeat, and a held key answers once.
+		if (e.key === 'Enter' && e.repeat) {
+			e.preventDefault();
 			return;
 		}
 		if (e.key !== 'Tab' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -298,7 +308,11 @@
 	}
 </script>
 
-<svelte:window onscrollcapture={schedule} onresize={schedule} />
+<svelte:window
+	onscrollcapture={schedule}
+	onresize={schedule}
+	onpointerdowncapture={(e) => tookOff(e.target)}
+/>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- The press keeps the focus where it is: the answer is about the text, not a move off it. -->
@@ -318,7 +332,8 @@
 	onmousedown={(e) => e.preventDefault()}
 	{onkeydown}
 	onfocusout={(e) => {
-		if (!riding && !el?.contains(e.relatedTarget as Node | null)) from = undefined;
+		if (e.relatedTarget) tookOff(e.relatedTarget);
+		else if (!riding) from = undefined;
 	}}
 >
 	{#if note}<p id={noteId} class="qm-review-card-reason" title={note}>{note}</p>{/if}

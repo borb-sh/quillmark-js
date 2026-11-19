@@ -20,6 +20,7 @@ import {
 	pmToContent
 } from '$lib/core/codec';
 import { BODY_KEYS } from '$lib/core/codec/shortcuts.js';
+import { chordInit } from '../helpers/chord.js';
 import {
 	contentEqual,
 	endOf,
@@ -232,7 +233,11 @@ describe('the task key in a body', () => {
 			)
 		);
 		view.dom.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'Enter', altKey: true, bubbles: true, cancelable: true })
+			new KeyboardEvent('keydown', {
+				...chordInit(LIST_KEYS.task),
+				bubbles: true,
+				cancelable: true
+			})
 		);
 		expect(checks(doc.main.body)).toEqual([true, true, 'none']);
 		expect(boxes(view)[1].checked).toBe(true);

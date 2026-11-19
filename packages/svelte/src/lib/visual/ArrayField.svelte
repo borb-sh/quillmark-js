@@ -922,7 +922,8 @@
 			return;
 		}
 		if (e.key === 'Enter') {
-			if (multiline && (!e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented)) return;
+			if (e.ctrlKey || e.metaKey) return;
+			if (multiline && (!e.altKey || e.defaultPrevented)) return;
 			e.preventDefault();
 			insertAfter(k, column);
 		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target, column)) {

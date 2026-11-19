@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
-import { REVIEW_KEYS } from '$lib/core/codec';
+import { FIELD_KEYS, REVIEW_KEYS } from '$lib/core/codec';
 import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
 import { core, quill, example } from '../helpers/fixtures.js';
 import {
@@ -405,6 +405,7 @@ describe('the answer keys at their edges', () => {
 		const inModal = document.createElement('button');
 		dialog.append(inModal);
 		chord(inModal, REVIEW_KEYS.accept);
+		chord(document.body, REVIEW_KEYS.accept);
 		expect(r.events).toEqual([]);
 		plain.remove();
 		dialog.remove();
@@ -513,7 +514,7 @@ describe('the answer keys at their edges', () => {
 		const order = r.drawn.at(-1)!.open;
 		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
 		press(body, 'a');
-		press(body, 'F10', { altKey: true });
+		chord(body, FIELD_KEYS.formatBar);
 		await settle();
 		chord(body, REVIEW_KEYS.accept);
 		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);

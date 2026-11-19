@@ -8,7 +8,7 @@
 
 **Dismiss is ⌘/Ctrl+Alt+Backspace, and ⌘/Ctrl+Backspace is always a delete.** `REVIEW_KEYS.dismiss` is `Mod-Alt-Backspace`, where it was `Mod-Backspace`, beside the steps' `Mod-Alt-ArrowDown` and `Mod-Alt-ArrowUp`. ⌘/Ctrl+Backspace deletes a line or a word in a field and removes a collapsed record from its header with a review open as with none, where it dismissed the current change unless the reader had just typed.
 
-**⌘/Ctrl+Enter is the review's alone, and Alt+Enter is the field's.** Accept answers alike in every field, and `REVIEW_KEYS.acceptAlt`, `Mod-Alt-Enter`, accepts too. Three field keys move off ⌘/Ctrl+Enter to Alt+Enter: `LIST_KEYS.task` ticks a task item, a list element of several lines takes its sibling, and a code block is left. ⌘/Ctrl+Enter in a field does nothing with no review open. A writer who ticked a task or added an element with ⌘/Ctrl+Enter presses Alt+Enter.
+**⌘/Ctrl+Enter is the review's alone, and Alt+Enter is the field's.** Accept answers alike in every field, and `REVIEW_KEYS.acceptAlt`, `Mod-Alt-Enter`, accepts too. Three field keys move off ⌘/Ctrl+Enter to Alt+Enter: `LIST_KEYS.task` ticks a task item, a list element of several lines takes its sibling, and a code block is left. ⌘/Ctrl+Enter in a field does nothing with no review open, a one-line list element included, where it took a sibling as a bare Enter does. A writer who ticked a task or added an element with ⌘/Ctrl+Enter presses Alt+Enter.
 
 **An answer key means the same while you type.** Typing still puts the card aside, and the first press of either answer key brings it back for the next to answer; neither key is the field's own in between, where dismiss was a delete and accept in a task item a tick.
 
@@ -16,7 +16,7 @@
 
 **A held answer key answers once.** Holding an answer key answered the current change, then each next one as the key repeated, through every change in view. A repeat now does nothing.
 
-**An answer key is not heard under a modal.** With the focus on a dialog's button, ⌘/Ctrl+Enter accepted the change behind the dialog. A key inside `[aria-modal="true"]` or a modal `<dialog>` that does not hold the editor is now the dialog's, as one in a text box is.
+**An answer key is not heard under a modal.** With the focus on a dialog's button, ⌘/Ctrl+Enter accepted the change behind the dialog. While `[aria-modal="true"]` or a modal `<dialog>` that does not hold the editor is on show, a review key is the dialog's wherever the focus is, on the page behind it included.
 
 **A text box the host marks `data-qm-review-keys` hands the review its keys.** Left empty it hands over every key: accept, dismiss, the steps and ⌘Z for an answer. Set to names (`accept dismiss next previous undo`) it hands over those alone, so a chat box holding a draft can hand over the answer keys and keep its own undo. `reviewKeysHeard(target, root?, key?)` is exported, so a host's own review chord, such as an Accept All key, is heard where the editor's are. Any editable counts as a text box, `contenteditable=""` and `plaintext-only` included.
 

@@ -753,8 +753,14 @@
 		typing = false;
 		if (!inView(id) || !(answerCard?.standsInView() ?? true)) await reveal(id, false, false);
 		await tick();
-		await answerCard?.enter();
+		// A reveal glides, and the card is entered once it stands in the pane.
+		for (let frame = 0; frame < ENTER_FRAMES && reviewing.lit === id; frame++) {
+			if (await answerCard?.enter()) return;
+			await new Promise(requestAnimationFrame);
+		}
 	}
+	/** How many frames Alt-F10 waits for a reveal's scroll to bring the card into the pane. */
+	const ENTER_FRAMES = 90;
 	/** Whether the key being matched was pressed inside the editor, where a step takes the caret
 	 *  with it. */
 	let inside = false;
@@ -786,7 +792,8 @@
 	}
 
 	/** The reader is typing: the card keeps out of the way until the pointer moves, the caret
-	 *  lands on a change, the focus moves to another leaf or place, or the accept key asks for it. */
+	 *  lands on a change, the focus moves to another leaf or place, or an answer key or Alt-F10
+	 *  asks for it. */
 	let typing = $state(false);
 	let pointerAt = { x: NaN, y: NaN };
 	function onTyped(e: KeyboardEvent): void {

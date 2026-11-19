@@ -109,6 +109,8 @@ describe('an array of multiline elements', () => {
 		const { target, editor } = mountEditor(q, doc);
 		await editor.setCaret({ field: 'main.tags[0]', pos: 3, granularity: 'cluster' });
 		await tick();
+		press(rows(target, 'Tags')[0], 'Enter', { ctrlKey: true });
+		expect(literal(doc.getStored('tags'))).toEqual(['abc']);
 		press(rows(target, 'Tags')[0], 'Enter');
 		expect(literal(doc.getStored('tags'))).toEqual(['abc', '']);
 	});

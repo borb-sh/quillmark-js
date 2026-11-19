@@ -1,6 +1,7 @@
 // The mounted-surface helpers the visual suites share: jsdom stubs, the mount, and DOM lookups.
 // Each file declares `@vitest-environment jsdom` and registers `afterEach(unmountAll)` itself: a
 // hook registered here would bind to the first importer.
+import { chordInit } from './chord.js';
 import { mount, unmount, flushSync, tick, type Component } from 'svelte';
 import type { Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
@@ -308,18 +309,7 @@ export function washHost(target: HTMLElement): HTMLElement | undefined {
 	return hosts[0];
 }
 
-/** The `KeyboardEventInit` of a binding in `prosemirror-keymap` notation, `Mod` as Ctrl: the
- *  suite runs off Apple's platforms. */
-export function chordInit(binding: string): KeyboardEventInit & { key: string } {
-	const parts = binding.split('-');
-	const key = parts.pop()!;
-	return {
-		key,
-		ctrlKey: parts.includes('Mod'),
-		altKey: parts.includes('Alt'),
-		shiftKey: parts.includes('Shift')
-	};
-}
+export { chordInit };
 
 /** Press a whole binding on `el`. */
 export function chord(el: HTMLElement, binding: string, init: KeyboardEventInit = {}): void {

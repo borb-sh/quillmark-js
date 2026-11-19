@@ -6,12 +6,27 @@ export function textBox(target: Element): boolean {
 	return !!editable && editable.getAttribute('contenteditable')?.toLowerCase() !== 'false';
 }
 
-/** Whether a modal the editor stands outside holds `target`: a key there is the dialog's. */
-function underModal(target: Element, root: Element | undefined): boolean {
-	const modal = target.closest('[aria-modal="true"], dialog[open]');
-	if (!modal) return false;
-	if (modal instanceof HTMLDialogElement && !modal.matches(':modal')) return false;
-	return !root || !modal.contains(root);
+const MODALS = '[aria-modal="true"], dialog[open]';
+
+/** Whether `el` is a modal on show. A `<dialog>` is one only as `showModal` opens it, and
+ *  counts as one where the engine has no `:modal` to ask. */
+function modal(el: Element): boolean {
+	if (el.checkVisibility?.() === false) return false;
+	if (!(el instanceof HTMLDialogElement)) return true;
+	try {
+		return el.matches(':modal');
+	} catch {
+		return true;
+	}
+}
+
+/** Whether a modal on show stands over the editor: one holding neither `root` nor, with no
+ *  `root`, any editor. A key under it is the dialog's wherever the focus is, on the page behind
+ *  it included. */
+function underModal(root: Element | undefined): boolean {
+	for (const el of document.querySelectorAll(MODALS))
+		if (modal(el) && !(root ? el.contains(root) : el.querySelector('.qm-editor'))) return true;
+	return false;
 }
 
 /** A review key by name, as a host lists the ones a text box hands over. */
@@ -39,7 +54,7 @@ export function reviewKeysHeard(
 	root?: Element,
 	key?: ReviewKeyName
 ): boolean {
-	if (!(target instanceof Element) || underModal(target, root)) return false;
+	if (!(target instanceof Element) || underModal(root)) return false;
 	if (root ? root.contains(target) : target.closest('.qm-editor')) return true;
 	if (target.closest('.qm-editor')) return false;
 	return !textBox(target) || handedOver(target, key);
