@@ -51,9 +51,11 @@
 		outdated: boolean;
 		/** Why, as the proposal's writer says it. */
 		note?: string;
+		/** The answer key whose press only brought the card, whose hint says to press it again. */
+		asked?: 'accept' | 'dismiss';
 		onAnswer(action: 'accept' | 'dismiss'): void;
 	}
-	let { id, root, inset, hidden, outdated, note, onAnswer }: Props = $props();
+	let { id, root, inset, hidden, outdated, note, asked, onAnswer }: Props = $props();
 	const noteId = $props.id();
 
 	const t = wording();
@@ -300,7 +302,9 @@
 			tabindex="-1"
 			aria-keyshortcuts={keyshortcut(REVIEW_KEYS.dismiss)}
 			onclick={() => answer('dismiss')}
-			>{t.strings.reviewDismiss}<kbd>{keycap(REVIEW_KEYS.dismiss)}</kbd></button
+			>{t.strings.reviewDismiss}<kbd class={{ 'qm-review-card-asked': asked === 'dismiss' }}
+				>{keycap(REVIEW_KEYS.dismiss)}</kbd
+			></button
 		>
 		<button
 			type="button"
@@ -308,7 +312,9 @@
 			tabindex="-1"
 			aria-keyshortcuts={keyshortcut(REVIEW_KEYS.accept)}
 			onclick={() => answer('accept')}
-			>{t.strings.reviewAccept}<kbd>{keycap(REVIEW_KEYS.accept)}</kbd></button
+			>{t.strings.reviewAccept}<kbd class={{ 'qm-review-card-asked': asked === 'accept' }}
+				>{keycap(REVIEW_KEYS.accept)}</kbd
+			></button
 		>
 	</div>
 </div>
@@ -379,6 +385,22 @@
 	}
 	kbd {
 		font: inherit;
+		border-radius: var(--_qm-radius-inner);
+	}
+	/* The press that brought the card asks for another: its key's hint rings once. */
+	.qm-review-card-asked {
+		outline: var(--_qm-border-width) solid currentColor;
+		outline-offset: 2px;
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.qm-review-card-asked {
+			animation: qm-review-card-ask var(--_qm-duration-slow) var(--_qm-ease-reverse) 2;
+		}
+	}
+	@keyframes qm-review-card-ask {
+		50% {
+			outline-offset: 4px;
+		}
 	}
 	.qm-review-card-answers {
 		display: flex;

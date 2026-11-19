@@ -381,3 +381,147 @@ describe('the current change', () => {
 		expect(r.lit.at(-1)).toBe(order[2]);
 	});
 });
+
+describe('the answer keys at their edges', () => {
+	function outside<K extends keyof HTMLElementTagNameMap>(
+		tag: K,
+		set: (el: HTMLElementTagNameMap[K]) => void = () => {}
+	): HTMLElementTagNameMap[K] {
+		const el = document.createElement(tag);
+		set(el);
+		document.body.append(el);
+		el.focus();
+		return el;
+	}
+
+	it('hears a text box the host marks as yielding the keys it names, and neither any other editable nor a modal', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+
+		const plain = outside('div', (el) => el.setAttribute('contenteditable', 'plaintext-only'));
+		press(plain, keyOf(REVIEW_KEYS.accept), mod);
+		const dialog = outside('div', (el) => el.setAttribute('aria-modal', 'true'));
+		const inModal = document.createElement('button');
+		dialog.append(inModal);
+		press(inModal, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([]);
+		plain.remove();
+		dialog.remove();
+
+		const prompt = outside('textarea', (el) => el.setAttribute('data-qm-review-keys', ''));
+		press(prompt, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);
+		expect(document.activeElement).toBe(prompt);
+		prompt.remove();
+
+		const draft = outside('textarea', (el) => el.setAttribute('data-qm-review-keys', 'accept'));
+		press(draft, keyOf(REVIEW_KEYS.dismiss), mod);
+		expect(r.events).toHaveLength(1);
+		press(draft, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events.at(-1)).toEqual({ id: order[1], action: 'accept' });
+		draft.remove();
+	});
+
+	it('answers once for a held accept, and lets no repeat through to a task item’s tick', async () => {
+		const r = batch(
+			(doc) => [
+				over(doc, 'r1', '- [ ] the quick red fox'),
+				over(doc, 'r2', '- [ ] a third task', undefined, 1)
+			],
+			'- [ ] the quick brown fox\n\n- [ ] a second task'
+		);
+		await settle();
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		const repeat = new KeyboardEvent('keydown', {
+			key: keyOf(REVIEW_KEYS.accept),
+			bubbles: true,
+			cancelable: true,
+			repeat: true,
+			...mod
+		});
+		body.dispatchEvent(repeat);
+		flushSync();
+		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
+		expect(r.lit.at(-1)).toBe('r2');
+		expect(repeat.defaultPrevented).toBe(true);
+
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		const after = new KeyboardEvent('keydown', {
+			key: keyOf(REVIEW_KEYS.accept),
+			bubbles: true,
+			cancelable: true,
+			repeat: true,
+			...mod
+		});
+		body.dispatchEvent(after);
+		flushSync();
+		expect(r.events.map((e) => e.id)).toEqual(['r1', 'r2']);
+		expect(after.defaultPrevented).toBe(true);
+		expect(r.doc.toMarkdown()).not.toContain('[x]');
+	});
+
+	it('leaves a held dismiss the leaf took to the leaf', async () => {
+		const r = batch(spread);
+		await settle();
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		press(body, 'a');
+		press(body, keyOf(REVIEW_KEYS.dismiss), mod);
+		const repeat = new KeyboardEvent('keydown', {
+			key: keyOf(REVIEW_KEYS.dismiss),
+			bubbles: true,
+			cancelable: true,
+			repeat: true,
+			...mod
+		});
+		body.dispatchEvent(repeat);
+		flushSync();
+		expect(r.events).toEqual([]);
+		expect(repeat.defaultPrevented).toBe(false);
+	});
+
+	it('rings the pressed key’s hint when a press only brings the card back', async () => {
+		const r = batch(spread);
+		await settle();
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		const hint = () => r.target.querySelector('.qm-review-card-accept kbd')!;
+		press(body, 'a');
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(hint().classList).toContain('qm-review-card-asked');
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toHaveLength(1);
+		expect(r.target.querySelector('.qm-review-card-asked')).toBeNull();
+	});
+
+	it('brings the card typing put aside back on Alt-F10, so the next accept answers', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		press(body, 'a');
+		press(body, 'F10', { altKey: true });
+		await settle();
+		press(body, keyOf(REVIEW_KEYS.accept), mod);
+		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);
+	});
+
+	it('takes an answer key at a showing card even where the answer cannot be made', async () => {
+		const r = batch((doc) => [
+			{ id: 'refused', field: doc.pathFor('columns'), after: 'not a number' }
+		]);
+		await settle();
+		expect(r.lit.at(-1)).toBe('refused');
+		const body = r.target.querySelector<HTMLElement>('.qm-card .ProseMirror')!;
+		const key = new KeyboardEvent('keydown', {
+			key: keyOf(REVIEW_KEYS.accept),
+			bubbles: true,
+			cancelable: true,
+			...mod
+		});
+		body.dispatchEvent(key);
+		flushSync();
+		expect(r.events).toEqual([]);
+		expect(key.defaultPrevented).toBe(true);
+	});
+});
