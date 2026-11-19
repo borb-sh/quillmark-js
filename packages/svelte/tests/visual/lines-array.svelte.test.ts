@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // An array whose `items` declares a `shape` holds elements of several lines each. The element
 // mounts the leaf its scalar field of that shape mounts, so Enter breaks a line inside it, and
-// the sibling insert moves to ⌘/Ctrl+Enter. A leaf of lines carries `data-qm-lines`, the hook
+// the sibling insert moves to Alt+Enter. A leaf of lines carries `data-qm-lines`, the hook
 // `prose.css` sets its paragraphs single spaced by.
 import { describe, it, expect, afterEach } from 'vitest';
 import { tick } from 'svelte';
@@ -71,7 +71,7 @@ const rows = (target: HTMLElement, label: string): HTMLElement[] => [
 ];
 
 describe('an array of multiline elements', () => {
-	it('breaks a line inside the element on Enter, and inserts a sibling on Ctrl+Enter', async () => {
+	it('breaks a line inside the element on Enter, and inserts a sibling on Alt+Enter alone', async () => {
 		const q = probe();
 		const doc = load();
 		const { target, editor } = mountEditor(q, doc);
@@ -86,6 +86,10 @@ describe('an array of multiline elements', () => {
 		expect(literal(doc.getStored('addresses'))).toEqual(['abc\n\ndef']);
 
 		press(rows(target, 'Addresses')[0], 'Enter', { ctrlKey: true, cancelable: true });
+		await settle();
+		expect(rows(target, 'Addresses')).toHaveLength(1);
+
+		press(rows(target, 'Addresses')[0], 'Enter', { altKey: true, cancelable: true });
 		await settle();
 		expect(rows(target, 'Addresses')).toHaveLength(2);
 		expect(reader().get('addresses')).toEqual(['abc\n\ndef', '']);
@@ -105,6 +109,8 @@ describe('an array of multiline elements', () => {
 		const { target, editor } = mountEditor(q, doc);
 		await editor.setCaret({ field: 'main.tags[0]', pos: 3, granularity: 'cluster' });
 		await tick();
+		press(rows(target, 'Tags')[0], 'Enter', { ctrlKey: true });
+		expect(literal(doc.getStored('tags'))).toEqual(['abc']);
 		press(rows(target, 'Tags')[0], 'Enter');
 		expect(literal(doc.getStored('tags'))).toEqual(['abc', '']);
 	});

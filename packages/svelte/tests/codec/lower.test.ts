@@ -6,7 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import type { Transaction } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
-import { baseKeymap, joinTextblockBackward } from 'prosemirror-commands';
+import { joinTextblockBackward } from 'prosemirror-commands';
+import { leafBaseKeymap } from '$lib/core/codec/shortcuts.js';
 import {
 	blockSchema,
 	bodyKeymap,
@@ -42,7 +43,7 @@ function keyTr(state: EditorState, key: string): Transaction {
 		out = tr;
 	};
 	const keys = bodyKeymap(blockSchema);
-	if (!keys[key]?.(state, claim)) baseKeymap[key]?.(state, claim);
+	if (!keys[key]?.(state, claim)) leafBaseKeymap[key]?.(state, claim);
 	if (!out) throw new Error(`no command claimed ${key}`);
 	return out;
 }

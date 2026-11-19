@@ -13,6 +13,7 @@ import {
 	leafText,
 	mountEditor,
 	openField,
+	chord,
 	press,
 	settle,
 	unmountAll,
@@ -26,7 +27,6 @@ const main = quill().schema.main;
 /** One of the answer card's two buttons. */
 const answer = (target: HTMLElement, action: 'accept' | 'dismiss') =>
 	target.querySelector<HTMLButtonElement>(`.qm-review-card .qm-review-card-${action}`)!;
-const keyOf = (chord: string): string => chord.slice(chord.lastIndexOf('-') + 1);
 const mod = { ctrlKey: true };
 
 interface Reviewed extends Mounted<EditorRef> {
@@ -61,7 +61,7 @@ describe('an accepted field proposal', () => {
 		flushSync();
 		const field = openField(r.target, main, 'subtitle');
 		expect(field.querySelector('[data-qm-review]')).toBeNull();
-		press(leaf(field), keyOf(REVIEW_KEYS.dismiss), mod);
+		chord(leaf(field), REVIEW_KEYS.dismiss);
 		expect(r.events).toEqual([{ id: 'r1', action: 'accept' }]);
 		expect(r.doc.toMarkdown()).not.toBe(before);
 	});
@@ -158,7 +158,7 @@ describe('a proposed field value', () => {
 	it('is left alone when turned down', async () => {
 		const r = review(proposed(2));
 		await settle();
-		press(document.body, keyOf(REVIEW_KEYS.dismiss), mod);
+		chord(document.body, REVIEW_KEYS.dismiss);
 		expect(r.events).toEqual([{ id: 'r1', action: 'dismiss' }]);
 		expect(r.changes).toEqual([]);
 		expect(r.target.querySelector('[data-qm-review~="r1"]')).toBeNull();
@@ -189,7 +189,7 @@ describe('a proposed field value', () => {
 		expect(leaf(subtitle).querySelector('.qm-review-ins')?.textContent).toBe(', revised');
 		expect(subtitle.querySelector('[data-qm-proposed]')).toBeNull();
 		expect(stored(r.doc, 'subtitle')).toBe(before);
-		press(leaf(subtitle), keyOf(REVIEW_KEYS.accept), mod);
+		chord(leaf(subtitle), REVIEW_KEYS.accept);
 		expect(stored(r.doc, 'subtitle')).toBe(`${before}, revised`);
 		expect(leafText(subtitle)).toBe(`${before}, revised`);
 	});
@@ -255,7 +255,7 @@ describe('an item in the body', () => {
 			.querySelector('[data-qm-review="r1"]')!
 			.closest<HTMLElement>('.ProseMirror')!;
 		expect(document.activeElement).toBe(body);
-		press(body, keyOf(REVIEW_KEYS.dismiss), mod);
+		chord(body, REVIEW_KEYS.dismiss);
 		expect(r.events).toEqual([{ id: 'r1', action: 'dismiss' }]);
 	});
 

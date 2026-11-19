@@ -5,7 +5,7 @@ import { expect } from 'vitest';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import { EditorState, TextSelection, type Command } from 'prosemirror-state';
-import { baseKeymap } from 'prosemirror-commands';
+import { leafBaseKeymap } from '$lib/core/codec/shortcuts.js';
 import {
 	init,
 	type Content,
@@ -216,8 +216,8 @@ export function representable(state: EditorState): boolean {
 
 /**
  * A press-and-check driver over one bound keymap: the leaf's own bindings, falling
- * through to `baseKeymap` exactly as the plugin stack does (`proseLeafPlugins`
- * mounts `editorKeymap` over `baseKeymap`).
+ * through to `leafBaseKeymap` exactly as the plugin stack does (`proseLeafPlugins`
+ * mounts `editorKeymap` over it).
  *
  * One driver for every caller: what a press means does not change with which link
  * of the chain is under test, so the list keys and the code-block keys drive
@@ -228,7 +228,7 @@ export function keyDriver(keys: Record<string, Command>) {
 	function press(state: EditorState, key: string): EditorState {
 		const bound = keys[key] ? run(state, keys[key]) : null;
 		if (bound) return bound;
-		const base = baseKeymap[key] ? run(state, baseKeymap[key]) : null;
+		const base = leafBaseKeymap[key] ? run(state, leafBaseKeymap[key]) : null;
 		return base ?? state;
 	}
 

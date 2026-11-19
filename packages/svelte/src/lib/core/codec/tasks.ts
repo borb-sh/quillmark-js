@@ -1,7 +1,7 @@
 // A task item is a `list_item` whose `checked` is a boolean (INVARIANTS §"Task items"). Its
 // `toDOM` draws a checkbox ahead of the item's blocks, disabled, which is the drawing a
 // held leaf, a copy and `renderContent` take; a leaf that edits mounts the item through
-// `taskItemView`, whose checkbox toggles, as `Mod-Enter` does (`toggleTask`). A task item
+// `taskItemView`, whose checkbox toggles, as `LIST_KEYS.task` does (`toggleTask`). A task item
 // is minted by source mode and by a paste alone: no shorthand, command or key makes one.
 import {
 	DOMSerializer,
@@ -153,8 +153,8 @@ export function splitTaskItem(itemType: NodeType): Command {
 
 /**
  * `checked` flipped on the nearest task item around the caret, or on a selected task item,
- * as one transaction. It declines outside a task item and inside a fence, where `baseKeymap`'s `exitCode` is the
- * nearer answer to `Mod-Enter`.
+ * as one transaction. It declines outside a task item and inside a fence, where leaving the fence is the
+ * nearer answer to the key the two share.
  */
 export function toggleTask(itemType: NodeType): Command {
 	return (state, dispatch) => {

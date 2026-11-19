@@ -5,7 +5,7 @@
 // A key a surface takes only to decline, hold or pass on (Backspace at a block edge, the
 // body's Tab hold, a code fence's Tab) is not a shortcut a writer looks up, and stays a
 // literal in its keymap.
-import { toggleMark } from 'prosemirror-commands';
+import { baseKeymap, exitCode, toggleMark } from 'prosemirror-commands';
 import type { Schema } from 'prosemirror-model';
 import type { Command } from 'prosemirror-state';
 
@@ -27,7 +27,8 @@ export const FIELD_KEYS = {
 /** A multi-block body, outside any surface nested in it. */
 export const BODY_KEYS = {
 	lineBreak: 'Shift-Enter',
-	leave: 'Escape'
+	leave: 'Escape',
+	exitCode: 'Alt-Enter'
 } as const;
 
 /** A list item (`lists.ts`, `list-move.ts`). */
@@ -36,7 +37,7 @@ export const LIST_KEYS = {
 	bulleted: 'Mod-Shift-8',
 	indent: 'Tab',
 	outdent: 'Shift-Tab',
-	task: 'Mod-Enter',
+	task: 'Alt-Enter',
 	moveUp: 'Alt-ArrowUp',
 	moveDown: 'Alt-ArrowDown'
 } as const;
@@ -58,16 +59,24 @@ export const TABLE_KEYS = {
 	eraseAlt: 'Delete'
 } as const;
 
-/** The review's keys, the editor's wherever the focus is while a review is open and ahead of
- *  every other binding of them, so `accept` takes the current change over a task item's
- *  `LIST_KEYS.task` and `dismiss` over a text leaf's own delete; `next` and `previous` step
- *  through the changes. */
+/** The review's keys, the editor's wherever the focus is while a review is open. No leaf binds
+ *  one of them, `accept` included, so each answers alike in every field; `acceptAlt` is `accept`
+ *  under the modifiers `dismiss` and the steps share. */
 export const REVIEW_KEYS = {
 	accept: 'Mod-Enter',
-	dismiss: 'Mod-Backspace',
+	acceptAlt: 'Mod-Alt-Enter',
+	dismiss: 'Mod-Alt-Backspace',
 	next: 'Mod-Alt-ArrowDown',
 	previous: 'Mod-Alt-ArrowUp'
 } as const;
+
+/** A leaf's last keymap: `baseKeymap` with a fence left by `BODY_KEYS.exitCode`. The review's
+ *  accept is held inside a fence, so it does nothing there with no review open either. */
+export const leafBaseKeymap: Record<string, Command> = {
+	...baseKeymap,
+	[REVIEW_KEYS.accept]: (state) => !!state.selection.$from.parent.type.spec.code,
+	[BODY_KEYS.exitCode]: exitCode
+};
 
 /** The mark toggles, each bound only where the schema declares its mark. */
 export function markKeymap(schema: Schema): Record<string, Command> {
@@ -106,6 +115,7 @@ export interface ShortcutStrings {
 	shortcutFormatBar: string;
 	shortcutLineBreak: string;
 	shortcutLeave: string;
+	shortcutExitCode: string;
 	shortcutNumberedList: string;
 	shortcutBulletedList: string;
 	shortcutIndent: string;
@@ -138,11 +148,12 @@ export const DEFAULT_SHORTCUT_STRINGS: ShortcutStrings = {
 	shortcutFormatBar: 'Move to the format bar over a selection',
 	shortcutLineBreak: 'Line break within a paragraph',
 	shortcutLeave: 'Let Tab leave the editor',
+	shortcutExitCode: 'Leave a code block',
 	shortcutNumberedList: 'Numbered list',
 	shortcutBulletedList: 'Bulleted list',
 	shortcutIndent: 'Nest under the item above',
 	shortcutOutdent: 'Move back up a level',
-	shortcutTask: 'Check or uncheck a task, outside a review',
+	shortcutTask: 'Check or uncheck a task',
 	shortcutMoveItem: 'Move the item up or down',
 	shortcutNextCell: 'Next cell, adding a row past the last',
 	shortcutPreviousCell: 'Previous cell',
@@ -179,6 +190,7 @@ const SHORTCUTS: readonly {
 	{ scope: 'field', label: 'shortcutFormatBar', keys: [F.formatBar] },
 	{ scope: 'body', label: 'shortcutLineBreak', keys: [BODY_KEYS.lineBreak] },
 	{ scope: 'body', label: 'shortcutLeave', keys: [BODY_KEYS.leave] },
+	{ scope: 'body', label: 'shortcutExitCode', keys: [BODY_KEYS.exitCode] },
 	{ scope: 'list', label: 'shortcutNumberedList', keys: [L.numbered] },
 	{ scope: 'list', label: 'shortcutBulletedList', keys: [L.bulleted] },
 	{ scope: 'list', label: 'shortcutIndent', keys: [L.indent] },
@@ -197,7 +209,11 @@ const SHORTCUTS: readonly {
 	},
 	{ scope: 'table', label: 'shortcutAlignColumn', keys: [T.alignLeft, T.alignRight] },
 	{ scope: 'table', label: 'shortcutDeleteCells', keys: [T.erase, T.eraseAlt] },
-	{ scope: 'review', label: 'shortcutReviewAccept', keys: [REVIEW_KEYS.accept] },
+	{
+		scope: 'review',
+		label: 'shortcutReviewAccept',
+		keys: [REVIEW_KEYS.accept, REVIEW_KEYS.acceptAlt]
+	},
 	{ scope: 'review', label: 'shortcutReviewDismiss', keys: [REVIEW_KEYS.dismiss] },
 	{ scope: 'review', label: 'shortcutReviewNext', keys: [REVIEW_KEYS.next] },
 	{ scope: 'review', label: 'shortcutReviewPrevious', keys: [REVIEW_KEYS.previous] }

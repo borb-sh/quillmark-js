@@ -6,6 +6,24 @@
 
 **The answer card stands under the field it answers in a shared row.** A change in a field or a property sharing its row with others put the card at the form's right edge, under the row's last field, so it read as that field's even when the change was in the first, and ⌘/Ctrl+Enter answers the change the card is on. The card now keeps to the right edge of the change's own field, reaching past it only as far as the card is wide; a field on a row of its own keeps the card at the form's edge as before.
 
+**Dismiss is ⌘/Ctrl+Alt+Backspace, and ⌘/Ctrl+Backspace is always a delete.** `REVIEW_KEYS.dismiss` is `Mod-Alt-Backspace`, where it was `Mod-Backspace`, beside the steps' `Mod-Alt-ArrowDown` and `Mod-Alt-ArrowUp`. ⌘/Ctrl+Backspace deletes a line or a word in a field and removes a collapsed record from its header with a review open as with none, where it dismissed the current change unless the reader had just typed.
+
+**⌘/Ctrl+Enter is the review's alone, and Alt+Enter is the field's.** Accept answers alike in every field, and `REVIEW_KEYS.acceptAlt`, `Mod-Alt-Enter`, accepts too. Three field keys move off ⌘/Ctrl+Enter to Alt+Enter: `LIST_KEYS.task` ticks a task item, a list element of several lines takes its sibling, and a code block is left. ⌘/Ctrl+Enter in a field does nothing with no review open, a one-line list element included, where it took a sibling as a bare Enter does. A writer who ticked a task or added an element with ⌘/Ctrl+Enter presses Alt+Enter.
+
+**An answer key means the same while you type.** Typing still puts the card aside, and the first press of either answer key brings it back for the next to answer; neither key is the field's own in between, where dismiss was a delete and accept in a task item a tick.
+
+**The answer card's own keys are bare, and the focus rides it.** With the focus on the card, reached by Alt-F10, Backspace or Delete dismisses and ↑ and ↓ step, beside Enter on its buttons. The focus stays on the card from change to change and goes back to where it was on Escape or the last answer, where every answer handed it back.
+
+**A held answer key answers once.** Holding an answer key answered the current change, then each next one as the key repeated, through every change in view. A repeat now does nothing.
+
+**An answer key is not heard under a modal.** With the focus on a dialog's button, ⌘/Ctrl+Enter accepted the change behind the dialog. While `[aria-modal="true"]` or a modal `<dialog>` that does not hold the editor is on show, a review key is the dialog's wherever the focus is, on the page behind it included.
+
+**A text box the host marks `data-qm-review-keys` hands the review its keys.** Left empty it hands over every key: accept, dismiss, the steps and ⌘Z for an answer. Set to names (`accept dismiss next previous undo`) it hands over those alone, so a chat box holding a draft can hand over the answer keys and keep its own undo. `reviewKeysHeard(target, root?, key?)` is exported, so a host's own review chord, such as an Accept All key, is heard where the editor's are. Any editable counts as a text box, `contenteditable=""` and `plaintext-only` included.
+
+**An answer key at a showing card is always the card's.** A proposal that could not be written left the key to the field. The key now does what the card's button does, and goes no further.
+
+**Alt-F10 reaches the card while you type.** It did nothing while typing had the card aside; it now brings the card back, scrolling it into view if needed, and puts the focus on Accept. A press that only brings the card back rings its key's hint on the card, so the next press reads as the answer.
+
 ## v0.39.1 - 2026-11-18
 
 **The answer card stays below its change.** It turned above the change whenever a scroll left no room under it, so scrolling moved it across the text, under a pointer about to answer, for room the next scroll took away. It now stands below, or beside a short last line, and scrolls out with its change; only a change too tall for the pane to show with its card still pins it at the pane's foot. An answer key now answers only while the whole card shows, the first press otherwise scrolling the change and its card back.

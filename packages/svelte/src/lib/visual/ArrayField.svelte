@@ -51,7 +51,7 @@
  caret there, and short of a prose line's end splits the line there, as a bulleted list
  does; a paste of several lines into a prose row opens a row per line; Backspace at a
  prose line's start joins it onto the line above and Delete at its end joins the next
- onto it, each one commit. A prose element whose `items` declares a `shape` holds lines of its own, so Enter breaks a line inside it and ⌘/Ctrl+Enter inserts the sibling, and a paste stays in the element. Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
+ onto it, each one commit. A prose element whose `items` declares a `shape` holds lines of its own, so Enter breaks a line inside it and Alt+Enter inserts the sibling, and a paste stays in the element. Backspace on an empty element removes it and hands focus back up the list, Alt+↑/↓
  anywhere in a row of the list moves it, the nearest row answering and never
  the record around a nested one: the twin of the handle's drag. A move is one splice of the ids
  and of the values together, the mechanism insert and remove use, so an element keeps
@@ -223,7 +223,7 @@
 	// has text elements.
 	const control = $derived(items ? controlKind(items) : 'text');
 	/** A prose element whose `items` declares a `shape`: its own lines, which Enter breaks and
-	 *  ⌘/Ctrl+Enter leaves for a sibling. */
+	 *  Alt+Enter leaves for a sibling. */
 	const multiline = $derived(control === 'prose' && !leafFlags(items).inline);
 	const table = $derived(layout === 'table' && control === 'object');
 	const columns = $derived(Object.entries(items?.properties ?? {}));
@@ -922,7 +922,8 @@
 			return;
 		}
 		if (e.key === 'Enter') {
-			if (multiline && !(e.ctrlKey || e.metaKey)) return;
+			if (e.ctrlKey || e.metaKey) return;
+			if (multiline && (!e.altKey || e.defaultPrevented)) return;
 			e.preventDefault();
 			insertAfter(k, column);
 		} else if (e.key === 'Backspace' && !e.repeat && elementEmpty(k, e.target, column)) {

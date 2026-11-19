@@ -30,7 +30,9 @@
  anywhere, a resize of the editor.
 
  It never takes the focus. A press on it keeps the focus where it is, and the keyboard reaches
- it only by `enter`, from which Escape and every answer hand the focus back.
+ it only by `enter`. There its keys are bare: Enter on a button, Backspace or Delete to dismiss,
+ the arrows up and down to step. The focus rides the card from change to change, and Escape or
+ the last answer hands it back.
 -->
 <script lang="ts">
 	import { tick } from 'svelte';
@@ -51,9 +53,13 @@
 		outdated: boolean;
 		/** Why, as the proposal's writer says it. */
 		note?: string;
+		/** The answer key whose press only brought the card, whose hint says to press it again. */
+		asked?: 'accept' | 'dismiss';
 		onAnswer(action: 'accept' | 'dismiss'): void;
+		/** Go to the next change, or the previous. */
+		onStep(dir: 1 | -1): void;
 	}
-	let { id, root, inset, hidden, outdated, note, onAnswer }: Props = $props();
+	let { id, root, inset, hidden, outdated, note, asked, onAnswer, onStep }: Props = $props();
 	const noteId = $props.id();
 
 	const t = wording();
@@ -69,6 +75,10 @@
 	let placed = $state(false);
 	/** Where the focus was when the keyboard entered the card, to hand it back. */
 	let from: HTMLElement | undefined;
+	/** The keyboard is on the card, from `enter` until the reader takes the focus off it. The
+	 *  card is inert between two changes, which drops the focus to the body: that is no move of
+	 *  the reader's, and the focus is put back as the card shows again. */
+	let riding = $state(false);
 
 	const shown = $derived(placed && !hidden && id !== undefined);
 
@@ -235,6 +245,7 @@
 	export async function enter(): Promise<boolean> {
 		if (!shown || !el || !inView(el)) return false;
 		from = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+		riding = true;
 		await tick();
 		el.querySelector<HTMLElement>('.qm-review-card-accept')?.focus({ preventScroll: true });
 		return true;
@@ -243,19 +254,48 @@
 	function leave(): void {
 		const back = from;
 		from = undefined;
+		riding = false;
 		if (back?.isConnected) back.focus({ preventScroll: true });
 	}
 
 	function answer(action: 'accept' | 'dismiss'): void {
-		const held = !!el?.contains(document.activeElement);
 		onAnswer(action);
-		if (held) leave();
+	}
+
+	$effect(() => {
+		if (!riding) return;
+		if (id === undefined) leave();
+		else if (shown && document.activeElement === document.body)
+			el?.querySelector<HTMLElement>('.qm-review-card-accept')?.focus({ preventScroll: true });
+	});
+
+	/** The reader took the focus off the card: to `to`, or by a press outside it. */
+	function tookOff(to: EventTarget | null): void {
+		if (to instanceof Node && el?.contains(to)) return;
+		riding = false;
+		from = undefined;
 	}
 
 	function onkeydown(e: KeyboardEvent): void {
+		if (e.ctrlKey || e.metaKey || e.altKey) return;
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			leave();
+			return;
+		}
+		if (e.key === 'Backspace' || e.key === 'Delete') {
+			e.preventDefault();
+			if (!e.repeat) answer('dismiss');
+			return;
+		}
+		if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+			e.preventDefault();
+			onStep(e.key === 'ArrowUp' ? -1 : 1);
+			return;
+		}
+		// A held Enter clicks its button on every repeat, and a held key answers once.
+		if (e.key === 'Enter' && e.repeat) {
+			e.preventDefault();
 			return;
 		}
 		if (e.key !== 'Tab' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -268,7 +308,11 @@
 	}
 </script>
 
-<svelte:window onscrollcapture={schedule} onresize={schedule} />
+<svelte:window
+	onscrollcapture={schedule}
+	onresize={schedule}
+	onpointerdowncapture={(e) => tookOff(e.target)}
+/>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- The press keeps the focus where it is: the answer is about the text, not a move off it. -->
@@ -288,7 +332,8 @@
 	onmousedown={(e) => e.preventDefault()}
 	{onkeydown}
 	onfocusout={(e) => {
-		if (!el?.contains(e.relatedTarget as Node | null)) from = undefined;
+		if (e.relatedTarget) tookOff(e.relatedTarget);
+		else if (!riding) from = undefined;
 	}}
 >
 	{#if note}<p id={noteId} class="qm-review-card-reason" title={note}>{note}</p>{/if}
@@ -300,7 +345,9 @@
 			tabindex="-1"
 			aria-keyshortcuts={keyshortcut(REVIEW_KEYS.dismiss)}
 			onclick={() => answer('dismiss')}
-			>{t.strings.reviewDismiss}<kbd>{keycap(REVIEW_KEYS.dismiss)}</kbd></button
+			>{t.strings.reviewDismiss}<kbd class={{ 'qm-review-card-asked': asked === 'dismiss' }}
+				>{keycap(REVIEW_KEYS.dismiss)}</kbd
+			></button
 		>
 		<button
 			type="button"
@@ -308,7 +355,9 @@
 			tabindex="-1"
 			aria-keyshortcuts={keyshortcut(REVIEW_KEYS.accept)}
 			onclick={() => answer('accept')}
-			>{t.strings.reviewAccept}<kbd>{keycap(REVIEW_KEYS.accept)}</kbd></button
+			>{t.strings.reviewAccept}<kbd class={{ 'qm-review-card-asked': asked === 'accept' }}
+				>{keycap(REVIEW_KEYS.accept)}</kbd
+			></button
 		>
 	</div>
 </div>
@@ -379,6 +428,22 @@
 	}
 	kbd {
 		font: inherit;
+		border-radius: var(--_qm-radius-inner);
+	}
+	/* The press that brought the card asks for another: its key's hint rings once. */
+	.qm-review-card-asked {
+		outline: var(--_qm-border-width) solid currentColor;
+		outline-offset: 2px;
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.qm-review-card-asked {
+			animation: qm-review-card-ask var(--_qm-duration-slow) var(--_qm-ease-reverse) 2;
+		}
+	}
+	@keyframes qm-review-card-ask {
+		50% {
+			outline-offset: 4px;
+		}
 	}
 	.qm-review-card-answers {
 		display: flex;

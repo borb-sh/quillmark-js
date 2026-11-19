@@ -1,6 +1,7 @@
 // The mounted-surface helpers the visual suites share: jsdom stubs, the mount, and DOM lookups.
 // Each file declares `@vitest-environment jsdom` and registers `afterEach(unmountAll)` itself: a
 // hook registered here would bind to the first importer.
+import { chordInit } from './chord.js';
 import { mount, unmount, flushSync, tick, type Component } from 'svelte';
 import type { Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
@@ -306,4 +307,12 @@ export function washHost(target: HTMLElement): HTMLElement | undefined {
 	const hosts = [...washed].filter((h): h is HTMLElement => target.contains(h));
 	if (hosts.length !== 1) throw new Error(`${hosts.length} washes on the surface`);
 	return hosts[0];
+}
+
+export { chordInit };
+
+/** Press a whole binding on `el`. */
+export function chord(el: HTMLElement, binding: string, init: KeyboardEventInit = {}): void {
+	const { key, ...mods } = chordInit(binding);
+	press(el, key, { ...mods, ...init });
 }

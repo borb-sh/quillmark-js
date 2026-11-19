@@ -13,6 +13,7 @@ import {
 	openList,
 	paste,
 	pick,
+	chord,
 	press,
 	settle,
 	trigger,
@@ -125,7 +126,7 @@ describe('a proposed card', () => {
 		press(document.body, 'ArrowDown', { ...mod, altKey: true });
 		await settle();
 		expect(lit()).toBe('c1');
-		press(document.body, REVIEW_KEYS.dismiss.split('-').at(-1)!, mod);
+		chord(document.body, REVIEW_KEYS.dismiss);
 		await settle();
 		expect(r.events).toEqual([{ id: 'c1', action: 'dismiss' }]);
 		expect(lit()).toBe('c0');

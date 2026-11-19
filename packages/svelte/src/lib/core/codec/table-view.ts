@@ -9,7 +9,7 @@
 //
 // Every control is absolutely positioned out of the grid; `codec/prose.css` draws the band, the
 // clusters and the selection wash.
-import { baseKeymap, chainCommands, selectAll } from 'prosemirror-commands';
+import { chainCommands, selectAll } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import type { Node as PMNode } from 'prosemirror-model';
@@ -23,7 +23,7 @@ import {
 import { EditorView, type NodeView, type NodeViewConstructor } from 'prosemirror-view';
 import type { GridCell, TableGrid } from './table.js';
 import { decode } from './decode.js';
-import { FIELD_KEYS, markKeymap, TABLE_KEYS as T } from './shortcuts.js';
+import { FIELD_KEYS, leafBaseKeymap, markKeymap, TABLE_KEYS as T } from './shortcuts.js';
 import { inputRulesPlugin, undoRuleKeymap } from './inputrules.js';
 import { linkPastePlugin } from './link-paste.js';
 import { dragMovePlugin } from './drag-move.js';
@@ -243,7 +243,7 @@ function cellPlugins(keys: Record<string, Command>, outer: () => EditorView) {
 		linkPastePlugin(cellSchema.marks.link),
 		dragMovePlugin(outer),
 		keymap(keys),
-		keymap(baseKeymap)
+		keymap(leafBaseKeymap)
 	];
 }
 
