@@ -1793,7 +1793,7 @@
 			els[0] ??
 			(key !== undefined ? leaves.control(key)?.el : undefined);
 		if (!at) return true;
-		const extent = answerCard?.extent();
+		const extent = framing(answerCard?.extent());
 		if (stepping && comfortable(els.length ? els : [at], extent)) return true;
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 		frame(at, {
@@ -1803,6 +1803,17 @@
 			extent
 		});
 		return true;
+	}
+	/** What a reveal frames beside the change: `whole`, the change's blocks and its card, where
+	 *  they fit in the pane together. Where they do not, the card pins at the pane's foot and the
+	 *  change's own words are what to show, so nothing is framed beside them. */
+	function framing(
+		whole: { top: number; bottom: number } | undefined
+	): { top: number; bottom: number } | undefined {
+		if (!whole) return undefined;
+		const { top, bottom } = pane();
+		const room = bottom - reviewInset - top - 2 * (spacePx(rootEl, 1) ?? 0);
+		return whole.bottom - whole.top <= room ? whole : undefined;
 	}
 	/** What a change that is a thing draws, which takes the focus as one stop: a row or a card
 	 *  proposed new, and a card proposed for removal. */
