@@ -40,8 +40,7 @@ describe('the shipped quill on the surface', () => {
 		expect(target.querySelector('.qm-card-recovery')).toBeNull();
 
 		const declared =
-			Object.keys(schema.main.fields).length +
-			Object.keys(schema.card_kinds!.indorsement.fields).length;
+			Object.keys(schema.main.fields).length + Object.keys(schema.indorsement.fields).length;
 		expect(target.querySelectorAll('.qm-field').length).toBe(declared);
 		// A control nothing names is a control nobody can reach: every field carries its
 		// label, closed sections included (a closed panel is inert, not unmounted).
@@ -70,7 +69,7 @@ describe('the shipped quill on the surface', () => {
 
 		const card = [...target.querySelectorAll<HTMLElement>('.qm-card')][1];
 		expect(texts(card, '.qm-field-label')).toEqual(
-			fieldModels(q.schema.card_kinds!.indorsement).map((m) => m.label)
+			fieldModels(q.schema.indorsement).map((m) => m.label)
 		);
 	});
 

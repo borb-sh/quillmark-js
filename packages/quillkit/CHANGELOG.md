@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The starter quill declares its cards under `schema:`.** `main` and each card kind are entries of one `schema:` block, the spelling `@quillmark/wasm` 0.140 loads; a top-level `main:` or `card_kinds:` fails as `quill::unknown_section`.
+
 **The carried `@quillmark/wasm` is 0.139.0.** The typed writer refuses a member a group's `properties`, or every world of a variant-bearing enum, leaves undeclared, as `edit::unknown_field` at the member, where it stored a value nothing drew or rendered (Quillmark's 0.138 → 0.139 migration).
 
 **`quillkit render <quill>` renders one quill's document to files.** The document is the quill's example where it declares one, else its seed; `--seed` or `--example` names one, and a markdown path after the quill renders that file. It writes one PDF, or one PNG per page under `--png`, into `--out` or the working directory, through the engine and fonts `check` renders through, and prints the files it wrote.

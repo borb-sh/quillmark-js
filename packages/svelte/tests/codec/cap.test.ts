@@ -27,22 +27,23 @@ quill:
   description: Content fields capped by max.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    code:
-      type: text
-      max: 5
-    note:
-      type: text
-      shape: lines
-      max: 8
-    tag:
-      type: richtext
-      max: 6
-    memo:
-      type: richtext
-      shape: blocks
-      max: 12
+schema:
+  main:
+    fields:
+      code:
+        type: text
+        max: 5
+      note:
+        type: text
+        shape: lines
+        max: 8
+      tag:
+        type: richtext
+        max: 6
+      memo:
+        type: richtext
+        shape: blocks
+        max: 12
 `);
 
 const docWith = (fields: Record<string, string> = {}): Document =>

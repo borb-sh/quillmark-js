@@ -182,7 +182,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 	const writeAddr = (addr: Addr): Addr =>
 		typeof addr.card === 'number' ? { ...addr, card: doc.card(addr.card).id } : addr;
 	const schemaOf = (c: CardRef, kind?: string): QuillCardSchema | undefined =>
-		c === MAIN ? quill.schema.main : quill.schema.card_kinds?.[kind ?? doc.card(c).kind];
+		c === MAIN ? quill.schema.main : quill.schema[kind ?? doc.card(c).kind];
 	const refs = (): CardRef[] => [MAIN, ...ids.map((_, i) => i)];
 
 	/** The form `schema` declares for field `name`; an undeclared field is a value. */
@@ -524,7 +524,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 	function cardFromY(name: string, id: string): CardInput {
 		const map = ydoc.getMap<unknown>(name);
 		const kind = map.get(KIND) as string;
-		const schema = quill.schema.card_kinds?.[kind];
+		const schema = quill.schema[kind];
 		const order = Object.keys(schema?.fields ?? {});
 		const held = yFields(name);
 		const keys = [

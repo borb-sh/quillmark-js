@@ -20,11 +20,12 @@ const YAML = `quill:
   description: One richtext field the format bar rises over.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    intro:
-      type: richtext
-      shape: blocks
+schema:
+  main:
+    fields:
+      intro:
+        type: richtext
+        shape: blocks
 `;
 const LIBRARY: LibraryFace[] = [
 	{ family: 'Tinos', weight: 400, style: 'normal', index: 0, data: new Uint8Array([1]) }

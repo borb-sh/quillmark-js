@@ -17,14 +17,15 @@ const q = quillFromYaml(`quill:
   description: A field of rich text paragraphs inside a record.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    entry:
-      type: object
-      properties:
-        details:
-          type: richtext
-          shape: blocks
+schema:
+  main:
+    fields:
+      entry:
+        type: object
+        properties:
+          details:
+            type: richtext
+            shape: blocks
 `);
 
 const entry = (paragraphs: string[]): Document => {

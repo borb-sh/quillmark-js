@@ -256,20 +256,21 @@ describe('a variant under an object property', () => {
   description: A variant one step inside a typed dictionary.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    header:
-      type: object
-      properties:
-        classification:
-          type: enum
-          values: [U, CUI]
-          default: U
-          variants:
-            CUI:
-              controlled_by:
-                type: text
-                default: ""
+schema:
+  main:
+    fields:
+      header:
+        type: object
+        properties:
+          classification:
+            type: enum
+            values: [U, CUI]
+            default: U
+            variants:
+              CUI:
+                controlled_by:
+                  type: text
+                  default: ""
 `;
 	const nested = () => quillFromYaml(NESTED);
 	const header = (doc: Document) => literal(doc.getStored('header'));

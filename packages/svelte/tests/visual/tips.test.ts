@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { MAIN_CARD_ADDR, type Document } from '@quillmark/wasm';
 import { tipsChannel, renderTip } from '$lib/visual/tips.js';
 import { patchEditorExt } from '$lib/visual/ext.js';
+import { cardKinds } from '$lib/visual/structure.js';
 import { core, quill as fixture } from '../helpers/fixtures.js';
 
 const quill = fixture();
@@ -105,7 +106,7 @@ describe('patchEditorExt', () => {
 		// namespace, so clearing the channel by replacing the namespace destroys the
 		// rename. Both addresses, since rename writes cards and tips write main.
 		const doc = quill.seedDocument();
-		const kind = Object.keys(quill.schema.card_kinds ?? {})[0];
+		const kind = cardKinds(quill.schema)[0];
 		const card = quill.seedCard(kind, doc.seedOverlay(kind));
 		if (!card) throw new Error(`the reference quill seeded no \`${kind}\` card`);
 		doc.unchecked.insertCard(card);

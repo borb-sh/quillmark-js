@@ -29,20 +29,20 @@ const YAML = `quill:
   description: Narrowed and plain fields, at the top level and on a card.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    title:
-      type: richtext
-    line:
-      type: text
-      default: ""
-    address:
-      type: text
-      shape: lines
-      default: ""
-    pages:
-      type: integer
-card_kinds:
+schema:
+  main:
+    fields:
+      title:
+        type: richtext
+      line:
+        type: text
+        default: ""
+      address:
+        type: text
+        shape: lines
+        default: ""
+      pages:
+        type: integer
   note:
     fields:
       heading:

@@ -31,21 +31,22 @@ const YAML = `quill:
   description: A block prose cell on a record row, and a number beside it.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    jobs:
-      type: array
-      items:
-        type: object
-        properties:
-          title:
-            type: text
-          details:
-            type: richtext
-            shape: blocks
-      default: []
-    pages:
-      type: integer
+schema:
+  main:
+    fields:
+      jobs:
+        type: array
+        items:
+          type: object
+          properties:
+            title:
+              type: text
+            details:
+              type: richtext
+              shape: blocks
+        default: []
+      pages:
+        type: integer
 `;
 const probe = () => quillFromYaml(YAML);
 const ISLANDS = '| a | b |\n|---|---|\n| 1 | 2 |\n\nSee ![chart](chart.png) here.';

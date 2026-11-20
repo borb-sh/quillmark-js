@@ -3,8 +3,9 @@ quill:
   version: '1.0.0'
   backend: typst
   description: Render fixture (memo)
-main:
-  fields:
-    title:
-      type: text
-      description: Memo title
+schema:
+  main:
+    fields:
+      title:
+        type: text
+        description: Memo title

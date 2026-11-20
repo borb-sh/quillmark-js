@@ -9,7 +9,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { Engine, type Document, type Quill } from '@quillmark/wasm';
-import { humanize } from '$lib/visual/structure';
+import { cardKinds, humanize } from '$lib/visual/structure';
 import { quill } from '../helpers/fixtures.js';
 import { mountEditor, unmountAll } from '../helpers/surface.svelte.js';
 
@@ -47,10 +47,10 @@ describe('the recovery shell', () => {
 		const options = [
 			...card.querySelectorAll<HTMLOptionElement>('.qm-recovery-retype option')
 		].filter((o) => o.value);
-		expect(options.map((o) => o.value)).toEqual(Object.keys(q.schema.card_kinds!));
+		expect(options.map((o) => o.value)).toEqual(cardKinds(q.schema));
 		// Each named as the add menu names it: the kind's `title`, else its humanized key.
 		expect(options.map((o) => o.textContent)).toEqual(
-			Object.entries(q.schema.card_kinds!).map(([kind, s]) => s.title ?? humanize(kind))
+			cardKinds(q.schema).map((kind) => q.schema[kind].title ?? humanize(kind))
 		);
 		expect(card.querySelector('.qm-card-delete')).not.toBeNull();
 	});

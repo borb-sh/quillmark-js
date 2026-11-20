@@ -24,13 +24,14 @@ quill:
   description: Two content fields differing only in declared type.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    note:
-      type: text
-      shape: lines
-    tag:
-      type: richtext
+schema:
+  main:
+    fields:
+      note:
+        type: text
+        shape: lines
+      tag:
+        type: richtext
 `;
 
 const q = probeQuill(QUILL_YAML);

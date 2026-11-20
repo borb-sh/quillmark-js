@@ -24,17 +24,18 @@ const q = quillFromYaml(`quill:
   description: A field of rich text lines at the top and inside a record.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    distribution:
-      type: richtext
-      shape: lines
-    header:
-      type: object
-      properties:
-        memo_for:
-          type: richtext
-          shape: lines
+schema:
+  main:
+    fields:
+      distribution:
+        type: richtext
+        shape: lines
+      header:
+        type: object
+        properties:
+          memo_for:
+            type: richtext
+            shape: lines
 `);
 
 const indent = (lines: string[], by: string): string[] =>

@@ -22,11 +22,11 @@ const YAML = `quill:
   description: Two kinds, one field name, two codecs.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    author:
-      type: text
-card_kinds:
+schema:
+  main:
+    fields:
+      author:
+        type: text
   plainnote:
     fields:
       note:

@@ -104,6 +104,7 @@
 		fieldValues,
 		fieldTitle,
 		humanize,
+		cardKinds,
 		placeCardInto,
 		bodyEnabled,
 		provenanceMap,
@@ -215,7 +216,7 @@
 	// card reorder.
 	const commitErrors = new SvelteMap<string, RoutedDiagnostic>();
 
-	const kinds = $derived(Object.keys(quill.schema.card_kinds ?? {}));
+	const kinds = $derived(cardKinds(quill.schema));
 
 	// The removal's step back (`undo.svelte.ts`), published so an array's row removal
 	// offers on the same toast a card's does.
@@ -279,7 +280,7 @@
 		if (!running || value === undefined || !shown || !Object.hasOwn(shown.values, name))
 			return rederive();
 		const fresh = fieldValues((isMain ? doc.main : doc.card(at)).payloadItems);
-		const cardSchema = isMain ? quill.schema.main : quill.schema.card_kinds?.[shown.kind];
+		const cardSchema = isMain ? quill.schema.main : quill.schema[shown.kind];
 		patched = {
 			...patched,
 			[id]: {
@@ -566,7 +567,7 @@
 		text: string;
 	} {
 		const { add } = item;
-		const schema = quill.schema.card_kinds?.[add.kind];
+		const schema = quill.schema[add.kind];
 		const values = fieldValues(add.payloadItems);
 		const named = (add.ext?.editor as { title?: unknown } | undefined)?.title;
 		const title = cardTitle(
@@ -922,7 +923,7 @@
 		if (!key?.field) return '';
 		const isMain = key.card === undefined;
 		const card = isMain ? model.main : model.cards[cardIndexOf(key.card as CardId)];
-		const schema = isMain ? quill.schema.main : quill.schema.card_kinds?.[card?.kind ?? ''];
+		const schema = isMain ? quill.schema.main : quill.schema[card?.kind ?? ''];
 		const sub = schema?.fields[key.field];
 		return sub ? fieldTitle(key.field, sub) : humanize(key.field);
 	}
@@ -1037,7 +1038,7 @@
 		const { card: at, field } = addr;
 		if (typeof at !== 'number' || field == null) return;
 		const shown = model.cards[at];
-		const cardSchema = shown && quill.schema.card_kinds?.[shown.kind];
+		const cardSchema = shown && quill.schema[shown.kind];
 		if (!cardSchema || cardSchema.title?.trim()) return;
 		const sub = Object.hasOwn(cardSchema.fields, field) ? cardSchema.fields[field] : undefined;
 		if (!sub || !shortCell(sub)) return;
@@ -1252,7 +1253,7 @@
 		const name =
 			shown?.titleOverride ||
 			shown?.titlePlaceholder ||
-			kindTitle(quill.schema.card_kinds?.[card.kind], card.kind);
+			kindTitle(quill.schema[card.kind], card.kind);
 		const gone = removed.remove(id, card, cardIds, i);
 		doc.removeCard(i);
 		arm.arm();
@@ -1511,7 +1512,7 @@
 					false,
 					c.kind,
 					c,
-					schema.card_kinds?.[c.kind],
+					schema[c.kind],
 					byCard.get(i) ?? NO_RESOLVED_ROWS
 				)
 			)
@@ -2138,7 +2139,7 @@
 		if (addr.field == null) return undefined;
 		const kind = typeof addr.card === 'number' ? model.cards[addr.card]?.kind : undefined;
 		const schema = quill.schema;
-		const card = addr.card == null ? schema.main : kind ? schema.card_kinds?.[kind] : undefined;
+		const card = addr.card == null ? schema.main : kind ? schema[kind] : undefined;
 		return card?.fields?.[addr.field];
 	}
 
@@ -2307,7 +2308,7 @@
 
 <FormatPopover {getActiveLeaf} families={fontFamilies} {fontLabels} />
 
-<!-- The add affordance is gated on the schema declaring `card_kinds`, there being
+<!-- The add affordance is gated on the schema declaring a card kind, there being
  nothing to seed otherwise. Cards render regardless: a kind with no schema degrades to
  a recovery shell inside <Card> (retype + delete), never gated away, so its content is
  neither dropped nor trapped. The gate lives here rather than at each call site: the
@@ -2400,7 +2401,7 @@
 							<div class="qm-menu-surface" data-qm-root>
 								{#each kinds as k (k)}
 									<DropdownMenu.Item class="qm-menu-item" onSelect={() => addPicked(atIndex, k)}
-										>{kindTitle(quill.schema.card_kinds?.[k], k)}</DropdownMenu.Item
+										>{kindTitle(quill.schema[k], k)}</DropdownMenu.Item
 									>
 								{/each}
 							</div>

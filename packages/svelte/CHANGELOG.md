@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The editor reads a quill's card kinds from `quill.schema` itself.** `quill.schema` is keyed by kind, `main` beside each card kind, as `@quillmark/wasm` 0.140 returns it, where the kinds sat under `schema.card_kinds`. A quill loaded with an older `@quillmark/wasm` shows no card kinds.
+
 **The answer card stands under the field it answers in a shared row.** A change in a field or a property sharing its row with others put the card at the form's right edge, under the row's last field, so it read as that field's even when the change was in the first, and ⌘/Ctrl+Enter answers the change the card is on. The card now keeps to the right edge of the change's own field, reaching past it only as far as the card is wide; a field on a row of its own keeps the card at the form's edge as before.
 
 **Dismiss is ⌘/Ctrl+Alt+Backspace, and ⌘/Ctrl+Backspace is always a delete.** `REVIEW_KEYS.dismiss` is `Mod-Alt-Backspace`, where it was `Mod-Backspace`, beside the steps' `Mod-Alt-ArrowDown` and `Mod-Alt-ArrowUp`. ⌘/Ctrl+Backspace deletes a line or a word in a field and removes a collapsed record from its header with a review open as with none, where it dismissed the current change unless the reader had just typed.

@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Quill, Document } from '@quillmark/wasm';
 import { createField } from '$lib/core/codec';
+import { cardKinds } from '$lib/visual/structure';
 import { core, mount, quill, example, viewOf } from './_util.js';
 
 /** A saved document: templated, written, serialized, and parsed back. */
@@ -55,7 +56,7 @@ describe('a document loaded from markdown', () => {
 		// Cards take the same lowering as main, so the authored shape reaches them too.
 		const { q, doc } = loaded();
 		const seeded = q.seedDocument();
-		const kind = Object.keys(q.schema.card_kinds ?? {})[0];
+		const kind = cardKinds(q.schema)[0];
 		const card = q.seedCard(kind, seeded.seedOverlay(kind));
 		expect(card).toBeTruthy();
 		seeded.unchecked.insertCard(card!, 0);
