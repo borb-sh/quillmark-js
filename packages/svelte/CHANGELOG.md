@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Enter at the start of a heading in a list opens a plain item above it.** The new item above took the heading's type, so pressing Enter before a heading item left an empty heading bullet where a paragraph opens outside a list. It now opens a paragraph item, the heading moving down with the caret.
+
 **A step to the next change brings its answer card into view.** A step scrolled for a fixed room under the change, about half the card's height, so a change near the pane's foot could land with its card below the fold, and a change in a long paragraph with its card under the paragraph's last line out of sight. A step, `revealReview` and an answer key's first press now scroll for the change and its card as the card stands.
 
 **The answer card stands under the field it answers in a shared row.** A change in a field or a property sharing its row with others put the card at the form's right edge, under the row's last field, so it read as that field's even when the change was in the first, and ⌘/Ctrl+Enter answers the change the card is on. The card now keeps to the right edge of the change's own field, reaching past it only as far as the card is wide; a field on a row of its own keeps the card at the form's edge as before.

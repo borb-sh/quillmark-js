@@ -72,6 +72,41 @@ function lineAbove(itemType: NodeType, paragraph: NodeType): Command {
 	};
 }
 
+/**
+ * Enter at the head of an item's first line that holds text and is no paragraph, a heading → the
+ * item `split` opens above it holds an empty paragraph, as `splitBlock` leaves one above a heading
+ * outside a list. `splitListItem` gives the new item the line's own type.
+ */
+function paragraphAbove(itemType: NodeType, paragraph: NodeType, split: Command): Command {
+	return (state, dispatch, view) => {
+		const { $from, empty } = state.selection;
+		const line = $from.parent;
+		if (
+			!dispatch ||
+			!empty ||
+			$from.parentOffset !== 0 ||
+			$from.depth < 2 ||
+			line.type === paragraph ||
+			line.type.spec.code ||
+			line.content.size === 0 ||
+			$from.node(-1).type !== itemType ||
+			$from.index(-1) !== 0
+		)
+			return split(state, dispatch, view);
+		return split(
+			state,
+			(tr) => {
+				const $at = tr.selection.$from;
+				const below = $at.before($at.depth - 1);
+				const above = tr.doc.resolve(below).nodeBefore;
+				if (above?.type === itemType) tr.setBlockType(below - above.nodeSize, below, paragraph);
+				dispatch(tr);
+			},
+			view
+		);
+	};
+}
+
 /** Whether `item` holds nothing but one empty textblock. */
 function emptyItem(item: PMNode): boolean {
 	return (
@@ -469,7 +504,7 @@ function sinkIntoList(itemType: NodeType): Command {
  *
  * `Enter` is a chain in precedence order: the empty line above an unnumbered one, an empty top-level
  * middle item out of the list, the marker back on an empty continuation line, `splitListItem` (`splitTaskItem` for
- * tasks), then `liftListItem`. The split link splits a non-empty item, and on an empty last item
+ * tasks, `paragraphAbove` over a heading), then `liftListItem`. The split link splits a non-empty item, and on an empty last item
  * either splits the wrapping item (a nested one, so Enter lifts one level) or bails so the last
  * link lifts a top-level one to a paragraph.
  *
@@ -498,7 +533,7 @@ export function listKeymap(schema: Schema): Record<string, Command> {
 			lineAbove(itemType, paragraph),
 			lineOutOfMiddle(itemType),
 			markerOn(itemType),
-			splitTaskItem(itemType),
+			paragraphAbove(itemType, paragraph, splitTaskItem(itemType)),
 			liftListItem(itemType)
 		),
 		Backspace: chainCommands(

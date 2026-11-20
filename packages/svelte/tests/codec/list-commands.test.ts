@@ -211,6 +211,14 @@ describe('Enter', () => {
 		);
 	});
 
+	it('at the start of a heading item, opens a paragraph item above, as outside a list', () => {
+		expectPress(
+			startOf('- a\n- # Title', 1),
+			'Enter',
+			'doc(bullet_list(list_item(paragraph("a")), list_item(paragraph), list_item(heading("Title"))))'
+		);
+	});
+
 	it('at the start of a NESTED first item, splits instead of reaching the parent item', () => {
 		expectPress(
 			startOf('- a\n    - b', 1),
