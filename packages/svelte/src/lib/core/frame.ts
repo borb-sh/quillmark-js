@@ -15,6 +15,9 @@ export interface FrameOptions {
 	/** Room held clear at the band's foot, where it is more than the scroller's own `scroll-padding`. */
 	foot?: number;
 	behavior?: ScrollBehavior;
+	/** The extent framed in place of the target's own box, in viewport px, where more than the
+	 *  target has to show with it. */
+	extent?: Band;
 }
 
 /**
@@ -106,8 +109,9 @@ function frameInline(
  * where it is.
  */
 export function frame(target: HTMLElement, opts: FrameOptions): void {
-	const box = target.getBoundingClientRect();
-	if (!box.width && !box.height) return;
+	const own = target.getBoundingClientRect();
+	if (!own.width && !own.height) return;
+	const box = opts.extent ?? own;
 	const field = target.closest('.qm-field');
 	const top = Math.min(field?.getBoundingClientRect().top ?? box.top, box.top);
 	const scroller = scrollerOf(target);

@@ -354,6 +354,30 @@ describe('the current change', () => {
 		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);
 	});
 
+	it('scrolls a step for the card where it stands, beyond what the change alone needs', async () => {
+		const r = batch(spread);
+		await settle();
+		const order = r.drawn.at(-1)!.open;
+		const card = r.target.querySelector<HTMLElement>('.qm-review-card')!;
+		const height = window.innerHeight;
+		Object.defineProperty(card, 'offsetHeight', { configurable: true, value: height / 8 });
+		const els = [...r.target.querySelectorAll<HTMLElement>(`[data-qm-review~="${order[1]}"]`)];
+		const near = height - card.offsetHeight / 2;
+		for (let at: HTMLElement | null = els[0]; at && at !== r.target; at = at.parentElement)
+			at.getBoundingClientRect = () => new DOMRect(0, near - 1, 1, 1);
+		for (const el of els) el.getBoundingClientRect = () => new DOMRect(0, near - 1, 1, 1);
+		const scrolls: number[] = [];
+		const scrollBy = window.scrollBy;
+		window.scrollBy = ((opts: ScrollToOptions) => void scrolls.push(opts.top ?? 0)) as never;
+		try {
+			expect(await r.editor.stepReview(1, { focus: false })).toBe(order[1]);
+		} finally {
+			window.scrollBy = scrollBy;
+		}
+		expect(scrolls.length).toBe(1);
+		expect(scrolls[0]).toBeGreaterThan(0);
+	});
+
 	it('takes the accept key over a task item’s tick for the length of the review', async () => {
 		const r = batch(
 			(doc) => [over(doc, 'r1', '- [ ] the quick red fox')],
