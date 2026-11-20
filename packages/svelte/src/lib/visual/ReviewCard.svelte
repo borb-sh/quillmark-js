@@ -73,6 +73,8 @@
 	let stands = false;
 	/** The change is drawn, so the card has somewhere to stand. */
 	let placed = $state(false);
+	/** The span, in viewport px, of the change's blocks and the card where it stands unpinned. */
+	let reach: { top: number; bottom: number } = { top: 0, bottom: 0 };
 	/** Where the focus was when the keyboard entered the card, to hand it back. */
 	let from: HTMLElement | undefined;
 	/** The keyboard is on the card, from `enter` until the reader takes the focus off it. The
@@ -144,6 +146,7 @@
 		const slot = last?.closest('.qm-object-prop, .qm-field')?.getBoundingClientRect();
 		const beside = tuck && tuck.right + gap <= left && (!slot || left + w <= slot.right + 1);
 		const below = beside ? tuck.top : lower + gap;
+		reach = { top: upper, bottom: Math.max(lower, below + h) };
 		const tall = lower - upper + gap + h > floor - ceil;
 		pinned = shows && tall && below + h > floor;
 		const y = pinned ? Math.max(ceil, floor - h) : below;
@@ -238,6 +241,13 @@
 	export function standsInView(): boolean {
 		place();
 		return !placed || stands;
+	}
+
+	/** What a reveal frames for the change: its blocks and the card under or beside them, as
+	 *  the card stands where nothing pins it. `undefined` while the change draws nothing. */
+	export function extent(): { top: number; bottom: number } | undefined {
+		place();
+		return placed ? reach : undefined;
 	}
 
 	/** Put the focus on Accept, handing it back to where it was on Escape or an answer. False

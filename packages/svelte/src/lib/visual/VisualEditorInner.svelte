@@ -1792,10 +1792,28 @@
 			(key !== undefined ? leaves.prose(key)?.reviewElements(id)[0] : undefined) ??
 			els[0] ??
 			(key !== undefined ? leaves.control(key)?.el : undefined);
-		if (!at || (stepping && comfortable(els.length ? els : [at]))) return true;
+		if (!at) return true;
+		const extent = framing(answerCard?.extent());
+		if (stepping && comfortable(els.length ? els : [at], extent)) return true;
 		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-		frame(at, { block: 'center', foot: reviewInset, behavior: reduce ? 'instant' : 'smooth' });
+		frame(at, {
+			block: 'center',
+			foot: reviewInset,
+			behavior: reduce ? 'instant' : 'smooth',
+			extent
+		});
 		return true;
+	}
+	/** What a reveal frames beside the change: `whole`, the change's blocks and its card, where
+	 *  they fit in the pane together. Where they do not, the card pins at the pane's foot and the
+	 *  change's own words are what to show, so nothing is framed beside them. */
+	function framing(
+		whole: { top: number; bottom: number } | undefined
+	): { top: number; bottom: number } | undefined {
+		if (!whole) return undefined;
+		const { top, bottom } = pane();
+		const room = bottom - reviewInset - top - 2 * (spacePx(rootEl, 1) ?? 0);
+		return whole.bottom - whole.top <= room ? whole : undefined;
 	}
 	/** What a change that is a thing draws, which takes the focus as one stop: a row or a card
 	 *  proposed new, and a card proposed for removal. */
@@ -1844,16 +1862,17 @@
 	const boxes = (els: readonly HTMLElement[]): DOMRect[] =>
 		els.map((el) => el.getBoundingClientRect()).filter((r) => r.width || r.height);
 	/** Whether `els` stand in the view the editor scrolls in, clear of the host's chrome at its
-	 *  foot, with the answer card's room under them. */
-	function comfortable(els: readonly HTMLElement[]): boolean {
+	 *  foot, with `extent`, the change and its answer card as the card stands, inside it too. */
+	function comfortable(
+		els: readonly HTMLElement[],
+		extent: { top: number; bottom: number } | undefined
+	): boolean {
 		const rects = boxes(els);
 		if (!rects.length) return false;
 		const { top, bottom } = pane();
-		const room = (spacePx(rootEl, 1) ?? 0) * CARD_ROOM;
-		const band = { top, bottom: bottom - reviewInset - room };
-		return (
-			(framedTop(els, band) ?? top) >= top && Math.max(...rects.map((r) => r.bottom)) <= band.bottom
-		);
+		const band = { top, bottom: bottom - reviewInset - (spacePx(rootEl, 1) ?? 0) };
+		const lowest = Math.max(extent?.bottom ?? -Infinity, ...rects.map((r) => r.bottom));
+		return (framedTop(els, band) ?? top) >= top && lowest <= band.bottom;
 	}
 	/** Whether any of the item `id` shows in that view, which is where its answer card stands.
 	 *  An editor with no box of its own measures nothing, and every item counts as shown. */
@@ -1862,8 +1881,6 @@
 		const { top, bottom } = pane();
 		return boxes(reviewEls(id)).some((r) => r.bottom > top && r.top < bottom - reviewInset);
 	}
-	/** The room the answer card takes under a change, in `--_qm-space` rungs. */
-	const CARD_ROOM = 7;
 
 	/** Whether the item `id` is listed in `group`. */
 	function inGroup(group: string): (id: string) => boolean {
