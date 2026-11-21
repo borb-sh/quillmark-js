@@ -26,6 +26,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # `configure-pages` reads the site's settings.
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v4
 
