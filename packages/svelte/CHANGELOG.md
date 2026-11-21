@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.40.0 - 2026-11-21
+
 **The `@quillmark/wasm` peer floor is `>=0.140.0-0`.** The editor reads a card kind's schema off `quill.schema` beside `main`, where it read `quill.schema.card_kinds`, so under an older wasm it finds no kind: every card draws its recovery shell and none can be added (Quillmark's 0.139 → 0.140 migration).
 
 **Enter at the start of a heading in a list opens a plain item above it.** The new item above took the heading's type, so pressing Enter before a heading item left an empty heading bullet where a paragraph opens outside a list. It now opens a paragraph item, the heading moving down with the caret.
