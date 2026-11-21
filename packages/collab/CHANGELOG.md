@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.5.0 - 2026-11-21
+
 **The `@quillmark/wasm` peer floor is `>=0.140.0-0`.** A card's field order is read off its kind's schema on `quill.schema` beside `main`, where it was read off `quill.schema.card_kinds` (Quillmark's 0.139 → 0.140 migration).
 
 ## v0.4.0 - 2026-11-14
