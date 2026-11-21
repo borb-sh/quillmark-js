@@ -3,20 +3,17 @@
 import { describe, expect, it } from 'vitest';
 import type { Content, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
+import { joinSession, QuillMismatch, type Session, type SessionLog } from '../src/session.js';
+import { localLog } from '../src/local.js';
 import {
-	joinSession,
-	localLog,
-	QuillMismatch,
 	readLog,
 	readVersion,
 	restoreVersion,
 	saveVersion,
-	writeFrom,
 	writeLog,
-	type Revision,
-	type Session,
-	type SessionLog
-} from '../src/index.js';
+	type Revision
+} from '../src/room.js';
+import { writeFrom } from '../src/fork.js';
 import { edit, quill, snapshot, type FixtureName } from './helpers.js';
 
 class Origin {

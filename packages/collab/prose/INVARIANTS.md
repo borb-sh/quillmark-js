@@ -1,6 +1,6 @@
 # @quillmark/collab invariants
 
-The rules a change to `@quillmark/collab` must keep, the reason behind each, and the designs already weighed and rejected. The binding, the session protocol and writes from a revision are walked through in the [README](../README.md) and documented in tsdoc; the Y shape is `src/shape.ts` and the `SessionLog` contract `src/session.ts`. A rule belongs here only if a capable reader of the code would plausibly break it, and a change that breaks one updates this page in the same commit, with the new reason.
+The rules a change to `@quillmark/collab` must keep, the reason behind each, and the designs already weighed and rejected. The session is walked through in the [README](../README.md), and the session, the binding and writes from a revision are documented in tsdoc; the Y shape is `src/shape.ts` and the `SessionLog` contract `src/session.ts`. A rule belongs here only if a capable reader of the code would plausibly break it, and a change that breaks one updates this page in the same commit, with the new reason.
 
 ## The model
 
@@ -9,6 +9,8 @@ Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to 
 **Every merge is this package's.** Quillmark core is single-writer and refuses a write whose base has moved (`edit::stale_base`), so concurrent writers merge here, in Y, and the Document takes the merged value through `replace`. Rejected: a merge in core, which would need a history core does not keep.
 
 **A write from a revision is written whole, or reported where it meets a change.** `writeFrom` holds nothing back: what it writes, it writes in one update, and where that meets a change made since it lists the change in `conflicts` for the host to answer. Rejected: holding back each part that meets a change for the host to write on request, a second rebase beside the editor's own, which carries an assistant's proposal through the reader's typing and has the reader answer it a paragraph at a time (svelte/INVARIANTS §"A proposal is an edit of the paragraph as its writer read it").
+
+**The entry exports the session and nothing under it.** `joinSession`, `localLog`, `QuillMismatch` and the types their signatures name are the package's surface, with `checkServerStore` on `/conformance`. The binding, writes from a revision and the server-side log verbs stay in their modules, which the tests import: an export is a promise every release keeps, and none of them has a consumer outside the package. One joins the entry with the consumer that needs it.
 
 **The package knows nothing of the editor.** The host wires `onRemote` to the editor's host verbs (svelte/INVARIANTS §"A host that changes the document says so").
 
@@ -59,7 +61,6 @@ Each client keeps its own WASM `Document`, and `bindDocument` keeps it equal to 
 - A change of quill reference is not a field edit. The host ends the session and every client rejoins.
 - `push` reads every card, so its cost grows with the document; debounce it for large documents.
 - A whole-value field is written whole: two people editing different rows of an array of records keep one row's edit.
-- A write applied over a conflict merges two rewrites into neither. Apply a write from a revision only when its `conflicts` is empty.
 - The host owns `session.doc` and frees it after `leave`.
 
 ## Testing

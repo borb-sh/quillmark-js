@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
-import { bindDocument, seedDocument } from '../src/index.js';
+import { bindDocument, seedDocument } from '../src/document.js';
 import { core, quill, snapshot, type FixtureName } from './helpers.js';
 
 const STARTS: [string, FixtureName, 'example' | 'seed' | 'empty'][] = [

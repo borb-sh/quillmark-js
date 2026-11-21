@@ -3,11 +3,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Content, ContentContainer, Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
-import { bindDocument, Diverged, seedDocument } from '../src/index.js';
+import { bindDocument, Diverged, seedDocument } from '../src/document.js';
 import { inserts, project } from '../src/project.js';
 import { contentRoot, contentTypes, readField } from '../src/shape.js';
 import { core, deliver, edit, peers, quill, settle, snapshot, type Peer } from './helpers.js';
-import type { Delta } from '../src/index.js';
+import type { Delta } from '../src/delta.js';
 
 const example = () => quill().exampleDocument()!;
 const body = (p: Peer, card?: number): Content =>

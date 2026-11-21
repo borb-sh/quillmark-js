@@ -8,10 +8,10 @@ import { init, type Addr, type Document, type Quill, type Step } from '@quillmar
 import {
 	bindDocument,
 	seedDocument,
-	type Delta,
 	type DocumentBinding,
 	type RemoteChange
-} from '../src/index.js';
+} from '../src/document.js';
+import { type Delta } from '../src/delta.js';
 import { canonical } from '../src/shape.js';
 
 export const core = await init();
