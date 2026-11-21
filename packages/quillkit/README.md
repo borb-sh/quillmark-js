@@ -86,7 +86,7 @@ npx quillkit serve --open      # studio
 npx quillkit serve app --open  # the app, with your App.yaml and app.css
 ```
 
-**Studio** is for authors. Pick a quill, edit, watch it paint, read the errors: `quillkit check` answers _does it work_, studio answers _what is it like to use_. The address bar names what is on screen (`?quill=showcase@1.0.0`), so a link goes to a quill; `?quill=showcase` and `?quill=showcase@1.0` resolve the way `getQuill` resolves them. **Edit source** is the document's canonical markdown, out and back in, and **Download PDF** is the page itself, rendered from the compile the preview is painting. Nothing it holds outlives the tab.
+**Studio** is for authors. Pick a quill, edit, watch it paint, read the errors: `quillkit check` answers _does it work_, studio answers _what is it like to use_. The address bar names what is on screen (`?quill=showcase@1.0.0`), so a link goes to a quill; `?quill=showcase` and `?quill=showcase@1.0` resolve the way `getQuill` resolves them. **Edit source** is the document's canonical markdown, out and back in, and **Download PDF** is the page itself, rendered from the compile the preview is painting; **Download Word** beside it writes the same compile as a `.docx` for a Typst quill. Nothing it holds outlives the tab.
 
 `render` is the same look without a browser, for a script or an agent in a loop. It renders one quill's document through the engine and fonts `check` renders through, and prints each file it writes:
 
@@ -98,7 +98,7 @@ npx quillkit render letter draft.md -o out   # a document of your own, as out/le
 
 The quill is named the way studio's address bar names it. Files land as `<quill>-<seed|example|file>.pdf`, or `-<page>.png` for each page under `--png`; the warnings the document and the render carry print above them, and a document that does not render fails with its diagnostics.
 
-**The app** is for the people filling your forms in, and names no quill, version or file. One quill opens its form; several open a card for each. The form stands beside the page it prints, with a Form/Page switch on a phone, and **Download PDF** waits for the page to catch up with the last keystroke and refuses a page that does not render. **Print** hands the same PDF to the browser's print dialog, or opens it in a tab to print from where the browser cannot print it in place. **My documents** keeps every document a reader starts, in their browser only, to reopen, download as `.md` or delete; a reload reopens the one that was open.
+**The app** is for the people filling your forms in, and names no quill, version or file. One quill opens its form; several open a card for each. The form stands beside the page it prints, with a Form/Page switch on a phone, and **Download PDF** waits for the page to catch up with the last keystroke and refuses a page that does not render; **Download Word** does the same for a `.docx`, offered where the quill is a Typst one. **Print** hands the same PDF to the browser's print dialog, or opens it in a tab to print from where the browser cannot print it in place. **My documents** keeps every document a reader starts, in their browser only, to reopen, download as `.md` or delete; a reload reopens the one that was open.
 
 ## The app
 

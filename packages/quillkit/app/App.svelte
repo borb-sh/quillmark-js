@@ -17,12 +17,14 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import type {
+		Artifact,
 		CoreSurface,
 		Diagnostic,
 		Document,
 		Engine,
 		FontFace,
 		LiveSession,
+		OutputFormat,
 		Quill
 	} from '@quillmark/wasm';
 	import type { Quiver } from '@quillmark/quiver';
@@ -116,6 +118,8 @@
 	/** Why the last download or print did not happen. */
 	let refusal = $state.raw<string | undefined>();
 	let downloading = $state.raw(false);
+	/** Whether the quill on screen writes Word, which an acroform quill does not. */
+	let words = $state.raw(false);
 
 	let drawer = $state.raw<DocRecord[] | undefined | false>(false);
 	let asking = $state.raw(false);
@@ -168,6 +172,7 @@
 		stranded = [];
 		painted = true;
 		refusal = undefined;
+		words = false;
 		await tick();
 		had?.free();
 		was?.doc.free();
@@ -192,6 +197,7 @@
 			const opened = await ready.open(at.quill, at.doc);
 			if (open !== at) return opened.free();
 			session = opened;
+			words = (await ready.supportedFormats(at.quill)).includes('docx');
 			thrown = [];
 			void facesFor(ready, at.quill).then((faces) => {
 				if (open === at) fonts = faces;
@@ -360,12 +366,12 @@
 
 	// ── The file ────────────────────────────────────────────────────────────────
 	/**
-	 * The document as the PDF the page shows, which both the download and the print hand
-	 * out. A keystroke not yet applied is applied first and an open still in flight is
+	 * The document as a file in `format`, the PDF of which both the download and the print
+	 * hand out. A keystroke not yet applied is applied first and an open still in flight is
 	 * waited on, so the file is the document in hand; a document that does not render is
 	 * refused rather than written from the last good page.
 	 */
-	async function pdfOf(at: Open): Promise<Uint8Array | undefined> {
+	async function fileOf(at: Open, format: OutputFormat): Promise<Artifact | undefined> {
 		if (settle !== undefined) await recompileNow();
 		await opening;
 		if (open !== at) return undefined;
@@ -373,19 +379,19 @@
 			refusal = thrown.some((d) => d.path) ? FIX_FIELDS : CANT_RENDER;
 			return undefined;
 		}
-		const [artifact] = session.render({ format: 'pdf' }).artifacts;
-		if (!artifact) throw new Error('no PDF');
+		const [artifact] = session.render({ format }).artifacts;
+		if (!artifact) throw new Error(`no ${format}`);
 		refusal = undefined;
-		return artifact.bytes;
+		return artifact;
 	}
 
-	async function download(): Promise<void> {
+	async function download(format: 'pdf' | 'docx'): Promise<void> {
 		const at = open;
 		if (!at || downloading) return;
 		downloading = true;
 		try {
-			const pdf = await pdfOf(at);
-			if (pdf) save(pdf, fileName(recordOf(at).title, 'pdf'), 'application/pdf');
+			const file = await fileOf(at, format);
+			if (file) save(file.bytes, fileName(recordOf(at).title, format), file.mimeType);
 		} catch {
 			refusal = CANT_RENDER;
 		} finally {
@@ -399,9 +405,9 @@
 		downloading = true;
 		const printing = beginPrint();
 		try {
-			const pdf = await pdfOf(at);
+			const pdf = await fileOf(at, 'pdf');
 			if (!pdf) printing.cancel();
-			else if (!printing.print(pdf)) refusal = CANT_PRINT;
+			else if (!printing.print(pdf.bytes)) refusal = CANT_PRINT;
 		} catch {
 			printing.cancel();
 			refusal = CANT_RENDER;
@@ -531,12 +537,21 @@
 				disabled={downloading}
 				onclick={print}>Print</button
 			>
+			{#if words}
+				<button
+					class="qm-control"
+					type="button"
+					data-testid="download-word"
+					disabled={downloading}
+					onclick={() => download('docx')}>Download Word</button
+				>
+			{/if}
 			<button
 				class="qm-app-primary"
 				type="button"
 				data-testid="download"
 				disabled={downloading}
-				onclick={download}>{downloading ? 'Preparing…' : 'Download PDF'}</button
+				onclick={() => download('pdf')}>{downloading ? 'Preparing…' : 'Download PDF'}</button
 			>
 		{/if}
 	</header>
