@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.26.0 - 2026-11-21
+
 **The carried `@quillmark/wasm` is 0.140.0.** A quill declares its cards in one `schema:` block, `main` and each card kind as peers, and one holding a top-level `main:` or `card_kinds:` fails to load as `quill::unknown_section`, so `check` fails it; `ui.layout: flat` and the retired spellings `plaintext`, `string`, `inline` and `ui.multiline` fail as `quill::field_parse_error`. The typed writer refuses a member a group's `properties`, or every world of a variant-bearing enum, leaves undeclared, as `edit::unknown_field` at the member, where it stored a value nothing drew or rendered (Quillmark's 0.138 → 0.139 and 0.139 → 0.140 migrations). `init` lays the letter quill under `schema:`.
 
 **Studio and the app download Word.** A **Download Word** button beside **Download PDF** writes the document as a `.docx` through the engine's `docx` format, offered where the quill on screen lists it, which a Typst quill does and an acroform one does not. The app's waits for the page as its PDF does and refuses a document that does not render.
