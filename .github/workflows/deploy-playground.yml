@@ -12,11 +12,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# `deploy` mints a Pages deployment (pages + id-token); `build` only reads.
+# `build` only reads; `deploy` alone mints a Pages deployment (pages + id-token), so the
+# install and build never hold the right to publish the site.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # One live deployment at a time; a newer push supersedes a queued one, but a
 # running publish is left to finish rather than cancelled mid-flight.
@@ -27,6 +26,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # `configure-pages` reads the site's settings.
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +67,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
