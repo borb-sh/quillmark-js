@@ -1,6 +1,6 @@
 /**
  * `render`, the look step: one quill's seed, example or a markdown document, rendered through
- * the engine and fonts `check` renders through, to a PDF or one PNG per page.
+ * the engine and fonts `check` renders through, to a PDF, a Word file or one PNG per page.
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -24,7 +24,11 @@ export interface Rendered {
 export async function render(
 	root: string,
 	ref: string,
-	{ source, png, out }: { source: Source | undefined; png: boolean; out: string }
+	{
+		source,
+		format,
+		out
+	}: { source: Source | undefined; format: 'pdf' | 'docx' | 'png'; out: string }
 ): Promise<Rendered> {
 	const { init, Engine, isQuillmarkError } = await import('@quillmark/wasm');
 	const { formatDiagnostic } = await init();
@@ -36,7 +40,7 @@ export async function render(
 	let artifacts: { bytes: Uint8Array }[];
 	try {
 		const engine = new Engine({ fonts: await loadSuite() });
-		const result = await engine.render(quill, doc, { format: png ? 'png' : 'pdf' });
+		const result = await engine.render(quill, doc, { format });
 		artifacts = result.artifacts;
 		said.push(...result.warnings);
 	} catch (err) {
@@ -52,9 +56,10 @@ export async function render(
 	const dir = resolve(out);
 	await mkdir(dir, { recursive: true });
 	const name = `${ref.split('@')[0]}-${stem}`;
-	const files = png
-		? artifacts.map((_, i) => join(dir, `${name}-${i + 1}.png`))
-		: [join(dir, `${name}.pdf`)];
+	const files =
+		format === 'png'
+			? artifacts.map((_, i) => join(dir, `${name}-${i + 1}.png`))
+			: [join(dir, `${name}.${format}`)];
 	await Promise.all(files.map((file, i) => writeFile(file, artifacts[i]!.bytes)));
 	return { files, what, warnings: [...new Set(said.map((d) => formatDiagnostic(d)))] };
 }

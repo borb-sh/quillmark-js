@@ -142,26 +142,27 @@ const grouped = () =>
   description: Enums inside a top-level object.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    classification:
-      type: object
-      properties:
-        level:
-          type: enum
-          values: [UNCLASSIFIED, CUI, SECRET]
-          variants:
-            CUI:
-              controlled_by:
-                type: text
-        dissemination:
-          type: text
-        handling:
-          type: object
-          properties:
-            caveat:
-              type: enum
-              values: [NONE, NOFORN]
+schema:
+  main:
+    fields:
+      classification:
+        type: object
+        properties:
+          level:
+            type: enum
+            values: [UNCLASSIFIED, CUI, SECRET]
+            variants:
+              CUI:
+                controlled_by:
+                  type: text
+          dissemination:
+            type: text
+          handling:
+            type: object
+            properties:
+              caveat:
+                type: enum
+                values: [NONE, NOFORN]
 `);
 
 /** The enum a subform's property label names, by the label's `for`. */

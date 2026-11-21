@@ -105,7 +105,7 @@ describe('patchEditorExt', () => {
 		// namespace, so clearing the channel by replacing the namespace destroys the
 		// rename. Both addresses, since rename writes cards and tips write main.
 		const doc = quill.seedDocument();
-		const kind = Object.keys(quill.schema.card_kinds ?? {})[0];
+		const kind = Object.keys(quill.schema).filter((k) => k !== 'main')[0];
 		const card = quill.seedCard(kind, doc.seedOverlay(kind));
 		if (!card) throw new Error(`the reference quill seeded no \`${kind}\` card`);
 		doc.unchecked.insertCard(card);

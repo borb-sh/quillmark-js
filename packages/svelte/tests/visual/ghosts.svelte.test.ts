@@ -43,99 +43,99 @@ const QUILL_YAML = `quill:
   description: One cell of each ghost the editor draws.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    heading:
-      type: text
-    lead:
-      type: richtext
-    kept:
-      type: text
-      default: Kept
-    motto:
-      type: richtext
-      default: "*Always* be testing."
-    signed_for:
-      type: text
-      default: ""
-    skippable:
-      type: text
-      default: ""
-    size:
-      type: integer?
-    pages:
-      type: integer
-      default: 12
-    tone:
-      type: enum
-      values: [low, high]
-      default: high
-    marking:
-      type: enum
-      values: [low, high]
-      default: ""
-      ui:
-        blank_title: (no marking)
-    dated:
-      type: date
-      default: 2026-01-15
-    ref:
-      type: text?
-    level:
-      type: enum?
-      values: [low, high]
-    flag:
-      type: boolean?
-    notify:
-      type: boolean
-      default: true
-    aside:
-      type: text?
-    remark:
-      type: richtext?
-      shape: blocks
-    lines:
-      type: array
-      items:
+schema:
+  main:
+    fields:
+      heading:
         type: text
-      default:
-        - First line
-    tags:
-      type: array
-      items:
+      lead:
+        type: richtext
+      kept:
         type: text
-      default: [alpha, beta]
-    contact:
-      type: object
-      properties:
-        name:
+        default: Kept
+      motto:
+        type: richtext
+        default: "*Always* be testing."
+      signed_for:
+        type: text
+        default: ""
+      skippable:
+        type: text
+        default: ""
+      size:
+        type: integer?
+      pages:
+        type: integer
+        default: 12
+      tone:
+        type: enum
+        values: [low, high]
+        default: high
+      marking:
+        type: enum
+        values: [low, high]
+        default: ""
+        ui:
+          blank_title: (no marking)
+      dated:
+        type: date
+        default: 2026-01-15
+      ref:
+        type: text?
+      level:
+        type: enum?
+        values: [low, high]
+      flag:
+        type: boolean?
+      notify:
+        type: boolean
+        default: true
+      aside:
+        type: text?
+      remark:
+        type: richtext?
+        shape: blocks
+      lines:
+        type: array
+        items:
           type: text
-        note:
+        default:
+          - First line
+      tags:
+        type: array
+        items:
           type: text
-        motto:
-          type: richtext
-          default: "*Always* be testing."
-        desk:
-          type: text
-          default: B-12
-        phone:
-          type: text?
-    crew:
-      type: array
-      items:
+        default: [alpha, beta]
+      contact:
         type: object
         properties:
-          who:
+          name:
             type: text
-          tag:
+          note:
             type: text
-            default: T
-      default:
-        - who: Ada
-          tag: X
-      ui:
-        layout: table
-card_kinds:
+          motto:
+            type: richtext
+            default: "*Always* be testing."
+          desk:
+            type: text
+            default: B-12
+          phone:
+            type: text?
+      crew:
+        type: array
+        items:
+          type: object
+          properties:
+            who:
+              type: text
+            tag:
+              type: text
+              default: T
+        default:
+          - who: Ada
+            tag: X
+        ui:
+          layout: table
   entry:
     fields:
       label:

@@ -630,9 +630,9 @@ const BODY_ONLY = `quill:
   description: One kind, declaring no field.
 typst:
   plate_file: plate.typ
-main:
-  fields: {}
-card_kinds:
+schema:
+  main:
+    fields: {}
   aside:
     fields: {}
 `;

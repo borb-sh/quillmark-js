@@ -38,53 +38,54 @@ const YAML = `quill:
   description: By-value prose leaves at every site, a field's own leaf, and a number.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    notes:
-      type: array
-      items:
-        type: richtext
-      default: []
-    errata:
-      type: array
-      items:
-        type: text
-      default: []
-    jobs:
-      type: array
-      items:
+schema:
+  main:
+    fields:
+      notes:
+        type: array
+        items:
+          type: richtext
+        default: []
+      errata:
+        type: array
+        items:
+          type: text
+        default: []
+      jobs:
+        type: array
+        items:
+          type: object
+          properties:
+            title:
+              type: text
+            summary:
+              type: richtext
+        default: []
+      crew:
+        type: array
+        items:
+          type: object
+          properties:
+            who:
+              type: text
+            note:
+              type: richtext
+        ui:
+          layout: table
+        default: []
+      contact:
         type: object
         properties:
-          title:
-            type: text
-          summary:
-            type: richtext
-      default: []
-    crew:
-      type: array
-      items:
-        type: object
-        properties:
-          who:
+          phone:
             type: text
           note:
             type: richtext
-      ui:
-        layout: table
-      default: []
-    contact:
-      type: object
-      properties:
-        phone:
-          type: text
-        note:
-          type: richtext
-          shape: blocks
-    intro:
-      type: richtext
-      shape: blocks
-    pages:
-      type: integer
+            shape: blocks
+      intro:
+        type: richtext
+        shape: blocks
+      pages:
+        type: integer
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (notes: string[] = ['First note', 'Second note']): Document => {

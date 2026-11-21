@@ -217,7 +217,7 @@ async function serve(args: string[]): Promise<void> {
 async function render(args: string[]): Promise<void> {
 	const parsed = parse('render', args, {
 		values: ['--out'],
-		switches: ['--seed', '--example', '--png'],
+		switches: ['--seed', '--example', '--png', '--docx'],
 		words: 2
 	});
 	const [ref, path] = parsed.words;
@@ -228,6 +228,8 @@ async function render(args: string[]): Promise<void> {
 	];
 	if (named.length > 1)
 		throw new Usage(`quillkit render takes one document, got ${named.join(' and ')}`);
+	if (parsed.switches.has('--png') && parsed.switches.has('--docx'))
+		throw new Usage('quillkit render takes one of --png and --docx');
 	const source: Source | undefined =
 		path !== undefined
 			? { kind: 'file', path: resolve(path) }
@@ -238,7 +240,7 @@ async function render(args: string[]): Promise<void> {
 					: undefined;
 	const { files, warnings, what } = await renderQuill(resolve('.'), ref, {
 		source,
-		png: parsed.switches.has('--png'),
+		format: parsed.switches.has('--png') ? 'png' : parsed.switches.has('--docx') ? 'docx' : 'pdf',
 		out: parsed.values.get('--out') ?? '.'
 	});
 	for (const said of warnings) console.error(said);
@@ -282,7 +284,7 @@ function usage(print: (text: string) => void = console.error): void {
 			'Usage:',
 			'  quillkit init  [<dir>]',
 			'  quillkit check [-D|--drafts] [--strict]',
-			'  quillkit render <quill> [--seed|--example|<doc.md>] [--png] [-o|--out <dir>]',
+			'  quillkit render <quill> [--seed|--example|<doc.md>] [--png|--docx] [-o|--out <dir>]',
 			'  quillkit build [quiver|studio|app] [-o|--out <dir>] [-D|--drafts]',
 			'  quillkit serve [quiver|studio|app] [-p|--port <n>] [--open]',
 			'  quillkit preview [-o|--out <dir>] [-p|--port <n>] [--open]',
@@ -290,7 +292,7 @@ function usage(print: (text: string) => void = console.error): void {
 			'The target is studio where none is named; preview serves whichever build is in --out.',
 			'check renders every version; --drafts admits drafts to the app it resolves and to a build.',
 			'check prints the warnings a pass carries, and fails on them under --strict.',
-			'render writes a PDF, or one PNG per page under --png, into --out, the working directory by default.'
+			'render writes a PDF, a Word file under --docx, or one PNG per page under --png, into --out, the working directory by default.'
 		].join('\n')
 	);
 }

@@ -223,6 +223,7 @@ const APP_SURVEY = `(async () => {
 		previewMounted: preview !== null,
 		download: document.querySelector('.qm-app-primary') !== null,
 		print: document.querySelector('[data-testid="print"]') !== null,
+		word: document.querySelector('[data-testid="download-word"]') !== null,
 		viewport: window.innerWidth,
 		scrollWidth: document.documentElement.scrollWidth,
 		shellWidth: width(shell),
@@ -257,6 +258,7 @@ interface AppSurvey {
 	previewMounted: boolean;
 	download: boolean;
 	print: boolean;
+	word: boolean;
 	viewport: number;
 	scrollWidth: number;
 	shellWidth: number | null;
@@ -399,6 +401,7 @@ describe('the built app, served under a subpath', () => {
 			expect(page.previewMounted, where).toBe(true);
 			expect(page.download, where).toBe(true);
 			expect(page.print, where).toBe(true);
+			expect(page.word, `a Typst quill downloads as Word ${where}`).toBe(true);
 		}
 	});
 

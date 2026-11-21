@@ -173,6 +173,7 @@
 					if (mine === turn) fonts = faces;
 				});
 			writes = next.formats.includes('pdf');
+			words = next.formats.includes('docx');
 			thrown = next.refused;
 			carried = next.carry.stranded;
 			// Failed with the surfaces up: the head says the state, and the strip over the
@@ -257,20 +258,22 @@
 	/** Whether the quill on screen writes a document as one file, which `pdf` is and the
 	 *  raster formats are not. Latched from the open so the control holds its place. */
 	let writes = $state.raw(false);
+	/** Whether it writes Word, which a Typst quill does and an acroform one does not. */
+	let words = $state.raw(false);
 
 	/**
 	 * The document out as the file a reader keeps, named by the ref the address bar carries.
 	 * It renders the compiled snapshot the preview is painting, so the file is the paint. A
 	 * refusal lands in `unemitted`, its own lane beside the compile's.
 	 */
-	function download(): void {
+	function download(format: 'pdf' | 'docx'): void {
 		const at = open;
 		if (!at?.session) return;
 		try {
-			const [artifact] = at.session.render({ format: 'pdf' }).artifacts;
-			if (!artifact) throw new Error(`${at.quill.backendId} emitted no PDF`);
+			const [artifact] = at.session.render({ format }).artifacts;
+			if (!artifact) throw new Error(`${at.quill.backendId} emitted no ${format}`);
 			unemitted = [];
-			save(artifact.bytes, `${at.ref}.pdf`, artifact.mimeType);
+			save(artifact.bytes, `${at.ref}.${format}`, artifact.mimeType);
 		} catch (err) {
 			unemitted = diagnosticsOf(err);
 		}
@@ -509,7 +512,16 @@
 				type="button"
 				data-testid="download-doc"
 				disabled={!open?.session}
-				onclick={download}>Download PDF</button
+				onclick={() => download('pdf')}>Download PDF</button
+			>
+		{/if}
+		{#if words}
+			<button
+				class="qm-control"
+				type="button"
+				data-testid="download-word"
+				disabled={!open?.session}
+				onclick={() => download('docx')}>Download Word</button
 			>
 		{/if}
 		<span class="state">

@@ -31,14 +31,14 @@ That is the whole install. quillkit carries `@quillmark/quiver` and `@quillmark/
 
 Every verb runs over the quiver in the working directory. A verb's argument is a target: `studio` (where you and your co-authors judge the quills, and the target when none is named), `app` (what the people filling your forms in use) or `quiver` (the packed quiver alone). `render` takes a quill instead.
 
-| Verb                      | What it does                                                          |
-| ------------------------- | --------------------------------------------------------------------- |
-| `quillkit init [<dir>]`   | lay a new quiver holding one starter quill                            |
-| `quillkit check`          | the gate: every quill's seed and example render, and the app resolves |
-| `quillkit render <quill>` | render one quill's document to a PDF, or to PNGs under `--png`        |
-| `quillkit serve [target]` | pack, serve the target over the pack, repack on save                  |
-| `quillkit build [target]` | lay the target's deploy into `dist/`                                  |
-| `quillkit preview`        | serve the build in `dist/` the way a static host will                 |
+| Verb                      | What it does                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| `quillkit init [<dir>]`   | lay a new quiver holding one starter quill                                            |
+| `quillkit check`          | the gate: every quill's seed and example render, and the app resolves                 |
+| `quillkit render <quill>` | render one quill's document to a PDF, a `.docx` under `--docx`, or PNGs under `--png` |
+| `quillkit serve [target]` | pack, serve the target over the pack, repack on save                                  |
+| `quillkit build [target]` | lay the target's deploy into `dist/`                                                  |
+| `quillkit preview`        | serve the build in `dist/` the way a static host will                                 |
 
 | Flag                  | Verbs                        |                                                                                                                                                     |
 | --------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -47,6 +47,7 @@ Every verb runs over the quiver in the working directory. A verb's argument is a
 | `-p`, `--port <n>`    | `serve`, `preview`           | `5174` for `serve`, `4174` for `preview`                                                                                                            |
 | `--open`              | `serve`, `preview`           | open the page in your browser                                                                                                                       |
 | `--png`               | `render`                     | one PNG per page rather than one PDF                                                                                                                |
+| `--docx`              | `render`                     | one Word file rather than one PDF, for a Typst quill                                                                                                |
 | `--seed`, `--example` | `render`                     | the document to render; a `<doc.md>` after the quill names a file instead                                                                           |
 | `--strict`            | `check`                      | fail a quill, or the app, on a warning it would otherwise pass with                                                                                 |
 
@@ -86,7 +87,7 @@ npx quillkit serve --open      # studio
 npx quillkit serve app --open  # the app, with your App.yaml and app.css
 ```
 
-**Studio** is for authors. Pick a quill, edit, watch it paint, read the errors: `quillkit check` answers _does it work_, studio answers _what is it like to use_. The address bar names what is on screen (`?quill=showcase@1.0.0`), so a link goes to a quill; `?quill=showcase` and `?quill=showcase@1.0` resolve the way `getQuill` resolves them. **Edit source** is the document's canonical markdown, out and back in, and **Download PDF** is the page itself, rendered from the compile the preview is painting. Nothing it holds outlives the tab.
+**Studio** is for authors. Pick a quill, edit, watch it paint, read the errors: `quillkit check` answers _does it work_, studio answers _what is it like to use_. The address bar names what is on screen (`?quill=showcase@1.0.0`), so a link goes to a quill; `?quill=showcase` and `?quill=showcase@1.0` resolve the way `getQuill` resolves them. **Edit source** is the document's canonical markdown, out and back in, and **Download PDF** is the page itself, rendered from the compile the preview is painting; **Download Word** beside it writes the same compile as a `.docx` for a Typst quill. Nothing it holds outlives the tab.
 
 `render` is the same look without a browser, for a script or an agent in a loop. It renders one quill's document through the engine and fonts `check` renders through, and prints each file it writes:
 
@@ -96,9 +97,9 @@ npx quillkit render letter@0.1 --seed --png  # the blank a reader starts from
 npx quillkit render letter draft.md -o out   # a document of your own, as out/letter-draft.pdf
 ```
 
-The quill is named the way studio's address bar names it. Files land as `<quill>-<seed|example|file>.pdf`, or `-<page>.png` for each page under `--png`; the warnings the document and the render carry print above them, and a document that does not render fails with its diagnostics.
+The quill is named the way studio's address bar names it. Files land as `<quill>-<seed|example|file>.pdf`, `.docx` under `--docx`, or `-<page>.png` for each page under `--png`; the warnings the document and the render carry print above them, and a document that does not render fails with its diagnostics.
 
-**The app** is for the people filling your forms in, and names no quill, version or file. One quill opens its form; several open a card for each. The form stands beside the page it prints, with a Form/Page switch on a phone, and **Download PDF** waits for the page to catch up with the last keystroke and refuses a page that does not render. **Print** hands the same PDF to the browser's print dialog, or opens it in a tab to print from where the browser cannot print it in place. **My documents** keeps every document a reader starts, in their browser only, to reopen, download as `.md` or delete; a reload reopens the one that was open.
+**The app** is for the people filling your forms in, and names no quill, version or file. One quill opens its form; several open a card for each. The form stands beside the page it prints, with a Form/Page switch on a phone, and **Download PDF** waits for the page to catch up with the last keystroke and refuses a page that does not render; **Download Word** does the same for a `.docx`, offered where the quill is a Typst one. **Print** hands the same PDF to the browser's print dialog, or opens it in a tab to print from where the browser cannot print it in place. **My documents** keeps every document a reader starts, in their browser only, to reopen, download as `.md` or delete; a reload reopens the one that was open.
 
 ## The app
 

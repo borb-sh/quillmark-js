@@ -22,15 +22,16 @@ quill:
   description: A multiline text field and a one-line one.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    address:
-      type: text
-      shape: lines
-      default: ""
-    line:
-      type: text
-      default: ""
+schema:
+  main:
+    fields:
+      address:
+        type: text
+        shape: lines
+        default: ""
+      line:
+        type: text
+        default: ""
 `;
 
 const q = probeQuill(QUILL_YAML);

@@ -16,30 +16,31 @@ const YAML = `quill:
   description: A card-level object beside a record list.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    addressing:
-      type: object
-      properties:
-        subject: { type: text }
-        issued: { type: date }
-        due: { type: date }
-        office: { type: text }
-        rank: { type: text, ui: { compact: true } }
-        grade: { type: text, ui: { compact: true } }
-        branch:
-          type: object
-          properties:
-            street: { type: text }
-            opened: { type: date }
-    jobs:
-      type: array
-      items:
+schema:
+  main:
+    fields:
+      addressing:
         type: object
         properties:
-          title: { type: text }
-          started: { type: date }
-      default: []
+          subject: { type: text }
+          issued: { type: date }
+          due: { type: date }
+          office: { type: text }
+          rank: { type: text, ui: { compact: true } }
+          grade: { type: text, ui: { compact: true } }
+          branch:
+            type: object
+            properties:
+              street: { type: text }
+              opened: { type: date }
+      jobs:
+        type: array
+        items:
+          type: object
+          properties:
+            title: { type: text }
+            started: { type: date }
+        default: []
 `;
 
 const wide = (scope: HTMLElement) =>

@@ -96,7 +96,7 @@ function write(answer: Document, quill: Quill): void {
 	const checks = answer.getStored('checks');
 	if ('checks' in fields) writer.set('checks', { ...((checks as object) ?? {}), figures: true });
 
-	if (quill.schema.card_kinds?.note)
+	if (quill.schema.note)
 		writer.addCard(
 			'note',
 			{ label: 'Aside', tone: 'warning' },

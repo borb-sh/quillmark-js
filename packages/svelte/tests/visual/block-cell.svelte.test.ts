@@ -28,37 +28,38 @@ const YAML = `quill:
   description: Block prose cells on a record row, and prose arrays.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    jobs:
-      type: array
-      items:
-        type: object
-        properties:
-          title:
-            type: text
-          details:
-            type: richtext
-            shape: blocks
-          address:
-            type: text
-            shape: lines
-      default: []
-    notes:
-      type: array
-      items:
-        type: richtext
-      default: []
-    tags:
-      type: array
-      items:
-        type: text
-      default: []
-    labels:
-      type: array
-      items:
-        type: text
-      default: []
+schema:
+  main:
+    fields:
+      jobs:
+        type: array
+        items:
+          type: object
+          properties:
+            title:
+              type: text
+            details:
+              type: richtext
+              shape: blocks
+            address:
+              type: text
+              shape: lines
+        default: []
+      notes:
+        type: array
+        items:
+          type: richtext
+        default: []
+      tags:
+        type: array
+        items:
+          type: text
+        default: []
+      labels:
+        type: array
+        items:
+          type: text
+        default: []
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (): Document =>

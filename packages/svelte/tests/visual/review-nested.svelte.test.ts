@@ -403,13 +403,14 @@ describe('a record’s text cell, whatever its kind', () => {
   description: A record holding a text cell.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    header:
-      type: object
-      properties:
-        recipient:
-          type: ${type}${shape === 'line' ? '' : `\n          shape: ${shape}`}
+schema:
+  main:
+    fields:
+      header:
+        type: object
+        properties:
+          recipient:
+            type: ${type}${shape === 'line' ? '' : `\n            shape: ${shape}`}
 `;
 	const memo = (recipient: string[]): Document =>
 		core.Document.parse(

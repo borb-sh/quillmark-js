@@ -74,7 +74,7 @@ export interface CardModel {
 	kind: string;
 	/**
 	 * The card's `kind` has no projectable schema: a foreign kind under
-	 * a schema that declares others, or a card under a schema with no `card_kinds` at
+	 * a schema that declares others, or a card under a schema declaring no card kind at
 	 * all. Such a card renders a recovery shell (humanized title + retype + delete)
 	 * instead of a field list, so its content is never dropped or trapped: retyping
 	 * to a declared kind re-projects it, delete removes it. Always `false` for `main`.
@@ -167,7 +167,7 @@ export interface BodyPlaceholderContext {
 	cardId: string;
 	/** The card's kind; `'main'` for the main card. */
 	kind: string;
-	/** The main card: whose `kind` is not a `card_kinds` key. */
+	/** The main card: the one `schema.main` describes. */
 	isMain: boolean;
 }
 

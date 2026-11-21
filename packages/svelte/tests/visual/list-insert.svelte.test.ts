@@ -16,22 +16,23 @@ const q = quillFromYaml(`quill:
   description: A record holding a list of lines and a list of records.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    header:
-      type: object
-      properties:
-        memo_for:
-          type: array
-          items:
-            type: text
-        signers:
-          type: array
-          items:
-            type: object
-            properties:
-              name:
-                type: text
+schema:
+  main:
+    fields:
+      header:
+        type: object
+        properties:
+          memo_for:
+            type: array
+            items:
+              type: text
+          signers:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: text
 `);
 
 const memo = (memoFor: string[], signers: string[] = ['ADA']): Document => {

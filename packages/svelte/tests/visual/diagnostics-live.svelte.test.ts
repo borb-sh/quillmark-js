@@ -17,13 +17,14 @@ const YAML = `quill:
   description: Two fields a host flags.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    subject:
-      type: text
-      default: ""
-    pages:
-      type: integer
+schema:
+  main:
+    fields:
+      subject:
+        type: text
+        default: ""
+      pages:
+        type: integer
 `;
 
 const error = (name: string, message: string): Diagnostic => ({

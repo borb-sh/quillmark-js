@@ -462,7 +462,7 @@
 
 {#snippet kindOptions()}
 	{#each kinds as k (k)}
-		<option value={k}>{kindTitle(quill.schema.card_kinds?.[k], k)}</option>
+		<option value={k}>{kindTitle(quill.schema[k], k)}</option>
 	{/each}
 {/snippet}
 
