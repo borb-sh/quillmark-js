@@ -20,8 +20,7 @@ export default defineConfig({
 	plugins: [
 		svelte({
 			compilerOptions: {
-				runes: ({ filename }) =>
-					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
+				runes: true
 			}
 		})
 	],

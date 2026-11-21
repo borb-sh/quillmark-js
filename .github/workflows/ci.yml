@@ -94,10 +94,4 @@ jobs:
             || { echo "::error::more than one svelte resolves at the floor"; exit 1; }
           test "$(node -p "require('svelte/package.json').version")" = "$floor" \
             || { echo "::error::the svelte that resolves is not $floor"; exit 1; }
-      # The committed config passes `runes` as a function of the filename, an option shape the
-      # floor's compiler refuses. `true` holds runes mode for the library's sources, and the
-      # components it also reaches in node_modules, bits-ui's, are runes-authored.
-      - name: Runes mode as a boolean
-        run: |
-          echo 'export default { compilerOptions: { runes: true } };' > packages/svelte/svelte.config.js
       - run: npm test -w packages/svelte

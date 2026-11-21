@@ -4,7 +4,7 @@
 // bin's program wants. `tsconfig.json` builds the Node half and `tsconfig.check.json` checks
 // it with the tests and the configs beside it; no file is in both a Node program and this one.
 {
-	"extends": "./tsconfig.base.json",
+	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
 		"module": "ESNext",
 		"moduleResolution": "bundler",
