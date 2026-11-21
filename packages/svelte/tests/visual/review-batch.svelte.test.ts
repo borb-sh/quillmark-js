@@ -510,15 +510,7 @@ describe('the answer keys at their edges', () => {
 		expect(r.doc.toMarkdown()).not.toContain('[x]');
 	});
 
-	it('accepts under the modifiers dismiss and the steps share', async () => {
-		const r = batch(spread);
-		await settle();
-		const order = r.drawn.at(-1)!.open;
-		chord(document.body, REVIEW_KEYS.acceptAlt);
-		expect(r.events).toEqual([{ id: order[0], action: 'accept' }]);
-	});
-
-	it('answers and steps by bare keys on the card, which keeps the focus', async () => {
+	it('answers and steps on the card by the review’s keys alone', async () => {
 		const r = batch(spread);
 		await settle();
 		const order = r.drawn.at(-1)!.open;
@@ -526,21 +518,14 @@ describe('the answer keys at their edges', () => {
 		const accept = card.querySelector<HTMLElement>('.qm-review-card-accept')!;
 		accept.focus();
 
-		press(accept, 'ArrowDown');
+		for (const key of ['Backspace', 'Delete', 'ArrowDown', 'ArrowUp']) press(accept, key);
 		await settle();
-		expect(r.lit.at(-1)).toBe(order[1]);
-		press(accept, 'ArrowUp');
-		await settle();
+		expect(r.events).toEqual([]);
 		expect(r.lit.at(-1)).toBe(order[0]);
 
-		press(accept, 'Backspace');
+		chord(accept, REVIEW_KEYS.dismiss);
 		await settle();
 		expect(r.events).toEqual([{ id: order[0], action: 'dismiss' }]);
-		press(accept, 'Delete', { repeat: true });
-		expect(r.events).toHaveLength(1);
-		press(accept, 'Delete');
-		await settle();
-		expect(r.events.map((e) => e.id)).toEqual(order.slice(0, 2));
 		expect(card.contains(document.activeElement)).toBe(true);
 	});
 

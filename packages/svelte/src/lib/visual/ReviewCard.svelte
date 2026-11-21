@@ -1,6 +1,6 @@
 <!--
  The answer card: one floating surface on the current change of a review, and the one place a
- change is answered by pointer. A quiet Dismiss and a primary Accept, each with its key, a note
+ change is answered by pointer. A quiet Dismiss and a primary Accept with its key, a note
  where the reader's own writing meets the change, and above them the line the proposal's writer
  gave for it, cut to one line. The change itself is drawn where it
  stands, so the card is the same two answers on every change. It carries no position: the count
@@ -30,9 +30,9 @@
  anywhere, a resize of the editor.
 
  It never takes the focus. A press on it keeps the focus where it is, and the keyboard reaches
- it only by `enter`. There its keys are bare: Enter on a button, Backspace or Delete to dismiss,
- the arrows up and down to step. The focus rides the card from change to change, and Escape or
- the last answer hands it back.
+ it only by `enter`. There Enter presses a button as on any, and no other key answers or
+ steps but the review's own. The focus rides the card from change to change, and Escape or the
+ last answer hands it back.
 -->
 <script lang="ts">
 	import { tick } from 'svelte';
@@ -56,10 +56,8 @@
 		/** The answer key whose press only brought the card, whose hint says to press it again. */
 		asked?: 'accept' | 'dismiss';
 		onAnswer(action: 'accept' | 'dismiss'): void;
-		/** Go to the next change, or the previous. */
-		onStep(dir: 1 | -1): void;
 	}
-	let { id, root, inset, hidden, outdated, note, asked, onAnswer, onStep }: Props = $props();
+	let { id, root, inset, hidden, outdated, note, asked, onAnswer }: Props = $props();
 	const noteId = $props.id();
 
 	const t = wording();
@@ -293,16 +291,6 @@
 			leave();
 			return;
 		}
-		if (e.key === 'Backspace' || e.key === 'Delete') {
-			e.preventDefault();
-			if (!e.repeat) answer('dismiss');
-			return;
-		}
-		if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-			e.preventDefault();
-			onStep(e.key === 'ArrowUp' ? -1 : 1);
-			return;
-		}
 		// A held Enter clicks its button on every repeat, and a held key answers once.
 		if (e.key === 'Enter' && e.repeat) {
 			e.preventDefault();
@@ -351,13 +339,14 @@
 		{#if outdated}<span class="qm-review-card-note">{t.strings.reviewOutdated}</span>{/if}
 		<button
 			type="button"
-			class="qm-review-card-dismiss qm-focus-ring"
+			class={[
+				'qm-review-card-dismiss qm-focus-ring',
+				{ 'qm-review-card-asked': asked === 'dismiss' }
+			]}
 			tabindex="-1"
+			title={keycap(REVIEW_KEYS.dismiss)}
 			aria-keyshortcuts={keyshortcut(REVIEW_KEYS.dismiss)}
-			onclick={() => answer('dismiss')}
-			>{t.strings.reviewDismiss}<kbd class={{ 'qm-review-card-asked': asked === 'dismiss' }}
-				>{keycap(REVIEW_KEYS.dismiss)}</kbd
-			></button
+			onclick={() => answer('dismiss')}>{t.strings.reviewDismiss}</button
 		>
 		<button
 			type="button"
@@ -440,7 +429,8 @@
 		font: inherit;
 		border-radius: var(--_qm-radius-inner);
 	}
-	/* The press that brought the card asks for another: its key's hint rings once. */
+	/* The press that brought the card asks for another: Accept's key hint rings once, and
+	   Dismiss itself, which shows no key. */
 	.qm-review-card-asked {
 		outline: var(--_qm-border-width) solid currentColor;
 		outline-offset: 2px;
