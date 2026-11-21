@@ -26,8 +26,8 @@
 	},
 	"devDependencies": {
 		"@quillmark/wasm": ">=0.140.0-0",
-		"@sveltejs/adapter-static": "^4.0.0",
-		"@sveltejs/kit": "^3.1.0",
+		"@sveltejs/adapter-static": "^4.0.1",
+		"@sveltejs/kit": "^3.4.0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"svelte": "^5.57.1",
 		"svelte-check": "^4.7.6",
