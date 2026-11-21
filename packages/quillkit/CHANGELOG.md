@@ -8,7 +8,7 @@
 
 **Studio and the app download Word.** A **Download Word** button beside **Download PDF** writes the document as a `.docx` through the engine's `docx` format, offered where the quill on screen lists it, which a Typst quill does and an acroform one does not. The app's waits for the page as its PDF does and refuses a document that does not render.
 
-**`quillkit render <quill>` renders one quill's document to files.** The document is the quill's example where it declares one, else its seed; `--seed` or `--example` names one, and a markdown path after the quill renders that file. It writes one PDF, or one PNG per page under `--png`, into `--out` or the working directory, through the engine and fonts `check` renders through, and prints the files it wrote.
+**`quillkit render <quill>` renders one quill's document to files.** The document is the quill's example where it declares one, else its seed; `--seed` or `--example` names one, and a markdown path after the quill renders that file. It writes one PDF, one `.docx` under `--docx`, or one PNG per page under `--png`, into `--out` or the working directory, through the engine and fonts `check` renders through, and prints the files it wrote.
 
 ## v0.25.0 - 2026-11-14
 

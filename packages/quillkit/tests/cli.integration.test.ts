@@ -282,12 +282,32 @@ describe('quillkit render', () => {
 		RENDER_MS
 	);
 
-	it('refuses two documents, and a render with no quill, before writing anything', async () => {
+	it(
+		'writes the seed as one Word file under --docx',
+		async () => {
+			const source = await temp.collection();
+			const { stdout } = await run(
+				process.execPath,
+				[BIN, 'render', 'usaf_memo', '--seed', '--docx'],
+				{
+					cwd: source
+				}
+			);
+			const [file, ...rest] = written(stdout);
+			expect(rest).toEqual([]);
+			expect(file!.endsWith('.docx')).toBe(true);
+			expect((await readFile(file!)).subarray(0, 2).toString('latin1')).toBe('PK');
+		},
+		RENDER_MS
+	);
+
+	it('refuses two documents, two formats, and a render with no quill, before writing anything', async () => {
 		const source = await temp.collection();
 		const before = await readdir(source);
 		for (const args of [
 			['render', 'showcase', '--seed', '--example'],
 			['render', 'showcase', 'doc.md', '--seed'],
+			['render', 'showcase', '--png', '--docx'],
 			['render', '--png']
 		])
 			expect((await refused(args, source)).message, args.join(' ')).toMatch(/Usage:/);
