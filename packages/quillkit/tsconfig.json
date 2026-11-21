@@ -2,7 +2,7 @@
 // builds, and a `client/` in this root would emit a second `dist/client` over the one
 // `vite build` writes.
 {
-	"extends": "./tsconfig.base.json",
+	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",

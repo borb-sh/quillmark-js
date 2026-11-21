@@ -1,0 +1,10 @@
+// What holds for every package's TypeScript programs. Which half a program is, Node emit or
+// browser resolution, is the config that extends this.
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true
+	}
+}

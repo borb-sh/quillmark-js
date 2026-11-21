@@ -18,8 +18,7 @@ export default defineConfig({
 	plugins: [
 		sveltekit({
 			compilerOptions: {
-				runes: ({ filename }) =>
-					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
+				runes: true
 			},
 			// A static SPA: `+layout.ts` sets ssr=false/prerender=false, so the fallback
 			// is the whole app, with no per-route prerender and no server.
