@@ -3,9 +3,8 @@
 // `/visual` name a place in their hooks, and a type declared twice is drift with nothing to catch
 // it.
 //
-// Paths for places, indexes for structure ops. `fieldPathForAddr` and `addrForFieldPath` are public
-// for a host holding both a hook's path and a verb that takes an `Addr`; `cardPath` is the editor's
-// own. The grammar is the boundary's, reached through `core()`.
+// Paths for places, indexes for structure ops. The grammar is the boundary's, reached through
+// `core()`.
 import type { Addr, DocPathSeg, HitGranularity, PathStep } from '@quillmark/wasm';
 import { core } from './lifecycle.js';
 

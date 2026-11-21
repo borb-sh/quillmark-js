@@ -20,7 +20,7 @@ Each subpath is its own module root; a bundler pulls only what the entry you imp
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `@quillmark/svelte/core`    | What the surfaces share: the `DocPath`/`Place` address vocabulary, the `EditorError` channel, `init`. No UI framework. |
 | `@quillmark/svelte/preview` | The live preview: `createPreview` + `<Preview>`. Reaches nothing editor-side.                                          |
-| `@quillmark/svelte/visual`  | The federated WYSIWYG: `<VisualEditor>`, the codec's `createField` prose leaf.                                         |
+| `@quillmark/svelte/visual`  | The federated WYSIWYG: `<VisualEditor>`.                                                                               |
 | `@quillmark/svelte`         | Re-exports `/core`.                                                                                                    |
 | `@quillmark/svelte/preset`  | The opt-in stylesheet for the page around a surface ([THEMING.md](THEMING.md)).                                        |
 
@@ -235,7 +235,7 @@ While a review is open, `REVIEW_KEYS` answer the current item from anywhere on t
 
 ### Wording
 
-The package ships English and a seam to replace it. `strings` is keyed and **partial**: set what you have translations for, and the rest stay the package's. Several keys are **accessible names** rather than decoration (the card controls, the add trigger), so an untranslated surface reads the wrong language to a screen reader. A string is words alone: a glyph drawn beside it, the `+` on every add control, is the control's own. `DEFAULT_VISUAL_STRINGS` is the English, exported so you can compose against it. A control's name is the name alone: where it has a shortcut the editor prints the keys beside the name in the control's tooltip and states them as `aria-keyshortcuts`, both read off the binding, so a translation carries no chord. `<Preview>` takes its own `strings`: the states it shows when there is nothing to paint, the zoom pill's action, and what a screen reader hears: the names of the pane and each page, and the pages standing again after a state it was told of.
+The package ships English and a seam to replace it. `strings` is keyed and **partial**: set what you have translations for, and the rest stay the package's. Several keys are **accessible names** rather than decoration (the card controls, the add trigger), so an untranslated surface reads the wrong language to a screen reader. A string is words alone: a glyph drawn beside it, the `+` on every add control, is the control's own. A control's name is the name alone: where it has a shortcut the editor prints the keys beside the name in the control's tooltip and states them as `aria-keyshortcuts`, both read off the binding, so a translation carries no chord. `<Preview>` takes its own `strings`: the states it shows when there is nothing to paint, the zoom pill's action, and what a screen reader hears: the names of the pane and each page, and the pages standing again after a state it was told of.
 
 ```svelte
 <VisualEditor
@@ -320,7 +320,7 @@ Both editor→preview hops or neither. A control reports its focus and no caret 
 
 A pick carries a caret where the compile tracks the content under the point, and the field alone where it tracks only the placement — a scalar the plate prints without tracking. `setCaret` takes both: an absent `pos` reveals and focuses the field, which is the whole of what a click on plate-placed ink can mean. The address may name an array element (`main.keywords[0]`), which lands on that row.
 
-A consumer holding an `Addr` of its own maps it with `fieldPathForAddr` (from `@quillmark/svelte/core`). The playground app's split-pane route is the full reference shell: one session, both bridge directions, the preview following edits, and diagnostics routed inline.
+A consumer holding an `Addr` of its own maps it with the Document's `pathFor`. The playground app's split-pane route is the full reference shell: one session, both bridge directions, the preview following edits, and diagnostics routed inline.
 
 ## Errors
 
