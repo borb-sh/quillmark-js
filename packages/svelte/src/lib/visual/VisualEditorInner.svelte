@@ -717,7 +717,6 @@
 	let answerCard = $state<ReviewCard | undefined>();
 	const reviewKeys = keydownHandler({
 		[REVIEW_KEYS.accept]: () => answerKey('accept'),
-		[REVIEW_KEYS.acceptAlt]: () => answerKey('accept'),
 		[REVIEW_KEYS.dismiss]: () => answerKey('dismiss'),
 		[REVIEW_KEYS.next]: () => {
 			void step(1, inside);
@@ -739,10 +738,10 @@
 	let named: ReviewKeyName | undefined;
 	const reviewKeyName = keydownHandler(
 		Object.fromEntries(
-			(['accept', 'acceptAlt', 'dismiss', 'next', 'previous'] as const).map((key) => [
+			(['accept', 'dismiss', 'next', 'previous'] as const).map((key) => [
 				REVIEW_KEYS[key],
 				() => {
-					named = key === 'acceptAlt' ? 'accept' : key;
+					named = key;
 					return true;
 				}
 			])
@@ -2280,7 +2279,6 @@
 			? undefined
 			: reviewing.items.find((i) => i.id === reviewing.lit)?.note}
 		onAnswer={answerCurrent}
-		onStep={(dir) => void step(dir, false)}
 	/>
 	<div class="qm-visually-hidden" role="status">{reviewPlace}</div>
 	<!-- Beside the review's region rather than in it or in the toast's: a status is read whole,

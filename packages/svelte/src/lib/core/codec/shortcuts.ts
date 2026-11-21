@@ -60,11 +60,9 @@ export const TABLE_KEYS = {
 } as const;
 
 /** The review's keys, the editor's wherever the focus is while a review is open. No leaf binds
- *  one of them, `accept` included, so each answers alike in every field; `acceptAlt` is `accept`
- *  under the modifiers `dismiss` and the steps share. */
+ *  one of them, `accept` included, so each answers alike in every field. */
 export const REVIEW_KEYS = {
 	accept: 'Mod-Enter',
-	acceptAlt: 'Mod-Alt-Enter',
 	dismiss: 'Mod-Alt-Backspace',
 	next: 'Mod-Alt-ArrowDown',
 	previous: 'Mod-Alt-ArrowUp'
@@ -209,11 +207,7 @@ const SHORTCUTS: readonly {
 	},
 	{ scope: 'table', label: 'shortcutAlignColumn', keys: [T.alignLeft, T.alignRight] },
 	{ scope: 'table', label: 'shortcutDeleteCells', keys: [T.erase, T.eraseAlt] },
-	{
-		scope: 'review',
-		label: 'shortcutReviewAccept',
-		keys: [REVIEW_KEYS.accept, REVIEW_KEYS.acceptAlt]
-	},
+	{ scope: 'review', label: 'shortcutReviewAccept', keys: [REVIEW_KEYS.accept] },
 	{ scope: 'review', label: 'shortcutReviewDismiss', keys: [REVIEW_KEYS.dismiss] },
 	{ scope: 'review', label: 'shortcutReviewNext', keys: [REVIEW_KEYS.next] },
 	{ scope: 'review', label: 'shortcutReviewPrevious', keys: [REVIEW_KEYS.previous] }

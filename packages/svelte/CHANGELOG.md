@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Each review action has one key, and the answer card shows Accept's alone.** `REVIEW_KEYS.acceptAlt` is removed, so ⌘/Ctrl+Alt+Enter no longer accepts. With the focus on the answer card, Backspace, Delete and the arrows do nothing, where they dismissed and stepped: the review keys answer there as everywhere, and Enter presses the focused button. The Dismiss button drops its key hint and carries the key as its tooltip.
+
 ## v0.40.0 - 2026-11-21
 
 **The `@quillmark/wasm` peer floor is `>=0.140.0-0`.** The editor reads a card kind's schema off `quill.schema` beside `main`, where it read `quill.schema.card_kinds`, so under an older wasm it finds no kind: every card draws its recovery shell and none can be added (Quillmark's 0.139 → 0.140 migration).
