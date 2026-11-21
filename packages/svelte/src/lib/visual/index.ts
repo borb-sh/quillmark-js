@@ -1,8 +1,8 @@
 // `@quillmark/svelte/visual`: the WYSIWYG surface.
 //
 // The federated VisualEditor: a thin Svelte composition over many small editors.
-// Each content leaf is the codec's `createField` prose leaf; scalar fields are
-// form controls; structure/cards are the editor's own. Depends on `/core` and the
+// Each content leaf is the codec's prose leaf; scalar fields are form controls;
+// structure/cards are the editor's own. Depends on `/core` and the
 // codec. Relative imports (not `$lib`): svelte-package ships this as-is.
 //
 // The barrel carries what a consumer story wants, and nothing else: a symbol
@@ -18,16 +18,9 @@ import '../core/theme.css';
 export { default as VisualEditor } from './VisualEditor.svelte';
 export type { VisualEditorProps } from './props.js';
 
-// The prose leaf: the vanilla mount API a non-Svelte consumer (or a custom
-// surface) builds on.
-export { createField } from '../core/codec/index.js';
-export type { CreateFieldOpts, FieldController } from '../core/codec/index.js';
-
 // What the surface says, and how it words a diagnostic. `strings` is keyed and
-// partial (unset keys take the package's English) and `DEFAULT_VISUAL_STRINGS` is
-// that English, exported so a consumer can compose against it rather than restate
-// it. The empty body's per-card hook is the `bodyPlaceholder` key inside it.
-export { DEFAULT_VISUAL_STRINGS } from './strings.js';
+// partial: unset keys take the package's English. The empty body's per-card hook
+// is the `bodyPlaceholder` key inside it.
 export type { VisualStrings, VisualStringsInput, FormatDiagnostic } from './strings.js';
 export type { BodyPlaceholder, BodyPlaceholderContext } from './structure.js';
 
@@ -54,8 +47,6 @@ export { proposalsBetween, reviewRevised } from './proposals.js';
 export type { Proposed, ProposalsOpts } from './proposals.js';
 export type { ReviewAction } from '../core/codec/index.js';
 export { REVIEW_KEYS } from '../core/codec/index.js';
-export { reviewKeysHeard } from './hears.js';
-export type { ReviewKeyName } from './hears.js';
 
 // The `$ext.editor` write unit. A consumer seeding editor-side chrome
 // state (a card title, the tips channel) goes through this rather than `storeExt`,
@@ -64,6 +55,5 @@ export { patchEditorExt } from './ext.js';
 
 // What the editor emits. Every hook naming a place speaks the canonical `DocPath`
 // the preview and the diagnostics already do, so the bridge is
-// `onCaretMove={preview.focusPosition}` and nothing here translates; the conversions
-// for a consumer holding an `Addr` of its own live in `/core`, beside the grammar.
+// `onCaretMove={preview.focusPosition}` and nothing here translates.
 export type { ActiveLeaf, CardId, CardOp, ChangeSource, EditorChange } from './signals.js';

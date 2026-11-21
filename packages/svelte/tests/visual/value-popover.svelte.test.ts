@@ -16,7 +16,7 @@ import { toggleMark } from 'prosemirror-commands';
 import { AllSelection, TextSelection } from 'prosemirror-state';
 import type { Content, Document, PathStep, TableProps } from '@quillmark/wasm';
 import { FIELD_KEYS, hasMarks } from '$lib/core/codec';
-import { DEFAULT_VISUAL_STRINGS } from '$lib/visual';
+import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { keycap, keyshortcut } from '$lib/visual/strings';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
 import {

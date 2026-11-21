@@ -15,8 +15,6 @@ export { init } from './lifecycle.js';
 // preview surfaces and the editor lands, whose caret is optional. Declared here because `/preview`
 // and `/visual` both name a place in their hooks.
 export type { DocPath, Landing, Place } from './address.js';
-// The hop between that vocabulary and the `Addr` the document verbs take.
-export { fieldPathForAddr, addrForFieldPath } from './address.js';
 // The text change `applyExternal` maps the caret through.
 export type { Delta } from './codec/positions.js';
 

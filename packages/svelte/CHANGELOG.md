@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Breaking: the entries export only what a consumer builds with.** `/visual` no longer exports `createField` or its `CreateFieldOpts` and `FieldController` types, nor `reviewKeysHeard` or its `ReviewKeyName` type; `/core` and the root no longer export `fieldPathForAddr` or `addrForFieldPath`; and `/preview` and `/visual` no longer export `DEFAULT_PREVIEW_STRINGS` or `DEFAULT_VISUAL_STRINGS`. A surface's `strings` stays partial, its unset keys the package's English, and a host holding an `Addr` names its place with the Document's `pathFor`.
+
 ## v0.41.0 - 2026-11-21
 
 **Each review action has one key, and the answer card shows Accept's alone.** `REVIEW_KEYS.acceptAlt` is removed, so ⌘/Ctrl+Alt+Enter no longer accepts. With the focus on the answer card, Backspace, Delete and the arrows do nothing, where they dismissed and stepped: the review keys answer there as everywhere, and Enter presses the focused button. The Dismiss button drops its key hint and carries the key as its tooltip.

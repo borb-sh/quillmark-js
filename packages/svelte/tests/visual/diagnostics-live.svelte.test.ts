@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import type { Diagnostic, Quill } from '@quillmark/wasm';
-import { DEFAULT_VISUAL_STRINGS as S } from '$lib/visual';
+import { DEFAULT_VISUAL_STRINGS as S } from '$lib/visual/strings';
 import { fieldTitle } from '$lib/visual/structure';
 import { quillFromYaml } from '../helpers/fixtures.js';
 import { field, mountEditor, unmountAll } from '../helpers/surface.svelte.js';

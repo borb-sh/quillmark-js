@@ -3,8 +3,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
-import { bindDocument, seedDocument, writeFrom } from '../src/index.js';
-import type { DocumentBinding, WriteFromOpts } from '../src/index.js';
+import { bindDocument, seedDocument } from '../src/document.js';
+import { writeFrom } from '../src/fork.js';
+import type { DocumentBinding } from '../src/document.js';
+import type { WriteFromOpts } from '../src/fork.js';
 import { edit, quill, snapshot } from './helpers.js';
 
 const q = quill();

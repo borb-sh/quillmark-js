@@ -6,7 +6,8 @@
 // Some edits are made from a revision the peer held earlier (`writeFrom`), as a slow writer's are.
 import { describe, expect, it } from 'vitest';
 import type { Addr, Change, Content, Document, Quill } from '@quillmark/wasm';
-import { writeFrom, type CardOp } from '../src/index.js';
+import { writeFrom } from '../src/fork.js';
+import { type CardOp } from '../src/document.js';
 import * as Y from 'yjs';
 import { project } from '../src/project.js';
 import { contentRoot, contentTypes, readField } from '../src/shape.js';

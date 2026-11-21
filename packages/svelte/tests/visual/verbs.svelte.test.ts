@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import type { Document, Quill } from '@quillmark/wasm';
-import { addrForFieldPath } from '$lib/core';
+import { addrForFieldPath } from '$lib/core/address.js';
 import { humanize } from '$lib/visual/structure';
 import { quill, quillFromYaml, example } from '../helpers/fixtures.js';
 import {

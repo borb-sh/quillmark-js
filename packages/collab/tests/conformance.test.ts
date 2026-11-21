@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { checkServerStore, type Caller } from '../src/conformance.js';
+import { localLog } from '../src/local.js';
 import {
-	localLog,
 	type Appended,
 	type Checkpoint,
 	type Opened,
 	type SessionLog,
 	type Version
-} from '../src/index.js';
+} from '../src/session.js';
 
 const MAX = 1 << 12;
 

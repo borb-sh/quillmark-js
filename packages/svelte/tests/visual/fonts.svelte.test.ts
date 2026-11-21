@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import type { FontFace as LibraryFace } from '@quillmark/wasm';
-import { DEFAULT_VISUAL_STRINGS } from '$lib/visual';
+import { DEFAULT_VISUAL_STRINGS } from '$lib/visual/strings';
 import { familiesOf, registerFaces } from '$lib/visual/fonts.js';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
 import { mountInner, settle, unmountAll, type InnerRef } from '../helpers/surface.svelte.js';

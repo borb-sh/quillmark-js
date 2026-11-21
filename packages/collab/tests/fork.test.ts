@@ -3,15 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Document } from '@quillmark/wasm';
 import * as Y from 'yjs';
-import {
-	bindDocument,
-	cardOps,
-	changesSince,
-	seedDocument,
-	Unwritable,
-	writeFrom
-} from '../src/index.js';
-import type { CardOp, DocumentBinding } from '../src/index.js';
+import { bindDocument, cardOps, seedDocument } from '../src/document.js';
+import { changesSince, Unwritable, writeFrom } from '../src/fork.js';
+import type { CardOp, DocumentBinding } from '../src/document.js';
 import { edit, quill, snapshot } from './helpers.js';
 
 const q = quill();

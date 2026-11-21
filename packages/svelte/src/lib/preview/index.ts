@@ -9,5 +9,4 @@ export { createPreview } from './controller.js';
 export type { PreviewOptions, PreviewController } from './controller.js';
 export { default as Preview } from './Preview.svelte';
 
-export { DEFAULT_PREVIEW_STRINGS } from './strings.js';
 export type { PreviewStrings, PreviewStringsInput } from './strings.js';

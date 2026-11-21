@@ -1,10 +1,13 @@
 // address.ts: the one hop between the `DocPath` grammar and the `Addr` the document
 // verbs take, both directions. Pure address math, no document and no surface.
 import { describe, it, expect } from 'vitest';
-import { fieldPathForAddr, addrForFieldPath } from '$lib/core';
-// Not on `/core`'s entry: the nested split is the editor's ladder, not a hop a host
-// needs (`core/index.ts` carries what more than one surface speaks).
-import { nestedAddrForFieldPath, nearestAddrForFieldPath, cardPath } from '$lib/core/address.js';
+import {
+	fieldPathForAddr,
+	addrForFieldPath,
+	nestedAddrForFieldPath,
+	nearestAddrForFieldPath,
+	cardPath
+} from '$lib/core/address.js';
 
 describe('fieldPathForAddr', () => {
 	it('maps the main body and main fields', () => {
