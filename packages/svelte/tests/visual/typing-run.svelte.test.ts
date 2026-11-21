@@ -15,12 +15,13 @@ const QUILL_YAML = `quill:
   description: Two numbers.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    count:
-      type: integer
-    pages:
-      type: integer
+schema:
+  main:
+    fields:
+      count:
+        type: integer
+      pages:
+        type: integer
 `;
 
 let q: Quill;

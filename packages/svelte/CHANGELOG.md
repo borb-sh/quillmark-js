@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.140.0-0`.** The editor reads a card kind's schema off `quill.schema` beside `main`, where it read `quill.schema.card_kinds`, so under an older wasm it finds no kind: every card draws its recovery shell and none can be added (Quillmark's 0.139 → 0.140 migration).
+
 **Enter at the start of a heading in a list opens a plain item above it.** The new item above took the heading's type, so pressing Enter before a heading item left an empty heading bullet where a paragraph opens outside a list. It now opens a paragraph item, the heading moving down with the caret.
 
 **A step to the next change brings its answer card into view.** A step scrolled for a fixed room under the change, about half the card's height, so a change near the pane's foot could land with its card below the fold, and a change in a long paragraph with its card under the paragraph's last line out of sight. A step, `revealReview` and an answer key's first press now scroll for the change and its card as the card stands.

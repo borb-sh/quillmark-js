@@ -35,13 +35,14 @@ const LIST = `quill:
   description: A list of lines.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    lines:
-      type: array
-      items: { type: text }
+schema:
+  main:
+    fields:
+      lines:
+        type: array
+        items: { type: text }
 `;
-const CAPPED = LIST.replace('items: { type: text }', 'items: { type: text }\n      max: 2');
+const CAPPED = LIST.replace('items: { type: text }', 'items: { type: text }\n        max: 2');
 
 describe('structural undo', () => {
 	it('puts a deleted card back where it was, holding what it held', async () => {

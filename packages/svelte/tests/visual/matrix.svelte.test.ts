@@ -494,22 +494,23 @@ const LISTS = `quill:
   description: An open checklist and a matrix declaring a default.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    tags:
-      type: matrix
-      title: Tags
-      open: true
-      members:
-        draft: Draft
-    preset:
-      type: matrix
-      title: Preset
-      members:
-        a: Alpha
-        b: Beta
-      default:
-        a: true
+schema:
+  main:
+    fields:
+      tags:
+        type: matrix
+        title: Tags
+        open: true
+        members:
+          draft: Draft
+      preset:
+        type: matrix
+        title: Preset
+        members:
+          a: Alpha
+          b: Beta
+        default:
+          a: true
 `;
 
 describe('an open checklist', () => {

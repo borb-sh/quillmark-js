@@ -31,36 +31,37 @@ const QUILL_YAML = `quill:
   description: One cell of each standing a field takes against its default.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    heading:
-      type: text
-    kept:
-      type: text
-      default: Kept
-    skippable:
-      type: text
-      default: ""
-    pages:
-      type: integer
-      default: 12
-    notify:
-      type: boolean
-      default: true
-    ref:
-      type: text?
-    lines:
-      type: array
-      items:
+schema:
+  main:
+    fields:
+      heading:
         type: text
-      default:
-        - First line
-    contact:
-      type: object
-      properties:
-        desk:
+      kept:
+        type: text
+        default: Kept
+      skippable:
+        type: text
+        default: ""
+      pages:
+        type: integer
+        default: 12
+      notify:
+        type: boolean
+        default: true
+      ref:
+        type: text?
+      lines:
+        type: array
+        items:
           type: text
-          default: B-12
+        default:
+          - First line
+      contact:
+        type: object
+        properties:
+          desk:
+            type: text
+            default: B-12
 `;
 
 let q: Quill;

@@ -55,7 +55,7 @@ describe('a document loaded from markdown', () => {
 		// Cards take the same lowering as main, so the authored shape reaches them too.
 		const { q, doc } = loaded();
 		const seeded = q.seedDocument();
-		const kind = Object.keys(q.schema.card_kinds ?? {})[0];
+		const kind = Object.keys(q.schema).filter((k) => k !== 'main')[0];
 		const card = q.seedCard(kind, seeded.seedOverlay(kind));
 		expect(card).toBeTruthy();
 		seeded.unchecked.insertCard(card!, 0);

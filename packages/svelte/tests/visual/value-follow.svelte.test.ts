@@ -30,25 +30,26 @@ const YAML = `quill:
   description: By-value prose leaves, and a number beside them.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    notes:
-      type: array
-      items:
-        type: richtext
-      default: []
-    jobs:
-      type: array
-      items:
-        type: object
-        properties:
-          title:
-            type: text
-          summary:
-            type: richtext
-      default: []
-    pages:
-      type: integer
+schema:
+  main:
+    fields:
+      notes:
+        type: array
+        items:
+          type: richtext
+        default: []
+      jobs:
+        type: array
+        items:
+          type: object
+          properties:
+            title:
+              type: text
+            summary:
+              type: richtext
+        default: []
+      pages:
+        type: integer
 `;
 const probe = () => quillFromYaml(YAML);
 const load = (): Document =>

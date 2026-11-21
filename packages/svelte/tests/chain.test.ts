@@ -22,7 +22,7 @@ describe('substrate chain', () => {
 		expect(quill.metadata.name).toBe('showcase');
 		expect(quill.backendId).toBe('typst');
 		expect(Object.keys(quill.schema.main.fields).length).toBeGreaterThan(0);
-		expect(quill.schema.card_kinds).toHaveProperty('section');
+		expect(quill.schema).toHaveProperty('section');
 
 		const doc = quill.seedDocument();
 		// Composed from the quill's own metadata; the contract is `name@MAJOR.MINOR`,

@@ -181,7 +181,7 @@ function contentAddrs(q: Quill, p: Peer): Addr[] {
 		if (f.type === 'richtext') out.push({ field: name });
 	p.doc.cards.forEach((c, i) => {
 		out.push({ card: i });
-		for (const [name, f] of Object.entries(q.schema.card_kinds?.[c.kind]?.fields ?? {}))
+		for (const [name, f] of Object.entries(q.schema[c.kind]?.fields ?? {}))
 			if (f.type === 'richtext') out.push({ card: i, field: name });
 	});
 	return out;
@@ -208,7 +208,7 @@ function contentRoots(p: Peer): { addr: Addr; card: string; root: string }[] {
 /** One random local edit on `p`, pushed; whether anything landed. */
 function edit(r: Rng, q: Quill, p: Peer): boolean {
 	const doc = p.doc;
-	const kinds = Object.keys(q.schema.card_kinds ?? {});
+	const kinds = Object.keys(q.schema).filter((k) => k !== 'main');
 	let op: CardOp | undefined;
 	try {
 		switch (

@@ -39,12 +39,12 @@ describe('the card header', () => {
 		const mounted = mountEditor(q, doc);
 		const { target } = mounted;
 
-		expect(q.schema.card_kinds!.section.title).toBeUndefined();
+		expect(q.schema.section.title).toBeUndefined();
 		const heading = literal(fieldValues(doc.cards[kinds.indexOf('section')].payloadItems).heading);
 		expect(heading).toBeTruthy();
 		expect(header(cardOf(target, kinds, 'section')).placeholder).toBe(heading);
 
-		const figure = q.schema.card_kinds!.figure.title;
+		const figure = q.schema.figure.title;
 		expect(figure).toBeTruthy();
 		expect(header(cardOf(target, kinds, 'figure')).placeholder).toBe(figure);
 	});
@@ -154,7 +154,7 @@ describe('a card rename', () => {
 
 		rename(title, 'Draft');
 		// A form control's commit is the lane that re-derives: the `numbered` switch.
-		openField(section, q.schema.card_kinds!.section, 'numbered')
+		openField(section, q.schema.section, 'numbered')
 			.querySelector<HTMLElement>('[role="switch"]')!
 			.click();
 		flushSync();
@@ -177,9 +177,11 @@ describe('the add menu', () => {
 			el.textContent?.trim()
 		);
 		expect(offered).toEqual(
-			Object.entries(q.schema.card_kinds!).map(([kind, s]) => s.title ?? humanize(kind))
+			Object.entries(q.schema)
+				.filter(([k]) => k !== 'main')
+				.map(([kind, s]) => s.title ?? humanize(kind))
 		);
-		expect(offered).toContain(q.schema.card_kinds!.note.title);
+		expect(offered).toContain(q.schema.note.title);
 		expect(offered).toContain(humanize('section'));
 
 		// Closed and let settle inside the test: the open menu locks the body's scroll, and
@@ -200,9 +202,9 @@ const PERSON = `quill:
   description: A kind with no title, named by an inline prose field.
 typst:
   plate_file: plate.typ
-main:
-  fields: {}
-card_kinds:
+schema:
+  main:
+    fields: {}
   person:
     fields:
       name:

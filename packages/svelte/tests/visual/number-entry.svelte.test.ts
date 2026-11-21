@@ -190,11 +190,12 @@ it('draws the refusal of an entry outside the grammar on its field', () => {
   description: One integer.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    pages:
-      type: integer
-      default: 12
+schema:
+  main:
+    fields:
+      pages:
+        type: integer
+        default: 12
 `);
 	const doc = q.seedDocument();
 	const { target } = mountEditor(q, doc);

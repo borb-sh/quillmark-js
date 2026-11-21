@@ -97,9 +97,7 @@ describe('a card grouped by top-level objects', () => {
 		expect(subform.classList.contains('qm-object-flat')).toBe(true);
 		expect(subform.getAttribute('aria-labelledby')).toBe(header.id);
 		const parked = mounted.target.querySelector(`#${subform.getAttribute('aria-describedby')}`);
-		expect(parked?.textContent).toBe(
-			guidanceText(q.schema.card_kinds!.credits.fields.publisher.description!)
-		);
+		expect(parked?.textContent).toBe(guidanceText(q.schema.credits.fields.publisher.description!));
 		expect(publisher.querySelector('.qm-group-head')?.contains(parked!)).toBe(true);
 	});
 

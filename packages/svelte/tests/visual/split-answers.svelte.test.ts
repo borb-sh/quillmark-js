@@ -25,24 +25,25 @@ const q = quillFromYaml(`quill:
   description: A record holding lines, a list of lines and paragraphs.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    distribution:
-      type: richtext
-      shape: lines
-    header:
-      type: object
-      properties:
-        memo_for:
-          type: richtext
-          shape: lines
-        cc:
-          type: array
-          items:
-            type: text
-        details:
-          type: richtext
-          shape: blocks
+schema:
+  main:
+    fields:
+      distribution:
+        type: richtext
+        shape: lines
+      header:
+        type: object
+        properties:
+          memo_for:
+            type: richtext
+            shape: lines
+          cc:
+            type: array
+            items:
+              type: text
+          details:
+            type: richtext
+            shape: blocks
 `);
 
 interface Header {

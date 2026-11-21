@@ -47,10 +47,12 @@ describe('the recovery shell', () => {
 		const options = [
 			...card.querySelectorAll<HTMLOptionElement>('.qm-recovery-retype option')
 		].filter((o) => o.value);
-		expect(options.map((o) => o.value)).toEqual(Object.keys(q.schema.card_kinds!));
+		expect(options.map((o) => o.value)).toEqual(Object.keys(q.schema).filter((k) => k !== 'main'));
 		// Each named as the add menu names it: the kind's `title`, else its humanized key.
 		expect(options.map((o) => o.textContent)).toEqual(
-			Object.entries(q.schema.card_kinds!).map(([kind, s]) => s.title ?? humanize(kind))
+			Object.entries(q.schema)
+				.filter(([k]) => k !== 'main')
+				.map(([kind, s]) => s.title ?? humanize(kind))
 		);
 		expect(card.querySelector('.qm-card-delete')).not.toBeNull();
 	});

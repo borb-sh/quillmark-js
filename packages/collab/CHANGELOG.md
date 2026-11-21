@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The `@quillmark/wasm` peer floor is `>=0.140.0-0`.** A card's field order is read off its kind's schema on `quill.schema` beside `main`, where it was read off `quill.schema.card_kinds` (Quillmark's 0.139 → 0.140 migration).
+
 ## v0.4.0 - 2026-11-14
 
 **Held writes are removed.** `writeFrom` and `writeLog` no longer take `hold`, and `Written` and `writeLog`'s answer no longer carry `held`; `writeHeld`, `heldState` and the `Held`, `HeldText`, `HeldValue`, `HeldCard`, `HeldPosition`, `HeldState` and `HeldOpts` types are gone. A write from a revision is written whole, and `conflicts` lists where it meets a change made since, as with `hold: 'none'`. A host that lets a reader take part of an answer draws it as proposals in the editor (`@quillmark/svelte`'s review layer) instead.

@@ -27,27 +27,28 @@ const probe = () =>
   description: Arrays of multiline elements beside one-line ones.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    addresses:
-      type: array
-      items:
-        type: text
-        shape: lines
-    notes:
-      type: array
-      items:
+schema:
+  main:
+    fields:
+      addresses:
+        type: array
+        items:
+          type: text
+          shape: lines
+      notes:
+        type: array
+        items:
+          type: richtext
+          shape: lines
+      tags:
+        type: array
+        items:
+          type: text
+      recipients:
         type: richtext
         shape: lines
-    tags:
-      type: array
-      items:
-        type: text
-    recipients:
-      type: richtext
-      shape: lines
-    subject:
-      type: richtext
+      subject:
+        type: richtext
 `);
 
 const load = (): Document =>

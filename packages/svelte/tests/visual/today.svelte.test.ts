@@ -19,15 +19,16 @@ const QUILL_YAML = `quill:
   description: A date written as the render date.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    dated:
-      type: date
-    stamped:
-      type: date
-      default: today
-    logged:
-      type: datetime
+schema:
+  main:
+    fields:
+      dated:
+        type: date
+      stamped:
+        type: date
+        default: today
+      logged:
+        type: datetime
 `;
 
 let q: Quill;

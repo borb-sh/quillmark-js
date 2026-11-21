@@ -18,24 +18,25 @@ const probe = () =>
   description: Capped content fields at each depth.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    code:
-      type: text
-      max: 5
-    note:
-      type: text
-    contact:
-      type: object
-      properties:
-        zip:
-          type: text
-          max: 5
-    tags:
-      type: array
-      items:
-        type: richtext
-        max: 3
+schema:
+  main:
+    fields:
+      code:
+        type: text
+        max: 5
+      note:
+        type: text
+      contact:
+        type: object
+        properties:
+          zip:
+            type: text
+            max: 5
+      tags:
+        type: array
+        items:
+          type: richtext
+          max: 3
 `);
 const load = (): Document =>
 	core.Document.parse(['~~~', '$quill: text_cap@1.0.0', 'tags:', '  - ab', '~~~', ''].join('\n'));

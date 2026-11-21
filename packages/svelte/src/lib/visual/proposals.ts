@@ -268,7 +268,7 @@ export function proposalsBetween(
 		}
 		kept.set(answerAt, at);
 		const first = items.length;
-		diffCard(quill.schema.card_kinds?.[was.kind], at, was, now, answerAt);
+		diffCard(quill.schema[was.kind], at, was, now, answerAt);
 		if (id) for (const item of items.slice(first)) Object.assign(item, { card: id });
 	}
 	for (const at of answerIds.keys()) {

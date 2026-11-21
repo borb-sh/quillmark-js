@@ -76,21 +76,22 @@ describe('an array<object> declaring ui.layout: table', () => {
   description: A table with a prose column.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    crew:
-      type: array
-      items:
-        type: object
-        properties:
-          who:
-            type: text
-          note:
-            type: richtext
-          lead:
-            type: boolean
-      ui:
-        layout: table
+schema:
+  main:
+    fields:
+      crew:
+        type: array
+        items:
+          type: object
+          properties:
+            who:
+              type: text
+            note:
+              type: richtext
+            lead:
+              type: boolean
+        ui:
+          layout: table
 `);
 		const t = field(mountEditor(q, q.seedDocument()).target, 'Crew');
 

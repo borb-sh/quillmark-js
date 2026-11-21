@@ -25,25 +25,26 @@ const QUILL_YAML = `quill:
   description: Lists of scalars.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    counts:
-      type: array
-      items:
-        type: integer
-    tags:
-      type: array
-      items:
-        type: enum
-        values: [alpha, beta]
-    flags:
-      type: array
-      items:
-        type: boolean
-    days:
-      type: array
-      items:
-        type: date
+schema:
+  main:
+    fields:
+      counts:
+        type: array
+        items:
+          type: integer
+      tags:
+        type: array
+        items:
+          type: enum
+          values: [alpha, beta]
+      flags:
+        type: array
+        items:
+          type: boolean
+      days:
+        type: array
+        items:
+          type: date
 `;
 
 let q: Quill;

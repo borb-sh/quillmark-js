@@ -298,7 +298,7 @@ function state(bound: Bound, quill: Quill): State {
 	for (const c of [MAIN, ...doc.cards.map((_, i) => i)] as CardRef[]) {
 		const card = c === MAIN ? doc.main : doc.card(c);
 		lines.set(keyOf(c), contentLines(card.body));
-		const schema = c === MAIN ? quill.schema.main : quill.schema.card_kinds?.[card.kind];
+		const schema = c === MAIN ? quill.schema.main : quill.schema[card.kind];
 		for (const [field, f] of Object.entries(schema?.fields ?? {})) {
 			const addr = addrOf(c, field);
 			const v = doc.getStored(addr);

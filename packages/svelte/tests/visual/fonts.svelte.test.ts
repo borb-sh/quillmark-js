@@ -23,11 +23,12 @@ const YAML = `quill:
   description: One richtext field a font family is set in.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    intro:
-      type: richtext
-      shape: blocks
+schema:
+  main:
+    fields:
+      intro:
+        type: richtext
+        shape: blocks
 `;
 
 const face = (family: string, weight = 400, index = 0): LibraryFace => ({

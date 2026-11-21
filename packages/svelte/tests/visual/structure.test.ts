@@ -420,7 +420,7 @@ describe('objectSections', () => {
 		const out = sections({
 			first: obj({ title: 'First' }),
 			note: f({}),
-			second: obj({ ui: { layout: 'flat' } }),
+			second: obj(),
 			rows: f({ type: 'array', items: obj() })
 		});
 		expect(out.map((s) => [s.group, s.label, s.head?.name])).toEqual([

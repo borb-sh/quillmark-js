@@ -182,18 +182,19 @@ quill:
   description: One field per leaf schema.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    notes:
-      type: richtext
-      shape: blocks
-    summary:
-      type: richtext
-    address:
-      type: text
-      shape: lines
-    line:
-      type: text
+schema:
+  main:
+    fields:
+      notes:
+        type: richtext
+        shape: blocks
+      summary:
+        type: richtext
+      address:
+        type: text
+        shape: lines
+      line:
+        type: text
 `);
 	const load = (): Document => core.Document.parse('~~~\n$quill: paste_probe@0.1.0\n~~~\n');
 	const LIST = '- Purpose\n- Action';

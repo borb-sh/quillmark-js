@@ -120,14 +120,15 @@ const DESCRIBED_YAML = `quill:
   description: A short description and a long one.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    short:
-      type: text
-      description: Set as \`code\`, *briefly*.
-    long:
-      type: text
-      description: A description that runs well past what one line under a label holds, set as \`code\` and pointing at [a page](https://example.com) for the rest of it.
+schema:
+  main:
+    fields:
+      short:
+        type: text
+        description: Set as \`code\`, *briefly*.
+      long:
+        type: text
+        description: A description that runs well past what one line under a label holds, set as \`code\` and pointing at [a page](https://example.com) for the rest of it.
 `;
 
 describe('a description', () => {

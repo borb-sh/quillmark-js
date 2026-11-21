@@ -21,12 +21,13 @@ quill:
   description: A richtext field of lines.
 typst:
   plate_file: plate.typ
-main:
-  fields:
-    memo_for:
-      type: richtext
-      shape: lines
-      default: ""
+schema:
+  main:
+    fields:
+      memo_for:
+        type: richtext
+        shape: lines
+        default: ""
 `;
 
 const q = probeQuill(QUILL_YAML);

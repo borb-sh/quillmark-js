@@ -7,226 +7,226 @@ quill:
 typst:
   plate_file: plate.typ
 
-main:
-  description: "Write the body as plain paragraphs. They're numbered for you, and bullets become lettered subparagraphs. Use a block quote for lines that shouldn't be numbered, like a list of names."
-  ui:
-    groups: [addressing, letterhead, classification, additional]
-  body:
-    example: |
-      Each group reviews every office of record it owns against references (a) and (b) by the suspense in the subject line. Group records custodians confirm two things for each office:
+schema:
+  main:
+    description: "Write the body as plain paragraphs. They're numbered for you, and bullets become lettered subparagraphs. Use a block quote for lines that shouldn't be numbered, like a list of names."
+    ui:
+      groups: [addressing, letterhead, classification, additional]
+    body:
+      example: |
+        Each group reviews every office of record it owns against references (a) and (b) by the suspense in the subject line. Group records custodians confirm two things for each office:
 
-      - The file plan lists every series the office keeps, with its disposition authority.
-      - Files past cutoff are staged for retirement or destruction.
+        - The file plan lists every series the office keeps, with its disposition authority.
+        - Files past cutoff are staged for retirement or destruction.
 
-      Each group commander signs the checklist at the attachment and returns it to 123 CS/SCX. The base records staff below can walk any office through the review:
+        Each group commander signs the checklist at the attachment and returns it to 123 CS/SCX. The base records staff below can walk any office through the review:
 
-      > MARY E. BROWN, Maj, USAF\
-      > ROBERT L. JONES, Capt, USAF
-  fields:
-    memo_for:
-      type: array
-      items:
-        type: text
-      ui:
-        group: addressing
-        compact: true
-      example:
-        - 123 OG/CC
-        - 123 MXG/CC
-        - 123 MSG/CC
-        - 123 MDG/CC
-      description: "Each recipient's office symbol, one per line. To address a person, add their rank and name in parentheses, for example 'ORG/SYMBOL (LT COL JANE DOE)'. For a long list, enter 'SEE DISTRIBUTION' and list everyone under Distribution."
+        > MARY E. BROWN, Maj, USAF\
+        > ROBERT L. JONES, Capt, USAF
+    fields:
+      memo_for:
+        type: array
+        items:
+          type: text
+        ui:
+          group: addressing
+          compact: true
+        example:
+          - 123 OG/CC
+          - 123 MXG/CC
+          - 123 MSG/CC
+          - 123 MDG/CC
+        description: "Each recipient's office symbol, one per line. To address a person, add their rank and name in parentheses, for example 'ORG/SYMBOL (LT COL JANE DOE)'. For a long list, enter 'SEE DISTRIBUTION' and list everyone under Distribution."
 
-    memo_from:
-      type: array
-      items:
-        type: text
-      default: []
-      ui:
-        group: addressing
-        compact: true
-      example:
-        - 123 CS/SCX
-      description: "Your office symbol. If any recipient is off your installation, add your full mailing address below it. Leave blank for a memorandum for record."
+      memo_from:
+        type: array
+        items:
+          type: text
+        default: []
+        ui:
+          group: addressing
+          compact: true
+        example:
+          - 123 CS/SCX
+        description: "Your office symbol. If any recipient is off your installation, add your full mailing address below it. Leave blank for a memorandum for record."
 
-    subject:
-      type: richtext
-      ui:
-        group: addressing
-      example: "Annual Records Management Review (Suspense: 30 October 2026)"
-      description: "A brief subject in title case. Put any suspense date in parentheses at the end."
-
-    date:
-      type: date
-      default: ""
-      ui:
-        group: addressing
-        compact: true
-      example: today
-      description: "The date you sign. Leave blank to add a fillable date field to the PDF instead."
-
-    authority_line:
-      type: text
-      default: ""
-      ui:
-        group: addressing
-        compact: true
-      example: FOR THE COMMANDER
-      description: "Usually blank. When you sign on the commander's behalf or state the headquarters' position, enter 'FOR THE COMMANDER'. It prints above the signature block."
-
-    signature_block:
-      type: array
-      items:
-        type: text
-      ui:
-        group: addressing
-        compact: true
-      example:
-        - JOHN B. SMITH, Maj, USAF
-        - Director of Operations
-      description: "Your name in uppercase, grade, and service on the first line, for example 'FIRST M. LAST, Capt, USAF'. Your duty title on the second."
-
-    letterhead_title:
-      type: array
-      items:
-        type: text
-      default:
-        - DEPARTMENT OF THE AIR FORCE
-      ui:
-        group: letterhead
-      example:
-        - DEPARTMENT OF THE AIR FORCE
-        - 123D COMMUNICATIONS SQUADRON
-      description: "The letterhead, in uppercase. Keep the first line unless you work for a joint command or a DoW agency, and add your unit's full name on the lines below it."
-
-    letterhead_seal:
-      type: enum
-      values:
-        - dow
-        - dod
-      default: dow
-      ui:
-        group: letterhead
-        compact: true
-      description: "The seal at the top left of the letterhead: Department of War or Department of Defense."
-
-    letterhead_seal_subtitle:
-      type: text
-      default: ""
-      ui:
-        group: letterhead
-        compact: true
-      description: "An optional line in bold capitals under the seal."
-
-    tag_line:
-      type: richtext
-      default: ""
-      ui:
-        group: letterhead
-        compact: true
-      description: "Your unit's motto, centered at the bottom of every page."
-
-    classification:
-      type: enum
-      values:
-        - UNCLASSIFIED
-        - CUI
-        - CONFIDENTIAL
-        - SECRET
-        - TOP SECRET
-      default: ""
-      ui:
-        group: classification
-        compact: true
-      description: "The classification banner at the top and bottom of every page. Leave blank for an unclassified document."
-      variants:
-        CUI:
-          controlled_by:
-            type: text
-            description: "The office that designated this information as CUI, for example 'SAF/AA'."
-          poc:
-            type: text
-            description: "Who to contact with questions about this CUI, with phone and email, for example 'Capt J. Smith, DSN 555-1234, john.smith@us.af.mil'."
-          category:
-            type: text
-            default: ""
-            description: "The category from the DoD CUI Registry, for example 'CTI' or 'PRVCY'."
-          limited_dissemination:
-            type: text
-            default: ""
-            description: "A dissemination control for the CUI block, for example 'FEDONLY' or 'NOFORN'. To add one to the banner, use Dissemination."
-
-    dissemination:
-      type: text
-      default: ""
-      ui:
-        group: classification
-        compact: true
-      description: "A control added to the end of the banner. For example, 'NF' prints as CUI//NF."
-
-    references:
-      type: array
-      items:
+      subject:
         type: richtext
-      default: []
-      ui:
-        group: additional
-      example:
-        - AFMAN 33-326, 25 November 2011, *Preparing Official Communications*
-        - AFI 33-360, *Publications and Forms Management*
-      description: "Cite each by organization, type, date, and title. One reference prints after the subject; two or more print as a lettered list."
+        ui:
+          group: addressing
+        example: "Annual Records Management Review (Suspense: 30 October 2026)"
+        description: "A brief subject in title case. Put any suspense date in parentheses at the end."
 
-    cc:
-      type: array
-      items:
+      date:
+        type: date
+        default: ""
+        ui:
+          group: addressing
+          compact: true
+        example: today
+        description: "The date you sign. Leave blank to add a fillable date field to the PDF instead."
+
+      authority_line:
         type: text
-      default: []
-      ui:
-        group: additional
-      example:
-        - 123 WG/CCE
-      description: Offices or people receiving a courtesy copy, one per line.
+        default: ""
+        ui:
+          group: addressing
+          compact: true
+        example: FOR THE COMMANDER
+        description: "Usually blank. When you sign on the commander's behalf or state the headquarters' position, enter 'FOR THE COMMANDER'. It prints above the signature block."
 
-    distribution:
-      type: array
-      items:
+      signature_block:
+        type: array
+        items:
+          type: text
+        ui:
+          group: addressing
+          compact: true
+        example:
+          - JOHN B. SMITH, Maj, USAF
+          - Director of Operations
+        description: "Your name in uppercase, grade, and service on the first line, for example 'FIRST M. LAST, Capt, USAF'. Your duty title on the second."
+
+      letterhead_title:
+        type: array
+        items:
+          type: text
+        default:
+          - DEPARTMENT OF THE AIR FORCE
+        ui:
+          group: letterhead
+        example:
+          - DEPARTMENT OF THE AIR FORCE
+          - 123D COMMUNICATIONS SQUADRON
+        description: "The letterhead, in uppercase. Keep the first line unless you work for a joint command or a DoW agency, and add your unit's full name on the lines below it."
+
+      letterhead_seal:
+        type: enum
+        values:
+          - dow
+          - dod
+        default: dow
+        ui:
+          group: letterhead
+          compact: true
+        description: "The seal at the top left of the letterhead: Department of War or Department of Defense."
+
+      letterhead_seal_subtitle:
         type: text
-      default: []
-      ui:
-        group: additional
-      description: "Everyone the memo goes to, when Memo For says 'SEE DISTRIBUTION'."
+        default: ""
+        ui:
+          group: letterhead
+          compact: true
+        description: "An optional line in bold capitals under the seal."
 
-    attachments:
-      type: array
-      items:
+      tag_line:
         type: richtext
-      default: []
-      ui:
-        group: additional
-      example:
-        - Records Management Self-Inspection Checklist, 1 September 2026
-      description: "Attachments in the order the memo mentions them. Describe each briefly and include its date. Don't write 'as stated'."
+        default: ""
+        ui:
+          group: letterhead
+          compact: true
+        description: "Your unit's motto, centered at the bottom of every page."
 
-    memo_style:
-      type: enum
-      values:
-        - usaf
-        - daf
-      default: usaf
-      ui:
-        group: additional
-        compact: true
-      description: "USAF for most memos, DAF for headquarters memos. DAF style dates as 'September 15, 2026' and indents paragraphs instead of numbering them."
+      classification:
+        type: enum
+        values:
+          - UNCLASSIFIED
+          - CUI
+          - CONFIDENTIAL
+          - SECRET
+          - TOP SECRET
+        default: ""
+        ui:
+          group: classification
+          compact: true
+        description: "The classification banner at the top and bottom of every page. Leave blank for an unclassified document."
+        variants:
+          CUI:
+            controlled_by:
+              type: text
+              description: "The office that designated this information as CUI, for example 'SAF/AA'."
+            poc:
+              type: text
+              description: "Who to contact with questions about this CUI, with phone and email, for example 'Capt J. Smith, DSN 555-1234, john.smith@us.af.mil'."
+            category:
+              type: text
+              default: ""
+              description: "The category from the DoD CUI Registry, for example 'CTI' or 'PRVCY'."
+            limited_dissemination:
+              type: text
+              default: ""
+              description: "A dissemination control for the CUI block, for example 'FEDONLY' or 'NOFORN'. To add one to the banner, use Dissemination."
 
-    font_size:
-      type: number
-      default: 12
-      ui:
-        group: additional
-        compact: true
-      description: "Body text size in points. The standard is 12."
+      dissemination:
+        type: text
+        default: ""
+        ui:
+          group: classification
+          compact: true
+        description: "A control added to the end of the banner. For example, 'NF' prints as CUI//NF."
 
-card_kinds:
+      references:
+        type: array
+        items:
+          type: richtext
+        default: []
+        ui:
+          group: additional
+        example:
+          - AFMAN 33-326, 25 November 2011, *Preparing Official Communications*
+          - AFI 33-360, *Publications and Forms Management*
+        description: "Cite each by organization, type, date, and title. One reference prints after the subject; two or more print as a lettered list."
+
+      cc:
+        type: array
+        items:
+          type: text
+        default: []
+        ui:
+          group: additional
+        example:
+          - 123 WG/CCE
+        description: Offices or people receiving a courtesy copy, one per line.
+
+      distribution:
+        type: array
+        items:
+          type: text
+        default: []
+        ui:
+          group: additional
+        description: "Everyone the memo goes to, when Memo For says 'SEE DISTRIBUTION'."
+
+      attachments:
+        type: array
+        items:
+          type: richtext
+        default: []
+        ui:
+          group: additional
+        example:
+          - Records Management Self-Inspection Checklist, 1 September 2026
+        description: "Attachments in the order the memo mentions them. Describe each briefly and include its date. Don't write 'as stated'."
+
+      memo_style:
+        type: enum
+        values:
+          - usaf
+          - daf
+        default: usaf
+        ui:
+          group: additional
+          compact: true
+        description: "USAF for most memos, DAF for headquarters memos. DAF style dates as 'September 15, 2026' and indents paragraphs instead of numbering them."
+
+      font_size:
+        type: number
+        default: 12
+        ui:
+          group: additional
+          compact: true
+        description: "Body text size in points. The standard is 12."
+
   indorsement:
     title: Routing indorsement
     description: "A reply to the memo, or a forward to the next office. Indorsements are numbered in order: 1st Ind, 2d Ind, and so on."
@@ -304,3 +304,4 @@ card_kinds:
           group: additional
           compact: true
         description: "The endorser's decision. The last indorsement prints Approve/Disapprove and earlier ones print Concur/Nonconcur, with the choice underlined. Choose undecided to mark it by hand, or leave blank to omit."
+
