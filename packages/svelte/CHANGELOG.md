@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-**Breaking: the entries export only what a consumer builds with.** `/visual` no longer exports `createField` or its `CreateFieldOpts` and `FieldController` types, nor `reviewKeysHeard` or its `ReviewKeyName` type; `/core` and the root no longer export `fieldPathForAddr` or `addrForFieldPath`; and `/preview` and `/visual` no longer export `DEFAULT_PREVIEW_STRINGS` or `DEFAULT_VISUAL_STRINGS`. A surface's `strings` stays partial, its unset keys the package's English, and a host holding an `Addr` names its place with the Document's `pathFor`.
+**Breaking: the entries export only what a consumer builds with.** `/visual` no longer exports `createField` or its `CreateFieldOpts` and `FieldController` types; `/core` and the root no longer export `fieldPathForAddr` or `addrForFieldPath`; and `/preview` and `/visual` no longer export `DEFAULT_PREVIEW_STRINGS` or `DEFAULT_VISUAL_STRINGS`. A surface's `strings` stays partial, its unset keys the package's English, and a host holding an `Addr` names its place with the Document's `pathFor`.
 
 ## v0.41.0 - 2026-11-21
 
