@@ -188,7 +188,7 @@ jobs:
   publish:
     needs: [build, tag]
     runs-on: ubuntu-latest
-    environment: Publish
+    environment: publish
     permissions:
       # npm Trusted Publishing (OIDC token exchange); no stored token.
       id-token: write
