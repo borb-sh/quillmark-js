@@ -22,7 +22,11 @@ concurrency:
 
 jobs:
   release:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    # The head must be this repository's own branch: a fork can name a branch `release/…` too.
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'release/')
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -52,7 +56,8 @@ jobs:
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          if [[ ! "$BRANCH" =~ ^release/([a-z]+)-v(.+)$ ]]; then
+          # The version is canonical x.y.z, so what later steps splice into a script is digits and dots.
+          if [[ ! "$BRANCH" =~ ^release/([a-z]+)-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             echo "::error::$BRANCH is not release/<package>-v<version>"
             exit 1
           fi
@@ -147,9 +152,10 @@ jobs:
             -m "${{ steps.release.outputs.name }} ${{ steps.release.outputs.version }}"
           git push origin "${{ steps.release.outputs.tag }}"
 
-      # Trusted Publishing requires npm >= 11.5.1.
+      # Trusted Publishing requires npm >= 11.5.1. The npm `packageManager` pins, rather than
+      # `latest`, since this job holds the publish token.
       - name: Upgrade npm for Trusted Publishing
-        run: npm install -g npm@latest
+        run: npm install -g "npm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 
       # Skipping a version the registry already has is what makes the job safe to
       # re-run, and it is the whole of the first-publish bootstrap: a package with
