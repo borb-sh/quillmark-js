@@ -1752,7 +1752,7 @@
 
 	/**
 	 * Bring the review item `id` to the reader as the current change: open the panel holding
-	 * it and scroll it to the middle of the view. The focus stays where it is, the reader having
+	 * it and every collapsed row it is under, and scroll it to the middle of the view. The focus stays where it is, the reader having
 	 * asked to look, unless `focus` asks for it: the caret then goes into the item, or the focus
 	 * to the control drawing it, a property inside a field included. False for an item the
 	 * editor does not draw.
@@ -1773,12 +1773,17 @@
 			for (const ref of cardRefs) ref?.revealLeaf(key);
 		}
 		if (!(await span.resumes(tick()))) return false;
+		const steps =
+			key !== undefined
+				? reviewing.at(key).nested?.find((e) => e.item.id === id)?.steps
+				: undefined;
+		if (steps) await leaves.control(key!)?.openPath?.(steps);
+		if (!span.alive) return false;
 		reviewing.reveal(id);
 		const thing = focus ? reviewEls(id).find((el) => el.matches(THING)) : undefined;
 		if (thing) thing.focus({ preventScroll: true });
 		else if (focus && key !== undefined && !leaves.prose(key)?.enterReview(id)) {
 			const control = leaves.control(key);
-			const steps = reviewing.at(key).nested?.find((e) => e.item.id === id)?.steps;
 			if (steps && control?.focusPath) await control.focusPath(steps);
 			else control?.focus();
 			if (!span.alive) return false;

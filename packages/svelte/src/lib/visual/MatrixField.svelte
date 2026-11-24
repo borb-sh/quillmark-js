@@ -201,6 +201,7 @@
 	type Subform = {
 		focus: () => void;
 		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+		openPath: (steps: readonly PathStep[]) => Promise<void>;
 	};
 	const memberEls: Record<string, HTMLElement | undefined> = $state({});
 	const tickEls: Record<string, HTMLInputElement | undefined> = $state({});
@@ -347,6 +348,13 @@
 		}
 		(own(tickEls, id) ?? own(titleEls, id))?.focus();
 		return member;
+	}
+	/** Open the collapsed rows under a held item's column ({@link FieldControl.openPath}):
+	 *  the item's details are drawn already while a proposal or a diagnostic names a cell. */
+	export async function openPath(steps: readonly PathStep[]): Promise<void> {
+		const [id, ...rest] = steps;
+		if (typeof id !== 'string' || !rest.length) return;
+		await own(colEls, id)?.openPath(rest);
 	}
 </script>
 

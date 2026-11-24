@@ -66,6 +66,12 @@ export interface FieldControl {
 	 * {@link el}.
 	 */
 	focusPath?(steps: readonly PathStep[], pos?: number): LandingBox;
+	/**
+	 * Open every collapsed row `steps` walks through, taking no focus and no caret: the
+	 * walk {@link focusPath} makes, short of the landing. Settles once the innermost row it
+	 * opened has drawn. Absent where {@link focusPath} is.
+	 */
+	openPath?(steps: readonly PathStep[]): Promise<void>;
 	readonly el: HTMLElement;
 }
 
