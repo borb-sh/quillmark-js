@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.6.0 - 2026-11-24
+
 **Breaking: the package exports the session and nothing under it.** The entry carries `joinSession`, `localLog`, `QuillMismatch` and the types they name; `bindDocument`, `cardOps`, `seedDocument`, `init`, `writeFrom`, `changesSince`, `projectDocument`, `deltaOf`, `readLog`, `writeLog`, `readVersion`, `saveVersion`, `restoreVersion`, `Diverged` and `Unwritable` are gone from it, with the `BindDocumentOpts`, `Change`, `ForkOpts`, `WriteFromOpts`, `Written`, `LogRead`, `LogWrite`, `ReadLogOpts`, `RestoreVersionOpts`, `Revision`, `VersionOpts` and `WriteLogOpts` types. `checkServerStore` stays on `/conformance`.
 
 ## v0.5.0 - 2026-11-21
