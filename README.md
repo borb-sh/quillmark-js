@@ -1,6 +1,6 @@
 # quillmark-js
 
-The JavaScript tier downstream of the [`@quillmark/wasm`](https://github.com/borb-sh/quillmark) artifact.
+The JavaScript tier downstream of the [`@quillmark/wasm`](https://github.com/birdorbs/quillmark) artifact.
 
 | Package                                |                                                                                                                             |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |

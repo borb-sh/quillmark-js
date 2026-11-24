@@ -2,7 +2,7 @@
 
 Load and build collections of quills for rendering with `@quillmark/wasm`.
 
-Quillmark is pre-1.0. Its [stability statement](https://github.com/borb-sh/quillmark#status) says what any release can change and what every release keeps.
+Quillmark is pre-1.0. Its [stability statement](https://github.com/birdorbs/quillmark#status) says what any release can change and what every release keeps.
 
 ## Install
 

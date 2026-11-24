@@ -643,7 +643,7 @@
 
 	<footer class="qm-bar qm-app-footer">
 		<span
-			>Built with <a href="https://github.com/borb-sh/quillmark" rel="noreferrer"
+			>Built with <a href="https://github.com/birdorbs/quillmark" rel="noreferrer"
 				>Quillmark v{QUILLMARK}</a
 			></span
 		>

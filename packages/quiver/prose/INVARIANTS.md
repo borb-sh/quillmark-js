@@ -32,7 +32,7 @@ The rules a change to `@quillmark/quiver` must keep, the reason behind each, and
 
 ## Quills
 
-**A quill is one file**: a `.quill` bundle, the format every Quillmark runtime reads (quillmark [`quill-bundle.md`](https://github.com/borb-sh/quillmark/blob/main/prose/references/quill-bundle.md)), holding the quill's whole tree with its fonts. The file `getQuill` reads is the file a host can store, attach or hand to `Quill.fromBundle`. Rejected: bundles sharing a font store, which saves a font two quills both carry at the cost of a quill no longer being one portable file.
+**A quill is one file**: a `.quill` bundle, the format every Quillmark runtime reads (quillmark [`quill-bundle.md`](https://github.com/birdorbs/quillmark/blob/main/prose/references/quill-bundle.md)), holding the quill's whole tree with its fonts. The file `getQuill` reads is the file a host can store, attach or hand to `Quill.fromBundle`. Rejected: bundles sharing a font store, which saves a font two quills both carry at the cost of a quill no longer being one portable file.
 
 **Nothing checks the bytes against their name.** Integrity is the channel's, so an artifact is served over https. What is checked is that a bundle opens as a zip, since a host answering a missing name with its own page answers 200. Nothing here is provenance either: the choice of source is the consumer's ([README](../README.md#what-a-quiver-is-trusted-to-be)).
 

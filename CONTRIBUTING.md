@@ -3,8 +3,8 @@
 ## Questions, bugs, and ideas
 
 - A bug: an issue naming the package and its version, with the smallest steps that reproduce it.
-- A change larger than a fix: open an issue before the pull request, so its shape is agreed before it is built. Quillmark's [stability statement](https://github.com/borb-sh/quillmark#status) says what a release can change.
-- A bug in rendering, parsing or a `Quill.yaml` rule: an issue on [borb-sh/quillmark](https://github.com/borb-sh/quillmark/issues/new/choose), which owns the engine these packages wrap.
+- A change larger than a fix: open an issue before the pull request, so its shape is agreed before it is built. Quillmark's [stability statement](https://github.com/birdorbs/quillmark#status) says what a release can change.
+- A bug in rendering, parsing or a `Quill.yaml` rule: an issue on [birdorbs/quillmark](https://github.com/birdorbs/quillmark/issues/new/choose), which owns the engine these packages wrap.
 
 ## Pull requests
 
