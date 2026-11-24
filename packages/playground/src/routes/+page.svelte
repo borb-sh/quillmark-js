@@ -99,7 +99,7 @@
 		<div class="actions">
 			<a class="pg-cta" href={resolve('/playground')}>Open the playground</a>
 			<a class="pg-cta-quiet" href="#get-started">Get started</a>
-			<a class="pg-link" href="https://github.com/borb-sh/quillmark-js">Source</a>
+			<a class="pg-link" href="https://github.com/birdorbs/quillmark-js">Source</a>
 		</div>
 	</section>
 

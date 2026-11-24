@@ -6,13 +6,13 @@
 	"license": "Apache-2.0 AND OFL-1.1 AND LicenseRef-GUST-Font-License AND Bitstream-Vera",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/borb-sh/quillmark-js.git",
+		"url": "git+https://github.com/birdorbs/quillmark-js.git",
 		"directory": "packages/fonts"
 	},
 	"bugs": {
-		"url": "https://github.com/borb-sh/quillmark-js/issues"
+		"url": "https://github.com/birdorbs/quillmark-js/issues"
 	},
-	"homepage": "https://github.com/borb-sh/quillmark-js/tree/main/packages/fonts#readme",
+	"homepage": "https://github.com/birdorbs/quillmark-js/tree/main/packages/fonts#readme",
 	"keywords": [
 		"quillmark",
 		"fonts",

@@ -4,13 +4,13 @@
 	"description": "Editor, live-preview and source surfaces over a Quillmark WASM session.",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/borb-sh/quillmark-js.git",
+		"url": "git+https://github.com/birdorbs/quillmark-js.git",
 		"directory": "packages/svelte"
 	},
 	"bugs": {
-		"url": "https://github.com/borb-sh/quillmark-js/issues"
+		"url": "https://github.com/birdorbs/quillmark-js/issues"
 	},
-	"homepage": "https://github.com/borb-sh/quillmark-js/tree/main/packages/svelte#readme",
+	"homepage": "https://github.com/birdorbs/quillmark-js/tree/main/packages/svelte#readme",
 	"license": "Apache-2.0",
 	"keywords": [
 		"quillmark",
