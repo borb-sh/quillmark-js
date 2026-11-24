@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v0.42.0 - 2026-11-24
+
 **Breaking: the entries export only what a consumer builds with.** `/visual` no longer exports `createField` or its `CreateFieldOpts` and `FieldController` types; `/core` and the root no longer export `fieldPathForAddr` or `addrForFieldPath`; and `/preview` and `/visual` no longer export `DEFAULT_PREVIEW_STRINGS` or `DEFAULT_VISUAL_STRINGS`. A surface's `strings` stays partial, its unset keys the package's English, and a host holding an `Addr` names its place with the Document's `pathFor`.
 
 **A change inside a collapsed record opens its row.** A step, an answer moving on, or `revealReview` to a change in a closed row of a list of records left the row closed, so the change showed only as a mark under the row's head; only a reveal that took the focus opened it. Every reveal now opens each collapsed row the change is under, as it opens a closed panel, and takes no focus unless asked.
