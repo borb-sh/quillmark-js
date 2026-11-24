@@ -200,7 +200,7 @@ schema:
 	const doc = q.seedDocument();
 	const { target } = mountEditor(q, doc);
 	const pages = field(target, 'Pages');
-	type(pages.querySelector('input')!, '0x1F');
+	type(pages.querySelector('input')!, '1,000');
 	const row = q
 		.reader(doc)
 		.resolve()

@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**The carried `@quillmark/wasm` is 0.141.0.** A `text` or `richtext` field declaring `multiline:` fails to load as `quill::field_parse_error`, where `check` reported it as `quill::deprecated_multiline`, so `check` fails such a quill; declare `shape:` instead. An unquoted document value whose text is not the number YAML reads it as, such as `0012` or `1.50`, stays the text written, so a `text` field prints `0012` (Quillmark's 0.140 → 0.141 migration).
+
 ## v0.26.0 - 2026-11-21
 
 **The carried `@quillmark/wasm` is 0.140.0.** A quill declares its cards in one `schema:` block, `main` and each card kind as peers, and one holding a top-level `main:` or `card_kinds:` fails to load as `quill::unknown_section`, so `check` fails it; `ui.layout: flat` and the retired spellings `plaintext`, `string`, `inline` and `ui.multiline` fail as `quill::field_parse_error`. The typed writer refuses a member a group's `properties`, or every world of a variant-bearing enum, leaves undeclared, as `edit::unknown_field` at the member, where it stored a value nothing drew or rendered (Quillmark's 0.138 → 0.139 and 0.139 → 0.140 migrations). `init` lays the letter quill under `schema:`.
