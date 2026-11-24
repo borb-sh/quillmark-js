@@ -6,6 +6,8 @@
 
 **Breaking: the entries export only what a consumer builds with.** `/visual` no longer exports `createField` or its `CreateFieldOpts` and `FieldController` types; `/core` and the root no longer export `fieldPathForAddr` or `addrForFieldPath`; and `/preview` and `/visual` no longer export `DEFAULT_PREVIEW_STRINGS` or `DEFAULT_VISUAL_STRINGS`. A surface's `strings` stays partial, its unset keys the package's English, and a host holding an `Addr` names its place with the Document's `pathFor`.
 
+**A change inside a collapsed record opens its row.** A step, an answer moving on, or `revealReview` to a change in a closed row of a list of records left the row closed, so the change showed only as a mark under the row's head; only a reveal that took the focus opened it. Every reveal now opens each collapsed row the change is under, as it opens a closed panel, and takes no focus unless asked.
+
 ## v0.41.0 - 2026-11-21
 
 **Each review action has one key, and the answer card shows Accept's alone.** `REVIEW_KEYS.acceptAlt` is removed, so ⌘/Ctrl+Alt+Enter no longer accepts. With the focus on the answer card, Backspace, Delete and the arrows do nothing, where they dismissed and stepped: the review keys answer there as everywhere, and Enter presses the focused button. The Dismiss button drops its key hint and carries the key as its tooltip.

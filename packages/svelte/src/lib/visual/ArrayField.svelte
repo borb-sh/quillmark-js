@@ -447,6 +447,7 @@
 	type Subform = {
 		focus: () => void;
 		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+		openPath: (steps: readonly PathStep[]) => Promise<void>;
 	};
 	const cellEls: Record<string, Subform | undefined> = $state({});
 	let addEl: HTMLButtonElement | undefined = $state();
@@ -839,6 +840,19 @@
 		if (pos != null && el?.setCaret) el.setCaret(pos);
 		else focusRow(id);
 		return rowEls[id];
+	}
+	/** Open the row `steps[0]` names where the walk goes on inside it, and the rows under it
+	 *  the rest names ({@link FieldControl.openPath}). A row's own address is drawn on its
+	 *  head, so it opens nothing. */
+	export async function openPath(steps: readonly PathStep[]): Promise<void> {
+		const [k, ...rest] = steps;
+		const id = typeof k === 'number' ? ids[k] : undefined;
+		if (id === undefined || !rest.length) return;
+		if (table) return cellEls[id]?.openPath(rest);
+		if (control !== 'object') return;
+		open.add(id);
+		if (!(await span.resumes(tick()))) return;
+		await objEls[id]?.openPath(rest);
 	}
 	/** Focus element `id` after the flush, never in the same tick: a mutation commits
 	 * the array by value, so the parent re-derives and the row does not exist until

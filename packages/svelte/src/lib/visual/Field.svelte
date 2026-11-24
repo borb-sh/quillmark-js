@@ -244,6 +244,7 @@
 	type Inside = {
 		focus: () => void;
 		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+		openPath: (steps: readonly PathStep[]) => Promise<void>;
 		washBox?: () => HTMLElement | undefined;
 	};
 	let proseEl = $state<{ focus: () => void } | undefined>();
@@ -263,6 +264,9 @@
 	 *  row it settled in comes back with it, the wash being the landing's own granularity. */
 	function focusPath(steps: readonly PathStep[], pos?: number): LandingBox {
 		return inside()?.focusPath(steps, pos);
+	}
+	async function openPath(steps: readonly PathStep[]): Promise<void> {
+		await inside()?.openPath(steps);
 	}
 	// Only where `for` cannot reach; the labelable four are the browser's own, and a
 	// second handler over them would be a focus the label already placed.
@@ -299,6 +303,7 @@
 		registry.registerControl(key, {
 			focus: focusControl,
 			focusPath: isContainer(field.control) ? focusPath : undefined,
+			openPath: isContainer(field.control) ? openPath : undefined,
 			get el() {
 				return inside()?.washBox?.() ?? wrapper;
 			}

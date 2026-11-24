@@ -487,6 +487,60 @@ describe('a place inside a closed group', () => {
 	});
 });
 
+describe('a place inside a collapsed row', () => {
+	const seed = (doc: Document): void =>
+		void quill()
+			.writer(doc)
+			.set('appendices', [
+				{ title: 'Sources', entries: [] },
+				{
+					title: 'Figures',
+					entries: [
+						{ label: 'Map', page: 1 },
+						{ label: 'Chart', page: 2 }
+					]
+				}
+			]);
+	/** Whether each row of `list` stands open, outermost rows first. */
+	const opened = (list: Element): (string | null)[] =>
+		[...list.querySelectorAll('.qm-element-summary')].map((s) => s.getAttribute('aria-expanded'));
+
+	it('opens the row holding each change it goes on to', async () => {
+		const r = nested((doc) => {
+			const path = doc.pathFor('appendices');
+			return [
+				{ id: 'first', field: `${path}[0].title`, before: 'Sources', after: 'Works cited' },
+				{ id: 'second', field: `${path}[1].title`, before: 'Figures', after: 'Plates' }
+			];
+		}, seed);
+		await settle();
+		const field = openField(r.target, main, 'appendices');
+		expect(opened(field)).toEqual(['true', 'false']);
+		press(r, 'first', 'accept');
+		await settle();
+		expect(opened(field).slice(0, 2)).toEqual(['true', 'true']);
+		expect(drawnOf(field, 'second')).toEqual(['Figures', 'Plates']);
+	});
+
+	it('opens every row down to a change two rows in, taking no focus', async () => {
+		const r = nested((doc) => {
+			const path = doc.pathFor('appendices');
+			return [
+				{ id: 'first', field: `${path}[0].title`, before: 'Sources', after: 'Works cited' },
+				{ id: 'deep', field: `${path}[1].entries[1].label`, before: 'Chart', after: 'Graph' }
+			];
+		}, seed);
+		await settle();
+		const field = openField(r.target, main, 'appendices');
+		const from = document.activeElement;
+		expect(await r.editor.revealReview('deep')).toBe(true);
+		flushSync();
+		expect(opened(field)).toEqual(['true', 'true', 'false', 'true']);
+		expect(drawnOf(field, 'deep')).toEqual(['Chart', 'Graph']);
+		expect(document.activeElement).toBe(from);
+	});
+});
+
 describe('a cell of an unticked matrix member', () => {
 	const severity = (doc: Document): ReviewItem[] => [
 		{ id: 'severity', field: `${doc.pathFor('checks')}.figures.severity`, after: 'major' }

@@ -134,11 +134,13 @@ it('orders the places one mark stands for as the row would draw them', async () 
 		const items: ReviewItem[] = [
 			{ id: 'entry-page', field: `${p('appendices')}[0].entries[1].page`, after: 15 },
 			{ id: 'entry-label', field: `${p('appendices')}[0].entries[0].label`, after: 'First' },
-			{ id: 'appendix-title', field: `${p('appendices')}[0].title`, after: 'Notes' }
+			{ id: 'appendix-title', field: `${p('appendices')}[0].title`, after: 'Notes' },
+			{ id: 'title', field: p('title'), after: 'Ahead' }
 		];
 		return items;
 	});
-	const marks = last.open.map((id) => target.querySelector(`[data-qm-review~="${id}"]`));
+	const row = last.open.slice(1);
+	const marks = row.map((id) => target.querySelector(`[data-qm-review~="${id}"]`));
 	expect(new Set(marks).size).toBe(1);
-	expect(last.open).toEqual(['appendix-title', 'entry-label', 'entry-page']);
+	expect(row).toEqual(['appendix-title', 'entry-label', 'entry-page']);
 });

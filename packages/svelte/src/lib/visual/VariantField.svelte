@@ -110,6 +110,7 @@
 	type Subform = {
 		focus: () => void;
 		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+		openPath: (steps: readonly PathStep[]) => Promise<void>;
 	};
 	let cellsEl = $state<Subform | undefined>();
 
@@ -144,6 +145,11 @@
 		if (live(steps[0]) && cellsEl) return cellsEl.focusPath(steps, pos);
 		focus();
 		return undefined;
+	}
+	/** Open the collapsed rows under the live cell `steps[0]` names ({@link
+	 *  FieldControl.openPath}). */
+	export async function openPath(steps: readonly PathStep[]): Promise<void> {
+		if (live(steps[0])) await cellsEl?.openPath(steps);
 	}
 </script>
 

@@ -214,7 +214,11 @@
 	> = $state({});
 	const nestedEls: Record<
 		string,
-		| { focus: () => void; focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox }
+		| {
+				focus: () => void;
+				focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+				openPath: (steps: readonly PathStep[]) => Promise<void>;
+		  }
 		| undefined
 	> = $state({});
 	let rootEl = $state<HTMLElement | undefined>();
@@ -249,6 +253,13 @@
 		}
 		focusProp(key);
 		return undefined;
+	}
+	/** Open the collapsed rows under the property `steps[0]` names ({@link
+	 *  FieldControl.openPath}). */
+	export async function openPath(steps: readonly PathStep[]): Promise<void> {
+		const [key, ...rest] = steps;
+		if (typeof key !== 'string' || !has(key)) return;
+		await own(nestedEls, key)?.openPath(rest);
 	}
 	/** A label click for the properties `for` cannot reach: the date control, whose
 	 *  focus lives on a segment, a prose cell, which is a `contenteditable`, and a
