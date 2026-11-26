@@ -43,7 +43,7 @@ jobs:
       node: ${{ steps.release.outputs.node }}
       npm: ${{ steps.release.outputs.npm }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The tags, for the `git tag` below: a push that would clobber an existing one
           # fails here rather than on the remote.
@@ -53,7 +53,7 @@ jobs:
           # published, so the tag names the bytes.
           ref: ${{ github.event.pull_request.merge_commit_sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
@@ -103,21 +103,36 @@ jobs:
       # The tarball, packed once and published below, so what the checks read is what
       # ships. `npm pack` on a directory runs its `prepack`, which is the build the
       # publish would otherwise run after the checks, on a dist it had already deleted.
+      # `prepack` runs dependency code, and the name crosses into `publish`: exactly one
+      # tarball, named in the alphabet `npm pack` uses.
       - name: Pack
         id: pack
+        env:
+          PKG: ${{ steps.release.outputs.pkg }}
         run: |
           mkdir -p "$RUNNER_TEMP/pack"
-          npm pack "./packages/${{ steps.release.outputs.pkg }}" \
-            --pack-destination "$RUNNER_TEMP/pack" >/dev/null
-          echo "tgz=$(basename "$RUNNER_TEMP"/pack/*.tgz)" >> "$GITHUB_OUTPUT"
+          npm pack "./packages/$PKG" --pack-destination "$RUNNER_TEMP/pack" >/dev/null
+          shopt -s nullglob
+          TARBALLS=("$RUNNER_TEMP"/pack/*.tgz)
+          if [ "${#TARBALLS[@]}" -ne 1 ]; then
+            echo "::error::expected one tarball in the pack directory, found ${#TARBALLS[@]}"
+            exit 1
+          fi
+          TGZ=$(basename "${TARBALLS[0]}")
+          if [[ ! "$TGZ" =~ ^[a-z0-9.-]+\.tgz$ ]]; then
+            echo "::error::the packed tarball has an unexpected name"
+            exit 1
+          fi
+          echo "tgz=$TGZ" >> "$GITHUB_OUTPUT"
 
       # ci.yml's `check:pack`, aimed at the tarball rather than at the worktree: publint
       # takes a file path as the package, so the manifest it reads and the files it
       # resolves against are the published ones.
       - name: Package (publint)
-        run: |
-          npm run check:pack -w packages/${{ steps.release.outputs.pkg }} \
-            -- "$RUNNER_TEMP/pack/${{ steps.pack.outputs.tgz }}"
+        env:
+          PKG: ${{ steps.release.outputs.pkg }}
+          TGZ: ${{ steps.pack.outputs.tgz }}
+        run: npm run check:pack -w "packages/$PKG" -- "$RUNNER_TEMP/pack/$TGZ"
 
       # The font suite's promise to stored documents, held against the release it follows:
       # outside a breaking version, no family the registry's latest names is gone and no face
@@ -134,9 +149,11 @@ jobs:
       # the workspace and the bin runs on the bytes it ships and the pins it names.
       - name: Deploy layout, from the tarball
         if: steps.release.outputs.pkg == 'quillkit'
+        env:
+          TGZ: ${{ steps.pack.outputs.tgz }}
         run: |
           mkdir -p "$RUNNER_TEMP/tool"
-          tar -xzf "$RUNNER_TEMP/pack/${{ steps.pack.outputs.tgz }}" -C "$RUNNER_TEMP/tool" --strip-components=1
+          tar -xzf "$RUNNER_TEMP/pack/$TGZ" -C "$RUNNER_TEMP/tool" --strip-components=1
           (cd "$RUNNER_TEMP/tool" && npm install --omit=dev --no-audit --no-fund --no-package-lock)
           cd fixtures
           for target in studio app; do
@@ -156,7 +173,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           node scripts/check-style.mjs --built "$RUNNER_TEMP/studio" "$RUNNER_TEMP/app"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release
           path: ${{ runner.temp }}/pack/
@@ -170,7 +187,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The tags, for the `git tag` below: a push that would clobber an existing one
           # fails here rather than on the remote.
@@ -178,12 +195,15 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Tag
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          NAME: ${{ needs.build.outputs.name }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ needs.build.outputs.tag }}" \
-            -m "${{ needs.build.outputs.name }} ${{ needs.build.outputs.version }}"
-          git push origin "${{ needs.build.outputs.tag }}"
+          git tag -a "$TAG" -m "$NAME $VERSION"
+          git push origin "$TAG"
 
   publish:
     needs: [build, tag]
@@ -193,7 +213,7 @@ jobs:
       # npm Trusted Publishing (OIDC token exchange); no stored token.
       id-token: write
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ needs.build.outputs.node }}
           registry-url: https://registry.npmjs.org
@@ -201,9 +221,11 @@ jobs:
       # Trusted Publishing requires npm >= 11.5.1. The npm `packageManager` pins, rather than
       # `latest`, since this job holds the publish token.
       - name: Upgrade npm for Trusted Publishing
-        run: npm install -g "npm@${{ needs.build.outputs.npm }}"
+        env:
+          NPM_VERSION: ${{ needs.build.outputs.npm }}
+        run: npm install -g "npm@$NPM_VERSION"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release
           path: ${{ runner.temp }}/pack
@@ -217,14 +239,16 @@ jobs:
       # The tarball `build` checked rather than a workspace directory, whose `prepack`
       # would build again. Provenance names the uploaded tarball's digest.
       - name: Publish
+        env:
+          NAME: ${{ needs.build.outputs.name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          TGZ: ${{ needs.build.outputs.tgz }}
         run: |
-          NAME="${{ needs.build.outputs.name }}"
-          VERSION="${{ needs.build.outputs.version }}"
           if [ "$(npm view "${NAME}@${VERSION}" version 2>/dev/null)" = "$VERSION" ]; then
             echo "${NAME}@${VERSION} is already on the registry; nothing to publish."
             exit 0
           fi
-          npm publish "$RUNNER_TEMP/pack/${{ needs.build.outputs.tgz }}" --provenance --access public
+          npm publish "$RUNNER_TEMP/pack/$TGZ" --provenance --access public
 
   release:
     needs: [build, publish]
@@ -233,15 +257,15 @@ jobs:
       # The GitHub Release.
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ needs.build.outputs.node }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release
           path: ${{ runner.temp }}/pack
@@ -249,11 +273,11 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PKG: ${{ needs.build.outputs.pkg }}
+          NAME: ${{ needs.build.outputs.name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          TAG: ${{ needs.build.outputs.tag }}
         run: |
-          PKG="${{ needs.build.outputs.pkg }}"
-          NAME="${{ needs.build.outputs.name }}"
-          VERSION="${{ needs.build.outputs.version }}"
-
           # The version's own section, verbatim: everything between its heading
           # and the next one.
           awk -v v="## v${VERSION} - " \
@@ -274,7 +298,7 @@ jobs:
 
           # No release is the repository's latest: the packages release on their
           # own clocks, so whichever went last would claim the label for all.
-          gh release create "${{ needs.build.outputs.tag }}" \
+          gh release create "$TAG" \
             --title "${NAME} ${VERSION}" \
             --notes-file notes.md \
             --latest=false
