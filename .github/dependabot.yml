@@ -1,0 +1,14 @@
+version: 2
+
+# A version is proposed once it is a week old, so a compromised release has time
+# to be caught and pulled first. Security updates skip the cooldown.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
