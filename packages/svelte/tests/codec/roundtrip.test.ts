@@ -13,7 +13,6 @@
 // `importMarkdown` produces still has to project.
 import { describe, it, expect } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
-import type { Content } from '@quillmark/wasm';
 import {
 	blockSchema,
 	bodyKeymap,

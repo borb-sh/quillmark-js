@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorView } from 'prosemirror-view';
 import { Selection, TextSelection } from 'prosemirror-state';
-import { createField, blockSchema, pmToContent } from '$lib/core/codec';
+import { createField, pmToContent } from '$lib/core/codec';
 import type { FieldController } from '$lib/core/codec';
 import type { Content, Document, TableProps } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';

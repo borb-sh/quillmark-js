@@ -13,7 +13,7 @@ import './prose.css';
 
 // What a floating surface anchors to. The visual tier's own surfaces mint one over a
 // selection (`visual/FormatPopover.svelte`), so it is reached off-barrel.
-export { markAnchor, rangeAnchor } from './anchor.js';
+export { rangeAnchor } from './anchor.js';
 export type { RangeAnchor } from './anchor.js';
 
 // The prose leaf.
@@ -47,14 +47,11 @@ export type { LeaveStrings } from './leave.js';
 
 // The review layer a leaf draws over its blocks: the visual tier's `ReviewItem` narrows to the
 // leaf's own.
-export type { BlockPlace, LeafUndrawn, ReviewAction, ReviewReport, TextReview } from './review.js';
-export { wordDiff } from './review-diff.js';
+export type { BlockPlace, ReviewAction, ReviewReport, TextReview } from './review.js';
 export { valueDiffPlugin, valueSpans } from './value-diff.js';
 export { reviewCaretPlugin } from './review-caret.js';
 export type { ValueProposal, ValueState } from './value-diff.js';
 export { asContent, planValue, valueChanges } from './value-plan.js';
-export type { ValuePlan, ValueChange } from './value-plan.js';
-export type { DiffHunk } from './review-diff.js';
 
 // The rich editor's shortcuts as a host lists them, read off the tables the keymaps bind from;
 // the visual tier's `strings` set extends their wording, and the formatting popover binds its
@@ -75,7 +72,6 @@ export {
 	inlineSchema,
 	plaintextSchema,
 	plainSchema,
-	linesSchema,
 	leafSchema,
 	isParagraphsSchema,
 	hasMarks
@@ -91,7 +87,7 @@ export { rendersHref, storableUrl } from './urls.js';
 // The barrel carries what has an off-barrel caller, and nothing else. A symbol
 // reached only by relative import within `codec/` stays off it: an export nothing
 // imports is surface that still has to stay honest.
-export { decode, fitsInline, fitsLeaf, fitsPlain, renderContent, usvLength } from './decode.js';
+export { decode, fitsInline, fitsLeaf, fitsPlain, renderContent } from './decode.js';
 export { pmToContent, lower } from './encode.js';
 export { offsetToPM, pmToOffset, buildLineIndex } from './positions.js';
 

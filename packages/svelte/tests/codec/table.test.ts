@@ -52,7 +52,6 @@ import {
 	withCell,
 	gridOf,
 	islandOf,
-	tableOfNode,
 	type GridCell,
 	type TableGrid
 } from '$lib/core/codec/table.js';
@@ -335,11 +334,6 @@ describe('what the model already answers', () => {
 });
 
 describe('the cell codec: a cell is its own content unit', () => {
-	/** A cell through decode and back: the round-trip a keystroke rides. */
-	function roundTrip(c: GridCell): GridCell {
-		return cellFromDoc(decode(cellContent(c), cellSchema), c);
-	}
-
 	it('an anchor in a cell follows an edit, holds against an insertion at it, and a range keeps its extent', () => {
 		const c: GridCell = { text: 'abcd', marks: [], anchors: [{ id: 'a1', start: 3, end: 3 }] };
 		// Retype the cell to something longer, inserted before the anchor.

@@ -48,14 +48,12 @@
 	import { tooltips } from '../core/tooltip.js';
 	import type {
 		Addr,
-		CardAddr,
 		Diagnostic,
 		Document,
 		PathStep,
 		PayloadItem,
 		QuillFieldSchema,
-		Resolved,
-		ResolvedField
+		Resolved
 	} from '@quillmark/wasm';
 	import type { VisualEditorProps } from './props.js';
 	import type { Delta } from '../core/codec/positions.js';

@@ -6,7 +6,6 @@ import { EditorState, type Command, type Transaction } from 'prosemirror-state';
 import { splitBlock } from 'prosemirror-commands';
 import { undo } from 'prosemirror-history';
 import { blockSchema, proseLeafPlugins } from '$lib/core/codec';
-import { startOf } from './_util.js';
 
 const AT = 1_000;
 

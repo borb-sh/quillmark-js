@@ -21,8 +21,6 @@ import {
 
 afterEach(unmountAll);
 
-const mod = { ctrlKey: true };
-
 interface Batch extends Mounted<EditorRef> {
 	doc: Document;
 	events: ReviewEvent[];
