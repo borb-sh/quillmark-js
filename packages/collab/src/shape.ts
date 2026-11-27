@@ -163,8 +163,14 @@ export function markAttrs(marks: readonly ContentMark[], chars: readonly string[
 				: m.type === 'font_family'
 					? (m as { attrs: { name: string } }).attrs.name
 					: true;
-		for (let i = 0; i < chars.length && at[i] < m.end; i++)
-			if (at[i] >= m.start) out[i][m.type] = value;
+		let lo = 0;
+		let hi = chars.length;
+		while (lo < hi) {
+			const mid = (lo + hi) >> 1;
+			if (at[mid] < m.start) lo = mid + 1;
+			else hi = mid;
+		}
+		for (let i = lo; i < chars.length && at[i] < m.end; i++) out[i][m.type] = value;
 	}
 	return out;
 }
