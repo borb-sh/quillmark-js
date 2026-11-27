@@ -7,12 +7,12 @@
 // holds it, the repair inside it with it.
 import type { Content, ContentContainer, ContentIsland } from '@quillmark/wasm';
 import { changedRuns, meet } from './lines.js';
-import { contentBlock, deriveMarks, islandOf } from './project.js';
+import { containerOf, contentBlock, deriveMarks, islandOf } from './project.js';
 import {
-	MARK_KEYS,
 	SLOT,
 	canonical,
 	markAttrs,
+	marksOf,
 	yBlock,
 	type Attrs,
 	type YBlock,
@@ -66,7 +66,7 @@ export function unrepaired(raw: YField, repaired: Content, next: Content): Conte
 		const record = raw.containers.get(id);
 		if (named.has(id) || record === undefined) continue;
 		named.add(id);
-		containers.push({ ...(record as object), id } as ContentContainer);
+		containers.push(containerOf(id, record));
 	}
 	return { ...contentOf(out, containers), ...(next.codec ? { codec: next.codec } : {}) };
 }
@@ -105,12 +105,6 @@ function split(
 		if (ch === SLOT) line.islands.push(islands[island++]);
 	});
 	out.push(line);
-	return out;
-}
-
-function marksOf(attrs: Attrs): Attrs {
-	const out: Attrs = {};
-	for (const k of MARK_KEYS) if (attrs[k] != null) out[k] = attrs[k];
 	return out;
 }
 

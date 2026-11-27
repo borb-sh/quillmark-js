@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { Quiver as MainQuiver } from '../src/index.js';
 import { fromDir } from '../src/node.js';
+import { SAMPLE_FIXTURE } from './helpers/fixtures.js';
 
 describe('node entry — the class is untouched', () => {
 	it('installs no statics on it', () => {
@@ -24,8 +25,7 @@ describe('node entry — the class is untouched', () => {
 
 describe('node entry — the factories', () => {
 	it("returns the main entry's class, carrying Quiver.yaml's description", async () => {
-		const fixture = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
-		const q = await fromDir(fixture);
+		const q = await fromDir(SAMPLE_FIXTURE);
 		expect(q).toBeInstanceOf(MainQuiver);
 		expect(q.description).toBe('A sample quiver for testing');
 	});

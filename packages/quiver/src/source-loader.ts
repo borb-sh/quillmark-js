@@ -7,7 +7,7 @@ import { readdir, readFile, lstat } from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { QuiverError } from './errors.js';
+import { QuiverError, transport } from './errors.js';
 import { parseQuiverYaml } from './quiver-yaml.js';
 import { QUILL_NAME_RULE, isQuillName } from './ref.js';
 import { isCanonicalSemver, compareSemver } from './semver.js';
@@ -15,19 +15,25 @@ import type { QuiverMeta } from './quiver-yaml.js';
 import type { QuiverLoader } from './quiver.js';
 
 /**
- * Refuse a symlink. Every rung that opens a tree or reads a file `lstat`s and asks,
+ * `lstat`, refusing a symlink. Every rung that opens a tree or reads a file `lstat`s and asks,
  * because a source quiver is content and a link is a reference out of it: followed,
  * `readFile` reads whatever it points at into the quill, where the backend can typeset
  * it and `build` packs it into the published artifact. A linked directory smuggles a
  * tree where a linked file smuggles one, so the answer is the same at each.
  */
-function refuseSymlink(st: Stats, path: string): void {
+async function lstatOwn(path: string): Promise<Stats> {
+	const st = await lstat(path);
 	if (st.isSymbolicLink()) {
 		throw new QuiverError(
 			'quiver_invalid',
 			`"${path}" is a symlink; a quiver holds its own content, and nothing under it may point outside`
 		);
 	}
+	return st;
+}
+
+async function statOwn(path: string): Promise<Stats> {
+	return transport(`Failed to stat "${path}"`, () => lstatOwn(path));
 }
 
 /**
@@ -109,7 +115,7 @@ export async function scanSourceQuiver(rootDir: string): Promise<{
 	const quiverYamlPath = join(rootDir, 'Quiver.yaml');
 	let raw: Uint8Array;
 	try {
-		refuseSymlink(await lstat(quiverYamlPath), quiverYamlPath);
+		await lstatOwn(quiverYamlPath);
 		raw = await readFile(quiverYamlPath);
 	} catch (err) {
 		if (err instanceof QuiverError) throw err;
@@ -157,46 +163,19 @@ export async function scanSourceQuiver(rootDir: string): Promise<{
 	for (const quillName of quillNames) {
 		const quillNameDir = join(quillsDir, quillName);
 
-		let st;
-		try {
-			st = await lstat(quillNameDir);
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Failed to stat "${quillNameDir}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
-		refuseSymlink(st, quillNameDir);
+		const st = await statOwn(quillNameDir);
 		if (!st.isDirectory()) continue;
 
-		let versionDirs: string[];
-		try {
-			versionDirs = await readdir(quillNameDir);
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Failed to read versions for quill "${quillName}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
+		const versionDirs = await transport(`Failed to read versions for quill "${quillName}"`, () =>
+			readdir(quillNameDir)
+		);
 
 		const versions: string[] = [];
 
 		for (const versionDir of versionDirs) {
 			const versionPath = join(quillNameDir, versionDir);
 
-			let vst;
-			try {
-				vst = await lstat(versionPath);
-			} catch (err) {
-				throw new QuiverError(
-					'transport_error',
-					`Failed to stat "${versionPath}": ${(err as Error).message}`,
-					{ cause: err }
-				);
-			}
-			refuseSymlink(vst, versionPath);
+			const vst = await statOwn(versionPath);
 			if (!vst.isDirectory()) continue;
 
 			if (!isCanonicalSemver(versionDir)) {
@@ -210,7 +189,7 @@ export async function scanSourceQuiver(rootDir: string): Promise<{
 			const quillYamlPath = join(versionPath, 'Quill.yaml');
 			let quillYaml: Uint8Array;
 			try {
-				refuseSymlink(await lstat(quillYamlPath), quillYamlPath);
+				await lstatOwn(quillYamlPath);
 				quillYaml = await readFile(quillYamlPath);
 			} catch (err) {
 				if (err instanceof QuiverError) throw err;
@@ -260,30 +239,13 @@ async function walkDir(
 	currentDir: string,
 	tree: Map<string, Uint8Array>
 ): Promise<void> {
-	let entries: string[];
-	try {
-		entries = await readdir(currentDir);
-	} catch (err) {
-		throw new QuiverError(
-			'transport_error',
-			`Failed to read directory "${currentDir}": ${(err as Error).message}`,
-			{ cause: err }
-		);
-	}
+	const entries = await transport(`Failed to read directory "${currentDir}"`, () =>
+		readdir(currentDir)
+	);
 
 	for (const entry of entries) {
 		const fullPath = join(currentDir, entry);
-		let st;
-		try {
-			st = await lstat(fullPath);
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Failed to stat "${fullPath}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
-		refuseSymlink(st, fullPath);
+		const st = await statOwn(fullPath);
 
 		if (st.isDirectory()) {
 			await walkDir(baseDir, fullPath, tree);
@@ -291,17 +253,10 @@ async function walkDir(
 			const rel = relative(baseDir, fullPath);
 			const posixRel = sep === '/' ? rel : rel.split(sep).join('/');
 
-			let bytes: Uint8Array;
-			try {
-				bytes = await readFile(fullPath);
-			} catch (err) {
-				throw new QuiverError(
-					'transport_error',
-					`Failed to read file "${fullPath}": ${(err as Error).message}`,
-					{ cause: err }
-				);
-			}
-			tree.set(posixRel, bytes);
+			tree.set(
+				posixRel,
+				await transport(`Failed to read file "${fullPath}"`, () => readFile(fullPath))
+			);
 		}
 	}
 }

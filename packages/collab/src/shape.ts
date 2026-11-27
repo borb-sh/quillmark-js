@@ -149,12 +149,7 @@ export function lineAttrs(block: YBlock): Attrs {
 /** The formatting attributes at each USV position of `chars`, from marks over UTF-16 offsets. */
 export function markAttrs(marks: readonly ContentMark[], chars: readonly string[]): Attrs[] {
 	const out: Attrs[] = chars.map(() => ({}));
-	const at: number[] = [];
-	let u = 0;
-	for (const ch of chars) {
-		at.push(u);
-		u += units(ch);
-	}
+	const at = offsets(chars);
 	for (const m of marks) {
 		if (!(MARK_KEYS as readonly string[]).includes(m.type)) continue;
 		const value =
@@ -169,6 +164,13 @@ export function markAttrs(marks: readonly ContentMark[], chars: readonly string[
 	return out;
 }
 
+/** The marks `attrs` sets, without its line keys or a cleared mark. */
+export function marksOf(attrs: Attrs): Attrs {
+	const out: Attrs = {};
+	for (const k of MARK_KEYS) if (attrs[k] != null) out[k] = attrs[k];
+	return out;
+}
+
 /** Equality over `keys`, an absent key and `null` being one value. */
 export function attrsEqual(a: Attrs, b: Attrs, keys: readonly string[]): boolean {
 	return keys.every((k) => (a[k] ?? null) === (b[k] ?? null));
@@ -176,6 +178,18 @@ export function attrsEqual(a: Attrs, b: Attrs, keys: readonly string[]): boolean
 
 /** The UTF-16 length of one USV character. */
 export const units = (ch: string): number => (ch.codePointAt(0)! > 0xffff ? 2 : 1);
+
+/** The UTF-16 offset of every USV position of `chars`, its end included. */
+export function offsets(chars: readonly string[]): number[] {
+	const at: number[] = [];
+	let u = 0;
+	for (const ch of chars) {
+		at.push(u);
+		u += units(ch);
+	}
+	at.push(u);
+	return at;
+}
 
 /** The UTF-16 offset of USV position `end` in `chars`. */
 export function utf16(chars: readonly string[], end: number): number {

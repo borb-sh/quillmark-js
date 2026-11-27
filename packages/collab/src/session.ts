@@ -226,7 +226,7 @@ function snapshotOf(updates: Uint8Array[]): Uint8Array {
 }
 
 const sameQuill = (ref: string, quill: Quill) => ref.split('@')[0] === quill.metadata.name;
-const quillOf = (quill: Quill) => `${quill.metadata.name}@${quill.metadata.version}`;
+export const quillOf = (quill: Quill) => `${quill.metadata.name}@${quill.metadata.version}`;
 
 export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	const { log, quill } = opts;

@@ -30,6 +30,7 @@ import {
 } from './fork.js';
 import {
 	QuillMismatch,
+	quillOf,
 	settled,
 	type Opened,
 	type Saved,
@@ -162,7 +163,7 @@ export async function writeLog(opts: WriteLogOpts): Promise<LogWrite> {
 				});
 				if (written.conflicts.length) return { status: 'conflict', conflicts: written.conflicts };
 				if (!opened) {
-					opened = await log.open(seed, quillRef(quill));
+					opened = await log.open(seed, quillOf(quill));
 					checkQuill(opened, quill);
 					if (!sameBytes(opened.seed, seed)) return { status: 'stale' };
 				}
@@ -246,11 +247,9 @@ export async function restoreVersion(opts: RestoreVersionOpts): Promise<LogWrite
 	return { status: 'stale' };
 }
 
-const quillRef = (quill: Quill) => `${quill.metadata.name}@${quill.metadata.version}`;
-
 /** Refuse a session opened under another version of the quill than `quill`. */
 function checkQuill(opened: Opened, quill: Quill): void {
-	if (opened.quill !== quillRef(quill)) throw new QuillMismatch(opened.quill);
+	if (opened.quill !== quillOf(quill)) throw new QuillMismatch(opened.quill);
 }
 
 /** `doc`, refused and freed where it is under another quill than `quill`. */

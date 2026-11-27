@@ -14,7 +14,7 @@ import { scanSourceQuiver, SourceLoader } from './source-loader.js';
 import { buildQuiver } from './build.js';
 import type { BuildOptions } from './build.js';
 import { loadBuiltQuiver } from './built-loader.js';
-import { QuiverError } from './errors.js';
+import { transport } from './errors.js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,16 +57,8 @@ export async function fromDir(pathOrFileUrl: string): Promise<Quiver> {
 export async function fromBuiltDir(dirPath: string): Promise<Quiver> {
 	return loadBuiltQuiver(async (path) => {
 		const file = join(dirPath, path);
-		try {
-			const buf = await readFile(file);
-			return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Failed to read "${file}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
+		const buf = await transport(`Failed to read "${file}"`, () => readFile(file));
+		return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 	});
 }
 
