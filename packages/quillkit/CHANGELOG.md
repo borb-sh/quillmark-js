@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Studio and the app boot sooner.** The quiver, and the app's document store, open while the core downloads rather than after it.
+
 ## v0.27.0 - 2026-11-24
 
 **The carried `@quillmark/wasm` is 0.141.0.** A `text` or `richtext` field declaring `multiline:` fails to load as `quill::field_parse_error`, where `check` reported it as `quill::deprecated_multiline`, so `check` fails such a quill; declare `shape:` instead. An unquoted document value whose text is not the number YAML reads it as, such as `0012` or `1.50`, stays the text written, so a `text` field prints `0012` (Quillmark's 0.140 → 0.141 migration).
