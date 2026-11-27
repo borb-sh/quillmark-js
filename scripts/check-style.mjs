@@ -51,7 +51,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import postcss from 'postcss';
-import { ROOT, filesUnder, packages, report } from './workspace.mjs';
+import { ROOT, decomment, filesUnder, packages, report } from './workspace.mjs';
 
 const THEMING = join(ROOT, 'packages', 'svelte', 'THEMING.md');
 
@@ -116,15 +116,9 @@ const LENGTH_LITERAL = /\b\d*\.?\d+(px|rem|em)\b/;
 /** The escape, with its reason. The lookahead keeps a comment's own closing delimiter from
  *  reading as one. */
 const MINT = /mint:\s*(?!\*\/)(\S[^*\n]*)/;
-/** Comments blanked, in the three shapes this workspace's sources carry them: a `qm-` name
- *  a comment mentions is prose about a class, not a class drawn. The line form is guarded
- *  on what precedes it, so a `https://` in a url is not a comment. */
-const decomment = (text) =>
-	text
-		.replace(/<!--[\s\S]*?-->/g, '')
-		.replace(/\/\*[\s\S]*?\*\//g, '')
-		.replace(/(^|[^:\w])\/\/[^\n]*/gm, '$1');
-/** A class in source, and never a dial: `--qm-space` carries `qm-space` after a dash too. */
+/** A class in source, and never a dial: `--qm-space` carries `qm-space` after a dash too.
+ *  Sources are read `decomment`ed: a `qm-` name a comment mentions is prose about a class,
+ *  not a class drawn. */
 const CLASS_IN_SRC = /(?<![-\w])qm-[\w-]+/g;
 
 // Three shapes of rule. `literal` forbids a pattern — most properties take values a

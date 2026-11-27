@@ -2,6 +2,8 @@
 // stylesheet, linked after the client's own.
 import type { AppConfig } from './records';
 
+export const CANT_LOAD = "This app can't load right now.";
+
 const at = (path: string): string => new URL(path, document.baseURI).href;
 
 function sheet(href: string): Promise<void> {
