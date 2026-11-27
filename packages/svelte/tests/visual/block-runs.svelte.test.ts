@@ -4,9 +4,16 @@
 // in the leaf and taken alone.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
-import { proposalsBetween } from '$lib/visual';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
-import { answerOn, mountEditor, openField, settle, unmountAll } from '../helpers/surface.svelte.js';
+import {
+	answerOn,
+	between,
+	drawnOf,
+	mountEditor,
+	openField,
+	settle,
+	unmountAll
+} from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
 
@@ -51,27 +58,14 @@ const PARAS = [
 	'Wrote the plan.'
 ];
 
-const between = (base: Document, answer: Document) => {
-	let n = 0;
-	return proposalsBetween(q, base, answer, () => `p${n++}`).items;
-};
-
 const textOf = (item: unknown): string => (item as { after: { text: string } }).after.text;
-
-const drawnOf = (root: ParentNode, id: string): [string, string] => {
-	const words = (selector: string) =>
-		[...root.querySelectorAll(`${selector}[data-qm-review~="${id}"]`)]
-			.map((el) => el.textContent)
-			.join('');
-	return [words('.qm-review-del'), words('.qm-review-ins')];
-};
 
 describe('a field of paragraphs inside a record', () => {
 	it('takes each changed paragraph as a proposal of its own, the value read with that paragraph alone written', () => {
 		const changed = [...PARAS];
 		changed[0] = 'Led a team of six.';
 		changed[1] = 'Cut the backlog by two thirds.';
-		const items = between(entry(PARAS), entry(changed));
+		const items = between(q, entry(PARAS), entry(changed));
 		expect(items.map(textOf)).toEqual([
 			[changed[0], ...PARAS.slice(1)].join('\n'),
 			[PARAS[0], changed[1], ...PARAS.slice(2)].join('\n')
@@ -79,7 +73,7 @@ describe('a field of paragraphs inside a record', () => {
 	});
 
 	it('takes a paragraph added at the top as one proposal', () => {
-		const items = between(entry(PARAS), entry(['Took command in May.', ...PARAS]));
+		const items = between(q, entry(PARAS), entry(['Took command in May.', ...PARAS]));
 		expect(items).toHaveLength(1);
 	});
 
@@ -89,7 +83,7 @@ describe('a field of paragraphs inside a record', () => {
 		changed[0] = 'Led a team of six.';
 		changed[3] = 'Wrote the campaign plan.';
 		const answer = entry(changed);
-		const items = between(doc, answer);
+		const items = between(q, doc, answer);
 		expect(items).toHaveLength(2);
 		const r = mountEditor(q, doc, { review: items });
 		await settle();

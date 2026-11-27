@@ -7,6 +7,7 @@ import type { Document, Quill, QuillCardSchema } from '@quillmark/wasm';
 import type { EditorView } from 'prosemirror-view';
 import type { Delta, EditorError } from '$lib/core';
 import type { ActiveLeaf, CardId, CardOp, EditorChange, ReviewProjection } from '$lib/visual';
+import { proposalsBetween } from '$lib/visual';
 import type { ActiveProse } from '$lib/visual/leaves';
 import type { VisualEditorProps } from '$lib/visual/props';
 import { fieldTitle, groupLabel } from '$lib/visual/structure';
@@ -316,3 +317,18 @@ export function chord(el: HTMLElement, binding: string, init: KeyboardEventInit 
 	const { key, ...mods } = chordInit(binding);
 	press(el, key, { ...mods, ...init });
 }
+
+/** The words proposal `id` draws struck and inserted under `root`. */
+export const drawnOf = (root: ParentNode, id: string): [string, string] => {
+	const words = (selector: string) =>
+		[...root.querySelectorAll(`${selector}[data-qm-review~="${id}"]`)]
+			.map((el) => el.textContent)
+			.join('');
+	return [words('.qm-review-del'), words('.qm-review-ins')];
+};
+
+/** The proposals from `base` to `answer`, numbered `p0`, `p1`, … */
+export const between = (q: Quill, base: Document, answer: Document) => {
+	let n = 0;
+	return proposalsBetween(q, base, answer, () => `p${n++}`).items;
+};

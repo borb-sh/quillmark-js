@@ -34,6 +34,13 @@ import type { FieldController, LeafViews } from '../core/codec/index.js';
  */
 export type LandingBox = HTMLElement | undefined | Promise<HTMLElement | undefined>;
 
+/** A nested form's handle, as a container field holds one per row, column or variant. */
+export type Subform = {
+	focus: () => void;
+	focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
+	openPath: (steps: readonly PathStep[]) => Promise<void>;
+};
+
 /**
  * A mounted field's landing handle: focus it, and the `.qm-wash` box the arrival wash
  * plays over ({@link import('../core/bloom.js').bloom}).

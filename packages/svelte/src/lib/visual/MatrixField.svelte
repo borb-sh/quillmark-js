@@ -62,7 +62,7 @@
 		schemaAt
 	} from './structure.js';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
-	import type { LandingBox } from './leaves.js';
+	import type { LandingBox, Subform } from './leaves.js';
 	import { propertyDomIds } from './domid.js';
 	import { bloom } from '../core/bloom.js';
 	import Icon from './icons/Icon.svelte';
@@ -198,11 +198,6 @@
 	// The item boxes, the ticks, the title inputs and the column subforms, keyed by
 	// member id — stable for the item's life. `$state` for the binding's sake
 	// (`ArrayField` keeps its element refs the same way).
-	type Subform = {
-		focus: () => void;
-		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
-		openPath: (steps: readonly PathStep[]) => Promise<void>;
-	};
 	const memberEls: Record<string, HTMLElement | undefined> = $state({});
 	const tickEls: Record<string, HTMLInputElement | undefined> = $state({});
 	const titleEls: Record<string, HTMLInputElement | undefined> = $state({});

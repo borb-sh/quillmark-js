@@ -15,15 +15,13 @@ import {
 import { pickList, wrapInList, wrapInQuote } from '$lib/core/codec/blocks.js';
 import { MAX_NESTING_DEPTH, nestingPlugin } from '$lib/core/codec/nesting.js';
 import { slashItems } from '$lib/core/codec/slash.js';
-import { md, mount, pathsOf, quill, representable, textblocks, viewOf } from './_util.js';
+import { md, mount, pathsOf, quill, representable, textblocks, viewOf, docOf } from './_util.js';
 
 const n = blockSchema.nodes;
 const p = (text: string) => n.paragraph.create(null, blockSchema.text(text));
 const li = (...blocks: PMNode[]) => n.list_item.create(null, blocks);
 const ul = (...items: PMNode[]) => n.bullet_list.create(null, items);
 const quote = (...blocks: PMNode[]) => n.blockquote.create(null, blocks);
-const docOf = (...blocks: PMNode[]) => n.doc.create(null, blocks);
-
 /** `inner` under `levels` list items, each carrying a line of its own. */
 function inItems(levels: number, inner: PMNode): PMNode {
 	return levels === 0 ? inner : ul(li(p(`l${levels}`), inItems(levels - 1, inner)));

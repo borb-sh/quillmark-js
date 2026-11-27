@@ -13,7 +13,7 @@
 // empties it: an inverse is good against the document it was recorded over. An answer's own
 // writes, and an inverse's, go down the lanes an edit does, so they are flagged while they are
 // made.
-import { getContext, setContext } from 'svelte';
+import { getContext, onDestroy, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { PathStep } from '@quillmark/wasm';
 import type { DocPath } from '../core/address.js';
@@ -654,4 +654,22 @@ const NO_REVIEW: Review = {
 /** The editor's review state, or {@link NO_REVIEW} off-tree. */
 export function review(): Review {
 	return getContext<Review>(KEY) ?? NO_REVIEW;
+}
+
+/** A proposal's plan goes when it leaves the list or the leaf goes, not when another in the
+ *  list is answered, which would leave its own Accept writing its value whole. Called during
+ *  a leaf's init. */
+export function dropPlansOnLeave(
+	reviewing: Review,
+	proposed: () => readonly { id: string }[] | undefined
+): void {
+	let plannedIds: readonly string[] = [];
+	$effect(() => {
+		const ids = (proposed() ?? []).map((p) => p.id);
+		for (const id of plannedIds) if (!ids.includes(id)) reviewing.planned(id, undefined);
+		plannedIds = ids;
+	});
+	onDestroy(() => {
+		for (const id of plannedIds) reviewing.planned(id, undefined);
+	});
 }

@@ -8,16 +8,7 @@ import type { Document } from '@quillmark/wasm';
 import { undo } from 'prosemirror-history';
 import { TextSelection } from 'prosemirror-state';
 import { capCount, createField, type FieldController } from '$lib/core/codec';
-import { core, mount, probeQuill, viewOf, literal } from './_util.js';
-
-/** A plain-text paste event jsdom can carry: it implements no `ClipboardEvent`. */
-function pasteEvent(): ClipboardEvent {
-	const event = new Event('paste', { bubbles: true, cancelable: true });
-	Object.defineProperty(event, 'clipboardData', {
-		value: { getData: () => '', setData: () => {} }
-	});
-	return event as ClipboardEvent;
-}
+import { core, mount, probeQuill, viewOf, literal, pasteEvent } from './_util.js';
 
 const q = probeQuill(`
 quill:

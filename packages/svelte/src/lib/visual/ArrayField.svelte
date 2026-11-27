@@ -130,7 +130,7 @@
 	import ReviewRows from './ReviewRows.svelte';
 	import { splitDeep, unrouted, type DeepDiagnostic } from './diagnostics.js';
 	import { propertyDomIds } from './domid.js';
-	import type { LandingBox } from './leaves.js';
+	import type { LandingBox, Subform } from './leaves.js';
 	import { reorder, reorderArm } from './motion.js';
 	import { rowDrag } from './rowdrag.svelte.js';
 	import {
@@ -444,11 +444,6 @@
 	// A table row's cells, on the same key: the subform a landing and the column-keeping
 	// Enter hop reach into. Every table row is open, so there is one per row where the
 	// list holds one per open row.
-	type Subform = {
-		focus: () => void;
-		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
-		openPath: (steps: readonly PathStep[]) => Promise<void>;
-	};
 	const cellEls: Record<string, Subform | undefined> = $state({});
 	let addEl: HTMLButtonElement | undefined = $state();
 	let rowsEl: HTMLElement | undefined = $state();

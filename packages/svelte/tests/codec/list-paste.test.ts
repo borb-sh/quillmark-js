@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { createField, type FieldController } from '$lib/core/codec';
-import { md, mount, quill, representable, viewOf } from './_util.js';
+import { md, mount, quill, representable, viewOf, pasteEvent } from './_util.js';
 
 function leaf(markdown: string): { field: FieldController; view: EditorView } {
 	const doc = quill().seedDocument();
@@ -38,14 +38,6 @@ function copy(
 	const { dom, text } = view.serializeForClipboard(view.state.selection.content());
 	field.destroy();
 	return { 'text/html': (dom as HTMLElement).innerHTML, 'text/plain': text };
-}
-
-function pasteEvent(data: Record<string, string>): ClipboardEvent {
-	const event = new Event('paste', { bubbles: true, cancelable: true });
-	Object.defineProperty(event, 'clipboardData', {
-		value: { getData: (type: string) => data[type] ?? '', setData: () => {} }
-	});
-	return event as ClipboardEvent;
 }
 
 /** The leaf over `markdown` after `data` is pasted at the caret `caret` places. */

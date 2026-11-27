@@ -8,7 +8,16 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type { Node as PMNode } from 'prosemirror-model';
 import { blockSchema, bodyKeymap, decode, inputRulesPlugin } from '$lib/core/codec';
-import { atBlock, atBlockEnd, keyDriver, md, representable, startOf, textblocks } from './_util.js';
+import {
+	atBlock,
+	atBlockEnd,
+	keyDriver,
+	md,
+	representable,
+	startOf,
+	textblocks,
+	docOf
+} from './_util.js';
 
 const { expectPress, press } = keyDriver(bodyKeymap(blockSchema));
 
@@ -17,8 +26,6 @@ const p = (text?: string) => n.paragraph.create(null, text ? blockSchema.text(te
 const li = (...blocks: PMNode[]) => n.list_item.create(null, blocks);
 const ol = (...items: PMNode[]) => n.ordered_list.create(null, items);
 const ul = (...items: PMNode[]) => n.bullet_list.create(null, items);
-const docOf = (...blocks: PMNode[]) => n.doc.create(null, blocks);
-
 /** A selection from `from` chars into textblock `first` to `to` chars into `last`. */
 function across(doc: PMNode, first: number, from: number, last: number, to: number): EditorState {
 	const blocks = textblocks(doc);
