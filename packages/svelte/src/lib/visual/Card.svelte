@@ -13,6 +13,7 @@
 	import Icon from './icons/Icon.svelte';
 	import type { Document, Quill, Addr, Diagnostic, PathStep } from '@quillmark/wasm';
 	import type { EditorErrorHandler } from '../core/errors.js';
+	import { schemaOf } from '../core/schema.js';
 	import type { LeafRegistry } from './leaves.js';
 	import type { CardModel, FieldModel } from './structure.js';
 	import { placeFields, humanize, initialExpandedGroup, kindTitle, mountKey } from './structure.js';
@@ -462,7 +463,7 @@
 
 {#snippet kindOptions()}
 	{#each kinds as k (k)}
-		<option value={k}>{kindTitle(quill.schema[k], k)}</option>
+		<option value={k}>{kindTitle(schemaOf(quill)[k], k)}</option>
 	{/each}
 {/snippet}
 

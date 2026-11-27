@@ -46,6 +46,7 @@
 	import { createLifespan } from '../core/teardown.js';
 	import { spacePx } from '../core/rungs.js';
 	import { tooltips } from '../core/tooltip.js';
+	import { schemaOf } from '../core/schema.js';
 	import type {
 		Addr,
 		CardAddr,
@@ -215,7 +216,7 @@
 	// card reorder.
 	const commitErrors = new SvelteMap<string, RoutedDiagnostic>();
 
-	const kinds = $derived(Object.keys(quill.schema).filter((k) => k !== 'main'));
+	const kinds = $derived(Object.keys(schemaOf(quill)).filter((k) => k !== 'main'));
 
 	// The removal's step back (`undo.svelte.ts`), published so an array's row removal
 	// offers on the same toast a card's does.
@@ -279,7 +280,7 @@
 		if (!running || value === undefined || !shown || !Object.hasOwn(shown.values, name))
 			return rederive();
 		const fresh = fieldValues((isMain ? doc.main : doc.card(at)).payloadItems);
-		const cardSchema = isMain ? quill.schema.main : quill.schema[shown.kind];
+		const cardSchema = schemaOf(quill)[isMain ? 'main' : shown.kind];
 		patched = {
 			...patched,
 			[id]: {
@@ -376,12 +377,24 @@
 		if (!review?.length) return review;
 		if (was === now && !review.some((item) => 'card' in item && item.card !== undefined))
 			return review;
+		let keys: Map<string, string> | undefined;
+		const keyOf = (id: string): string | undefined => {
+			if (!keys) {
+				keys = new Map();
+				const cards = doc.cards;
+				for (const [k, key] of now.entries()) {
+					const at = cards[k]?.id;
+					if (at != null && !keys.has(at)) keys.set(at, key);
+				}
+			}
+			return keys.get(id);
+		};
 		return review.map((item) => {
 			if (byCard(item)) return item;
 			let field: DocPath;
 			if (item.card === undefined) field = cardMoved(item.field, was, now);
 			else {
-				const key = cardKeyFor(item.card);
+				const key = keyOf(item.card);
 				field = pathOnCard(item.field, key === undefined ? now.length : now.indexOf(key));
 			}
 			return field === item.field ? item : { ...item, field };
@@ -566,7 +579,7 @@
 		text: string;
 	} {
 		const { add } = item;
-		const schema = quill.schema[add.kind];
+		const schema = schemaOf(quill)[add.kind];
 		const values = fieldValues(add.payloadItems);
 		const named = (add.ext?.editor as { title?: unknown } | undefined)?.title;
 		const title = cardTitle(
@@ -921,7 +934,7 @@
 		if (!key?.field) return '';
 		const isMain = key.card === undefined;
 		const card = isMain ? model.main : model.cards[cardIndexOf(key.card as CardId)];
-		const schema = isMain ? quill.schema.main : quill.schema[card?.kind ?? ''];
+		const schema = schemaOf(quill)[isMain ? 'main' : (card?.kind ?? '')];
 		const sub = schema?.fields[key.field];
 		return sub ? fieldTitle(key.field, sub) : humanize(key.field);
 	}
@@ -1036,7 +1049,7 @@
 		const { card: at, field } = addr;
 		if (typeof at !== 'number' || field == null) return;
 		const shown = model.cards[at];
-		const cardSchema = shown && quill.schema[shown.kind];
+		const cardSchema = shown && schemaOf(quill)[shown.kind];
 		if (!cardSchema || cardSchema.title?.trim()) return;
 		const sub = Object.hasOwn(cardSchema.fields, field) ? cardSchema.fields[field] : undefined;
 		if (!sub || !shortCell(sub)) return;
@@ -1251,7 +1264,7 @@
 		const name =
 			shown?.titleOverride ||
 			shown?.titlePlaceholder ||
-			kindTitle(quill.schema[card.kind], card.kind);
+			kindTitle(schemaOf(quill)[card.kind], card.kind);
 		const gone = removed.remove(id, card, cardIds, i);
 		doc.removeCard(i);
 		arm.arm();
@@ -1476,7 +1489,7 @@
 
 	const tree = $derived.by(() => {
 		revision; // re-derive on every mutation
-		const schema = quill.schema;
+		const schema = schemaOf(quill);
 		const main = doc.main;
 		const cards = doc.cards;
 		// The provenance channel (FIELD_PROVENANCE): one whole-doc resolve per
@@ -2158,7 +2171,7 @@
 	function declaredField(addr: Addr): QuillFieldSchema | undefined {
 		if (addr.field == null) return undefined;
 		const kind = typeof addr.card === 'number' ? model.cards[addr.card]?.kind : undefined;
-		const schema = quill.schema;
+		const schema = schemaOf(quill);
 		const card = addr.card == null ? schema.main : kind ? schema[kind] : undefined;
 		return card?.fields?.[addr.field];
 	}
@@ -2420,7 +2433,7 @@
 							<div class="qm-menu-surface" data-qm-root>
 								{#each kinds as k (k)}
 									<DropdownMenu.Item class="qm-menu-item" onSelect={() => addPicked(atIndex, k)}
-										>{kindTitle(quill.schema[k], k)}</DropdownMenu.Item
+										>{kindTitle(schemaOf(quill)[k], k)}</DropdownMenu.Item
 									>
 								{/each}
 							</div>

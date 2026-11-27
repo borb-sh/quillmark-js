@@ -11,6 +11,7 @@ import type {
 	QuillFieldSchema
 } from '@quillmark/wasm';
 import { addrForFieldPath, fieldPathForAddr } from '../core/address.js';
+import { schemaOf } from '../core/schema.js';
 import { asContent, lineRuns } from '../core/codec/value-plan.js';
 import {
 	byBlocks,
@@ -71,9 +72,12 @@ export function proposalsBetween(
 	const { mint = () => `review-${minted++}`, label } =
 		typeof opts === 'function' ? { mint: opts } : opts;
 	const items: ReviewItem[] = [];
-	const kinds = Array.from({ length: base.cardCount }, (_, i) => base.card(i).kind);
-	const baseIds = Array.from({ length: base.cardCount }, (_, i) => base.card(i).id ?? '');
-	const answerIds = Array.from({ length: answer.cardCount }, (_, i) => answer.card(i).id ?? '');
+	const schemas = schemaOf(quill);
+	const baseCards = base.cards;
+	const answerCards = answer.cards;
+	const kinds = baseCards.map((c) => c.kind);
+	const baseIds = baseCards.map((c) => c.id ?? '');
+	const answerIds = answerCards.map((c) => c.id ?? '');
 
 	const pathOf = (at: number | undefined, field: string | undefined, steps: PathStep[] = []) =>
 		fieldPathForAddr(addrOf(at, field), kinds, steps)!;
@@ -254,21 +258,21 @@ export function proposalsBetween(
 		}
 	};
 
-	diffCard(quill.schema.main, undefined, base.main, answer.main, undefined);
+	diffCard(schemas.main, undefined, base.main, answer.main, undefined);
 	/** The base's index of each card the answer keeps as it was, by its answer index. */
 	const kept = new Map<number, number>();
 	const removed: number[] = [];
 	for (const [at, id] of baseIds.entries()) {
 		const answerAt = answerIds.indexOf(id);
-		const was = base.card(at);
-		const now = answerAt < 0 ? undefined : answer.card(answerAt);
+		const was = baseCards[at];
+		const now = answerAt < 0 ? undefined : answerCards[answerAt];
 		if (!now || now.kind !== was.kind) {
 			removed.push(at);
 			continue;
 		}
 		kept.set(answerAt, at);
 		const first = items.length;
-		diffCard(quill.schema[was.kind], at, was, now, answerAt);
+		diffCard(schemas[was.kind], at, was, now, answerAt);
 		if (id) for (const item of items.slice(first)) Object.assign(item, { card: id });
 	}
 	for (const at of answerIds.keys()) {
@@ -278,7 +282,7 @@ export function proposalsBetween(
 		const after = kept.get(lead);
 		items.push({
 			id: mint(),
-			add: answer.card(at),
+			add: answerCards[at],
 			...(after !== undefined && { after }),
 			...(after !== undefined && baseIds[after] && { afterCard: baseIds[after] })
 		});
