@@ -10,13 +10,14 @@ import { groupLabel } from '$lib/visual/structure';
 import { core, quill, example, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	answerOn,
+	drawnOf,
 	mountEditor,
 	openField,
 	press as key,
 	settle,
-	unmountAll,
 	type EditorRef,
-	type Mounted
+	type Mounted,
+	unmountAll
 } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -45,14 +46,6 @@ function nested(items: (doc: Document) => ReviewItem[], seed?: (doc: Document) =
 /** The first element drawing item `id`. */
 const markOf = (root: ParentNode, id: string): Element | null =>
 	root.querySelector(`[data-qm-review~="${id}"]`);
-/** What item `id` draws in place: the words it strikes, then the words it writes. */
-const drawnOf = (root: ParentNode, id: string): [string, string] => {
-	const words = (selector: string) =>
-		[...root.querySelectorAll(`${selector}[data-qm-review~="${id}"]`)]
-			.map((el) => el.textContent)
-			.join('');
-	return [words('.qm-review-del'), words('.qm-review-ins')];
-};
 /** A value with each plain text in it as its words. */
 const texts = (value: unknown): unknown =>
 	JSON.parse(

@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
 import { blockSchema, decode, listKeymap } from '$lib/core/codec';
-import { md, atBlock, atBlockEnd, startOf, endOf, run, keyDriver } from './_util.js';
+import { md, atBlock, atBlockEnd, startOf, endOf, run, keyDriver, docOf } from './_util.js';
 
 const keys = listKeymap(blockSchema);
 const { press, expectPress } = keyDriver(keys);
@@ -37,8 +37,6 @@ const n = blockSchema.nodes;
 const p = (text?: string) => n.paragraph.create(null, text ? blockSchema.text(text) : undefined);
 const li = (...blocks: PMNode[]) => n.list_item.create(null, blocks);
 const ul = (...items: PMNode[]) => n.bullet_list.create(null, items);
-const docOf = (...blocks: PMNode[]) => n.doc.create(null, blocks);
-
 describe('Tab / Shift-Tab change nesting depth', () => {
 	it('Tab on the first item at a level is claimed and does nothing — nothing to sink under', () => {
 		for (const [markdown, index] of [

@@ -266,3 +266,16 @@ export function assertPositionInverse(doc: PMNode, label = 'position map'): void
 	}
 	expect(broken, label).toEqual([]);
 }
+
+/** The doc node over `blocks`. */
+export const docOf = (...blocks: PMNode[]): PMNode => blockSchema.nodes.doc.create(null, blocks);
+
+/** A paste event jsdom can carry: it implements no `DataTransfer`, and `getData` is all
+ *  ProseMirror's paste handler reads. */
+export function pasteEvent(data: Record<string, string> = {}): ClipboardEvent {
+	const event = new Event('paste', { bubbles: true, cancelable: true });
+	Object.defineProperty(event, 'clipboardData', {
+		value: { getData: (type: string) => data[type] ?? '', setData: () => {} }
+	});
+	return event as ClipboardEvent;
+}

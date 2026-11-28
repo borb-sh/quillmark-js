@@ -4,10 +4,11 @@
 // one, and each run is drawn as words in the leaf and taken alone.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
-import { proposalsBetween } from '$lib/visual';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
 import {
 	answerOn,
+	between,
+	drawnOf,
 	field,
 	mountEditor,
 	openField,
@@ -61,23 +62,10 @@ const memo = (distribution: string[], memoFor: string[]): Document => {
 
 const OFFICES = ['1 OG/CC', '2 MXG/CC', '3 MSG/CC', '4 MDG/CC', '5 CS/CC', '6 FSS/CC', '7 LRS/CC'];
 
-const between = (base: Document, answer: Document) => {
-	let n = 0;
-	return proposalsBetween(q, base, answer, () => `p${n++}`).items;
-};
-
-/** What each item draws in `root`: the words it strikes, then the words it writes. */
-const drawnOf = (root: ParentNode, id: string): [string, string] => {
-	const words = (selector: string) =>
-		[...root.querySelectorAll(`${selector}[data-qm-review~="${id}"]`)]
-			.map((el) => el.textContent)
-			.join('');
-	return [words('.qm-review-del'), words('.qm-review-ins')];
-};
-
 describe('a field of lines', () => {
 	it('takes a line added above the rest as one proposal, wherever the field sits', () => {
 		const items = between(
+			q,
 			memo(OFFICES.slice(0, 3), OFFICES.slice(0, 3)),
 			memo(['HQ USAF/CC', ...OFFICES.slice(0, 3)], ['HQ USAF/CC', ...OFFICES.slice(0, 3)])
 		);
@@ -91,7 +79,7 @@ describe('a field of lines', () => {
 		const changed = [...OFFICES];
 		changed[1] = '2 OSS/CC';
 		changed[6] = '7 CES/CC';
-		const items = between(memo(OFFICES, OFFICES), memo(changed, OFFICES));
+		const items = between(q, memo(OFFICES, OFFICES), memo(changed, OFFICES));
 		expect(items).toHaveLength(2);
 		const text = (item: (typeof items)[number]) => (item as { after: { text: string } }).after.text;
 		expect(text(items[0]).split('\n')).toEqual([
@@ -106,7 +94,7 @@ describe('a field of lines', () => {
 		const changed = [...OFFICES];
 		changed[1] = '2 OSS/CC';
 		changed[4] = '5 CES/CC';
-		expect(between(memo(OFFICES, OFFICES), memo(changed, OFFICES))).toHaveLength(1);
+		expect(between(q, memo(OFFICES, OFFICES), memo(changed, OFFICES))).toHaveLength(1);
 	});
 
 	it('draws each run as words in the leaf, and takes each alone', async () => {
@@ -115,7 +103,7 @@ describe('a field of lines', () => {
 		changed[1] = '2 OSS/CC';
 		changed[6] = '7 CES/CC';
 		const answer = memo(OFFICES, changed);
-		const items = between(doc, answer);
+		const items = between(q, doc, answer);
 		const r = mountEditor(q, doc, { review: items });
 		await settle();
 		const cell = openField(r.target, q.schema.main, 'header').querySelector(
@@ -135,7 +123,7 @@ describe('a field of lines', () => {
 	it('draws a line added at the top of a top-level field as words, and takes it as the field', async () => {
 		const doc = memo(OFFICES.slice(0, 3), OFFICES.slice(0, 1));
 		const answer = memo(['HQ USAF/CC', ...OFFICES.slice(0, 3)], OFFICES.slice(0, 1));
-		const items = between(doc, answer);
+		const items = between(q, doc, answer);
 		const r = mountEditor(q, doc, { review: items });
 		await settle();
 		expect(drawnOf(field(r.target, 'Distribution'), 'p0')).toEqual(['', 'HQ USAF/CC\n']);

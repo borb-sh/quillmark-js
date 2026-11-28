@@ -9,6 +9,7 @@ import { proposalsBetween } from '$lib/visual';
 import { quill, example } from '../helpers/fixtures.js';
 import {
 	activeView,
+	drawnOf,
 	leaf,
 	mountInner,
 	openField,
@@ -16,9 +17,9 @@ import {
 	press,
 	settle,
 	trigger,
-	unmountAll,
 	type InnerRef,
-	type Mounted
+	type Mounted,
+	unmountAll
 } from '../helpers/surface.svelte.js';
 
 afterEach(unmountAll);
@@ -44,14 +45,6 @@ function review(items: (doc: Document) => ReviewItem[], seed?: (doc: Document) =
 	return { ...mounted, doc, events, drawn };
 }
 
-/** What item `id` draws in place: the words it strikes, then the words it writes. */
-const drawnOf = (root: ParentNode, id: string): [string, string] => {
-	const words = (selector: string) =>
-		[...root.querySelectorAll(`${selector}[data-qm-review~="${id}"]`)]
-			.map((el) => el.textContent)
-			.join('');
-	return [words('.qm-review-del'), words('.qm-review-ins')];
-};
 const text = (value: unknown): unknown => (value as { text?: string } | undefined)?.text ?? value;
 const undo = (r: Reviewed): void => {
 	press(r.target.querySelector<HTMLElement>('.qm-editor') ?? document.body, 'z', { ctrlKey: true });

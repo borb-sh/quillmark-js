@@ -12,20 +12,10 @@ import { EditorView } from 'prosemirror-view';
 import type { Content, Document, TableProps } from '@quillmark/wasm';
 import { createField, plaintextSchema, proseLeafPlugins } from '$lib/core/codec';
 import type { FieldController, LeafViews } from '$lib/core/codec';
-import { core, md, mount, probeQuill, quill, viewOf } from './_util.js';
+import { core, md, mount, probeQuill, quill, viewOf, pasteEvent } from './_util.js';
 import { depthsOf } from './_util.js';
 
 type Clipboard = Record<string, string>;
-
-/** A paste event jsdom can carry: it implements no `DataTransfer`, and `getData` is all
- *  ProseMirror's paste handler reads. */
-function pasteEvent(data: Clipboard = {}): ClipboardEvent {
-	const event = new Event('paste', { bubbles: true, cancelable: true });
-	Object.defineProperty(event, 'clipboardData', {
-		value: { getData: (type: string) => data[type] ?? '', setData: () => {} }
-	});
-	return event as ClipboardEvent;
-}
 
 /** A body over `markdown`, its caret on a fresh line below it: where a writer pastes a
  *  draft. An empty `markdown` is an empty body. */

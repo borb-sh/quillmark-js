@@ -5,7 +5,7 @@
  this leaf's commits with the caret riding the untouched view.
 -->
 <script lang="ts">
-	import { onDestroy, untrack } from 'svelte';
+	import { untrack } from 'svelte';
 	import {
 		createField,
 		type FieldController,
@@ -15,7 +15,7 @@
 	import type { LeafRegistry } from './leaves.js';
 	import SlashMenu from './SlashMenu.svelte';
 	import { wording } from './strings.js';
-	import { review } from './review.svelte.js';
+	import { dropPlansOnLeave, review } from './review.svelte.js';
 	import type { TextProposal } from './review.js';
 	import './controls.css';
 	import type { Document, Quill, Addr, Content, Diagnostic } from '@quillmark/wasm';
@@ -202,17 +202,7 @@
 			(proposed ?? []).map((p) => ({ ...p, lit: reviewing.lit === p.id }))
 		);
 	});
-	/** A proposal's plan goes when it leaves the list or the leaf goes, not when another in the
-	 *  list is answered, which would leave its own Accept writing its value whole. */
-	let plannedIds: readonly string[] = [];
-	$effect(() => {
-		const ids = (proposed ?? []).map((p) => p.id);
-		for (const id of plannedIds) if (!ids.includes(id)) reviewing.planned(id, undefined);
-		plannedIds = ids;
-	});
-	onDestroy(() => {
-		for (const id of plannedIds) reviewing.planned(id, undefined);
-	});
+	dropPlansOnLeave(reviewing, () => proposed);
 
 	// Only a narrowed or a plain leaf holds by what a re-validation says, so only one of them asks.
 	$effect(() => {

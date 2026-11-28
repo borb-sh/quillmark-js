@@ -11,7 +11,7 @@ import { EditorState, NodeSelection, TextSelection } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
 import { blockSchema, bodyKeymap, decode } from '$lib/core/codec';
 import { islandOf, newTable } from '$lib/core/codec/table.js';
-import { md, atBlock, startOf, keyDriver, shape, textblocks } from './_util.js';
+import { md, atBlock, startOf, keyDriver, shape, textblocks, docOf } from './_util.js';
 
 const { expectPress, press } = keyDriver(bodyKeymap(blockSchema));
 
@@ -32,8 +32,6 @@ const p = (text?: string) => n.paragraph.create(null, text ? blockSchema.text(te
 const li = (...blocks: PMNode[]) => n.list_item.create(null, blocks);
 const ul = (...items: PMNode[]) => n.bullet_list.create(null, items);
 const quote = (...blocks: PMNode[]) => n.blockquote.create(null, blocks);
-const docOf = (...blocks: PMNode[]) => n.doc.create(null, blocks);
-
 describe('a first block a gap cursor declines gets a paragraph above it', () => {
 	it('a fence that opens the body', () => {
 		expectPress(startOf('```\ncode\n```', 0), 'Enter', 'doc(paragraph, code_block("code"))');

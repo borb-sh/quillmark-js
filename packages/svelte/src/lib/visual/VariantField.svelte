@@ -22,7 +22,7 @@
 	import type { DeepDiagnostic } from './diagnostics.js';
 	import { shownValue, splitReview, type DeepReview } from './review.js';
 	import { review as reviewState } from './review.svelte.js';
-	import type { LandingBox } from './leaves.js';
+	import type { LandingBox, Subform } from './leaves.js';
 	import {
 		VARIANT_DISCRIMINANT,
 		commitDiscriminant,
@@ -107,11 +107,6 @@
 		onCommit(next);
 	}
 
-	type Subform = {
-		focus: () => void;
-		focusPath: (steps: readonly PathStep[], pos?: number) => LandingBox;
-		openPath: (steps: readonly PathStep[]) => Promise<void>;
-	};
 	let cellsEl = $state<Subform | undefined>();
 
 	/** Whether a step names a cell the live world draws. The one test the landing and
