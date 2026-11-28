@@ -485,9 +485,11 @@
 			// that fails before then is not reported as unhandled.
 			engine.catch(() => {});
 			try {
-				core = await init();
-				quiver = await openQuiver();
-				store = await openStore(new URL('.', document.baseURI).href);
+				[core, quiver, store] = await Promise.all([
+					init(),
+					openQuiver(),
+					openStore(new URL('.', document.baseURI).href)
+				]);
 				keeps = store !== undefined;
 				if (cancelled) return;
 				const id = await store?.opened();

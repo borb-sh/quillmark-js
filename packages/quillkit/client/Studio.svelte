@@ -437,10 +437,9 @@
 			built.catch(() => {});
 			try {
 				// `init` instantiates the core and latches the surface the editor's codec
-				// reads synchronously. The quiver awaits the same memoized gate to
-				// materialize a quill.
-				core = await init();
-				quiver = await openQuiver();
+				// reads synchronously. The quiver needs no core to open, and awaits the
+				// same memoized gate to materialize a quill.
+				[core, quiver] = await Promise.all([init(), openQuiver()]);
 				const next = catalogOf(quiver);
 				catalog = next;
 				const at = firstOpen(quiver, next);
