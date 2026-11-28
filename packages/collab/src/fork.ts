@@ -294,11 +294,13 @@ function state(bound: Bound, quill: Quill): State {
 	const { doc } = bound;
 	const a = quill.toAuthoring(doc);
 	const reader = quill.reader(doc);
+	const schemas = quill.schema;
+	const cards = doc.cards;
 	const lines = new Map<string, string[]>();
-	for (const c of [MAIN, ...doc.cards.map((_, i) => i)] as CardRef[]) {
-		const card = c === MAIN ? doc.main : doc.card(c);
+	for (const c of [MAIN, ...cards.map((_, i) => i)] as CardRef[]) {
+		const card = c === MAIN ? doc.main : cards[c];
 		lines.set(keyOf(c), contentLines(card.body));
-		const schema = c === MAIN ? quill.schema.main : quill.schema[card.kind];
+		const schema = c === MAIN ? schemas.main : schemas[card.kind];
 		for (const [field, f] of Object.entries(schema?.fields ?? {})) {
 			const addr = addrOf(c, field);
 			const v = doc.getStored(addr);
@@ -310,7 +312,7 @@ function state(bound: Bound, quill: Quill): State {
 	}
 	return {
 		ids: [...bound.binding.ids],
-		cardIds: doc.cards.map((c) => c.id ?? ''),
+		cardIds: cards.map((c) => c.id ?? ''),
 		main: authoring({ kind: MAIN, fields: a.fields, body: a.body }),
 		cards: (a.cards ?? []).map(authoring),
 		lines

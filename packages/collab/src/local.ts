@@ -148,8 +148,9 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 			storage.setItem(key.count(epoch), String(at));
 			if (append.key !== undefined) storage.setItem(key.once(epoch, append.key), String(at));
 			touch();
-			const all = stored(epoch);
-			if (all.length > (opts.compactAt ?? 100)) {
+			const compactAt = opts.compactAt ?? 100;
+			const all = entries(epoch).length > compactAt ? stored(epoch) : [];
+			if (all.length > compactAt) {
 				const from = Math.min(...all.map((e) => e.from));
 				const to = Math.max(...all.map((e) => e.to));
 				write(epoch, from, to, Y.mergeUpdates(all.map((e) => e.update)));
@@ -169,12 +170,13 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 			const seen = cursor instanceof Set ? (cursor as Set<string>) : new Set<string>();
 			if (!isOpen(epoch)) return undefined;
 			const all = stored(epoch);
+			const lead = leader(epoch);
 			return {
 				updates: all.filter((e) => !seen.has(e.key)).map((e) => e.update),
 				cursor: new Set(all.map((e) => e.key)),
 				count: count(epoch),
 				touched: Number(storage.getItem(key.touched) ?? 0),
-				...(leader(epoch) === undefined ? {} : { leader: leader(epoch) })
+				...(lead === undefined ? {} : { leader: lead })
 			};
 		},
 		async checkpoint(epoch, checkpoint) {
