@@ -483,7 +483,7 @@ function readLeaf(reader: DocumentReader, addr: Addr): Content {
 /** `addr` as a content write takes it: a card named by its `$id`, which a write requires. */
 function writeAddr(doc: Document, addr: Addr): Addr {
 	if (typeof addr.card !== 'number') return addr;
-	return { ...addr, card: doc.card(addr.card).id ?? addr.card };
+	return { ...addr, card: doc.cardId(addr.card) };
 }
 
 /** The canonical empty `Content`: one empty `para` block. */
