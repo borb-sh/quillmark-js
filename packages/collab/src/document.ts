@@ -181,7 +181,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 	const cardOf = (c: CardRef): Card => (c === MAIN ? doc.main : doc.card(c));
 	/** `addr` naming its card by `$id`, as a content write takes it. */
 	const writeAddr = (addr: Addr): Addr =>
-		typeof addr.card === 'number' ? { ...addr, card: doc.card(addr.card).id } : addr;
+		typeof addr.card === 'number' ? { ...addr, card: doc.cardId(addr.card) } : addr;
 	const schemaOf = (c: CardRef, kind?: string): QuillCardSchema | undefined =>
 		c === MAIN ? schemas.main : schemas[kind ?? doc.card(c).kind];
 	const refs = (): CardRef[] => [MAIN, ...ids.map((_, i) => i)];
@@ -282,7 +282,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 		ydoc.transact(() => {
 			for (const name of named) {
 				const c = ids.indexOf(name);
-				if (c >= 0) ydoc.getMap<unknown>(name).set(ID, doc.card(c).id);
+				if (c >= 0) ydoc.getMap<unknown>(name).set(ID, doc.cardId(c));
 			}
 			for (const { root, addr } of reminted) {
 				const content = storedContent(addr);
@@ -447,7 +447,7 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 			// A card whose `$id` the list now gives another card leaves, to return under its own.
 			const rekeyed = new Map<string, Card>();
 			for (let i = ids.length - 1; i >= 0; i--) {
-				if (doc.card(i).id === want.get(ids[i])) continue;
+				if (doc.cardId(i) === want.get(ids[i])) continue;
 				rekeyed.set(ids[i], doc.card(i));
 				doc.removeCard(i);
 				ids.splice(i, 1);

@@ -982,7 +982,7 @@ export function placeCardInto(target: Document, card: Card, at: number): void {
 	const { id, ...bare } = card;
 	const free =
 		id !== undefined &&
-		!Array.from({ length: target.cardCount }, (_, k) => target.card(k).id).includes(id);
+		!Array.from({ length: target.cardCount }, (_, k) => target.cardId(k)).includes(id);
 	try {
 		target.unchecked.insertCard(free ? card : bare, at);
 	} catch (e) {

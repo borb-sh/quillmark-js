@@ -365,7 +365,7 @@
 	};
 	/** The session key of the card holding `$id` `id`. */
 	function cardKeyFor(id: string): string | undefined {
-		return cardIds.find((_, k) => doc.card(k).id === id);
+		return cardIds.find((_, k) => doc.cardId(k) === id);
 	}
 	/** The host's list with each card a path names moved to where that card stands now: the card
 	 *  holding the item's `card`, else the one at the path's index when the list was set. */
