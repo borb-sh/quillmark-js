@@ -6,7 +6,7 @@
 // edit to land inside, and two words it changed far apart in one line are two splices, so what
 // was typed between them stays.
 import { changedRuns, type Run, type Splice } from './lines.js';
-import { LINE_KEYS, MARK_KEYS, SLOT, canonical, type YField } from './shape.js';
+import { LINE_KEYS, SLOT, canonical, marksOf, type YField } from './shape.js';
 
 export type Grain = 'char' | 'word';
 
@@ -107,21 +107,15 @@ export function fieldTokens(field: YField): Tokens {
 			keys.push(canonical({ nl: attrs, within: within(b?.path ?? []) }));
 		} else if (ch === SLOT) {
 			const map = field.islands[island++];
-			keys.push(canonical({ island: map?.toJSON() ?? null, marks: marksAt(field, s) }));
+			keys.push(canonical({ island: map?.toJSON() ?? null, marks: marksOf(field.attrs[s]) }));
 		} else {
 			const marks: unknown[] = [];
-			for (let i = s; i < e; i++) marks.push(marksAt(field, i));
+			for (let i = s; i < e; i++) marks.push(marksOf(field.attrs[i]));
 			keys.push(canonical({ text: field.chars.slice(s, e).join(''), marks }));
 		}
 		block.push(line);
 	}
 	return { keys, block };
-}
-
-function marksAt(field: YField, i: number): Record<string, unknown> {
-	const out: Record<string, unknown> = {};
-	for (const k of MARK_KEYS) if (field.attrs[i][k] != null) out[k] = field.attrs[i][k];
-	return out;
 }
 
 /** A run of tokens two states of one root differ in. An insertion alone can sit at any gap

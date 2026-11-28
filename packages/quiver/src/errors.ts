@@ -28,3 +28,15 @@ export class QuiverError extends Error {
 		this.quiverName = options?.quiverName;
 	}
 }
+
+/** Run `io`, rethrowing its failure as a `transport_error` whose message names what failed. A `QuiverError` passes through untouched. */
+export async function transport<T>(failed: string, io: () => Promise<T>): Promise<T> {
+	try {
+		return await io();
+	} catch (err) {
+		if (err instanceof QuiverError) throw err;
+		throw new QuiverError('transport_error', `${failed}: ${(err as Error).message}`, {
+			cause: err
+		});
+	}
+}

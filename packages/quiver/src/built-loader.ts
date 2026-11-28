@@ -5,7 +5,7 @@
  * Package-internal, and browser-safe: no static `node:` imports at any level.
  */
 
-import { QuiverError } from './errors.js';
+import { QuiverError, transport } from './errors.js';
 import { QUILL_NAME_RULE, isQuillName } from './ref.js';
 import { isCanonicalSemver, compareSemver } from './semver.js';
 import { FORMAT, INDEX } from './format.js';
@@ -38,28 +38,15 @@ export function httpReader(base: string): ArtifactReader {
 	const root = base.endsWith('/') ? base : `${base}/`;
 	return async (path, mode) => {
 		const url = `${root}${path}`;
-		let response: Response;
-		try {
-			response = await globalThis.fetch(url, { cache: mode });
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Network error fetching "${url}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
+		const response = await transport(`Network error fetching "${url}"`, () =>
+			globalThis.fetch(url, { cache: mode })
+		);
 		if (!response.ok) {
 			throw new QuiverError('transport_error', `HTTP ${response.status} fetching "${url}"`);
 		}
-		try {
-			return new Uint8Array(await response.arrayBuffer());
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Network error reading "${url}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
+		return new Uint8Array(
+			await transport(`Network error reading "${url}"`, () => response.arrayBuffer())
+		);
 	};
 }
 
@@ -159,15 +146,7 @@ class BuiltLoader implements QuiverLoader {
 }
 
 async function readIndex(read: ArtifactReader): Promise<BuiltIndex> {
-	let bytes: Uint8Array;
-	try {
-		bytes = await read(INDEX, 'no-cache');
-	} catch (err) {
-		if (err instanceof QuiverError) throw err;
-		throw new QuiverError('transport_error', `Failed to read ${INDEX}: ${(err as Error).message}`, {
-			cause: err
-		});
-	}
+	const bytes = await transport(`Failed to read ${INDEX}`, () => read(INDEX, 'no-cache'));
 	return parseIndex(new TextDecoder().decode(bytes));
 }
 

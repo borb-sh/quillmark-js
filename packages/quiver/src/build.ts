@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, isAbsolute, resolve } from 'node:path';
-import { QuiverError } from './errors.js';
+import { QuiverError, transport } from './errors.js';
 import { BUNDLE_EXTENSION, packFiles } from './bundle.js';
 import { FORMAT, INDEX, LEGACY_POINTER } from './format.js';
 import { isFont } from './signature.js';
@@ -132,16 +132,10 @@ export async function buildQuiver(
 	 * wide against the seconds a build takes.
 	 */
 	async function packGeneration(): Promise<void> {
-		try {
+		await transport(`Failed to prepare output directory "${outDir}"`, async () => {
 			await rm(stage, { recursive: true, force: true });
 			await mkdir(stage, { recursive: true });
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Failed to prepare output directory "${outDir}": ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
+		});
 
 		const quills: Array<{ name: string; version: string; bundle: string }> = [];
 
@@ -188,15 +182,9 @@ export async function buildQuiver(
 					.slice(0, NAME_DIGEST_LENGTH);
 				const bundleName = `${quillName}@${version}.${bundleHash}.${BUNDLE_EXTENSION}`;
 
-				try {
-					await writeFile(join(stage, bundleName), zipBytes);
-				} catch (err) {
-					throw new QuiverError(
-						'transport_error',
-						`Failed to write bundle "${join(outDir, bundleName)}": ${(err as Error).message}`,
-						{ cause: err }
-					);
-				}
+				await transport(`Failed to write bundle "${join(outDir, bundleName)}"`, () =>
+					writeFile(join(stage, bundleName), zipBytes)
+				);
 
 				quills.push({ name: quillName, version, bundle: bundleName });
 			}
@@ -211,16 +199,10 @@ export async function buildQuiver(
 			quills
 		};
 
-		try {
+		await transport(`Failed to write "${join(outDir, INDEX)}" or its legacy pointer`, async () => {
 			await writeFile(join(stage, INDEX), JSON.stringify(index, null, 2), 'utf-8');
 			await writeFile(join(stage, LEGACY_POINTER), JSON.stringify({ format: FORMAT }), 'utf-8');
-		} catch (err) {
-			throw new QuiverError(
-				'transport_error',
-				`Failed to write "${join(outDir, INDEX)}" or its legacy pointer: ${(err as Error).message}`,
-				{ cause: err }
-			);
-		}
+		});
 
 		// `prev` is cleared first: a rename onto a non-empty directory fails, and the
 		// tree left by an interrupted run is one.

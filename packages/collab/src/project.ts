@@ -16,7 +16,7 @@ import type {
 	Repair
 } from '@quillmark/wasm';
 import { core } from './core.js';
-import { MARK_KEYS, SLOT_PREFIX, units, type Attrs, type YBlock, type YField } from './shape.js';
+import { MARK_KEYS, SLOT_PREFIX, offsets, type Attrs, type YBlock, type YField } from './shape.js';
 
 export interface Projection {
 	content: Content;
@@ -28,9 +28,7 @@ export function project(field: YField): Projection {
 	const raw: RawContent = {
 		text: field.chars.join(''),
 		blocks: field.blocks.map(contentBlock),
-		containers: [...field.containers.entries()].map(
-			([id, record]) => ({ ...(record as object), id }) as ContentContainer
-		),
+		containers: [...field.containers.entries()].map(([id, record]) => containerOf(id, record)),
 		marks: deriveMarks(field.chars, field.attrs),
 		islands: field.islands.map(islandOf),
 		...(field.codec ? { codec: field.codec } : {})
@@ -43,6 +41,9 @@ export function project(field: YField): Projection {
  *  writes back. */
 export const inserts = (r: Repair): boolean =>
 	r.inserts === true || (r.repair === 'in_slot' && inserts(r.inner));
+
+export const containerOf = (id: string, record: unknown): ContentContainer =>
+	({ ...(record as object), id }) as ContentContainer;
 
 export function contentBlock(b: YBlock): ContentBlock {
 	return {
@@ -66,13 +67,7 @@ export function islandOf(map: Y.Map<unknown>): ContentIsland {
 }
 
 export function deriveMarks(chars: string[], attrs: Attrs[]): ContentMark[] {
-	const at: number[] = [];
-	let u = 0;
-	for (const ch of chars) {
-		at.push(u);
-		u += units(ch);
-	}
-	at.push(u);
+	const at = offsets(chars);
 	const marks: ContentMark[] = [];
 	for (const key of MARK_KEYS) {
 		let start = -1;

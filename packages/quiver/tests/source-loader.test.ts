@@ -3,8 +3,7 @@ import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { scanSourceQuiver, readQuillTree } from '../src/source-loader.js';
 import { scratch } from './helpers/scratch.js';
-
-const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
+import { SAMPLE_FIXTURE } from './helpers/fixtures.js';
 
 const temp = scratch('quiver-source-');
 afterEach(() => temp.cleanup());

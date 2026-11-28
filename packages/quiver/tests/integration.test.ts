@@ -13,8 +13,7 @@ import { join, sep } from 'node:path';
 import { Quiver, build, fromBuiltDir } from '../src/node.js';
 import { mockQuillLoad } from './helpers/mock-engine.js';
 import { scratch } from './helpers/scratch.js';
-
-const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
+import { SAMPLE_FIXTURE } from './helpers/fixtures.js';
 
 const temp = scratch('quiver-integration-');
 let out: string;

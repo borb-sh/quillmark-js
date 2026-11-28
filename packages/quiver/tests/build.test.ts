@@ -6,12 +6,11 @@ import { unzipSync } from 'fflate';
 import { buildQuiver } from '../src/build.js';
 import { FORMAT } from '../src/format.js';
 import { scratch } from './helpers/scratch.js';
+import { SAMPLE_FIXTURE } from './helpers/fixtures.js';
 
 /** An OpenType signature and then `tail`: bytes the build takes as a font. */
 const font = (...tail: number[]): Uint8Array =>
 	new Uint8Array([...new TextEncoder().encode('OTTO'), ...tail]);
-
-const SAMPLE_FIXTURE = new URL('./fixtures/sample-quiver', import.meta.url).pathname;
 
 const temp = scratch('quiver-build-');
 afterEach(() => temp.cleanup());
