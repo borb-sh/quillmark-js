@@ -50,22 +50,6 @@ export interface AppendOpts {
 	key?: string;
 }
 
-/** A state of an epoch the log keeps past compaction: how many entries it holds, and its
- *  `Y.encodeSnapshot`. A session's history holds every state it passed through (garbage
- *  collection off), so the snapshot alone rebuilds the state. */
-export interface Checkpoint {
-	count: number;
-	snapshot: Uint8Array;
-}
-
-/** A named version of the room's Document: its label, `doc.toStored()` as it stood, and when it
- *  was kept, in ms since the epoch. It outlives the session it was read from. */
-export interface Version {
-	label: string;
-	stored: string;
-	at: number;
-}
-
 /** Where a room keeps its saved Document and its session's log. */
 export interface SessionLog {
 	/** The open session; `undefined` when none is. */
@@ -94,15 +78,6 @@ export interface SessionLog {
 		| { updates: Uint8Array[]; cursor: unknown; count: number; touched: number; leader?: number }
 		| undefined
 	>;
-	/** Keep `checkpoint` for `epoch` while it is open, and drop it when the epoch ends. */
-	checkpoint(epoch: string, checkpoint: Checkpoint): Promise<void>;
-	/** The checkpoints kept for `epoch`, in the order kept; `undefined` when `epoch` is no longer
-	 *  open. */
-	checkpoints(epoch: string): Promise<Checkpoint[] | undefined>;
-	/** Keep `version`, past the end of every session. */
-	keepVersion(version: Version): Promise<void>;
-	/** Every version kept, in the order kept. */
-	versions(): Promise<Version[]>;
 	/** Call `onChange` when the log may hold new entries. A hint: `since` is what reads them. */
 	subscribe(onChange: () => void): () => void;
 	load(): Promise<Saved | undefined>;
@@ -148,14 +123,6 @@ export interface Session {
 	readonly binding: DocumentBinding;
 	/** `binding.push`: write a local edit to the session. */
 	push(op?: CardOp | readonly CardOp[]): Addr[];
-	/** `Y.encodeSnapshot` of the state the session holds now, a base for `writeFrom`. */
-	snapshot(): Uint8Array;
-	/**
-	 * Apply an update made for this session from an older state, `writeFrom`'s, as an edit by
-	 * `author`: it is appended under that name, and the Document hears it through `onRemote`.
-	 * Run the `writeFrom` and the `apply` in one task, so the conflicts it reported are current.
-	 */
-	apply(update: Uint8Array, author: string): void;
 	/** Whether the store elects this client to lead, as of the last pull. */
 	readonly leader: boolean;
 	/** Save now rather than after the delay. */
@@ -198,7 +165,7 @@ export function covers(a: Uint8Array, b: Uint8Array): boolean {
  * Whether `opened` is over for a writer: closed, or idle past `lease` with `saved` holding every
  * entry, so the next session can open from the save.
  */
-export async function settled(
+async function settled(
 	log: SessionLog,
 	opened: Opened,
 	saved: Saved,
@@ -226,7 +193,7 @@ function snapshotOf(updates: Uint8Array[]): Uint8Array {
 }
 
 const sameQuill = (ref: string, quill: Quill) => ref.split('@')[0] === quill.metadata.name;
-export const quillOf = (quill: Quill) => `${quill.metadata.name}@${quill.metadata.version}`;
+const quillOf = (quill: Quill) => `${quill.metadata.name}@${quill.metadata.version}`;
 
 export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	const { log, quill } = opts;
@@ -265,7 +232,6 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	const read = await log.since(epoch);
 	if (!read) throw new Error('the session closed while joining');
 
-	// History is kept, so a writer can work from an older revision (`writeFrom`).
 	const ydoc = new Y.Doc({ gc: false });
 	Y.applyUpdate(ydoc, Y.mergeUpdates([opened.seed, ...read.updates]), LOG);
 	let cursor = read.cursor;
@@ -307,28 +273,24 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 	// on it, so one missing would hold all of them back from every other client. Updates made
 	// while an append is out go together in the next, and a failed append is tried again: an
 	// update applied twice changes nothing, so a retry of one that landed unseen is harmless.
-	const authors = new WeakMap<object, string>();
-	const queue: { author?: string; updates: Uint8Array[] }[] = [];
+	const queue: Uint8Array[] = [];
 	let flushing: Promise<void> | undefined;
 	const delays = opts.retry ?? RETRY;
 	const onUpdate = (update: Uint8Array, origin: unknown) => {
 		schedule();
 		if (origin === LOG) return;
-		const author =
-			(origin !== null && typeof origin === 'object' && authors.get(origin)) || opts.author;
-		const last = queue.at(-1);
-		if (last && last.author === author) last.updates.push(update);
-		else queue.push({ author, updates: [update] });
+		queue.push(update);
 		flushing ??= flush().finally(() => (flushing = undefined));
 	};
 	async function flush(): Promise<void> {
-		for (let group = queue.shift(); group; group = queue.shift()) {
+		while (queue.length) {
 			if (ended) return void (lost = true);
-			const update = group.updates.length === 1 ? group.updates[0] : Y.mergeUpdates(group.updates);
+			const updates = queue.splice(0);
+			const update = updates.length === 1 ? updates[0] : Y.mergeUpdates(updates);
 			let appended: Appended | undefined;
 			for (let attempt = 0; appended === undefined; attempt++) {
 				try {
-					appended = await log.append(epoch, update, { author: group.author });
+					appended = await log.append(epoch, update, { author: opts.author });
 				} catch (e) {
 					report(e);
 					if (attempt >= delays.length || ended) break;
@@ -412,12 +374,6 @@ export async function joinSession(opts: JoinSessionOpts): Promise<Session> {
 		ydoc,
 		binding: bound,
 		push: (op) => bound.push(op),
-		snapshot: () => Y.encodeSnapshot(Y.snapshot(ydoc)),
-		apply(update, author) {
-			const by = { author };
-			authors.set(by, author);
-			Y.applyUpdate(ydoc, update, by);
-		},
 		get leader() {
 			return bound.leader;
 		},

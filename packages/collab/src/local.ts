@@ -6,24 +6,15 @@
 // event, which fires in every other tab of the origin, is the wake-up. Once an epoch passes
 // `compactAt` entries, the appending tab merges them into one entry holding their whole range,
 // writing it before deleting the keys it merged, and a reader that finds a key it listed gone
-// lists again. The epoch's checkpoints are one key, a list, so a revision compaction merged
-// past is still rebuilt from its snapshot. Presence is one key, each client's last touch, and the
-// leader is the lowest client id touched within the lease, so a tab that closes hands the lead
-// on once its touch lapses. Versions are one key, a list, outside every epoch. Web Storage has no
-// transactions: two tabs opening a session at once each write one, the later write stands, and
+// lists again. Presence is one key, each client's last touch, and the leader is the lowest client
+// id touched within the lease, so a tab that closes hands the lead on once its touch lapses. Web
+// Storage has no transactions: two tabs opening a session at once each write one, the later write stands, and
 // the other tab's session ends at its first append; two tabs appending in the same instant can
 // take one entry number, which a conditional append does not catch, and two tabs can each read
 // themselves leader for one beat. An entry's `author` is not kept: every tab of an origin is one
 // person.
 import * as Y from 'yjs';
-import {
-	covers,
-	type Checkpoint,
-	type Opened,
-	type Saved,
-	type SessionLog,
-	type Version
-} from './session.js';
+import { covers, type Opened, type Saved, type SessionLog } from './session.js';
 
 export interface LocalLogOpts {
 	room: string;
@@ -50,9 +41,7 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 		log: (epoch: string) => `${prefix}log:${epoch}:`,
 		count: (epoch: string) => `${prefix}count:${epoch}`,
 		once: (epoch: string, k: string) => `${prefix}key:${epoch}:${encodeURIComponent(k)}`,
-		checkpoints: (epoch: string) => `${prefix}checkpoints:${epoch}`,
-		present: (epoch: string) => `${prefix}present:${epoch}`,
-		versions: `${prefix}versions`
+		present: (epoch: string) => `${prefix}present:${epoch}`
 	};
 	const tab = randomId();
 	let n = 0;
@@ -103,13 +92,6 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 		}
 	};
 	const touch = () => storage.setItem(key.touched, String(Date.now()));
-	const checkpoints = (epoch: string): Checkpoint[] =>
-		(
-			JSON.parse(storage.getItem(key.checkpoints(epoch)) ?? '[]') as {
-				count: number;
-				snapshot: string;
-			}[]
-		).map((c) => ({ ...c, snapshot: fromBase64(c.snapshot) }));
 	const present = (epoch: string): Record<string, number> =>
 		JSON.parse(storage.getItem(key.present(epoch)) ?? '{}') as Record<string, number>;
 	const leader = (epoch: string): number | undefined => {
@@ -119,7 +101,6 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 			.map(([client]) => Number(client));
 		return live.length ? Math.min(...live) : undefined;
 	};
-	const versions = (): Version[] => JSON.parse(storage.getItem(key.versions) ?? '[]') as Version[];
 
 	return {
 		current: async () => current(),
@@ -134,7 +115,6 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 			if (!isOpen(epoch)) return;
 			storage.removeItem(key.open);
 			storage.removeItem(key.count(epoch));
-			storage.removeItem(key.checkpoints(epoch));
 			storage.removeItem(key.present(epoch));
 			for (const k of [...entries(epoch), ...keysUnder(key.once(epoch, ''))]) storage.removeItem(k);
 		},
@@ -179,24 +159,6 @@ export function localLog(opts: LocalLogOpts): Required<SessionLog> {
 				...(lead === undefined ? {} : { leader: lead })
 			};
 		},
-		async checkpoint(epoch, checkpoint) {
-			if (!isOpen(epoch)) return;
-			const held = checkpoints(epoch);
-			const same = (c: Checkpoint) =>
-				c.count === checkpoint.count && toBase64(c.snapshot) === toBase64(checkpoint.snapshot);
-			if (held.some(same)) return;
-			storage.setItem(
-				key.checkpoints(epoch),
-				JSON.stringify([...held, checkpoint].map((c) => ({ ...c, snapshot: toBase64(c.snapshot) })))
-			);
-		},
-		async checkpoints(epoch) {
-			return isOpen(epoch) ? checkpoints(epoch) : undefined;
-		},
-		async keepVersion(version) {
-			storage.setItem(key.versions, JSON.stringify([...versions(), version]));
-		},
-		versions: async () => versions(),
 		subscribe(onChange) {
 			const fn = (e: Event) => {
 				const k = (e as StorageEvent).key;

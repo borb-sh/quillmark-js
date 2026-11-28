@@ -5,7 +5,7 @@ import { init as initWasm, type CoreSurface } from '@quillmark/wasm';
 let latched: CoreSurface | undefined;
 
 /** Instantiate the core WASM build, as `@quillmark/wasm`'s `init` does, and hold its surface for
- *  the sync verbs. `joinSession`, `readLog` and `writeLog` await it themselves. */
+ *  the sync verbs. `joinSession` awaits it itself. */
 export async function init(): Promise<CoreSurface> {
 	latched = await initWasm();
 	return latched;

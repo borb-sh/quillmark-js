@@ -4,13 +4,11 @@ export { joinSession, QuillMismatch } from './session.js';
 export type {
 	Appended,
 	AppendOpts,
-	Checkpoint,
 	JoinSessionOpts,
 	Opened,
 	Saved,
 	Session,
-	SessionLog,
-	Version
+	SessionLog
 } from './session.js';
 export { localLog } from './local.js';
 export type { LocalLogOpts } from './local.js';
