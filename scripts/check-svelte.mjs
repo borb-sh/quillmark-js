@@ -27,7 +27,7 @@
 
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
-import { ROOT, filesUnder, packages, report } from './workspace.mjs';
+import { ROOT, blank, decomment, filesUnder, packages, report } from './workspace.mjs';
 
 const DOC = 'svelte/INVARIANTS §"Core vs chrome"';
 
@@ -127,13 +127,6 @@ const RULES = [
 	}
 ];
 
-/** `text` with every match of `re` replaced by its own newlines, so a line number read off
- *  the result is the source's. */
-const blank = (text, re) => text.replace(re, (m) => m.replace(/[^\n]/g, ''));
-/** Comments blanked in the three shapes these sources carry them. The line form is guarded
- *  on what precedes it, so a `https://` in a url is not a comment. */
-const decomment = (text) =>
-	blank(blank(text, /<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//g), /(?<=^|[^:\w])\/\/[^\n]*/gm);
 const markupOf = (text) => blank(text, /<(script|style)\b[\s\S]*?<\/\1>/g);
 
 const SVELTE = packages().filter(({ json }) =>

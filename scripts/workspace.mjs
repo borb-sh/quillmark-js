@@ -59,6 +59,14 @@ export function filesUnder(at, ext, { skip = [], names = [] } = {}) {
 	return out;
 }
 
+/** `text` with every match of `re` replaced by its own newlines, so a line number read off
+ *  the result is the source's. */
+export const blank = (text, re) => text.replace(re, (m) => m.replace(/[^\n]/g, ''));
+/** Comments blanked in the three shapes this workspace's sources carry them. The line form
+ *  is guarded on what precedes it, so a `https://` in a url is not a comment. */
+export const decomment = (text) =>
+	blank(blank(text, /<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//g), /(?<=^|[^:\w])\/\/[^\n]*/gm);
+
 /** A gate's verdict, in two severities. An error fails the run: a fault the diff cannot
  *  show — a pruned stylesheet, a dangling pointer, a rung that resolves to nothing — or a
  *  form a rule admitting no exception refuses, which review would only ever reject. A

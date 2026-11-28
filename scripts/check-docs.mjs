@@ -13,9 +13,9 @@
 // directory (`quiver/INVARIANTS §…`) from anywhere else. The sibling quillmark repo is
 // qualified as `quillmark/` and passes through untouched, since its tree is not here.
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
-import { ROOT, packages, report } from './workspace.mjs';
+import { readFileSync } from 'node:fs';
+import { basename, relative } from 'node:path';
+import { ROOT, filesUnder, packages, report } from './workspace.mjs';
 
 /** The sibling repo's qualifier: a pointer under it names a doc this tree does not hold. */
 const SIBLING = 'quillmark';
@@ -30,18 +30,7 @@ const POINTER = new RegExp(
 );
 
 const SCANNED = /\.(ts|svelte|css|mjs|md)$/;
-const SKIP = new Set(['node_modules', 'dist', 'build', 'site', '.git', '.svelte-kit', 'static']);
-
-function* tree(dir) {
-	for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
-		a.name < b.name ? -1 : 1
-	)) {
-		if (SKIP.has(entry.name)) continue;
-		const at = join(dir, entry.name);
-		if (entry.isDirectory()) yield* tree(at);
-		else if (SCANNED.test(entry.name)) yield at;
-	}
-}
+const SKIP = ['dist', 'build', 'site', 'static'];
 
 /** A heading or a reference as comparable words: unstyled, unpunctuated, lowercase. */
 const words = (text) =>
@@ -63,7 +52,7 @@ function aligns(a, b) {
 const packageOf = (rel) => rel.match(/^packages\/([^/]+)\//)?.[1] ?? null;
 
 const errors = [];
-const files = [...tree(ROOT)];
+const files = filesUnder(ROOT, SCANNED, { names: SKIP });
 
 /** Each doc's sections, as word lists: its headings, and the bold lead a rule opens on. */
 const docs = files

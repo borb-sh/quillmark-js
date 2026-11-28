@@ -127,7 +127,6 @@ if (!pin)
 else if (!/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(pin))
 	fail(`package.json: \`overrides.${WASM}\` is \`${pin}\` — pin exactly one version, not a range`);
 
-/** `>=1.2.3-0` → `[1, 2, 3]`, or null if the range is not a single `>=` comparator. */
 const VERSION = /(\d+)\.(\d+)\.(\d+)(?:-[\w.]+)?/.source;
 /** The floor and the optional ceiling of a `>=X [<Y]` range, or null for any other shape. */
 const boundsOf = (range) => {

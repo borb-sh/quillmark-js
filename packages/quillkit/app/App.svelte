@@ -41,6 +41,7 @@
 	import Choose from './Choose.svelte';
 	import Drawer from './Drawer.svelte';
 	import Update from './Update.svelte';
+	import { CANT_LOAD } from './config';
 	import { land } from './document';
 	import {
 		fileName,
@@ -68,7 +69,6 @@
 	/** The wasm compiled into this bundle, which is the release the footer names. */
 	const QUILLMARK = __CARRIED__['@quillmark/wasm'];
 	const CANT_RENDER = "This form can't render right now.";
-	const CANT_LOAD = "This app can't load right now.";
 	const CANT_OPEN = "This document can't open right now.";
 	const GONE = 'This document was made with a form this app no longer has.';
 	const FIX_FIELDS = 'Some answers need fixing before the page can update.';

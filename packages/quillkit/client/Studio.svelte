@@ -37,7 +37,7 @@
 -->
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import type { CoreSurface, Diagnostic, Document, Engine, FontFace } from '@quillmark/wasm';
+	import type { CoreSurface, Diagnostic, Document, Engine, FontFace, Quill } from '@quillmark/wasm';
 	import type { Quiver } from '@quillmark/quiver';
 	import { init } from '@quillmark/svelte/core';
 	import type { EditorError, Landing, Place } from '@quillmark/svelte/core';
@@ -148,6 +148,12 @@
 	/** The open in progress; the loser of two overlapping opens drops what it built. */
 	let turn = 0;
 
+	function loadFaces(from: Engine, quill: Quill, mine: number): void {
+		void facesFor(from, quill).then((faces) => {
+			if (mine === turn) fonts = faces;
+		});
+	}
+
 	/**
 	 * Replace what is mounted with `ref`, over `carry` when the document should cross.
 	 * Old handles are freed after the surfaces are gone, since a live `<Preview>` paints
@@ -168,10 +174,7 @@
 			if (mine !== turn) return close(next);
 			open = next;
 			held = undefined;
-			if (next.session)
-				void facesFor(engine, next.quill).then((faces) => {
-					if (mine === turn) fonts = faces;
-				});
+			if (next.session) loadFaces(engine, next.quill, mine);
 			writes = next.formats.includes('pdf');
 			words = next.formats.includes('docx');
 			thrown = next.refused;
@@ -212,7 +215,6 @@
 	 * own quill and is believed (INVARIANTS §"The document has doors").
 	 */
 	async function applyMarkdown(text: string): Promise<string | undefined> {
-		let at = picked;
 		let asked: string;
 		let probe: Document | undefined;
 		try {
@@ -225,12 +227,7 @@
 			probe?.free();
 		}
 		// A selector is honoured, `usaf_memo@0.3` being how a document pins a line.
-		try {
-			const [name, version] = quiver!.resolve(asked).split('@');
-			at = { name: name!, version: version! };
-		} catch {
-			// Not a ref this quiver resolves.
-		}
+		const at = resolved(quiver!, asked) ?? picked;
 		if (!at) return `quiver "${catalog?.name}" holds no quills`;
 		sourceText = undefined;
 		repacked = false;
@@ -287,20 +284,24 @@
 		await mount(`${name}@${version}`);
 	}
 
+	/** `asked` as the quiver resolves it, or undefined where it does not. */
+	function resolved(from: Quiver, asked: string): { name: string; version: string } | undefined {
+		try {
+			const [name, version] = from.resolve(asked).split('@');
+			return { name: name!, version: version! };
+		} catch {
+			return undefined;
+		}
+	}
+
 	/**
 	 * The quill a boot opens: what the URL asks for where the quiver holds it, else the
 	 * catalog's first; the write below corrects the address bar.
 	 */
 	function firstOpen(from: Quiver, next: Catalog): { name: string; version: string } | undefined {
 		const asked = askedRef();
-		if (asked !== undefined) {
-			try {
-				const [name, version] = from.resolve(asked).split('@');
-				return { name: name!, version: version! };
-			} catch {
-				// Not a ref this quiver resolves.
-			}
-		}
+		const at = asked === undefined ? undefined : resolved(from, asked);
+		if (at) return at;
 		const first = next.quills[0];
 		if (!first) return undefined;
 		return { name: first.name, version: first.versions[0] };
@@ -383,10 +384,7 @@
 			thrown = landed.refused;
 			if (landed.session) {
 				phase = { kind: 'ready' };
-				const mine = turn;
-				void facesFor(engine, at.quill).then((faces) => {
-					if (mine === turn) fonts = faces;
-				});
+				loadFaces(engine, at.quill, turn);
 			}
 		}
 		syncNotes();
