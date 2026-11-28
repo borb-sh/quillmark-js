@@ -15,7 +15,6 @@ import {
 	press,
 	settle,
 	summaries,
-	summaryTexts,
 	unmountAll
 } from '../helpers/surface.svelte.js';
 

@@ -3,7 +3,6 @@
 // card's fields are, so a field moved into a group keeps its row; a record's cells pack
 // wherever they are short.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync } from 'svelte';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
 import { field, mountEditor, openRow, unmountAll } from '../helpers/surface.svelte.js';
 

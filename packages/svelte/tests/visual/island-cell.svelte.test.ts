@@ -7,7 +7,6 @@
 // own quill: a record list with a block prose cell, and a number whose commit
 // re-derives.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync } from 'svelte';
 import type { Document } from '@quillmark/wasm';
 import { core, quillFromYaml } from '../helpers/fixtures.js';
 import {

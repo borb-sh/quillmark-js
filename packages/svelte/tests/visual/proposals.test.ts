@@ -12,7 +12,6 @@ const between = (edit: (answer: Document, base: Document) => void) => {
 	let n = 0;
 	return { base, ...proposalsBetween(quill(), base, answer, () => `p${n++}`) };
 };
-const texts = (list: string[]) => list.map((text) => ({ text, codec: 'plain' }));
 
 describe('a body', () => {
 	it('takes a block rewritten or taken out by its id, with what the writer read', () => {

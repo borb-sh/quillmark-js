@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
 import { blockSchema, bodyKeymap, decode } from '$lib/core/codec';
-import { md, startOf, endOf, run, shape, keyDriver } from './_util.js';
+import { md, startOf, endOf, run, keyDriver } from './_util.js';
 
 const keys = bodyKeymap(blockSchema);
 const { press, expectPress } = keyDriver(keys);

@@ -4,7 +4,7 @@
 // the way between places in the document and places in the copy.
 import { describe, it, expect, afterEach } from 'vitest';
 import type { Document } from '@quillmark/wasm';
-import type { ReviewDrawn, ReviewEvent, ReviewItem } from '$lib/visual';
+import type { ReviewDrawn, ReviewEvent } from '$lib/visual';
 import { proposalsBetween } from '$lib/visual/proposals';
 import { quill, example } from '../helpers/fixtures.js';
 import { mountEditor, settle, unmountAll } from '../helpers/surface.svelte.js';

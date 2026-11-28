@@ -3,7 +3,7 @@
 // A selection across items of one list moves them together. The number an item draws
 // is its position, so a move renumbers and writes nothing else. At the list's edge the
 // key declines: an item leaving its list is a different edit.
-import type { Node as PMNode, Schema } from 'prosemirror-model';
+import type { Schema } from 'prosemirror-model';
 import type { Command } from 'prosemirror-state';
 import { isList } from './list-node.js';
 import { LIST_KEYS } from './shortcuts.js';

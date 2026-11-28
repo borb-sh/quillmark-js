@@ -6,7 +6,6 @@
 // flattening back. The reference quill declares none of these shapes, so the probe is
 // its own quill.
 import { describe, it, expect, afterEach } from 'vitest';
-import { flushSync } from 'svelte';
 import type { Content, Document } from '@quillmark/wasm';
 import { core, quillFromYaml, literal } from '../helpers/fixtures.js';
 import {
