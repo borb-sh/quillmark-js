@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**`build` writes no `latest.json`.** The file held the format alone, so a reader of format 1 refused the artifact with the upgrade named; that reader now meets a missing file. A host rule naming `latest.json` under a built quiver names nothing.
+
 ## v0.39.0 - 2026-10-29
 
 **A built quiver is `quiver.json` and one `.quill` bundle per quill, its fonts inside it.** `build` writes `<name>@<x.y.z>.<digest>.quill`, the zip Quillmark specifies as a quill's one file, `Quill.yaml` at its root, and writes no `fonts/`; a `quiver.json` entry carries no `fonts`. `quiver.json` and `latest.json` state format 3, so a reader of format 2 refuses the artifact naming the upgrade, and this one refuses a format-2 artifact naming the rebuild (MIGRATION.md). A font two quills or versions carry is in both bundles.

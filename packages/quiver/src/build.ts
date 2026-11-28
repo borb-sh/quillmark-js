@@ -8,7 +8,7 @@ import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, isAbsolute, resolve } from 'node:path';
 import { QuiverError, transport } from './errors.js';
 import { BUNDLE_EXTENSION, packFiles } from './bundle.js';
-import { FORMAT, INDEX, LEGACY_POINTER } from './format.js';
+import { FORMAT, INDEX } from './format.js';
 import { isFont } from './signature.js';
 import { isDraft } from './semver.js';
 import { scanSourceQuiver, readQuillTree } from './source-loader.js';
@@ -78,11 +78,10 @@ function assertSafeOutDir(sourceDir: string, outDir: string): void {
 /**
  * Reads a Source Quiver, validates it, and writes the build output to outDir.
  *
- * Output layout. Every name but the two JSON documents carries the SHA-256 of what it
+ * Output layout. Every name but `quiver.json` carries the SHA-256 of what it
  * names, which is what makes it safe to cache forever:
  *   outDir/
  *     quiver.json                         # the format and the catalog
- *     latest.json                         # the format alone, for a reader of format 1
  *     <name>@<version>.<sha256:32>.quill  # one `.quill` bundle per quill, fonts and all
  *
  * A generation is assembled beside outDir and moved in whole, so a reader
@@ -199,10 +198,9 @@ export async function buildQuiver(
 			quills
 		};
 
-		await transport(`Failed to write "${join(outDir, INDEX)}" or its legacy pointer`, async () => {
-			await writeFile(join(stage, INDEX), JSON.stringify(index, null, 2), 'utf-8');
-			await writeFile(join(stage, LEGACY_POINTER), JSON.stringify({ format: FORMAT }), 'utf-8');
-		});
+		await transport(`Failed to write "${join(outDir, INDEX)}"`, () =>
+			writeFile(join(stage, INDEX), JSON.stringify(index, null, 2), 'utf-8')
+		);
 
 		// `prev` is cleared first: a rename onto a non-empty directory fails, and the
 		// tree left by an interrupted run is one.

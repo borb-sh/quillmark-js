@@ -2,13 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { checkServerStore, type Caller } from '../src/conformance.js';
 import { localLog } from '../src/local.js';
-import {
-	type Appended,
-	type Checkpoint,
-	type Opened,
-	type SessionLog,
-	type Version
-} from '../src/session.js';
+import { type Appended, type Opened, type SessionLog } from '../src/session.js';
 
 const MAX = 1 << 12;
 
@@ -17,8 +11,6 @@ interface Room {
 	entries: { update: Uint8Array; author: string; key?: string }[];
 	touched: number;
 	present: Map<number, number>;
-	checkpoints: Checkpoint[];
-	versions: Version[];
 }
 
 /** A server store held in memory: the reference the check is written against. */
@@ -26,11 +18,7 @@ function memoryStore() {
 	const rooms = new Map<string, Room>();
 	const roomOf = (name: string) => {
 		let room = rooms.get(name);
-		if (!room)
-			rooms.set(
-				name,
-				(room = { entries: [], touched: 0, present: new Map(), checkpoints: [], versions: [] })
-			);
+		if (!room) rooms.set(name, (room = { entries: [], touched: 0, present: new Map() }));
 		return room;
 	};
 	const byClientZero = (update: Uint8Array) =>
@@ -49,7 +37,6 @@ function memoryStore() {
 				room.opened = undefined;
 				room.entries = [];
 				room.present.clear();
-				room.checkpoints = [];
 			},
 			async append(epoch, update, opts = {}): Promise<Appended> {
 				if (caller.role !== 'writer') throw new Error('readers do not append');
@@ -79,14 +66,6 @@ function memoryStore() {
 					...(present.length ? { leader: Math.min(...present) } : {})
 				};
 			},
-			async checkpoint(epoch, checkpoint) {
-				if (isOpen(epoch)) room.checkpoints.push(checkpoint);
-			},
-			checkpoints: async (epoch) => (isOpen(epoch) ? room.checkpoints : undefined),
-			async keepVersion(version) {
-				room.versions.push(version);
-			},
-			versions: async () => room.versions,
 			subscribe: () => () => {},
 			load: async () => undefined,
 			save: async () => false

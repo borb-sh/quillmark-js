@@ -43,47 +43,12 @@ import { inserts, project, type Projection } from './project.js';
 import { unrepaired } from './repaired.js';
 import { withoutAnchors, writeContent, type Mint } from './write.js';
 import { deltaOf, type Delta } from './delta.js';
-import { commonRun } from './lines.js';
-import type { Grain } from './words.js';
 
 /** A change to the composable card list, by index, as the Document takes it. */
 export type CardOp =
 	| { op: 'insert'; at: number }
 	| { op: 'remove'; at: number }
 	| { op: 'move'; from: number; to: number };
-
-/**
- * The card operations that take a list of `count` cards to the one `from` describes: for each
- * card of the new list, the index of the old card it is, or `null` for an inserted one, as
- * `writer.reviseDocument`'s receipt reports. Removals come first, highest index first. The kept
- * cards that stay put are the longest run the old and new orders share, picked as `changesSince`
- * and `writeFrom`'s conflict check pick it, so the update moves exactly the cards they read as
- * moved. Every other kept card is moved once and every inserted card inserted, each placed after
- * the card before it in the new list. Throws `RangeError` when `from` names a card twice or one
- * past `count`.
- */
-export function cardOps(from: readonly (number | null)[], count: number): CardOp[] {
-	const kept = from.filter((i): i is number => i !== null);
-	const named = new Set(kept);
-	if (named.size < kept.length || kept.some((i) => !Number.isInteger(i) || i < 0 || i >= count))
-		throw new RangeError(`cardOps: from names a card twice or one past ${count} cards`);
-	const ops: CardOp[] = [];
-	for (let i = count - 1; i >= 0; i--) if (!named.has(i)) ops.push({ op: 'remove', at: i });
-
-	const list = [...kept].sort((x, y) => x - y);
-	const stays = new Set(commonRun(list.map(String), kept.map(String)).map(([i]) => list[i]));
-	const key = (j: number) => from[j] ?? -1 - j;
-	from.forEach((i, j) => {
-		if (i !== null && stays.has(i)) return;
-		const at = i === null ? -1 : list.indexOf(i);
-		if (at >= 0) list.splice(at, 1);
-		const to = j === 0 ? 0 : list.indexOf(key(j - 1)) + 1;
-		list.splice(to, 0, key(j));
-		if (i === null) ops.push({ op: 'insert', at: to });
-		else ops.push({ op: 'move', from: at, to });
-	});
-	return ops;
-}
 
 /** A card by its place in the Document: the main card, or a composable card's index. */
 export type CardRef = 'main' | number;
@@ -141,11 +106,6 @@ export interface DocumentBinding {
 type Form = 'content' | 'value';
 
 export function bindDocument(opts: BindDocumentOpts): DocumentBinding {
-	return bindWith(opts, 'char');
-}
-
-/** `bindDocument` writing at `grain`: a write from a revision writes whole words. */
-export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding {
 	const { doc, quill, ydoc } = opts;
 	const origin = Symbol('quillmark-collab');
 	const mint = minter(ydoc);
@@ -218,14 +178,14 @@ export function bindWith(opts: BindDocumentOpts, grain: Grain): DocumentBinding 
 	 *  repair that inserts: it reads it through `repair`. */
 	function writeField(root: string, content: Content): Map<string, string> {
 		const types = contentTypes(ydoc, root);
-		if (leader || !inserting.has(root)) return writeContent(types, content, mint, grain);
+		if (leader || !inserting.has(root)) return writeContent(types, content, mint);
 		const raw = readField(types);
 		const projection = project(raw);
 		if (!projection.repairs.some(inserts)) {
 			inserting.delete(root);
-			return writeContent(types, content, mint, grain);
+			return writeContent(types, content, mint);
 		}
-		return writeContent(types, unrepaired(raw, projection.content, content), mint, grain);
+		return writeContent(types, unrepaired(raw, projection.content, content), mint);
 	}
 
 	// ── Document → Y ─────────────────────────────────────────────────────────
@@ -792,7 +752,7 @@ const isContent = (v: unknown): v is Content =>
 
 const CARD_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
-export function formOf(type: string): Form {
+function formOf(type: string): Form {
 	const base = type.endsWith('?') ? type.slice(0, -1) : type;
 	return base === 'richtext' || base === 'text' ? 'content' : 'value';
 }

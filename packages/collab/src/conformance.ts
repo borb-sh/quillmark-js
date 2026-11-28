@@ -1,14 +1,12 @@
 // The checks a server `SessionLog` passes before a room's clients trust it. Nothing in a Y update
 // says who made it or whether they may, so a store on a server holds what the client's word
 // cannot: who an entry is by, who may append, how large an update is, and the seed's client id.
-// It also holds what every client relies on: a leader elected from the clients present, its
-// checkpoints until the session ends, and its versions past every session.
+// It also holds what every client relies on: a leader elected from the clients present.
 //
 // `checkServerStore` runs each check against fresh rooms of the host's store, reached as the
 // callers it names, and answers what failed, empty when the store conforms. It takes no test
 // runner: a host asserts the answer is empty in its own.
 import * as Y from 'yjs';
-import { sameBytes } from './shape.js';
 import type { SessionLog } from './session.js';
 
 /** Who reaches the store: an id the store authenticated, and whether they may only read. */
@@ -77,29 +75,6 @@ export async function checkServerStore(opts: ServerStoreOpts): Promise<string[]>
 		if (leader !== 3 && leader !== 5) return `the leader is ${leader}, which touched nothing`;
 	});
 
-	await check('a checkpoint lasts its session', async (room) => {
-		const log = opts.store(room, ann);
-		const { epoch } = await log.open(seed, QUILL);
-		await log.checkpoint(epoch, { count: 0, snapshot: SNAPSHOT });
-		const kept = (await log.checkpoints(epoch)) ?? [];
-		if (!kept.some((c) => c.count === 0 && sameBytes(c.snapshot, SNAPSHOT)))
-			return 'the checkpoint was not kept';
-		await log.end(epoch);
-		if ((await log.checkpoints(epoch)) !== undefined)
-			return 'an ended session still has checkpoints';
-	});
-
-	await check('a version outlives its session', async (room) => {
-		const log = opts.store(room, ann);
-		const { epoch } = await log.open(seed, QUILL);
-		const version = { label: 'draft', stored: '{}', at: 1 };
-		await log.keepVersion(version);
-		await log.end(epoch);
-		const kept = await log.versions();
-		if (!kept.some((v) => v.label === version.label && v.stored === version.stored))
-			return 'the version did not outlive the session';
-	});
-
 	await check('a reader appends nothing', async (room) => {
 		const { epoch } = await opts.store(room, ann).open(seed, QUILL);
 		const read = opts.store(room, bo);
@@ -143,7 +118,6 @@ export async function checkServerStore(opts: ServerStoreOpts): Promise<string[]>
 }
 
 const QUILL = 'q@1.0.0';
-const SNAPSHOT = Y.encodeSnapshot(Y.emptySnapshot);
 
 /** A session seed, written by client id 0 as `seedDocument` writes one. */
 function seedUpdate(text = 'seed'): Uint8Array {

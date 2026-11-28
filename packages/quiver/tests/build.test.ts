@@ -62,16 +62,6 @@ describe('buildQuiver — happy path (sample-quiver fixture)', () => {
 
 		expect((await indexOf(out)).format).toBe(FORMAT);
 	});
-
-	it('leaves a reader of format 1 the format and nothing more', async () => {
-		// What that reader fetches first and reads `format` off before anything else, so it
-		// refuses the artifact with the upgrade named.
-		const out = await fresh();
-		await buildQuiver(SAMPLE_FIXTURE, out);
-
-		const pointer = JSON.parse(await readFile(join(out, 'latest.json'), 'utf-8')) as unknown;
-		expect(pointer).toEqual({ format: FORMAT });
-	});
 });
 
 describe('buildQuiver — one .quill bundle per quill, fonts and all', () => {
@@ -96,7 +86,7 @@ describe('buildQuiver — one .quill bundle per quill, fonts and all', () => {
 			expect(files['fonts/font.ttf']).toEqual(shared);
 		}
 		expect((await readdir(out)).sort()).toEqual(
-			['latest.json', 'quiver.json', ...quills.map((q) => q['bundle'] as string)].sort()
+			['quiver.json', ...quills.map((q) => q['bundle'] as string)].sort()
 		);
 	});
 

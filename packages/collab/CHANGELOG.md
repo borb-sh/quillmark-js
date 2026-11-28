@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+**Breaking: `SessionLog` drops `checkpoint`, `checkpoints`, `keepVersion` and `versions`, and `Session` drops `snapshot` and `apply`.** They served the server-side writes from a revision and named versions, which no release exported and nothing called; that code is gone, with the `Checkpoint` and `Version` types. `checkServerStore` no longer checks a store for checkpoints or versions, and a store may drop the four methods.
+
 A binding reads `quill.schema` once rather than per card on every push and pull, and `localLog` reads its stored updates on an append only when the log has grown past `compactAt`.
 
 ## v0.6.0 - 2026-11-24

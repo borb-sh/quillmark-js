@@ -9,10 +9,3 @@ export const INDEX = 'quiver.json';
  * `fonts/`.
  */
 export const FORMAT = 3;
-
-/**
- * What a reader of format 1 fetches first. It reads `format` off it before anything else,
- * so a file carrying this format and nothing more is refused there with the upgrade named,
- * rather than as a missing file. No reader of this format reads it.
- */
-export const LEGACY_POINTER = 'latest.json';
